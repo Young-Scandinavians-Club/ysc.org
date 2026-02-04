@@ -275,6 +275,36 @@ make dev-setup
 
 This command will take a few minutes the first time as it downloads Docker images and compiles dependencies.
 
+### Seeded Development Data
+
+The `make dev-setup` command automatically seeds your database with test data for development. This includes:
+
+#### Default Admin User
+
+You can log in immediately with the default admin account:
+
+**Email**: `admin@ysc.org`  
+**Password**: `very_secure_password`
+
+This account has full administrative access to the application.
+
+#### Other Seeded Data
+
+The seeds also create:
+- **10 active members** with various membership types (single and family)
+- **5 pending members** awaiting approval
+- **3 rejected applications**
+- **User notes** on various accounts (for testing the notes feature)
+- **Sample posts** with images
+- **Sample events** (both past and upcoming, free and paid)
+- **Event ticket tiers** and agendas
+- **Tahoe cabin rooms** with images
+- **Social media links** (Instagram, Facebook, Discord)
+
+All seeded users (except admin) follow the pattern:
+- **Email**: `firstname_lastname_N@ysc.org` (e.g., `karl_andersson_0@ysc.org`)
+- **Password**: `very_secure_password` (same as admin)
+
 ### Start the Development Server
 
 ```bash

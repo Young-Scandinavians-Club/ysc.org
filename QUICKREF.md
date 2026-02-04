@@ -17,6 +17,15 @@ make dev
 open http://localhost:4000
 ```
 
+### Default Login Credentials
+
+After running `make dev-setup`, you can log in with the seeded admin account:
+
+**Email**: `admin@ysc.org`
+**Password**: `very_secure_password`
+
+Other test users follow the pattern `firstname_lastname_N@ysc.org` (all with the same password).
+
 ### Stopping Your Development Session
 
 ```bash
@@ -35,6 +44,7 @@ make shell            # Open an IEx shell with the app loaded
 ```
 
 **Note:** `make dev` now includes automatic checks for:
+
 - Environment variables (Stripe credentials)
 - Docker containers (PostgreSQL, LocalStack)
 - Database connection
@@ -238,18 +248,21 @@ open http://localhost:4000/dev/mailbox
 ### Common Email Tests
 
 **Registration email:**
+
 ```bash
 # Register at http://localhost:4000/users/register
 # Check http://localhost:4000/dev/mailbox
 ```
 
 **Password reset:**
+
 ```bash
 # Go to http://localhost:4000/users/reset-password
 # Check /dev/mailbox for reset link
 ```
 
 **Event/Ticket confirmation:**
+
 ```bash
 # Purchase ticket or register for event
 # Check /dev/mailbox for confirmation
@@ -257,10 +270,10 @@ open http://localhost:4000/dev/mailbox
 
 ### Email Systems Comparison
 
-| System | URL | Purpose |
-|--------|-----|---------|
+| System             | URL                               | Purpose                                  |
+| ------------------ | --------------------------------- | ---------------------------------------- |
 | **Swoosh Mailbox** | http://localhost:4000/dev/mailbox | App emails (registration, tickets, etc.) |
-| **Mailpit** | http://localhost:8025 | Newsletter emails from Keila |
+| **Mailpit**        | http://localhost:8025             | Newsletter emails from Keila             |
 
 **Tip**: Use Swoosh mailbox for app emails, Mailpit for newsletter testing.
 

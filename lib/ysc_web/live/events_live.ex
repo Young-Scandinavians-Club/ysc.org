@@ -70,13 +70,43 @@ defmodule YscWeb.EventsLive do
               <p class="text-sm text-zinc-600 leading-relaxed mb-4">
                 Join our community to see what members are planning informally.
               </p>
-              <.link
-                navigate={~p"/news"}
-                class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-blue-600 transition-colors"
-              >
-                Read Club News
-                <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
-              </.link>
+              <div class="space-y-3">
+                <.link
+                  navigate={~p"/news"}
+                  class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-blue-600 transition-colors"
+                >
+                  Read Club News
+                  <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
+                </.link>
+                <div class="border-t border-zinc-100 pt-3">
+                  <p class="text-xs text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
+                    Community Chat
+                  </p>
+                  <div class="flex flex-col gap-2">
+                    <a
+                      href="https://discord.gg/ysc"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-blue-600 transition-colors"
+                    >
+                      <.icon
+                        name="hero-chat-bubble-left-right"
+                        class="w-4 h-4 me-2"
+                      /> Discord
+                    </a>
+                    <a
+                      :if={@current_user}
+                      href="#"
+                      class="inline-flex items-center text-sm font-bold text-zinc-400 cursor-not-allowed"
+                      title="WhatsApp link coming soon"
+                    >
+                      <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
+                      WhatsApp
+                      <span class="ml-2 text-xs text-zinc-400">(Coming Soon)</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           </aside>
         </div>

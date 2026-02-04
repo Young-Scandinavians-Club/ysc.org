@@ -180,6 +180,25 @@ defmodule YscWeb.ContactLive do
             </a>
 
             <a
+              href="mailto:web@ysc.org"
+              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
+            >
+              <div class="flex items-start gap-3">
+                <.icon
+                  name="hero-computer-desktop"
+                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+                />
+                <div>
+                  <h3 class="font-bold text-zinc-900 mb-1">Web</h3>
+                  <p class="text-sm text-zinc-600">
+                    Sign in or website related issues.
+                  </p>
+                  <p class="text-sm text-blue-600 mt-2">web@ysc.org</p>
+                </div>
+              </div>
+            </a>
+
+            <a
               href="mailto:info@ysc.org"
               class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
             >

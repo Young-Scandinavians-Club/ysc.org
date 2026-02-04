@@ -47,6 +47,7 @@ ysc-redesign-ex/
 ├── docs/
 │   ├── TROUBLESHOOTING.md              # Detailed troubleshooting
 │   ├── DEVELOPMENT_ARCHITECTURE.md     # System architecture
+│   ├── SEED_DATA_REFERENCE.md          # Complete seed data reference
 │   │
 │   └── [other project docs]/           # Additional documentation
 │       ├── LEDGER_SYSTEM_README.md
@@ -107,6 +108,15 @@ make preflight
 # Get help
 make help
 ```
+
+## Default Login Credentials
+
+After running `make dev-setup`, you can immediately log in:
+
+**Email**: `admin@ysc.org`  
+**Password**: `very_secure_password`
+
+See [SEED_DATA_REFERENCE.md](SEED_DATA_REFERENCE.md) for complete details on all seeded test data (users, events, posts, etc.).
 
 ## Support Resources
 
