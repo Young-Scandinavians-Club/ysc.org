@@ -93,10 +93,9 @@ defmodule Ysc.SettingsTest do
       assert Repo.get!(SiteSetting, setting.id).value == "new"
     end
 
-    test "raises if setting not found" do
-      assert_raise Ecto.NoResultsError, fn ->
-        Settings.update_setting("nonexistent", "value")
-      end
+    test "returns error if setting not found" do
+      assert {:error, :not_found} =
+               Settings.update_setting("nonexistent", "value")
     end
 
     test "updates caches after successful update" do

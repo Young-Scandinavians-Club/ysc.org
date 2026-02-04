@@ -240,7 +240,11 @@ defmodule YscWeb.AdminSettingsLive do
 
   def handle_event("update-settings", %{"settings" => settings}, socket) do
     for {k, v} <- settings do
-      Settings.update_setting(k, Map.get(v, "value"))
+      case Settings.update_setting(k, Map.get(v, "value")) do
+        {:ok, _} -> :ok
+        {:error, :not_found} -> :skip
+        {:error, _} -> :ok
+      end
     end
 
     {:noreply,

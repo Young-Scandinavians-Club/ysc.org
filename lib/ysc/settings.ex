@@ -89,8 +89,16 @@ defmodule Ysc.Settings do
   end
 
   def update_setting(name, value) do
-    current_setting = Repo.get_by!(SiteSetting, name: name)
+    case Repo.get_by(SiteSetting, name: name) do
+      nil ->
+        {:error, :not_found}
 
+      current_setting ->
+        update_setting!(current_setting, name, value)
+    end
+  end
+
+  defp update_setting!(current_setting, name, value) do
     case SiteSetting.site_setting_changeset(current_setting, %{value: value})
          |> Repo.update() do
       {:ok, updated} ->
