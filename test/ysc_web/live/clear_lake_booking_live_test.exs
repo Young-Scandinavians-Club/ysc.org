@@ -1919,6 +1919,78 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     end
   end
 
+  describe "marketing content and image gallery" do
+    test "displays image carousel for logged-in users", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
+
+      # Image carousel should be present
+      assert html =~ "clear-lake-experience-carousel"
+      assert html =~ "Clear Lake Cabin Exterior"
+    end
+
+    test "shows winter bedding information for logged-in users", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
+
+      # Winter bedding info should be clear
+      assert html =~ "Indoor beds are set up in the cabin during winter months"
+      assert html =~ "bring your own linens"
+    end
+
+    test "shows community treasure messaging instead of dugnad", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
+
+      # Should show positive community messaging
+      assert html =~ "Community Treasure" or html =~ "Member Sanctuary"
+      # Should NOT contain dugnad or chore references
+      refute html =~ "dugnad"
+      refute html =~ "chore duty"
+    end
+
+    test "shows contact information instead of donate button", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
+
+      # Should show reach out message instead of donate button
+      assert html =~ "Reach out to the club" or html =~ "contact page"
+      # Should NOT have donate now button
+      refute html =~ "Donate Now"
+    end
+
+    test "displays winter season information in packing list", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
+
+      # Packing list should mention linens and bedding
+      assert html =~ "Linens" or html =~ "linens"
+      assert html =~ "comforter" or html =~ "sleeping bag"
+    end
+
+    test "shows year-round access with seasonal details", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
+
+      # Should explain both summer and winter sleeping arrangements
+      assert html =~ "Summer" and html =~ "Winter"
+      assert html =~ "sleeping lawn" or html =~ "under the stars"
+      assert html =~ "Indoor beds"
+    end
+  end
+
   # Helper function for finding next weekday
   defp find_next_weekday(date, target_day_of_week) do
     current_day = Date.day_of_week(date)

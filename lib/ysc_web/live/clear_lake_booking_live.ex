@@ -1404,23 +1404,23 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </h3>
                 <p class="text-zinc-700 leading-relaxed">
                   <strong class="text-amber-700">Summer (May–Sept):</strong>
-                  Legendary dock parties, community meals, and boat tie-ups.
+                  Legendary dock parties, community meals, and boat tie-ups. Sleep under the stars on our outdoor sleeping lawn with mattresses provided (bring sleeping bags).
                   <strong class="text-amber-700">Winter (Oct–April):</strong>
-                  Perfect for hikers and wine enthusiasts seeking quiet lakeside retreats.
+                  Cozy indoor beds are set up in the cabin (bring your own linens and comforter). Perfect for warm, comfortable lakeside retreats.
                 </p>
               </div>
             </div>
           </div>
-          <!-- The Dugnad Spirit -->
+          <!-- Community Owned -->
           <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div class="flex items-start gap-4">
               <div class="text-4xl flex-shrink-0">🤝</div>
               <div class="flex-1">
                 <h3 class="text-xl font-black text-zinc-900 mb-2">
-                  The Dugnad Spirit
+                  A Community Treasure
                 </h3>
                 <p class="text-zinc-700 leading-relaxed">
-                  Low rates are possible because members steward the cabin together. This is <strong class="text-purple-700">your cabin — not a hotel</strong>. Members share responsibility for cleaning and maintenance, keeping costs affordable for everyone.
+                  Owned and operated by our members since 1963. <strong class="text-purple-700">Your cabin, your getaway</strong>. Low rates and authentic experiences made possible through our cooperative spirit.
                 </p>
               </div>
             </div>
@@ -1483,6 +1483,35 @@ defmodule YscWeb.ClearLakeBookingLive do
               <p>
                 Imagine waking up to the mist rolling off Clear Lake, coffee in hand on a <strong>private 100-foot dock</strong>, with the dormant peak of Mt. Konocti as your backdrop. This isn't just a rental; it's a 60-year tradition of Scandinavian lakeside living.
               </p>
+            </div>
+            <!-- Photo Gallery -->
+            <div class="my-12 py-8">
+              <YscWeb.Components.ImageCarousel.image_carousel
+                id="clear-lake-experience-carousel"
+                images={[
+                  %{
+                    src: ~p"/images/clear_lake/clear_lake_main.webp",
+                    alt: "Clear Lake Cabin Exterior"
+                  },
+                  %{
+                    src: ~p"/images/clear_lake/clear_lake_dock.webp",
+                    alt: "Private Dock on Clear Lake"
+                  },
+                  %{
+                    src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+                    alt: "Dock View at Sunset"
+                  },
+                  %{
+                    src: ~p"/images/clear_lake/clear_lake_sweep.webp",
+                    alt: "Lake Views"
+                  },
+                  %{
+                    src: ~p"/images/clear_lake/clear_lake_cabin.webp",
+                    alt: "Cabin Interior"
+                  }
+                ]}
+                class="rounded-2xl overflow-hidden shadow-2xl"
+              />
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12">
@@ -1813,9 +1842,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <.icon name="hero-sparkles" class="w-6 h-6 text-teal-600" />
                 </div>
                 <div>
-                  <h4 class="font-bold text-zinc-900">The Sleeping Lawn</h4>
+                  <h4 class="font-bold text-zinc-900">
+                    Comfortable Sleeping Arrangements
+                  </h4>
                   <p class="text-sm text-zinc-500">
-                    Fall asleep to the sound of crickets and the lake breeze. We provide the mattresses; the stars provide the view.
+                    <strong>Summer:</strong>
+                    Sleep under the stars on our scenic sleeping lawn with provided mattresses (bring sleeping bags).
+                    <strong>Winter:</strong>
+                    Indoor beds are set up in the cabin—bring your own linens, pillowcases, and comforter to stay warm and cozy.
                   </p>
                 </div>
               </div>
@@ -1859,18 +1893,18 @@ defmodule YscWeb.ClearLakeBookingLive do
           <section id="cabin-rules" class="bg-zinc-50 rounded-3xl p-8 lg:p-12 mb-4">
             <div class="max-w-3xl">
               <h2 class="text-3xl font-bold text-zinc-900 mb-4">
-                Living the Nordic Way
+                Your Stay, Your Way
               </h2>
               <p class="text-zinc-600 mb-10 leading-relaxed">
-                Since 1963, our cabin has operated on mutual respect and shared effort. To keep the legacy alive, we ask all members to follow these standards.
+                Since 1963, our cabin has been a place of relaxation and connection. Here's what you need to know for the perfect getaway.
               </p>
 
               <div class="space-y-4">
                 <details class="group bg-white border border-zinc-200 rounded-xl transition-all">
                   <summary class="p-5 cursor-pointer font-bold flex justify-between items-center list-none hover:text-teal-700">
                     <span class="flex items-center gap-3">
-                      <span class="text-xl">🤝</span>
-                      <span>Community & Kids</span>
+                      <span class="text-xl">🌊</span>
+                      <span>Lake Life & Activities</span>
                     </span>
                     <.icon
                       name="hero-chevron-down"
@@ -1879,20 +1913,20 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </summary>
                   <div class="px-5 pb-5 text-base text-zinc-600 space-y-3 border-t border-zinc-50 pt-4">
                     <p>
-                      <strong>Dugnad (Chore Duty):</strong>
-                      Everyone signs up for a daily task upon arrival. This is how we keep costs low and the cabin clean.
+                      <strong>Private Dock Access:</strong>
+                      Enjoy swimming, boating, and fishing from our exclusive 100-foot dock. Perfect for morning coffee on the water or sunset views.
                     </p>
                     <p>
-                      <strong>Midnight Silence:</strong>
-                      Quiet hours begin at midnight unless it's a sanctioned party weekend.
+                      <strong>Peaceful Atmosphere:</strong>
+                      We maintain quiet hours starting at midnight to ensure everyone can enjoy restful nights by the lake.
                     </p>
                     <p>
-                      <strong>Families:</strong>
-                      Most weekends are family-friendly; check specific event descriptions for "Adults Only" gatherings.
+                      <strong>Family-Friendly:</strong>
+                      Most weekends welcome families and guests of all ages. Check specific event descriptions for any age restrictions.
                     </p>
                     <p>
-                      <strong>Non-Member Guests:</strong>
-                      Guests are welcome on general visits, but all guests must be included in and paid for by the member making the reservation. Certain events may have guest restrictions—check event details for specifics.
+                      <strong>Bring Your Guests:</strong>
+                      Non-member guests are welcome! All guests must be included in your reservation. Check event details for any specific restrictions.
                     </p>
                   </div>
                 </details>
@@ -1901,7 +1935,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <summary class="p-5 cursor-pointer font-bold flex justify-between items-center list-none hover:text-teal-700">
                     <span class="flex items-center gap-3">
                       <span class="text-xl">⚓</span>
-                      <span>The Grounds & Water</span>
+                      <span>Property & Water Access</span>
                     </span>
                     <.icon
                       name="hero-chevron-down"
@@ -1910,17 +1944,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </summary>
                   <div class="px-5 pb-5 text-sm text-zinc-600 space-y-4 border-t border-zinc-50 pt-4">
                     <p>
-                      <strong>Strictly No Pets:</strong>
-                      To protect local wildlife and maintain cleanliness, pets are not permitted anywhere on property.
+                      <strong>No Pets Policy:</strong>
+                      To protect local wildlife and maintain a pristine environment, pets are not permitted on the property.
                     </p>
                     <p>
-                      <strong>Boating:</strong>
-                      Mooring at our private dock is free for members. Please notify the Cabin Master in advance.
+                      <strong>Boating & Dock Access:</strong>
+                      Members enjoy free mooring at our private dock. Please notify the Cabin Master in advance.
                       <em>Note: trailers must be parked off-site.</em>
                     </p>
                     <div class="p-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
                       <strong>⚠️ Quagga Mussel Warning:</strong>
-                      Mandatory inspection is required. Violations result in a $1,000 fine from Lake County.
+                      Mandatory boat inspection required. Violations result in a $1,000 fine from Lake County.
                     </div>
                   </div>
                 </details>
@@ -1980,7 +2014,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               Owned by Members, Loved by All
             </h2>
             <p class="text-zinc-600 mb-6 leading-relaxed">
-              This isn't a hotel—it's a collective treasure. Since 1963, we've kept costs low and the quality high through <strong>Dugnad</strong>: the Nordic tradition of "shared effort." Everyone pitches in for one small chore a day, ensuring the cabin stays beautiful for the next generation.
+              This isn't a hotel—it's a collective treasure. Since 1963, we've maintained this lakeside sanctuary through our <strong>cooperative community</strong>. Members share a commitment to preserving this special place, ensuring the cabin stays beautiful and accessible for generations to come.
             </p>
             <.link
               navigate={~p"/code-of-conduct"}
@@ -2016,7 +2050,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     1970s - 90s: Built by Hand
                   </h4>
                   <p class="text-base text-zinc-500 leading-relaxed">
-                    Generations of members spent their weekends on "Dugnad" (work parties), building the kitchen, the social hall, and the iconic private dock.
+                    Generations of members spent their weekends building the kitchen, the social hall, and the iconic private dock—creating a lasting legacy of community and craftsmanship.
                   </p>
                 </div>
 
@@ -2025,7 +2059,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                   <h4 class="font-bold text-zinc-900">Today: Your Turn</h4>
                   <p class="text-base text-zinc-500 leading-relaxed">
-                    As a member-run treasure, the cabin remains a place where we share meals, chores, and the best sunset views on the lake.
+                    As a member-run treasure, the cabin remains a place where we share meals, connection, and the best sunset views on the lake. Your visit helps preserve this legacy for future generations.
                   </p>
                 </div>
                 <div :if={@user} class="relative pl-10">
@@ -2043,44 +2077,25 @@ defmodule YscWeb.ClearLakeBookingLive do
         <!-- Right Sidebar -->
         <aside class="space-y-8">
           <div class="sticky top-24 space-y-8">
-            <!-- Your Stay Card -->
-            <div class="bg-white border-2 border-zinc-900 rounded-2xl overflow-hidden shadow-xl">
-              <div class="bg-zinc-900 px-6 py-4">
-                <h3 class="font-bold text-white">Your Stay</h3>
-              </div>
-              <div class="p-6 space-y-4">
-                <div class="flex justify-between text-base">
-                  <span class="text-zinc-500">Lakeside Dock</span>
-                  <span class="font-bold text-teal-600">Included</span>
-                </div>
-                <div class="flex justify-between text-base">
-                  <span class="text-zinc-500">Group Kitchen</span>
-                  <span class="font-bold text-teal-600">Included</span>
-                </div>
-                <div class="flex justify-between text-base border-t border-zinc-50 pt-4">
-                  <span class="text-zinc-500">Check-in</span>
-                  <span class="font-bold text-zinc-900">3:00 PM</span>
-                </div>
-                <div class="flex justify-between text-base">
-                  <span class="text-zinc-500">Check-out</span>
-                  <span class="font-bold text-zinc-900">11:00 AM</span>
-                </div>
-              </div>
-              <div class="px-6 pb-6">
-                <button class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-teal-600/20">
-                  Check Availability
-                </button>
-              </div>
-            </div>
             <!-- The Packing List Card -->
             <div class="bg-teal-900 rounded-2xl p-8 text-white">
               <h3 class="text-lg font-bold mb-6">The Packing List</h3>
               <ul class="space-y-4 text-sm text-teal-100">
-                <li class="flex items-center gap-3">
-                  <span class="text-teal-400">●</span> Sleeping bag & Pillow
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 mt-0.5">●</span>
+                  <div>
+                    <span class="block">Linens & Bedding</span>
+                    <span class="text-xs text-teal-300">
+                      Sheets, pillowcases, comforter/sleeping bag
+                    </span>
+                  </div>
                 </li>
-                <li class="flex items-center gap-3">
-                  <span class="text-teal-400">●</span> Dancing Shoes
+                <li class="flex items-start gap-3">
+                  <span class="text-teal-400 mt-0.5">●</span>
+                  <div>
+                    <span class="block">Towels</span>
+                    <span class="text-xs text-teal-300">Bath & beach towels</span>
+                  </div>
                 </li>
                 <li class="flex items-center gap-3">
                   <span class="text-teal-400">●</span> Reusable Water Bottle
@@ -2102,19 +2117,26 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Clear Lake is the oldest lake in North America, offering a unique ecosystem for bird watching and fishing year-round.
                 </p>
                 <p>
-                  <strong class="text-white">The "Dugnad" Spirit:</strong>
-                  Everything you see was built or maintained by members. We don't just stay here; we steward it.
+                  <strong class="text-white">A Member Sanctuary:</strong>
+                  Everything you see was built and is maintained by our community. We don't just stay here; we preserve and cherish it together.
                 </p>
               </div>
             </div>
             <!-- Winter Travel Tip Card -->
             <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 shadow-sm">
               <h3 class="text-lg font-bold mb-3 flex items-center gap-2 text-amber-900">
-                <span class="text-xl">🍂</span> Winter Travel Tip
+                <span class="text-xl">❄️</span> Winter Season (Oct–April)
               </h3>
-              <p class="text-base text-amber-800 leading-relaxed">
-                The lake air gets chilly! We recommend bringing an extra wool blanket and a pair of indoor slippers (a true Scandinavian tradition) to keep cozy in the Social Hall after dark.
-              </p>
+              <div class="space-y-3">
+                <p class="text-base text-amber-900 leading-relaxed font-semibold">
+                  <span class="inline-block mr-1">🛏️</span>
+                  Indoor beds are set up in the cabin during winter months!
+                </p>
+                <p class="text-sm text-amber-800 leading-relaxed">
+                  <strong>Bring your own:</strong>
+                  Sheets, pillowcases, comforter or sleeping bag, and towels. We also recommend an extra wool blanket and indoor slippers (a true Scandinavian tradition) to keep cozy in the Social Hall.
+                </p>
+              </div>
             </div>
           </div>
         </aside>
@@ -2147,14 +2169,16 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-6">
-              <a
-                href="#donate"
-                class="bg-amber-600 text-white px-8 py-3 rounded-xl font-black hover:bg-amber-700 transition shadow-lg shadow-amber-200"
-              >
-                Donate Now
-              </a>
-              <div class="text-base text-amber-800 italic flex items-center">
+            <div class="bg-white border-2 border-amber-200 rounded-xl p-6 shadow-sm">
+              <p class="text-base text-amber-900 leading-relaxed mb-2">
+                <strong>
+                  Interested in contributing to the Dock Revival Project?
+                </strong>
+              </p>
+              <p class="text-sm text-zinc-600 leading-relaxed mb-3">
+                Reach out to the club through our contact page to learn more about donation options and legacy tiers.
+              </p>
+              <div class="text-sm text-amber-800 italic flex items-center">
                 <.icon name="hero-heart" class="w-5 h-5 mr-2" />
                 The club matches all member donations!
               </div>
