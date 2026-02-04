@@ -106,11 +106,28 @@ Contributions to this project are managed by the web tech group. Here's the gene
 1.  **Create a branch**: Create a new branch from `main` for your feature or bug fix. Use a descriptive name (e.g., `feature/add-dark-mode` or `fix/login-bug`).
 2.  **Make your changes**: Implement your changes, following the project's coding style and conventions.
 3.  **Write tests**: Add tests to cover any new functionality or bug fixes.
-4.  **Run tests**: Make sure the entire test suite passes by running `make test`.
-5.  **Lint your code**: Ensure your code is well-formatted and free of linting errors by running `make lint`.
-6.  **Submit a pull request**: Open a pull request from your branch to the `main` branch. Provide a clear description of your changes and why they are needed.
+4.  **Run preflight checks**: Before committing, run `make preflight` to ensure all CI checks pass locally.
+5.  **Submit a pull request**: Open a pull request from your branch to the `main` branch. Provide a clear description of your changes and why they are needed.
 
 A team member will review your pull request. Thank you for your contribution!
+
+### Before You Commit
+
+**Always run `make preflight` before pushing your code!** This command runs all the same checks that will run in CI (GitHub Actions), catching issues early:
+
+```bash
+make preflight
+```
+
+This single command will:
+- Compile your code with warnings as errors
+- Check code formatting
+- Run Credo (strict mode)
+- Run Sobelow security audit
+- Audit dependencies for vulnerabilities
+- Run the complete test suite with coverage
+
+If all checks pass, your code is ready to push. If any check fails, you'll get clear feedback on what needs to be fixed.
 
 ### Testing QuickBooks Integration
 
@@ -161,6 +178,17 @@ To test QuickBooks integration locally, you'll need to configure QuickBooks sand
 
 The project includes several useful make targets for development:
 
+#### Pre-Commit Checks
+
+- **`make preflight`** - **Run this before every commit!** Executes all CI checks locally:
+  - Compiles code with warnings as errors
+  - Checks code formatting
+  - Runs Credo in strict mode
+  - Runs Sobelow security audit
+  - Audits dependencies for vulnerabilities
+  - Runs complete test suite with coverage
+  - If all checks pass, your code is ready to push to CI
+
 #### Code Quality
 
 - **`make format`** - Format all Elixir code using the project's formatter
@@ -173,7 +201,7 @@ The project includes several useful make targets for development:
 
 - **`make test`** or **`make tests`** - Run the full test suite
   - Automatically starts PostgreSQL if needed
-  - Runs all tests with trace output
+  - Runs all tests with coverage
 - **`make test-failed`** - Run only tests that failed in the previous test run
   - Useful for iterating on failing tests
 
