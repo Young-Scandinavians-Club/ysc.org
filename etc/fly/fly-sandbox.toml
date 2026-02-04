@@ -1,0 +1,62 @@
+# fly.toml app configuration file generated for ysc-sandbox on 2025-11-14T08:35:48-08:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'ysc-sandbox'
+primary_region = 'sjc'
+kill_signal = 'SIGTERM'
+
+[build]
+
+[deploy]
+release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} /app/bin/migrate && /app/bin/seed'"
+
+[env]
+ENVIRONMENT = 'sandbox'
+APP_ENV = 'sandbox'
+PHX_HOST = 'ysc-sandbox.fly.dev'
+PHX_SERVER = 'true'
+PORT = '4000'
+ERL_AFLAGS = '-proto_dist inet6_tcp'
+ECTO_IPV6 = 'true'
+LOG_LEVEL = 'debug'
+FLOWROUTE_FORCE_ENABLE = 'true'
+STRIPE_SINGLE_PRICE_ID = 'price_1SUZVAREiftrEncLCHpFzbJY'
+STRIPE_FAMILY_PRICE_ID = 'price_1SUZVcREiftrEncLSSYnzi6N'
+EMAIL_FROM = "info+sandbox@ysc.org"
+EMAIL_FROM_NAME = "YSC Test Sandbox"
+EMAIL_CONTACT = "info+sandbox@ysc.org"
+EMAIL_ADMIN = "admin+sandbox@ysc.org"
+EMAIL_MEMBERSHIP = "membership+sandbox@ysc.org"
+EMAIL_BOARD = "board+sandbox@ysc.org"
+EMAIL_VOLUNTEER = "volunteer+sandbox@ysc.org"
+EMAIL_TAHOE = "tahoe+sandbox@ysc.org"
+EMAIL_CLEAR_LAKE = "clearlake+sandbox@ysc.org"
+QUICKBOOKS_BASE_URL = "https://sandbox-quickbooks.api.intuit.com/v3"
+QUICKBOOKS_REALM_ID = "9341455772023176"
+QUICKBOOKS_APP_ID = "f746318b-1165-4e61-b808-3134e5c3afcc"
+QUICKBOOKS_BANK_ACCOUNT_ID = "35"
+QUICKBOOKS_STRIPE_ACCOUNT_ID = "1150040000"
+EXPENSE_REPORTS_BUCKET_NAME = "ysc-sandbox-expense-reports-2"
+
+[http_service]
+internal_port = 4000
+force_https = true
+auto_stop_machines = 'stop'
+auto_start_machines = true
+min_machines_running = 0
+processes = ['app']
+
+[metrics]
+port = 4000
+path = "/metrics"
+
+[http_service.concurrency]
+type = 'connections'
+hard_limit = 1000
+soft_limit = 1000
+
+[[vm]]
+size = 'shared-cpu-1x'
+memory = 512

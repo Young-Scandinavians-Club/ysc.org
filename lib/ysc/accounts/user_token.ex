@@ -1,4 +1,10 @@
 defmodule Ysc.Accounts.UserToken do
+  @moduledoc """
+  User token schema and utilities.
+
+  Defines the UserToken database schema for authentication tokens including
+  remember me tokens and email confirmation tokens.
+  """
   use Ecto.Schema
   import Ecto.Query
   alias Ysc.Accounts.UserToken
@@ -15,6 +21,7 @@ defmodule Ysc.Accounts.UserToken do
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
+  @timestamps_opts [type: :utc_datetime]
   schema "users_tokens" do
     field :token, :binary
     field :context, :string
@@ -118,7 +125,9 @@ defmodule Ysc.Accounts.UserToken do
         query =
           from token in by_token_and_context_query(hashed_token, context),
             join: user in assoc(token, :user),
-            where: token.inserted_at > ago(^days, "day") and token.sent_to == user.email,
+            where:
+              token.inserted_at > ago(^days, "day") and
+                token.sent_to == user.email,
             select: user
 
         {:ok, query}
@@ -152,7 +161,8 @@ defmodule Ysc.Accounts.UserToken do
 
         query =
           from token in by_token_and_context_query(hashed_token, context),
-            where: token.inserted_at > ago(@change_email_validity_in_days, "day")
+            where:
+              token.inserted_at > ago(@change_email_validity_in_days, "day")
 
         {:ok, query}
 

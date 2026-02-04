@@ -1,0 +1,30 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>New Membership Application Awaiting Review</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej Board Members,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">This email is to inform you that a new membership application has been received for the Young Scandinavians Club.</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Applicant Name:</strong> <%= @applicant_name %></mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Application Date:</strong> <%= @submission_date %></mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Membership Director, please review this application at your earliest convenience and take the appropriate next steps according to our bylaws.</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">You can access the application here:</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @review_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Review Application → </mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Please let the board know if you have any questions or need to discuss.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thanks!</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

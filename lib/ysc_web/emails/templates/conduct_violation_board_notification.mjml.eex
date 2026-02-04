@@ -1,0 +1,98 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#d32f2f" font-size="32px" line-height="1.25" padding="0px">
+      <strong>⚠️ New Conduct Violation Report</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Dear YSC Board Members,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      A new conduct violation report has been submitted and requires immediate board review.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" color="#d32f2f">
+      <strong>Report Details:</strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px">
+      <strong>Reporter:</strong> <%= @first_name %> <%= @last_name %><br/>
+      <strong>Email:</strong> <%= @email %><br/>
+      <strong>Phone:</strong> <%= @phone %><br/>
+      <strong>Report ID:</strong> <%= @report_id %><br/>
+      <strong>Submitted:</strong> <%= @submitted_at %>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" background-color="<%= if @anonymous, do: "#fff3cd", else: "#e7f3ff" %>" border-radius="4px" border="2px solid <%= if @anonymous, do: "#ffc107", else: "#1976d2" %>" color="<%= if @anonymous, do: "#856404", else: "#004085" %>">
+      <strong>🔒 Anonymity Request:</strong> <%= if @anonymous, do: "YES - The reporter has requested to remain anonymous to the parties involved.", else: "NO - The reporter has not requested anonymity." %><br/><br/>
+      <strong>Important:</strong> <%= if @anonymous, do: "While the reporter's identity is visible to the board for follow-up purposes, their name and contact information must NOT be shared with the parties involved in the incident. This is a critical confidentiality requirement.", else: "The reporter has not requested anonymity, but all reports should still be handled with discretion and confidentiality." %>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Violation Summary:</strong>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" font-style="italic" line-height="1.6" padding="20px" background-color="#fff8e1" border-radius="6px" border="2px solid #ffc107" color="#424242">
+      <%= @summary %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Required Actions:</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="0px">
+      <ul style="margin: 0; padding-left: 20px;">
+        <li style="margin-bottom: 8px;">Review the report details carefully and confidentially</li>
+        <li style="margin-bottom: 8px;">Determine appropriate investigation steps</li>
+        <li style="margin-bottom: 8px;">Contact the reporter if additional information is needed</li>
+        <li style="margin-bottom: 0;">Follow YSC Code of Conduct procedures for resolution</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Important Notes:</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="0px">
+      <ul style="margin: 0; padding-left: 20px;">
+        <li style="margin-bottom: 8px;">This report is confidential and should only be discussed among board members</li>
+        <li style="margin-bottom: 8px;">All parties involved have the right to privacy and fair treatment</li>
+        <li style="margin-bottom: 8px;">Document all actions taken in response to this report</li>
+        <li style="margin-bottom: 0;">Follow up with the reporter regarding the outcome when appropriate</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Please access the admin dashboard to view additional details and manage this report:
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-button href="<%= admin_dashboard_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Admin Dashboard →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="12px" line-height="1.5" padding="0px" color="#666" align="center">
+      This is an automated notification. Please do not reply to this email.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

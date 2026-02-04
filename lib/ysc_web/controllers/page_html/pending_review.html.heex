@@ -1,0 +1,55 @@
+<div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+  <div class="max-w-xl mx-auto lg:mx-0 prose prose-zinc prose-a:text-blue-600 pb-10">
+    <.icon name="hero-document-magnifying-glass" class="h-16 w-16" />
+
+    <h2>
+      Your Membership Application is Under Review
+    </h2>
+
+    <p class="font-bold">
+      Application submitted on:
+      <span class="mx-1 bg-blue-100 text-blue-800 text-sm font-medium me-2 px-2 py-1 rounded">
+        <%= Timex.format!(
+          @application_submitted_date,
+          "{YYYY}-{0M}-{0D}"
+        ) %> (<%= @time_delta %>)
+      </span>
+    </p>
+
+    <p>
+      The YSC board will review your membership application as soon as possible and let you know the outcome via email. If your application is approved, you will be able to access the website and pay your membership dues online. Only after your membership is paid will your account be moved to active member status, enabling cabin bookings and event ticket purchases.
+    </p>
+
+    <ul>
+      <li>
+        <strong>Review Process:</strong>
+        Our board will review your application as soon as possible. We typically aim to make decisions within 2 weeks.
+      </li>
+      <li>
+        <strong>Communication:</strong>
+        We will let you know the outcome of your application via email.
+      </li>
+      <li>
+        <strong>Membership Approval:</strong>
+        If your application is approved, you can access the website and pay your membership dues. After payment is completed, your account will be activated as a member, which enables booking cabins and purchasing event tickets.
+      </li>
+    </ul>
+
+    <h3>
+      Haven't heard from us in a while?
+    </h3>
+
+    <p>
+      If you haven't heard from us within 4 weeks, please feel free to reach out to us at <.link
+        class="hover:underline"
+        href="mailto:membership@ysc.org"
+      >membership@ysc.org</.link>. We're always happy to answer any questions you may have.
+    </p>
+
+    <h3>We hope to see you soon!</h3>
+
+    <p>
+      We're excited to welcome you to the Young Scandinavians Club! In the meantime, please feel free to explore our website and learn more about our upcoming events and activities.
+    </p>
+  </div>
+</div>

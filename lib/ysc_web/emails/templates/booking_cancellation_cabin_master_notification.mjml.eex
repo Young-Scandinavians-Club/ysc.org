@@ -1,0 +1,122 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Booking Cancellation Notification</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">A booking at <%= @booking.property %> has been cancelled.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Important Notice -->
+    <%= if @requires_review do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" css-class="yellow-alert-box" background-color="#FEF3C7" border-left="4px solid #F59E0B" border-radius="6px">
+      <strong>⚠️ Review Required:</strong> This cancellation requires admin review due to refund policy. Please review the refund request.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% else %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" css-class="green-alert-box" background-color="#F0FDF4" border-left="4px solid #10B981" border-radius="6px">
+      <strong>✓ Processed Automatically:</strong> This cancellation has been processed automatically. The refund (if applicable) has been initiated and no action is required from you.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Booking Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Booking Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Booking Reference:</strong>
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
+        <%= @booking.reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Property:</strong> <%= @booking.property %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-in:</strong> <%= @booking.checkin_date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-out:</strong> <%= @booking.checkout_date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <%
+        adults_count = @booking.guests_count
+        total_guests = @booking.guests_count + (@booking.children_count || 0)
+      %>
+      <strong>Guests:</strong>
+      <%= if adults_count > 0 do %>
+        <%= adults_count %> <%= if adults_count == 1, do: "adult", else: "adults" %>
+      <% end %>
+      <%= if (@booking.children_count || 0) > 0 do %>
+        <%= if adults_count > 0, do: ", ", else: "" %><%= @booking.children_count %> <%= if @booking.children_count == 1, do: "child", else: "children" %>
+      <% end %>
+      <span style="color: #6B7280;"> (Total: <%= total_guests %> <%= if total_guests == 1, do: "guest", else: "guests" %>)</span>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- User Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">User Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Name:</strong> <%= @user.name %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Email:</strong> <%= @user.email %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Cancellation Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Cancellation Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Cancelled:</strong> <%= @cancellation.date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Reason:</strong> <%= @cancellation.reason %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Payment Details -->
+    <%= if @payment.reference_id != "N/A" do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Payment Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Original Payment:</strong> <%= @payment.amount %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Payment Reference:</strong>
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
+        <%= @payment.reference_id %>
+      </span>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Refund Details -->
+    <%= if @pending_refund do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Policy Refund Amount:</strong> <span style="color: #059669; font-weight: bold;"><%= @pending_refund.policy_refund_amount %></span>
+      <%= if @pending_refund.applied_rule_refund_percentage do %>
+        <span style="color: #6B7280; font-size: 16px;">(<%= @pending_refund.applied_rule_refund_percentage %>% refund)</span>
+      <% end %>
+    </mj-text>
+    <%= if @pending_refund.applied_rule_days_before_checkin do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Policy Rule:</strong> <%= @pending_refund.applied_rule_days_before_checkin %>+ days before check-in
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Action Buttons -->
+    <%= if @requires_review && @review_url do %>
+    <mj-button href="<%= @review_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Review Refund Request →</mj-button>
+    <mj-spacer height="12px"></mj-spacer>
+    <% end %>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#6B7280" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

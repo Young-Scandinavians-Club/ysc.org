@@ -1,0 +1,112 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Expense Report Submitted</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for submitting your expense report. We've received your submission and it's now being processed by our Treasurer.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Expense Report Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Expense Report Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Report ID:</strong>
+      <span class="expense-report-id-badge">
+        <%= @expense_report.id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Purpose:</strong> <%= @expense_report.purpose %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Submitted:</strong> <%= @expense_report.submitted_date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Reimbursement Method:</strong> <%= @expense_report.reimbursement_method %>
+    </mj-text>
+    <%= if @expense_report.event do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Related Event:</strong> <%= @expense_report.event.title %> (<%= @expense_report.event.reference_id %>)
+    </mj-text>
+    <% end %>
+    <%= if @expense_report.bank_account do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Bank Account:</strong> ...<%= @expense_report.bank_account.last_4 %>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Expense Items -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Expense Items</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <%= if length(@expense_report.expense_items) > 0 do %>
+      <%= for item <- @expense_report.expense_items do %>
+      <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" css-class="expense-item-box">
+        <strong><%= item.vendor %></strong><br/>
+        <%= item.description %><br/>
+        <span class="gray-text-inline">Date: <%= item.date %></span><br/>
+        <span class="green-text-bold">Amount: <%= item.amount %></span>
+        <%= if item.has_receipt do %>
+        <br/><span class="green-text">✓ Receipt attached</span>
+        <% end %>
+      </mj-text>
+      <% end %>
+    <% else %>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" css-class="gray-text">No expense items</mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Income Items -->
+    <%= if length(@expense_report.income_items) > 0 do %>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Income Items</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+      <%= for item <- @expense_report.income_items do %>
+      <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" css-class="expense-item-box">
+        <strong><%= item.description %></strong><br/>
+        <span class="gray-text-inline">Date: <%= item.date %></span><br/>
+        <span class="green-text-bold">Amount: <%= item.amount %></span>
+        <%= if item.has_proof do %>
+        <br/><span class="green-text">✓ Proof attached</span>
+        <% end %>
+      </mj-text>
+      <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Totals -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Totals</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Total Expenses:</strong> <%= @expense_report.expense_total %>
+    </mj-text>
+    <%= if length(@expense_report.income_items) > 0 do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Total Income:</strong> <%= @expense_report.income_total %>
+    </mj-text>
+    <% end %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" css-class="net-total-green">
+      <strong>Net Total:</strong> <%= @expense_report.net_total %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @expense_report_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Expense Report →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Next Steps -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong>What's Next?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Your expense report has been submitted and is now being reviewed by our Treasurer</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• You will be notified once your reimbursement has been processed</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, please contact the Treasurer</mj-text>
+    <mj-spacer height="36px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for your submission!</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

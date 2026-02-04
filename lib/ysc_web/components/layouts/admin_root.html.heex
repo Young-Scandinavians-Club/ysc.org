@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" class="[scrollbar-gutter:stable]">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title suffix=" · YSC.org Admin">
+      <%= assigns[:page_title] || "YSC Admin" %>
+    </.live_title>
+    <link
+      phx-track-static
+      rel="stylesheet"
+      href={~p"/assets/app.css"}
+      nonce={@csp_nonce}
+    />
+    <script
+      defer
+      phx-track-static
+      type="text/javascript"
+      src={~p"/assets/app.js"}
+      nonce={@csp_nonce}
+    >
+    </script>
+
+    <link
+      href="https://js.radar.com/v4.4.8/radar.css"
+      rel="stylesheet"
+      nonce={@csp_nonce}
+    />
+    <script src="https://js.radar.com/v4.4.8/radar.min.js" nonce={@csp_nonce}>
+    </script>
+    <script nonce={@csp_nonce}>
+      window.radarPublicKey = "<%= Application.get_env(:ysc, :radar)[:public_key] %>";
+    </script>
+  </head>
+  <body class="antialiased bg-white">
+    <.impersonation_banner
+      :if={assigns[:impersonating?] && @current_user}
+      impersonating?={assigns[:impersonating?]}
+      impersonated_user_name={"#{@current_user.first_name} #{@current_user.last_name}"}
+      impersonated_user_email={@current_user.email}
+    />
+    <div class={[
+      "flex flex-col min-h-screen",
+      assigns[:impersonating?] && "pb-[72px]"
+    ]}>
+      <%= @inner_content %>
+    </div>
+  </body>
+</html>

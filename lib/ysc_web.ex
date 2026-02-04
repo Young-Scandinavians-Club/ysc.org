@@ -17,11 +17,13 @@ defmodule YscWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
+  def static_paths,
+    do:
+      ~w(assets fonts images video exports favicon.ico robots.txt security.txt site.webmanifest favicon-16x16.png favicon-32x32.png apple-touch-icon.png android-chrome-512x512.png android-chrome-192x192.png)
 
   def router do
     quote do
-      use Phoenix.Router, helpers: false
+      use Phoenix.Router, helpers: true
 
       # Import common connection and controller functions to use in pipelines
       import Plug.Conn
@@ -85,6 +87,7 @@ defmodule YscWeb do
       import Phoenix.HTML
       # Core UI components and translation
       import YscWeb.CoreComponents
+      import YscWeb.Components.Autocomplete
       import YscWeb.Gettext
 
       # Shortcut for generating JS commands

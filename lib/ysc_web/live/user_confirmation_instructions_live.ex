@@ -11,7 +11,11 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
         <:subtitle>We'll send a new confirmation link to your inbox</:subtitle>
       </.header>
 
-      <.simple_form for={@form} id="resend_confirmation_form" phx-submit="send_instructions">
+      <.simple_form
+        for={@form}
+        id="resend_confirmation_form"
+        phx-submit="send_instructions"
+      >
         <.input field={@form[:email]} type="email" placeholder="Email" required />
         <:actions>
           <.button phx-disable-with="Sending..." class="w-full">
@@ -21,18 +25,24 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
       </.simple_form>
 
       <p class="text-center mt-4">
-        <.link href={~p"/users/register"}>Register</.link>
-        | <.link href={~p"/users/log_in"}>Log in</.link>
+        <.link navigate={~p"/users/register"}>Register</.link>
+        | <.link navigate={~p"/users/log-in"}>Sign in</.link>
       </p>
     </div>
     """
   end
 
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, form: to_form(%{}, as: "user"))}
+    {:ok,
+     assign(socket, form: to_form(%{}, as: "user"))
+     |> assign(:page_title, "Resend Confirmation Instructions")}
   end
 
-  def handle_event("send_instructions", %{"user" => %{"email" => email}}, socket) do
+  def handle_event(
+        "send_instructions",
+        %{"user" => %{"email" => email}},
+        socket
+      ) do
     if user = Accounts.get_user_by_email(email) do
       Accounts.deliver_user_confirmation_instructions(
         user,

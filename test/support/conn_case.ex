@@ -33,6 +33,8 @@ defmodule YscWeb.ConnCase do
 
   setup tags do
     Ysc.DataCase.setup_sandbox(tags)
+    # Ensure basic site settings exist
+    Ysc.Settings.ensure_settings_exist()
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 

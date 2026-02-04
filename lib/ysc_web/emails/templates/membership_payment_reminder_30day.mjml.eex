@@ -1,0 +1,41 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Final Reminder: Complete Your Membership</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">This is a friendly reminder that your membership application to the Young Scandinavians Club was approved about a month ago, and we'd love to have you complete your membership payment to join our community.</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #FEF3C7; padding: 16px; border-radius: 6px; border-left: 4px solid #F59E0B;">
+      <strong>Your membership approval is still valid!</strong> Complete your payment anytime to unlock all member benefits.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Complete Your Membership Payment → </mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">As a member, you'll have access to:</mj-text>
+    <mj-text font-size="18px" align="left" line-height="1.5">
+      <ul>
+        <li style="padding-bottom: 10px"><strong>Exclusive Events:</strong> Join our vibrant community gatherings, cultural celebrations, and social activities. <a href="<%= @upcoming_events_url %>">View Upcoming Events</a></li>
+        <li style="padding-bottom: 10px"><strong>Cabin Bookings:</strong> Reserve our beautiful Tahoe and Clear Lake properties for your getaways</li>
+        <li><strong>Community Access:</strong> Connect with fellow Scandinavians and build lasting friendships</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We understand that life can get busy, but we'd love to have you as part of our community. If you have any questions or concerns about membership, please don't hesitate to reach out to us.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you're no longer interested in joining, that's okay too - just let us know by replying to this email.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We hope to welcome you to the Young Scandinavians Club soon!</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

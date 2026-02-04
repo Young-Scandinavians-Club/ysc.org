@@ -2,7 +2,9 @@ defmodule YscWeb.ErrorJSONTest do
   use YscWeb.ConnCase, async: true
 
   test "renders 404" do
-    assert YscWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}
+    assert YscWeb.ErrorJSON.render("404.json", %{}) == %{
+             errors: %{detail: "Not Found"}
+           }
   end
 
   test "renders 500" do

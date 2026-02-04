@@ -8,7 +8,7 @@ defmodule YscWeb.UserConfirmationInstructionsLiveTest do
   alias Ysc.Repo
 
   setup do
-    %{user: user_fixture()}
+    %{user: user_fixture(%{phone_number: "+14159098268"})}
   end
 
   describe "Resend confirmation" do
@@ -29,10 +29,14 @@ defmodule YscWeb.UserConfirmationInstructionsLiveTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
                "If your email is in our system"
 
-      assert Repo.get_by!(Accounts.UserToken, user_id: user.id).context == "confirm"
+      assert Repo.get_by!(Accounts.UserToken, user_id: user.id).context ==
+               "confirm"
     end
 
-    test "does not send confirmation token if user is confirmed", %{conn: conn, user: user} do
+    test "does not send confirmation token if user is confirmed", %{
+      conn: conn,
+      user: user
+    } do
       Repo.update!(Accounts.User.confirm_changeset(user))
 
       {:ok, lv, _html} = live(conn, ~p"/users/confirm")
@@ -54,7 +58,9 @@ defmodule YscWeb.UserConfirmationInstructionsLiveTest do
 
       {:ok, conn} =
         lv
-        |> form("#resend_confirmation_form", user: %{email: "unknown@example.com"})
+        |> form("#resend_confirmation_form",
+          user: %{email: "unknown@example.com"}
+        )
         |> render_submit()
         |> follow_redirect(conn, ~p"/")
 

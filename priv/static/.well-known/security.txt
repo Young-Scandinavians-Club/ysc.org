@@ -1,0 +1,8 @@
+# Security Policy
+# See https://www.ietf.org/rfc/rfc9116.txt for the security.txt specification
+
+Contact: mailto:security@ysc.org
+Expires: 2026-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://ysc.org/.well-known/security.txt
+

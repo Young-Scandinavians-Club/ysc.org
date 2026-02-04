@@ -8,13 +8,13 @@ defmodule YscWeb.UserConfirmationLiveTest do
   alias Ysc.Repo
 
   setup do
-    %{user: user_fixture()}
+    %{user: user_fixture(%{phone_number: "+14159098268"})}
   end
 
   describe "Confirm user" do
     test "renders confirmation page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/confirm/some-token")
-      assert html =~ "Confirm Account"
+      assert html =~ "Confirm Email"
     end
 
     test "confirms the given token once", %{conn: conn, user: user} do

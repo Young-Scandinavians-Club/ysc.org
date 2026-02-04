@@ -1,0 +1,357 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Your Stay is Almost Here!</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your stay at our <%= @property_name %> property is <%= if @days_until_checkin == 0 do %>today<% else %><%= if @days_until_checkin == 1 do %>tomorrow<% else %><%= @days_until_checkin %> days away<% end %><% end %>! We're excited to host you.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Door Code Notice - Very Prominent -->
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <div class="door-code-box">
+        <strong class="door-code-title">Your Door Code</strong>
+        <span class="door-code-value"><%= @door_code %></span>
+        <span class="door-code-note">Please save this code - you'll need it to access the property.</span>
+      </div>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Property Location -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Property Location</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Property:</strong> <%= @property_name %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Address:</strong> <%= @property_address %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Check-in and Check-out Times -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Check-in & Check-out Times</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <div class="blue-alert-box">
+        <strong>Check-in:</strong> <%= @checkin_date %> at <strong><%= @checkin_time %></strong>
+      </div>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <div class="blue-alert-box-margin">
+        <strong>Check-out:</strong> <%= @checkout_date %> at <strong><%= @checkout_time %></strong>
+      </div>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Reservation Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Reservation Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Booking Reference:</strong>
+      <span class="booking-reference-badge">
+        <%= @booking_reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Booking Type:</strong> <%= @booking_mode %>
+    </mj-text>
+    <%= if @room_names do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Room(s):</strong> <%= @room_names %>
+    </mj-text>
+    <% end %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Duration:</strong> <%= @nights %> <%= if @nights == 1, do: "night", else: "nights" %>
+    </mj-text>
+    <%= if @is_buyout do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <div class="buyout-text">
+        <strong>Full Property Buyout:</strong> You have the entire property to yourself!
+      </div>
+    </mj-text>
+    <% else %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <%
+        adults_count = @guests_count - (@children_count || 0)
+        total_guests = @guests_count
+      %>
+      <strong>Guests:</strong>
+      <%= if adults_count > 0 do %>
+        <%= adults_count %> <%= if adults_count == 1, do: "adult", else: "adults" %>
+      <% end %>
+      <%= if (@children_count || 0) > 0 do %>
+        <%= if adults_count > 0, do: ", ", else: "" %><%= @children_count %> <%= if @children_count == 1, do: "child", else: "children" %>
+      <% end %>
+      <span class="gray-text"> (Total: <%= total_guests %> <%= if total_guests == 1, do: "guest", else: "guests" %>)</span>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Tahoe-Specific Information -->
+    <%= if @property == "tahoe" do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Important Information for Your Stay</mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+
+    <!-- Critical Reminders -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold" color="#DC2626">
+      Critical Reminders
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="red-alert-box">
+        <strong class="strong-block">BEARS ARE ACTIVE ALL YEAR.</strong> They will get in your car. Lock your car doors ALWAYS.<br/><br/>
+        <strong>No Pets Allowed. No Exceptions.</strong><br/><br/>
+        Ensure your reservation for the number of adults staying is accurate.<br/><br/>
+        Guests must be accompanied by a Member. Members are responsible for ensuring guests know the cabin policies.
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Neighborhood Etiquette -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Neighborhood Etiquette</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="blue-alert-box-large">
+        This is a residential neighborhood. Please be good neighbors!<br/><br/>
+        <ul class="email-list">
+          <li class="email-list-item">Drive slowly.</li>
+          <li class="email-list-item-last">Keep noise down. No outside/deck noise after 10:00 PM.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- What to Bring -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">What to Bring</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="green-alert-box">
+        Please bring your own:<br/><br/>
+        <ul class="email-list">
+          <li class="email-list-item">Top and bottom sheets (Single or Queen)</li>
+          <li class="email-list-item">Warm comforters or sleeping bags (Cabin comforters are decorative only)</li>
+          <li class="email-list-item">Pillows and Towels</li>
+          <li class="email-list-item-last">Newspaper for fire starting</li>
+        </ul>
+        <br/>
+        <em>Note: Bringing your own bedding means you won't have to do laundry before you leave!</em>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- The Bear Wire -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">The Bear Wire</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="yellow-alert-box">
+        <strong>Check Status:</strong> The box to the right of the front door should be clicking. If not, reset it in the fuse box in the laundry room (marked "BW").<br/><br/>
+        <strong>To Deactivate:</strong> Remove top wire first, then 2nd, then 3rd.<br/>
+        <strong>To Reactivate:</strong> Hook bottom wire first, then 2nd, then top.<br/><br/>
+        <strong class="red-text">IMPORTANT:</strong> Make sure all three outside doors have bear wire UP when leaving the cabin and at night.
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Parking -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Parking</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="blue-alert-box-large">
+        <ul class="email-list">
+          <li class="email-list-item">Do not park in front of neighbors' driveways.</li>
+          <li class="email-list-item">Park within the white stripe to leave room for others.</li>
+          <li class="email-list-item-last"><strong>Nov 1st - May 1st:</strong> No parking on the street. You will get a ticket and cause complaints.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Chores & Checkout -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Chores & Checkout</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="green-alert-box">
+        Don't be that person! Clean as you go.<br/><br/>
+        <ul class="email-list">
+          <li class="email-list-item"><strong>Clean Your Space:</strong> Scrub, vacuum, and tidy your rooms, bathrooms, and kitchen before leaving.</li>
+          <li class="email-list-item"><strong>Common Areas:</strong> Don't clutter with personal items. Keep ski boots in the laundry room and skis outside.</li>
+          <li class="email-list-item"><strong>Firewood:</strong> Leave wood and kindling for the next members. Only chop wood at the wood pile (not in the cabin).</li>
+          <li class="email-list-item"><strong>Thermostat:</strong> Set to 50°F at night and when leaving.</li>
+          <li class="email-list-item-last"><strong>Final Check:</strong> Close front blinds, ensure lights are out, and verify bear wire is active.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Garbage & Recycling -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Garbage & Recycling</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="yellow-alert-box">
+        <ul class="email-list">
+          <li class="email-list-item"><strong>Food:</strong> ALL food must be removed from the cabin and secured in the outside Bear Box at the street.</li>
+          <li class="email-list-item"><strong>Trash Schedule:</strong> Set out by Tuesday evening for early Wednesday pickup. Do not park in front of the bear box on Wed mornings.</li>
+          <li class="email-list-item"><strong>Recycling:</strong> Use BLUE trash bags for mixed recycling. Place them inside the bear box next to the cans (not inside the cans).</li>
+          <li class="email-list-item"><strong>Winter:</strong> Help remove snow to allow easy trash removal.</li>
+          <li class="email-list-item-last"><strong>If Full:</strong> You may need to take trash home if cans are full. Ensure the box is completely closed to prevent bear entry.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Final Note from Cabin Master -->
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="gray-alert-box">
+        If it's broken, fix it. If it's messy, clean it. This is your cabin—the better we take care of it, the better we will like being there.<br/><br/>
+        Let me know if anything is unrepaired or needed.<br/><br/>
+        All the best,<br/>
+        <strong>Jesper (Cabin Master)</strong>
+      </div>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+
+    <!-- Clear Lake-Specific Information -->
+    <%= if @property == "clear_lake" do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Important Information for Your Stay</mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+
+    <!-- Before You Arrive -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold" color="#DC2626">
+      Before You Arrive
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="red-alert-box">
+        <ul class="email-list">
+          <li class="email-list-item"><strong>MANDATORY:</strong> Please watch the Clearlake Training Videos (8 short videos) before arrival.</li>
+          <li class="email-list-item"><strong>No Pets:</strong> No dogs, cats, or other pets allowed.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Arrival & Locking Up -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Arrival & Locking Up</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="blue-alert-box-large">
+        <strong>Lockbox Location:</strong> Left side of the single entry door (as you walk across the main grass area).<br/><br/>
+        <strong>Keys:</strong> There are 4 keys in the lockbox. Use them to open all doors and pool storage.<br/><br/>
+        <strong>Lock Everything:</strong> When leaving, you must lock:<br/><br/>
+        <ul class="email-list">
+          <li class="email-list-item">The Cabin</li>
+          <li class="email-list-item">The Pantry</li>
+          <li class="email-list-item">The Pool Room</li>
+          <li class="email-list-item-last">Men's & Women's Bathrooms</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Water & Sprinklers -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Water & Sprinklers (Important!)</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="yellow-alert-box">
+        <strong class="strong-block">SPRINKLERS: THURSDAY MORNINGS</strong>
+        If staying Wed-Thu, move sleeping arrangements off the lawn to the deck or concrete patio. Do not let belongings get water damaged.<br/><br/>
+        <strong>Water Conservation & Usage:</strong><br/>
+        Use the spigot by the lawn entry gate for hosing down the deck or filling pools (non-drinkable water). All other spigots are potable—do not waste fresh water.
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Checklists & Rules -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Checklists & Rules</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="green-alert-box">
+        <strong>Opening & Closing:</strong> In the Cabin Master Room, find the "OPENING" and "CLOSING" checklists. Use these guides to properly open up and shut down the cabin.<br/><br/>
+        <br/><br/>
+        <strong>Sanitization:</strong><br/><br/>
+        <ul class="email-list">
+          <li class="email-list-item">Sanitize all surfaces before and after use.</li>
+          <li class="email-list-item">Wash all dishes and utensils before and after use.</li>
+          <li class="email-list-item-last">Report low cleaning supplies/sanitizer to the Cabin Master.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Kitchen & Cleaning -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Kitchen & Cleaning</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="green-alert-box">
+        <ul class="email-list">
+          <li class="email-list-item"><strong>Deep Clean:</strong> Sanitize range top, ovens, and counter tops.</li>
+          <li class="email-list-item"><strong>Dishwasher:</strong> Empty BEFORE departure.</li>
+          <li class="email-list-item-last"><strong>Supplies:</strong> Located under the kitchen sink and behind the men's bathroom entry door.</li>
+        </ul>
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Packing & Parking -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Packing & Parking</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="blue-alert-box-large">
+        <strong>What to Bring:</strong> Sleeping bag, pillow, towels, tent (if needed).<br/><br/>
+        <strong>Mats:</strong> Sleeping mats are available in the storage room next to the pool toy room. Sanitize/wipe down before and after use. Stack neatly upon departure.<br/><br/>
+        <strong>Parking:</strong> Park parallel in the lot along the water line. Do not block the driveway or neighbors' spots.
+      </div>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+
+    <!-- Final Note from Cabin Master -->
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="gray-alert-box">
+        Please be considerate of others. It is everyone's responsibility to keep the cabin clean and inviting.<br/><br/>
+        Enjoy your stay!<br/><br/>
+        <strong>Dave Conroy</strong><br/>
+        Your Clearlake Cabin Master<br/>
+        <a href="tel:415-298-4206" class="email-link">415-298-4206</a>
+      </div>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+
+    <!-- View Booking Button -->
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Cabin Master Contact -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong>Questions or Need Help?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you have any questions or need help, please reach out to the Cabin Master:</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <%= if @cabin_master_name do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Cabin Master:</strong> <%= @cabin_master_name %>
+    </mj-text>
+    <% end %>
+    <%= if @cabin_master_email do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Email:</strong> <a href="mailto:<%= @cabin_master_email %>" class="email-link"><%= @cabin_master_email %></a>
+    </mj-text>
+    <% end %>
+    <%= if @cabin_master_phone do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Phone:</strong> <a href="tel:<%= @cabin_master_phone %>" class="email-link"><%= @cabin_master_phone %></a>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We look forward to hosting you at our <%= @property_name %> property!</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Vi ses snart! (See you soon!) 👋</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

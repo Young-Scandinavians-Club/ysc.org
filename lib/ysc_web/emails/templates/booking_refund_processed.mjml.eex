@@ -1,0 +1,99 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Booking Refund Processed</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your booking refund has been processed successfully. The refund amount will be credited back to your original payment method within 5-10 business days.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Refund Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold;"><%= @refund_amount %></span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Refund Date:</strong> <%= @refund_date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Refund Reference:</strong>
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
+        <%= @refund.reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Reason:</strong> <%= @refund.reason %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Booking Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Booking Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Booking Reference:</strong>
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
+        <%= @booking.reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Property:</strong> <%= @booking.property %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-in:</strong> <%= @booking.checkin_date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-out:</strong> <%= @booking.checkout_date %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <%
+        adults_count = @booking.guests_count
+        total_guests = @booking.guests_count + (@booking.children_count || 0)
+      %>
+      <strong>Guests:</strong>
+      <%= if adults_count > 0 do %>
+        <%= adults_count %> <%= if adults_count == 1, do: "adult", else: "adults" %>
+      <% end %>
+      <%= if (@booking.children_count || 0) > 0 do %>
+        <%= if adults_count > 0, do: ", ", else: "" %><%= @booking.children_count %> <%= if @booking.children_count == 1, do: "child", else: "children" %>
+      <% end %>
+      <span style="color: #6B7280;"> (Total: <%= total_guests %> <%= if total_guests == 1, do: "guest", else: "guests" %>)</span>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Payment Details -->
+    <%= if @payment.reference_id != "N/A" do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Payment Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Original Payment:</strong> <%= @payment.amount %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Payment Reference:</strong>
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
+        <%= @payment.reference_id %>
+      </span>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Next Steps -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong>What's Next?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The refund will be processed to your original payment method</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• It may take 5-10 business days for the refund to appear in your account</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, contact the Cabin Master or reach out to us at <a href="mailto:info@ysc.org">info@ysc.org</a>.</mj-text>
+    <mj-spacer height="36px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for your understanding.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

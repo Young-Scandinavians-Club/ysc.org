@@ -1,0 +1,4 @@
+<figure>
+  <img src={@src} alt={if @caption != "", do: @caption, else: "Image"} />
+  <figcaption :if={@caption != ""}><%= @caption %></figcaption>
+</figure>

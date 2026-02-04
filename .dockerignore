@@ -1,0 +1,15 @@
+_build/
+deps/
+assets/node_modules/
+test/
+.git/
+.gitignore
+etc/
+.dockerignore
+.elixir_ls/
+docs/
+erl_crash.dump
+*.dump
+.formatter.exs
+.formatterignore
+.python-version

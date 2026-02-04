@@ -1,0 +1,88 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#1976d2" font-size="32px" line-height="1.25" padding="0px">
+      <strong>🎉 New Volunteer Signup</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Dear YSC Board Members,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      A new volunteer signup has been submitted and is ready for review.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" color="#1976d2">
+      <strong>Volunteer Details:</strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px" padding="16px">
+      <strong>Name:</strong> <%= @name %><br/>
+      <strong>Email:</strong> <%= @email %><br/>
+      <strong>Volunteer ID:</strong> <%= @volunteer_id %><br/>
+      <strong>Submitted:</strong> <%= @submitted_at %>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Volunteer Interests:</strong>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="20px" background-color="#e3f2fd" border-radius="6px" border="2px solid #1976d2" color="#424242">
+      <%= if Enum.empty?(@interests) do %>
+        No specific interests selected
+      <% else %>
+        <ul style="margin: 0; padding-left: 20px;">
+          <%= for interest <- @interests do %>
+            <li style="margin-bottom: 8px;"><%= interest %></li>
+          <% end %>
+        </ul>
+      <% end %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Next Steps:</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="0px">
+      <ul style="margin: 0; padding-left: 20px;">
+        <li style="margin-bottom: 8px;">Review the volunteer's interests and contact information</li>
+        <li style="margin-bottom: 8px;">Reach out to discuss volunteer opportunities that match their interests</li>
+        <li style="margin-bottom: 8px;">Coordinate with relevant committee leads if needed</li>
+        <li style="margin-bottom: 0;">Follow up with the volunteer within a reasonable timeframe</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Please access the admin dashboard to view additional details and manage this volunteer signup:
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-button href="<%= admin_dashboard_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Admin Dashboard →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="12px" line-height="1.5" padding="0px" color="#666" align="center">
+      This is an automated notification. Please do not reply to this email.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

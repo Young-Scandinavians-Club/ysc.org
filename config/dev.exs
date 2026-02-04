@@ -19,14 +19,27 @@ config :ysc, Ysc.Repo,
 config :ysc, YscWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4000],
+  http: [
+    ip: {0, 0, 0, 0},
+    port: 4000,
+    protocol_options: [
+      # LiveView Native can generate large query strings (interface metadata).
+      # Raise request-line limit in dev to avoid 414 responses while iterating.
+      max_request_line_length: 64_000
+    ]
+  ],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "HVfMgcL35fAJz7aiwv581CSXDiPTWHDuSQcqIL4gkkPomNfXjUo4MENFgQ1U4sZF",
+  secret_key_base:
+    "HVfMgcL35fAJz7aiwv581CSXDiPTWHDuSQcqIL4gkkPomNfXjUo4MENFgQ1U4sZF",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]},
+    esbuild:
+      {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
+  ],
+  live_reload: [
+    web_console_logger: true
   ]
 
 # ## SSL Support
@@ -56,9 +69,13 @@ config :ysc, YscWeb.Endpoint,
 config :ysc, YscWeb.Endpoint,
   live_reload: [
     patterns: [
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg|swiftui\.styles)$",
+      ~r"assets/js/.*(js)$",
+      ~r"assets/css/.*(css)$",
       ~r"priv/gettext/.*(po)$",
-      ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$"
+      ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$",
+      ~r"lib/ysc_web/(live|components)/.*neex$",
+      ~r"lib/ysc_web/styles/.*(ex|neex|heex)$"
     ]
   ]
 
@@ -77,3 +94,89 @@ config :phoenix, :plug_init_mode, :runtime
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+config :ex_aws,
+  access_key_id: "dummy",
+  secret_access_key: "fake",
+  debug_requests: true,
+  s3: [
+    scheme: "http://",
+    host: "media.s3.localhost.localstack.cloud",
+    port: "4566"
+  ]
+
+config :ysc,
+  expense_reports_s3_bucket: "expense-reports",
+  membership_plans: [
+    %{
+      id: :single,
+      name: "Single",
+      interval: "year",
+      amount: 45,
+      currency: "usd",
+      trial_period_days: 0,
+      stripe_price_id: "price_1SIE3vRMG501eq4FsxHj8mZQ",
+      statement_descriptor: "Single Membership",
+      description: "Membership just for yourself",
+      metadata: %{
+        "plan_type" => "membership",
+        "interval" => "year"
+      }
+    },
+    %{
+      id: :family,
+      name: "Family",
+      interval: "year",
+      amount: 65,
+      currency: "usd",
+      trial_period_days: 0,
+      stripe_price_id: "price_1SIE4lRMG501eq4FscHCTXOl",
+      statement_descriptor: "Family Membership",
+      description: "For you, your Spouse and your children under 18",
+      metadata: %{
+        "plan_type" => "membership",
+        "interval" => "year"
+      }
+    }
+  ]
+
+config :ysc, :keila,
+  api_url: "http://localhost:4001",
+  api_key: "h4ANq5tAf4fLTW1HpjSc1nszdCpcKOxBsLbnxe8-XDs",
+  project_id: "np_weLJnLY5",
+  form_id: "nfrm_BzLMaLXv"
+
+# Include HEEx debug annotations as HTML comments in rendered markup
+config :phoenix_live_view, :debug_heex_annotations, true
+
+config :live_view_native_stylesheet,
+  annotations: true,
+  pretty: true
+
+# Native iOS API Key Configuration
+# Default API key for development (can be overridden via NATIVE_API_KEY env var)
+config :ysc, :native_api_key, System.get_env("NATIVE_API_KEY") || "development"
+
+# OAuth Configuration for development
+# Set these via environment variables or use test values
+config :ueberauth, Ueberauth.Strategy.Google.OAuth,
+  client_id: System.get_env("GOOGLE_CLIENT_ID") || "dev_google_client_id",
+  client_secret:
+    System.get_env("GOOGLE_CLIENT_SECRET") || "dev_google_client_secret"
+
+config :ueberauth, Ueberauth.Strategy.Facebook.OAuth,
+  client_id: System.get_env("FACEBOOK_CLIENT_ID") || "dev_facebook_client_id",
+  client_secret:
+    System.get_env("FACEBOOK_CLIENT_SECRET") || "dev_facebook_client_secret"
+
+# Wax (WebAuthn) configuration for development
+#
+# RP ID: "localhost" (development only - each environment has separate passkeys)
+# Origin: Must match the actual origin where the app runs
+#
+# Note: For production subdomain sharing, set WEBAUTHN_RP_ID environment variable
+# to the base domain (e.g., "ysc.org") to allow passkeys to work across subdomains
+config :wax_,
+  rp_id: "localhost",
+  origin: "http://localhost:4000",
+  attestation: "none"

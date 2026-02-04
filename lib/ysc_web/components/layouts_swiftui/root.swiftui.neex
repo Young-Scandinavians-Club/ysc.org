@@ -1,0 +1,14 @@
+<.csrf_token />
+<Style url={~p"/assets/app.swiftui.styles"} />
+<NavigationStack
+  class="kiosk-bg"
+  style={[
+    "frame(maxWidth: .infinity, maxHeight: .infinity)"
+  ]}
+>
+  <VStack class="bg-secondary-system-background" style={[
+    "frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"
+  ]}>
+    <%= @inner_content %>
+  </VStack>
+</NavigationStack>

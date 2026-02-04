@@ -5,10 +5,14 @@ defmodule YscWeb.ErrorHTMLTest do
   import Phoenix.Template
 
   test "renders 404.html" do
-    assert render_to_string(YscWeb.ErrorHTML, "404", "html", []) == "Not Found"
+    html = render_to_string(YscWeb.ErrorHTML, "404", "html", [])
+    assert html =~ "404"
+    assert html =~ "Page not found"
   end
 
   test "renders 500.html" do
-    assert render_to_string(YscWeb.ErrorHTML, "500", "html", []) == "Internal Server Error"
+    html = render_to_string(YscWeb.ErrorHTML, "500", "html", [])
+    assert html =~ "500"
+    assert html =~ "Internal Server Error"
   end
 end

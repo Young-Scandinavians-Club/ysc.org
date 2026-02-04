@@ -2,11 +2,21 @@ defmodule YscWeb.UserResetPasswordLive do
   use YscWeb, :live_view
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.AuthService
+  alias Ysc.Accounts.UserNotifier
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm">
-      <.header class="text-center">Reset Password</.header>
+    <div class="max-w-sm mx-auto py-10">
+      <.link
+        navigate={~p"/"}
+        class="flex items-center text-center justify-center py-10 hover:opacity-80 transition duration-200 ease-in-out"
+      >
+        <.ysc_logo class="h-28" />
+      </.link>
+      <.header class="text-center">
+        Reset Your Password
+      </.header>
 
       <.simple_form
         for={@form}
@@ -14,32 +24,38 @@ defmodule YscWeb.UserResetPasswordLive do
         phx-submit="reset_password"
         phx-change="validate"
       >
-        <.error :if={@form.errors != []}>
-          Oops, something went wrong! Please check the errors below.
-        </.error>
-
-        <.input field={@form[:password]} type="password" label="New password" required />
+        <.input
+          field={@form[:password]}
+          type="password-toggle"
+          label="New password"
+          required
+        />
         <.input
           field={@form[:password_confirmation]}
-          type="password"
+          type="password-toggle"
           label="Confirm new password"
           required
         />
         <:actions>
-          <.button phx-disable-with="Resetting..." class="w-full">Reset Password</.button>
+          <.button phx-disable-with="Resetting..." class="w-full">
+            Reset Password
+          </.button>
         </:actions>
       </.simple_form>
 
       <p class="text-center text-sm mt-4">
-        <.link href={~p"/users/register"}>Register</.link>
-        | <.link href={~p"/users/log_in"}>Log in</.link>
+        <.link href={~p"/users/log-in"}>Sign in</.link>
       </p>
     </div>
     """
   end
 
   def mount(params, _session, socket) do
-    socket = assign_user_and_token(socket, params)
+    remote_ip =
+      get_connect_info(socket, :peer_data) |> Map.get(:address, {0, 0, 0, 0})
+
+    socket =
+      assign(socket, :remote_ip, remote_ip) |> assign_user_and_token(params)
 
     form_source =
       case socket.assigns do
@@ -50,27 +66,50 @@ defmodule YscWeb.UserResetPasswordLive do
           %{}
       end
 
-    {:ok, assign_form(socket, form_source), temporary_assigns: [form: nil]}
+    {:ok,
+     assign_form(socket, form_source) |> assign(:page_title, "Reset Password"),
+     temporary_assigns: [form: nil]}
   end
 
-  # Do not log in the user after reset password to avoid a
+  # Do not sign in the user after reset password to avoid a
   # leaked token giving the user access to the account.
   def handle_event("reset_password", %{"user" => user_params}, socket) do
-    case Accounts.reset_user_password(socket.assigns.user, user_params) do
-      {:ok, _} ->
+    ip = socket.assigns[:remote_ip] || {0, 0, 0, 0}
+
+    case Ysc.AuthRateLimit.check_ip(ip) do
+      {:error, :rate_limited, _} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Password reset successfully.")
-         |> redirect(to: ~p"/users/log_in")}
+         |> put_flash(:error, "Too many attempts. Please try again later.")
+         |> redirect(to: ~p"/users/log-in")}
 
-      {:error, changeset} ->
-        {:noreply, assign_form(socket, Map.put(changeset, :action, :insert))}
+      :ok ->
+        do_reset_password(socket, user_params)
     end
   end
 
   def handle_event("validate", %{"user" => user_params}, socket) do
     changeset = Accounts.change_user_password(socket.assigns.user, user_params)
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+  end
+
+  defp do_reset_password(socket, user_params) do
+    case Accounts.reset_user_password(socket.assigns.user, user_params) do
+      {:ok, user} ->
+        # Log successful password reset
+        AuthService.log_password_reset_success(socket.assigns.user, socket)
+
+        # Send password changed notification
+        UserNotifier.deliver_password_changed_notification(user)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Password reset successfully.")
+         |> redirect(to: ~p"/users/log-in")}
+
+      {:error, changeset} ->
+        {:noreply, assign_form(socket, Map.put(changeset, :action, :insert))}
+    end
   end
 
   defp assign_user_and_token(socket, %{"token" => token}) do

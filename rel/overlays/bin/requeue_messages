@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+cd -P -- "$(dirname -- "$0")"
+exec ./ysc eval "Ysc.Release.requeue_failed_messages()"
+

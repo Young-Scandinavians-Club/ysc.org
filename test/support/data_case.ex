@@ -18,26 +18,59 @@ defmodule Ysc.DataCase do
 
   using do
     quote do
+      use Oban.Testing, repo: Ysc.Repo
+
       alias Ysc.Repo
 
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
       import Ysc.DataCase
+      import Mox
     end
   end
 
   setup tags do
-    Ysc.DataCase.setup_sandbox(tags)
-    :ok
+    owner = Ysc.DataCase.setup_sandbox(tags)
+    # Ensure basic site settings exist, unless the test explicitly opts out
+    unless tags[:skip_settings_setup] do
+      Ysc.Settings.ensure_settings_exist()
+    end
+
+    {:ok, sandbox_owner: owner}
   end
 
   @doc """
   Sets up the sandbox based on the test tags.
+  Returns the owner PID so it can be passed to concurrent tasks.
   """
   def setup_sandbox(tags) do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Ysc.Repo, shared: not tags[:async])
+    pid =
+      Ecto.Adapters.SQL.Sandbox.start_owner!(Ysc.Repo, shared: not tags[:async])
+
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    pid
+  end
+
+  @doc """
+  Allows a process to checkout its own database connection from the sandbox.
+  This is necessary for concurrent tests using Task.async_stream where each
+  task needs its own connection for proper database locking behavior.
+
+  When async: true, you must pass the owner PID from the test context.
+  When async: false, the owner is available from Repo.config()[:owner].
+  """
+  def allow_sandbox(pid \\ self(), owner \\ nil) do
+    owner =
+      owner || Ysc.Repo.config()[:owner] ||
+        Process.get({Ecto.Adapters.SQL.Sandbox, :owner})
+
+    if owner do
+      Ecto.Adapters.SQL.Sandbox.allow(Ysc.Repo, pid, owner)
+    else
+      # Fallback: use checkout which finds the owner automatically from parent
+      Ecto.Adapters.SQL.Sandbox.checkout(Ysc.Repo, sandbox: true)
+    end
   end
 
   @doc """

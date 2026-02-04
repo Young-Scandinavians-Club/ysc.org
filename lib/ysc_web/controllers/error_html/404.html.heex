@@ -1,0 +1,41 @@
+<!-- logo section upper left corner -->
+<div class="w-full h-full bg-[#fcf9ec]">
+  <div class="absolute top-5 left-5 z-10">
+    <.link
+      navigate={~p"/"}
+      class="hover:opacity-80 transition duration-200 ease-in-out flex items-center"
+    >
+      <.ysc_logo class="h-28" />
+    </.link>
+  </div>
+  <!-- centered content container -->
+  <div class="min-h-screen flex items-center justify-center px-4">
+    <div class="max-w-5xl w-full flex flex-col md:flex-row items-center gap-12">
+      <!-- text content -->
+      <div class="flex-1 text-center md:text-left">
+        <h1 class="text-5xl md:text-6xl font-bold text-zinc-900 mb-4">404</h1>
+        <h2 class="text-2xl md:text-3xl font-semibold text-zinc-800 mb-3">
+          Page not found
+        </h2>
+        <p class="text-lg text-zinc-600 mb-6">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <.link
+          navigate={~p"/"}
+          class="inline-block px-6 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition duration-200 ease-in-out font-semibold"
+        >
+          <.icon name="hero-arrow-left-solid" class="w-5 h-5 -mt-0.5 me-2" />
+          Go back home
+        </.link>
+      </div>
+      <!-- image -->
+      <div class="flex-1 flex items-center justify-center">
+        <img
+          src={~p"/images/lost_tomte.webp"}
+          alt="404 Lost Tomte"
+          class="w-full max-w-4xl h-auto object-contain"
+        />
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,178 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-text align="center" color="#555" />
+    </mj-attributes>
+    <mj-style>
+      .btn_block a {
+      cursor: pointer;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      text-align: center;
+      }
+      .btn_block a {
+      width: 92%;
+      }
+      .btn_block a:hover {
+      background-color: #155dfc !important;
+      }
+      .door-code-box {
+      background-color: #DBEAFE;
+      padding: 20px;
+      border-radius: 6px;
+      border-left: 4px solid #1E40AF;
+      }
+      .door-code-title {
+      font-size: 20px;
+      color: #1E40AF;
+      display: block;
+      margin-bottom: 12px;
+      }
+      .door-code-value {
+      font-size: 32px;
+      font-weight: bold;
+      font-family: monospace;
+      color: #1E40AF;
+      letter-spacing: 4px;
+      display: block;
+      margin: 12px 0;
+      }
+      .door-code-note {
+      font-size: 16px;
+      color: #1E3A8A;
+      display: block;
+      margin-top: 12px;
+      }
+      .blue-alert-box {
+      background-color: #DBEAFE;
+      padding: 12px;
+      border-radius: 6px;
+      border-left: 4px solid #1E40AF;
+      }
+      .blue-alert-box-margin {
+      background-color: #DBEAFE;
+      padding: 12px;
+      border-radius: 6px;
+      border-left: 4px solid #1E40AF;
+      margin-top: 8px;
+      }
+      .blue-alert-box-large {
+      background-color: #DBEAFE;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #1E40AF;
+      }
+      .booking-reference-badge {
+      background-color: #DBEAFE;
+      color: #1E40AF;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 8px;
+      }
+      .buyout-text {
+      color: #059669;
+      font-weight: bold;
+      }
+      .gray-text {
+      color: #6B7280;
+      }
+      .red-alert-box {
+      background-color: #FEF2F2;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #DC2626;
+      }
+      .strong-block {
+      display: block;
+      margin-bottom: 8px;
+      }
+      .email-list {
+      margin: 0;
+      padding-left: 20px;
+      }
+      .email-list-item {
+      margin-bottom: 8px;
+      }
+      .email-list-item-last {
+      margin-bottom: 0;
+      }
+      .green-alert-box {
+      background-color: #F0FDF4;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #16A34A;
+      }
+      .yellow-alert-box {
+      background-color: #FEF3C7;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #F59E0B;
+      }
+      .red-text {
+      color: #DC2626;
+      }
+      .gray-alert-box {
+      background-color: #F9FAFB;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #6B7280;
+      }
+      .email-link {
+      color: #1447e6;
+      text-decoration: underline;
+      }
+      .expense-report-id-badge {
+      background-color: #DBEAFE;
+      color: #1E40AF;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 8px;
+      }
+      .expense-item-box {
+      background-color: #F9FAFB;
+      padding: 12px !important;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      }
+      .expense-item-box td {
+      padding: 12px !important;
+      }
+      .expense-item-box div {
+      padding: 0;
+      }
+      .gray-text-inline {
+      color: #6B7280;
+      }
+      .green-text-bold {
+      color: #059669;
+      font-weight: bold;
+      }
+      .green-text {
+      color: #059669;
+      }
+      .red-text-bold {
+      color: #DC2626;
+      font-weight: bold;
+      }
+      .red-text-inline {
+      color: #DC2626;
+      }
+      .net-total-green {
+      color: #059669;
+      font-weight: bold;
+      }
+      .net-total-red {
+      color: #DC2626;
+      font-weight: bold;
+      }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#eee">
+    <%= render_dynamic_component(YscWeb.Emails.HeaderBlock) %>
+    <%= @inner_content %>
+    <%= render_dynamic_component(YscWeb.Emails.FooterBlock) %>
+  </mj-body>
+</mjml>

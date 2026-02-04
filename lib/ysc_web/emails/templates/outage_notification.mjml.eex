@@ -1,0 +1,130 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Property Outage Alert</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Hej <%= @first_name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We wanted to let you know that a <strong><%= incident_type_name(@incident_type) %></strong> has been reported at the <%= property_name(@property) %>.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Outage Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">
+      Outage Details
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Type:</strong> <%= incident_type_name(@incident_type) %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Provider:</strong> <%= @company_name %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Date:</strong> <%= format_date(@incident_date) %>
+    </mj-text>
+    <%= if @description do %>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Description:</strong> <%= @description %>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Your Booking -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">
+      Your Booking
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-in:</strong> <%= format_date(@checkin_date) %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-out:</strong> <%= format_date(@checkout_date) %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Contact Information -->
+    <%= if @cabin_master_name || @cabin_master_email do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you have any issues or need help, please reach out to the cabin master:
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <%= if @cabin_master_name do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Cabin Master:</strong> <%= @cabin_master_name %>
+    </mj-text>
+    <% end %>
+    <%= if @cabin_master_phone do %>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Phone:</strong> <%= @cabin_master_phone %>
+    </mj-text>
+    <% end %>
+    <%= if @cabin_master_email do %>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Email:</strong> <%= @cabin_master_email %>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We recommend checking the provider's outage map for the latest status and estimated restoration time.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <%= if provider_outage_map_url(@company_name) do %>
+    <mj-button
+      href="<%= provider_outage_map_url(@company_name) %>"
+      css-class="btn_block"
+      inner-padding="15px"
+      width="100%"
+      background-color="#1447e6"
+      color="#ffffff"
+      align="left"
+      font-size="18px"
+      border-radius="4px"
+    >
+      View Outage Map - <%= @company_name %> →
+    </mj-button>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Please note that outages can be unpredictable and restoration times may vary. We recommend checking the provider's website for the most up-to-date information.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you have any questions or concerns, please don't hesitate to reach out to us.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The Young Scandinavians Club
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

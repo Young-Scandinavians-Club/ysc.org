@@ -1,0 +1,74 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Membership Application Submitted</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Hej <%= @first_name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Tak for din ansøgning! (That's "Thank you for your application!" in Danish 😉)
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We've received your application to join the Young Scandinavians Club and we're so excited to take a look!
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The Board will carefully review your submission and be in touch soon to let you know the status of your application.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      In the meantime, feel free to check out our website or follow us on social media to learn more about our community and upcoming events:
+    </mj-text>
+    <mj-text font-size="18px" align="left" line-height="1.5">
+      <ul>
+        <li style="padding-bottom: 10px">
+          <strong><a href="<%= upcoming_events_url() %>">Upcoming Events</a></strong>
+        </li>
+        <li style="padding-bottom: 10px">
+          <strong><a href="<%= latest_news_url() %>">Latest News</a></strong>
+        </li>
+        <li style="padding-bottom: 10px">
+          <strong><a href="<%= facebook_path() %>">Facebook</a></strong>
+        </li>
+        <li><strong><a href="<%= instagram_path() %>">Instagram</a></strong></li>
+      </ul>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We can't wait to welcome you (hopefully!) to the Young Scandinavians Club!
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Vi ses snart! (See you soon!) 👋
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The Young Scandinavians Club
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

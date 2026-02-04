@@ -1,32 +1,776 @@
-<header class="px-4 sm:px-6 lg:px-8">
-  <div class="flex items-center justify-between border-b border-zinc-100 py-3 text-sm">
-    <div class="flex items-center gap-4">
-      <a href="/">
-        <img src={~p"/images/logo.svg"} width="36" />
-      </a>
-      <p class="bg-brand/5 text-brand rounded-full px-2 font-medium leading-6">
-        v<%= Application.spec(:phoenix, :vsn) %>
-      </p>
+<%!-- Get current path for fullscreen check --%>
+<% current_path =
+  cond do
+    assigns[:request_path] -> assigns[:request_path]
+    assigns[:conn] -> Path.join(["/" | assigns[:conn].path_info])
+    true -> ""
+  end %>
+<% is_fullscreen = fullscreen?(current_path) %>
+<% is_hero_mode = hero_mode?(current_path, @current_user) %>
+
+<div id="app-container" class="w-full flex flex-col min-h-screen">
+  <.flash_group flash={@flash} />
+
+  <header
+    :if={!is_fullscreen}
+    id="site-header"
+    class={[
+      "relative transition-all duration-300",
+      is_hero_mode && "hero-mode"
+    ]}
+  >
+    <nav
+      id="rootNavbar"
+      class={[
+        "top-0 z-[100] w-full start-0 transition-colors duration-300",
+        if(is_hero_mode,
+          do: "bg-transparent border-transparent text-white",
+          else: "bg-white border-b border-zinc-100"
+        )
+      ]}
+    >
+      <div class="flex flex-row items-center justify-between max-w-screen-xl mx-auto py-4 lg:py-0 px-4">
+        <!-- Logo - hidden on mobile -->
+        <.link
+          navigate={~p"/"}
+          class="hidden lg:flex items-center flex-shrink-0"
+        >
+          <.ysc_logo no_circle={true} class="h-12 w-12" />
+        </.link>
+
+        <div class="flex flex-1 items-center justify-end lg:justify-between py-0 lg:py-6">
+          <.hamburger_menu
+            toggle_id="navbar-dropdown"
+            current_user={@current_user}
+          >
+            <:desktop_content>
+              <ul class="flex flex-row lg:border-0 ms-6 items-center gap-2">
+                <li>
+                  <.link
+                    navigate={~p"/news"}
+                    class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    News
+                  </.link>
+                </li>
+                <li>
+                  <.link
+                    navigate={~p"/events"}
+                    class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Events
+                  </.link>
+                </li>
+                <li>
+                  <.link
+                    navigate={~p"/bookings/tahoe"}
+                    class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Tahoe Cabin
+                  </.link>
+                </li>
+                <li>
+                  <.link
+                    navigate={~p"/bookings/clear-lake"}
+                    class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Clear Lake Cabin
+                  </.link>
+                </li>
+                <li>
+                  <.dropdown
+                    id="navbar-about-desktop"
+                    class="nav-link text-zinc-900 hover:bg-zinc-100 hover:text-black py-[0.595rem]"
+                  >
+                    <:button_block>
+                      Club Info
+                      <.icon
+                        name="hero-chevron-down"
+                        class="w-5 h-5 ms-2 transition-transform duration-200 ease-in-out"
+                      />
+                    </:button_block>
+                    <ul
+                      class="py-2 text-sm font-medium text-zinc-800"
+                      aria-labelledby="dropdownLargeButton"
+                    >
+                      <li>
+                        <.link
+                          navigate={~p"/history"}
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          Our History
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/board"}
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          Board of Directors
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/volunteer"}
+                          class="block px-4 py-2 transition ease-in-out duration-400 hover:bg-zinc-100"
+                        >
+                          Volunteer
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/contact"}
+                          class="block px-4 py-2 transition ease-in-out duration-400 hover:bg-zinc-100"
+                        >
+                          Contact Us
+                        </.link>
+                      </li>
+                      <%!-- Moved Governance/Financials/Code of Conduct to Footer to clean up navigation --%>
+                    </ul>
+                  </.dropdown>
+                </li>
+              </ul>
+            </:desktop_content>
+
+            <:mobile_content>
+              <ul class="flex flex-col font-medium">
+                <li>
+                  <.link
+                    navigate={~p"/news"}
+                    phx-click={
+                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
+                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
+                      |> JS.add_class("-translate-x-full",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("translate-x-0",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("overflow-hidden", to: "body")
+                    }
+                    class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    News
+                  </.link>
+                </li>
+                <li>
+                  <.link
+                    navigate={~p"/events"}
+                    phx-click={
+                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
+                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
+                      |> JS.add_class("-translate-x-full",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("translate-x-0",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("overflow-hidden", to: "body")
+                    }
+                    class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Events
+                  </.link>
+                </li>
+                <li>
+                  <.link
+                    navigate={~p"/bookings/tahoe"}
+                    phx-click={
+                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
+                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
+                      |> JS.add_class("-translate-x-full",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("translate-x-0",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("overflow-hidden", to: "body")
+                    }
+                    class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Tahoe Cabin
+                  </.link>
+                </li>
+                <li>
+                  <.link
+                    navigate={~p"/bookings/clear-lake"}
+                    phx-click={
+                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
+                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
+                      |> JS.add_class("-translate-x-full",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("translate-x-0",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("overflow-hidden", to: "body")
+                    }
+                    class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Clear Lake Cabin
+                  </.link>
+                </li>
+                <li>
+                  <.dropdown
+                    id="navbar-about-mobile"
+                    class="nav-link text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                    mobile={true}
+                  >
+                    <:button_block>
+                      Club Info
+                      <.icon
+                        name="hero-chevron-down"
+                        class="w-5 h-5 ms-2 transition-transform duration-200 ease-in-out"
+                      />
+                    </:button_block>
+                    <ul
+                      class="py-2 text-sm font-medium text-zinc-800"
+                      aria-labelledby="dropdownLargeButton"
+                    >
+                      <li>
+                        <.link
+                          navigate={~p"/history"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          Our History
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/board"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          Board of Directors
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/volunteer"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out duration-400 hover:bg-zinc-100"
+                        >
+                          Volunteer
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/contact"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out duration-400 hover:bg-zinc-100"
+                        >
+                          Contact Us
+                        </.link>
+                      </li>
+                      <%!-- Moved Governance/Financials/Code of Conduct to Footer to clean up navigation --%>
+                    </ul>
+                  </.dropdown>
+                </li>
+              </ul>
+            </:mobile_content>
+
+            <:cta_section>
+              <%= if @current_user do %>
+                <.user_avatar
+                  email={@current_user.email}
+                  user_id={@current_user.id}
+                  most_connected_country={@current_user.most_connected_country}
+                  first_name={String.capitalize(@current_user.first_name)}
+                  last_name={String.capitalize(@current_user.last_name)}
+                >
+                  <div class="z-10 w-64 bg-white divide-y divide-zinc-100 rounded shadow">
+                    <div class="px-4 py-3 text-sm text-zinc-900">
+                      <p>
+                        <%= String.capitalize(@current_user.first_name) <>
+                          " " <> String.capitalize(@current_user.last_name) %>
+                      </p>
+                      <div class="font-medium truncate">
+                        <%= @current_user.email %>
+                      </div>
+                    </div>
+                    <ul
+                      class="py-2 text-sm text-zinc-700"
+                      aria-labelledby="avatarButton"
+                    >
+                      <li>
+                        <.link
+                          navigate={~p"/users/membership"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          Membership
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/users/payments"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          My Bookings & Tickets
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/users/settings"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                        >
+                          Account Settings
+                        </.link>
+                      </li>
+                    </ul>
+                    <div class="py-1">
+                      <.link
+                        href={~p"/users/log-out"}
+                        method="delete"
+                        phx-click={
+                          JS.remove_class("open",
+                            to: "#navbar-dropdown-hamburger"
+                          )
+                          |> JS.add_class("hidden",
+                            to: "#navbar-dropdown-overlay"
+                          )
+                          |> JS.add_class("-translate-x-full",
+                            to: "#navbar-dropdown"
+                          )
+                          |> JS.remove_class("translate-x-0",
+                            to: "#navbar-dropdown"
+                          )
+                          |> JS.remove_class("overflow-hidden", to: "body")
+                        }
+                        class="block px-4 py-2 text-sm text-zinc-800 transition ease-in-out hover:bg-zinc-100 duration-400"
+                      >
+                        Sign out
+                      </.link>
+                    </div>
+                  </div>
+                </.user_avatar>
+              <% else %>
+                <div class="flex items-center space-x-2">
+                  <.link
+                    href={~p"/users/log-in"}
+                    phx-click={
+                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
+                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
+                      |> JS.add_class("-translate-x-full",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("translate-x-0",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("overflow-hidden", to: "body")
+                    }
+                    class="nav-link px-2 py-2 lg:px-3 lg:py-2 font-bold transition ease-in-out rounded duration-400 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Sign In
+                  </.link>
+                  <.link
+                    navigate={~p"/users/register"}
+                    phx-click={
+                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
+                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
+                      |> JS.add_class("-translate-x-full",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("translate-x-0",
+                        to: "#navbar-dropdown"
+                      )
+                      |> JS.remove_class("overflow-hidden", to: "body")
+                    }
+                    class="px-3 py-2 lg:px-4 lg:py-2.5 text-sm font-bold text-center text-zinc-100 transition ease-in-out bg-blue-700 rounded duration-400 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+                  >
+                    Become a Member
+                  </.link>
+                </div>
+              <% end %>
+            </:cta_section>
+          </.hamburger_menu>
+        </div>
+      </div>
+    </nav>
+    <%!-- Hero mode: notice strip sits just below the nav, rounded and not full width --%>
+    <div :if={is_hero_mode} class="relative z-[90] shrink-0 px-4 pt-2 pb-2">
+      <div class="max-w-screen-xl mx-auto rounded-xl overflow-hidden shadow-lg">
+        <.alert_banner
+          :if={
+            @current_user && @current_user.state == :pending_approval &&
+              !is_fullscreen
+          }
+          type="warning"
+          icon="hero-exclamation-triangle"
+          title="Application Under Review"
+        >
+          Your membership application is currently being reviewed by our board. You will be able to access all features of the website once your application has been approved. For more details <.link
+            navigate={~p"/pending-review"}
+            class="hover:underline font-bold"
+          >click here</.link>.
+        </.alert_banner>
+
+        <.alert_banner
+          :if={
+            @current_user && @current_user.state == :active &&
+              !@active_membership? &&
+              !is_fullscreen
+          }
+          type="orange"
+          icon="hero-exclamation-triangle"
+          title="Membership Required"
+          action_label="Manage Membership"
+          action_path={~p"/users/membership"}
+        >
+          To access events and the cabin booking system, you need to be a paying member of the club. Click the button below to activate your membership plan.
+        </.alert_banner>
+      </div>
     </div>
-    <div class="flex items-center gap-4 font-semibold leading-6 text-zinc-900">
-      <a href="https://twitter.com/elixirphoenix" class="hover:text-zinc-700">
-        @elixirphoenix
-      </a>
-      <a href="https://github.com/phoenixframework/phoenix" class="hover:text-zinc-700">
-        GitHub
-      </a>
-      <a
-        href="https://hexdocs.pm/phoenix/overview.html"
-        class="rounded-lg bg-zinc-100 px-2 py-1 hover:bg-zinc-200/80"
-      >
-        Get Started <span aria-hidden="true">&rarr;</span>
-      </a>
-    </div>
+  </header>
+
+  <%!-- Non–hero pages: notice between header and main --%>
+  <div :if={!is_hero_mode}>
+    <.alert_banner
+      :if={
+        @current_user && @current_user.state == :pending_approval &&
+          !is_fullscreen
+      }
+      type="warning"
+      icon="hero-exclamation-triangle"
+      title="Application Under Review"
+    >
+      Your membership application is currently being reviewed by our board. You will be able to access all features of the website once your application has been approved. For more details <.link
+        navigate={~p"/pending-review"}
+        class="hover:underline font-bold"
+      >click here</.link>.
+    </.alert_banner>
+
+    <.alert_banner
+      :if={
+        @current_user && @current_user.state == :active && !@active_membership? &&
+          !is_fullscreen
+      }
+      type="orange"
+      icon="hero-exclamation-triangle"
+      title="Membership Required"
+      action_label="Manage Membership"
+      action_path={~p"/users/membership"}
+    >
+      To access events and the cabin booking system, you need to be a paying member of the club. Click the button below to activate your membership plan.
+    </.alert_banner>
   </div>
-</header>
-<main class="px-4 py-20 sm:px-6 lg:px-8">
-  <div class="mx-auto max-w-2xl">
-    <.flash_group flash={@flash} />
+
+  <main class={["flex-1 w-full", is_hero_mode && "relative z-[1]"]}>
     <%= @inner_content %>
-  </div>
-</main>
+  </main>
+
+  <footer
+    :if={!is_fullscreen}
+    class="bg-white border-t border-zinc-100 w-full mt-8"
+  >
+    <div class="mx-auto max-w-screen-xl px-4 py-8">
+      <div class="space-y-8 lg:flex lg:justify-between lg:space-y-4">
+        <div class="lg:flex-shrink-0">
+          <.link
+            navigate={~p"/"}
+            class="flex items-center font-semibold whitespace-nowrap"
+          >
+            <.ysc_logo class="me-3 h-14" />
+            <span class="text-2xl">Young Scandinavians Club</span>
+          </.link>
+        </div>
+        <div class="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:justify-end pb-8 lg:mt-0">
+          <div>
+            <h3 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
+              Socials
+            </h3>
+            <ul class="space-y-3 text-sm text-zinc-600">
+              <li>
+                <.link
+                  href={@site_setting_socials_facebook}
+                  target="_blank"
+                  aria-label="Facebook"
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Facebook
+                </.link>
+              </li>
+              <li>
+                <.link
+                  href={@site_setting_socials_instagram}
+                  target="_blank"
+                  aria-label="Instagram"
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Instagram
+                </.link>
+              </li>
+              <li>
+                <.link
+                  href={@site_setting_socials_discord}
+                  target="_blank"
+                  aria-label="Discord"
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Discord
+                </.link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
+              Policies
+            </h3>
+            <ul class="space-y-3 text-sm text-zinc-600">
+              <li>
+                <.link
+                  navigate={~p"/privacy-policy"}
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Privacy Policy
+                </.link>
+              </li>
+              <li>
+                <.link
+                  navigate={~p"/terms-of-service"}
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Terms of Service
+                </.link>
+              </li>
+              <li>
+                <.link
+                  navigate={~p"/code-of-conduct"}
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Code of Conduct
+                </.link>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
+              Governance
+            </h3>
+            <ul class="space-y-3 text-sm text-zinc-600">
+              <li>
+                <.link
+                  navigate={~p"/financials"}
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Financials & Meetings
+                </.link>
+              </li>
+              <li>
+                <.link
+                  navigate={~p"/bylaws"}
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Bylaws
+                </.link>
+              </li>
+              <li>
+                <.link
+                  navigate={~p"/report-conduct-violation"}
+                  class="hover:text-zinc-900 transition-colors"
+                >
+                  Report Conduct Violation
+                </.link>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="border-t border-zinc-100 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between mt-4 pt-4">
+        <p class="text-sm text-zinc-600 text-center sm:text-left">
+          © <%= DateTime.utc_now().year %> <.link
+            navigate={~p"/"}
+            class="hover:text-zinc-900 transition-colors font-medium"
+          >The Young Scandinavians Club</.link>. All Rights Reserved.
+        </p>
+
+        <ul class="flex flex-wrap items-center justify-center sm:items-start sm:justify-start gap-2">
+          <li class="">
+            <.link
+              href={@site_setting_socials_facebook}
+              target="_blank"
+              aria-label="Facebook"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                x="0px"
+                y="0px"
+                viewBox="0 0 64 64"
+                class="w-10 h-10 transition duration-300 fill-current text-zinc-600 hover:text-blue-700"
+              >
+                <path d="M48,7H16c-4.418,0-8,3.582-8,8v32c0,4.418,3.582,8,8,8h17V38h-6v-7h6v-5c0-7,4-11,10-11c3.133,0,5,1,5,1v6h-4 c-2.86,0-4,2.093-4,4v5h7l-1,7h-6v17h8c4.418,0,8-3.582,8-8V15C56,10.582,52.418,7,48,7z">
+                </path>
+              </svg>
+              <span class="sr-only">Facebook</span>
+            </.link>
+          </li>
+
+          <li>
+            <.link
+              href={@site_setting_socials_instagram}
+              target="_blank"
+              aria-label="Instagram"
+            >
+              <div class="relative w-10 h-10">
+                <svg
+                  style="width:0;height:0;position:absolute;"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <linearGradient id="insta-gradient" y1="1">
+                    <stop stop-color="#405de6" />
+                    <stop offset=".2" stop-color="#5851db" />
+                    <stop offset=".4" stop-color="#833ab4" />
+                    <stop offset=".6" stop-color="#c13584" />
+                    <stop offset=".8" stop-color="#e1306c" />
+                    <stop offset="1" stop-color="#fd1d1d" />
+                  </linearGradient>
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  x="0px"
+                  y="0px"
+                  viewBox="0 0 64 64"
+                  class="absolute z-10 w-10 h-10 transition duration-300 fill-current text-zinc-600 hover:opacity-0"
+                >
+                  <path d="M 21.580078 7 C 13.541078 7 7 13.544938 7 21.585938 L 7 42.417969 C 7 50.457969 13.544938 57 21.585938 57 L 42.417969 57 C 50.457969 57 57 50.455062 57 42.414062 L 57 21.580078 C 57 13.541078 50.455062 7 42.414062 7 L 21.580078 7 z M 47 15 C 48.104 15 49 15.896 49 17 C 49 18.104 48.104 19 47 19 C 45.896 19 45 18.104 45 17 C 45 15.896 45.896 15 47 15 z M 32 19 C 39.17 19 45 24.83 45 32 C 45 39.17 39.169 45 32 45 C 24.83 45 19 39.169 19 32 C 19 24.831 24.83 19 32 19 z M 32 23 C 27.029 23 23 27.029 23 32 C 23 36.971 27.029 41 32 41 C 36.971 41 41 36.971 41 32 C 41 27.029 36.971 23 32 23 z">
+                  </path>
+                </svg>
+                <svg
+                  fill="url(#insta-gradient)"
+                  xmlns="http://www.w3.org/2000/svg"
+                  x="0px"
+                  y="0px"
+                  viewBox="0 0 64 64"
+                  class="absolute w-10 h-10 transition duration-300 z-1"
+                >
+                  <path d="M 21.580078 7 C 13.541078 7 7 13.544938 7 21.585938 L 7 42.417969 C 7 50.457969 13.544938 57 21.585938 57 L 42.417969 57 C 50.457969 57 57 50.455062 57 42.414062 L 57 21.580078 C 57 13.541078 50.455062 7 42.414062 7 L 21.580078 7 z M 47 15 C 48.104 15 49 15.896 49 17 C 49 18.104 48.104 19 47 19 C 45.896 19 45 18.104 45 17 C 45 15.896 45.896 15 47 15 z M 32 19 C 39.17 19 45 24.83 45 32 C 45 39.17 39.169 45 32 45 C 24.83 45 19 39.169 19 32 C 19 24.831 24.83 19 32 19 z M 32 23 C 27.029 23 23 27.029 23 32 C 23 36.971 27.029 41 32 41 C 36.971 41 41 36.971 41 32 C 41 27.029 36.971 23 32 23 z">
+                  </path>
+                </svg>
+              </div>
+              <span class="sr-only">Instagram</span>
+            </.link>
+          </li>
+
+          <li class="w-10 h-10 flex text-center items-center justify-center">
+            <.link
+              href={@site_setting_socials_discord}
+              target="_blank"
+              aria-label="Discord"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 512 512"
+                class="w-8 h-8 transition text-center duration-300 fill-current text-zinc-600 hover:text-[#5865F2] items-center justify-center"
+              >
+                <path d="M105 0h302c57.928.155 104.845 47.072 105 104.996V407c-.155 57.926-47.072 104.844-104.996 104.998L105 512C47.074 511.844.156 464.926.002 407.003L0 105C.156 47.072 47.074.155 104.997 0H105zm263.896 153.382a269.459 269.459 0 00-67.117-20.638 186.784 186.784 0 00-8.571 17.476 250.18 250.18 0 00-37.246-2.8c-12.447 0-24.956.945-37.25 2.776-2.512-5.927-5.428-11.804-8.592-17.455a271.746 271.746 0 00-67.133 20.681c-42.48 62.842-53.992 124.112-48.236 184.513a270.634 270.634 0 0082.308 41.312c6.637-8.959 12.583-18.497 17.63-28.422a174.021 174.021 0 01-27.772-13.253c2.329-1.689 4.606-3.428 6.805-5.118 25.727 12.083 53.837 18.385 82.277 18.385 28.442 0 56.552-6.302 82.279-18.386 2.226 1.816 4.503 3.556 6.805 5.117a175.079 175.079 0 01-27.822 13.289 197.895 197.895 0 0017.63 28.4 269.527 269.527 0 0082.363-41.306l-.007.007c6.754-70.044-11.537-130.753-48.351-184.578zM201.969 300.789c-16.04 0-29.293-14.556-29.293-32.464s12.791-32.593 29.241-32.593 29.599 14.685 29.318 32.593c-.282 17.908-12.919 32.464-29.266 32.464zm108.061 0c-16.066 0-29.266-14.556-29.266-32.464s12.791-32.593 29.266-32.593c16.475 0 29.523 14.685 29.241 32.593-.281 17.908-12.893 32.464-29.241 32.464z" />
+              </svg>
+            </.link>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</div>

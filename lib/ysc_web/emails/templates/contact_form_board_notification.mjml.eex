@@ -1,0 +1,81 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text font-size="32px" line-height="1.25" padding="0px">
+      <strong>📧 New Contact Form Submission</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Dear YSC Board Members,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      A new contact form has been submitted and requires your attention.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" color="#1976d2">
+      <strong>Contact Details:</strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px" padding="16px">
+      <strong>Name:</strong> <%= @name %><br/>
+      <strong>Email:</strong> <a href="mailto:<%= @email %>" style="color: #1976d2;"><%= @email %></a><br/>
+      <strong>Subject:</strong> <%= @subject %><br/>
+      <strong>Contact Form ID:</strong> <%= @contact_form_id %><br/>
+      <strong>Submitted:</strong> <%= @submitted_at %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" color="#1976d2">
+      <strong>Message:</strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="20px" background-color="#e3f2fd" border-radius="6px" border="2px solid #1976d2" color="#424242" white-space="pre-wrap">
+      <%= @message %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Next Steps:</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="0px">
+      <ul style="margin: 0; padding-left: 20px;">
+        <li style="margin-bottom: 8px;">Review the message and determine the appropriate response</li>
+        <li style="margin-bottom: 8px;">Reply directly to <a href="mailto:<%= @email %>" style="color: #1976d2;"><%= @email %></a> if a response is needed</li>
+        <li style="margin-bottom: 8px;">Forward to the appropriate department if needed (Tahoe, Board, Volunteer, etc.)</li>
+        <li style="margin-bottom: 0;">Follow up within 24–48 hours as per our community standards</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      You can reply directly to the sender using the button below:
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-button href="mailto:<%= @email %>?subject=Re: <%= URI.encode(@subject) %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Reply to <%= @name %></mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="12px" line-height="1.5" padding="0px" color="#666" align="center">
+      This is an automated notification. Please do not reply to this email.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

@@ -1,0 +1,67 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>You're Invited!</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Hi<%= if @family_member_name do %> <%= @family_member_name %><% else %> there<% end %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong><%= @primary_user_name %></strong> has invited you to join their YSC family membership!
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      As a family member, you'll be able to:
+    </mj-text>
+    <mj-text font-size="18px" align="left" line-height="1.5">
+      <ul>
+        <li style="padding-bottom: 10px">Book stays at our cabins (Tahoe and Clear Lake)</li>
+        <li style="padding-bottom: 10px">Purchase tickets to member events</li>
+        <li style="padding-bottom: 10px">Access all membership benefits</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Important:</strong> Family members share the primary account's membership. You cannot purchase your own membership, but you'll have full access to all membership benefits.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @invite_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Accept Invitation & Create Account →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      This invitation will expire in <%= @expires_in_days %> days.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you didn't expect this invitation, you can safely ignore this email.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The Young Scandinavians Club
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

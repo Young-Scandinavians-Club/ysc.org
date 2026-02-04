@@ -1,0 +1,463 @@
+<div class="py-8 lg:py-12 max-w-screen-xl mx-auto px-4">
+  <%!-- Page Header --%>
+  <div class="mb-10">
+    <h1 class="text-4xl font-extrabold tracking-tight text-zinc-900 mb-4">
+      Financials & Annual Meetings
+    </h1>
+    <p class="text-lg text-zinc-600 max-w-2xl">
+      Access official reports, meeting minutes, and financial disclosures for The Young Scandinavians Club.
+    </p>
+  </div>
+
+  <%!-- Quick Stats Section (Current Year) --%>
+  <div class="mb-10 bg-gradient-to-br from-blue-50 to-zinc-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+    <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
+      <.icon name="hero-chart-bar" class="w-6 h-6 text-blue-600" />
+      2024 At a Glance
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white rounded-lg p-4 border border-zinc-200">
+        <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">
+          Active Members
+        </div>
+        <div class="text-2xl font-bold text-zinc-900">~500</div>
+      </div>
+      <div class="bg-white rounded-lg p-4 border border-zinc-200">
+        <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">
+          Annual Revenue
+        </div>
+        <div class="text-2xl font-bold text-zinc-900">Available in Report</div>
+      </div>
+      <div class="bg-white rounded-lg p-4 border border-zinc-200">
+        <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">
+          Fiscal Year
+        </div>
+        <div class="text-2xl font-bold text-zinc-900">2024</div>
+      </div>
+    </div>
+  </div>
+
+  <%!-- Jump to Year Navigation --%>
+  <div class="mb-8 bg-white border border-zinc-200 rounded-lg p-4 sticky top-4 z-10 shadow-sm">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-sm font-semibold text-zinc-700 mr-2">
+        Jump to Year:
+      </span>
+      <.link
+        href="#year-2025"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2025
+      </.link>
+      <span class="text-zinc-300">|</span>
+      <.link
+        href="#year-2024"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2024
+      </.link>
+      <span class="text-zinc-300">|</span>
+      <a
+        href="#year-2023"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2023
+      </a>
+      <span class="text-zinc-300">|</span>
+      <.link
+        href="#year-2022"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2022
+      </.link>
+      <span class="text-zinc-300">|</span>
+      <.link
+        href="#year-2021"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2021
+      </.link>
+      <span class="text-zinc-300">|</span>
+      <a
+        href="#year-2020"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2020
+      </a>
+      <span class="text-zinc-300">|</span>
+      <.link
+        href="#year-2019"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2019
+      </.link>
+      <span class="text-zinc-300">|</span>
+      <.link
+        href="#year-2018"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2018
+      </.link>
+    </div>
+  </div>
+
+  <%!-- Financial Reports by Year --%>
+  <div class="space-y-6">
+    <%!-- 2025 General Meeting (Most Recent - Expanded) --%>
+    <section
+      id="year-2025"
+      class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden"
+    >
+      <div class="bg-zinc-900 px-6 py-4">
+        <h2 class="text-white font-bold text-xl m-0">2025 General Meeting</h2>
+      </div>
+      <div class="p-6 grid gap-4 sm:grid-cols-2">
+        <.link
+          href="#"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-text" class="w-6 h-6" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Financials Summary 2024
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 1.2 MB
+            </div>
+          </div>
+        </.link>
+
+        <.link
+          href="#"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Full Annual Report
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 4.5 MB
+            </div>
+          </div>
+        </.link>
+      </div>
+    </section>
+
+    <%!-- 2024 General Meeting --%>
+    <section
+      id="year-2024"
+      class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden"
+    >
+      <div class="bg-zinc-900 px-6 py-4">
+        <h2 class="text-white font-bold text-xl m-0">2024 General Meeting</h2>
+      </div>
+      <div class="p-6 grid gap-4 sm:grid-cols-2">
+        <.link
+          href="#"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-text" class="w-6 h-6" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Financials Summary 2024
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 1.2 MB
+            </div>
+          </div>
+        </.link>
+
+        <.link
+          href="#"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Full Annual Report
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 4.5 MB
+            </div>
+          </div>
+        </.link>
+      </div>
+    </section>
+
+    <%!-- 2023 General Meeting --%>
+    <section
+      id="year-2023"
+      class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden"
+    >
+      <div class="bg-zinc-900 px-6 py-4">
+        <h2 class="text-white font-bold text-xl m-0">2023 General Meeting</h2>
+      </div>
+      <div class="p-6 grid gap-4 sm:grid-cols-2">
+        <a
+          href="#"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-text" class="w-6 h-6" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Financials Summary 2023
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 1.1 MB
+            </div>
+          </div>
+        </a>
+
+        <.link
+          href="#"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Full Annual Report
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 4.2 MB
+            </div>
+          </div>
+        </.link>
+      </div>
+    </section>
+
+    <%!-- Older Years (Collapsible) --%>
+    <details class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+      <summary class="bg-zinc-800 px-6 py-4 cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between">
+        <h2 class="text-white font-bold text-xl m-0">Archive (2022 - 2018)</h2>
+        <.icon
+          name="hero-chevron-down"
+          class="w-5 h-5 text-white chevron-icon flex-shrink-0"
+        />
+      </summary>
+      <div class="divide-y divide-zinc-100">
+        <%!-- 2022 General Meeting --%>
+        <div id="year-2022" class="p-6">
+          <h3 class="text-lg font-semibold text-zinc-900 mb-4">
+            2022 General Meeting
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-text" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Financials Summary 2022
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 1.0 MB
+                </div>
+              </div>
+            </.link>
+
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Full Annual Report
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 4.0 MB
+                </div>
+              </div>
+            </.link>
+          </div>
+        </div>
+
+        <%!-- 2021 General Meeting --%>
+        <div id="year-2021" class="p-6">
+          <h3 class="text-lg font-semibold text-zinc-900 mb-4">
+            2021 General Meeting
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-text" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Financials Summary 2021
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 0.9 MB
+                </div>
+              </div>
+            </.link>
+
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Full Annual Report
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 3.8 MB
+                </div>
+              </div>
+            </.link>
+          </div>
+        </div>
+
+        <%!-- 2020 General Meeting --%>
+        <div id="year-2020" class="p-6">
+          <h3 class="text-lg font-semibold text-zinc-900 mb-4">
+            2020 General Meeting
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-text" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Financials Summary 2020
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 0.9 MB
+                </div>
+              </div>
+            </.link>
+
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Full Annual Report
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 3.7 MB
+                </div>
+              </div>
+            </.link>
+          </div>
+        </div>
+
+        <%!-- 2019 General Meeting --%>
+        <div id="year-2019" class="p-6">
+          <h3 class="text-lg font-semibold text-zinc-900 mb-4">
+            2019 General Meeting
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-text" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Financials Summary 2019
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 0.8 MB
+                </div>
+              </div>
+            </.link>
+
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Full Annual Report
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 3.5 MB
+                </div>
+              </div>
+            </.link>
+          </div>
+        </div>
+
+        <%!-- 2018 General Meeting --%>
+        <div id="year-2018" class="p-6">
+          <h3 class="text-lg font-semibold text-zinc-900 mb-4">
+            2018 General Meeting
+          </h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-text" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Financials Summary 2018
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 0.8 MB
+                </div>
+              </div>
+            </.link>
+
+            <.link
+              href="#"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Full Annual Report
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 3.4 MB
+                </div>
+              </div>
+            </.link>
+          </div>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>

@@ -1,0 +1,188 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Ticket Purchase Confirmation</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Hej <%= @first_name %>, </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Thank you for your ticket purchase! Your order has been confirmed and your tickets are ready. </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Event Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Event Details </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong><%= @event.title %></strong>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> <%= @event.description %> </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Date & Time:</strong> <%= @event_date_time %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Location:</strong> <%= @event.location_name %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Address:</strong> <%= @event.address %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <%= if @event.age_restriction && @event.age_restriction > 0 do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Age Restriction:</strong> <%= @event.age_restriction %>+ years old
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Event Details → </mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Event Agenda -->
+    <%= if @agenda && length(@agenda) > 0 do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Event Agenda </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <%= for agenda <- @agenda do %>
+    <%= if length(@agenda) > 1 do %>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">
+      <%= agenda.title %>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <% end %>
+    <%= for item <- agenda.items do %>
+    <mj-section background-color="<%= item.background_color %>" border-radius="6px" padding="0px">
+      <mj-column>
+        <mj-table>
+          <tr>
+            <td style="border-left: 4px solid <%= item.border_color %>; padding: 2px 0px 2px 12px;">
+              <%= if item.start_time do %>
+                <div style="font-size: 14px; font-weight: 600; color: #6B7280; margin-bottom: 4px;">
+                  <%= if item.end_time do %>
+                    <%= item.start_time %> - <%= item.end_time %>
+                  <% else %>
+                    <%= item.start_time %>
+                  <% end %>
+                </div>
+              <% end %>
+              <div style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 4px;">
+                <%= item.title %>
+              </div>
+              <%= if item.description do %>
+                <div style="font-size: 14px; color: #6B7280; line-height: 1.4;">
+                  <%= item.description %>
+                </div>
+              <% end %>
+            </td>
+          </tr>
+        </mj-table>
+      </mj-column>
+    </mj-section>
+    <mj-spacer height="8px"></mj-spacer>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <% end %>
+
+    <!-- Ticket Summary -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Your Tickets </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Order Reference:
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+        <%= @ticket_order.reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Purchase Date: <strong><%= @purchase_date %></strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <!-- Ticket Details Table -->
+    <mj-table css-class="table" padding="12px 0">
+      <tr style="border-bottom:1px solid #e0e0e0;">
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px;">Ticket</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:center;">Qty</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Price</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Total</td>
+      </tr> <%= for ticket_summary <- @ticket_summaries do %> <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding: 12px 16px; font-size:16px;"><%= ticket_summary.ticket_tier_name %></td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:center;"><%= ticket_summary.quantity %></td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= ticket_summary.price_per_ticket %></td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:right;">
+          <%= if ticket_summary.original_price && ticket_summary.original_price != ticket_summary.total_price do %>
+            <span style="text-decoration: line-through; color: #9CA3AF; margin-right: 8px;"><%= ticket_summary.original_price %></span>
+          <% end %>
+          <%= ticket_summary.total_price %>
+        </td>
+      </tr>
+      <%= if ticket_summary.discount_percentage && ticket_summary.discount_percentage > 0 && ticket_summary.discount_amount && ticket_summary.discount_amount != "$0.00" do %>
+      <tr style="border-bottom:1px solid #f0f0f0; background-color:#F0FDF4;">
+        <td colspan="3" style="padding: 12px 16px; font-size:14px; color:#16A34A;">
+          Reserved discount (<%= ticket_summary.discount_percentage |> Float.round(2) %>%)
+        </td>
+        <td style="padding: 12px 16px; font-size:14px; text-align:right; color:#16A34A; font-weight:500;">
+          -<%= ticket_summary.discount_amount %>
+        </td>
+      </tr>
+      <% end %>
+      <% end %>
+      <%= if @has_discounts && @total_discount && @total_discount != "$0.00" do %>
+      <tr style="border-top:1px solid #e0e0e0;">
+        <td colspan="3" style="padding: 12px 16px; font-size:16px; color:#6B7280;">Subtotal</td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:right; color:#6B7280;"><%= @gross_total %></td>
+      </tr>
+      <tr>
+        <td colspan="3" style="padding: 12px 16px; font-size:16px; color:#16A34A; font-weight:500;">Discount</td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:right; color:#16A34A; font-weight:500;">-<%= @total_discount %></td>
+      </tr>
+      <% end %>
+      <tr style="border-top:2px solid #000; background-color:#f8f9fa;">
+        <td colspan="3" style="padding: 12px 16px; font-weight:bold; font-size:18px;">Total</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:18px; text-align:right;"><%= @total_amount %></td>
+      </tr>
+    </mj-table>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Payment Details -->
+    <%= if @payment_method != "Free" do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Payment Details </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Method: <strong><%= @payment_method %></strong>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Date: <strong><%= @payment_date %></strong>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Transaction ID: <strong><%= @payment.reference_id %></strong>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Individual Ticket References -->
+    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold"> Your Ticket Reference Numbers </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Please keep these reference numbers for your records: </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" padding-left="16px">
+      <%= for ticket <- @tickets do %>
+      <div style="margin-bottom: 8px;">
+        <span style="background-color: #DCFCE7; color: #166534; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-right: 8px;">
+          <%= ticket.reference_id %>
+        </span>
+        <span style="color: #6B7280; font-size: 14px;"><%= ticket.ticket_tier_name %></span>
+      </div>
+      <% end %>
+    </mj-text>
+    <mj-spacer height="18px"></mj-spacer>
+    <!-- Next Steps -->
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong>What's Next?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • You'll receive a reminder email 24 hours before the event </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • If you have any questions, reply to this email or contact us </mj-text>
+    <mj-spacer height="36px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> We look forward to seeing you at the event! </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Vi ses snart! (See you soon!) 👋</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

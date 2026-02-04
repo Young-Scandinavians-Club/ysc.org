@@ -1,0 +1,153 @@
+<div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+  <%!-- Intro Section --%>
+  <div class="prose prose-zinc prose-a:text-blue-600 max-w-3xl mb-12">
+    <h1>Board of Directors</h1>
+
+    <p>
+      The Board of Directors consists of up to eleven positions with a minimum of nine. In addition to overseeing the day-to-day affairs of the YSC, it also works to develop a vision for the club that reflects current membership needs and keeps the club alive, healthy, relevant and Scandinavian.
+    </p>
+    <p>
+      The YSC is always in need of talented, motivated members to serve on the board and/or the various committees. Annual elections take place at the beginning of each year. You can see the board in action by reviewing our
+      <.link
+        navigate={~p"/financials"}
+        class="hover:text-blue-700 transition ease-in-out"
+      >
+        Financials & Annual Meetings
+      </.link>
+      page.
+    </p>
+  </div>
+
+  <%!-- Two Column Layout --%>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+    <%!-- Left Column: Active Board Members --%>
+    <div
+      :if={@bod_members != []}
+      class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0"
+    >
+      <h2>Current Board Members</h2>
+      <div class="not-prose">
+        <div class="space-y-4">
+          <%= for member <- @bod_members do %>
+            <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-2xl bg-white hover:shadow-md transition-shadow">
+              <.user_avatar_image
+                email={member.email}
+                user_id={member.id}
+                country={member.most_connected_country}
+                class="h-24 w-24 rounded-full flex-shrink-0"
+              />
+              <div class="flex-1">
+                <h3 class="text-xl font-bold text-zinc-900">
+                  <%= member.first_name %> <%= member.last_name %>
+                </h3>
+                <p class="text-blue-600 font-medium mt-1">
+                  <%= atom_to_readable(member.board_position) %>
+                </p>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Right Column: Join the Board Section --%>
+    <div
+      :if={@vacant_positions != []}
+      class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0"
+    >
+      <div class="p-8 bg-blue-50 rounded-3xl border border-blue-100 h-fit sticky top-8">
+        <div class="prose prose-zinc max-w-none mb-6">
+          <h2>Help Shape the Future of YSC</h2>
+          <p>
+            We are currently looking for passionate members to fill the following roles. Annual elections take place at the beginning of each year, and we welcome inquiries year-round.
+          </p>
+        </div>
+        <div class="not-prose space-y-4">
+          <%= for position <- @vacant_positions do %>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-zinc-100 hover:border-blue-300 transition-all">
+              <div class="flex justify-between items-start gap-4">
+                <div class="flex-1">
+                  <h3 class="font-semibold text-zinc-900 mb-1">
+                    <%= atom_to_readable(position) %>
+                  </h3>
+                  <p class="text-sm text-zinc-600">
+                    <%= case position do %>
+                      <% :president -> %>
+                        Lead the organization and set strategic direction for the club.
+                      <% :vice_president -> %>
+                        Support the President and step in when needed.
+                      <% :secretary -> %>
+                        Manage board meetings, minutes, and official documentation.
+                      <% :treasurer -> %>
+                        Oversee financial operations and budgeting.
+                      <% :tahoe_cabin_master -> %>
+                        Oversee the maintenance and magic of our mountain retreat.
+                      <% :clear_lake_cabin_master -> %>
+                        Manage our Clear Lake cabin and coordinate bookings.
+                      <% :event_director -> %>
+                        Plan and coordinate club events and activities.
+                      <% :member_outreach -> %>
+                        Connect with members and build community engagement.
+                      <% :membership_director -> %>
+                        Manage membership applications and member relations.
+                      <% _ -> %>
+                        Help guide the club's vision and operations.
+                    <% end %>
+                  </p>
+                </div>
+                <.link
+                  navigate={
+                    ~p"/contact?subject=#{URI.encode(atom_to_readable(position))}"
+                  }
+                  class="text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap flex-shrink-0 ml-4"
+                >
+                  Inquire<.icon
+                    name="hero-arrow-right-solid"
+                    class="w-4 h-4 -mt-0.5 inline-block ms-1"
+                  />
+                </.link>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Full Width: Active Members if no vacancies --%>
+    <div
+      :if={@vacant_positions == [] && @bod_members != []}
+      class="lg:col-span-2 prose prose-zinc prose-a:text-blue-600 max-w-3xl"
+    >
+      <h2>Current Board Members</h2>
+      <div class="not-prose">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <%= for member <- @bod_members do %>
+            <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-2xl bg-white hover:shadow-md transition-shadow">
+              <.user_avatar_image
+                email={member.email}
+                user_id={member.id}
+                country={member.most_connected_country}
+                class="h-24 w-24 rounded-full flex-shrink-0"
+              />
+              <div class="flex-1">
+                <h3 class="text-xl font-bold text-zinc-900">
+                  <%= member.first_name %> <%= member.last_name %>
+                </h3>
+                <p class="text-blue-600 font-medium mt-1">
+                  <%= atom_to_readable(member.board_position) %>
+                </p>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <div class="not-prose mt-12">
+        <div class="p-6 bg-green-50 rounded-xl border border-green-200">
+          <p class="text-green-800 font-semibold">
+            All board positions are currently filled! Thank you to our dedicated board members.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,92 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Conduct Violation Report Received</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Dear <%= @first_name %> <%= @last_name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Thank you for taking the time to report a conduct violation to the Young Scandinavians Club. We have received your report and take all such matters seriously.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Report Summary:</strong>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px" padding="16px">
+      <%= @summary %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" background-color="<%= if @anonymous, do: "#fff3cd", else: "#e7f3ff" %>" border-radius="4px" border="2px solid <%= if @anonymous, do: "#ffc107", else: "#1976d2" %>" color="<%= if @anonymous, do: "#856404", else: "#004085" %>">
+      <strong>🔒 Anonymity Status:</strong> <%= if @anonymous, do: "You have requested to remain anonymous to the parties involved.", else: "You have not requested anonymity." %><br/><br/>
+      <%= if @anonymous do %>
+        <strong>What this means:</strong> Your name and contact information will be visible to the YSC Board of Directors for follow-up purposes, but will NOT be shared with the parties involved in the incident. This helps protect your privacy while allowing the board to contact you if additional information is needed.
+      <% else %>
+        <strong>Note:</strong> Your report will be handled with discretion and confidentiality by the board. If you have concerns about your privacy, please contact the board directly.
+      <% end %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>What happens next?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      • The YSC Board of Directors will review your report carefully and confidentially
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      • We will investigate the matter according to our Code of Conduct procedures
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      • You will be contacted if we need additional information
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      • Appropriate action will be taken based on our findings
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We appreciate your commitment to maintaining a safe and respectful environment within our community. Your report helps us ensure that the Young Scandinavians Club remains a welcoming place for all members.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you have any questions or need to provide additional information, please don't hesitate to contact us at <a href="<%= contact_url() %>">our contact page</a>.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Thank you again for your report.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Best regards</mj-text>
+    <mj-spacer height="18px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" color="#666">
+      The Young Scandinavians Club Board of Directors
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

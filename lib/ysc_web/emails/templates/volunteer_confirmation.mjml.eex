@@ -1,0 +1,80 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Thank You for Volunteering!</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Dear <%= @name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Thank you for your interest in volunteering with the Young Scandinavians Club! We have received your volunteer form submission and are excited about the possibility of working with you.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Your Volunteer Interests:</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="0px">
+      <%= if Enum.empty?(@interests) do %>
+        No specific interests selected
+      <% else %>
+        <ul style="margin: 0; padding-left: 20px;">
+          <%= for interest <- @interests do %>
+            <li style="margin-bottom: 8px;"><%= interest %></li>
+          <% end %>
+        </ul>
+      <% end %>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>What happens next?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.8" padding="0px">
+      <ul style="margin: 0; padding-left: 20px;">
+        <li style="margin-bottom: 8px;">The YSC Board of Directors will review your volunteer application</li>
+        <li style="margin-bottom: 8px;">We will contact you via email to discuss volunteer opportunities that match your interests</li>
+        <li style="margin-bottom: 0;">You'll receive updates about upcoming events and volunteer needs</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We truly appreciate your willingness to contribute to our vibrant community. Volunteers like you are essential to creating memorable experiences for all our members!
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you have any questions or would like to provide additional information, please don't hesitate to contact us at <a href="<%= contact_url() %>">our contact page</a>.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Best regards</mj-text>
+    <mj-spacer height="18px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" color="#666">
+      The Young Scandinavians Club Board of Directors
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
+

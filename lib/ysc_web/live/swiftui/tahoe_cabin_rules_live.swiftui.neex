@@ -1,0 +1,1 @@
+<CabinRulesView data={@rules_json} selectedCategory={@selected_category} phx-click="select_category" />

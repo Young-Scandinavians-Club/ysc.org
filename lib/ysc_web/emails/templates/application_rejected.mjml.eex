@@ -1,0 +1,78 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Update On Your Young Scandinavians Club Application</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Hej <%= @first_name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Thank you for your interest in joining the Young Scandinavians Club. We appreciate you taking the time to submit an application.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Unfortunately, we are unable to approve your application at this time.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      To be eligible for membership, applicants must meet certain criteria as outlined in our bylaws. This includes demonstrating a strong connection to Scandinavian culture through one or more of the following:
+    </mj-text>
+    <mj-text font-size="18px" align="left" line-height="1.5">
+      <ul>
+        <li style="padding-bottom: 10px">
+          Citizenship of a Scandinavian country (Denmark, Finland, Iceland, Norway, Sweden)
+        </li>
+        <li style="padding-bottom: 10px">Birth in Scandinavia</li>
+        <li style="padding-bottom: 10px">
+          Having at least one Scandinavian-born parent, grandparent, or great-grandparent
+        </li>
+        <li style="padding-bottom: 10px">Having lived at least six (6) months in Scandinavia</li>
+        <li style="padding-bottom: 10px">Speaking one of the Scandinavian languages</li>
+        <li>Being the spouse of a member</li>
+      </ul>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      While we appreciate your enthusiasm for our community, we weren't able to determine that you met the eligibility requirements based on the information provided in your application.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you believe there has been an error or you have any questions regarding our membership criteria, please don't hesitate to contact us at <a href="mailto:memberships@ysc.org">memberships@ysc.org</a> and we would be happy to discuss it further.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We wish you all the best in your pursuit of Scandinavian cultural experiences.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Med venlig hilsen, (Sincerely)
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The Young Scandinavians Club
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

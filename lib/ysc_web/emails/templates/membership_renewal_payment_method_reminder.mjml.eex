@@ -1,0 +1,50 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Action Required: Membership Renewal</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your Young Scandinavians Club membership is set to renew on <strong><%= @renewal_date %></strong> (in 14 days).</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We noticed that you don't currently have a payment method on file. To ensure your membership continues without interruption, please add a payment method before your renewal date.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @payment_methods_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Add Payment Method →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Why is this important?</strong></mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Without a payment method on file, your membership renewal will fail, and you'll lose access to:</mj-text>
+    <mj-text font-size="18px" align="left" line-height="1.5">
+      <ul>
+        <li style="padding-bottom: 10px">Exclusive member-only events and gatherings</li>
+        <li style="padding-bottom: 10px">Cabin booking privileges at our Tahoe and Clear Lake properties</li>
+        <li style="padding-bottom: 10px">Access to the vibrant YSC community</li>
+        <li>All member discounts and benefits</li>
+      </ul>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Adding a payment method is quick and easy:</strong></mj-text>
+    <mj-text font-size="18px" align="left" line-height="1.5">
+      <ol>
+        <li style="padding-bottom: 10px">Click the button above or visit your <a href="<%= @membership_url %>">membership page</a></li>
+        <li style="padding-bottom: 10px">Navigate to Payment Methods</li>
+        <li>Add your credit or debit card information securely</li>
+      </ol>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you have any questions or need assistance, please contact us at <a href="mailto:memberships@ysc.org">memberships@ysc.org</a>.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for being a valued member of the Young Scandinavians Club! 🎉</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Bästa hälsningar (Best regards),</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>
