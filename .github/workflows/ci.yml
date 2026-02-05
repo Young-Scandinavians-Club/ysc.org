@@ -1,9 +1,9 @@
-# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
-# CI runs tests, linter, and mix deps.audit in parallel; deploy only runs if all CI passes on main branch.
+# CI workflow for Pull Requests
+# Runs tests, linter, and mix deps.audit in parallel without deploying
 
-name: CI and Deploy Sandbox
+name: CI
 on:
-  push:
+  pull_request:
     branches:
       - main
 
@@ -164,15 +164,3 @@ jobs:
 
       - name: Dependency audit
         run: mix deps.audit
-
-  deploy:
-    name: Deploy app sandbox
-    runs-on: ubuntu-latest
-    needs: [test, formatting, credo, security]
-    concurrency: deploy-group
-    steps:
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
