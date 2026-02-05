@@ -56,8 +56,8 @@ defmodule YscWeb.PageController do
       {"2012-2013", "Niels Kvaavik"},
       {"2014-2019", "Peter Nordström"},
       {"2020-2022", "Ulrika Lidström"},
-      {"2023-2026", "Jeanette Flodell"},
-      {"2026-present", "TBD"}
+      {"2023-2025", "Jeanette Flodell"},
+      {"2026-present", "Peter Nordström"}
     ]
 
     conn
