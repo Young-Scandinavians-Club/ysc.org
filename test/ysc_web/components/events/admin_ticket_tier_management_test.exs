@@ -263,6 +263,48 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
     end
   end
 
+  describe "Partiful - external registration" do
+    test "displays External Registration via Partiful when event has partiful_link" do
+      event =
+        event_fixture(%{
+          partiful_link: "https://partiful.com/e/test-event-xyz"
+        })
+
+      user = user_fixture()
+
+      html =
+        render_component(TicketTierManagement, %{
+          id: "tier-management",
+          event_id: event.id,
+          current_user: user
+        })
+
+      assert html =~ "External Registration via Partiful"
+      assert html =~ "Partiful for registration"
+      assert html =~ "View Partiful Event"
+      assert html =~ "https://partiful.com/e/test-event-xyz"
+    end
+
+    test "does not display ticket tier list when event has partiful_link" do
+      event =
+        event_fixture(%{
+          partiful_link: "https://partiful.com/e/another"
+        })
+
+      user = user_fixture()
+
+      html =
+        render_component(TicketTierManagement, %{
+          id: "tier-management",
+          event_id: event.id,
+          current_user: user
+        })
+
+      refute html =~ "Add Ticket Tier"
+      assert html =~ "External Registration via Partiful"
+    end
+  end
+
   describe "CSV export" do
     test "displays CSV export button" do
       event = event_fixture()

@@ -110,6 +110,9 @@ defmodule Ysc.Events.Event do
     # Optional: External ID from a mapping service (e.g., Google Place ID)
     field :place_id, :string
 
+    # Optional: Partiful event URL for external RSVP (when set, ticket tiers cannot be used)
+    field :partiful_link, :string
+
     has_many :faq_questions, Ysc.Events.FaqQuestion, on_replace: :delete
     has_many :agendas, Ysc.Events.Agenda, on_replace: :delete
     has_many :ticket_tiers, Ysc.Events.TicketTier, on_replace: :delete
@@ -143,6 +146,7 @@ defmodule Ysc.Events.Event do
       :latitude,
       :longitude,
       :place_id,
+      :partiful_link,
       :start_date,
       :start_time,
       :end_date,
@@ -159,6 +163,7 @@ defmodule Ysc.Events.Event do
     |> handle_unlimited_capacity()
     |> put_reference_id()
     |> unique_constraint(:reference_id)
+    |> validate_partiful_link()
     |> validate_publish_dates()
     |> validate_start_end()
     |> optimistic_lock(:lock_version)
@@ -217,6 +222,44 @@ defmodule Ysc.Events.Event do
   end
 
   defp combine_date_time(_, _), do: nil
+
+  defp validate_partiful_link(changeset) do
+    partiful_link = get_field(changeset, :partiful_link)
+
+    case partiful_link do
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      link when is_binary(link) ->
+        link = String.trim(link)
+
+        if link == "" do
+          put_change(changeset, :partiful_link, nil)
+        else
+          changeset = put_change(changeset, :partiful_link, link)
+
+          case URI.parse(link) do
+            %URI{scheme: scheme, host: host}
+            when scheme in ["http", "https"] and not is_nil(host) ->
+              if String.ends_with?(host, "partiful.com") do
+                changeset
+              else
+                add_error(
+                  changeset,
+                  :partiful_link,
+                  "must be a partiful.com URL"
+                )
+              end
+
+            _ ->
+              add_error(changeset, :partiful_link, "must be a valid URL")
+          end
+        end
+    end
+  end
 
   defp put_reference_id(changeset) do
     case get_field(changeset, :reference_id) do

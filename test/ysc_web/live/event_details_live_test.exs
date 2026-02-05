@@ -1121,6 +1121,92 @@ defmodule YscWeb.EventDetailsLiveTest do
     end
   end
 
+  describe "Partiful - event with external registration" do
+    test "displays RSVP on Partiful button and link when event has partiful_link",
+         %{
+           conn: conn
+         } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "Partiful Gala",
+            partiful_link: "https://partiful.com/e/partiful-gala-2026"
+          }
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "RSVP on"
+      assert html =~ "Partiful"
+      assert html =~ "https://partiful.com/e/partiful-gala-2026"
+    end
+
+    test "does not display Partiful CTA when event has no partiful_link", %{
+      conn: conn
+    } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "No Partiful Event"}
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      refute html =~ "RSVP on"
+      assert html =~ "No Partiful Event"
+    end
+
+    test "event with partiful_link shows Partiful CTA for unauthenticated user",
+         %{
+           conn: conn
+         } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "Public Partiful Event",
+            partiful_link: "https://partiful.com/e/public"
+          }
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "RSVP on"
+      assert html =~ "partiful.com/e/public"
+    end
+
+    test "event with tickets and no partiful_link shows Get Tickets flow", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ event.title
+      refute html =~ "RSVP on"
+      assert html =~ "Get Tickets" or html =~ "ticket"
+    end
+
+    test "event with no tickets and no partiful_link shows no registration or Get Tickets",
+         %{
+           conn: conn
+         } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "No Tickets Event"}
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "No Tickets Event"
+      refute html =~ "RSVP on"
+    end
+  end
+
   describe "event with agenda" do
     test "can view event with agenda items", %{conn: conn} do
       event =

@@ -902,4 +902,90 @@ defmodule Ysc.EventsTest do
       assert Map.has_key?(purchase, :total_amount)
     end
   end
+
+  describe "event partiful_link validation" do
+    test "accepts valid partiful.com URL", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Partiful Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:ok, updated} =
+        Events.update_event(event, %{
+          "partiful_link" =>
+            "https://partiful.com/e/g1hU5HXmUnfJwxpW8u8M?c=fLU6roGc"
+        })
+
+      assert updated.partiful_link ==
+               "https://partiful.com/e/g1hU5HXmUnfJwxpW8u8M?c=fLU6roGc"
+    end
+
+    test "trims leading and trailing whitespace from partiful_link", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Partiful Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:ok, updated} =
+        Events.update_event(event, %{
+          "partiful_link" => "  https://partiful.com/e/abc123  "
+        })
+
+      assert updated.partiful_link == "https://partiful.com/e/abc123"
+    end
+
+    test "rejects non-partiful.com URL", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:error, changeset} =
+        Events.update_event(event, %{
+          "partiful_link" => "https://evil.com/phishing"
+        })
+
+      assert %{partiful_link: ["must be a partiful.com URL"]} =
+               errors_on(changeset)
+    end
+
+    test "rejects invalid URL", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:error, changeset} =
+        Events.update_event(event, %{"partiful_link" => "not-a-url"})
+
+      assert %{partiful_link: ["must be a valid URL"]} = errors_on(changeset)
+    end
+
+    test "allows nil and empty partiful_link", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:ok, updated} = Events.update_event(event, %{"partiful_link" => ""})
+      assert updated.partiful_link == nil
+    end
+  end
 end

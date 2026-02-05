@@ -813,34 +813,62 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                     </div>
 
-                    <%= if @has_ticket_tiers do %>
-                      <%= if @event_at_capacity do %>
-                        <div class="w-full">
-                          <.tooltip tooltip_text="This event is sold out">
-                            <.button
-                              :if={@current_user != nil && @active_membership?}
-                              class="w-full py-4 uppercase tracking-widest"
-                              disabled
-                            >
-                              <.icon name="hero-ticket" class="me-2 -mt-0.5" />Sold Out
-                            </.button>
-                          </.tooltip>
-                        </div>
-                      <% else %>
-                        <.button
-                          :if={@current_user != nil && @active_membership?}
-                          class="w-full py-4 uppercase tracking-widest"
-                          phx-click="open-ticket-modal"
-                        >
-                          <.icon name="hero-ticket" class="me-2 -mt-0.5" />Get Tickets
+                    <%= if @event.partiful_link not in [nil, ""] do %>
+                      <a
+                        href={@event.partiful_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="block w-full"
+                      >
+                        <.button class="w-full py-4 flex items-center justify-center gap-2">
+                          <span class="uppercase tracking-widest">RSVP on</span>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            version="1.2"
+                            viewBox="0 0 204 46"
+                            class="h-4 w-auto"
+                          >
+                            <path
+                              style="fill:currentColor"
+                              d="m98.3 14.5c-1.7-1.6-4.4-2.6-7.9-2.6-6.6 0-10.9 3.5-11.3 8.3v0.4l0.4 0.1 4.7 1 0.6 0.2v-0.9c0-1.4 0.4-2.4 1.2-2.9 0.9-0.6 2.2-1 4.1-1 2 0 3.3 0.3 4 1 0.7 0.5 1.1 1.5 1.1 3.2v0.8l-9.3 1q-1.5 0.1-2.9 0.6-1.4 0.4-2.4 1.2c-1.3 1-2 2.4-2 4.3 0 1.8 0.8 3.5 2.1 4.5 1.4 1.1 3.4 1.6 5.6 1.6 4.2 0 7.5-1.6 9.1-4.4v4h5.5v-13.6c0-2.7-0.8-5.1-2.6-6.8zm-5.1 15c-1.3 0.9-3.2 1.3-5.6 1.3-1.3 0-2.1-0.2-2.6-0.5-0.4-0.3-0.7-0.8-0.7-1.4q0.1-0.6 0.2-0.9 0.2-0.3 0.5-0.5c0.4-0.3 1.2-0.5 2.4-0.6l7.7-0.9c-0.1 1.6-0.8 2.7-1.9 3.5zm106.7-24.6h-5.2v30h5.8v-30zm-31.4 1.5l-0.1 0.3-1.5 4.5c0 0-1.2-2.2-4.4-2.2-1.4 0-2.2 0.3-2.6 0.9-0.4 0.5-0.6 1.2-0.5 2.4h7.8v5h-7.7v17.6h-5.8v-17.6h-3.2v-5h3.3c0.1-2.3 0.9-4.3 2.3-5.6 1.5-1.5 3.7-2.3 6.4-2.3 2.2 0 4.4 0.7 5.8 1.8zm18.4 5.9h-0.5v11.2c0 2.2-0.5 3.8-1.5 4.8-1 1.1-2.5 1.7-4.8 1.7-2.3 0-3.6-0.5-4.5-1.4-0.9-0.9-1.3-2.2-1.3-4.1v-12.2h-5.8v13.5c0 2.5 0.8 4.9 2.4 6.7 1.6 1.7 4 2.8 7.1 2.8 2.9 0 5.1-0.9 6.7-2.3 0.9-0.8 1.6-1.8 2.1-2.8v4.6h5.3v-22.5zm-63.8 7.5c0 1.3-0.2 2.6-0.7 3.6l-0.2 0.4h-5.6l0.3-0.8q0.4-1 0.4-2.3c0-1.4-0.3-2.3-0.8-2.8-0.6-0.6-1.5-0.9-3.1-0.9-1.7 0-2.8 0.4-3.5 1.3-0.7 0.8-1 2.1-1 4v12.5h-5.8v-22.5h5.4v3.7q0.6-1.2 1.7-2.2c1.3-1.2 3.1-1.9 5.4-1.9 2.6 0 4.5 0.9 5.7 2.4 1.3 1.5 1.8 3.4 1.8 5.5zm20.5-7.5h-0.5v22.5h5.7v-22.5zm4.8-7.1c-0.6-0.5-1.4-0.7-2.4-0.7-1 0-1.9 0.2-2.5 0.7-0.6 0.5-0.9 1.2-0.9 2 0 0.9 0.3 1.6 0.9 2.1 0.6 0.5 1.5 0.7 2.5 0.7 0.9 0 1.8-0.2 2.4-0.7 0.7-0.5 1-1.2 1-2.1q0-1.3-1-2zm-6.3 27.1l-0.2 0.2c-1.4 1.8-4 2.8-6.7 2.8-2.5 0-4.5-0.8-5.8-2.3-1.4-1.4-2.1-3.5-2.1-6.1v-9.6h-3.6v-5h3.6v-4.7h5.8v4.7h7.7v5h-7.7v9.7c0 1.1 0.3 1.8 0.7 2.3 0.5 0.4 1.2 0.7 2.3 0.7 1.8 0 3.2-0.6 3.9-1.9l0.6-1.1 0.4 1.2 1 3.8c0 0 0.1 0.3 0.1 0.3zm-67.6-17.1c-1.9-2.1-4.6-3.2-8.1-3.2-2.5 0-4.7 0.6-6.3 1.8-1 0.7-1.8 1.7-2.3 2.9v-4.3h-5.5v29.8h5.8v-11.4c0.5 1.1 1.3 1.9 2.2 2.6 1.6 1.3 3.7 1.9 6.2 1.9 3.5 0 6.2-1.1 8-3.2 1.9-2.1 2.8-5 2.8-8.5 0-3.4-0.9-6.3-2.8-8.4zm-16.4 8.4c0-2.2 0.6-3.7 1.7-4.7 1.2-1 2.9-1.6 5.1-1.6 2.3 0 3.8 0.5 4.9 1.4 1.1 0.9 1.7 2.5 1.7 4.9 0 2.5-0.6 4-1.7 5-1 0.9-2.7 1.3-4.9 1.3q-3.3 0-5-1.4c-1.1-1-1.8-2.5-1.8-4.5zm-48.6 18.9c4.3 0 7.6-4 7.6-7.8 0-2.3-1.2-3.2-1.2-4.9 0-1.4 0.9-1.9 1.7-1.9 1 0 2.1 0.8 4.5 0.8 5.6 0 13.6-4.4 13.6-11.8 0-7.9-9.1-12.6-17.7-12.6-7.1 0-14.7 2.9-14.7 7.9 0 5.4 8.8 5.6 8.8 9.7 0 4.4-9.9 5-9.9 12.6 0 4.2 3.1 8 7.3 8zm-1.9-5.5c-1.9 0-3.2-1.4-3.2-3.4 0-6.2 12.4-8.7 12.4-13.5 0-4.6-11-2.6-11-6.4 0-2.4 3.9-3 7-3 6.5 0 13.5 2.8 13.5 8.5 0 3.2-2.8 7-7.4 7-0.8 0-1.3-0.1-2.3-0.1-9.6 0-3.8 10.9-9 10.9z"
+                            />
+                          </svg>
+                          <.icon
+                            name="hero-arrow-top-right-on-square"
+                            class="w-4 h-4 -mt-0.5"
+                          />
                         </.button>
-                      <% end %>
+                      </a>
                     <% else %>
-                      <div class="w-full text-center py-2">
-                        <p class="font-bold text-green-700 text-sm">
-                          No registration required
-                        </p>
-                      </div>
+                      <%= if @has_ticket_tiers do %>
+                        <%= if @event_at_capacity do %>
+                          <div class="w-full">
+                            <.tooltip tooltip_text="This event is sold out">
+                              <.button
+                                :if={@current_user != nil && @active_membership?}
+                                class="w-full py-4 uppercase tracking-widest"
+                                disabled
+                              >
+                                <.icon name="hero-ticket" class="me-2 -mt-0.5" />Sold Out
+                              </.button>
+                            </.tooltip>
+                          </div>
+                        <% else %>
+                          <.button
+                            :if={@current_user != nil && @active_membership?}
+                            class="w-full py-4 uppercase tracking-widest"
+                            phx-click="open-ticket-modal"
+                          >
+                            <.icon name="hero-ticket" class="me-2 -mt-0.5" />Get Tickets
+                          </.button>
+                        <% end %>
+                      <% else %>
+                        <div class="w-full text-center py-2">
+                          <p class="font-bold text-green-700 text-sm">
+                            No registration required
+                          </p>
+                        </div>
+                      <% end %>
                     <% end %>
                   </div>
                 <% end %>
@@ -932,44 +960,72 @@ defmodule YscWeb.EventDetailsLive do
                   <%= if event_in_past?(@event) do %>
                     <!-- No action button for past events -->
                   <% else %>
-                    <%= if @current_user == nil && @has_ticket_tiers do %>
-                      <.button
-                        class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
-                        phx-click={
-                          JS.navigate(
-                            ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
-                          )
-                        }
+                    <%= if @event.partiful_link not in [nil, ""] do %>
+                      <a
+                        href={@event.partiful_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex-shrink-0"
                       >
-                        <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign In to Continue
-                      </.button>
+                        <.button class="px-8 py-3.5 flex items-center justify-center gap-2">
+                          <span class="uppercase tracking-widest">RSVP on</span>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            version="1.2"
+                            viewBox="0 0 204 46"
+                            class="h-4 w-auto"
+                          >
+                            <path
+                              style="fill:currentColor"
+                              d="m98.3 14.5c-1.7-1.6-4.4-2.6-7.9-2.6-6.6 0-10.9 3.5-11.3 8.3v0.4l0.4 0.1 4.7 1 0.6 0.2v-0.9c0-1.4 0.4-2.4 1.2-2.9 0.9-0.6 2.2-1 4.1-1 2 0 3.3 0.3 4 1 0.7 0.5 1.1 1.5 1.1 3.2v0.8l-9.3 1q-1.5 0.1-2.9 0.6-1.4 0.4-2.4 1.2c-1.3 1-2 2.4-2 4.3 0 1.8 0.8 3.5 2.1 4.5 1.4 1.1 3.4 1.6 5.6 1.6 4.2 0 7.5-1.6 9.1-4.4v4h5.5v-13.6c0-2.7-0.8-5.1-2.6-6.8zm-5.1 15c-1.3 0.9-3.2 1.3-5.6 1.3-1.3 0-2.1-0.2-2.6-0.5-0.4-0.3-0.7-0.8-0.7-1.4q0.1-0.6 0.2-0.9 0.2-0.3 0.5-0.5c0.4-0.3 1.2-0.5 2.4-0.6l7.7-0.9c-0.1 1.6-0.8 2.7-1.9 3.5zm106.7-24.6h-5.2v30h5.8v-30zm-31.4 1.5l-0.1 0.3-1.5 4.5c0 0-1.2-2.2-4.4-2.2-1.4 0-2.2 0.3-2.6 0.9-0.4 0.5-0.6 1.2-0.5 2.4h7.8v5h-7.7v17.6h-5.8v-17.6h-3.2v-5h3.3c0.1-2.3 0.9-4.3 2.3-5.6 1.5-1.5 3.7-2.3 6.4-2.3 2.2 0 4.4 0.7 5.8 1.8zm18.4 5.9h-0.5v11.2c0 2.2-0.5 3.8-1.5 4.8-1 1.1-2.5 1.7-4.8 1.7-2.3 0-3.6-0.5-4.5-1.4-0.9-0.9-1.3-2.2-1.3-4.1v-12.2h-5.8v13.5c0 2.5 0.8 4.9 2.4 6.7 1.6 1.7 4 2.8 7.1 2.8 2.9 0 5.1-0.9 6.7-2.3 0.9-0.8 1.6-1.8 2.1-2.8v4.6h5.3v-22.5zm-63.8 7.5c0 1.3-0.2 2.6-0.7 3.6l-0.2 0.4h-5.6l0.3-0.8q0.4-1 0.4-2.3c0-1.4-0.3-2.3-0.8-2.8-0.6-0.6-1.5-0.9-3.1-0.9-1.7 0-2.8 0.4-3.5 1.3-0.7 0.8-1 2.1-1 4v12.5h-5.8v-22.5h5.4v3.7q0.6-1.2 1.7-2.2c1.3-1.2 3.1-1.9 5.4-1.9 2.6 0 4.5 0.9 5.7 2.4 1.3 1.5 1.8 3.4 1.8 5.5zm20.5-7.5h-0.5v22.5h5.7v-22.5zm4.8-7.1c-0.6-0.5-1.4-0.7-2.4-0.7-1 0-1.9 0.2-2.5 0.7-0.6 0.5-0.9 1.2-0.9 2 0 0.9 0.3 1.6 0.9 2.1 0.6 0.5 1.5 0.7 2.5 0.7 0.9 0 1.8-0.2 2.4-0.7 0.7-0.5 1-1.2 1-2.1q0-1.3-1-2zm-6.3 27.1l-0.2 0.2c-1.4 1.8-4 2.8-6.7 2.8-2.5 0-4.5-0.8-5.8-2.3-1.4-1.4-2.1-3.5-2.1-6.1v-9.6h-3.6v-5h3.6v-4.7h5.8v4.7h7.7v5h-7.7v9.7c0 1.1 0.3 1.8 0.7 2.3 0.5 0.4 1.2 0.7 2.3 0.7 1.8 0 3.2-0.6 3.9-1.9l0.6-1.1 0.4 1.2 1 3.8c0 0 0.1 0.3 0.1 0.3zm-67.6-17.1c-1.9-2.1-4.6-3.2-8.1-3.2-2.5 0-4.7 0.6-6.3 1.8-1 0.7-1.8 1.7-2.3 2.9v-4.3h-5.5v29.8h5.8v-11.4c0.5 1.1 1.3 1.9 2.2 2.6 1.6 1.3 3.7 1.9 6.2 1.9 3.5 0 6.2-1.1 8-3.2 1.9-2.1 2.8-5 2.8-8.5 0-3.4-0.9-6.3-2.8-8.4zm-16.4 8.4c0-2.2 0.6-3.7 1.7-4.7 1.2-1 2.9-1.6 5.1-1.6 2.3 0 3.8 0.5 4.9 1.4 1.1 0.9 1.7 2.5 1.7 4.9 0 2.5-0.6 4-1.7 5-1 0.9-2.7 1.3-4.9 1.3q-3.3 0-5-1.4c-1.1-1-1.8-2.5-1.8-4.5zm-48.6 18.9c4.3 0 7.6-4 7.6-7.8 0-2.3-1.2-3.2-1.2-4.9 0-1.4 0.9-1.9 1.7-1.9 1 0 2.1 0.8 4.5 0.8 5.6 0 13.6-4.4 13.6-11.8 0-7.9-9.1-12.6-17.7-12.6-7.1 0-14.7 2.9-14.7 7.9 0 5.4 8.8 5.6 8.8 9.7 0 4.4-9.9 5-9.9 12.6 0 4.2 3.1 8 7.3 8zm-1.9-5.5c-1.9 0-3.2-1.4-3.2-3.4 0-6.2 12.4-8.7 12.4-13.5 0-4.6-11-2.6-11-6.4 0-2.4 3.9-3 7-3 6.5 0 13.5 2.8 13.5 8.5 0 3.2-2.8 7-7.4 7-0.8 0-1.3-0.1-2.3-0.1-9.6 0-3.8 10.9-9 10.9z"
+                            />
+                          </svg>
+                          <.icon
+                            name="hero-arrow-top-right-on-square"
+                            class="w-4 h-4 -mt-0.5"
+                          />
+                        </.button>
+                      </a>
                     <% else %>
-                      <%= if @has_ticket_tiers do %>
-                        <%= if @event_at_capacity do %>
-                          <div class="text-red-700 font-black text-sm text-center">
-                            Sold Out
-                          </div>
-                        <% else %>
-                          <%= if @active_membership? do %>
-                            <.button
-                              class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
-                              phx-click="open-ticket-modal"
-                            >
-                              <.icon
-                                name="hero-ticket"
-                                class="w-5 h-5 me-2 -mt-0.5"
-                              />Get Tickets
-                            </.button>
-                          <% else %>
-                            <div class="text-orange-700 font-black text-sm text-center">
-                              Membership Required
-                            </div>
-                          <% end %>
-                        <% end %>
+                      <%= if @current_user == nil && @has_ticket_tiers do %>
+                        <.button
+                          class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                          phx-click={
+                            JS.navigate(
+                              ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
+                            )
+                          }
+                        >
+                          <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign In to Continue
+                        </.button>
                       <% else %>
-                        <span class="text-xs font-black text-green-700 uppercase tracking-widest">
-                          No registration required
-                        </span>
+                        <%= if @has_ticket_tiers do %>
+                          <%= if @event_at_capacity do %>
+                            <div class="text-red-700 font-black text-sm text-center">
+                              Sold Out
+                            </div>
+                          <% else %>
+                            <%= if @active_membership? do %>
+                              <.button
+                                class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                                phx-click="open-ticket-modal"
+                              >
+                                <.icon
+                                  name="hero-ticket"
+                                  class="w-5 h-5 me-2 -mt-0.5"
+                                />Get Tickets
+                              </.button>
+                            <% else %>
+                              <div class="text-orange-700 font-black text-sm text-center">
+                                Membership Required
+                              </div>
+                            <% end %>
+                          <% end %>
+                        <% else %>
+                          <span class="text-xs font-black text-green-700 uppercase tracking-widest">
+                            No registration required
+                          </span>
+                        <% end %>
                       <% end %>
                     <% end %>
                   <% end %>

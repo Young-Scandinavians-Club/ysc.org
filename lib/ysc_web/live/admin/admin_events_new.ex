@@ -168,16 +168,22 @@ defmodule YscWeb.AdminEventsNewLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/events/#{@event.id}/tickets"}
+                  navigate={
+                    if @partiful_link_present,
+                      do: "#",
+                      else: ~p"/admin/events/#{@event.id}/tickets"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :tickets &&
+                    @partiful_link_present && "opacity-50 cursor-not-allowed",
+                    !@partiful_link_present && @live_action == :tickets &&
                       "text-blue-600 border-blue-600 active",
-                    @live_action != :tickets &&
+                    !@partiful_link_present && @live_action != :tickets &&
                       "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
                   ]}
                 >
-                  Tickets
+                  Tickets <%= if @partiful_link_present,
+                    do: "(Disabled - Using Partiful)" %>
                 </.link>
               </li>
             </ul>
@@ -255,6 +261,28 @@ defmodule YscWeb.AdminEventsNewLive do
                 phx-debounce="300"
                 required
               />
+              <.input
+                type="text"
+                field={@form[:partiful_link]}
+                label="Partiful Link (Optional)"
+                placeholder="https://partiful.com/e/..."
+                phx-debounce="300"
+                disabled={@ticket_tier_count > 0}
+              />
+              <p
+                :if={@ticket_tier_count > 0}
+                class="text-xs text-amber-700 -mt-2 flex items-start gap-1.5"
+              >
+                <.icon
+                  name="hero-information-circle"
+                  class="w-4 h-4 flex-shrink-0 mt-0.5"
+                />
+                Partiful cannot be used when this event has ticket tiers. Remove all ticket tiers on the Tickets tab to add a Partiful link.
+              </p>
+              <p :if={@ticket_tier_count == 0} class="text-xs text-zinc-500 -mt-2">
+                If you're using Partiful for registration, paste the event link here.
+                When provided, ticket tiers cannot be added.
+              </p>
             </div>
 
             <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
@@ -484,6 +512,7 @@ defmodule YscWeb.AdminEventsNewLive do
               id={"ticket-tier-management-#{@event.id}"}
               module={YscWeb.AdminEventsLive.TicketTierManagement}
               event_id={@event.id}
+              event={@event}
               current_user={@current_user}
             />
           </div>
@@ -527,6 +556,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:end_time, event.end_time)
      |> assign(:ticket_count, length(tickets))
      |> assign(:ticket_tier_count, length(ticket_tiers))
+     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
      |> assign(trigger_submit: false, check_errors: false)
      |> stream(:agendas, agendas)
      |> assign(form: to_form(event_changeset, as: "event"))
@@ -696,6 +726,10 @@ defmodule YscWeb.AdminEventsNewLive do
     {:noreply,
      assign_form(socket, updated_changeset)
      |> assign(:event, updated_event)
+     |> assign(
+       :partiful_link_present,
+       updated_event.partiful_link not in [nil, ""]
+     )
      |> assign(
        description_length: String.length(event_params["description"] || "")
      )
@@ -897,6 +931,7 @@ defmodule YscWeb.AdminEventsNewLive do
       {:noreply,
        socket
        |> assign(:event, event)
+       |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
        |> assign(:event_title, event.title)
        |> assign(:state, event.state)
        |> assign(:start_date, event.start_date)
