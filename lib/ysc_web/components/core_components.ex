@@ -70,15 +70,18 @@ defmodule YscWeb.CoreComponents do
         tabindex="0"
       >
         <div class="flex items-center justify-center min-h-full">
-          <div class={"w-full #{if @fullscreen == true, do: "w-full", else: @max_width} p-4 sm:p-6 lg:py-8"}>
+          <div class={[
+            "w-full sm:p-4 sm:py-6 lg:py-8",
+            unless(@fullscreen == true, do: @max_width, else: "")
+          ]}>
             <.focus_wrap
               id={"#{@id}-container"}
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 rounded p-8 ring-1"
+              class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1 p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
             >
-              <div class="absolute top-6 right-7">
+              <div class="absolute top-4 right-4 sm:top-6 sm:right-7">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
@@ -1426,257 +1429,261 @@ defmodule YscWeb.CoreComponents do
       aria-label="Sidebar"
       phx-click-away={hide_sidebar("#admin-navigation")}
     >
-      <div class="h-full px-5 py-8 overflow-y-auto bg-zinc-900 relative">
-        <.link navigate="/" class="items-center group ps-2.5 mb-5 inline-block">
-          <div class="flex items-center gap-2">
-            <.ysc_logo class="h-20 me-3" />
-            <span class="text-[10px] font-black bg-zinc-800 text-white px-2 py-0.5 rounded">
-              ADMIN
+      <div class="h-full flex flex-col bg-zinc-900">
+        <%!-- Scrollable content area --%>
+        <div class="flex-1 overflow-y-auto px-5 py-8">
+          <.link navigate="/" class="items-center group ps-2.5 mb-5 inline-block">
+            <div class="flex items-center gap-2">
+              <.ysc_logo class="h-20 me-3" />
+              <span class="text-[10px] font-black bg-zinc-800 text-white px-2 py-0.5 rounded">
+                ADMIN
+              </span>
+            </div>
+            <span class="block group-hover:underline text-sm font-bold text-zinc-400 py-4">
+              Go to site <.icon name="hero-arrow-right" class="h-4 w-4" />
             </span>
-          </div>
-          <span class="block group-hover:underline text-sm font-bold text-zinc-400 py-4">
-            Go to site <.icon name="hero-arrow-right" class="h-4 w-4" />
-          </span>
-        </.link>
+          </.link>
 
-        <ul class="space-y-2 leading-6 mt-4 font-medium">
-          <li>
-            <.link
-              navigate="/admin"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :dashboard,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :dashboard}
-            >
-              <.icon
-                :if={@active_page == :dashboard}
-                name="hero-chart-pie"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :dashboard}
-                name="hero-chart-pie"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :dashboard && "font-semibold"]}>
-                Overview
-              </span>
-            </.link>
-          </li>
+          <ul class="space-y-2 leading-6 mt-4 font-medium">
+            <li>
+              <.link
+                navigate="/admin"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :dashboard,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :dashboard}
+              >
+                <.icon
+                  :if={@active_page == :dashboard}
+                  name="hero-chart-pie"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :dashboard}
+                  name="hero-chart-pie"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :dashboard && "font-semibold"]}>
+                  Overview
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/posts"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :news,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :news}
-            >
-              <.icon
-                :if={@active_page == :news}
-                name="hero-document-text"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :news}
-                name="hero-document-text"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :news && "font-semibold"]}>
-                Posts
-              </span>
-            </.link>
-          </li>
+            <li>
+              <.link
+                navigate="/admin/posts"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :news,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :news}
+              >
+                <.icon
+                  :if={@active_page == :news}
+                  name="hero-document-text"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :news}
+                  name="hero-document-text"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :news && "font-semibold"]}>
+                  Posts
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/events"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :events,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :events}
-            >
-              <.icon
-                :if={@active_page == :events}
-                name="hero-calendar"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :events}
-                name="hero-calendar"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :events && "font-semibold"]}>
-                Events
-              </span>
-            </.link>
-          </li>
+            <li>
+              <.link
+                navigate="/admin/events"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :events,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :events}
+              >
+                <.icon
+                  :if={@active_page == :events}
+                  name="hero-calendar"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :events}
+                  name="hero-calendar"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :events && "font-semibold"]}>
+                  Events
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/bookings"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :bookings,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :bookings}
-            >
-              <.icon
-                :if={@active_page == :bookings}
-                name="hero-home"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :bookings}
-                name="hero-home"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :bookings && "font-semibold"]}>
-                Bookings
-              </span>
-            </.link>
-          </li>
+            <li>
+              <.link
+                navigate="/admin/bookings"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :bookings,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :bookings}
+              >
+                <.icon
+                  :if={@active_page == :bookings}
+                  name="hero-home"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :bookings}
+                  name="hero-home"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :bookings && "font-semibold"]}>
+                  Bookings
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/users"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :members,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :members}
-            >
-              <.icon
-                :if={@active_page == :members}
-                name="hero-users"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :members}
-                name="hero-users"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :members && "font-semibold"]}>
-                Users
-              </span>
-            </.link>
-          </li>
+            <li>
+              <.link
+                navigate="/admin/users"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :members,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :members}
+              >
+                <.icon
+                  :if={@active_page == :members}
+                  name="hero-users"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :members}
+                  name="hero-users"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :members && "font-semibold"]}>
+                  Users
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/money"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :money,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :money}
-            >
-              <.icon
-                :if={@active_page == :money}
-                name="hero-wallet"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :money}
-                name="hero-wallet"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :money && "font-semibold"]}>
-                Money
-              </span>
-            </.link>
-          </li>
+            <li>
+              <.link
+                navigate="/admin/money"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :money,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :money}
+              >
+                <.icon
+                  :if={@active_page == :money}
+                  name="hero-wallet"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :money}
+                  name="hero-wallet"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :money && "font-semibold"]}>
+                  Money
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/media"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :media,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :media}
-            >
-              <.icon
-                :if={@active_page == :media}
-                name="hero-photo"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :media}
-                name="hero-photo"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={["ms-3", @active_page == :media && "font-semibold"]}>
-                Media
-              </span>
-            </.link>
-          </li>
+            <li>
+              <.link
+                navigate="/admin/media"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :media,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :media}
+              >
+                <.icon
+                  :if={@active_page == :media}
+                  name="hero-photo"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :media}
+                  name="hero-photo"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={["ms-3", @active_page == :media && "font-semibold"]}>
+                  Media
+                </span>
+              </.link>
+            </li>
 
-          <li>
-            <.link
-              navigate="/admin/settings"
-              class={[
-                "flex items-center px-3 py-4 rounded group transition-colors",
-                if(@active_page == :admin_settings,
-                  do:
-                    "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                  else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                )
-              ]}
-              aria-current={@active_page == :admin_settings}
-            >
-              <.icon
-                :if={@active_page == :admin_settings}
-                name="hero-cog-6-tooth"
-                class="w-5 h-5 transition duration-75 text-blue-400"
-              />
-              <.icon
-                :if={@active_page != :admin_settings}
-                name="hero-cog-6-tooth"
-                class="w-5 h-5 transition duration-75 text-blue-500"
-              />
-              <span class={[
-                "ms-3",
-                @active_page == :admin_settings && "font-semibold"
-              ]}>
-                Settings
-              </span>
-            </.link>
-          </li>
-        </ul>
+            <li>
+              <.link
+                navigate="/admin/settings"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :admin_settings,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :admin_settings}
+              >
+                <.icon
+                  :if={@active_page == :admin_settings}
+                  name="hero-cog-6-tooth"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :admin_settings}
+                  name="hero-cog-6-tooth"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={[
+                  "ms-3",
+                  @active_page == :admin_settings && "font-semibold"
+                ]}>
+                  Settings
+                </span>
+              </.link>
+            </li>
+          </ul>
+        </div>
 
-        <div class="absolute inset-x-0 bottom-0 px-4 py-4 border-t border-zinc-700 bg-zinc-900">
+        <%!-- Fixed bottom user card --%>
+        <div class="flex-shrink-0 px-4 py-4 border-t border-zinc-700 bg-zinc-900">
           <.user_card
             email={@email}
             user_id={@user_id}
@@ -2634,6 +2641,19 @@ defmodule YscWeb.CoreComponents do
         </.form>
       </div>
     </article>
+    """
+  end
+
+  attr :id, :string, required: true
+
+  def dummy_component(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="max-w-0 sm:min-h-0 md:min-h-0 min-h-0 border-1 border-orange-500 hover:border-orange-500 transition-all duration-300"
+    >
+      <p>Dummy component</p>
+    </div>
     """
   end
 

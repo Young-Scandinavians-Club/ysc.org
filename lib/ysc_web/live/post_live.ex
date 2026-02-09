@@ -31,7 +31,7 @@ defmodule YscWeb.PostLive do
     >
       <div
         id="reading-progress"
-        class="h-full bg-teal-500 transition-all duration-150"
+        class="h-full bg-blue-500 transition-all duration-150"
         style="width: 0%"
       >
       </div>
@@ -50,7 +50,7 @@ defmodule YscWeb.PostLive do
       <div :if={@post != nil} class="max-w-screen-lg mx-auto px-4">
         <div class="max-w-3xl mx-auto text-center mb-12">
           <div class="flex items-center justify-center gap-3 mb-6">
-            <span class="text-[10px] font-black text-teal-600 uppercase tracking-[0.3em]">
+            <span class="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">
               Club News
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
@@ -117,7 +117,7 @@ defmodule YscWeb.PostLive do
 
       <%!-- Typography Palate Cleanser with Drop Cap --%>
       <div :if={@post != nil} class="max-w-screen-lg mx-auto px-4">
-        <article class="prose prose-zinc prose-lg lg:prose-xl prose-a:text-teal-600 prose-strong:text-zinc-900 max-w-3xl mx-auto py-12 bg-zinc-50/50 rounded-xl px-8 md:px-12">
+        <article class="prose prose-zinc prose-lg lg:prose-xl prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-3xl mx-auto py-12 bg-zinc-50/50 rounded-xl px-8 md:px-12">
           <div
             id="article-body"
             class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-light border-l border-zinc-100 ml-[-2rem] pl-8"
@@ -136,7 +136,7 @@ defmodule YscWeb.PostLive do
         <section class="max-w-2xl mx-auto">
           <div class="bg-white border border-zinc-200 rounded-xl p-10 shadow-sm">
             <div class="flex items-center gap-3 mb-8">
-              <div class="w-1.5 h-6 bg-teal-500 rounded-full"></div>
+              <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
               <h2 class="text-2xl font-black text-zinc-900 tracking-tight">
                 Community Discussion (<%= @n_comments %>)
               </h2>
@@ -153,7 +153,7 @@ defmodule YscWeb.PostLive do
                 type="textarea"
                 id="comment"
                 rows="4"
-                class="w-full bg-zinc-50 border-none rounded-lg p-6 text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-teal-500/20 transition-all min-h-[120px]"
+                class="w-full bg-zinc-50 border-none rounded-lg p-6 text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/20 transition-all min-h-[120px]"
                 placeholder="Share your thoughts..."
                 required
               >

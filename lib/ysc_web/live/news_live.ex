@@ -230,7 +230,7 @@ defmodule YscWeb.NewsLive do
 
             <div class="px-4 pb-4 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
-                <span class="text-[10px] font-black text-teal-600 uppercase tracking-[0.2em]">
+                <span class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">
                   <%= Timex.format!(post.published_on, "{Mshort} {D}") %>
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
