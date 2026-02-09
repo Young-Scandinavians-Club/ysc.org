@@ -66,7 +66,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       </h4>
                       <.badge
                         type={tier_status_badge_type(ticket_tier)}
-                        class="text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
+                        class="text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
                       >
                         <%= tier_status_text(ticket_tier) %>
                       </.badge>
@@ -89,7 +89,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
                       <div>
-                        <p class="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
                           Price
                         </p>
                         <p class="text-sm font-bold text-zinc-800">
@@ -107,7 +107,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       </div>
 
                       <div>
-                        <p class="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
                           Sold
                         </p>
                         <div class="flex items-center gap-2">
@@ -152,7 +152,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       </div>
 
                       <div>
-                        <p class="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
                           Sales Period
                         </p>
                         <p class="text-sm text-zinc-700 whitespace-nowrap">
@@ -164,7 +164,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       </div>
 
                       <div>
-                        <p class="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
                           Registration
                         </p>
                         <p class="text-sm text-zinc-700">

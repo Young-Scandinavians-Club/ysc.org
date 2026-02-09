@@ -83,7 +83,7 @@ defmodule YscWeb.EventDetailsLive do
                   </p>
                   <%= if @event_selling_fast do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
-                    <span class="text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded uppercase tracking-widest">
+                    <span class="text-xs font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded uppercase tracking-widest">
                       Going Fast!
                     </span>
                   <% end %>
@@ -171,7 +171,7 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex items-center justify-between mb-6">
                       <div class="flex items-center gap-2">
                         <span class={[
-                          "px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg border",
+                          "px-3 py-1 text-xs font-black uppercase tracking-widest rounded-lg border",
                           if(all_refunded,
                             do: "bg-red-500/20 text-red-400 border-red-500/30",
                             else:
@@ -182,7 +182,7 @@ defmodule YscWeb.EventDetailsLive do
                         </span>
                         <%= if purchase_date do %>
                           <span class={[
-                            "text-[10px] uppercase tracking-widest",
+                            "text-xs uppercase tracking-widest",
                             if(all_refunded,
                               do: "text-red-300/70",
                               else: "text-zinc-500"
@@ -192,12 +192,12 @@ defmodule YscWeb.EventDetailsLive do
                           </span>
                         <% end %>
                         <%= if all_refunded do %>
-                          <span class="px-3 py-1 bg-red-500/20 text-red-300 text-[10px] font-black uppercase tracking-widest rounded-lg border border-red-500/30">
+                          <span class="px-3 py-1 bg-red-500/20 text-red-300 text-xs font-black uppercase tracking-widest rounded-lg border border-red-500/30">
                             Fully Refunded
                           </span>
                         <% else %>
                           <%= if partial_refund do %>
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase tracking-widest rounded-lg border border-amber-500/30">
+                            <span class="px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-black uppercase tracking-widest rounded-lg border border-amber-500/30">
                               Partially Refunded
                             </span>
                           <% end %>
@@ -356,7 +356,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse">
                     </span>
-                    <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                    <span class="text-xs font-black text-blue-600 uppercase tracking-widest">
                       Upcoming
                     </span>
                   </div>
@@ -664,10 +664,10 @@ defmodule YscWeb.EventDetailsLive do
                         <%= if sold_percentage != nil do %>
                           <div class="space-y-2">
                             <div class="flex justify-between items-end">
-                              <p class="text-[10px] font-black text-orange-600 uppercase tracking-widest">
+                              <p class="text-xs font-black text-orange-600 uppercase tracking-widest">
                                 Limited Availability
                               </p>
-                              <p class="text-[10px] font-mono text-zinc-400">
+                              <p class="text-xs font-mono text-zinc-400">
                                 <%= sold_percentage %>% Booked
                               </p>
                             </div>
@@ -931,12 +931,12 @@ defmodule YscWeb.EventDetailsLive do
                           <%= @event.pricing_info.display_text %>
                         </p>
                         <%= if @event_selling_fast && !@event_at_capacity do %>
-                          <span class="text-[9px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded">
+                          <span class="text-xs font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded">
                             Going Fast
                           </span>
                         <% else %>
                           <%= if event_live?(@event) do %>
-                            <span class="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded">
+                            <span class="text-xs font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded">
                               Live
                             </span>
                           <% end %>
@@ -944,7 +944,7 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                       <%= if @event.start_date != nil do %>
                         <%!-- Mobile: Short format (Wed, Dec 25) --%>
-                        <p class="sm:hidden text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                        <p class="sm:hidden text-xs font-bold text-zinc-400 uppercase tracking-widest truncate">
                           <%= format_start_date_short(@event.start_date) %>
                           <%= if @event.start_time != nil do %>
                             • <%= case format_time(@event.start_time) do
@@ -957,7 +957,7 @@ defmodule YscWeb.EventDetailsLive do
                           <% end %>
                         </p>
                         <%!-- Desktop: Full format (Wednesday, December 25) --%>
-                        <p class="hidden sm:block text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                        <p class="hidden sm:block text-xs font-bold text-zinc-400 uppercase tracking-widest truncate">
                           <%= format_start_date(@event.start_date) %>
                           <%= if @event.start_time != nil do %>
                             • <%= case format_time(@event.start_time) do
@@ -1244,7 +1244,7 @@ defmodule YscWeb.EventDetailsLive do
                             }
                             placeholder="0.00"
                             disabled={false}
-                            class="w-full sm:w-32 border-0 focus:ring-0 focus:outline-none font-medium text-zinc-900"
+                            class="w-full sm:w-32 border-0 focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900"
                           />
                         </div>
                       </div>

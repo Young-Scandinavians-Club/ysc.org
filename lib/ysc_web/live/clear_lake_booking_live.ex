@@ -441,7 +441,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-lg">
               Clear Lake Portal
             </h1>
-            <span class="px-2 py-1 bg-teal-600 mt-1 text-white text-[10px] font-bold uppercase tracking-widest rounded-full border border-teal-500 backdrop-blur-sm">
+            <span class="px-2 py-1 bg-teal-600 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-teal-500 backdrop-blur-sm">
               Member Access
             </span>
           </div>
@@ -463,7 +463,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <%= for booking <- @active_bookings do %>
               <div class="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
                 <div class="flex justify-between items-start mb-3">
-                  <span class="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
+                  <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
                     <%= booking.reference_id %>
                   </span>
                   <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>

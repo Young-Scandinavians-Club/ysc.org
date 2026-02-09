@@ -743,7 +743,7 @@ defmodule YscWeb.TahoeBookingLive do
               <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-lg">
                 Lake Tahoe Cabin
               </h1>
-              <span class="px-2 py-1 bg-blue-700/90 mt-1 text-white text-[10px] font-bold uppercase tracking-widest rounded-full border border-blue-500/50 backdrop-blur-sm">
+              <span class="px-2 py-1 bg-blue-700/90 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-blue-500/50 backdrop-blur-sm">
                 Member Access
               </span>
             </div>
@@ -791,7 +791,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl flex-shrink-0">🧺</span>
               <div>
-                <p class="text-[10px] font-black text-blue-400 uppercase">
+                <p class="text-xs font-black text-blue-400 uppercase">
                   Mandatory
                 </p>
                 <p class="text-xs font-bold leading-tight">BRING YOUR OWN LINENS</p>
@@ -800,7 +800,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl flex-shrink-0">🚫</span>
               <div>
-                <p class="text-[10px] font-black text-zinc-400 uppercase">
+                <p class="text-xs font-black text-zinc-400 uppercase">
                   Enforced
                 </p>
                 <p class="text-xs font-bold leading-tight">NO PETS / NO SMOKING</p>
@@ -809,7 +809,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl flex-shrink-0">❄️</span>
               <div>
-                <p class="text-[10px] font-black text-amber-400 uppercase">
+                <p class="text-xs font-black text-amber-400 uppercase">
                   Safety
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -820,7 +820,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl flex-shrink-0">🧹</span>
               <div>
-                <p class="text-[10px] font-black text-zinc-400 uppercase">
+                <p class="text-xs font-black text-zinc-400 uppercase">
                   Community
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -842,7 +842,7 @@ defmodule YscWeb.TahoeBookingLive do
               <%= for booking <- @active_bookings do %>
                 <div class="bg-white border-2 border-blue-100 rounded-xl p-5 shadow-sm">
                   <div class="flex justify-between items-start mb-3">
-                    <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                    <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                       <%= booking.reference_id %>
                     </span>
                     <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>
@@ -2243,7 +2243,7 @@ defmodule YscWeb.TahoeBookingLive do
                               name="hero-information-circle"
                               class="w-3 h-3 text-amber-600 flex-shrink-0 mt-0.5"
                             />
-                            <p class="text-[10px] text-amber-800 leading-tight">
+                            <p class="text-xs text-amber-800 leading-tight">
                               Minimum occupancy pricing applied
                             </p>
                           </div>

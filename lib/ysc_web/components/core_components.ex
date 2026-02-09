@@ -558,7 +558,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div phx-feedback-for={@name} class="text-sm">
       <.label for={@id}><%= @label %></.label>
-      <div class="w-full bg-white rounded text-left cursor-default focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+      <div class="w-full bg-white rounded text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         <div class="grid grid-cols-1 gap-1 text-sm items-baseline">
           <div :for={{label, value} <- @options} class="flex items-center">
             <label for={"#{@name}-#{value}"} class="font-medium text-zinc-700 py-1">
@@ -700,7 +700,7 @@ defmodule YscWeb.CoreComponents do
             name={"#{@name}[#{i}]"}
             id={"#{@id}_#{i}"}
             maxlength="1"
-            class="block w-12 h-12 text-center border-gray-200 rounded-md sm:text-sm focus:scale-110 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none"
+            class="block w-12 h-12 text-center border-zinc-200 rounded-md sm:text-sm focus:scale-110 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none"
             data-otp-input-item=""
             {@rest}
           />
@@ -1435,7 +1435,7 @@ defmodule YscWeb.CoreComponents do
           <.link navigate="/" class="items-center group ps-2.5 mb-5 inline-block">
             <div class="flex items-center gap-2">
               <.ysc_logo class="h-20 me-3" />
-              <span class="text-[10px] font-black bg-zinc-800 text-white px-2 py-0.5 rounded">
+              <span class="text-xs font-black bg-zinc-800 text-white px-2 py-0.5 rounded">
                 ADMIN
               </span>
             </div>
@@ -2575,7 +2575,7 @@ defmodule YscWeb.CoreComponents do
             <p class="text-sm font-black text-zinc-900 leading-none">
               <%= @author %>
             </p>
-            <p class="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1">
+            <p class="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
               <time
                 pubdate
                 datetime={Timex.format!(@date, "%Y-%m-%d", :strftime)}

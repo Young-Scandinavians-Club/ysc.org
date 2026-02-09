@@ -460,7 +460,7 @@ defmodule YscWeb.HomeLive do
           <%!-- Lake Tahoe --%>
           <div class="grid lg:grid-cols-12 gap-12 items-center">
             <div class="lg:col-span-5 order-2 lg:order-1">
-              <div class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-widest mb-6">
+              <div class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-black uppercase tracking-widest mb-6">
                 <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Lake Tahoe, CA
               </div>
               <h3 class="text-4xl font-black text-zinc-900 tracking-tight mb-4">
@@ -523,7 +523,7 @@ defmodule YscWeb.HomeLive do
               </div>
             </div>
             <div class="lg:col-span-5">
-              <div class="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest mb-6">
+              <div class="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest mb-6">
                 <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Clear Lake, CA
               </div>
               <h3 class="text-4xl font-black text-zinc-900 tracking-tight mb-4">
@@ -705,12 +705,12 @@ defmodule YscWeb.HomeLive do
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap">
                   <%= if days_since_inserted(event.inserted_at) <= 7 do %>
-                    <span class="px-3 py-1 bg-slate-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg">
                       Just Added
                     </span>
                   <% end %>
                   <%= if event_sold_out?(event) do %>
-                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-black uppercase tracking-widest rounded-lg shadow-lg">
                       Sold Out
                     </span>
                   <% end %>
@@ -731,7 +731,7 @@ defmodule YscWeb.HomeLive do
                   </span>
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
                   <%= if event.start_time && event.start_time != "" do %>
-                    <span class="text-zinc-400 text-xs font-bold uppercase tracking-widest text-[10px]">
+                    <span class="text-zinc-400 text-xs font-bold uppercase tracking-widest text-xs">
                       <%= format_event_time(event.start_date, event.start_time) %>
                     </span>
                   <% end %>
@@ -845,7 +845,7 @@ defmodule YscWeb.HomeLive do
                   }
                 />
               </div>
-              <time class="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+              <time class="text-xs font-black text-blue-600 uppercase tracking-widest">
                 <%= format_post_date(post.published_on) %> · <%= reading_time_for_news(
                   post
                 ) %> min read
@@ -1294,18 +1294,18 @@ defmodule YscWeb.HomeLive do
                     </div>
                     <div class="p-8 flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                       <div class="space-y-1 md:border-r border-zinc-100 pr-6">
-                        <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">
+                        <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
                           Destination
                         </p>
                         <p class="font-black text-2xl text-zinc-900 tracking-tighter">
                           <%= format_property_name(booking.property) %>
                         </p>
-                        <p class="text-[10px] font-mono text-zinc-400">
+                        <p class="text-xs font-mono text-zinc-400">
                           <%= booking.reference_id %>
                         </p>
                       </div>
                       <div class="space-y-2">
-                        <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">
+                        <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
                           Dates
                         </p>
                         <p class="font-bold text-zinc-800">
@@ -1314,7 +1314,7 @@ defmodule YscWeb.HomeLive do
                           ) %>
                         </p>
                         <span class={[
-                          "inline-flex items-center px-2.5 py-0.5 text-[10px] font-black rounded uppercase tracking-tighter",
+                          "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded uppercase tracking-tighter",
                           case days_until_booking(booking) do
                             :started ->
                               "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
@@ -1340,7 +1340,7 @@ defmodule YscWeb.HomeLive do
                           end %>
                         </span>
                         <%= if booking.booking_mode == :buyout do %>
-                          <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-[10px] font-black rounded uppercase tracking-tighter">
+                          <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
                             Full Buyout
                           </span>
                         <% end %>
@@ -1425,7 +1425,7 @@ defmodule YscWeb.HomeLive do
                   <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-lg p-8 hover:shadow-md transition-all">
                     <div class="flex justify-between items-start mb-4">
                       <span class={[
-                        "px-2 py-1 text-[10px] font-bold rounded",
+                        "px-2 py-1 text-xs font-bold rounded",
                         case days_until_event(event) do
                           0 -> "bg-amber-50 text-amber-700"
                           1 -> "bg-blue-50 text-blue-700"
@@ -1470,7 +1470,7 @@ defmodule YscWeb.HomeLive do
                       </span>
                       <div class="flex flex-wrap gap-1">
                         <%= for {tier_name, tickets} <- grouped_tiers do %>
-                          <span class="text-[10px] font-bold text-zinc-400">
+                          <span class="text-xs font-bold text-zinc-400">
                             <%= length(tickets) %>× <%= tier_name %>
                           </span>
                         <% end %>
@@ -1631,7 +1631,7 @@ defmodule YscWeb.HomeLive do
                       </div>
                     </div>
                     <div>
-                      <p class="text-[10px] font-bold text-blue-600 mb-1">
+                      <p class="text-xs font-bold text-blue-600 mb-1">
                         <%= format_post_date(post.published_on) %>
                       </p>
                       <h4 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">

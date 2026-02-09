@@ -4245,7 +4245,7 @@ defmodule YscWeb.UserSettingsLive do
               "Free"
             end %>
           </p>
-          <p class="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">
+          <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
             Paid on <%= if @payment_info.payment do
               if @payment_info.payment.payment_date do
                 Timex.format!(@payment_info.payment.payment_date, "{Mshort} {D}")

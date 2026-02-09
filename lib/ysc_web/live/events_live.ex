@@ -41,7 +41,7 @@ defmodule YscWeb.EventsLive do
           <%!-- Sidebar --%>
           <aside class="lg:col-span-3 space-y-4 md:space-y-8">
             <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+              <h4 class="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
                 Upcoming Events
               </h4>
               <p class="text-sm text-zinc-600 leading-relaxed">
@@ -50,7 +50,7 @@ defmodule YscWeb.EventsLive do
             </div>
             <%!-- Get Involved - Always shown to encourage event hosting --%>
             <div class="p-6 md:p-8 bg-gradient-to-br from-blue-50/50 to-slate-50/50 rounded-xl border-2 border-blue-200 backdrop-blur-sm lg:scale-105 shadow-md">
-              <h4 class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
+              <h4 class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Get Involved
               </h4>
               <p class="text-sm text-zinc-700 leading-relaxed mb-4">
@@ -64,7 +64,7 @@ defmodule YscWeb.EventsLive do
               </.link>
             </div>
             <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100 shadow-sm">
-              <h4 class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
+              <h4 class="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Stay Connected
               </h4>
               <p class="text-sm text-zinc-600 leading-relaxed mb-4">

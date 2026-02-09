@@ -224,7 +224,7 @@ defmodule YscWeb.Components.Events.EventCard do
       # Add "Just Added" badge if applicable (within 48 hours of publishing)
       just_added_badge =
         if DateTime.diff(DateTime.utc_now(), published_at, :hour) <= 48 do
-          [%{text: "Just Added", class: "bg-slate-500 text-white", icon: nil}]
+          [%{text: "Just Added", class: "bg-zinc-600 text-white", icon: nil}]
         else
           []
         end

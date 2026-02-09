@@ -50,11 +50,11 @@ defmodule YscWeb.PostLive do
       <div :if={@post != nil} class="max-w-screen-lg mx-auto px-4">
         <div class="max-w-3xl mx-auto text-center mb-12">
           <div class="flex items-center justify-center gap-3 mb-6">
-            <span class="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">
+            <span class="text-xs font-black text-blue-600 uppercase tracking-[0.3em]">
               Club News
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
-            <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+            <span class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
               <%= Timex.format!(post_date(@post), "{Mshort} {D}, {YYYY}") %>
             </span>
           </div>
@@ -69,7 +69,7 @@ defmodule YscWeb.PostLive do
               class="w-10 h-10 rounded-full"
             />
             <div class="text-left">
-              <p class="text-[10px] font-black text-zinc-900 uppercase tracking-widest">
+              <p class="text-xs font-black text-zinc-900 uppercase tracking-widest">
                 Post By
               </p>
               <p class="text-sm font-medium text-zinc-500">

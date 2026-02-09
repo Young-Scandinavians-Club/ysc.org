@@ -322,10 +322,10 @@ defmodule YscWeb.AdminMediaLive do
               <span class="group-hover:hidden flex items-center justify-center w-full h-full">
                 <%= String.slice(to_string(item.year), -2, 2) %>
               </span>
-              <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-[10px] font-bold whitespace-nowrap px-1">
+              <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
                 <%= item.year %>
               </span>
-              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
                 <%= item.count %> photos
               </span>
             </button>

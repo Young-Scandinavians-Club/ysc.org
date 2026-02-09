@@ -1132,7 +1132,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       <div class="flex flex-wrap justify-center gap-0.5 max-w-[60px]">
         #{dots_html}
       </div>
-      <span class="text-[10px] font-medium whitespace-nowrap #{text_class}">
+      <span class="text-xs font-medium whitespace-nowrap #{text_class}">
         #{spots_available} #{spots_text}
       </span>
     </div>

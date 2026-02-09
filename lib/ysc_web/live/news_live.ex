@@ -102,7 +102,7 @@ defmodule YscWeb.NewsLive do
               <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-500">
                 <div class="max-w-3xl">
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
+                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-sm sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
                       <.icon name="hero-star-solid" class="w-3 h-3 inline me-1" />Pinned News
                     </span>
                   </div>
@@ -142,7 +142,7 @@ defmodule YscWeb.NewsLive do
                       </p>
                       <p
                         :if={@featured.author.board_position}
-                        class="text-[10px] sm:text-xs text-zinc-500 sm:text-white/80 font-medium mt-0.5"
+                        class="text-xs sm:text-xs text-zinc-500 sm:text-white/80 font-medium mt-0.5"
                       >
                         YSC <%= format_board_position(
                           @featured.author.board_position
@@ -230,11 +230,11 @@ defmodule YscWeb.NewsLive do
 
             <div class="px-4 pb-4 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
-                <span class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">
+                <span class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
                   <%= Timex.format!(post.published_on, "{Mshort} {D}") %>
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
-                <span class="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">
+                <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
                   <%= reading_time(post) %> min read
                 </span>
               </div>
@@ -259,13 +259,13 @@ defmodule YscWeb.NewsLive do
                     class="w-8 h-8 rounded-full grayscale group-hover:grayscale-0 transition-all"
                   />
                   <div>
-                    <p class="text-[10px] font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
+                    <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
                       <%= String.capitalize(post.author.first_name || "") %>
                       <%= String.capitalize(post.author.last_name || "") %>
                     </p>
                     <p
                       :if={post.author.board_position}
-                      class="text-[9px] text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
+                      class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
                     >
                       YSC <%= format_board_position(post.author.board_position) %>
                     </p>
