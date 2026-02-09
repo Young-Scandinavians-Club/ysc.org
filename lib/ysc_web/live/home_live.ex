@@ -1143,10 +1143,10 @@ defmodule YscWeb.HomeLive do
       <%!-- Dashboard Content --%>
       <div class="max-w-screen-xl mx-auto px-4 -mt-8 pb-20">
         <%!-- App Launcher Grid --%>
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0">
           <.link
             navigate={~p"/bookings/tahoe"}
-            class="bg-white p-6 rounded shadow-sm border border-zinc-200 hover:border-blue-500 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group"
+            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-blue-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
           >
             <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <.icon name="hero-home" class="w-5 h-5 text-blue-600" />
@@ -1156,7 +1156,7 @@ defmodule YscWeb.HomeLive do
           </.link>
           <.link
             navigate={~p"/bookings/clear-lake"}
-            class="bg-white p-6 rounded shadow-sm border border-zinc-200 hover:border-emerald-500 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group"
+            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-emerald-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
           >
             <div class="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <.icon name="hero-home" class="w-5 h-5 text-emerald-600" />
@@ -1166,7 +1166,7 @@ defmodule YscWeb.HomeLive do
           </.link>
           <.link
             navigate={~p"/users/settings"}
-            class="bg-white p-6 rounded shadow-sm border border-zinc-200 hover:border-zinc-500 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group"
+            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-zinc-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
           >
             <div class="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-zinc-600" />
@@ -1177,7 +1177,7 @@ defmodule YscWeb.HomeLive do
           <%= if @current_user && @current_user.role == :admin do %>
             <.link
               navigate={~p"/expensereport"}
-              class="bg-white p-6 rounded shadow-sm border border-zinc-200 hover:border-yellow-500 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group"
+              class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-orange-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
             >
               <div class="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <.icon name="hero-receipt-refund" class="w-5 h-5 text-orange-600" />
@@ -1186,13 +1186,16 @@ defmodule YscWeb.HomeLive do
               <p class="text-xs text-zinc-500">File Report</p>
             </.link>
           <% else %>
-            <div class="bg-white p-6 rounded shadow-sm border border-zinc-200 opacity-50">
-              <div class="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mb-4">
-                <.icon name="hero-lock-closed" class="w-5 h-5 text-zinc-400" />
+            <.link
+              navigate={~p"/events"}
+              class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-purple-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
+            >
+              <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <.icon name="hero-calendar-days" class="w-5 h-5 text-purple-600" />
               </div>
-              <p class="font-bold text-zinc-400">More</p>
-              <p class="text-xs text-zinc-400">Coming soon</p>
-            </div>
+              <p class="font-bold text-zinc-900">Events</p>
+              <p class="text-xs text-zinc-500">Browse Events</p>
+            </.link>
           <% end %>
         </div>
 
@@ -1216,7 +1219,7 @@ defmodule YscWeb.HomeLive do
               <%!-- Loading skeleton for bookings --%>
               <div
                 :if={!@async_data_loaded}
-                class="bg-white rounded shadow-sm border border-zinc-200 p-6 animate-pulse"
+                class="bg-white rounded-lg shadow-sm border border-zinc-200 p-6 animate-pulse"
               >
                 <div class="flex gap-4">
                   <div class="w-24 h-20 bg-zinc-200 rounded"></div>
@@ -1230,12 +1233,12 @@ defmodule YscWeb.HomeLive do
 
               <div
                 :if={@async_data_loaded && Enum.empty?(@future_bookings)}
-                class="bg-white rounded shadow-lg border border-zinc-200 p-12 text-center"
+                class="bg-white rounded-lg shadow-sm border border-zinc-200 p-12 text-center"
               >
-                <div class="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <.icon name="hero-home" class="w-8 h-8 text-zinc-400" />
+                <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
                 </div>
-                <h3 class="text-lg font-black text-zinc-900 mb-2">
+                <h3 class="text-base font-bold text-zinc-900 mb-2">
                   No upcoming bookings
                 </h3>
                 <p class="text-zinc-500 text-sm mb-6">
@@ -1244,13 +1247,13 @@ defmodule YscWeb.HomeLive do
                 <div class="flex flex-col sm:flex-row gap-3 justify-center">
                   <.link
                     navigate={~p"/bookings/tahoe"}
-                    class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded transition-colors"
+                    class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors"
                   >
                     Book Lake Tahoe
                   </.link>
                   <.link
                     navigate={~p"/bookings/clear-lake"}
-                    class="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded transition-colors"
+                    class="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors"
                   >
                     Book Clear Lake
                   </.link>
@@ -1268,7 +1271,7 @@ defmodule YscWeb.HomeLive do
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
                     class={[
-                      "relative bg-white rounded-lg overflow-hidden flex flex-col md:flex-row transition-all duration-300 group hover:-translate-y-1 shadow-sm hover:shadow-lg border border-zinc-100",
+                      "relative bg-white rounded-lg overflow-hidden flex flex-col md:flex-row transition-all duration-300 group hover:-translate-y-1 shadow-sm hover:shadow-md border border-zinc-200",
                       if is_active do
                         if booking.property == :tahoe do
                           "ring-1 ring-blue-500/10"
@@ -1343,7 +1346,7 @@ defmodule YscWeb.HomeLive do
                         <% end %>
                       </div>
                       <div class="flex justify-end">
-                        <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded group-hover:bg-blue-600 transition-colors shadow shadow-zinc-200 group-hover:shadow-blue-200">
+                        <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded-lg group-hover:bg-blue-600 transition-colors shadow-sm group-hover:shadow-blue-200">
                           View Details
                         </span>
                       </div>
@@ -1355,10 +1358,18 @@ defmodule YscWeb.HomeLive do
 
             <%!-- Event Tickets Section --%>
             <section>
-              <h3 class="text-lg font-bold text-zinc-900 mb-6 flex items-center gap-2">
-                <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
-                Event Tickets
-              </h3>
+              <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
+                  Event Tickets
+                </h3>
+                <.link
+                  navigate={~p"/events"}
+                  class="text-xs font-bold text-blue-600 hover:underline"
+                >
+                  Browse Events
+                </.link>
+              </div>
 
               <%!-- Loading skeleton for tickets --%>
               <div
@@ -1378,12 +1389,12 @@ defmodule YscWeb.HomeLive do
 
               <div
                 :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
-                class="bg-white border border-zinc-200 rounded shadow-lg p-12 text-center"
+                class="bg-white border-2 border-dashed border-zinc-200 rounded-lg shadow-sm p-12 text-center"
               >
-                <div class="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <.icon name="hero-calendar-days" class="w-8 h-8 text-zinc-400" />
+                <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
                 </div>
-                <h3 class="text-lg font-black text-zinc-900 mb-2">
+                <h3 class="text-base font-bold text-zinc-900 mb-2">
                   No upcoming event tickets
                 </h3>
                 <p class="text-zinc-500 text-sm mb-6">
@@ -1391,7 +1402,7 @@ defmodule YscWeb.HomeLive do
                 </p>
                 <.link
                   navigate={~p"/events"}
-                  class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded transition-colors"
+                  class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded-lg transition-colors"
                 >
                   Browse Events
                 </.link>
@@ -1411,7 +1422,7 @@ defmodule YscWeb.HomeLive do
                       _ ->
                         nil
                     end %>
-                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-lg p-8 hover:shadow-lg transition-all">
+                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-lg p-8 hover:shadow-md transition-all">
                     <div class="flex justify-between items-start mb-4">
                       <span class={[
                         "px-2 py-1 text-[10px] font-bold rounded",
@@ -1475,7 +1486,7 @@ defmodule YscWeb.HomeLive do
           <aside class="space-y-10">
             <%!-- Membership Status Card --%>
             <div class={[
-              "relative overflow-hidden rounded-lg p-8 text-white shadow-lg",
+              "relative overflow-hidden rounded-lg p-8 text-white shadow-sm",
               if @active_membership? do
                 "bg-zinc-900"
               else
@@ -1502,7 +1513,7 @@ defmodule YscWeb.HomeLive do
 
               <div class="relative z-10">
                 <div class={[
-                  "mb-4 inline-flex h-10 w-10 items-center justify-center rounded backdrop-blur-md",
+                  "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg backdrop-blur-md",
                   if @active_membership? do
                     "bg-white/10"
                   else
@@ -1556,7 +1567,7 @@ defmodule YscWeb.HomeLive do
                 <.link
                   navigate={~p"/users/membership"}
                   class={[
-                    "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-black transition-all hover:scale-[1.02] active:scale-[0.98]",
+                    "flex w-full items-center justify-center rounded-lg px-6 py-4 text-sm font-black transition-all hover:scale-[1.02] active:scale-[0.98]",
                     if @active_membership? do
                       "bg-white text-zinc-900 hover:bg-blue-50"
                     else
@@ -1641,18 +1652,16 @@ defmodule YscWeb.HomeLive do
         <div class="mt-16 space-y-12">
           <%!-- Upcoming Events --%>
           <div>
-            <div class="flex items-center justify-between mb-8">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
-                </div>
-                <h2 class="text-2xl font-black text-zinc-900">Upcoming Events</h2>
-              </div>
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
+                Upcoming Events
+              </h3>
               <.link
                 navigate={~p"/events"}
-                class="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                class="text-xs font-bold text-blue-600 hover:underline"
               >
-                View all events →
+                View All Events
               </.link>
             </div>
 
@@ -1662,7 +1671,7 @@ defmodule YscWeb.HomeLive do
               class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
               <%= for _i <- 1..3 do %>
-                <div class="bg-white rounded-xl shadow-sm border border-zinc-100 overflow-hidden animate-pulse">
+                <div class="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
                   <div class="h-48 bg-zinc-200"></div>
                   <div class="p-6 space-y-3">
                     <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
@@ -1675,17 +1684,23 @@ defmodule YscWeb.HomeLive do
 
             <div
               :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
-              class="bg-white rounded shadow-lg p-12 text-center border border-zinc-200"
+              class="bg-white rounded-lg shadow-sm border border-zinc-200 p-12 text-center"
             >
-              <div class="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <.icon name="hero-calendar" class="w-6 h-6 text-zinc-400" />
+              <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
               </div>
-              <h3 class="text-sm font-black text-zinc-900 mb-1">
+              <h3 class="text-base font-bold text-zinc-900 mb-2">
                 No upcoming events
               </h3>
-              <p class="text-xs text-zinc-500">
+              <p class="text-zinc-500 text-sm mb-6">
                 Check back later for new community events
               </p>
+              <.link
+                navigate={~p"/events"}
+                class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded-lg transition-colors"
+              >
+                Browse Events
+              </.link>
             </div>
 
             <div
@@ -1704,7 +1719,7 @@ defmodule YscWeb.HomeLive do
         </div>
       </div>
 
-      <%!-- White Buffer Zone with Gradient Transition --%>
+      <%!-- Fade from dashboard background to white footer --%>
       <div class="h-32 bg-gradient-to-b from-transparent to-white"></div>
     </main>
     """
