@@ -99,7 +99,7 @@ dev: ## Start the local dev server
 		echo ""; \
 		\
 		echo "$(BOLD)→ Checking database migrations...$(RESET)"; \
-		PENDING_MIGRATIONS=$$(mix ecto.migrations 2>/dev/null | grep -c "down" || echo "0"); \
+		PENDING_MIGRATIONS=$$(mix ecto.migrations 2>/dev/null | grep "down" | wc -l | tr -d ' ' || echo "0"); \
 		if [ "$$PENDING_MIGRATIONS" -gt "0" ]; then \
 			echo "$(RED)✗ Database has pending migrations ($$PENDING_MIGRATIONS migration(s) not applied)$(RESET)"; \
 			echo "$(TEAL)  Hint: Run: mix ecto.migrate$(RESET)"; \
