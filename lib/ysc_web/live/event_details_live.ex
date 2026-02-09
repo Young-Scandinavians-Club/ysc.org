@@ -942,18 +942,34 @@ defmodule YscWeb.EventDetailsLive do
                           <% end %>
                         <% end %>
                       </div>
-                      <p
-                        :if={@event.start_date != nil}
-                        class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate"
-                      >
-                        <%= format_start_date(@event.start_date) %>
-                        <%= if @event.start_time != nil do %>
-                          • <%= case format_time(@event.start_time) do
-                            %Time{} = time -> Timex.format!(time, "{h12}:{m} {AM}")
-                            _ -> ""
-                          end %>
-                        <% end %>
-                      </p>
+                      <%= if @event.start_date != nil do %>
+                        <%!-- Mobile: Short format (Wed, Dec 25) --%>
+                        <p class="sm:hidden text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                          <%= format_start_date_short(@event.start_date) %>
+                          <%= if @event.start_time != nil do %>
+                            • <%= case format_time(@event.start_time) do
+                              %Time{} = time ->
+                                Timex.format!(time, "{h12}:{m} {AM}")
+
+                              _ ->
+                                ""
+                            end %>
+                          <% end %>
+                        </p>
+                        <%!-- Desktop: Full format (Wednesday, December 25) --%>
+                        <p class="hidden sm:block text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                          <%= format_start_date(@event.start_date) %>
+                          <%= if @event.start_time != nil do %>
+                            • <%= case format_time(@event.start_time) do
+                              %Time{} = time ->
+                                Timex.format!(time, "{h12}:{m} {AM}")
+
+                              _ ->
+                                ""
+                            end %>
+                          <% end %>
+                        </p>
+                      <% end %>
                     </div>
                   <% end %>
 
@@ -5454,6 +5470,10 @@ defmodule YscWeb.EventDetailsLive do
 
   def format_start_date(date) do
     Timex.format!(date, "{WDfull}, {Mfull} {D}")
+  end
+
+  def format_start_date_short(date) do
+    Timex.format!(date, "{WDshort}, {Mshort} {D}")
   end
 
   defp event_body(%Event{rendered_details: nil} = event),
