@@ -28,7 +28,7 @@ defmodule YscWeb.AgendaEditComponent do
           data-agenda_id={form.data.agenda_id}
           class="
           relative flex items-center space-x-2 rounded px-2 py-4
-          focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 hover:border-zinc-100
+          focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 hover:border-zinc-100
           drag-item:focus-within:ring-0 drag-item:focus-within:ring-offset-0
           drag-ghost:bg-zinc-300 drag-ghost:border-0 drag-ghost:ring-0 drag-item:shadow-lg
           bg-blue-100

@@ -54,7 +54,7 @@ defmodule YscWeb.AdminDashboardLive do
           <!-- Applications Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
-              <p class="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
                 Applications
               </p>
               <div class="flex items-baseline gap-2">
@@ -68,13 +68,13 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-2 gap-4">
               <div>
-                <p class="text-[9px] font-bold text-zinc-400 uppercase">
+                <p class="text-xs font-bold text-zinc-400 uppercase">
                   This Month
                 </p>
                 <p class="text-sm font-black text-zinc-700">
                   <%= @applications_this_month %>
                 </p>
-                <p class="text-[9px] text-zinc-500 mt-0.5">
+                <p class="text-xs text-zinc-500 mt-0.5">
                   <%= if @applications_last_month > 0 do %>
                     <span class={
                       if @applications_month_change >= 0,
@@ -89,11 +89,11 @@ defmodule YscWeb.AdminDashboardLive do
                 </p>
               </div>
               <div>
-                <p class="text-[9px] font-bold text-zinc-400 uppercase">YTD</p>
+                <p class="text-xs font-bold text-zinc-400 uppercase">YTD</p>
                 <p class="text-sm font-black text-zinc-700">
                   <%= @applications_this_year %>
                 </p>
-                <p class="text-[9px] text-zinc-500 mt-0.5">
+                <p class="text-xs text-zinc-500 mt-0.5">
                   <%= if @applications_last_year > 0 do %>
                     <span class={
                       if @applications_year_change >= 0,
@@ -112,7 +112,7 @@ defmodule YscWeb.AdminDashboardLive do
           <!-- Total Revenue Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
-              <p class="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
                 Total Revenue (<%= Timex.format!(DateTime.utc_now(), "{Mshort}") %>)
               </p>
               <div class="flex items-baseline gap-2">
@@ -120,7 +120,7 @@ defmodule YscWeb.AdminDashboardLive do
                   <%= format_money(@current_month_revenue) %>
                 </p>
                 <span class={[
-                  "text-[10px] font-bold flex items-center",
+                  "text-xs font-bold flex items-center",
                   get_revenue_change_color_class(@revenue_change_direction)
                 ]}>
                   <.icon
@@ -133,7 +133,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-2 gap-4">
               <div>
-                <p class="text-[9px] font-bold text-zinc-400 uppercase">
+                <p class="text-xs font-bold text-zinc-400 uppercase">
                   vs Last Month
                 </p>
                 <p class="text-sm font-bold text-zinc-500">
@@ -141,7 +141,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </p>
               </div>
               <div>
-                <p class="text-[9px] font-bold text-zinc-400 uppercase">
+                <p class="text-xs font-bold text-zinc-400 uppercase">
                   vs <%= Timex.format!(DateTime.utc_now(), "{Mshort}") %> '23
                 </p>
                 <p class="text-sm font-bold text-zinc-500">
@@ -153,7 +153,7 @@ defmodule YscWeb.AdminDashboardLive do
           <!-- Revenue Mix Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
-              <p class="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
                 Revenue Mix
               </p>
               <div class="w-full bg-zinc-100 h-3 rounded-full overflow-hidden flex mb-2">
@@ -179,7 +179,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div class="mt-4 space-y-2">
               <div class="flex justify-between items-center">
-                <span class="flex items-center text-[9px] font-bold text-zinc-500 uppercase">
+                <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
                   <span class="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>Bookings
                 </span>
                 <span class="text-sm font-black text-zinc-700">
@@ -187,7 +187,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="flex items-center text-[9px] font-bold text-zinc-500 uppercase">
+                <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
                   <span class="w-2 h-2 rounded-full bg-purple-500 mr-2"></span>Events
                 </span>
                 <span class="text-sm font-black text-zinc-700">
@@ -195,7 +195,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="flex items-center text-[9px] font-bold text-zinc-500 uppercase">
+                <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
                   <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>Membership
                 </span>
                 <span class="text-sm font-black text-zinc-700">
@@ -207,7 +207,7 @@ defmodule YscWeb.AdminDashboardLive do
           <!-- Active Now Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
-              <p class="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
                 Active Now
               </p>
               <p class="text-3xl font-black text-zinc-900">
@@ -228,7 +228,7 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
               <div
                 :if={@active_guests_count > length(@active_guests_sample)}
-                class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-[8px] font-bold text-zinc-500 ring-2 ring-white"
+                class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-500 ring-2 ring-white"
               >
                 +<%= @active_guests_count - length(@active_guests_sample) %>
               </div>
@@ -251,7 +251,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </div>
                 <span
                   :if={@pending_reviews_count > 0}
-                  class="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-black rounded uppercase ring-1 ring-amber-200"
+                  class="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-black rounded uppercase ring-1 ring-amber-200"
                 >
                   <%= @pending_reviews_count %> PENDING
                 </span>
@@ -307,7 +307,7 @@ defmodule YscWeb.AdminDashboardLive do
 
                   <div class="flex items-center gap-6">
                     <div class="hidden sm:block text-right border-r border-zinc-100 pr-6">
-                      <p class="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">
+                      <p class="text-xs font-black text-zinc-400 uppercase tracking-widest mb-0.5">
                         Plan Type
                       </p>
                       <p class="text-xs font-bold text-zinc-700">
@@ -386,7 +386,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </h2>
                 <.link
                   navigate={~p"/admin/events"}
-                  class="text-[10px] font-black text-teal-600 underline"
+                  class="text-xs font-black text-teal-600 underline"
                 >
                   VIEW ALL
                 </.link>
@@ -426,7 +426,7 @@ defmodule YscWeb.AdminDashboardLive do
 
                   <div :if={not Enum.empty?(tiers)} class="space-y-4">
                     <div :for={tier <- tiers} class="space-y-1">
-                      <div class="flex justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                      <div class="flex justify-between text-xs font-black text-zinc-400 uppercase tracking-widest">
                         <span><%= tier.name %></span>
                         <span class="text-zinc-900">
                           <%= tier.sold_tickets_count %> / <%= if tier.quantity,
@@ -735,19 +735,19 @@ defmodule YscWeb.AdminDashboardLive do
 
       cond do
         hours_ago < 24 ->
-          "text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 uppercase tracking-widest"
+          "text-xs font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 uppercase tracking-widest"
 
         hours_ago >= 24 && hours_ago <= 48 ->
-          "text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 uppercase tracking-widest"
+          "text-xs font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 uppercase tracking-widest"
 
         hours_ago > 48 ->
-          "text-[9px] font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 uppercase tracking-widest"
+          "text-xs font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 uppercase tracking-widest"
 
         true ->
-          "text-[9px] font-black text-zinc-600 bg-zinc-50 px-1.5 py-0.5 uppercase tracking-widest"
+          "text-xs font-black text-zinc-600 bg-zinc-50 px-1.5 py-0.5 uppercase tracking-widest"
       end
     else
-      "text-[9px] font-black text-zinc-600 bg-zinc-50 px-1.5 py-0.5 uppercase tracking-widest"
+      "text-xs font-black text-zinc-600 bg-zinc-50 px-1.5 py-0.5 uppercase tracking-widest"
     end
   end
 

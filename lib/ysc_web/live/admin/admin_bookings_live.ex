@@ -597,7 +597,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <div class="space-y-1.5">
                   <%= for guest <- Enum.sort_by(@booking.booking_guests, & &1.order_index) do %>
                     <div class="flex items-center gap-2 text-xs">
-                      <div class="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-[10px]">
+                      <div class="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-xs">
                         <%= "#{String.first(guest.first_name)}#{String.first(guest.last_name)}" %>
                       </div>
                       <span class="text-zinc-900">
@@ -6560,7 +6560,7 @@ defmodule YscWeb.AdminBookingsLive do
         <span class="truncate">#{escaped_user_name_str}</span>
         #{checked_in_indicator}
       </div>
-      <div class="truncate px-2 text-[10px] opacity-90">#{escaped_checkin_str} - #{escaped_checkout_str}</div>
+      <div class="truncate px-2 text-xs opacity-90">#{escaped_checkin_str} - #{escaped_checkout_str}</div>
       #{right_indicator}
     </div>
     """

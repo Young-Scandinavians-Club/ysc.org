@@ -67,11 +67,11 @@ defmodule YscWeb.Components.News.NewsCard do
 
       <div class="px-4 pb-4 flex flex-col flex-1">
         <div class="flex items-center gap-3 mb-4">
-          <span class="text-[10px] font-black text-teal-600 uppercase tracking-[0.2em]">
+          <span class="text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
             <%= Timex.format!(@post.published_on, "{Mshort} {D}") %>
           </span>
           <span class="h-3 w-px bg-zinc-200"></span>
-          <span class="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">
+          <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
             <%= @reading_time %> min read
           </span>
         </div>
@@ -96,13 +96,13 @@ defmodule YscWeb.Components.News.NewsCard do
               class="w-8 h-8 rounded-full grayscale group-hover:grayscale-0 transition-all"
             />
             <div>
-              <p class="text-[10px] font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
+              <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
                 <%= String.capitalize(@post.author.first_name || "") %>
                 <%= String.capitalize(@post.author.last_name || "") %>
               </p>
               <p
                 :if={@post.author.board_position}
-                class="text-[9px] text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
+                class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
               >
                 YSC <%= format_board_position(@post.author.board_position) %>
               </p>

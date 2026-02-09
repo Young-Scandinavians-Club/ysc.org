@@ -273,10 +273,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 :if={@ticket_tier_count > 0}
                 class="text-xs text-amber-700 -mt-2 flex items-start gap-1.5"
               >
-                <.icon
-                  name="hero-information-circle"
-                  class="w-4 h-4 flex-shrink-0 mt-0.5"
-                />
+                <.icon name="hero-information-circle" class="w-4 h-4 flex-shrink-0" />
                 Partiful cannot be used when this event has ticket tiers. Remove all ticket tiers on the Tickets tab to add a Partiful link.
               </p>
               <p :if={@ticket_tier_count == 0} class="text-xs text-zinc-500 -mt-2">

@@ -83,7 +83,7 @@ defmodule YscWeb.EventsListLive do
               <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-500">
                 <div class="max-w-3xl">
                   <div class="flex flex-wrap items-center gap-2 mb-4 grayscale-0">
-                    <span class="px-3 py-1.5 bg-slate-600 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg sm:bg-slate-500/90 sm:backdrop-blur-md sm:border sm:border-slate-400 animate-badge-shine-slate">
+                    <span class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate">
                       <.icon
                         name="hero-calendar-solid"
                         class="w-3.5 h-3.5 inline me-0.5 relative z-10"
@@ -592,7 +592,7 @@ defmodule YscWeb.EventsListLive do
       "Sold Out" -> "bg-red-600"
       "Going Fast!" -> "bg-emerald-600"
       "Cancelled" -> "bg-zinc-600"
-      _ -> "bg-slate-600"
+      _ -> "bg-zinc-600"
     end
   end
 
@@ -608,7 +608,7 @@ defmodule YscWeb.EventsListLive do
         "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"
 
       _ ->
-        "sm:bg-slate-500/90 sm:backdrop-blur-md sm:border sm:border-slate-400"
+        "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"
     end
   end
 end
