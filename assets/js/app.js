@@ -49,7 +49,6 @@ import YearScrubber from "./year_scrubber";
 import ScrollPreserver from "./scroll_preserver";
 import ResendTimer from "./resend_timer";
 import BackToTop from "./back_to_top";
-import HistoryNav from "./history_nav";
 import InfoNav from "./info_nav";
 import Confetti from "./confetti";
 import AutoConsumeUpload from "./auto_consume_upload";
@@ -63,7 +62,7 @@ import ScrollToSection from "./scroll_to_section";
 import PasskeyAuth from "./passkey_auth";
 import ConfirmCloseModal from "./confirm_close_modal";
 import ClipboardCopy from "./clipboard_copy";
-import MobileToc from "./mobile_toc";
+import DecadeIndicator from "./decade_indicator";
 
 let Hooks = {
     StickyNavbar,
@@ -91,7 +90,6 @@ let Hooks = {
     ScrollPreserver,
     ResendTimer,
     BackToTop,
-    HistoryNav,
     InfoNav,
     Confetti,
     AutoConsumeUpload,
@@ -105,7 +103,7 @@ let Hooks = {
     PasskeyAuth,
     ConfirmCloseModal,
     ClipboardCopy,
-    MobileToc,
+    DecadeIndicator,
 };
 Hooks.LivePhone = LivePhone;
 
