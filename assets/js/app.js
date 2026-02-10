@@ -63,6 +63,7 @@ import ScrollToSection from "./scroll_to_section";
 import PasskeyAuth from "./passkey_auth";
 import ConfirmCloseModal from "./confirm_close_modal";
 import ClipboardCopy from "./clipboard_copy";
+import MobileToc from "./mobile_toc";
 
 let Hooks = {
     StickyNavbar,
@@ -104,6 +105,7 @@ let Hooks = {
     PasskeyAuth,
     ConfirmCloseModal,
     ClipboardCopy,
+    MobileToc,
 };
 Hooks.LivePhone = LivePhone;
 
