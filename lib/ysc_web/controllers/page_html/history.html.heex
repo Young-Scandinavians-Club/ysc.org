@@ -210,7 +210,7 @@
                 <div class="mb-4 archival-photo era-1950s stacked-paper rounded-lg overflow-hidden border-4 border-white/20 p-3 -rotate-1 hover:rotate-0 transition-transform duration-300">
                   <div class="aspect-[3/4] rounded overflow-hidden">
                     <img
-                      src={~p"/images/history/ysc_origin_story_by_arnold.jpg"}
+                      src={~p"/images/history/ysc_origin_story_by_arnold.webp"}
                       alt="Arnold Rolkert's account of founding the YSC in 1950"
                       class="w-full h-full object-cover"
                     />
@@ -371,7 +371,7 @@
                     <div class="rounded-lg overflow-hidden shadow-md bg-zinc-100 era-1960s">
                       <div class="aspect-[4/3] overflow-hidden">
                         <img
-                          src={~p"/images/history/SAS 1963.jpeg"}
+                          src="/images/history/SAS 1963.webp"
                           alt="YSC members on SAS flight to Scandinavia in 1963"
                           class="w-full h-full object-cover"
                         />
@@ -384,7 +384,7 @@
                     <div class="rounded-lg overflow-hidden shadow-md bg-zinc-100 era-2000s">
                       <div class="aspect-[4/3] overflow-hidden">
                         <img
-                          src={~p"/images/history/clear_lake_from_above.jpg"}
+                          src="/images/history/clear_lake_from_above.webp"
                           alt="Aerial view of Clear Lake cabin and dock"
                           class="w-full h-full object-cover"
                         />
@@ -467,7 +467,7 @@
                 <div class="my-4 rounded-lg overflow-hidden era-1960s">
                   <div class="aspect-[4/3] relative">
                     <img
-                      src="/images/history/ysc_15th_anniversary.jpg"
+                      src="/images/history/ysc_15th_anniversary.webp"
                       alt="YSC 15th Anniversary celebration"
                       class="w-full h-full object-cover"
                     />
@@ -597,8 +597,8 @@
 
           <%!-- Timeline events 1970-1982 --%>
           <%= for {year, title, content, tags, image_path, image_caption} <- [
-          {"1970", "20th Anniversary", "On September 26, 1970, YSC celebrates its 20th Anniversary with a grand celebration at Del Webb's Townhouse in San Francisco. In a remarkable show of diplomatic support, all the Consul Generals of the Nordic countries attended—representing Iceland, Norway, Denmark, Sweden, and Finland—marking this as one of the most prestigious events in YSC history.", ["anniversary"], "/images/history/ysc_20th_anniversary.jpg", "YSC 20th Anniversary celebration"},
-          {"1970s", "Yosemite Adventure", "YSC members embark on memorable outdoor adventures to Yosemite National Park, strengthening bonds through shared experiences in nature.", ["organization"], "/images/history/ysc_yosemite.jpg", "YSC members at Yosemite National Park"},
+          {"1970", "20th Anniversary", "On September 26, 1970, YSC celebrates its 20th Anniversary with a grand celebration at Del Webb's Townhouse in San Francisco. In a remarkable show of diplomatic support, all the Consul Generals of the Nordic countries attended—representing Iceland, Norway, Denmark, Sweden, and Finland—marking this as one of the most prestigious events in YSC history.", ["anniversary"], "/images/history/ysc_20th_anniversary.webp", "YSC 20th Anniversary celebration"},
+          {"1970s", "Yosemite Adventure", "YSC members embark on memorable outdoor adventures to Yosemite National Park, strengthening bonds through shared experiences in nature.", ["organization"], "/images/history/ysc_yosemite.webp", "YSC members at Yosemite National Park"},
           {"1976", "New pier", "New pier built at Clear Lake.", ["cabin life"], nil, nil},
           {"1980", "New dock", "New floating dock at Clear Lake.", ["cabin life"], nil, nil},
           {"1979-1981", "Clear Lake rebuild", "Formed CL Task Force to rebuild cabin. Produced architectural plans and received bids from contractors for 2-story building, cost $135 to $160K. Plans were dropped due to an existing building moratorium and resulting permit problems. It was decided to renovate instead.", ["cabin life"], nil, nil},
@@ -772,8 +772,8 @@
 
           <%!-- Timeline events 1985-2026 --%>
           <%= for {year, title, content, tags, image_path, image_caption} <- [
-          {"1985", "Lucia Celebration", "YSC Lucia celebration captured in this memorable photo.", ["organization"], "/images/history/Lucia 1985 03.jpeg", "YSC Lucia celebration, 1985"},
-          {"1986", "Executive Committee", "The Executive Committee meeting at Clear Lake. New floating docks with steel pilings and sea wall reconstruction completed.", ["cabin life", "club leadership"], "/images/history/Exec Comm 1986.jpeg", "Executive Committee at Clear Lake, 1986"},
+          {"1985", "Lucia Celebration", "YSC Lucia celebration captured in this memorable photo.", ["organization"], "/images/history/Lucia 1985 03.webp", "YSC Lucia celebration, 1985"},
+          {"1986", "Executive Committee", "The Executive Committee meeting at Clear Lake. New floating docks with steel pilings and sea wall reconstruction completed.", ["cabin life", "club leadership"], "/images/history/Exec Comm 1986.webp", "Executive Committee at Clear Lake, 1986"},
           {"1993", "Tahoe Cabin Purchase", "Tahoe cabin purchased for $190,000.00, marking a major milestone in the club's growth.", ["real estate", "cabin life"], nil, nil},
           {"1996-1999", "New Clear Lake ambitions", "A Bathroom Subcommittee was charged with expanding and remodeling the bathrooms at CL. After ten different design schemes construction drawings were submitted for bidding. The plans incorporated a separate new structure complete with handicapped access and resistant to periodic flooding. At a cost of $106,000 it was decided that we might as well build a whole new cabin. Preliminary drawings for a 2-story structure were made for a presentation at our 50th anniversary. The Bathroom Subcommittee was disbanded in 1999.", ["cabin life"], nil, nil},
           {"1997", "Tahoe Cabin Master on the Board", "Andrew Vik, 24, becomes youngest president in YSC history. Changes made to the bylaws to include Tahoe Cabin Manager on the Executive Committee and the Board of Trustees at six full members (formerly five plus an alternate).", ["club leadership"], nil, nil},
@@ -782,13 +782,13 @@
           {"2003", "New ski boat", "Clear Lake – Replaced 21 year old Ski Supreme with a brand new Moomba ski boat.", ["cabin life"], nil, nil},
           {"2007", "Clear Lake bathroom remodel", "Bathrooms finally remodeled according to 1982 scheme – move wall to add a toilet and a shower from men's to women's room, and installing two showers in men's room using existing plumbing. Purchase new gas stove, an electric double oven and a refrigerator for the pantry.", ["cabin life"], nil, nil},
           {"2010_DECADE", "", "", [], nil, nil},
-          {"2014", "Sauna in Tahoe", "Tahoe Cabin – After a strong fundraising drive by the Tahoe committee, the John Rollings Memorial Sauna is inaugurated in November this year.", ["cabin life"], "/images/history/ysc_tahoe_sauna_tiles.jpg", "John Rollings Memorial Sauna at Tahoe"},
-          {"2015", "65th Anniversary", "In September, YSC celebrates its 65th Anniversary with a grand black-tie party at the Maritime Museum in San Francisco.", ["anniversary"], "/images/history/7_presidents_65th_anniversary.jpg", "Seven YSC presidents at the 65th Anniversary celebration"},
+          {"2014", "Sauna in Tahoe", "Tahoe Cabin – After a strong fundraising drive by the Tahoe committee, the John Rollings Memorial Sauna is inaugurated in November this year.", ["cabin life"], "/images/history/ysc_tahoe_sauna_tiles.webp", "John Rollings Memorial Sauna at Tahoe"},
+          {"2015", "65th Anniversary", "In September, YSC celebrates its 65th Anniversary with a grand black-tie party at the Maritime Museum in San Francisco.", ["anniversary"], "/images/history/7_presidents_65th_anniversary.webp", "Seven YSC presidents at the 65th Anniversary celebration"},
           {"2017", "Clear Lake flooded", "Clear Lake – After several dry years with many wildfires around the lake it is finally raining again. The Clear Lake cabin is again flooded with a foot of water on throughout the cabin.", ["cabin life"], nil, nil},
           {"2019", "Longest serving President", "With six consecutive years, Peter Nordström becomes the longest serving president of the YSC to date.", ["club leadership"], nil, nil},
           {"2020_DECADE", "", "", [], nil, nil},
           {"2020", "Covid-19 Pandemic", "Due to the COVID-19 pandemic, the YSC, (together with most of the world), has to freeze all operations and close our cabins.", ["organization"], nil, nil},
-          {"2025", "75 Year Anniversary", "The YSC celebrates its 75th Anniversary with a grand party at the Swedish American Hall in San Francisco.", ["anniversary"], "/images/history/ysc_75th_anniversary.jpg", "YSC 75th Anniversary celebration"},
+          {"2025", "75 Year Anniversary", "The YSC celebrates its 75th Anniversary with a grand party at the Swedish American Hall in San Francisco.", ["anniversary"], "/images/history/ysc_75th_anniversary.webp", "YSC 75th Anniversary celebration"},
           {"2026", "Peter Nordström Returns as President", "Peter Nordström returns as president of the club after coming back to the board in 2025 as an event coordinator, marking his return to leadership.", ["club leadership"], nil, nil}
         ] do %>
             <% tag_colors = %{

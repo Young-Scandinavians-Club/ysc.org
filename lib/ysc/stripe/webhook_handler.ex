@@ -54,6 +54,12 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Maximum age for webhook events (5 minutes in seconds)
   @webhook_max_age_seconds 300
 
+  # Optional override for tests: when set, get_webhook_event_by_provider_and_event_id
+  # in the duplicate-rescue path uses this module (e.g. to simulate "not found").
+  defp webhooks_context do
+    Application.get_env(:ysc, :webhooks_context, Ysc.Webhooks)
+  end
+
   def handle_event(event) do
     require Logger
 
@@ -120,6 +126,15 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp normalize_currency("cad"), do: :CAD
   defp normalize_currency("aud"), do: :AUD
   defp normalize_currency("jpy"), do: :JPY
+  defp normalize_currency("sek"), do: :SEK
+  defp normalize_currency("nok"), do: :NOK
+  defp normalize_currency("dkk"), do: :DKK
+  defp normalize_currency("nzd"), do: :NZD
+  defp normalize_currency("chf"), do: :CHF
+  defp normalize_currency("mxn"), do: :MXN
+  defp normalize_currency("brl"), do: :BRL
+  defp normalize_currency("ars"), do: :ARS
+  defp normalize_currency("clp"), do: :CLP
 
   defp normalize_currency(currency) when is_binary(currency) do
     # For unknown currencies, try to use existing atom
@@ -215,12 +230,13 @@ defmodule Ysc.Stripe.WebhookHandler do
       Ysc.Webhooks.DuplicateWebhookEventError ->
         # Event already exists - this is a duplicate webhook delivery from Stripe
         # Check if it's already processed or being processed
-        case Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
+        case webhooks_context().get_webhook_event_by_provider_and_event_id(
                "stripe",
                event.id
              ) do
           nil ->
-            # Race condition: event was just deleted or something very wrong happened
+            # Race condition: event was just deleted or something very wrong happened.
+            # Return error so Stripe retries - we cannot be sure the event was processed.
             Logger.error(
               "Webhook event not found after duplicate error - race condition",
               event_id: event.id,
@@ -241,8 +257,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               }
             )
 
-            # We don't know the state, but likely another process handled it
-            :ok
+            {:error, :webhook_not_found_after_duplicate}
 
           webhook_event ->
             # Event exists, check its state

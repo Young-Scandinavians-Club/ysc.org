@@ -1121,10 +1121,7 @@ defmodule YscWeb.HomeLive do
                   ) %>
                 </p>
                 <p class="text-xs text-zinc-500">
-                  Member since <%= Calendar.strftime(
-                    @current_user.inserted_at,
-                    "%Y"
-                  ) %>
+                  <%= membership_status_text(@current_user, @current_membership) %>
                 </p>
               </div>
               <div class="w-16 h-16 rounded-full ring-4 ring-zinc-50 shadow-inner overflow-hidden">
@@ -2492,6 +2489,30 @@ defmodule YscWeb.HomeLive do
     word_count = String.split(rendered_body, ~r/\s+/, trim: true) |> length()
     # Average reading speed is 200 words per minute
     ceil(word_count / 200) |> max(1)
+  end
+
+  defp membership_status_text(user, membership) do
+    cond do
+      # User is pending approval - they're not a member yet
+      user.state == :pending_approval ->
+        "Application submitted #{Calendar.strftime(user.inserted_at, "%Y")}"
+
+      # User has active membership with start date
+      membership != nil && membership.start_date != nil ->
+        "Member since #{Calendar.strftime(membership.start_date, "%Y")}"
+
+      # User has lifetime membership
+      user.lifetime_membership_awarded_at != nil ->
+        "Member since #{Calendar.strftime(user.lifetime_membership_awarded_at, "%Y")}"
+
+      # Fallback: use account creation date for active users
+      user.state == :active ->
+        "Member since #{Calendar.strftime(user.inserted_at, "%Y")}"
+
+      # Other states (rejected, suspended, deleted)
+      true ->
+        "Account created #{Calendar.strftime(user.inserted_at, "%Y")}"
+    end
   end
 
   defp preview_text_for_news(%Post{preview_text: nil} = post) do
