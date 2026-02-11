@@ -273,7 +273,9 @@ defmodule YscWeb.HomeLive do
           </div>
           <div class="w-px h-12 bg-white/30"></div>
           <div class="text-center">
-            <div class="text-3xl font-bold text-white">75+</div>
+            <div class="text-3xl font-bold text-white">
+              <%= div(Date.utc_today().year - 1950, 5) * 5 %>+
+            </div>
             <div class="text-sm uppercase tracking-wide">Years</div>
           </div>
         </div>
@@ -428,7 +430,7 @@ defmodule YscWeb.HomeLive do
             </div>
             <div class="mt-4 pt-4 border-t border-blue-400/30 w-full">
               <div class="text-2xl font-black text-white mb-1">
-                <%= Date.utc_today().year - 1950 %>+
+                <%= div(Date.utc_today().year - 1950, 5) * 5 %>+
               </div>
               <div class="text-xs text-blue-100 uppercase tracking-widest">
                 Years of Community

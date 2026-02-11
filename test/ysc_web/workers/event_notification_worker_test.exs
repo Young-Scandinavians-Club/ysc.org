@@ -68,6 +68,34 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
       result = EventNotificationWorker.perform(job)
       assert result == :ok
     end
+
+    test "skips notifications for published event with past start date (retroactive)",
+         %{
+           event: event
+         } do
+      past_date = DateTime.add(DateTime.utc_now(), -86400 * 2, :second)
+      past_time = ~T[10:00:00]
+
+      event
+      |> Event.changeset(%{
+        state: :published,
+        start_date: past_date,
+        start_time: past_time
+      })
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_id" => event.id},
+        worker: "YscWeb.Workers.EventNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      result = EventNotificationWorker.perform(job)
+      assert result == :ok
+    end
   end
 
   describe "schedule_notifications/2" do

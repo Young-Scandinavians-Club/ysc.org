@@ -250,4 +250,243 @@ defmodule Ysc.QuickbooksTest do
       :ok
     end
   end
+
+  describe "create_purchase_sales_receipt/1" do
+    test "returns error when customer_id is missing" do
+      Logger.put_module_level(Ysc.Quickbooks, :none)
+
+      try do
+        assert {:error, :missing_customer_id} =
+                 Quickbooks.create_purchase_sales_receipt(%{
+                   item_id: "item_123",
+                   quantity: 1,
+                   unit_price: Decimal.new("100.00")
+                 })
+      after
+        Logger.delete_module_level(Ysc.Quickbooks)
+      end
+    end
+
+    test "returns error when customer_id is empty string" do
+      Logger.put_module_level(Ysc.Quickbooks, :none)
+
+      try do
+        assert {:error, :missing_customer_id} =
+                 Quickbooks.create_purchase_sales_receipt(%{
+                   customer_id: "",
+                   item_id: "item_123",
+                   quantity: 1,
+                   unit_price: Decimal.new("100.00")
+                 })
+      after
+        Logger.delete_module_level(Ysc.Quickbooks)
+      end
+    end
+
+    test "returns error when item_id is missing" do
+      Logger.put_module_level(Ysc.Quickbooks, :none)
+
+      try do
+        assert {:error, :missing_item_id} =
+                 Quickbooks.create_purchase_sales_receipt(%{
+                   customer_id: "cust_123",
+                   quantity: 1,
+                   unit_price: Decimal.new("100.00")
+                 })
+      after
+        Logger.delete_module_level(Ysc.Quickbooks)
+      end
+    end
+
+    test "returns error when item_id is empty string" do
+      Logger.put_module_level(Ysc.Quickbooks, :none)
+
+      try do
+        assert {:error, :missing_item_id} =
+                 Quickbooks.create_purchase_sales_receipt(%{
+                   customer_id: "cust_123",
+                   item_id: "",
+                   quantity: 1,
+                   unit_price: Decimal.new("100.00")
+                 })
+      after
+        Logger.delete_module_level(Ysc.Quickbooks)
+      end
+    end
+
+    test "creates sales receipt successfully with minimal params" do
+      stub(ClientMock, :query_class_by_name, fn "Administration" ->
+        {:ok, "admin_class_123"}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params ->
+        assert params.customer_ref == %{value: "cust_123"}
+        assert params.total_amt == Decimal.new("150.00")
+        assert [line] = params.line
+        assert line.detail_type == "SalesItemLineDetail"
+        assert line.sales_item_line_detail.item_ref == %{value: "item_456"}
+        assert line.sales_item_line_detail.quantity == Decimal.new(1)
+        assert line.sales_item_line_detail.unit_price == Decimal.new("150.00")
+
+        assert line.sales_item_line_detail.class_ref == %{
+                 value: "admin_class_123",
+                 name: "Administration"
+               }
+
+        {:ok, %{"Id" => "sr_789", "TotalAmt" => "150.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "sr_789"}} =
+               Quickbooks.create_purchase_sales_receipt(%{
+                 customer_id: "cust_123",
+                 item_id: "item_456",
+                 quantity: 1,
+                 unit_price: Decimal.new("150.00")
+               })
+    end
+
+    test "creates sales receipt with optional class_ref, txn_date, memo" do
+      expect(ClientMock, :create_sales_receipt, fn params ->
+        assert params.customer_ref == %{value: "cust_1"}
+        assert params.total_amt == Decimal.new("200.00")
+        assert params.txn_date == "2024-06-15"
+        assert params.memo == "Event ticket"
+        assert [line] = params.line
+
+        assert line.sales_item_line_detail.class_ref == %{
+                 value: "class_1",
+                 name: "Events"
+               }
+
+        {:ok, %{"Id" => "sr_ok", "TotalAmt" => "200.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "sr_ok"}} =
+               Quickbooks.create_purchase_sales_receipt(%{
+                 customer_id: "cust_1",
+                 item_id: "item_1",
+                 quantity: 2,
+                 unit_price: Decimal.new("100.00"),
+                 class_ref: %{value: "class_1", name: "Events"},
+                 txn_date: ~D[2024-06-15],
+                 memo: "Event ticket"
+               })
+    end
+  end
+
+  describe "create_refund_sales_receipt/1" do
+    test "creates refund sales receipt with positive amounts" do
+      expect(ClientMock, :create_sales_receipt, fn params ->
+        assert params.customer_ref == %{value: "cust_ref"}
+        assert params.total_amt == Decimal.new("50.00")
+        assert [line] = params.line
+        assert line.sales_item_line_detail.unit_price == Decimal.new("50.00")
+        assert line.description == "Refund"
+
+        {:ok, %{"Id" => "sr_refund", "TotalAmt" => "50.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "sr_refund"}} =
+               Quickbooks.create_refund_sales_receipt(%{
+                 customer_id: "cust_ref",
+                 item_id: "item_ref",
+                 quantity: 1,
+                 unit_price: Decimal.new("50.00")
+               })
+    end
+
+    test "creates refund sales receipt with optional class_ref, txn_date, memo, private_note" do
+      expect(ClientMock, :create_sales_receipt, fn params ->
+        assert params.txn_date == "2025-01-10"
+        assert params.memo == "Refund memo"
+        assert params.private_note == "Internal note"
+        assert [line] = params.line
+
+        assert line.sales_item_line_detail.class_ref == %{
+                 value: "events",
+                 name: "Events"
+               }
+
+        {:ok, %{"Id" => "sr_opt", "TotalAmt" => "25.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "sr_opt"}} =
+               Quickbooks.create_refund_sales_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("25.00"),
+                 class_ref: %{value: "events", name: "Events"},
+                 txn_date: ~D[2025-01-10],
+                 memo: "Refund memo",
+                 private_note: "Internal note"
+               })
+    end
+  end
+
+  describe "create_refund_receipt/1" do
+    test "creates refund receipt with refund_from_account_ref" do
+      expect(ClientMock, :create_refund_receipt, fn params ->
+        assert params.customer_ref == %{value: "cust_r"}
+        assert params.refund_from_account_ref == %{value: "undeposited_1"}
+        assert params.total_amt == Decimal.new("75.00")
+        assert [line] = params.line
+        assert line.sales_item_line_detail.item_ref == %{value: "item_r"}
+
+        {:ok, %{"Id" => "rr_1", "TotalAmt" => "75.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "rr_1"}} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "cust_r",
+                 item_id: "item_r",
+                 quantity: 1,
+                 unit_price: Decimal.new("75.00"),
+                 refund_from_account_id: "undeposited_1"
+               })
+    end
+  end
+
+  describe "create_stripe_payout_deposit/1" do
+    test "creates deposit with required params" do
+      expect(ClientMock, :create_deposit, fn params ->
+        assert params.deposit_to_account_ref == %{value: "bank_1"}
+        assert params.total_amt == 500.00
+        assert [line] = params.line
+        assert line.detail_type == "DepositLineDetail"
+        assert line.deposit_line_detail.account_ref == %{value: "stripe_acc_1"}
+        assert line.description == "Stripe payout"
+
+        {:ok, %{"Id" => "dep_1", "TotalAmt" => "500.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "dep_1"}} =
+               Quickbooks.create_stripe_payout_deposit(%{
+                 bank_account_id: "bank_1",
+                 stripe_account_id: "stripe_acc_1",
+                 amount: 500.00
+               })
+    end
+
+    test "creates deposit with optional txn_date, memo, class_ref" do
+      expect(ClientMock, :create_deposit, fn params ->
+        assert params.txn_date == "2024-12-01"
+        assert params.memo == "Payout for November"
+        assert [line] = params.line
+        assert line.deposit_line_detail.class_ref == %{value: "class_payout"}
+
+        {:ok, %{"Id" => "dep_2", "TotalAmt" => "1000.00"}}
+      end)
+
+      assert {:ok, %{"Id" => "dep_2"}} =
+               Quickbooks.create_stripe_payout_deposit(%{
+                 bank_account_id: "bank_2",
+                 stripe_account_id: "stripe_2",
+                 amount: 1000.00,
+                 txn_date: ~D[2024-12-01],
+                 memo: "Payout for November",
+                 class_ref: "class_payout"
+               })
+    end
+  end
 end

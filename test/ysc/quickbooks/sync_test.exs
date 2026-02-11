@@ -712,6 +712,110 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       assert {:ok, _} = Sync.sync_refund(refund)
     end
+
+    test "returns ok with existing ID when refund already synced", %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_already_synced_refund",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {refund, _refund_transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(2_000, :USD),
+          external_refund_id: "re_already_synced",
+          reason: "Refund"
+        })
+
+      refund =
+        refund
+        |> Refund.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_sales_receipt_id: "qb_existing_refund_123"
+        })
+        |> Repo.update!()
+        |> Repo.reload!()
+
+      assert {:ok, %{"Id" => "qb_existing_refund_123"}} =
+               Sync.sync_refund(refund)
+    end
+
+    test "returns error when client create_refund_receipt fails", %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_refund_error_test",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {refund, _refund_transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(1_000, :USD),
+          external_refund_id: "re_error_test",
+          reason: "Refund"
+        })
+
+      Process.sleep(100)
+      refund = Repo.reload!(refund)
+
+      refund =
+        if refund.quickbooks_sync_status == "synced" do
+          refund
+          |> Refund.changeset(%{
+            quickbooks_sync_status: "pending",
+            quickbooks_sales_receipt_id: nil,
+            quickbooks_response: nil
+          })
+          |> Repo.update!()
+          |> Repo.reload!()
+        else
+          refund
+        end
+
+      stub(ClientMock, :query_account_by_name, fn "Undeposited Funds" ->
+        {:ok, "undeposited_123"}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Events" -> {:ok, "events_class_123"}
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_err"}}
+      end)
+
+      expect(ClientMock, :create_refund_receipt, fn _params ->
+        {:error, "QuickBooks API error: Rate limited"}
+      end)
+
+      assert {:error, "QuickBooks API error: Rate limited"} =
+               Sync.sync_refund(refund)
+
+      refund = Repo.reload!(refund)
+      assert refund.quickbooks_sync_status == "failed"
+      assert refund.quickbooks_sync_error != nil
+    end
   end
 
   describe "sync_payment/1 with mixed event/donation payments" do
@@ -1807,6 +1911,114 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       assert {:ok, _} = Sync.sync_payout(payout)
+    end
+
+    test "returns ok with existing ID when payout already synced", %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_payout_already_synced",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment =
+        payment
+        |> Payment.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_sales_receipt_id: "qb_sr_for_payout"
+        })
+        |> Repo.update!()
+        |> Repo.reload!()
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(10_000, :USD),
+          stripe_payout_id: "po_already_synced",
+          description: "Payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+      payout = Repo.reload!(payout)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "qb_deposit_existing_456"
+        })
+        |> Repo.update!()
+        |> Repo.reload!()
+
+      assert {:ok, %{"Id" => "qb_deposit_existing_456"}} =
+               Sync.sync_payout(payout)
+    end
+
+    test "returns error when client create_deposit fails", %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_payout_deposit_error",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment =
+        payment
+        |> Payment.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_sales_receipt_id: "qb_sr_dep_err"
+        })
+        |> Repo.update!()
+        |> Repo.reload!()
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(10_000, :USD),
+          stripe_payout_id: "po_deposit_error",
+          description: "Payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+      payout = Repo.reload!(payout)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_deposit, fn _params ->
+        {:error, "QuickBooks API error: Deposit failed"}
+      end)
+
+      assert {:error, "QuickBooks API error: Deposit failed"} =
+               Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "failed"
+      assert payout.quickbooks_sync_error != nil
     end
   end
 

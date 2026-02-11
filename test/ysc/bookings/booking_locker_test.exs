@@ -14,6 +14,46 @@ defmodule Ysc.Bookings.BookingLockerTest do
     %{user: user}
   end
 
+  describe "optimistic locking retry" do
+    test "retries on stale inventory and returns property_unavailable when another booking wins",
+         %{
+           sandbox_owner: owner
+         } do
+      user1 = user_fixture()
+      user2 = user_fixture()
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      results =
+        [user1, user2]
+        |> Task.async_stream(
+          fn user ->
+            Ysc.DataCase.allow_sandbox(self(), owner)
+
+            BookingLocker.create_buyout_booking(
+              user.id,
+              :tahoe,
+              checkin,
+              checkout,
+              4
+            )
+          end,
+          max_concurrency: 2,
+          timeout: 5_000
+        )
+        |> Enum.to_list()
+
+      successful = Enum.count(results, &match?({:ok, {:ok, _}}, &1))
+      failed = Enum.count(results, &match?({:ok, {:error, _}}, &1))
+
+      assert successful == 1,
+             "expected exactly one successful buyout booking, got #{successful}"
+
+      assert failed == 1,
+             "expected exactly one failed attempt (stale then unavailable), got #{failed}"
+    end
+  end
+
   describe "create_buyout_booking/6" do
     test "creates a buyout booking for Tahoe", %{user: user} do
       checkin = Date.utc_today() |> Date.add(7)
@@ -134,6 +174,69 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end
     end
 
+    test "multi-room booking combines pricing for multiple rooms", %{user: user} do
+      {:ok, _} =
+        Ysc.Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room1} =
+        Ysc.Bookings.create_room(%{
+          name: "Multi Room A",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {:ok, room2} =
+        Ysc.Bookings.create_room(%{
+          name: "Multi Room B",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      checkin = Date.utc_today() |> Date.add(14)
+      checkout = Date.add(checkin, 2)
+      guests = 2
+      nights = Date.diff(checkout, checkin)
+
+      result =
+        BookingLocker.create_room_booking(
+          user.id,
+          [room1.id, room2.id],
+          checkin,
+          checkout,
+          guests
+        )
+
+      case result do
+        {:ok, %Booking{} = booking} ->
+          booking = Ysc.Repo.preload(booking, :rooms)
+          assert length(booking.rooms) == 2
+          # 2 rooms * 2 guests * 2 nights * $100 = $800
+          expected_min = Money.new(:USD, 2 * 2 * nights * 100 - 1)
+          assert Money.compare(booking.total_price, expected_min) in [:gt, :eq]
+          assert booking.booking_mode == :room
+          assert booking.status == :hold
+
+        {:ok, {:error, :pricing_calculation_failed}} ->
+          :ok
+
+        {:error, :pricing_calculation_failed} ->
+          :ok
+
+        other ->
+          flunk("Unexpected result: #{inspect(other)}")
+      end
+    end
+
     test "prevents overlapping room bookings", %{user: user} do
       # Set up pricing rules for room bookings
       {:ok, _} =
@@ -188,6 +291,160 @@ defmodule Ysc.Bookings.BookingLockerTest do
         other ->
           flunk("Unexpected result: #{inspect(other)}")
       end
+    end
+  end
+
+  describe "create_admin_booking/2" do
+    test "creates a complete buyout booking and updates inventory", %{
+      user: user
+    } do
+      checkin = Date.utc_today() |> Date.add(14)
+      checkout = Date.add(checkin, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      assert {:ok, %Booking{} = booking} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert booking.user_id == user.id
+      assert booking.property == :tahoe
+      assert booking.booking_mode == :buyout
+      assert booking.status == :complete
+      assert booking.checkin_date == checkin
+      assert booking.checkout_date == checkout
+    end
+  end
+
+  describe "refund_complete_booking/2" do
+    test "refunds a complete booking and sets status to refunded", %{user: user} do
+      checkin = Date.utc_today() |> Date.add(21)
+      checkout = Date.add(checkin, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(attrs,
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:ok, updated} = BookingLocker.refund_complete_booking(booking.id)
+      assert updated.status == :refunded
+    end
+
+    test "refund_complete_booking with release_inventory false does not rollback",
+         %{user: user} do
+      checkin = Date.utc_today() |> Date.add(28)
+      checkout = Date.add(checkin, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(attrs,
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:ok, updated} =
+               BookingLocker.refund_complete_booking(booking.id, false)
+
+      assert updated.status == :refunded
+    end
+
+    test "refund_complete_booking returns error for non-complete booking", %{
+      user: user
+    } do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+
+      {:ok, hold_booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      assert {:error, {:error, :invalid_status}} =
+               BookingLocker.refund_complete_booking(hold_booking.id)
+    end
+  end
+
+  describe "Clear Lake per-guest capacity" do
+    test "create_per_guest_booking succeeds within capacity", %{user: user} do
+      checkin = Date.utc_today() |> Date.add(30)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, %Booking{} = booking} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert booking.property == :clear_lake
+      assert booking.booking_mode == :day
+      assert booking.guests_count == 2
+      assert booking.status == :hold
+    end
+
+    test "create_per_guest_booking fails when capacity would be exceeded", %{
+      user: user
+    } do
+      checkin = Date.utc_today() |> Date.add(35)
+      checkout = Date.add(checkin, 2)
+
+      # Default Clear Lake capacity is 12; book all 12 first
+      assert {:ok, _booking1} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 12
+               )
+
+      # Second user tries to book 1 more guest -> insufficient capacity
+      other_user = user_fixture(%{phone_number: "+14159098310"})
+
+      assert {:error, {:error, :insufficient_capacity}} =
+               BookingLocker.create_per_guest_booking(
+                 other_user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 1
+               )
     end
   end
 

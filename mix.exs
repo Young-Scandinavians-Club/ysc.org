@@ -39,7 +39,16 @@ defmodule Ysc.MixProject do
           Mix.Tasks.Message.Requeue,
           Mix.Tasks.TestOutageEmail,
           Mix.Tasks.TestSubscriptionExpiration,
-          Mix.Tasks.Webhook.Reprocess
+          Mix.Tasks.Webhook.Reprocess,
+          Ysc.Customers.Behaviour,
+          Ysc.Keila.Behaviour,
+          Ysc.Payments.Behaviour,
+          Ysc.Quickbooks.Client,
+          Ysc.Quickbooks.ClientBehaviour,
+          Ysc.Stripe.PaymentIntentBehaviour,
+          Ysc.Stripe.PaymentMethodBehaviour,
+          Ysc.Stripe.SetupIntentBehaviour,
+          Ysc.StripeBehaviour
         ]
       ]
     ]

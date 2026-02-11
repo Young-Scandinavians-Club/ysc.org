@@ -1,4 +1,4 @@
-# Ysc
+# YSC.org
 
 This is the central repository for the YSC web application, a comprehensive platform for managing club activities, memberships, events, and finances. Built with Elixir and the Phoenix framework, it provides a robust and scalable solution for the club's needs.
 
@@ -283,7 +283,7 @@ The `make dev-setup` command automatically seeds your database with test data fo
 
 You can log in immediately with the default admin account:
 
-**Email**: `admin@ysc.org`  
+**Email**: `admin@ysc.org`
 **Password**: `very_secure_password`
 
 This account has full administrative access to the application.
@@ -291,6 +291,7 @@ This account has full administrative access to the application.
 #### Other Seeded Data
 
 The seeds also create:
+
 - **10 active members** with various membership types (single and family)
 - **5 pending members** awaiting approval
 - **3 rejected applications**
@@ -302,6 +303,7 @@ The seeds also create:
 - **Social media links** (Instagram, Facebook, Discord)
 
 All seeded users (except admin) follow the pattern:
+
 - **Email**: `firstname_lastname_N@ysc.org` (e.g., `karl_andersson_0@ysc.org`)
 - **Password**: `very_secure_password` (same as admin)
 
@@ -348,6 +350,7 @@ Visit http://localhost:4000
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 **You should have three terminal windows open:**
+
 1. **Stripe CLI** - Running `stripe listen --forward-to localhost:4000/webhooks/stripe`
 2. **Phoenix Server** - Running `make dev`
 3. **Your working terminal** - For running commands, tests, etc.
@@ -457,6 +460,7 @@ All emails sent by the YSC application can be viewed at:
 **[http://localhost:4000/dev/mailbox](http://localhost:4000/dev/mailbox)**
 
 This includes:
+
 - 🔐 **User registration confirmations**
 - 🔑 **Password reset emails**
 - ✉️ **Account notifications**
@@ -475,6 +479,7 @@ YSC App sends email → Swoosh.Adapters.Local → Stored in memory
 ```
 
 **Key points:**
+
 - Emails persist only while the Phoenix server is running
 - Restarting the server clears all stored emails
 - No external SMTP server needed
@@ -515,6 +520,7 @@ open http://localhost:4000/dev/mailbox
 #### Email Preview Features
 
 The Swoosh mailbox preview provides:
+
 - **List view** - See all sent emails chronologically
 - **Email details** - View full email content (HTML and text versions)
 - **Metadata** - See recipient, subject, from address
@@ -525,12 +531,13 @@ The Swoosh mailbox preview provides:
 
 The application uses **two different email systems**:
 
-| System | Purpose | URL | Emails |
-|--------|---------|-----|--------|
-| **Swoosh Mailbox** | YSC app emails | http://localhost:4000/dev/mailbox | Registration, notifications, tickets, etc. |
-| **Mailpit** | Keila newsletters | http://localhost:8025 | Newsletter campaigns, subscription confirmations |
+| System             | Purpose           | URL                               | Emails                                           |
+| ------------------ | ----------------- | --------------------------------- | ------------------------------------------------ |
+| **Swoosh Mailbox** | YSC app emails    | http://localhost:4000/dev/mailbox | Registration, notifications, tickets, etc.       |
+| **Mailpit**        | Keila newsletters | http://localhost:8025             | Newsletter campaigns, subscription confirmations |
 
 **Why two systems?**
+
 - **Swoosh** is built into Phoenix - handles transactional emails from the app
 - **Mailpit** is an external SMTP server - handles Keila's newsletter emails
 - They serve different purposes and operate independently
@@ -570,11 +577,13 @@ open http://localhost:4000/dev/mailbox
 ```
 
 **Mailbox is empty after restart:**
+
 - This is expected - emails are stored in memory only
 - They're cleared when the server restarts
 - Generate new test emails as needed
 
 **Need to test actual email delivery:**
+
 - Use a test SMTP service (Mailpit, MailHog, or Mailtrap)
 - Configure in `config/dev.exs` or use environment variables
 - For most development, the local adapter is sufficient
@@ -586,6 +595,7 @@ The application uses [Keila](https://www.keila.io/) for email marketing and news
 #### What is Keila?
 
 Keila is an open-source email marketing platform that handles:
+
 - Newsletter subscriptions and unsubscriptions
 - Email campaign management
 - Contact list management
@@ -607,6 +617,7 @@ User subscribes → YSC App → Oban Job → Keila API → Keila Database
 ```
 
 **Key components:**
+
 - **YSC Application** - Handles newsletter checkbox in user settings and homepage
 - **Oban Worker** (`YscWeb.Workers.KeilaSubscriber`) - Processes subscription requests asynchronously
 - **Keila API** - Manages contacts and subscriptions
@@ -714,6 +725,7 @@ config :ysc, :keila,
 #### Common Scenarios
 
 **Test newsletter subscription flow:**
+
 ```bash
 # 1. Subscribe on homepage
 curl -X POST http://localhost:4000/api/newsletter/subscribe \
@@ -728,6 +740,7 @@ curl -X POST http://localhost:4000/api/newsletter/subscribe \
 ```
 
 **Test user settings integration:**
+
 ```bash
 # 1. Create a test user in the app
 # 2. Go to Settings → Notifications
@@ -739,6 +752,7 @@ curl -X POST http://localhost:4000/api/newsletter/subscribe \
 #### Troubleshooting Keila
 
 **Keila container not running:**
+
 ```bash
 # Check container status
 docker-compose -f etc/docker/docker-compose.yml ps keila
@@ -751,6 +765,7 @@ docker-compose -f etc/docker/docker-compose.yml logs keila
 ```
 
 **Subscription not working:**
+
 ```bash
 # Check Oban queue
 # Visit http://localhost:4000/admin/settings
@@ -764,6 +779,7 @@ curl http://localhost:4001
 ```
 
 **Emails not appearing in Mailpit:**
+
 ```bash
 # Check Mailpit is running
 docker-compose -f etc/docker/docker-compose.yml ps mailpit
@@ -809,10 +825,10 @@ The project includes a sandbox environment deployed on Fly.io for testing integr
 
 #### Sandbox Configuration
 
--   **URL**: https://ysc-sandbox.fly.dev
--   **Environment**: Sandbox (auto-shuts down after 10 minutes of inactivity)
--   **QuickBooks**: Uses QuickBooks Sandbox API
--   **Stripe**: Uses Stripe test mode
+- **URL**: https://ysc-sandbox.fly.dev
+- **Environment**: Sandbox (auto-shuts down after 10 minutes of inactivity)
+- **QuickBooks**: Uses QuickBooks Sandbox API
+- **Stripe**: Uses Stripe test mode
 
 #### Deploying to Sandbox
 
@@ -830,34 +846,34 @@ The production environment is hosted on Fly.io. For detailed deployment instruct
 
 This is a web application built with the Phoenix framework, written in Elixir. It follows the standard Phoenix project structure:
 
-*   **Core Business Logic (`lib/ysc`)**: This layer encapsulates the core functionalities of the application, such as user accounts, payments, bookings, and integrations with third-party services like Stripe and QuickBooks. It is decoupled from the web interface.
-*   **Web Interface (`lib/ysc_web`)**: This is the Phoenix web application that provides the user interface. It uses Phoenix LiveView for rich, real-time user experiences, and traditional controllers for handling HTTP requests. It's responsible for rendering templates, handling user input, and communicating with the core business logic.
-*   **Database**: The application uses a PostgreSQL database, managed by Ecto, Elixir's database wrapper and query language.
-*   **Background Jobs**: Asynchronous tasks, like sending emails or syncing with QuickBooks, are managed by Oban, a robust background job processing library for Elixir.
-*   **Third-Party Integrations**:
-    *   **Stripe**: For payment processing.
-    *   **QuickBooks**: For accounting and financial management.
-    *   **AWS S3**: For file storage.
-    *   **Flowroute**: For SMS services.
+- **Core Business Logic (`lib/ysc`)**: This layer encapsulates the core functionalities of the application, such as user accounts, payments, bookings, and integrations with third-party services like Stripe and QuickBooks. It is decoupled from the web interface.
+- **Web Interface (`lib/ysc_web`)**: This is the Phoenix web application that provides the user interface. It uses Phoenix LiveView for rich, real-time user experiences, and traditional controllers for handling HTTP requests. It's responsible for rendering templates, handling user input, and communicating with the core business logic.
+- **Database**: The application uses a PostgreSQL database, managed by Ecto, Elixir's database wrapper and query language.
+- **Background Jobs**: Asynchronous tasks, like sending emails or syncing with QuickBooks, are managed by Oban, a robust background job processing library for Elixir.
+- **Third-Party Integrations**:
+  - **Stripe**: For payment processing.
+  - **QuickBooks**: For accounting and financial management.
+  - **AWS S3**: For file storage.
+  - **Flowroute**: For SMS services.
 
 ## Features
 
 The application provides a comprehensive set of features for managing a club or organization:
 
-*   **User Management**: User accounts, authentication, and authorization.
-*   **Membership Management**: Handling memberships, subscriptions, and renewals.
-*   **Event Management**: Creating and managing events, including ticketing and registration.
-*   **Bookings**: A system for booking resources or facilities.
-*   **Content Management**: Creating and publishing posts and announcements.
-*   **Financial Management**:
-    *   Processing payments with Stripe.
-    *   Generating expense reports.
-    *   Syncing financial data with QuickBooks.
-    *   Maintaining ledgers and financial records.
-*   **Communication**: Sending emails and SMS messages to users.
-*   **Support**: A ticketing system for handling user inquiries.
-*   **File Management**: Uploading and managing files with AWS S3.
-*   **Search**: A comprehensive search functionality.
+- **User Management**: User accounts, authentication, and authorization.
+- **Membership Management**: Handling memberships, subscriptions, and renewals.
+- **Event Management**: Creating and managing events, including ticketing and registration.
+- **Bookings**: A system for booking resources or facilities.
+- **Content Management**: Creating and publishing posts and announcements.
+- **Financial Management**:
+  - Processing payments with Stripe.
+  - Generating expense reports.
+  - Syncing financial data with QuickBooks.
+  - Maintaining ledgers and financial records.
+- **Communication**: Sending emails and SMS messages to users.
+- **Support**: A ticketing system for handling user inquiries.
+- **File Management**: Uploading and managing files with AWS S3.
+- **Search**: A comprehensive search functionality.
 
 ## Contributing
 
@@ -880,6 +896,7 @@ make preflight
 ```
 
 This single command will:
+
 - Compile your code with warnings as errors
 - Check code formatting
 - Run Credo (strict mode)
@@ -894,7 +911,6 @@ If all checks pass, your code is ready to push. If any check fails, you'll get c
 To test QuickBooks integration locally, you'll need to configure QuickBooks sandbox credentials:
 
 1. **Get QuickBooks Sandbox Credentials**:
-
    - Sign up for a [QuickBooks Developer Account](https://developer.intuit.com/)
    - Create a sandbox company in the QuickBooks Developer Dashboard
    - Create an app and obtain OAuth credentials
@@ -987,7 +1003,6 @@ The project includes several useful make targets for development:
 
 - **`make help`** - Display all available make targets with descriptions
 
-
 ## Environment Variables
 
 **Important:** All Stripe environment variables must be set before running `make dev`. You can either export them in your shell or use a `.env` file.
@@ -1076,4 +1091,3 @@ RADAR_PUBLIC_KEY=prj_live_pk_...  # Optional, defaults to test key
 **Note:** Exported environment variables take precedence over values in the `.env` file. The `make dev` command will automatically load variables from `.env` if the file exists.
 
 **Security Note:** Never commit your `.env` file to version control. It's already included in `.gitignore`.
-
