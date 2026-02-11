@@ -141,6 +141,8 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
   describe "mount/3 - security and authorization" do
     test "prevents access to other user's booking", %{conn: conn} do
+      Logger.put_module_level(YscWeb.PaymentSuccessLive, :none)
+
       user1 = user_fixture()
       user2 = user_fixture()
       booking = booking_fixture(%{user_id: user2.id})
@@ -184,6 +186,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         assert flash["error"] =~
                  "Payment was successful, but we couldn't find your booking or order"
       after
+        Logger.put_module_level(YscWeb.PaymentSuccessLive, :error)
         Application.put_env(:ysc, :stripe_client, original_client)
         Process.delete(:test_metadata)
       end
