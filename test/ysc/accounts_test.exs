@@ -5,7 +5,7 @@ defmodule Ysc.AccountsTest do
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
-  alias Ysc.Accounts.{User, UserToken}
+  alias Ysc.Accounts.{User, UserPasskey, UserToken}
 
   describe "get_user_by_email/1" do
     test "does not return the user if the email does not exist" do
@@ -15,6 +15,335 @@ defmodule Ysc.AccountsTest do
     test "returns the user if the email exists" do
       %{id: id} = user = user_fixture(%{phone_number: "+14159098268"})
       assert %User{id: ^id} = Accounts.get_user_by_email(user.email)
+    end
+  end
+
+  describe "get_user_by_phone_number/1" do
+    test "returns nil for unknown phone number" do
+      refute Accounts.get_user_by_phone_number("+15550000000")
+      refute Accounts.get_user_by_phone_number("unknown")
+    end
+
+    test "returns user when phone number matches exactly (E.164)" do
+      %{id: id} = user_fixture(%{phone_number: "+14159098268"})
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("+14159098268")
+    end
+
+    test "returns user when phone number is US format with dashes" do
+      %{id: id} = user_fixture(%{phone_number: "+14159098268"})
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("415-909-8268")
+    end
+
+    test "returns user when phone number is US format without country code" do
+      %{id: id} = user_fixture(%{phone_number: "+14159098268"})
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("4159098268")
+    end
+
+    test "returns user when phone number has spaces (US)" do
+      %{id: id} = user_fixture(%{phone_number: "+14159098268"})
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("415 909 8268")
+    end
+
+    test "returns user for Nordic number stored as E.164 (Swedish)" do
+      %{id: id} = user_fixture(%{phone_number: "+46701234567"})
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("+46701234567")
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("070-123 45 67")
+    end
+  end
+
+  describe "passkey lifecycle" do
+    test "get_user_passkeys returns empty list for user with no passkeys",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      assert Accounts.get_user_passkeys(user) == []
+    end
+
+    test "create_user_passkey adds a passkey and get_user_passkeys returns it",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098268"})
+
+      attrs = %{
+        external_id: "cred-id-1",
+        public_key: <<1, 2, 3>>,
+        nickname: "Device 1"
+      }
+
+      assert {:ok, %UserPasskey{} = passkey} =
+               Accounts.create_user_passkey(user, attrs)
+
+      assert passkey.user_id == user.id
+      assert passkey.external_id == "cred-id-1"
+      assert passkey.sign_count == 0
+
+      passkeys = Accounts.get_user_passkeys(user)
+      assert length(passkeys) == 1
+      assert hd(passkeys).id == passkey.id
+    end
+
+    test "update_passkey_sign_count updates sign_count and last_used_at", %{} do
+      user = user_fixture(%{phone_number: "+14159098269"})
+
+      {:ok, passkey} =
+        Accounts.create_user_passkey(user, %{
+          external_id: "cred-id-2",
+          public_key: <<4, 5, 6>>
+        })
+
+      assert {:ok, updated} = Accounts.update_passkey_sign_count(passkey, 3)
+      assert updated.sign_count == 3
+      assert updated.last_used_at != nil
+    end
+
+    test "delete_user_passkey removes the passkey", %{} do
+      user = user_fixture(%{phone_number: "+14159098270"})
+
+      {:ok, passkey} =
+        Accounts.create_user_passkey(user, %{
+          external_id: "cred-id-3",
+          public_key: <<7, 8, 9>>
+        })
+
+      assert {:ok, _} = Accounts.delete_user_passkey(passkey)
+      assert Accounts.get_user_passkeys(user) == []
+    end
+
+    test "should_show_passkey_prompt? is true when user has no passkeys and never dismissed",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098271"})
+      assert user.passkey_prompt_dismissed_at == nil
+      assert Accounts.should_show_passkey_prompt?(user) == true
+    end
+
+    test "should_show_passkey_prompt? is false when user has passkeys", %{} do
+      user = user_fixture(%{phone_number: "+14159098272"})
+
+      Accounts.create_user_passkey(user, %{
+        external_id: "cred-id-4",
+        public_key: <<0>>
+      })
+
+      assert Accounts.should_show_passkey_prompt?(user) == false
+    end
+
+    test "dismiss_passkey_prompt sets passkey_prompt_dismissed_at and should_show_passkey_prompt? is false",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098273"})
+      assert Accounts.should_show_passkey_prompt?(user) == true
+
+      assert {:ok, updated} = Accounts.dismiss_passkey_prompt(user)
+      assert updated.passkey_prompt_dismissed_at != nil
+      assert Accounts.should_show_passkey_prompt?(updated) == false
+    end
+
+    test "get_user_passkey_by_external_id returns passkey", %{} do
+      user = user_fixture(%{phone_number: "+14159098274"})
+
+      {:ok, passkey} =
+        Accounts.create_user_passkey(user, %{
+          external_id: "cred-unique-99",
+          public_key: <<10>>
+        })
+
+      found = Accounts.get_user_passkey_by_external_id("cred-unique-99")
+      assert found != nil
+      assert found.id == passkey.id
+    end
+  end
+
+  describe "verification codes" do
+    test "generate_email_verification_code returns 6-digit string", %{} do
+      code = Accounts.generate_email_verification_code()
+      assert is_binary(code)
+      assert String.length(code) == 6
+      assert code =~ ~r/^\d{6}$/
+    end
+
+    test "store and get_email_verification_code roundtrip", %{} do
+      user = user_fixture(%{phone_number: "+14159098280"})
+      Accounts.store_email_verification_code(user, "123456", 600)
+      assert Accounts.get_email_verification_code(user) == "123456"
+    end
+
+    test "verify_email_verification_code returns ok when code matches", %{} do
+      user = user_fixture(%{phone_number: "+14159098281"})
+      Accounts.store_email_verification_code(user, "654321", 600)
+
+      assert Accounts.verify_email_verification_code(user, "654321") ==
+               {:ok, :verified}
+    end
+
+    test "verify_email_verification_code returns invalid_code when code does not match",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098282"})
+      Accounts.store_email_verification_code(user, "111111", 600)
+
+      assert Accounts.verify_email_verification_code(user, "999999") ==
+               {:error, :invalid_code}
+    end
+
+    test "verify_email_verification_code accepts 000000 in dev/test", %{} do
+      user = user_fixture(%{phone_number: "+14159098283"})
+      # No code stored; in dev/test "000000" is accepted as bypass
+      assert Accounts.verify_email_verification_code(user, "000000") ==
+               {:ok, :verified}
+    end
+
+    test "remove_email_verification_code clears code", %{} do
+      user = user_fixture(%{phone_number: "+14159098284"})
+      Accounts.store_email_verification_code(user, "222222", 600)
+      assert Accounts.get_email_verification_code(user) == "222222"
+      Accounts.remove_email_verification_code(user)
+      assert Accounts.get_email_verification_code(user) == nil
+    end
+
+    test "generate_and_store_email_verification_code returns stored code",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098285"})
+      code = Accounts.generate_and_store_email_verification_code(user, 600)
+      assert String.length(code) == 6
+      assert Accounts.get_email_verification_code(user) == code
+    end
+
+    test "verify_email_code accepts valid 6-digit code", %{} do
+      user = user_fixture(%{phone_number: "+14159098286"})
+      assert Accounts.verify_email_code(user, "123456") == {:ok, user}
+      assert Accounts.verify_email_code(user, "000000") == {:ok, user}
+    end
+
+    test "verify_email_code rejects invalid format", %{} do
+      user = user_fixture(%{phone_number: "+14159098287"})
+
+      assert Accounts.verify_email_code(user, "12345") ==
+               {:error, :invalid_code}
+
+      assert Accounts.verify_email_code(user, "1234567") ==
+               {:error, :invalid_code}
+
+      assert Accounts.verify_email_code(user, "12a456") ==
+               {:error, :invalid_code}
+    end
+
+    test "store and verify_phone_verification_code roundtrip", %{} do
+      user = user_fixture(%{phone_number: "+14159098288"})
+      Accounts.store_phone_verification_code(user, "555555", 600)
+
+      assert Accounts.verify_phone_verification_code(user, "555555") ==
+               {:ok, :verified}
+    end
+
+    test "verify_phone_verification_code accepts 000000 in dev/test", %{} do
+      user = user_fixture(%{phone_number: "+14159098289"})
+
+      assert Accounts.verify_phone_verification_code(user, "000000") ==
+               {:ok, :verified}
+    end
+
+    test "generate_and_store_phone_verification_code stores and returns code",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098290"})
+      code = Accounts.generate_and_store_phone_verification_code(user, 600)
+      assert String.length(code) == 6
+
+      assert Accounts.verify_phone_verification_code(user, code) ==
+               {:ok, :verified}
+    end
+  end
+
+  describe "family account" do
+    test "get_family_group returns only user when no family", %{} do
+      user = user_fixture(%{phone_number: "+14159098291"})
+      group = Accounts.get_family_group(user)
+      assert length(group) == 1
+      assert hd(group).id == user.id
+    end
+
+    test "primary_user? and sub_account?", %{} do
+      primary = user_fixture(%{phone_number: "+14159098292"})
+      assert Accounts.primary_user?(primary) == true
+      assert Accounts.sub_account?(primary) == false
+
+      sub = user_fixture(%{phone_number: "+14159098293"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      assert Accounts.primary_user?(sub) == false
+      assert Accounts.sub_account?(sub) == true
+    end
+
+    test "get_family_group returns primary and sub_accounts", %{} do
+      primary = user_fixture(%{phone_number: "+14159098294"})
+      sub = user_fixture(%{phone_number: "+14159098295"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      group = Accounts.get_family_group(primary)
+      assert length(group) == 2
+      ids = Enum.map(group, & &1.id)
+      assert primary.id in ids
+      assert sub.id in ids
+
+      assert Accounts.get_primary_user(sub).id == primary.id
+      sub_accounts = Accounts.get_sub_accounts(primary)
+      assert length(sub_accounts) == 1
+      assert hd(sub_accounts).id == sub.id
+    end
+
+    test "get_family_group_user_ids returns all family user ids", %{} do
+      primary = user_fixture(%{phone_number: "+14159098296"})
+      sub = user_fixture(%{phone_number: "+14159098297"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      ids = Accounts.get_family_group_user_ids(primary)
+      assert length(ids) == 2
+      assert primary.id in ids
+      assert sub.id in ids
+    end
+
+    test "remove_sub_account clears primary_user_id", %{} do
+      primary = user_fixture(%{phone_number: "+14159098298"})
+      sub = user_fixture(%{phone_number: "+14159098299"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      assert {:ok, updated} = Accounts.remove_sub_account(sub, primary)
+      assert updated.primary_user_id == nil
+
+      group = Accounts.get_family_group(primary)
+      assert length(group) == 1
+      assert hd(group).id == primary.id
+    end
+
+    test "remove_sub_account returns error when sub does not belong to primary",
+         %{} do
+      primary1 = user_fixture(%{phone_number: "+14159098300"})
+      primary2 = user_fixture(%{phone_number: "+14159098301"})
+      sub = user_fixture(%{phone_number: "+14159098302"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary1.id)
+        |> Repo.update!()
+
+      assert {:error, :unauthorized} =
+               Accounts.remove_sub_account(sub, primary2)
     end
   end
 

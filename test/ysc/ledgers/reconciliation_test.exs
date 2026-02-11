@@ -1979,6 +1979,85 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
   end
 
+  describe "account balance with date range" do
+    test "get_account_balance(account_id, start_date, end_date) filters by payment date",
+         %{
+           user: user
+         } do
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+
+      # Payment 1: now
+      payment_date = DateTime.truncate(DateTime.utc_now(), :second)
+
+      {:ok, {_payment1, _tx1, _e1}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_balance_date_1",
+          payment_date: payment_date,
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "Payment 1",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      today = DateTime.to_date(payment_date)
+      start_today = DateTime.new!(today, ~T[00:00:00])
+      end_today = DateTime.new!(today, ~T[23:59:59])
+      next_week = Date.add(today, 7)
+      start_future = DateTime.new!(next_week, ~T[00:00:00])
+      end_future = DateTime.new!(next_week, ~T[23:59:59])
+
+      # Balance in range [today, today] should include payment1's stripe entries
+      balance_today =
+        Ledgers.get_account_balance(stripe_account.id, start_today, end_today)
+
+      # Balance in range [next_week] should be zero (no payments that day)
+      balance_future =
+        Ledgers.get_account_balance(stripe_account.id, start_future, end_future)
+
+      assert Money.compare(balance_today, Money.new(0, :USD)) != :lt
+      assert Money.equal?(balance_future, Money.new(0, :USD))
+    end
+  end
+
+  describe "complex transaction (payment + refund)" do
+    test "payment then full refund keeps ledger balanced and reconciliation passes",
+         %{
+           user: user
+         } do
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(15_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_complex_tx",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(450, :USD),
+          description: "Payment for refund test",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      {:ok, {_refund, _refund_tx, _refund_entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(15_000, :USD),
+          reason: "Test refund",
+          external_refund_id: "re_complex_tx"
+        })
+
+      {:ok, report} = Reconciliation.run_full_reconciliation()
+      assert report.overall_status == :ok
+      assert report.checks.ledger_balance.balanced == true
+    end
+  end
+
   describe "recovery and repair scenarios" do
     test "identifies exact discrepancies for manual correction", %{user: user} do
       # Create payment

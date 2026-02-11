@@ -19,7 +19,7 @@
         <div class="absolute -inset-6 bg-blue-600/5 rounded-full blur-3xl">
         </div>
         <h1 class="relative text-7xl md:text-9xl font-black text-zinc-900 tracking-tighter mb-4">
-          75
+          <%= div(Date.utc_today().year - 1950, 5) * 5 %>+
           <span class="text-3xl md:text-5xl align-top mt-4 inline-block text-blue-600">
             Years
           </span>
@@ -138,7 +138,7 @@
         <div class="flex items-center justify-center gap-3 text-xs font-semibold text-zinc-600">
           <.icon name="hero-clock" class="w-4 h-4 text-blue-600" />
           <span id="current-decade-indicator" class="min-w-[120px] text-center">
-            Exploring 75 Years
+            Exploring <%= div(Date.utc_today().year - 1950, 5) * 5 %> Years
           </span>
           <div class="flex gap-1 ml-2 border-l border-zinc-300 pl-3">
             <a
@@ -276,7 +276,7 @@
                   <div class="aspect-[3/4] rounded overflow-hidden">
                     <img
                       src={
-                        ~p"/images/history/nordic_highlight_1960_frontpage.png"
+                        ~p"/images/history/nordic_highlight_1960_frontpage.webp"
                       }
                       alt="Nordic Highlight frontpage from 1960"
                       class="w-full h-full object-cover"
@@ -735,7 +735,7 @@
                   <div class="rounded-lg overflow-hidden era-1980s">
                     <div class="aspect-[3/4] relative">
                       <img
-                        src="/images/history/35th_anniversary_program.png"
+                        src="/images/history/35th_anniversary_program.webp"
                         alt="35th Anniversary celebration program cover"
                         class="w-full h-full object-cover"
                       />
@@ -747,7 +747,7 @@
                   <div class="rounded-lg overflow-hidden era-1980s">
                     <div class="aspect-[3/4] relative">
                       <img
-                        src="/images/history/35th_anniversary_program_2.png"
+                        src="/images/history/35th_anniversary_program_2.webp"
                         alt="35th Anniversary celebration program inside"
                         class="w-full h-full object-cover"
                       />
@@ -1237,7 +1237,9 @@
         class="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
         style="mask-image: radial-gradient(circle at center, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.02) 50%, transparent 80%);"
       >
-        <span class="text-[20rem] font-black text-white">75</span>
+        <span class="text-[20rem] font-black text-white">
+          <%= div(Date.utc_today().year - 1950, 5) * 5 %>
+        </span>
       </div>
 
       <div class="relative z-10">
@@ -1245,7 +1247,10 @@
           Write the Next Chapter.
         </h3>
         <p class="text-xl text-zinc-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-          Our history isn't just about the past—it's about the families and friends who will steward these cabins for the next 75 years.
+          Our history isn't just about the past—it's about the families and friends who will steward these cabins for the next <%= div(
+            Date.utc_today().year - 1950,
+            5
+          ) * 5 %> years.
           <strong class="text-white"> Will you be one of them?</strong>
         </p>
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
@@ -1374,7 +1379,7 @@
         <p class="text-lg text-blue-200 max-w-2xl mx-auto leading-relaxed">
           Since 1950, YSC has connected Scandinavian families across Northern California—from our San Francisco roots to the shores of Clear Lake and the peaks of Tahoe.
         </p>
-        <div class="mt-8 flex flex-wrap gap-4 justify-center text-sm text-zinc-400">
+        <div class="mt-8 flex flex-wrap gap-4 justify-center text-sm text-blue-200">
           <a href="#key-events" class="hover:text-white transition-colors">
             ↑ Back to Timeline
           </a>

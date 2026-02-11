@@ -3,6 +3,23 @@ defmodule YscWeb.Workers.FileExportCleanUpTest do
 
   alias YscWeb.Workers.FileExportCleanUp
 
+  describe "perform/1" do
+    test "runs cleanup and returns :ok" do
+      export_dir = "#{:code.priv_dir(:ysc)}/static/exports"
+      File.mkdir_p!(export_dir)
+
+      try do
+        result = FileExportCleanUp.perform(%Oban.Job{})
+        assert result == :ok
+      after
+        # Leave directory in place; other tests or app may use it
+        if File.exists?(export_dir) do
+          for f <- File.ls!(export_dir), do: File.rm(Path.join(export_dir, f))
+        end
+      end
+    end
+  end
+
   describe "zero_pad/1" do
     test "pads single digit" do
       assert FileExportCleanUp.zero_pad(0) == "00"

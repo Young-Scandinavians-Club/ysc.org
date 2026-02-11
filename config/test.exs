@@ -80,6 +80,7 @@ config :ysc, Ysc.Alerts.Discord,
 
 config :ysc,
   expense_reports_s3_bucket: "expense-reports",
+  expense_reports_s3_upload: Ysc.ExpenseReports.S3UploadMock,
   environment: "test"
 
 # FlowRoute SMS configuration for tests

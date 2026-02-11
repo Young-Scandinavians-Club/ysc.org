@@ -102,15 +102,21 @@ defmodule Ysc.Quickbooks.ClientTest do
       # These functions check configuration before making requests
       # Without valid config, they should return configuration errors
       # Provide minimal valid params so it reaches the credential check
-      result =
-        Client.create_sales_receipt(%{
-          customer_ref: %{value: "123"},
-          line: [],
-          total_amt: 0,
-          txn_date: "2026-01-01"
-        })
+      Logger.put_module_level(Client, :none)
 
-      assert match?({:error, _}, result)
+      try do
+        result =
+          Client.create_sales_receipt(%{
+            customer_ref: %{value: "123"},
+            line: [],
+            total_amt: 0,
+            txn_date: "2026-01-01"
+          })
+
+        assert match?({:error, _}, result)
+      after
+        Logger.delete_module_level(Client)
+      end
     end
   end
 

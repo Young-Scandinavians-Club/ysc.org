@@ -6,6 +6,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
 
   alias YscWeb.Workers.QuickbooksSyncPaymentWorker
   alias Ysc.Ledgers
+  alias Ysc.Repo
 
   setup :verify_on_exit!
 
@@ -93,6 +94,70 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
       }
 
       assert :ok = QuickbooksSyncPaymentWorker.perform(job)
+    end
+
+    test "returns error when sync fails", %{user: user} do
+      Ledgers.ensure_basic_accounts()
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn _ ->
+        {:ok, "acc_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn _ ->
+        {:ok, "class_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _ ->
+        {:ok, %{"Id" => "qb_cust"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn _name, _opts ->
+        {:ok, "item_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+        {:error, "QuickBooks API error"}
+      end)
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: "pi_sync_fail",
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment = Repo.reload!(payment)
+
+      payment =
+        if payment.quickbooks_sync_status == "synced" do
+          payment
+          |> Ecto.Changeset.change(
+            quickbooks_sync_status: "pending",
+            quickbooks_sales_receipt_id: nil
+          )
+          |> Repo.update!()
+          |> Repo.reload!()
+        else
+          payment
+        end
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"payment_id" => payment.id},
+        worker: "YscWeb.Workers.QuickbooksSyncPaymentWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert {:error, "QuickBooks API error"} =
+               QuickbooksSyncPaymentWorker.perform(job)
     end
   end
 end

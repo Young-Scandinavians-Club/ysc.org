@@ -758,10 +758,16 @@ defmodule Ysc.ExpenseReports do
     )
 
     result =
-      path
-      |> ExAws.S3.Upload.stream_file()
-      |> ExAws.S3.upload(bucket_name, unique_key)
-      |> ExAws.request!()
+      case Application.get_env(:ysc, :expense_reports_s3_upload) do
+        nil ->
+          path
+          |> ExAws.S3.Upload.stream_file()
+          |> ExAws.S3.upload(bucket_name, unique_key)
+          |> ExAws.request!()
+
+        upload_module when is_atom(upload_module) ->
+          upload_module.upload(path, bucket_name, unique_key)
+      end
 
     Logger.debug("S3 upload result", result: inspect(result, limit: 10))
 
