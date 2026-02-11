@@ -10,6 +10,24 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
   import Ysc.AccountsFixtures
   import Swoosh.TestAssertions
 
+  # Test-only module: when :webhook_test_return_nil_for_event_id is set,
+  # get_webhook_event_by_provider_and_event_id returns nil for that event_id
+  # so we can test the "webhook not found after duplicate error" path.
+  defmodule WebhooksReturnNilForEvent do
+    def get_webhook_event_by_provider_and_event_id(provider, event_id) do
+      if provider == "stripe" and
+           event_id ==
+             Application.get_env(:ysc, :webhook_test_return_nil_for_event_id) do
+        nil
+      else
+        Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
+          provider,
+          event_id
+        )
+      end
+    end
+  end
+
   # Helper to create a basic Stripe event
   defp build_stripe_event(type, object_data, opts \\ []) do
     event_id =
@@ -256,6 +274,52 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert webhook_event != nil
       assert webhook_event.state == :processed
       assert webhook_event.event_type == "invoice.payment_succeeded"
+    end
+
+    test "returns error when duplicate is detected but event not found on lookup (race condition)" do
+      # Simulates the rare case: we get DuplicateWebhookEventError (row existed on insert)
+      # but get_webhook_event_by_provider_and_event_id returns nil (e.g. row deleted).
+      # We return error so Stripe retries.
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      event_id = "evt_not_found_after_dup_#{System.unique_integer()}"
+      invoice_id = "in_not_found_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => invoice_id,
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "amount_paid" => 4500,
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      event =
+        build_stripe_event("invoice.payment_succeeded", invoice_data,
+          event_id: event_id
+        )
+
+      # Pre-create the webhook event so the second handle_event will get duplicate on insert
+      Webhooks.create_webhook_event!(%{
+        provider: "stripe",
+        event_id: event_id,
+        event_type: event.type,
+        payload: WebhookHandler.event_payload_for_storage(event)
+      })
+
+      # Configure test to return nil for this event_id so handler hits "not found after duplicate" path
+      Application.put_env(:ysc, :webhooks_context, WebhooksReturnNilForEvent)
+      Application.put_env(:ysc, :webhook_test_return_nil_for_event_id, event_id)
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :webhooks_context)
+        Application.delete_env(:ysc, :webhook_test_return_nil_for_event_id)
+      end)
+
+      # Second delivery (duplicate): insert raises, lookup returns nil -> return error for Stripe retry
+      assert {:error, :webhook_not_found_after_duplicate} =
+               WebhookHandler.handle_event(event)
     end
   end
 
