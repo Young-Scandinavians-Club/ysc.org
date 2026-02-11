@@ -2292,13 +2292,13 @@ defmodule YscWeb.CoreComponents do
     <img
       :if={!@no_circle}
       class={@class}
-      src={"/images/ysc_logo.png"}
+      src="/images/ysc_logo.png"
       alt="The Young Scandinavian Club Logo"
     />
     <img
       :if={@no_circle}
       class={@class}
-      src={"/images/ysc_logo_no_circle.svg"}
+      src="/images/ysc_logo_no_circle.svg"
       alt="The Young Scandinavian Club Logo"
     />
     """
