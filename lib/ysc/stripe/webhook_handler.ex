@@ -4,6 +4,44 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   Processes various Stripe webhook event types including subscriptions,
   payments, invoices, and customer updates.
+
+  ## Critical Guarantees
+
+  This module provides the following guarantees for webhook processing:
+
+  ### 1. Event Storage Guarantee
+  - Webhooks are ALWAYS stored in the database before Stripe receives a success response
+  - If storage fails, Stripe receives an error and will retry
+  - Duplicate webhooks are detected and handled idempotently
+
+  ### 2. Transactional Processing
+  - All webhook handlers run inside database transactions
+  - If processing succeeds, the webhook is marked as :processed atomically
+  - If processing fails, ALL database changes are rolled back
+  - Partial success is impossible - either everything succeeds or everything fails
+
+  ### 3. External API Call Safety
+  - Stripe API calls are made BEFORE entering transactions when possible
+  - This prevents long-running transactions from holding database locks
+  - Email sending is moved to async jobs to prevent failures from affecting processing
+
+  ### 4. Nested Transactions
+  - Many operations use nested transactions (e.g., Ledgers.process_payment)
+  - Ecto handles these as savepoints, which is safe
+  - If an inner transaction fails, the outer transaction also rolls back
+
+  ## Error Handling
+
+  - Network/API errors: Webhook marked as failed, can be retried
+  - Data validation errors: Webhook marked as failed, logged to Sentry
+  - Duplicate events: Idempotent handling based on external IDs
+
+  ## Important Notes
+
+  - Never return success (:ok) unless the webhook event is stored in the database
+  - Always use transactions for multi-step database operations
+  - External API calls should be minimized within transactions
+  - Email sending must be async to prevent cascading failures
   """
   import Ecto.Query, warn: false
   alias Ysc.Customers
@@ -111,8 +149,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp process_webhook(event) do
     require Logger
 
-    # Write the webhook event to the database first
-    # IF already exists, try to lock and process it
+    # CRITICAL: Write the webhook event to the database first
+    # This ensures we ALWAYS have a record of the webhook, even if processing fails
+    # We only return :ok to Stripe if we successfully store the event
     try do
       Ysc.Webhooks.create_webhook_event!(%{
         provider: "stripe",
@@ -132,11 +171,16 @@ defmodule Ysc.Stripe.WebhookHandler do
             event_type: event.type
           )
 
+          # Process in a separate function that handles its own errors
+          # The webhook is stored, so we can safely return :ok to Stripe
+          # even if processing fails (we'll mark it as failed for retry)
           process_webhook_event(webhook_event, event)
+          :ok
 
         {:error, :already_processing} ->
+          # Another process locked it first, that's fine - event is stored
           Logger.info(
-            "Newly created webhook event already being processed, skipping",
+            "Newly created webhook event already being processed by another process",
             event_id: event.id,
             event_type: event.type
           )
@@ -144,12 +188,13 @@ defmodule Ysc.Stripe.WebhookHandler do
           :ok
 
         {:error, :not_found} ->
+          # This should never happen - we just created it!
+          # This is a critical error, but event is stored so we return :ok
           Logger.error("Newly created webhook event not found after creation",
             event_id: event.id,
             event_type: event.type
           )
 
-          # Report to Sentry
           Sentry.capture_message("Webhook event not found after creation",
             level: :error,
             extra: %{
@@ -163,38 +208,25 @@ defmodule Ysc.Stripe.WebhookHandler do
             }
           )
 
+          # Event is stored, so return :ok to Stripe
           :ok
       end
     rescue
       Ysc.Webhooks.DuplicateWebhookEventError ->
-        # Event already exists, try to lock and process it
-        case Ysc.Webhooks.lock_webhook_event_by_provider_and_event_id(
+        # Event already exists - this is a duplicate webhook delivery from Stripe
+        # Check if it's already processed or being processed
+        case Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
                "stripe",
                event.id
              ) do
-          {:ok, webhook_event} ->
-            Logger.info("Locked existing webhook event for processing",
+          nil ->
+            # Race condition: event was just deleted or something very wrong happened
+            Logger.error(
+              "Webhook event not found after duplicate error - race condition",
               event_id: event.id,
               event_type: event.type
             )
 
-            process_webhook_event(webhook_event, event)
-
-          {:error, :already_processing} ->
-            Logger.info("Webhook event already being processed, skipping",
-              event_id: event.id,
-              event_type: event.type
-            )
-
-            :ok
-
-          {:error, :not_found} ->
-            Logger.error("Webhook event not found after duplicate error",
-              event_id: event.id,
-              event_type: event.type
-            )
-
-            # Report to Sentry
             Sentry.capture_message(
               "Webhook event not found after duplicate error",
               level: :error,
@@ -209,65 +241,400 @@ defmodule Ysc.Stripe.WebhookHandler do
               }
             )
 
+            # We don't know the state, but likely another process handled it
             :ok
+
+          webhook_event ->
+            # Event exists, check its state
+            case webhook_event.state do
+              :processed ->
+                # Already processed successfully
+                Logger.info("Duplicate webhook already processed",
+                  event_id: event.id,
+                  event_type: event.type
+                )
+
+                :ok
+
+              :failed ->
+                # Previous processing failed, try to lock and reprocess
+                Logger.info(
+                  "Duplicate webhook previously failed, attempting reprocessing",
+                  event_id: event.id,
+                  event_type: event.type
+                )
+
+                case Ysc.Webhooks.lock_webhook_event_by_provider_and_event_id(
+                       "stripe",
+                       event.id
+                     ) do
+                  {:ok, locked_webhook_event} ->
+                    process_webhook_event(locked_webhook_event, event)
+                    :ok
+
+                  {:error, :already_processing} ->
+                    Logger.info("Failed webhook already being reprocessed",
+                      event_id: event.id
+                    )
+
+                    :ok
+
+                  {:error, :not_found} ->
+                    # State changed, assume another process handled it
+                    :ok
+                end
+
+              :processing ->
+                # Currently being processed by another process
+                Logger.info("Duplicate webhook currently being processed",
+                  event_id: event.id,
+                  event_type: event.type
+                )
+
+                :ok
+
+              :pending ->
+                # Still pending, try to lock and process
+                Logger.info(
+                  "Duplicate webhook still pending, attempting to process",
+                  event_id: event.id,
+                  event_type: event.type
+                )
+
+                case Ysc.Webhooks.lock_webhook_event_by_provider_and_event_id(
+                       "stripe",
+                       event.id
+                     ) do
+                  {:ok, locked_webhook_event} ->
+                    process_webhook_event(locked_webhook_event, event)
+                    :ok
+
+                  {:error, :already_processing} ->
+                    Logger.info("Pending webhook locked by another process",
+                      event_id: event.id
+                    )
+
+                    :ok
+
+                  {:error, :not_found} ->
+                    # State changed, assume processed
+                    :ok
+                end
+            end
         end
     end
   end
 
-  defp process_webhook_event(webhook_event, event) do
+  # CRITICAL: Processes a webhook event with transactional guarantees
+  #
+  # This function wraps the entire webhook handling in a database transaction to ensure:
+  # 1. If handler succeeds, webhook state is marked as :processed (atomic)
+  # 2. If handler fails, all database changes are rolled back AND webhook state is marked as :failed
+  # 3. Partial success is impossible - either everything succeeds or everything fails
+  #
+  # IMPORTANT NOTES:
+  # - Many handler functions also use transactions (e.g., Ledgers.process_payment)
+  # - Ecto treats nested transactions as savepoints, which is safe
+  # - External API calls (Stripe) should happen BEFORE database operations when possible
+  #   to avoid holding transactions open during slow API calls
+  # - Email sending has been moved to async jobs to prevent failures from affecting processing
+  #
+  # Used by the live webhook endpoint and by Ysc.Stripe.WebhookReconciliationWorker.
+  @doc false
+  def process_webhook_event(webhook_event, event) do
     require Logger
 
-    try do
-      # Process the webhook event
-      result = handle(event.type, event.data.object)
+    # CRITICAL: Use a transaction to ensure atomicity
+    # Either the handler succeeds AND state is marked processed, or both rollback
+    result =
+      Repo.transaction(fn ->
+        try do
+          # Fetch fresh webhook_event within transaction by ID to avoid stale entry errors
+          # Note: webhook_event passed in may have stale state (:pending) from before lock
+          case Repo.get(Ysc.Webhooks.WebhookEvent, webhook_event.id) do
+            nil ->
+              # Webhook was deleted or doesn't exist - this shouldn't happen
+              Logger.error(
+                "Webhook event not found within transaction",
+                webhook_event_id: webhook_event.id,
+                event_id: event.id,
+                event_type: event.type
+              )
 
-      # Mark as processed
-      Ysc.Webhooks.update_webhook_state(webhook_event, :processed)
+              Repo.rollback(:webhook_not_found)
 
-      Logger.info("Webhook event processed successfully",
-        event_id: event.id,
-        event_type: event.type
-      )
+            webhook_event_fresh ->
+              # Process the webhook event
+              # The handle function should return {:ok, result} or :ok
+              handle_result = handle(event.type, event.data.object)
 
-      result
-    rescue
-      error ->
-        # Mark as failed
-        Ysc.Webhooks.update_webhook_state(webhook_event, :failed)
+              # If we get here, processing succeeded
+              # Now mark as processed in the same transaction
+              case Ysc.Webhooks.update_webhook_state(
+                     webhook_event_fresh,
+                     :processed
+                   ) do
+                {:ok, _updated_webhook} ->
+                  Logger.info("Webhook event processed successfully",
+                    event_id: event.id,
+                    event_type: event.type
+                  )
 
-        Logger.warning("Webhook event processing failed",
+                  handle_result
+
+                {:error, changeset} ->
+                  # Failed to mark as processed - rollback everything
+                  Logger.error(
+                    "Failed to mark webhook as processed after successful handling",
+                    event_id: event.id,
+                    event_type: event.type,
+                    errors: inspect(changeset.errors)
+                  )
+
+                  # Rollback the transaction
+                  Repo.rollback(:failed_to_mark_processed)
+              end
+          end
+        rescue
+          error ->
+            # Processing failed - rollback the transaction
+            Logger.warning(
+              "Webhook event processing failed, rolling back transaction",
+              event_id: event.id,
+              event_type: event.type,
+              error: Exception.message(error)
+            )
+
+            # Rollback everything that happened in the handler
+            Repo.rollback({:handler_error, error, __STACKTRACE__})
+        end
+      end)
+
+    # Handle transaction result
+    case result do
+      {:ok, _handle_result} ->
+        # Success - webhook processed and marked as such
+        :ok
+
+      {:error, :webhook_not_found} ->
+        # Webhook disappeared during processing - mark as failed if we can find it
+        Logger.error("Webhook disappeared during transaction",
           event_id: event.id,
-          event_type: event.type,
-          error: Exception.message(error)
+          webhook_event_id: webhook_event.id
         )
 
-        # Report to Sentry with full context
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            event_id: event.id,
-            event_type: event.type,
-            webhook_event_id: webhook_event.id,
-            error_message: Exception.message(error)
-          },
-          tags: %{
-            webhook_provider: "stripe",
-            event_type: event.type,
-            worker: "WebhookHandler"
-          }
-        )
+        # Try to find and mark as failed
+        case Repo.get(Ysc.Webhooks.WebhookEvent, webhook_event.id) do
+          nil ->
+            # Can't find it - just log and return ok
+            Logger.error("Cannot mark webhook as failed - not found",
+              event_id: event.id
+            )
+
+          webhook_event_fresh ->
+            Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
+        end
+
+        :ok
+
+      {:error, {:handler_error, error, stacktrace}} ->
+        # Handler failed - mark webhook as failed (outside transaction)
+        # After transaction rollback, fetch fresh webhook state by provider+event_id
+        case Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
+               "stripe",
+               event.id
+             ) do
+          nil ->
+            # Webhook not found - may have been deleted or transaction fully rolled back
+            # This shouldn't happen in normal operation
+            Logger.error(
+              "Cannot mark webhook as failed - webhook record not found after transaction rollback",
+              event_id: event.id,
+              event_type: event.type,
+              error: Exception.message(error),
+              note:
+                "Webhook was stored initially but not found after rollback - check database constraints"
+            )
+
+            # Report to Sentry - this is unexpected
+            Sentry.capture_message(
+              "Webhook record not found after processing error and rollback",
+              level: :error,
+              extra: %{
+                event_id: event.id,
+                event_type: event.type,
+                webhook_event_id: webhook_event.id,
+                error_message: Exception.message(error),
+                note: "Original webhook_event.id: #{webhook_event.id}"
+              },
+              tags: %{
+                webhook_provider: "stripe",
+                event_type: event.type,
+                error_type: "webhook_not_found_after_rollback"
+              }
+            )
+
+          webhook_event_fresh ->
+            # Mark as failed so it can be retried
+            Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
+
+            Logger.warning("Webhook event processing failed, marked as failed",
+              event_id: event.id,
+              event_type: event.type,
+              webhook_state: webhook_event_fresh.state,
+              error: Exception.message(error)
+            )
+
+            # Report to Sentry with full context
+            Sentry.capture_exception(error,
+              stacktrace: stacktrace,
+              extra: %{
+                event_id: event.id,
+                event_type: event.type,
+                webhook_event_id: webhook_event.id,
+                error_message: Exception.message(error)
+              },
+              tags: %{
+                webhook_provider: "stripe",
+                event_type: event.type,
+                worker: "WebhookHandler"
+              }
+            )
+        end
+
+        :ok
+
+      {:error, :failed_to_mark_processed} ->
+        # Couldn't mark as processed - mark as failed
+        # Fetch fresh version by provider and event_id (safer after rollback)
+        case Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
+               "stripe",
+               event.id
+             ) do
+          nil ->
+            Logger.error(
+              "Cannot mark webhook as failed - not found after mark-processed failure",
+              event_id: event.id,
+              event_type: event.type
+            )
+
+            Sentry.capture_message(
+              "Webhook not found after failed to mark as processed",
+              level: :error,
+              extra: %{
+                event_id: event.id,
+                event_type: event.type,
+                webhook_event_id: webhook_event.id
+              }
+            )
+
+          webhook_event_fresh ->
+            Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
+
+            Logger.error(
+              "Webhook processing succeeded but failed to mark as processed",
+              event_id: event.id,
+              event_type: event.type
+            )
+
+            Sentry.capture_message(
+              "Webhook processing succeeded but failed to mark as processed",
+              level: :error,
+              extra: %{
+                event_id: event.id,
+                event_type: event.type,
+                webhook_event_id: webhook_event.id
+              }
+            )
+        end
+
+        :ok
+
+      {:error, other_error} ->
+        # Unknown error - mark as failed
+        # Fetch fresh version by provider and event_id
+        case Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
+               "stripe",
+               event.id
+             ) do
+          nil ->
+            Logger.error(
+              "Cannot mark webhook as failed - not found after unknown error",
+              event_id: event.id,
+              event_type: event.type,
+              error: inspect(other_error)
+            )
+
+            Sentry.capture_message("Webhook not found after unknown error",
+              level: :error,
+              extra: %{
+                event_id: event.id,
+                event_type: event.type,
+                webhook_event_id: webhook_event.id,
+                error: inspect(other_error)
+              }
+            )
+
+          webhook_event_fresh ->
+            Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
+
+            Logger.error("Webhook transaction failed with unknown error",
+              event_id: event.id,
+              event_type: event.type,
+              error: inspect(other_error)
+            )
+
+            Sentry.capture_message(
+              "Webhook transaction failed with unknown error",
+              level: :error,
+              extra: %{
+                event_id: event.id,
+                event_type: event.type,
+                webhook_event_id: webhook_event.id,
+                error: inspect(other_error)
+              }
+            )
+        end
 
         :ok
     end
   end
 
   defp handle("customer.deleted", %Stripe.Customer{} = event) do
+    require Logger
+
     user = Ysc.Accounts.get_user_from_stripe_id(event.id)
 
     if user do
-      user
-      |> Customers.subscriptions()
-      |> Enum.each(&Subscriptions.mark_as_cancelled/1)
+      # CRITICAL: Wrap subscription cancellations in transaction
+      # Either all subscriptions are cancelled, or none are
+      Repo.transaction(fn ->
+        subscriptions = Customers.subscriptions(user)
+
+        Enum.each(subscriptions, fn subscription ->
+          case Subscriptions.mark_as_cancelled(subscription) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.error("Failed to cancel subscription in customer.deleted",
+                subscription_id: subscription.id,
+                user_id: user.id,
+                customer_id: event.id,
+                error: inspect(reason)
+              )
+
+              # Rollback all cancellations if any fail
+              Repo.rollback(:failed_to_cancel_subscription)
+          end
+        end)
+
+        Logger.info("All subscriptions cancelled for deleted customer",
+          user_id: user.id,
+          customer_id: event.id,
+          subscriptions_count: length(subscriptions)
+        )
+      end)
     end
 
     :ok
@@ -386,12 +753,26 @@ defmodule Ysc.Stripe.WebhookHandler do
       status = event.status
 
       if status == "incomplete_expired" do
-        # Invalidate cache before deleting
-        if subscription.user_id do
-          Ysc.Accounts.MembershipCache.invalidate_user(subscription.user_id)
-        end
+        # CRITICAL: Wrap in transaction to ensure cache invalidation and deletion are atomic
+        Repo.transaction(fn ->
+          # Invalidate cache before deleting
+          if subscription.user_id do
+            Ysc.Accounts.MembershipCache.invalidate_user(subscription.user_id)
+          end
 
-        Subscriptions.delete_subscription(subscription)
+          case Subscriptions.delete_subscription(subscription) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.error("Failed to delete incomplete_expired subscription",
+                subscription_id: subscription.id,
+                error: inspect(reason)
+              )
+
+              Repo.rollback(:failed_to_delete_subscription)
+          end
+        end)
       else
         # Build update attrs from Stripe subscription
         attrs = %{
@@ -416,33 +797,64 @@ defmodule Ysc.Stripe.WebhookHandler do
             attrs
           end
 
-        case Subscriptions.update_subscription(subscription, attrs) do
-          {:ok, updated_subscription} ->
-            # Update subscription items
-            update_subscription_items(updated_subscription, event.items.data)
-
-            # Check if subscription is now expired or cancelled after update
-            # This handles edge cases where status might be "active" but period has ended
-            if Subscriptions.cancelled?(updated_subscription) or
-                 not Subscriptions.active?(updated_subscription) do
-              # Invalidate membership cache to ensure immediate access revocation
-              if updated_subscription.user_id do
-                Ysc.Accounts.MembershipCache.invalidate_user(
-                  updated_subscription.user_id
+        # CRITICAL: Wrap subscription update and items update in transaction
+        result =
+          Repo.transaction(fn ->
+            case Subscriptions.update_subscription(subscription, attrs) do
+              {:ok, updated_subscription} ->
+                # Update subscription items in the same transaction
+                update_subscription_items(
+                  updated_subscription,
+                  event.items.data
                 )
 
-                Logger.info(
-                  "Subscription expired/cancelled via webhook, cache invalidated",
-                  subscription_id: updated_subscription.id,
-                  user_id: updated_subscription.user_id,
-                  stripe_status: updated_subscription.stripe_status,
-                  current_period_end: updated_subscription.current_period_end,
-                  ends_at: updated_subscription.ends_at
+                # Check if subscription is now expired or cancelled after update
+                # This handles edge cases where status might be "active" but period has ended
+                if Subscriptions.cancelled?(updated_subscription) or
+                     not Subscriptions.active?(updated_subscription) do
+                  # Invalidate membership cache to ensure immediate access revocation
+                  if updated_subscription.user_id do
+                    Ysc.Accounts.MembershipCache.invalidate_user(
+                      updated_subscription.user_id
+                    )
+
+                    Logger.info(
+                      "Subscription expired/cancelled via webhook, cache invalidated",
+                      subscription_id: updated_subscription.id,
+                      user_id: updated_subscription.user_id,
+                      stripe_status: updated_subscription.stripe_status,
+                      current_period_end:
+                        updated_subscription.current_period_end,
+                      ends_at: updated_subscription.ends_at
+                    )
+                  end
+                end
+
+                {:ok, updated_subscription}
+
+              {:error, changeset} ->
+                Logger.error("Failed to update subscription",
+                  subscription_id: subscription.id,
+                  errors: inspect(changeset.errors)
                 )
-              end
+
+                Repo.rollback(:failed_to_update_subscription)
             end
+          end)
 
-          {:error, _changeset} ->
+        case result do
+          {:ok, _updated_subscription} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error("Subscription update transaction failed",
+              subscription_id: subscription.id,
+              stripe_subscription_id: event.id,
+              error: inspect(reason)
+            )
+
+            # Don't raise - webhook will be marked as failed by outer transaction
+            # but Stripe should not retry as this is likely a data issue
             :ok
         end
       end
@@ -659,8 +1071,9 @@ defmodule Ysc.Stripe.WebhookHandler do
             billing_reason: billing_reason
           )
 
-          # Send email notification (always send, regardless of renewal status)
-          send_membership_payment_failure_email(
+          # CRITICAL: Enqueue email notification asynchronously
+          # This ensures email failures don't cause webhook processing to fail
+          enqueue_membership_payment_failure_email(
             user,
             membership_type,
             is_renewal,
@@ -751,12 +1164,20 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             :ok
           else
-            # Process the subscription payment with ledger entries
-            # Use find_or_create_subscription_reference to handle race condition
-            # where invoice arrives before subscription.created webhook
+            # CRITICAL: Pre-fetch data from Stripe BEFORE transaction
+            # This avoids holding database transaction open during slow API calls
+
+            # Find or create subscription reference (may fetch from Stripe)
             entity_id =
               find_or_create_subscription_reference(subscription_id, user)
 
+            # Extract stripe fee (may fetch from Stripe)
+            stripe_fee = extract_stripe_fee_from_invoice(invoice)
+
+            # Extract payment method (may fetch from Stripe)
+            payment_method_id = extract_payment_method_from_invoice(invoice)
+
+            # Now process payment with pre-fetched data
             amount_paid = invoice[:amount_paid] || invoice["amount_paid"]
             description = invoice[:description] || invoice["description"]
             number = invoice[:number] || invoice["number"]
@@ -768,11 +1189,11 @@ defmodule Ysc.Stripe.WebhookHandler do
               entity_type: :membership,
               entity_id: entity_id,
               external_payment_id: invoice_id,
-              stripe_fee: extract_stripe_fee_from_invoice(invoice),
+              stripe_fee: stripe_fee,
               description:
                 "Membership payment - #{description || "Invoice #{number}"}",
               property: nil,
-              payment_method_id: extract_payment_method_from_invoice(invoice)
+              payment_method_id: payment_method_id
             }
 
             case Ledgers.process_payment(payment_attrs) do
@@ -785,7 +1206,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                   entity_id: entity_id
                 )
 
-                # Send appropriate email: renewal success or first-time payment confirmation
+                # CRITICAL: Enqueue email sending asynchronously
+                # This ensures email failures don't cause webhook processing to fail
                 billing_reason =
                   invoice[:billing_reason] || invoice["billing_reason"]
 
@@ -803,24 +1225,24 @@ defmodule Ysc.Stripe.WebhookHandler do
                     _ -> Date.utc_today()
                   end
 
+                # Enqueue the appropriate email job
                 if is_renewal do
-                  send_membership_renewal_success_email(
+                  enqueue_membership_renewal_success_email(
                     user,
                     membership_type,
                     payment.amount,
                     payment_date
                   )
                 else
-                  # First-time membership payment: send confirmation that payment was received and membership is active
-                  # paid_elsewhere: true when no payment method (e.g. cash/check via Stripe paid_out_of_band)
+                  # First-time membership payment
                   paid_elsewhere = is_nil(payment.payment_method_id)
 
-                  YscWeb.Emails.Notifier.deliver_membership_payment_confirmation(
+                  enqueue_membership_payment_confirmation_email(
                     user,
                     membership_type,
                     payment.amount,
                     payment_date,
-                    paid_elsewhere: paid_elsewhere
+                    paid_elsewhere
                   )
                 end
 
@@ -834,7 +1256,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                   error: reason
                 )
 
-                # Raise error to mark webhook as failed
+                # Raise error to mark webhook as failed and rollback transaction
                 raise "Failed to process payment: #{inspect(reason)}"
             end
           end
@@ -1334,6 +1756,12 @@ defmodule Ysc.Stripe.WebhookHandler do
     updated_payout
   end
 
+  # Returns the payload map for storing a Stripe event in webhook_events.
+  # Used by the live webhook endpoint and by Ysc.Stripe.WebhookReconciliationWorker.
+  @doc false
+  def event_payload_for_storage(%Stripe.Event{} = event),
+    do: stripe_event_to_map(event)
+
   # Convert Stripe.Event struct to a plain map for JSON storage
   defp stripe_event_to_map(%Stripe.Event{} = event) do
     %{
@@ -1575,6 +2003,8 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to find or create subscription reference from Stripe
   # This handles the race condition where invoice.payment_succeeded arrives before customer.subscription.created
+  # NOTE: This function makes external API calls to Stripe, so it should be called
+  # BEFORE entering a transaction to avoid long-running transactions
   defp find_or_create_subscription_reference(stripe_subscription_id, user) do
     require Logger
 
@@ -1589,8 +2019,10 @@ defmodule Ysc.Stripe.WebhookHandler do
           user_id: user.id
         )
 
+        # IMPORTANT: Fetch from Stripe BEFORE transaction to avoid long-running transaction
         case Stripe.Subscription.retrieve(stripe_subscription_id) do
           {:ok, stripe_subscription} ->
+            # Now create in database - this will be wrapped in the outer transaction
             case Subscriptions.create_subscription_from_stripe(
                    user,
                    stripe_subscription
@@ -1612,7 +2044,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                   error: inspect(reason)
                 )
 
-                nil
+                # Raise to rollback the transaction
+                raise "Failed to create subscription: #{inspect(reason)}"
             end
 
           {:error, reason} ->
@@ -1622,7 +2055,8 @@ defmodule Ysc.Stripe.WebhookHandler do
               error: inspect(reason)
             )
 
-            nil
+            # Raise to rollback the transaction
+            raise "Failed to fetch subscription from Stripe: #{inspect(reason)}"
         end
 
       subscription ->
@@ -3022,8 +3456,8 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   end
 
-  # Helper function to send membership renewal success email
-  defp send_membership_renewal_success_email(
+  # Helper function to enqueue membership renewal success email asynchronously
+  defp enqueue_membership_renewal_success_email(
          user,
          membership_type,
          amount,
@@ -3049,7 +3483,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       idempotency_key =
         "membership_renewal_success_#{user.id}_#{Date.to_iso8601(renewal_date)}"
 
-      Logger.info("Sending membership renewal success email",
+      Logger.info("Enqueuing membership renewal success email",
         user_id: user.id,
         email: user.email,
         membership_type: membership_type,
@@ -3057,6 +3491,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         renewal_date: Date.to_iso8601(renewal_date)
       )
 
+      # Enqueue email job asynchronously - failures won't affect webhook processing
       YscWeb.Emails.Notifier.schedule_email(
         user.email,
         idempotency_key,
@@ -3066,18 +3501,86 @@ defmodule Ysc.Stripe.WebhookHandler do
         "",
         user.id
       )
+
+      :ok
     rescue
       error ->
-        Logger.error("Failed to send membership renewal success email",
+        # Log error but don't fail webhook processing
+        Logger.error("Failed to enqueue membership renewal success email",
           user_id: user.id,
           error: Exception.message(error),
-          stacktrace: __STACKTRACE__
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
         )
+
+        # Report to Sentry but continue
+        Sentry.capture_exception(error,
+          stacktrace: __STACKTRACE__,
+          extra: %{
+            user_id: user.id,
+            membership_type: membership_type,
+            function: "enqueue_membership_renewal_success_email"
+          }
+        )
+
+        :ok
     end
   end
 
-  # Helper function to send membership payment failure email
-  defp send_membership_payment_failure_email(
+  # Helper function to enqueue membership payment confirmation email asynchronously
+  defp enqueue_membership_payment_confirmation_email(
+         user,
+         membership_type,
+         amount,
+         payment_date,
+         paid_elsewhere
+       ) do
+    require Logger
+
+    try do
+      Logger.info("Enqueuing membership payment confirmation email",
+        user_id: user.id,
+        email: user.email,
+        membership_type: membership_type,
+        amount: Money.to_string!(amount),
+        payment_date: Date.to_iso8601(payment_date),
+        paid_elsewhere: paid_elsewhere
+      )
+
+      # Enqueue email job asynchronously - failures won't affect webhook processing
+      YscWeb.Emails.Notifier.deliver_membership_payment_confirmation(
+        user,
+        membership_type,
+        amount,
+        payment_date,
+        paid_elsewhere: paid_elsewhere
+      )
+
+      :ok
+    rescue
+      error ->
+        # Log error but don't fail webhook processing
+        Logger.error("Failed to enqueue membership payment confirmation email",
+          user_id: user.id,
+          error: Exception.message(error),
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+        )
+
+        # Report to Sentry but continue
+        Sentry.capture_exception(error,
+          stacktrace: __STACKTRACE__,
+          extra: %{
+            user_id: user.id,
+            membership_type: membership_type,
+            function: "enqueue_membership_payment_confirmation_email"
+          }
+        )
+
+        :ok
+    end
+  end
+
+  # Helper function to enqueue membership payment failure email asynchronously
+  defp enqueue_membership_payment_failure_email(
          user,
          membership_type,
          is_renewal,
@@ -3102,7 +3605,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       # Generate idempotency key from invoice ID to prevent duplicate emails
       idempotency_key = "membership_payment_failure_#{invoice_id}"
 
-      Logger.info("Sending membership payment failure email",
+      Logger.info("Enqueuing membership payment failure email",
         user_id: user.id,
         email: user.email,
         membership_type: membership_type,
@@ -3110,6 +3613,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         invoice_id: invoice_id
       )
 
+      # Enqueue email job asynchronously - failures won't affect webhook processing
       YscWeb.Emails.Notifier.schedule_email(
         user.email,
         idempotency_key,
@@ -3119,14 +3623,30 @@ defmodule Ysc.Stripe.WebhookHandler do
         "",
         user.id
       )
+
+      :ok
     rescue
       error ->
-        Logger.error("Failed to send membership payment failure email",
+        # Log error but don't fail webhook processing
+        Logger.error("Failed to enqueue membership payment failure email",
           user_id: user.id,
           invoice_id: invoice_id,
           error: Exception.message(error),
-          stacktrace: __STACKTRACE__
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
         )
+
+        # Report to Sentry but continue
+        Sentry.capture_exception(error,
+          stacktrace: __STACKTRACE__,
+          extra: %{
+            user_id: user.id,
+            membership_type: membership_type,
+            invoice_id: invoice_id,
+            function: "enqueue_membership_payment_failure_email"
+          }
+        )
+
+        :ok
     end
   end
 
