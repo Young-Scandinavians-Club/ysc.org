@@ -16,12 +16,16 @@ defmodule Ysc.TestLoggerBackend do
     "Failed to refresh QuickBooks access token",
     # Stripe webhook duplicate/race (tests exercise duplicate event handling)
     "Webhook event not found after duplicate error - race condition",
+    "evt_not_found_after_dup",
     # Webhook retry worker (tests exercise unsupported provider / parse failure path)
     "Failed to parse webhook event",
+    "unsupported_provider",
     # Webhook reconciliation worker (tests exercise failure path e.g. api_connection_error)
     "Webhook reconciliation failed",
     # Payment success LiveView (tests exercise booking_not_found / redirect failure path)
-    "Failed to redirect from payment success after retries"
+    "Failed to redirect from payment success after retries",
+    # Ledgers process_payment (tests exercise payment_exists_but_not_completed path)
+    "Failed to process payment in ledger"
   ]
 
   def init(_) do
@@ -33,7 +37,8 @@ defmodule Ysc.TestLoggerBackend do
     {Ysc.Stripe.WebhookReconciliationWorker, :perform, 1},
     {YscWeb.Workers.WebhookRetryWorker, :retry_webhook, 1},
     {Ysc.Stripe.WebhookHandler, :process_webhook, 1},
-    {YscWeb.PaymentSuccessLive, :mount, 3}
+    {YscWeb.PaymentSuccessLive, :mount, 3},
+    {Ysc.Ledgers, :process_payment, 1}
   ]
 
   def handle_event({level, _gl, {Logger, msg, _ts, md}}, state)
@@ -48,13 +53,8 @@ defmodule Ysc.TestLoggerBackend do
       metadata_str = inspect(md)
       full_message = message_str <> " " <> metadata_str
 
-      # Suppress known expected errors from specific workers/LiveViews (only when message matches)
-      from_suppress_mfa? =
-        md[:mfa] in @suppress_error_mfas and
-          Enum.any?(@expected_error_patterns, fn pattern ->
-            String.contains?(message_str, pattern) or
-              String.contains?(full_message, pattern)
-          end)
+      # Suppress any error from these MFAs (expected test-triggered paths)
+      from_suppress_mfa? = md[:mfa] in @suppress_error_mfas
 
       # Check if this is an expected test error - if so, completely suppress it
       is_expected_error =

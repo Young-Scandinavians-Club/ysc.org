@@ -2,8 +2,21 @@ defmodule Ysc.LedgersTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Ledgers
-  alias Ysc.Ledgers.{LedgerAccount, LedgerTransaction, Payment, Refund}
+
+  alias Ysc.Ledgers.{
+    LedgerAccount,
+    LedgerTransaction,
+    LedgerEntry,
+    Payment,
+    Refund
+  }
+
+  alias Ysc.Repo
+  import Ecto.Query
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
+  import Ysc.TicketsFixtures
+  import Ysc.EventsFixtures
 
   describe "ledger account management" do
     test "ensure_basic_accounts/0 creates all basic accounts" do
@@ -179,6 +192,81 @@ defmodule Ysc.LedgersTest do
       end)
     end
 
+    test "process_payment/1 returns existing payment when duplicate external_payment_id (idempotency)",
+         %{
+           user: user
+         } do
+      amount = Money.new(5000, :USD)
+      stripe_fee = Money.new(175, :USD)
+      external_id = "pi_idempotent_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        amount: amount,
+        entity_type: :membership,
+        entity_id: Ecto.ULID.generate(),
+        external_payment_id: external_id,
+        stripe_fee: stripe_fee,
+        description: "First payment",
+        property: nil,
+        payment_method_id: nil
+      }
+
+      assert {:ok, {payment1, _tx1, _entries1}} = Ledgers.process_payment(attrs)
+      assert {:ok, {payment2, _tx2, _entries2}} = Ledgers.process_payment(attrs)
+      assert payment1.id == payment2.id
+      assert payment2.external_payment_id == external_id
+    end
+
+    test "process_payment/1 returns error when payment exists but not completed",
+         %{
+           user: user
+         } do
+      amount = Money.new(5000, :USD)
+      external_id = "pi_not_completed_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        amount: amount,
+        entity_type: :membership,
+        entity_id: Ecto.ULID.generate(),
+        external_payment_id: external_id,
+        stripe_fee: Money.new(175, :USD),
+        description: "Payment",
+        property: nil,
+        payment_method_id: nil
+      }
+
+      assert {:ok, {payment, _tx, _entries}} = Ledgers.process_payment(attrs)
+      # Mark payment as not completed (e.g. pending)
+      {:ok, _} =
+        Ledgers.update_payment(payment, %{status: :pending})
+
+      assert {:error, :payment_exists_but_not_completed} =
+               Ledgers.process_payment(attrs)
+    end
+
+    test "process_payment/1 raises for booking without property", %{
+      user: user
+    } do
+      attrs = %{
+        user_id: user.id,
+        amount: Money.new(20_000, :USD),
+        entity_type: :booking,
+        entity_id: Ecto.ULID.generate(),
+        external_payment_id:
+          "pi_booking_no_prop_#{System.unique_integer([:positive])}",
+        stripe_fee: Money.new(640, :USD),
+        description: "Booking",
+        property: nil,
+        payment_method_id: nil
+      }
+
+      assert_raise RuntimeError, ~r/property to be specified/, fn ->
+        Ledgers.process_payment(attrs)
+      end
+    end
+
     test "get_account_balance/1 calculates correct balance" do
       Ledgers.ensure_basic_accounts()
       cash_account = Ledgers.get_account_by_name("cash")
@@ -312,6 +400,46 @@ defmodule Ysc.LedgersTest do
       assert stripe_credit_entry != nil
       assert Money.equal?(stripe_credit_entry.amount, refund_amount)
       assert stripe_credit_entry.debit_credit == :credit
+    end
+
+    test "process_refund/1 returns existing refund when duplicate external_refund_id (idempotency)",
+         %{
+           payment: payment
+         } do
+      refund_amount = Money.new(2500, :USD)
+      external_refund_id = "re_idempotent_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        payment_id: payment.id,
+        refund_amount: refund_amount,
+        reason: "Duplicate test",
+        external_refund_id: external_refund_id
+      }
+
+      assert {:ok, {refund1, _tx1, entries1}} = Ledgers.process_refund(attrs)
+      assert length(entries1) == 2
+
+      assert {:ok, {refund2, _tx2, entries2}} = Ledgers.process_refund(attrs)
+      assert refund1.id == refund2.id
+      assert entries2 == []
+    end
+
+    test "get_entries_by_refund/1 returns entries for refund", %{
+      payment: payment
+    } do
+      {:ok, {refund, _transaction, _created_entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(2500, :USD),
+          reason: "Test",
+          external_refund_id:
+            "re_entries_test_#{System.unique_integer([:positive])}"
+        })
+
+      entries = Ledgers.get_entries_by_refund(refund.id)
+      assert is_list(entries)
+      assert length(entries) == 2
+      assert Enum.all?(entries, &(&1.refund_id == refund.id))
     end
   end
 
@@ -825,6 +953,23 @@ defmodule Ysc.LedgersTest do
       assert length(entries) >= 2
     end
 
+    test "process_stripe_payout/1 accepts optional fee_total", %{payment1: _p1} do
+      payout_attrs = %{
+        payout_amount: Money.new(10_000, :USD),
+        stripe_payout_id: "po_fee_#{System.unique_integer([:positive])}",
+        description: "Payout with fee",
+        currency: "usd",
+        status: "paid",
+        arrival_date: DateTime.utc_now(),
+        fee_total: Money.new(100, :USD)
+      }
+
+      assert {:ok, {_payout_payment, _transaction, _entries, payout}} =
+               Ledgers.process_stripe_payout(payout_attrs)
+
+      assert payout.stripe_payout_id == payout_attrs.stripe_payout_id
+    end
+
     test "link_payment_to_payout/2 links payment to payout", %{
       payment1: payment1,
       payment2: payment2
@@ -1233,6 +1378,34 @@ defmodule Ysc.LedgersTest do
              end)
     end
 
+    test "list_all_user_payments/1 includes free ticket orders when user has them",
+         %{
+           user: user
+         } do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      _free_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      items = Ledgers.list_all_user_payments(user.id)
+
+      free_orders =
+        Enum.filter(items, fn item -> Map.get(item, :ticket_order) end)
+
+      assert free_orders != []
+
+      assert Enum.any?(free_orders, fn item ->
+               item.type == :ticket && item.ticket_order != nil &&
+                 item.payment == nil
+             end)
+    end
+
     test "list_user_payments_paginated/3 returns paginated payments", %{
       user: user
     } do
@@ -1242,6 +1415,33 @@ defmodule Ysc.LedgersTest do
       assert is_list(entries)
       assert is_integer(total_count)
       assert total_count >= 0
+    end
+
+    test "list_user_payments_paginated/3 returns empty for user with no payments" do
+      user = user_fixture()
+      Ledgers.ensure_basic_accounts()
+
+      {entries, total_count} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 10)
+
+      assert entries == []
+      assert total_count == 0
+    end
+
+    test "list_user_payments_paginated/3 page 2 returns second page", %{
+      user: user
+    } do
+      {page1, total} = Ledgers.list_user_payments_paginated(user.id, 1, 1)
+      {page2, ^total} = Ledgers.list_user_payments_paginated(user.id, 2, 1)
+
+      assert is_list(page1)
+      assert is_list(page2)
+
+      if total >= 2 do
+        assert length(page1) == 1
+        assert length(page2) == 1
+        assert hd(page1) != hd(page2)
+      end
     end
 
     test "update_payment/2 updates payment", %{payment: payment} do
@@ -1524,6 +1724,25 @@ defmodule Ysc.LedgersTest do
       assert {:ok, :balanced} = Ledgers.get_ledger_imbalance_details()
     end
 
+    test "get_ledger_imbalance_details/0 returns error with details when unbalanced" do
+      Ledgers.ensure_basic_accounts()
+      account = Ledgers.get_account_by_name("cash")
+
+      # Insert a single unbalanced entry (no matching credit)
+      %LedgerEntry{
+        amount: Money.new(100, :USD),
+        debit_credit: :debit,
+        account_id: account.id,
+        description: "Unbalanced test entry"
+      }
+      |> Repo.insert!()
+
+      assert {:error, {:imbalanced, _difference, account_balances}} =
+               Ledgers.get_ledger_imbalance_details()
+
+      assert is_list(account_balances)
+    end
+
     test "verify_ledger_balance!/0 raises on imbalance" do
       Ledgers.ensure_basic_accounts()
       account = Ledgers.get_account_by_name("cash")
@@ -1728,6 +1947,12 @@ defmodule Ysc.LedgersTest do
       assert Ecto.assoc_loaded?(found.payment)
     end
 
+    test "get_payout!/1 raises Ecto.NoResultsError for non-existent id" do
+      assert_raise Ecto.NoResultsError, fn ->
+        Ledgers.get_payout!(Ecto.ULID.generate())
+      end
+    end
+
     test "get_payout_payments/1 returns payments for payout", %{
       payout: payout,
       payment: payment
@@ -1769,7 +1994,11 @@ defmodule Ysc.LedgersTest do
         client_secret: "test_client_secret",
         company_id: "test_company_id",
         access_token: "test_access_token",
-        refresh_token: "test_refresh_token"
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       import Mox
@@ -1780,6 +2009,10 @@ defmodule Ysc.LedgersTest do
 
       stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+        {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
       end)
 
       %{user: user}
@@ -1806,6 +2039,10 @@ defmodule Ysc.LedgersTest do
                "Membership",
                "Unknown"
              ]
+    end
+
+    test "add_payment_type_info_batch/1 returns empty list for empty input" do
+      assert Ledgers.add_payment_type_info_batch([]) == []
     end
 
     test "add_payment_type_info_batch/1 adds type info to multiple payments", %{
@@ -1847,6 +2084,108 @@ defmodule Ysc.LedgersTest do
                &Map.has_key?(&1, :payment_type_info)
              )
     end
+
+    test "add_payment_type_info/1 for donation payment returns Donation type",
+         %{
+           user: user
+         } do
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(5_000, :USD),
+          entity_type: :donation,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_donation_type_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(160, :USD),
+          description: "Donation",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment_with_info = Ledgers.add_payment_type_info(payment)
+      assert payment_with_info.payment_type_info.type == "Donation"
+    end
+
+    test "add_payment_type_info/1 for booking payment returns Booking type", %{
+      user: user
+    } do
+      booking = booking_fixture(%{user_id: user.id, property: :clear_lake})
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(20_000, :USD),
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_booking_type_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(640, :USD),
+          description: "Clear Lake booking",
+          property: :clear_lake,
+          payment_method_id: nil
+        })
+
+      payment_with_info = Ledgers.add_payment_type_info(payment)
+      assert payment_with_info.payment_type_info.type == "Booking"
+      assert payment_with_info.payment_type_info.details =~ "Clear Lake"
+    end
+
+    test "add_payment_type_info_batch/1 returns Payout type for payout payment" do
+      {:ok, {payout_payment, _transaction, _entries, _payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(5_000, :USD),
+          stripe_payout_id:
+            "po_batch_type_#{System.unique_integer([:positive])}",
+          description: "Test payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now()
+        })
+
+      [payment_with_info] =
+        Ledgers.add_payment_type_info_batch([payout_payment])
+
+      assert payment_with_info.payment_type_info.type == "Payout"
+    end
+
+    test "add_payment_type_info/1 for event payment with ticket order returns Event type",
+         %{
+           user: user
+         } do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(10_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_event_type_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      ticket_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      payment_with_info = Ledgers.add_payment_type_info(payment)
+      assert payment_with_info.payment_type_info.type == "Event"
+      assert payment_with_info.payment_type_info.details == event.title
+    end
   end
 
   describe "get_payment_related_entity/1" do
@@ -1861,7 +2200,11 @@ defmodule Ysc.LedgersTest do
         client_secret: "test_client_secret",
         company_id: "test_company_id",
         access_token: "test_access_token",
-        refresh_token: "test_refresh_token"
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       import Mox
@@ -1872,6 +2215,10 @@ defmodule Ysc.LedgersTest do
 
       stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+        {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
       end)
 
       %{user: user}
@@ -1894,6 +2241,148 @@ defmodule Ysc.LedgersTest do
       # May return nil or a tuple depending on implementation
       result = Ledgers.get_payment_related_entity(payment)
       assert result == nil || is_tuple(result)
+    end
+
+    test "returns {:booking, booking} when payment is for a booking", %{
+      user: user
+    } do
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(20_000, :USD),
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_booking_entity_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(640, :USD),
+          description: "Tahoe booking",
+          property: :tahoe,
+          payment_method_id: nil
+        })
+
+      assert {:booking, found_booking} =
+               Ledgers.get_payment_related_entity(payment)
+
+      assert found_booking.id == booking.id
+    end
+
+    test "process_refund/1 for booking payment triggers refund email path", %{
+      user: user
+    } do
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(20_000, :USD),
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_booking_refund_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(640, :USD),
+          description: "Tahoe booking",
+          property: :tahoe,
+          payment_method_id: nil
+        })
+
+      assert {:ok, {refund, _tx, entries}} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: Money.new(10_000, :USD),
+                 reason: "Partial refund",
+                 external_refund_id:
+                   "re_booking_refund_#{System.unique_integer([:positive])}"
+               })
+
+      assert refund.payment_id == payment.id
+      assert length(entries) == 2
+    end
+
+    test "returns {:ticket_order, ticket_order} when payment is linked to ticket order",
+         %{
+           user: user
+         } do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(10_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_ticket_entity_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      ticket_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      assert {:ticket_order, found_order} =
+               Ledgers.get_payment_related_entity(payment)
+
+      assert found_order.id == ticket_order.id
+    end
+
+    test "process_refund/1 for event payment with ticket order triggers ticket refund path",
+         %{
+           user: user
+         } do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(10_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_ticket_refund_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      ticket_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      assert {:ok, {refund, _tx, entries}} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: Money.new(5_000, :USD),
+                 reason: "Partial refund",
+                 external_refund_id:
+                   "re_ticket_refund_#{System.unique_integer([:positive])}"
+               })
+
+      assert refund.payment_id == payment.id
+      assert length(entries) == 2
     end
   end
 
