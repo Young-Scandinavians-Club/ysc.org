@@ -34,87 +34,11 @@ export DBNAME 			?= ysc_dev
 
 .PHONY: dev
 dev: ## Start the local dev server
-	@bash -c ' \
-		echo "$(BOLD)🔍 Checking prerequisites...$(RESET)"; \
-		echo ""; \
-		\
-		if [ -f .env ]; then \
-			set -a; \
-			. .env; \
-			set +a; \
-		fi; \
-		\
-		echo "$(BOLD)→ Checking environment variables...$(RESET)"; \
-		if [ -z "$$STRIPE_SECRET" ]; then \
-			echo "$(RED)✗ Required environment variable $(BOLD)STRIPE_SECRET$(RESET)$(RED) not set.$(RESET)"; \
-			echo "$(TEAL)  Hint: Add it to your .env file (see .env.example)$(RESET)"; \
-			exit 1; \
-		fi; \
-		if [ -z "$$STRIPE_PUBLIC_KEY" ]; then \
-			echo "$(RED)✗ Required environment variable $(BOLD)STRIPE_PUBLIC_KEY$(RESET)$(RED) not set.$(RESET)"; \
-			echo "$(TEAL)  Hint: Add it to your .env file (see .env.example)$(RESET)"; \
-			exit 1; \
-		fi; \
-		if [ -z "$$STRIPE_WEBHOOK_SECRET" ]; then \
-			echo "$(RED)✗ Required environment variable $(BOLD)STRIPE_WEBHOOK_SECRET$(RESET)$(RED) not set.$(RESET)"; \
-			echo "$(TEAL)  Hint: Run stripe listen --forward-to localhost:4000/webhooks/stripe$(RESET)"; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)✓ Environment variables configured$(RESET)"; \
-		echo ""; \
-		\
-		echo "$(BOLD)→ Checking Docker containers...$(RESET)"; \
-		if ! docker ps > /dev/null 2>&1; then \
-			echo "$(RED)✗ Docker is not running$(RESET)"; \
-			echo "$(TEAL)  Hint: Start Docker Desktop (macOS) or docker service (Linux)$(RESET)"; \
-			exit 1; \
-		fi; \
-		\
-		POSTGRES_RUNNING=$$(docker ps --filter "name=postgres" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -c "postgres" || echo "0"); \
-		if [ "$$POSTGRES_RUNNING" -eq "0" ]; then \
-			echo "$(RED)✗ PostgreSQL container is not running$(RESET)"; \
-			echo "$(TEAL)  Hint: Start containers with: docker-compose -f $(DOCKER_COMPOSE_FILE) up -d$(RESET)"; \
-			echo "$(TEAL)  Or run: make dev-setup$(RESET)"; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)✓ PostgreSQL container is running$(RESET)"; \
-		\
-		LOCALSTACK_RUNNING=$$(docker ps --filter "name=localstack" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -c "localstack" || echo "0"); \
-		if [ "$$LOCALSTACK_RUNNING" -eq "0" ]; then \
-			echo "$(RED)✗ LocalStack container is not running$(RESET)"; \
-			echo "$(TEAL)  Hint: Start containers with: docker-compose -f $(DOCKER_COMPOSE_FILE) up -d$(RESET)"; \
-			echo "$(TEAL)  Or run: make dev-setup$(RESET)"; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)✓ LocalStack container is running$(RESET)"; \
-		echo ""; \
-		\
-		echo "$(BOLD)→ Checking database connection...$(RESET)"; \
-		if ! PGPASSWORD=$$PGPASSWORD psql -h localhost -U postgres -d $$DBNAME -c "SELECT 1" > /dev/null 2>&1; then \
-			echo "$(RED)✗ Cannot connect to database$(RESET)"; \
-			echo "$(TEAL)  Hint: Wait for PostgreSQL to be ready or run: make dev-setup$(RESET)"; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)✓ Database connection successful$(RESET)"; \
-		echo ""; \
-		\
-		echo "$(BOLD)→ Checking database migrations...$(RESET)"; \
-		PENDING_MIGRATIONS=$$(mix ecto.migrations 2>/dev/null | grep "down" | wc -l | tr -d ' ' || echo "0"); \
-		if [ "$$PENDING_MIGRATIONS" -gt "0" ]; then \
-			echo "$(RED)✗ Database has pending migrations ($$PENDING_MIGRATIONS migration(s) not applied)$(RESET)"; \
-			echo "$(TEAL)  Hint: Run: mix ecto.migrate$(RESET)"; \
-			echo "$(TEAL)  Or run: make setup-dev-db$(RESET)"; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)✓ All migrations applied$(RESET)"; \
-		echo ""; \
-		\
-		echo "$(GREEN)$(BOLD)✓ All checks passed!$(RESET)"; \
-		echo ""; \
-		echo "$(BOLD)🚀 Starting Phoenix server...$(RESET)"; \
-		echo "$(TEAL)Visit http://localhost:4000$(RESET)"; \
-		echo ""; \
-		mix phx.server'
+	@BOLD="$(BOLD)" RESET="$(RESET)" RED="$(RED)" GREEN="$(GREEN)" TEAL="$(TEAL)" \
+		DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" \
+		PGPASSWORD="$(PGPASSWORD)" DBNAME="$(DBNAME)" \
+		./etc/scripts/check_dev_prerequisites.sh
+	@mix phx.server
 
 .PHONY: dev-setup
 dev-setup:  ## Set up local dev environment
@@ -189,176 +113,15 @@ lint:  ## Run the lint suite
 
 .PHONY: preflight
 preflight:  ## Run all CI checks locally (compile, format, credo, sobelow, audit, tests)
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo "$(BOLD)                           🚀 PREFLIGHT CHECKS                              $(RESET)"
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo ""
-	@echo "$(TEAL)Running all CI checks that would run in GitHub Actions...$(RESET)"
-	@echo ""
-	@echo "$(BOLD)Ensuring PostgreSQL is running...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d postgres || true
-	@DBNAME=postgres ./etc/scripts/_wait_db_connection.sh true
-	@echo "$(GREEN)✓ PostgreSQL is ready$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[1/7] Installing dependencies...$(RESET)"
-	@mix deps.get || (echo "$(RED)✗ Dependencies installation failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Dependencies installed$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[2/7] Compiling with warnings as errors...$(RESET)"
-	@mix compile --warnings-as-errors || (echo "$(RED)✗ Compilation failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Compilation successful$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[3/7] Checking code format...$(RESET)"
-	@mix format --check-formatted || (echo "$(RED)✗ Code format check failed. Run 'make format' to fix.$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Code formatting is correct$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[4/7] Running Credo (strict mode)...$(RESET)"
-	@mix credo --strict || (echo "$(RED)✗ Credo checks failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Credo checks passed$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[5/7] Running Sobelow (security audit)...$(RESET)"
-	@mix sobelow --skip --exit || (echo "$(RED)✗ Sobelow security audit failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Sobelow security audit passed$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[6/7] Running dependency audit...$(RESET)"
-	@mix deps.audit || (echo "$(RED)✗ Dependency audit failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Dependency audit passed$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[7/7] Running test suite with coverage...$(RESET)"
-	@MIX_ENV=test mix test --cover || (echo "$(RED)✗ Tests failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ All tests passed$(RESET)"
-	@echo ""
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo "$(GREEN)$(BOLD)                      ✓ ALL PREFLIGHT CHECKS PASSED!                       $(RESET)"
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo ""
-	@echo "$(TEAL)Your code is ready to be pushed to CI. All checks that run in GitHub Actions$(RESET)"
-	@echo "$(TEAL)have passed locally.$(RESET)"
-	@echo ""
+	@BOLD="$(BOLD)" RESET="$(RESET)" RED="$(RED)" GREEN="$(GREEN)" TEAL="$(TEAL)" \
+		DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" \
+		./etc/scripts/preflight.sh
 
 .PHONY: preflight-parallel
 preflight-parallel:  ## Run all CI checks in parallel where possible (faster)
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo "$(BOLD)                      🚀 PREFLIGHT CHECKS (PARALLEL)                        $(RESET)"
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo ""
-	@echo "$(TEAL)Running CI checks in parallel for faster execution...$(RESET)"
-	@echo ""
-	@echo "$(BOLD)Ensuring PostgreSQL is running...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d postgres || true
-	@DBNAME=postgres ./etc/scripts/_wait_db_connection.sh true
-	@echo "$(GREEN)✓ PostgreSQL is ready$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[Phase 1] Installing dependencies...$(RESET)"
-	@mix deps.get || (echo "$(RED)✗ Dependencies installation failed$(RESET)" && exit 1)
-	@echo "$(GREEN)✓ Dependencies installed$(RESET)"
-	@echo ""
-	@echo "$(BOLD)[Phase 2] Running parallel checks (format, deps audit, compile)...$(RESET)"
-	@bash -c ' \
-		set -e; \
-		tmpdir=$$(mktemp -d); \
-		trap "rm -rf $$tmpdir" EXIT; \
-		( \
-			mix format --check-formatted > $$tmpdir/format.log 2>&1 && \
-			echo "✓ format" > $$tmpdir/format.status || \
-			echo "✗ format" > $$tmpdir/format.status \
-		) & \
-		pid_format=$$!; \
-		( \
-			mix deps.audit > $$tmpdir/audit.log 2>&1 && \
-			echo "✓ deps.audit" > $$tmpdir/audit.status || \
-			echo "✗ deps.audit" > $$tmpdir/audit.status \
-		) & \
-		pid_audit=$$!; \
-		( \
-			mix compile --warnings-as-errors > $$tmpdir/compile.log 2>&1 && \
-			echo "✓ compile" > $$tmpdir/compile.status || \
-			echo "✗ compile" > $$tmpdir/compile.status \
-		) & \
-		pid_compile=$$!; \
-		wait $$pid_format $$pid_audit $$pid_compile; \
-		format_status=$$(cat $$tmpdir/format.status); \
-		audit_status=$$(cat $$tmpdir/audit.status); \
-		compile_status=$$(cat $$tmpdir/compile.status); \
-		if [[ "$$format_status" == "✗ format" ]]; then \
-			echo "$(RED)✗ Code format check failed. Run make format to fix.$(RESET)"; \
-			cat $$tmpdir/format.log; \
-			exit 1; \
-		fi; \
-		if [[ "$$audit_status" == "✗ deps.audit" ]]; then \
-			echo "$(RED)✗ Dependency audit failed$(RESET)"; \
-			cat $$tmpdir/audit.log; \
-			exit 1; \
-		fi; \
-		if [[ "$$compile_status" == "✗ compile" ]]; then \
-			echo "$(RED)✗ Compilation failed$(RESET)"; \
-			cat $$tmpdir/compile.log; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)✓ Code formatting is correct$(RESET)"; \
-		echo "$(GREEN)✓ Dependency audit passed$(RESET)"; \
-		echo "$(GREEN)✓ Compilation successful$(RESET)"; \
-	'
-	@echo ""
-	@echo "$(BOLD)[Phase 3] Running parallel checks (credo, sobelow, tests)...$(RESET)"
-	@bash -c ' \
-		set -e; \
-		tmpdir=$$(mktemp -d); \
-		trap "rm -rf $$tmpdir" EXIT; \
-		( \
-			mix credo --strict > $$tmpdir/credo.log 2>&1 && \
-			echo "✓ credo" > $$tmpdir/credo.status || \
-			echo "✗ credo" > $$tmpdir/credo.status \
-		) & \
-		pid_credo=$$!; \
-		( \
-			mix sobelow --skip --exit > $$tmpdir/sobelow.log 2>&1 && \
-			echo "✓ sobelow" > $$tmpdir/sobelow.status || \
-			echo "✗ sobelow" > $$tmpdir/sobelow.status \
-		) & \
-		pid_sobelow=$$!; \
-		( \
-			MIX_ENV=test mix test --cover > $$tmpdir/test.log 2>&1 && \
-			echo "✓ test" > $$tmpdir/test.status || \
-			echo "✗ test" > $$tmpdir/test.status \
-		) & \
-		pid_test=$$!; \
-		wait $$pid_credo $$pid_sobelow $$pid_test; \
-		credo_status=$$(cat $$tmpdir/credo.status); \
-		sobelow_status=$$(cat $$tmpdir/sobelow.status); \
-		test_status=$$(cat $$tmpdir/test.status); \
-		failed=0; \
-		if [[ "$$credo_status" == "✗ credo" ]]; then \
-			echo "$(RED)✗ Credo checks failed$(RESET)"; \
-			cat $$tmpdir/credo.log; \
-			failed=1; \
-		else \
-			echo "$(GREEN)✓ Credo checks passed$(RESET)"; \
-		fi; \
-		if [[ "$$sobelow_status" == "✗ sobelow" ]]; then \
-			echo "$(RED)✗ Sobelow security audit failed$(RESET)"; \
-			cat $$tmpdir/sobelow.log; \
-			failed=1; \
-		else \
-			echo "$(GREEN)✓ Sobelow security audit passed$(RESET)"; \
-		fi; \
-		if [[ "$$test_status" == "✗ test" ]]; then \
-			echo "$(RED)✗ Tests failed$(RESET)"; \
-			cat $$tmpdir/test.log; \
-			failed=1; \
-		else \
-			echo "$(GREEN)✓ All tests passed$(RESET)"; \
-		fi; \
-		exit $$failed; \
-	'
-	@echo ""
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo "$(GREEN)$(BOLD)                      ✓ ALL PREFLIGHT CHECKS PASSED!                       $(RESET)"
-	@echo "$(BOLD)════════════════════════════════════════════════════════════════════════════$(RESET)"
-	@echo ""
-	@echo "$(TEAL)Your code is ready to be pushed to CI. All checks that run in GitHub Actions$(RESET)"
-	@echo "$(TEAL)have passed locally.$(RESET)"
-	@echo ""
+	@BOLD="$(BOLD)" RESET="$(RESET)" RED="$(RED)" GREEN="$(GREEN)" TEAL="$(TEAL)" \
+		DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" \
+		./etc/scripts/preflight_parallel.sh
 
 .PHONY: clean-compose
 clean-compose:  ## Remove docker containers and volumes

@@ -1,41 +1,42 @@
 {
-    "default_stop_words": [
-        "defmodule",
-        "defrecord",
-        "defimpl",
-        "defexception",
-        "defprotocol",
-        "defstruct",
-        "def.+(.+\\\\.+).+do",
-        "^\\s+use\\s+"
-    ],
+  "default_stop_words": [
+    "defmodule",
+    "defrecord",
+    "defimpl",
+    "defexception",
+    "defprotocol",
+    "defstruct",
+    "def.+(.+\\\\.+).+do",
+    "^\\s+use\\s+"
+  ],
 
-    "custom_stop_words": [],
+  "custom_stop_words": [],
 
-    "print_summary": true,
+  "print_summary": true,
 
-    "coverage_options": {
-        "treat_no_relevant_lines_as_covered": false,
-        "output_dir": "cover/",
-        "minimum_coverage": 0,
-        "floor_coverage": true
-    },
+  "coverage_options": {
+    "treat_no_relevant_lines_as_covered": false,
+    "output_dir": "cover/",
+    "minimum_coverage": 0,
+    "floor_coverage": true
+  },
 
-    "terminal_options": {
-        "file_column_width": 40
-    },
+  "terminal_options": {
+    "file_column_width": 40
+  },
 
-    "skip_files": [
-        "ysc_native\\.ex",
-        "\\.swiftui\\.ex",
-        "ysc/application\\.ex",
-        "ysc/cldr\\.ex",
-        "deps/ex_cldr",
-        "ysc_web/live/tahoe_cabin_rules_live\\.ex",
-        "ysc_web/live/tahoe_staying_with_live\\.ex",
-        "ysc_web/live/property_check_in_live\\.ex",
-        "ysc_web/test_log_filter\\.ex",
-        "mix/tasks/",
-        "test/support/"
-    ]
+  "skip_files": [
+    "ysc_native\\.ex",
+    "\\.swiftui\\.ex",
+    "ysc/application\\.ex",
+    "ysc/cldr\\.ex",
+    "deps/ex_cldr",
+    "ysc_web/live/tahoe_cabin_rules_live\\.ex",
+    "ysc_web/live/tahoe_staying_with_live\\.ex",
+    "ysc_web/live/property_check_in_live\\.ex",
+    "ysc_web/test_log_filter\\.ex",
+    "mix/tasks/",
+    "test/support/",
+    "lib/ysc_web/authorization/policy.ex"
+  ]
 }

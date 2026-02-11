@@ -413,6 +413,10 @@ defmodule YscWeb.ClearLakeBookingLive do
               alt: "Clear Lake Cabin Exterior"
             },
             %{
+              src: ~p"/images/history/clear_lake_from_above.jpg",
+              alt: "Clear Lake Aerial View"
+            },
+            %{
               src: ~p"/images/clear_lake/clear_lake_dock.webp",
               alt: "Clear Lake Dock"
             },
@@ -1323,6 +1327,10 @@ defmodule YscWeb.ClearLakeBookingLive do
               alt: "Clear Lake Cabin Exterior"
             },
             %{
+              src: ~p"/images/history/clear_lake_from_above.jpg",
+              alt: "Clear Lake Aerial View"
+            },
+            %{
               src: ~p"/images/clear_lake/clear_lake_dock.webp",
               alt: "Clear Lake Dock"
             },
@@ -1492,6 +1500,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                   %{
                     src: ~p"/images/clear_lake/clear_lake_main.webp",
                     alt: "Clear Lake Cabin Exterior"
+                  },
+                  %{
+                    src: ~p"/images/history/clear_lake_from_above.jpg",
+                    alt: "Clear Lake Aerial View"
                   },
                   %{
                     src: ~p"/images/clear_lake/clear_lake_dock.webp",

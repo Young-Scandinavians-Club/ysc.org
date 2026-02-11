@@ -185,24 +185,20 @@ This is a web application written using the Phoenix web framework.
 Always ensure you optimize for optimal performance. Below guidelines will help.
 
 - Memory Management
-
   - Use `temporary_assigns` for data that only needs to be rendered once (e.g., search results, flash messages) to clear it from server RAM immediately after the diff is sent.
   - Store minimal data in `socket.assigns`; pick specific fields (e.g., `user.id`) rather than full, deeply-nested Ecto structs to reduce the memory footprint per process.
   - Configure `:hibernate_after` in the socket to compress the state of idle processes.
 
 - List Rendering & Diffing
-
   - Implement LiveView Streams (`stream/4`) for large lists to send only the changes (insertions/deletions) rather than re-diffing the entire collection.
   - Wrap list items in `LiveComponent` to isolate updates; this ensures a change in one item doesn't trigger a re-render of the entire list.
 
 - Client-Side Efficiency
-
   - Use `phx-debounce` and `phx-throttle` on inputs and buttons to limit the frequency of messages sent over the WebSocket.
   - Leverage `Phoenix.LiveView.JS` for purely visual logic (toggling menus, adding CSS classes) to execute changes instantly without a server round-trip.
   - Wrap heavy data loading in if `connected?(socket)` to ensure the initial static HTML response is delivered as fast as possible.
 
 - Async & Non-Blocking Ops
-
   - Use `assign_async` or `start_async` to fetch data in the background, preventing slow DB queries or API calls from freezing the UI.
   - Delegate heavy computations (PDF generation, data exports) to background workers like Oban and update the UI via PubSub.
 
@@ -213,7 +209,6 @@ Always ensure you optimize for optimal performance. Below guidelines will help.
 ### LiveView streams
 
 - **Always** use LiveView streams for collections for assigning regular lists to avoid memory ballooning and runtime termination with the following operations:
-
   - basic append of N items - `stream(socket, :messages, [new_msg])`
   - resetting stream with new items - `stream(socket, :messages, [new_msg], reset: true)` (e.g. for filtering items)
   - prepend to stream - `stream(socket, :messages, [new_msg], at: -1)`
@@ -338,3 +333,7 @@ And **never** do this:
 
   <!-- phoenix:liveview-end -->
   <!-- usage-rules-end -->
+
+## Shell Scripts
+
+- Always use `#!/usr/bin/env bash` as shebang for scripts
