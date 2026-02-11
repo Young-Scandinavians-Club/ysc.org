@@ -38,4 +38,7 @@ defmodule Ysc.TestStripeClient do
 
   @impl true
   def retrieve_payment_method(_id), do: {:error, :not_implemented}
+
+  @impl true
+  def list_events(_params, _opts), do: {:error, :not_implemented}
 end

@@ -97,9 +97,11 @@ config :ysc, Oban,
        {"*/5 * * * *", Ysc.Events.EventPublishWorker},
        {"*/15 * * * *", Ysc.Subscriptions.ExpirationWorker},
        {"0 2 * * *", YscWeb.Workers.ImageReprocessor},
+       {"0 2 * * *", Ysc.Stripe.WebhookReconciliationWorker},
        {"0 0 * * *", Ysc.Ledgers.BalanceCheckWorker},
        {"0 1 * * *", Ysc.Ledgers.ReconciliationWorker},
        {"0 3 * * *", YscWeb.Workers.QuickbooksSyncRetryWorker},
+       {"0 3 * * *", YscWeb.Workers.WebhookRetryWorker},
        {"0 */6 * * *", YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker},
        {"0 9 * * *", YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker}
      ]}

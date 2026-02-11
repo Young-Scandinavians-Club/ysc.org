@@ -279,6 +279,155 @@ defmodule Ysc.Alerts.Discord do
     send_error(description, fields: fields)
   end
 
+  @doc """
+  Sends a webhook reconciliation report to Discord.
+
+  ## Options
+
+  - `:stats` - Map with keys: total_checked, missing_found, processed_success,
+    processed_failed, failed_event_ids (list), duration_ms
+  - `:status` - :success, :warning (missing events found), or :error
+
+  ## Examples
+
+      send_webhook_reconciliation_report(%{
+        total_checked: 150,
+        missing_found: 0,
+        duration_ms: 1200
+      }, :success)
+
+      send_webhook_reconciliation_report(%{
+        total_checked: 150,
+        missing_found: 3,
+        processed_success: 2,
+        processed_failed: 1,
+        failed_event_ids: ["evt_xxx"],
+        duration_ms: 3500
+      }, :warning)
+  """
+  def send_webhook_reconciliation_report(stats, status \\ :info) do
+    {title, color, emoji} =
+      case status do
+        :success ->
+          {"Webhook Reconciliation Passed", :success, "✅"}
+
+        :warning ->
+          {"Webhook Reconciliation - Missing Events Processed", :warning, "⚠️"}
+
+        :error ->
+          {"Webhook Reconciliation Failed", :error, "❌"}
+
+        _ ->
+          {"Webhook Reconciliation Report", :info, "ℹ️"}
+      end
+
+    description =
+      "Stripe webhook reconciliation completed at #{DateTime.utc_now()}"
+
+    fields =
+      [
+        %{
+          name: "Total Events Checked",
+          value: to_string(stats[:total_checked] || 0),
+          inline: true
+        },
+        %{
+          name: "Missing Found",
+          value: to_string(stats[:missing_found] || 0),
+          inline: true
+        },
+        %{
+          name: "Duration",
+          value: "#{stats[:duration_ms] || 0}ms",
+          inline: true
+        }
+      ]
+      |> maybe_add_processed_success(stats)
+      |> maybe_add_processed_failed(stats)
+      |> maybe_add_failed_event_ids(stats)
+
+    footer = "Stripe Webhook Reconciliation"
+
+    send_alert(
+      title: "#{emoji} #{title}",
+      description: description,
+      color: color,
+      fields: fields,
+      footer: footer,
+      timestamp: DateTime.utc_now()
+    )
+  end
+
+  @doc """
+  Sends an alert when missing webhook events are found during reconciliation.
+
+  ## Examples
+
+      send_missing_webhooks_alert(5, ["evt_1", "evt_2", "evt_3"])
+  """
+  def send_missing_webhooks_alert(count, event_ids \\ []) do
+    description = """
+    Stripe webhook reconciliation found #{count} event(s) that were not in our database.
+
+    Events have been stored and processing has been kicked off.
+    """
+
+    fields =
+      if event_ids != [] do
+        truncated = Enum.take(event_ids, 10) |> Enum.join("\n")
+
+        value =
+          if length(event_ids) > 10,
+            do: truncated <> "\n... (and #{length(event_ids) - 10} more)",
+            else: truncated
+
+        [%{name: "Event IDs", value: value, inline: false}]
+      else
+        []
+      end
+
+    send_warning(description, fields: fields)
+  end
+
+  defp maybe_add_processed_success(fields, stats) do
+    if key = stats[:processed_success],
+      do:
+        fields ++
+          [
+            %{
+              name: "Successfully Processed",
+              value: to_string(key),
+              inline: true
+            }
+          ],
+      else: fields
+  end
+
+  defp maybe_add_processed_failed(fields, stats) do
+    if key = stats[:processed_failed],
+      do:
+        fields ++
+          [%{name: "Failed to Process", value: to_string(key), inline: true}],
+      else: fields
+  end
+
+  defp maybe_add_failed_event_ids(fields, stats) do
+    case stats[:failed_event_ids] do
+      ids when is_list(ids) and ids != [] ->
+        value = Enum.take(ids, 10) |> Enum.join("\n")
+
+        value =
+          if length(ids) > 10,
+            do: value <> "\n... (and #{length(ids) - 10} more)",
+            else: value
+
+        fields ++ [%{name: "Failed Event IDs", value: value, inline: false}]
+
+      _ ->
+        fields
+    end
+  end
+
   ## Private Functions
 
   defp enabled? do

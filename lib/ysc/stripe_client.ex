@@ -14,4 +14,5 @@ defmodule Ysc.StripeClient do
   def create_customer(params), do: Stripe.Customer.create(params)
   def update_customer(id, params), do: Stripe.Customer.update(id, params)
   def retrieve_payment_method(id), do: Stripe.PaymentMethod.retrieve(id)
+  def list_events(params, opts \\ []), do: Stripe.Event.list(params, opts)
 end
