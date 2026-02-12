@@ -2084,6 +2084,7 @@ defmodule YscWeb.AdminMoneyLive do
       <.modal
         :if={@live_action == :view_payout && @selected_payout}
         id="payout-modal"
+        max_width="max-w-7xl"
         show
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Payout Details</h3>
@@ -2202,6 +2203,25 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </tbody>
             </table>
+            <!-- Total Payments -->
+            <div class="px-6 py-3 bg-zinc-50 border-t border-zinc-200">
+              <div class="flex justify-between items-center">
+                <span class="text-sm font-semibold text-zinc-700">
+                  Total Payments:
+                </span>
+                <span class="text-sm font-bold text-zinc-900">
+                  <%= Money.to_string!(
+                    (@selected_payout.payments || [])
+                    |> Enum.reduce(Money.new(0, :USD), fn payment, acc ->
+                      case Money.add(acc, payment.amount) do
+                        {:ok, total} -> total
+                        {:error, _} -> acc
+                      end
+                    end)
+                  ) %>
+                </span>
+              </div>
+            </div>
           </div>
           <p
             :if={length(@selected_payout.payments || []) == 0}
@@ -2280,6 +2300,25 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </tbody>
             </table>
+            <!-- Total Refunds -->
+            <div class="px-6 py-3 bg-zinc-50 border-t border-zinc-200">
+              <div class="flex justify-between items-center">
+                <span class="text-sm font-semibold text-zinc-700">
+                  Total Refunds:
+                </span>
+                <span class="text-sm font-bold text-red-600">
+                  <%= Money.to_string!(
+                    (@selected_payout.refunds || [])
+                    |> Enum.reduce(Money.new(0, :USD), fn refund, acc ->
+                      case Money.add(acc, refund.amount) do
+                        {:ok, total} -> total
+                        {:error, _} -> acc
+                      end
+                    end)
+                  ) %>
+                </span>
+              </div>
+            </div>
           </div>
           <p
             :if={length(@selected_payout.refunds || []) == 0}
