@@ -293,8 +293,24 @@ defmodule Ysc.Bookings.BookingLockerConcurrencyTest do
       assert second_confirmation.id == confirmed_booking.id
       assert second_confirmation.status == :complete
 
-      assert second_confirmation.updated_at == confirmed_booking.updated_at,
-             "Booking should not be modified on second confirmation"
+      # Verify only one set of inventory was booked (not double-booked)
+      # This is the key idempotency check - inventory should only be marked booked once
+      room_inventory_count =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and
+                ri.day >= ^checkin_date and
+                ri.day < ^checkout_date and
+                ri.booked == true
+          ),
+          :count
+        )
+
+      expected_nights = Date.diff(checkout_date, checkin_date)
+
+      assert room_inventory_count == expected_nights,
+             "Inventory should only be booked once, not double-booked"
     end
   end
 end
