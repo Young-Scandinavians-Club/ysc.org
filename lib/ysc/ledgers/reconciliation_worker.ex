@@ -25,13 +25,13 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     queue: :maintenance,
     max_attempts: 3
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Ledgers.Reconciliation
   alias Ysc.Alerts.Discord
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
-    Logger.info("Starting scheduled financial reconciliation")
+    Ysc.Logging.info("Starting scheduled financial reconciliation")
 
     # Note: run_full_reconciliation/0 currently always returns {:ok, report}
     # even when discrepancies are found. Discrepancies are indicated via
@@ -50,11 +50,11 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
   Manually triggers a reconciliation check immediately.
   """
   def run_now do
-    Logger.info("Manually triggering reconciliation")
+    Ysc.Logging.info("Manually triggering reconciliation")
 
     {:ok, report} = Reconciliation.run_full_reconciliation()
     # Print formatted report to console
-    Logger.info(Reconciliation.format_report(report))
+    Ysc.Logging.info(Reconciliation.format_report(report))
     handle_reconciliation_results(report)
   end
 
@@ -72,7 +72,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
   defp handle_reconciliation_results(report) do
     case report.overall_status do
       :ok ->
-        Logger.info("✅ Reconciliation passed all checks",
+        Ysc.Logging.info("✅ Reconciliation passed all checks",
           duration_ms: report.duration_ms
         )
 
@@ -88,7 +88,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
   end
 
   defp alert_on_discrepancies(report) do
-    Logger.critical("🚨 FINANCIAL RECONCILIATION DISCREPANCIES DETECTED")
+    Ysc.Logging.error("🚨 FINANCIAL RECONCILIATION DISCREPANCIES DETECTED")
 
     # Build detailed alert message
     alert_sections = build_alert_sections(report)
@@ -114,7 +114,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     ```
     """
 
-    Logger.critical(full_alert)
+    Ysc.Logging.error(full_alert)
 
     # Send Discord alert
     send_discord_alert(report)

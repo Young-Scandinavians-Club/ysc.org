@@ -39,7 +39,7 @@ defmodule Ysc.Quickbooks do
       })
   """
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Accounts.User
 
   defp client_module do
@@ -76,7 +76,7 @@ defmodule Ysc.Quickbooks do
     # Validate required parameters early to provide better error messages
     cond do
       is_nil(params[:customer_id]) or params[:customer_id] == "" ->
-        Logger.error(
+        Ysc.Logging.error(
           "[QB] create_purchase_sales_receipt: CRITICAL - customer_id is nil or empty! Cannot create sales receipt without a customer.",
           params: inspect(params, limit: :infinity)
         )
@@ -84,7 +84,7 @@ defmodule Ysc.Quickbooks do
         {:error, :missing_customer_id}
 
       is_nil(params[:item_id]) or params[:item_id] == "" ->
-        Logger.error(
+        Ysc.Logging.error(
           "[QB] create_purchase_sales_receipt: CRITICAL - item_id is nil or empty! Cannot create sales receipt without an item.",
           params: inspect(params, limit: :infinity)
         )
@@ -131,7 +131,7 @@ defmodule Ysc.Quickbooks do
 
             _ ->
               # Last resort fallback - this may fail, but we must provide a class
-              Logger.error(
+              Ysc.Logging.error(
                 "[QB] create_purchase_sales_receipt: CRITICAL - Administration class not found! Using hardcoded fallback (this may fail)"
               )
 
@@ -564,9 +564,9 @@ defmodule Ysc.Quickbooks do
                   {:ok, customer_id}
 
                 {:error, changeset} ->
-                  require Logger
+                  require Ysc.Logging
 
-                  Logger.error(
+                  Ysc.Logging.error(
                     "Failed to update user with quickbooks_customer_id",
                     user_id: user.id,
                     quickbooks_customer_id: customer_id,
@@ -598,9 +598,9 @@ defmodule Ysc.Quickbooks do
 
               modified_display_name = "#{display_name} (#{user_id_suffix})"
 
-              require Logger
+              require Ysc.Logging
 
-              Logger.info(
+              Ysc.Logging.info(
                 "[QB] Duplicate name detected, retrying with modified display name",
                 user_id: user.id,
                 original_display_name: display_name,
@@ -629,7 +629,7 @@ defmodule Ysc.Quickbooks do
                         {:ok, customer_id}
 
                       {:error, changeset} ->
-                        Logger.error(
+                        Ysc.Logging.error(
                           "Failed to update user with quickbooks_customer_id",
                           user_id: user.id,
                           quickbooks_customer_id: customer_id,

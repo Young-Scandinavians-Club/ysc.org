@@ -31,7 +31,6 @@ defmodule Ysc.MixProject do
           YscWeb.TahoeCabinRulesLive,
           YscWeb.TahoeStayingWithLive,
           YscWeb.PropertyCheckInLive,
-          YscWeb.TestLogFilter,
           Mix.Tasks.CheckQuickbooksSync,
           Mix.Tasks.DebugEmails,
           Mix.Tasks.ExpireCheckoutSessions,

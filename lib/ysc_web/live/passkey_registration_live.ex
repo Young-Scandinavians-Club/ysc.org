@@ -90,7 +90,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
   end
 
   def handle_event("create_passkey", _params, socket) do
-    require Logger
+    require Ysc.Logging
     user = socket.assigns.current_user
 
     # Set loading state
@@ -122,7 +122,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
           }
         )
 
-      require Logger
+      require Ysc.Logging
 
       # Convert challenge to JSON-serializable format for JS
       # Note: WebAuthn API requires camelCase keys
@@ -155,10 +155,13 @@ defmodule YscWeb.PasskeyRegistrationLive do
        |> push_event("create_registration_challenge", %{options: challenge_json})}
     rescue
       e ->
-        Logger.error("[PasskeyRegistrationLive] Error creating challenge", %{
-          error: inspect(e),
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        })
+        Ysc.Logging.error(
+          "[PasskeyRegistrationLive] Error creating challenge",
+          %{
+            error: inspect(e),
+            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          }
+        )
 
         {:noreply,
          assign(socket,

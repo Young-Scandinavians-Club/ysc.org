@@ -3114,9 +3114,9 @@ defmodule YscWeb.EventDetailsLive do
           Ysc.Tickets.subscribe_event(event_id)
 
           if socket.assigns.current_user != nil do
-            require Logger
+            require Ysc.Logging
 
-            Logger.info("Subscribing to ticket events for user",
+            Ysc.Logging.info("Subscribing to ticket events for user",
               user_id: socket.assigns.current_user.id,
               event_id: event_id,
               topic: "tickets:user:#{socket.assigns.current_user.id}"
@@ -3458,8 +3458,8 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   def handle_async(:load_event_data, {:exit, reason}, socket) do
-    require Logger
-    Logger.error("Failed to load event data async: #{inspect(reason)}")
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load event data async: #{inspect(reason)}")
 
     # Keep showing the page with minimal data, mark as loaded to avoid infinite loading
     {:noreply, assign(socket, :async_data_loaded, true)}
@@ -3527,9 +3527,9 @@ defmodule YscWeb.EventDetailsLive do
          checkout_step,
          event_id
        ) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug("restore_checkout_state_from_url: Starting restore",
+    Ysc.Logging.debug("restore_checkout_state_from_url: Starting restore",
       order_id: order_id,
       checkout_step: checkout_step,
       event_id: event_id,
@@ -3538,7 +3538,7 @@ defmodule YscWeb.EventDetailsLive do
 
     case Ysc.Tickets.get_ticket_order(order_id) do
       nil ->
-        Logger.warning("restore_checkout_state_from_url: Order not found",
+        Ysc.Logging.warning("restore_checkout_state_from_url: Order not found",
           order_id: order_id
         )
 
@@ -3547,7 +3547,7 @@ defmodule YscWeb.EventDetailsLive do
         |> push_patch(to: ~p"/events/#{event_id}")
 
       ticket_order ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "restore_checkout_state_from_url: Order found - order_id=#{ticket_order.id}, order_user_id=#{ticket_order.user_id}, order_event_id=#{ticket_order.event_id}, order_status=#{inspect(ticket_order.status)}, order_expires_at=#{inspect(ticket_order.expires_at)}, current_user_id=#{socket.assigns.current_user.id}, expected_event_id=#{event_id}"
         )
 
@@ -3556,7 +3556,7 @@ defmodule YscWeb.EventDetailsLive do
         event_matches = ticket_order.event_id == event_id
         status_pending = ticket_order.status == :pending
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "restore_checkout_state_from_url: Validation checks - user_matches=#{user_matches}, event_matches=#{event_matches}, status_pending=#{status_pending}, order_status=#{inspect(ticket_order.status)}, all_valid=#{user_matches && event_matches && status_pending}"
         )
 
@@ -3565,14 +3565,15 @@ defmodule YscWeb.EventDetailsLive do
           now = DateTime.utc_now()
           is_expired = DateTime.compare(now, ticket_order.expires_at) == :gt
 
-          Logger.debug("restore_checkout_state_from_url: Expiration check",
+          Ysc.Logging.debug("restore_checkout_state_from_url: Expiration check",
             now: now,
             expires_at: ticket_order.expires_at,
             is_expired: is_expired
           )
 
           if is_expired do
-            Logger.warning("restore_checkout_state_from_url: Order expired",
+            Ysc.Logging.warning(
+              "restore_checkout_state_from_url: Order expired",
               order_id: ticket_order.id,
               expires_at: ticket_order.expires_at,
               now: now
@@ -3585,7 +3586,7 @@ defmodule YscWeb.EventDetailsLive do
             )
             |> push_patch(to: ~p"/events/#{event_id}")
           else
-            Logger.debug(
+            Ysc.Logging.debug(
               "restore_checkout_state_from_url: All checks passed, restoring state",
               order_id: ticket_order.id,
               checkout_step: checkout_step
@@ -3595,7 +3596,7 @@ defmodule YscWeb.EventDetailsLive do
             restore_payment_state_from_url(socket, ticket_order, checkout_step)
           end
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "restore_checkout_state_from_url: Validation failed - order_id=#{ticket_order.id}, user_matches=#{user_matches}, event_matches=#{event_matches}, status_pending=#{status_pending}, order_user_id=#{ticket_order.user_id}, current_user_id=#{socket.assigns.current_user.id}, order_event_id=#{ticket_order.event_id}, expected_event_id=#{event_id}, order_status=#{inspect(ticket_order.status)}"
           )
 
@@ -3624,9 +3625,9 @@ defmodule YscWeb.EventDetailsLive do
 
   # Restore checkout state from a pending order (legacy support)
   defp restore_checkout_state(socket, order_id, event_id) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug("restore_checkout_state: Starting restore (legacy)",
+    Ysc.Logging.debug("restore_checkout_state: Starting restore (legacy)",
       order_id: order_id,
       event_id: event_id,
       current_user_id: socket.assigns.current_user.id
@@ -3635,7 +3636,7 @@ defmodule YscWeb.EventDetailsLive do
     # Determine checkout step based on order amount
     case Ysc.Tickets.get_ticket_order(order_id) do
       nil ->
-        Logger.warning("restore_checkout_state: Order not found",
+        Ysc.Logging.warning("restore_checkout_state: Order not found",
           order_id: order_id
         )
 
@@ -3643,7 +3644,7 @@ defmodule YscWeb.EventDetailsLive do
         |> put_flash(:error, "Order not found")
 
       ticket_order ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "restore_checkout_state: Order found - order_id=#{ticket_order.id}, order_user_id=#{ticket_order.user_id}, order_event_id=#{ticket_order.event_id}, order_status=#{inspect(ticket_order.status)}, order_total_amount=#{inspect(ticket_order.total_amount)}, current_user_id=#{socket.assigns.current_user.id}, expected_event_id=#{event_id}"
         )
 
@@ -3652,7 +3653,7 @@ defmodule YscWeb.EventDetailsLive do
         event_matches = ticket_order.event_id == event_id
         status_pending = ticket_order.status == :pending
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "restore_checkout_state: Validation checks - user_matches=#{user_matches}, event_matches=#{event_matches}, status_pending=#{status_pending}, all_valid=#{user_matches && event_matches && status_pending}"
         )
 
@@ -3661,14 +3662,14 @@ defmodule YscWeb.EventDetailsLive do
           now = DateTime.utc_now()
           is_expired = DateTime.compare(now, ticket_order.expires_at) == :gt
 
-          Logger.debug("restore_checkout_state: Expiration check",
+          Ysc.Logging.debug("restore_checkout_state: Expiration check",
             now: now,
             expires_at: ticket_order.expires_at,
             is_expired: is_expired
           )
 
           if is_expired do
-            Logger.warning("restore_checkout_state: Order expired",
+            Ysc.Logging.warning("restore_checkout_state: Order expired",
               order_id: ticket_order.id,
               expires_at: ticket_order.expires_at,
               now: now
@@ -3685,7 +3686,7 @@ defmodule YscWeb.EventDetailsLive do
                 do: "free",
                 else: "payment"
 
-            Logger.debug(
+            Ysc.Logging.debug(
               "restore_checkout_state: All checks passed, restoring state",
               order_id: ticket_order.id,
               checkout_step: checkout_step
@@ -3695,7 +3696,7 @@ defmodule YscWeb.EventDetailsLive do
             restore_payment_state_from_url(socket, ticket_order, checkout_step)
           end
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "restore_checkout_state: Validation failed - order_id=#{ticket_order.id}, user_matches=#{user_matches}, event_matches=#{event_matches}, status_pending=#{status_pending}, order_user_id=#{ticket_order.user_id}, current_user_id=#{socket.assigns.current_user.id}, order_event_id=#{ticket_order.event_id}, expected_event_id=#{event_id}, order_status=#{inspect(ticket_order.status)}"
           )
 
@@ -3723,9 +3724,9 @@ defmodule YscWeb.EventDetailsLive do
 
   # Restore payment state from URL (payment intent or free ticket confirmation)
   defp restore_payment_state_from_url(socket, ticket_order, checkout_step) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug("restore_payment_state_from_url: Starting restore",
+    Ysc.Logging.debug("restore_payment_state_from_url: Starting restore",
       order_id: ticket_order.id,
       checkout_step: checkout_step
     )
@@ -3733,7 +3734,7 @@ defmodule YscWeb.EventDetailsLive do
     # Reload ticket order with tickets and tiers
     ticket_order = Ysc.Tickets.get_ticket_order(ticket_order.id)
 
-    Logger.debug("restore_payment_state_from_url: Ticket order reloaded",
+    Ysc.Logging.debug("restore_payment_state_from_url: Ticket order reloaded",
       order_id: ticket_order.id,
       tickets_count: length(ticket_order.tickets || []),
       total_amount: ticket_order.total_amount
@@ -3839,9 +3840,9 @@ defmodule YscWeb.EventDetailsLive do
 
       "payment" ->
         # For paid tickets, retrieve or create payment intent and show payment modal with registration
-        require Logger
+        require Ysc.Logging
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "restore_payment_state_from_url: Retrieving/creating payment intent",
           order_id: ticket_order.id,
           payment_intent_id: ticket_order.payment_intent_id,
@@ -3853,7 +3854,7 @@ defmodule YscWeb.EventDetailsLive do
                socket.assigns.current_user
              ) do
           {:ok, payment_intent} ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "restore_payment_state_from_url: Payment intent retrieved/created successfully",
               order_id: ticket_order.id,
               payment_intent_id: payment_intent.id,
@@ -3879,7 +3880,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:payment_redirect_in_progress, false)
 
           {:error, reason} ->
-            Logger.error(
+            Ysc.Logging.error(
               "restore_payment_state_from_url: Failed to retrieve/create payment intent",
               order_id: ticket_order.id,
               error: reason
@@ -4178,9 +4179,10 @@ defmodule YscWeb.EventDetailsLive do
         socket
       ) do
     # Handle checkout session expiration
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Received CheckoutSessionExpired event in EventDetailsLive",
+    Ysc.Logging.info(
+      "Received CheckoutSessionExpired event in EventDetailsLive",
       user_id: socket.assigns.current_user.id,
       show_payment_modal: socket.assigns.show_payment_modal,
       current_ticket_order_id:
@@ -4223,9 +4225,10 @@ defmodule YscWeb.EventDetailsLive do
         socket
       ) do
     # Handle checkout session cancellation
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Received CheckoutSessionCancelled event in EventDetailsLive",
+    Ysc.Logging.info(
+      "Received CheckoutSessionCancelled event in EventDetailsLive",
       user_id: socket.assigns.current_user.id,
       show_payment_modal: socket.assigns.show_payment_modal,
       current_ticket_order_id:
@@ -4523,9 +4526,9 @@ defmodule YscWeb.EventDetailsLive do
                   "succeeded" ->
                     # Payment already succeeded - order should be completed, but if we're here,
                     # something went wrong. Don't cancel to be safe.
-                    require Logger
+                    require Ysc.Logging
 
-                    Logger.warning(
+                    Ysc.Logging.warning(
                       "Payment intent already succeeded in terminate/2, not cancelling order",
                       payment_intent_id: payment_intent_id,
                       ticket_order_id: socket.assigns.ticket_order.id
@@ -4541,9 +4544,9 @@ defmodule YscWeb.EventDetailsLive do
               {:error, _} ->
                 # If we can't retrieve payment intent, err on the side of caution
                 # and don't cancel (might be a temporary Stripe API issue or payment in progress)
-                require Logger
+                require Ysc.Logging
 
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Could not retrieve payment intent status in terminate/2, not cancelling order",
                   payment_intent_id: payment_intent_id,
                   ticket_order_id: socket.assigns.ticket_order.id
@@ -5030,7 +5033,7 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("select-ticket-attendee", params, socket) do
-    require Logger
+    require Ysc.Logging
 
     # Get ticket_id from the hidden field
     ticket_id = params["ticket_id"]
@@ -5079,7 +5082,7 @@ defmodule YscWeb.EventDetailsLive do
 
             if me_already_selected do
               # "Me" is already selected for another ticket, don't allow this selection
-              Logger.warning(
+              Ysc.Logging.warning(
                 "select-ticket-attendee: Attempted to select 'Me' for ticket #{ticket_id_str}, but 'Me' is already selected for another ticket"
               )
 
@@ -5174,7 +5177,7 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:tickets_for_me, updated_tickets_for_me)
        |> assign(:selected_family_members, updated_selected_family_members)}
     else
-      Logger.warning(
+      Ysc.Logging.warning(
         "select-ticket-attendee: Missing ticket_id or selected_value. ticket_id=#{inspect(ticket_id)}, selected_value=#{inspect(selected_value)}, all_params=#{inspect(params)}"
       )
 
@@ -5200,7 +5203,7 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("update-registration-field", params, socket) do
-    require Logger
+    require Ysc.Logging
 
     # LiveView sends ALL form fields when phx-change fires on a form
     # Extract all ticket fields from params and update them all at once
@@ -5450,9 +5453,9 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_ticket_modal, false)}
 
       {:error, reason} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Unexpected error creating ticket order",
+        Ysc.Logging.error("Unexpected error creating ticket order",
           user_id: user_id,
           event_id: event_id,
           reason: reason
@@ -5991,7 +5994,7 @@ defmodule YscWeb.EventDetailsLive do
          socket,
          error_message
        ) do
-    require Logger
+    require Ysc.Logging
 
     failing_tickets =
       find_failing_tickets(
@@ -6016,7 +6019,7 @@ defmodule YscWeb.EventDetailsLive do
         "Ticket #{f.ticket_id}: is_for_me=#{f.is_for_me}, detail=#{inspect(f.detail)}, form_data=#{inspect(f.form_data)}"
       end)
 
-    Logger.warning(
+    Ysc.Logging.warning(
       "Registration validation failed. Failing tickets: #{failing_info}. All form_data: #{inspect(ticket_details_form)}. Tickets_for_me: #{inspect(tickets_for_me)}"
     )
 

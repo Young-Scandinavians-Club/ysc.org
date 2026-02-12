@@ -4,7 +4,7 @@ defmodule Ysc.Settings do
 
   Provides functions for retrieving and caching application-wide site settings.
   """
-  require Logger
+  require Ysc.Logging
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
@@ -165,7 +165,7 @@ defmodule Ysc.Settings do
 
               if has_unique_error? do
                 # Race condition: another process created the setting, fetch it
-                Logger.debug(
+                Ysc.Logging.debug(
                   "[Settings] Race condition detected, fetching existing setting",
                   name: name
                 )
@@ -187,7 +187,7 @@ defmodule Ysc.Settings do
                 end
               else
                 # Some other error occurred
-                Logger.error("[Settings] Failed to create setting",
+                Ysc.Logging.error("[Settings] Failed to create setting",
                   name: name,
                   errors: inspect(changeset.errors)
                 )
@@ -205,7 +205,7 @@ defmodule Ysc.Settings do
             if String.contains?(error_message, "unique") or
                  String.contains?(error_message, "duplicate") do
               # Likely a race condition, try fetching the existing setting
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[Settings] Database constraint violation, fetching existing setting",
                 name: name,
                 error: error_message
@@ -214,7 +214,7 @@ defmodule Ysc.Settings do
               case Repo.get_by(SiteSetting, name: name) do
                 nil ->
                   # Still not found, return default
-                  Logger.warning(
+                  Ysc.Logging.warning(
                     "[Settings] Setting not found after constraint violation",
                     name: name
                   )
@@ -228,7 +228,7 @@ defmodule Ysc.Settings do
               end
             else
               # Some other exception occurred
-              Logger.error("[Settings] Exception while creating setting",
+              Ysc.Logging.error("[Settings] Exception while creating setting",
                 name: name,
                 error: error_message,
                 stacktrace: Exception.format_stacktrace(__STACKTRACE__)

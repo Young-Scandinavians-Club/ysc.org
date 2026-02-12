@@ -148,11 +148,11 @@ defmodule Ysc.Tickets.StripeService do
   """
   def cancel_payment_intent(payment_intent_id)
       when is_binary(payment_intent_id) do
-    require Logger
+    require Ysc.Logging
 
     case stripe_client().cancel_payment_intent(payment_intent_id, %{}) do
       {:ok, _payment_intent} ->
-        Logger.info("Successfully canceled PaymentIntent",
+        Ysc.Logging.info("Successfully canceled PaymentIntent",
           payment_intent_id: payment_intent_id
         )
 
@@ -162,14 +162,14 @@ defmodule Ysc.Tickets.StripeService do
         # PaymentIntent might already be canceled or succeeded - that's okay
         if String.contains?(error.message, "already") or
              String.contains?(error.message, "succeeded") do
-          Logger.debug("PaymentIntent already canceled or succeeded",
+          Ysc.Logging.debug("PaymentIntent already canceled or succeeded",
             payment_intent_id: payment_intent_id,
             error: error.message
           )
 
           :ok
         else
-          Logger.warning("Failed to cancel PaymentIntent",
+          Ysc.Logging.warning("Failed to cancel PaymentIntent",
             payment_intent_id: payment_intent_id,
             error: error.message
           )
@@ -178,7 +178,7 @@ defmodule Ysc.Tickets.StripeService do
         end
 
       {:error, reason} ->
-        Logger.warning("Failed to cancel PaymentIntent",
+        Ysc.Logging.warning("Failed to cancel PaymentIntent",
           payment_intent_id: payment_intent_id,
           error: reason
         )

@@ -7,7 +7,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
   2. Finds the linked Bill (expense report) using the LinkedTxn field
   3. Updates the expense report status to "paid"
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Ysc.Webhooks
@@ -26,7 +26,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
           "bill_payment_id" => bill_payment_id
         }
       }) do
-    Logger.info("Processing QuickBooks BillPayment",
+    Ysc.Logging.info("Processing QuickBooks BillPayment",
       webhook_event_id: webhook_event_id,
       bill_payment_id: bill_payment_id
     )
@@ -37,14 +37,14 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
         process_bill_payment(webhook_event, bill_payment_id)
 
       {:error, :not_found} ->
-        Logger.warning("Webhook event not found",
+        Ysc.Logging.warning("Webhook event not found",
           webhook_event_id: webhook_event_id
         )
 
         {:error, :webhook_not_found}
 
       {:error, :already_processing} ->
-        Logger.info("Webhook event already being processed, skipping",
+        Ysc.Logging.info("Webhook event already being processed, skipping",
           webhook_event_id: webhook_event_id
         )
 
@@ -56,7 +56,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
     # Fetch the BillPayment from QuickBooks
     case client().get_bill_payment(bill_payment_id) do
       {:ok, bill_payment} ->
-        Logger.info("Retrieved BillPayment from QuickBooks",
+        Ysc.Logging.info("Retrieved BillPayment from QuickBooks",
           bill_payment_id: bill_payment_id,
           bill_payment: inspect(bill_payment, limit: 50)
         )
@@ -66,7 +66,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
 
         case find_linked_bill(linked_txns) do
           {:ok, bill_id} ->
-            Logger.info("Found linked Bill",
+            Ysc.Logging.info("Found linked Bill",
               bill_id: bill_id,
               bill_payment_id: bill_payment_id
             )
@@ -74,7 +74,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
             # Find the expense report with this QuickBooks bill ID
             case find_expense_report_by_bill_id(bill_id) do
               {:ok, expense_report} ->
-                Logger.info("Found expense report for Bill",
+                Ysc.Logging.info("Found expense report for Bill",
                   expense_report_id: expense_report.id,
                   bill_id: bill_id,
                   current_status: expense_report.status
@@ -92,7 +92,8 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
                 # Update the expense report status to "paid"
                 case ExpenseReports.mark_expense_report_as_paid(expense_report) do
                   {:ok, updated_report} ->
-                    Logger.info("Successfully marked expense report as paid",
+                    Ysc.Logging.info(
+                      "Successfully marked expense report as paid",
                       expense_report_id: updated_report.id,
                       bill_id: bill_id,
                       bill_payment_id: bill_payment_id
@@ -104,7 +105,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
                     :ok
 
                   {:error, changeset} ->
-                    Logger.error("Failed to mark expense report as paid",
+                    Ysc.Logging.error("Failed to mark expense report as paid",
                       expense_report_id: expense_report.id,
                       errors: inspect(changeset.errors)
                     )
@@ -112,21 +113,12 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
                     # Mark webhook event as failed
                     Webhooks.update_webhook_state(webhook_event, :failed)
 
-                    Sentry.capture_message(
-                      "Failed to mark expense report as paid",
-                      level: :error,
-                      extra: %{
-                        expense_report_id: expense_report.id,
-                        bill_id: bill_id,
-                        errors: inspect(changeset.errors)
-                      }
-                    )
-
                     {:error, :update_failed}
                 end
 
               {:error, :not_found} ->
-                Logger.warning("No expense report found for QuickBooks Bill",
+                Ysc.Logging.warning(
+                  "No expense report found for QuickBooks Bill",
                   bill_id: bill_id,
                   bill_payment_id: bill_payment_id
                 )
@@ -137,7 +129,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
                 :ok
 
               {:error, reason} ->
-                Logger.warning("Error finding expense report",
+                Ysc.Logging.warning("Error finding expense report",
                   bill_id: bill_id,
                   error: reason
                 )
@@ -149,7 +141,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
             end
 
           {:error, :no_linked_bill} ->
-            Logger.warning("BillPayment has no linked Bill",
+            Ysc.Logging.warning("BillPayment has no linked Bill",
               bill_payment_id: bill_payment_id
             )
 
@@ -160,7 +152,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
         end
 
       {:error, reason} ->
-        Logger.warning("Failed to fetch BillPayment from QuickBooks",
+        Ysc.Logging.warning("Failed to fetch BillPayment from QuickBooks",
           bill_payment_id: bill_payment_id,
           error: inspect(reason)
         )
@@ -169,13 +161,6 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
         Webhooks.update_webhook_state(webhook_event, :failed)
 
         unless reason == :not_found do
-          Sentry.capture_message("Failed to fetch BillPayment from QuickBooks",
-            level: :error,
-            extra: %{
-              bill_payment_id: bill_payment_id,
-              error: inspect(reason)
-            }
-          )
         end
 
         {:error, :fetch_failed}

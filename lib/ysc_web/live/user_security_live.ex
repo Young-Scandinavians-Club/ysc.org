@@ -57,8 +57,8 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   def handle_async(:load_passkeys, {:exit, reason}, socket) do
-    require Logger
-    Logger.error("Failed to load passkeys async: #{inspect(reason)}")
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load passkeys async: #{inspect(reason)}")
 
     {:noreply,
      socket
@@ -126,8 +126,8 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   def handle_event("reauth_with_passkey", _params, socket) do
-    require Logger
-    Logger.info("[UserSecurityLive] reauth_with_passkey event received")
+    require Ysc.Logging
+    Ysc.Logging.info("[UserSecurityLive] reauth_with_passkey event received")
 
     # Generate authentication challenge for passkey
     challenge =
@@ -146,13 +146,13 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   def handle_event("verify_authentication", params, socket) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info(
+    Ysc.Logging.info(
       "[UserSecurityLive] verify_authentication event received for re-auth"
     )
 
-    Logger.debug("Params: #{inspect(params)}")
+    Ysc.Logging.debug("Params: #{inspect(params)}")
 
     # In a full production implementation, you should verify the passkey signature here
     # against the stored public key and challenge. For now, we trust the browser's
@@ -169,9 +169,9 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   def handle_event("passkey_auth_error", %{"error" => error}, socket) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[UserSecurityLive] Passkey authentication error: #{inspect(error)}"
     )
 

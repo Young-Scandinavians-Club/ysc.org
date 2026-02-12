@@ -13,7 +13,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRetryWorker do
   before the sync system was in place, will eventually be synced.
   """
 
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :maintenance
 
   alias Ysc.Repo
@@ -22,7 +22,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRetryWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: _args}) do
-    Logger.info("Starting nightly QuickBooks sync retry job")
+    Ysc.Logging.info("Starting nightly QuickBooks sync retry job")
 
     payments_count = enqueue_unsynced_payments()
     refunds_count = enqueue_unsynced_refunds()
@@ -30,7 +30,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRetryWorker do
 
     total = payments_count + refunds_count + payouts_count
 
-    Logger.info("QuickBooks sync retry job completed",
+    Ysc.Logging.info("QuickBooks sync retry job completed",
       payments_enqueued: payments_count,
       refunds_enqueued: refunds_count,
       payouts_enqueued: payouts_count,
@@ -55,7 +55,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRetryWorker do
     count = length(unsynced_payments)
 
     if count > 0 do
-      Logger.info("Found unsynced payments", count: count)
+      Ysc.Logging.info("Found unsynced payments", count: count)
 
       Enum.each(unsynced_payments, fn payment_id ->
         %{payment_id: to_string(payment_id)}
@@ -82,7 +82,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRetryWorker do
     count = length(unsynced_refunds)
 
     if count > 0 do
-      Logger.info("Found unsynced refunds", count: count)
+      Ysc.Logging.info("Found unsynced refunds", count: count)
 
       Enum.each(unsynced_refunds, fn refund_id ->
         %{refund_id: to_string(refund_id)}
@@ -109,7 +109,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRetryWorker do
     count = length(unsynced_payouts)
 
     if count > 0 do
-      Logger.info("Found unsynced payouts", count: count)
+      Ysc.Logging.info("Found unsynced payouts", count: count)
 
       Enum.each(unsynced_payouts, fn payout_id ->
         %{payout_id: to_string(payout_id)}

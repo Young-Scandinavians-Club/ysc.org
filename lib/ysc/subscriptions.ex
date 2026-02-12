@@ -917,7 +917,7 @@ defmodule Ysc.Subscriptions do
   """
   def create_subscription_paid_out_of_band(%Ysc.Accounts.User{} = user, plan_id)
       when plan_id in [:single, :family] do
-    require Logger
+    require Ysc.Logging
 
     if Ysc.Accounts.sub_account?(user) do
       {:error, :sub_accounts_cannot_create_subscriptions}
@@ -957,7 +957,7 @@ defmodule Ysc.Subscriptions do
   defp ensure_user_has_stripe_id(user), do: user
 
   defp do_create_subscription_paid_out_of_band(user, plan) do
-    require Logger
+    require Ysc.Logging
 
     # Optional callback for tests to inject a fake Stripe subscription without calling Stripe API
     case Application.get_env(
@@ -992,7 +992,7 @@ defmodule Ysc.Subscriptions do
   end
 
   defp do_create_subscription_paid_out_of_band_stripe(user, plan) do
-    require Logger
+    require Ysc.Logging
 
     stripe_params = %{
       customer: user.stripe_id,
@@ -1029,7 +1029,7 @@ defmodule Ysc.Subscriptions do
                 {:ok, subscription}
 
               err ->
-                Logger.error(
+                Ysc.Logging.error(
                   "Failed to create local subscription after paid-out-of-band",
                   user_id: user.id,
                   stripe_subscription_id: stripe_subscription.id,
@@ -1040,7 +1040,7 @@ defmodule Ysc.Subscriptions do
             end
 
           {:error, err} ->
-            Logger.error("Failed to mark invoice as paid out of band",
+            Ysc.Logging.error("Failed to mark invoice as paid out of band",
               user_id: user.id,
               invoice_id: invoice_id,
               error: inspect(err)
@@ -1058,7 +1058,7 @@ defmodule Ysc.Subscriptions do
   defp invoice_id_from_expand(%{id: id}), do: id
 
   defp send_membership_confirmation_email_for_paid_elsewhere(user, plan) do
-    require Logger
+    require Ysc.Logging
 
     try do
       amount = Money.new(plan.amount, :USD)
@@ -1073,7 +1073,7 @@ defmodule Ysc.Subscriptions do
       )
     rescue
       error ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "Failed to send membership confirmation email for paid-elsewhere subscription",
           user_id: user.id,
           error: Exception.message(error)
@@ -1086,13 +1086,13 @@ defmodule Ysc.Subscriptions do
   This is used as a backup when webhooks might not be reliable.
   """
   def create_subscription_from_stripe(user, stripe_subscription) do
-    require Logger
+    require Ysc.Logging
 
     # Check if subscription already exists
     existing = get_subscription_by_stripe_id(stripe_subscription.id)
 
     if existing do
-      Logger.info("Subscription already exists locally",
+      Ysc.Logging.info("Subscription already exists locally",
         user_id: user.id,
         subscription_id: existing.id,
         stripe_subscription_id: stripe_subscription.id
@@ -1144,7 +1144,7 @@ defmodule Ysc.Subscriptions do
                 :ok
 
               {:error, reason} ->
-                Logger.error("Failed to create subscription item",
+                Ysc.Logging.error("Failed to create subscription item",
                   user_id: user.id,
                   subscription_id: subscription.id,
                   error: reason
@@ -1152,7 +1152,7 @@ defmodule Ysc.Subscriptions do
             end
           end)
 
-          Logger.info("Successfully created subscription from Stripe",
+          Ysc.Logging.info("Successfully created subscription from Stripe",
             user_id: user.id,
             subscription_id: subscription.id,
             stripe_subscription_id: stripe_subscription.id
@@ -1164,7 +1164,7 @@ defmodule Ysc.Subscriptions do
           {:ok, subscription}
 
         {:error, reason} ->
-          Logger.error("Failed to create subscription from Stripe",
+          Ysc.Logging.error("Failed to create subscription from Stripe",
             user_id: user.id,
             stripe_subscription_id: stripe_subscription.id,
             error: reason
@@ -1190,7 +1190,7 @@ defmodule Ysc.Subscriptions do
 
   """
   def retry_failed_invoice(user, invoice_id) when is_binary(invoice_id) do
-    require Logger
+    require Ysc.Logging
 
     # Retrieve the invoice from Stripe to verify it exists and belongs to the user
     case Stripe.Invoice.retrieve(invoice_id) do
@@ -1199,7 +1199,7 @@ defmodule Ysc.Subscriptions do
         customer_id = invoice.customer
 
         if customer_id != user.stripe_id do
-          Logger.warning("Invoice does not belong to user",
+          Ysc.Logging.warning("Invoice does not belong to user",
             user_id: user.id,
             invoice_id: invoice_id,
             invoice_customer: customer_id,
@@ -1210,7 +1210,7 @@ defmodule Ysc.Subscriptions do
         else
           # Check if invoice is already paid
           if invoice.status == "paid" do
-            Logger.info("Invoice is already paid",
+            Ysc.Logging.info("Invoice is already paid",
               user_id: user.id,
               invoice_id: invoice_id
             )
@@ -1219,7 +1219,7 @@ defmodule Ysc.Subscriptions do
           else
             # Check if invoice is open and can be paid
             if invoice.status != "open" do
-              Logger.warning("Invoice is not in a payable state",
+              Ysc.Logging.warning("Invoice is not in a payable state",
                 user_id: user.id,
                 invoice_id: invoice_id,
                 invoice_status: invoice.status
@@ -1228,14 +1228,14 @@ defmodule Ysc.Subscriptions do
               {:error, :invalid_invoice_status}
             else
               # Attempt to pay the invoice
-              Logger.info("Attempting to retry payment for invoice",
+              Ysc.Logging.info("Attempting to retry payment for invoice",
                 user_id: user.id,
                 invoice_id: invoice_id
               )
 
               case Stripe.Invoice.pay(invoice_id, %{}) do
                 {:ok, paid_invoice} ->
-                  Logger.info("Successfully retried payment for invoice",
+                  Ysc.Logging.info("Successfully retried payment for invoice",
                     user_id: user.id,
                     invoice_id: invoice_id,
                     invoice_status: paid_invoice.status
@@ -1244,7 +1244,7 @@ defmodule Ysc.Subscriptions do
                   {:ok, paid_invoice}
 
                 {:error, %Stripe.Error{} = error} ->
-                  Logger.error("Failed to retry payment for invoice",
+                  Ysc.Logging.error("Failed to retry payment for invoice",
                     user_id: user.id,
                     invoice_id: invoice_id,
                     error: error.message
@@ -1253,7 +1253,7 @@ defmodule Ysc.Subscriptions do
                   {:error, error.message}
 
                 {:error, reason} ->
-                  Logger.error("Failed to retry payment for invoice",
+                  Ysc.Logging.error("Failed to retry payment for invoice",
                     user_id: user.id,
                     invoice_id: invoice_id,
                     error: inspect(reason)
@@ -1266,7 +1266,7 @@ defmodule Ysc.Subscriptions do
         end
 
       {:error, %Stripe.Error{code: code}} when code in ["resource_missing"] ->
-        Logger.warning("Invoice not found in Stripe",
+        Ysc.Logging.warning("Invoice not found in Stripe",
           user_id: user.id,
           invoice_id: invoice_id
         )
@@ -1274,7 +1274,7 @@ defmodule Ysc.Subscriptions do
         {:error, :invoice_not_found}
 
       {:error, %Stripe.Error{} = error} ->
-        Logger.error("Failed to retrieve invoice from Stripe",
+        Ysc.Logging.error("Failed to retrieve invoice from Stripe",
           user_id: user.id,
           invoice_id: invoice_id,
           error: error.message
@@ -1283,7 +1283,7 @@ defmodule Ysc.Subscriptions do
         {:error, error.message}
 
       {:error, reason} ->
-        Logger.error("Failed to retrieve invoice from Stripe",
+        Ysc.Logging.error("Failed to retrieve invoice from Stripe",
           user_id: user.id,
           invoice_id: invoice_id,
           error: inspect(reason)

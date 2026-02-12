@@ -19,9 +19,9 @@ defmodule Ysc.PropertyOutages.Scheduler do
     # Recurring jobs are handled by Oban.Cron plugin (configured in config.exs)
     # which runs every 30 minutes: "*/30 * * * *"
     # This means it runs at :00 and :30 of every hour (e.g., 12:00, 12:30, 13:00, etc.)
-    require Logger
+    require Ysc.Logging
 
-    Logger.info(
+    Ysc.Logging.info(
       "Outage scraper scheduler initialized - recurring jobs handled by Oban.Cron (every 30 minutes)"
     )
 

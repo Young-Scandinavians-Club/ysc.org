@@ -6,7 +6,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
-  require Logger
+  require Ysc.Logging
   import Ecto.Query
   alias Phoenix.LiveView.JS
 
@@ -82,7 +82,7 @@ defmodule YscWeb.BookingReceiptLive do
             Map.get(params, "confetti") == "true" ||
               Map.get(params, "redirect_status") == "succeeded"
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "Confetti check: params=#{inspect(params)}, show_confetti=#{show_confetti}"
           )
 
@@ -1143,7 +1143,7 @@ defmodule YscWeb.BookingReceiptLive do
              |> put_flash(:info, "Your booking is confirmed."), false}
 
           {:error, reason} ->
-            Logger.error("Failed to process payment from redirect",
+            Ysc.Logging.error("Failed to process payment from redirect",
               booking_id: booking.id,
               payment_intent_id: payment_intent_id,
               error: reason
@@ -1205,12 +1205,15 @@ defmodule YscWeb.BookingReceiptLive do
                   {:ok, confirmed_booking}
 
                 {:error, reason} ->
-                  Logger.error("Failed to confirm booking: #{inspect(reason)}")
+                  Ysc.Logging.error(
+                    "Failed to confirm booking: #{inspect(reason)}"
+                  )
+
                   {:error, :booking_confirmation_failed}
               end
 
             {:error, reason} ->
-              Logger.error(
+              Ysc.Logging.error(
                 "Failed to process ledger payment: #{inspect(reason)}"
               )
 
@@ -1221,7 +1224,10 @@ defmodule YscWeb.BookingReceiptLive do
         end
 
       {:error, reason} ->
-        Logger.error("Failed to retrieve payment intent: #{inspect(reason)}")
+        Ysc.Logging.error(
+          "Failed to retrieve payment intent: #{inspect(reason)}"
+        )
+
         {:error, :payment_verification_failed}
     end
   end
@@ -1294,7 +1300,7 @@ defmodule YscWeb.BookingReceiptLive do
 
     case stripe_payment_method_id do
       nil ->
-        Logger.info("No payment method found in payment intent",
+        Ysc.Logging.info("No payment method found in payment intent",
           payment_intent_id: payment_intent.id
         )
 
@@ -1313,7 +1319,7 @@ defmodule YscWeb.BookingReceiptLive do
                    stripe_payment_method
                  ) do
               {:ok, payment_method} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Successfully synced payment method for booking payment",
                   payment_method_id: payment_method.id,
                   stripe_payment_method_id: pm_id,
@@ -1323,7 +1329,7 @@ defmodule YscWeb.BookingReceiptLive do
                 payment_method.id
 
               {:error, reason} ->
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to sync payment method for booking payment",
                   stripe_payment_method_id: pm_id,
                   user_id: user_id,
@@ -1334,7 +1340,7 @@ defmodule YscWeb.BookingReceiptLive do
             end
 
           {:error, error} ->
-            Logger.warning("Failed to retrieve payment method from Stripe",
+            Ysc.Logging.warning("Failed to retrieve payment method from Stripe",
               payment_method_id: pm_id,
               payment_intent_id: payment_intent.id,
               error: error.message
@@ -1403,7 +1409,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   def handle_async(:load_receipt_data, {:exit, reason}, socket) do
-    Logger.error("Failed to load receipt data async: #{inspect(reason)}")
+    Ysc.Logging.error("Failed to load receipt data async: #{inspect(reason)}")
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 

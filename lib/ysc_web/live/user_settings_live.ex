@@ -1949,9 +1949,9 @@ defmodule YscWeb.UserSettingsLive do
 
       updated_default = Ysc.Payments.get_default_payment_method(user)
 
-      require Logger
+      require Ysc.Logging
 
-      Logger.info("Refreshed payment methods after selection",
+      Ysc.Logging.info("Refreshed payment methods after selection",
         user_id: user.id,
         payment_methods_count: length(updated_payment_methods),
         default_payment_method_id: updated_default && updated_default.id
@@ -2024,8 +2024,8 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_event("reauth_with_passkey", _params, socket) do
-    require Logger
-    Logger.info("[UserSettingsLive] reauth_with_passkey event received")
+    require Ysc.Logging
+    Ysc.Logging.info("[UserSettingsLive] reauth_with_passkey event received")
 
     # Generate authentication challenge for passkey
     challenge =
@@ -2044,13 +2044,13 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_event("verify_authentication", params, socket) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info(
+    Ysc.Logging.info(
       "[UserSettingsLive] verify_authentication event received for re-auth"
     )
 
-    Logger.debug("Params: #{inspect(params)}")
+    Ysc.Logging.debug("Params: #{inspect(params)}")
 
     # In a full production implementation, you should verify the passkey signature here
     # against the stored public key and challenge. For now, we trust the browser's
@@ -2067,9 +2067,9 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_event("passkey_auth_error", %{"error" => error}, socket) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[UserSettingsLive] Passkey authentication error: #{inspect(error)}"
     )
 
@@ -2340,9 +2340,9 @@ defmodule YscWeb.UserSettingsLive do
         %{"verification_code" => code},
         socket
       ) do
-    require Logger
-    Logger.debug("=== EMAIL VALIDATION EVENT ===")
-    Logger.debug("Validation code: #{inspect(code)}")
+    require Ysc.Logging
+    Ysc.Logging.debug("=== EMAIL VALIDATION EVENT ===")
+    Ysc.Logging.debug("Validation code: #{inspect(code)}")
 
     # Only allow email code validation if user has pending email verification
     pending_email = socket.assigns.pending_email
@@ -2355,24 +2355,24 @@ defmodule YscWeb.UserSettingsLive do
         String.length(normalized_code) == 6 &&
           String.match?(normalized_code, ~r/^\d{6}$/)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "Normalized validation code: #{normalized_code}, is_valid: #{is_valid}"
       )
 
       {:noreply,
        assign(socket, email_code_valid: is_valid, email_verification_error: nil)}
     else
-      Logger.debug("No pending email for validation")
+      Ysc.Logging.debug("No pending email for validation")
       {:noreply, socket}
     end
   end
 
   def handle_event("verify_email_code", params, socket) do
-    require Logger
-    Logger.debug("=== EMAIL VERIFICATION EVENT TRIGGERED ===")
-    Logger.debug("Params: #{inspect(params)}")
+    require Ysc.Logging
+    Ysc.Logging.debug("=== EMAIL VERIFICATION EVENT TRIGGERED ===")
+    Ysc.Logging.debug("Params: #{inspect(params)}")
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "Socket assigns: pending_email=#{socket.assigns.pending_email}, live_action=#{socket.assigns.live_action}"
     )
 
@@ -2380,26 +2380,30 @@ defmodule YscWeb.UserSettingsLive do
     pending_email = socket.assigns.pending_email
     user = socket.assigns.current_user
 
-    Logger.debug("Pending email: #{pending_email}, User: #{user && user.email}")
+    Ysc.Logging.debug(
+      "Pending email: #{pending_email}, User: #{user && user.email}"
+    )
 
     if pending_email do
-      Logger.debug("Has pending email, processing verification...")
+      Ysc.Logging.debug("Has pending email, processing verification...")
 
       case params do
         %{"verification_code" => entered_code} ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "Found verification_code in params: #{inspect(entered_code)}"
           )
 
           # Handle both OTP array format and single string format
           code = normalize_verification_code(entered_code)
 
-          Logger.debug("Normalized code: #{code}")
+          Ysc.Logging.debug("Normalized code: #{code}")
 
           verification_result =
             Accounts.verify_email_verification_code(user, code)
 
-          Logger.debug("Verification result: #{inspect(verification_result)}")
+          Ysc.Logging.debug(
+            "Verification result: #{inspect(verification_result)}"
+          )
 
           case verification_result do
             {:ok, :verified} ->
@@ -2475,7 +2479,7 @@ defmodule YscWeb.UserSettingsLive do
           end
 
         _ ->
-          Logger.debug("No verification_code in params")
+          Ysc.Logging.debug("No verification_code in params")
 
           {:noreply,
            assign(
@@ -2485,7 +2489,7 @@ defmodule YscWeb.UserSettingsLive do
            )}
       end
     else
-      Logger.debug("No pending email verification")
+      Ysc.Logging.debug("No pending email verification")
 
       {:noreply,
        assign(
@@ -2758,9 +2762,9 @@ defmodule YscWeb.UserSettingsLive do
                  |> redirect(to: ~p"/users/membership")}
 
               {:error, reason} ->
-                require Logger
+                require Ysc.Logging
 
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to save subscription locally, webhook should handle it",
                   user_id: user.id,
                   stripe_subscription_id: stripe_subscription.id,
@@ -2790,9 +2794,9 @@ defmodule YscWeb.UserSettingsLive do
              )}
 
           {:error, error} ->
-            require Logger
+            require Ysc.Logging
 
-            Logger.error("Failed to create subscription",
+            Ysc.Logging.error("Failed to create subscription",
               user_id: user.id,
               error: error
             )
@@ -2993,10 +2997,10 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_event("add-new-payment-method", _params, socket) do
-    require Logger
+    require Ysc.Logging
     user = socket.assigns.user
 
-    Logger.info("Creating setup intent for user",
+    Ysc.Logging.info("Creating setup intent for user",
       user_id: user.id,
       stripe_id: user.stripe_id
     )
@@ -3005,7 +3009,7 @@ defmodule YscWeb.UserSettingsLive do
     user = ensure_stripe_customer_exists(user)
 
     if user.stripe_id == nil do
-      Logger.error(
+      Ysc.Logging.error(
         "User still has no stripe_id after ensure_stripe_customer_exists",
         user_id: user.id
       )
@@ -3018,7 +3022,7 @@ defmodule YscWeb.UserSettingsLive do
        )
        |> assign(:show_new_payment_form, false)}
     else
-      Logger.info("User has stripe_id, creating setup intent",
+      Ysc.Logging.info("User has stripe_id, creating setup intent",
         user_id: user.id,
         stripe_id: user.stripe_id
       )
@@ -3029,7 +3033,7 @@ defmodule YscWeb.UserSettingsLive do
              }
            ) do
         {:ok, setup_intent} ->
-          Logger.info("Setup intent created successfully",
+          Ysc.Logging.info("Setup intent created successfully",
             setup_intent_id: setup_intent.id,
             has_client_secret: not is_nil(setup_intent.client_secret)
           )
@@ -3049,7 +3053,7 @@ defmodule YscWeb.UserSettingsLive do
               other -> inspect(other, pretty: true)
             end
 
-          Logger.error("Failed to create setup intent",
+          Ysc.Logging.error("Failed to create setup intent",
             user_id: user.id,
             stripe_id: user.stripe_id,
             error: error_message,
@@ -3356,7 +3360,7 @@ defmodule YscWeb.UserSettingsLive do
          selected_payment_method,
          payment_method_id
        ) do
-    require Logger
+    require Ysc.Logging
 
     socket =
       apply_optimistic_update(
@@ -3365,7 +3369,7 @@ defmodule YscWeb.UserSettingsLive do
         payment_method_id
       )
 
-    Logger.info("Setting payment method as default",
+    Ysc.Logging.info("Setting payment method as default",
       user_id: user.id,
       payment_method_id: selected_payment_method.id,
       provider_id: selected_payment_method.provider_id
@@ -3417,11 +3421,12 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp set_default_in_database(user, selected_payment_method) do
-    require Logger
+    require Ysc.Logging
 
     case Ysc.Payments.set_default_payment_method(user, selected_payment_method) do
       {:ok, _} ->
-        Logger.info("Successfully set payment method as default in database",
+        Ysc.Logging.info(
+          "Successfully set payment method as default in database",
           user_id: user.id,
           payment_method_id: selected_payment_method.id
         )
@@ -3429,7 +3434,7 @@ defmodule YscWeb.UserSettingsLive do
         {:ok, :success}
 
       {:error, reason} ->
-        Logger.error("Failed to set payment method as default in database",
+        Ysc.Logging.error("Failed to set payment method as default in database",
           user_id: user.id,
           payment_method_id: selected_payment_method.id,
           reason: inspect(reason)
@@ -3440,9 +3445,9 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp update_stripe_default(user, selected_payment_method) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Updating Stripe customer default payment method",
+    Ysc.Logging.info("Updating Stripe customer default payment method",
       user_id: user.id,
       stripe_customer_id: user.stripe_id,
       default_payment_method_id: selected_payment_method.provider_id
@@ -3454,7 +3459,7 @@ defmodule YscWeb.UserSettingsLive do
            }
          }) do
       {:ok, _stripe_customer} ->
-        Logger.info(
+        Ysc.Logging.info(
           "Successfully updated Stripe customer default payment method",
           user_id: user.id,
           stripe_customer_id: user.stripe_id
@@ -3870,9 +3875,9 @@ defmodule YscWeb.UserSettingsLive do
          |> YscWeb.Workers.KeilaSubscriber.new()
          |> Oban.insert() do
       {:ok, _job} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.info("Keila subscription sync job enqueued",
+        Ysc.Logging.info("Keila subscription sync job enqueued",
           user_id: user.id,
           email: user.email,
           action: action
@@ -3881,9 +3886,9 @@ defmodule YscWeb.UserSettingsLive do
         :ok
 
       {:error, changeset} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.warning("Failed to enqueue Keila subscription sync job",
+        Ysc.Logging.warning("Failed to enqueue Keila subscription sync job",
           user_id: user.id,
           email: user.email,
           action: action,
@@ -4077,9 +4082,9 @@ defmodule YscWeb.UserSettingsLive do
           end
 
         {:error, error} ->
-          require Logger
+          require Ysc.Logging
 
-          Logger.error("Failed to create Stripe customer",
+          Ysc.Logging.error("Failed to create Stripe customer",
             user_id: user.id,
             error: inspect(error)
           )
@@ -4110,9 +4115,9 @@ defmodule YscWeb.UserSettingsLive do
               end
 
             {:error, error} ->
-              require Logger
+              require Ysc.Logging
 
-              Logger.error("Failed to create Stripe customer",
+              Ysc.Logging.error("Failed to create Stripe customer",
                 user_id: user.id,
                 error: inspect(error)
               )
@@ -4730,7 +4735,7 @@ defmodule YscWeb.UserSettingsLive do
   # Helper function to handle retry invoice payment
   defp handle_retry_invoice_payment(socket, invoice_id)
        when is_binary(invoice_id) do
-    require Logger
+    require Ysc.Logging
     user = socket.assigns.user
 
     if user.state != :active do
@@ -4741,14 +4746,14 @@ defmodule YscWeb.UserSettingsLive do
          "You must have an approved account to retry invoice payments."
        )}
     else
-      Logger.info("Retrying invoice payment",
+      Ysc.Logging.info("Retrying invoice payment",
         user_id: user.id,
         invoice_id: invoice_id
       )
 
       case Subscriptions.retry_failed_invoice(user, invoice_id) do
         {:ok, _paid_invoice} ->
-          Logger.info("Successfully retried invoice payment",
+          Ysc.Logging.info("Successfully retried invoice payment",
             user_id: user.id,
             invoice_id: invoice_id
           )

@@ -5,7 +5,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
   Sends an email and SMS (if user is opted in) 3 days before check-in at 8:00 AM PST
   with door code, location, and check-in information.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
 
   alias Ysc.Repo
@@ -16,13 +16,13 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"booking_id" => booking_id}}) do
-    Logger.info("Processing booking check-in reminder",
+    Ysc.Logging.info("Processing booking check-in reminder",
       booking_id: booking_id
     )
 
     case Repo.get(Booking, booking_id) |> Repo.preload([:user, :rooms]) do
       nil ->
-        Logger.warning("Booking not found for check-in reminder",
+        Ysc.Logging.warning("Booking not found for check-in reminder",
           booking_id: booking_id
         )
 
@@ -34,7 +34,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
           send_checkin_reminder_email(booking)
           send_checkin_reminder_sms(booking)
         else
-          Logger.info("Booking is not active, skipping check-in reminder",
+          Ysc.Logging.info("Booking is not active, skipping check-in reminder",
             booking_id: booking_id,
             status: booking.status
           )
@@ -45,7 +45,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
   end
 
   defp send_checkin_reminder_email(booking) do
-    require Logger
+    require Ysc.Logging
 
     try do
       email_module = BookingCheckinReminder
@@ -56,7 +56,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
       # Generate idempotency key to prevent duplicate emails
       idempotency_key = "booking_checkin_reminder_#{booking.id}"
 
-      Logger.info("Sending booking check-in reminder",
+      Ysc.Logging.info("Sending booking check-in reminder",
         booking_id: booking.id,
         user_id: booking.user_id,
         checkin_date: booking.checkin_date,
@@ -73,53 +73,26 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
              booking.user_id
            ) do
         %Oban.Job{} ->
-          Logger.info("Booking check-in reminder scheduled successfully",
+          Ysc.Logging.info("Booking check-in reminder scheduled successfully",
             booking_id: booking.id
           )
 
           :ok
 
         {:error, reason} ->
-          Logger.error("Failed to schedule booking check-in reminder",
+          Ysc.Logging.error("Failed to schedule booking check-in reminder",
             booking_id: booking.id,
             error: inspect(reason)
-          )
-
-          # Report to Sentry
-          Sentry.capture_message("Failed to schedule booking check-in reminder",
-            level: :error,
-            extra: %{
-              booking_id: booking.id,
-              user_id: booking.user_id,
-              error: inspect(reason)
-            },
-            tags: %{
-              email_template: template_name,
-              reminder_type: "checkin_reminder"
-            }
           )
 
           {:error, reason}
       end
     rescue
       error ->
-        Logger.error("Failed to send booking check-in reminder",
+        Ysc.Logging.error("Failed to send booking check-in reminder",
           booking_id: booking.id,
           error: Exception.message(error),
           stacktrace: __STACKTRACE__
-        )
-
-        # Report to Sentry
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            booking_id: booking.id,
-            user_id: booking.user_id
-          },
-          tags: %{
-            email_template: "booking_checkin_reminder",
-            reminder_type: "checkin_reminder"
-          }
         )
 
         {:error, error}
@@ -127,7 +100,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
   end
 
   defp send_checkin_reminder_sms(booking) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Check if user has SMS notifications enabled and has a phone number
@@ -143,7 +116,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
         # Generate idempotency key to prevent duplicate SMS
         idempotency_key = "booking_checkin_reminder_sms_#{booking.id}"
 
-        Logger.info("Sending booking check-in reminder SMS",
+        Ysc.Logging.info("Sending booking check-in reminder SMS",
           booking_id: booking.id,
           user_id: booking.user_id,
           checkin_date: booking.checkin_date,
@@ -158,14 +131,16 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
                booking.user_id
              ) do
           {:ok, %Oban.Job{}} ->
-            Logger.info("Booking check-in reminder SMS scheduled successfully",
+            Ysc.Logging.info(
+              "Booking check-in reminder SMS scheduled successfully",
               booking_id: booking.id
             )
 
             :ok
 
           {:error, :notifications_disabled} ->
-            Logger.info("SMS not sent - user has disabled SMS notifications",
+            Ysc.Logging.info(
+              "SMS not sent - user has disabled SMS notifications",
               booking_id: booking.id,
               user_id: booking.user_id
             )
@@ -173,7 +148,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
             :ok
 
           {:error, :no_phone_number} ->
-            Logger.info("SMS not sent - user has no phone number",
+            Ysc.Logging.info("SMS not sent - user has no phone number",
               booking_id: booking.id,
               user_id: booking.user_id
             )
@@ -181,30 +156,16 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
             :ok
 
           {:error, reason} ->
-            Logger.error("Failed to schedule booking check-in reminder SMS",
+            Ysc.Logging.error(
+              "Failed to schedule booking check-in reminder SMS",
               booking_id: booking.id,
               error: inspect(reason)
-            )
-
-            # Report to Sentry
-            Sentry.capture_message(
-              "Failed to schedule booking check-in reminder SMS",
-              level: :error,
-              extra: %{
-                booking_id: booking.id,
-                user_id: booking.user_id,
-                error: inspect(reason)
-              },
-              tags: %{
-                sms_template: template_name,
-                reminder_type: "checkin_reminder"
-              }
             )
 
             :ok
         end
       else
-        Logger.info(
+        Ysc.Logging.info(
           "Skipping SMS check-in reminder - user not opted in or no phone number",
           booking_id: booking.id,
           user_id: booking.user_id,
@@ -220,23 +181,10 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
       end
     rescue
       error ->
-        Logger.error("Failed to send booking check-in reminder SMS",
+        Ysc.Logging.error("Failed to send booking check-in reminder SMS",
           booking_id: booking.id,
           error: Exception.message(error),
           stacktrace: __STACKTRACE__
-        )
-
-        # Report to Sentry
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            booking_id: booking.id,
-            user_id: booking.user_id
-          },
-          tags: %{
-            sms_template: "booking_checkin_reminder",
-            reminder_type: "checkin_reminder"
-          }
         )
 
         :ok
@@ -250,7 +198,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
   If check-in is less than 3 days away, the email is sent immediately.
   """
   def schedule_reminder(booking_id, checkin_date) do
-    require Logger
+    require Ysc.Logging
 
     # Calculate 3 days before check-in date
     reminder_date = Date.add(checkin_date, -3)
@@ -275,7 +223,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
       |> new(scheduled_at: reminder_datetime_utc)
       |> Oban.insert()
 
-      Logger.info("Scheduled check-in reminder email",
+      Ysc.Logging.info("Scheduled check-in reminder email",
         booking_id: booking_id,
         checkin_date: checkin_date,
         reminder_date: reminder_date,
@@ -284,7 +232,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
       )
     else
       # If check-in is less than 3 days away, send immediately
-      Logger.info(
+      Ysc.Logging.info(
         "Check-in is less than 3 days away, sending reminder immediately",
         booking_id: booking_id,
         checkin_date: checkin_date
@@ -293,7 +241,8 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
       # Load booking and send email immediately
       case Repo.get(Booking, booking_id) |> Repo.preload([:user, :rooms]) do
         nil ->
-          Logger.warning("Booking not found for immediate check-in reminder",
+          Ysc.Logging.warning(
+            "Booking not found for immediate check-in reminder",
             booking_id: booking_id
           )
 
@@ -305,7 +254,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
             send_checkin_reminder_email(booking)
             send_checkin_reminder_sms(booking)
           else
-            Logger.info(
+            Ysc.Logging.info(
               "Booking is not active, skipping immediate check-in reminder",
               booking_id: booking_id,
               status: booking.status

@@ -53,7 +53,7 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
   """
 
   use Mix.Task
-  require Logger
+  require Ysc.Logging
 
   import Ecto.Query
 

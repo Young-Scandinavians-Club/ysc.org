@@ -7,7 +7,7 @@ defmodule Ysc.Bookings.SeasonCache do
   Cache is invalidated via PubSub when seasons are created/updated/deleted.
   """
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Bookings.Season
 
   @cache_name :ysc_cache
@@ -77,7 +77,7 @@ defmodule Ysc.Bookings.SeasonCache do
       {:season_cache_invalidated, new_version}
     )
 
-    Logger.debug("Season cache invalidated", version: new_version)
+    Ysc.Logging.debug("Season cache invalidated", version: new_version)
     :ok
   end
 

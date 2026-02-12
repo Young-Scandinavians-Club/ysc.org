@@ -166,9 +166,9 @@ defmodule Ysc.Payments do
   This will unset any existing default payment method and set the new one.
   """
   def set_default_payment_method(user, payment_method) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Starting set_default_payment_method transaction",
+    Ysc.Logging.info("Starting set_default_payment_method transaction",
       user_id: user.id,
       payment_method_id: payment_method.id,
       current_is_default: payment_method.is_default
@@ -182,7 +182,7 @@ defmodule Ysc.Payments do
              )
              |> Repo.update_all(set: [is_default: false])
 
-           Logger.info("Unset existing default payment methods",
+           Ysc.Logging.info("Unset existing default payment methods",
              user_id: user.id,
              unset_count: elem(unset_result, 0)
            )
@@ -193,7 +193,7 @@ defmodule Ysc.Payments do
              |> PaymentMethod.changeset(%{is_default: true})
              |> Repo.update!()
 
-           Logger.info("Set new default payment method",
+           Ysc.Logging.info("Set new default payment method",
              user_id: user.id,
              payment_method_id: updated_payment_method.id,
              is_default: updated_payment_method.is_default
@@ -202,7 +202,7 @@ defmodule Ysc.Payments do
            updated_payment_method
          end) do
       {:ok, updated_payment_method} ->
-        Logger.info(
+        Ysc.Logging.info(
           "Successfully completed set_default_payment_method transaction",
           user_id: user.id,
           payment_method_id: updated_payment_method.id
@@ -211,7 +211,7 @@ defmodule Ysc.Payments do
         {:ok, user}
 
       {:error, reason} ->
-        Logger.error("Failed set_default_payment_method transaction",
+        Ysc.Logging.error("Failed set_default_payment_method transaction",
           user_id: user.id,
           payment_method_id: payment_method.id,
           error: reason
@@ -226,7 +226,7 @@ defmodule Ysc.Payments do
   This can be called to ensure the local database is in sync with Stripe.
   """
   def sync_payment_methods_with_stripe(user) do
-    require Logger
+    require Ysc.Logging
 
     # Get all payment methods from Stripe
     stripe_payment_methods =
@@ -235,7 +235,7 @@ defmodule Ysc.Payments do
           payment_methods
 
         {:error, error} ->
-          Logger.error("Failed to fetch payment methods from Stripe",
+          Ysc.Logging.error("Failed to fetch payment methods from Stripe",
             user_id: user.id,
             error: error.message
           )
@@ -270,7 +270,7 @@ defmodule Ysc.Payments do
     if stripe_default_pm do
       case get_payment_method_by_provider(:stripe, stripe_default_pm) do
         nil ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "Stripe default payment method not found in local database",
             user_id: user.id,
             stripe_payment_method_id: stripe_default_pm
@@ -281,7 +281,7 @@ defmodule Ysc.Payments do
       end
     end
 
-    Logger.info("Synced payment methods with Stripe",
+    Ysc.Logging.info("Synced payment methods with Stripe",
       user_id: user.id,
       stripe_payment_methods_count: length(stripe_payment_methods),
       local_payment_methods_count: length(local_payment_methods)

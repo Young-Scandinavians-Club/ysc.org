@@ -7,7 +7,7 @@ defmodule YscWeb.Workers.ImageReprocessor do
   or images that were uploaded but never processed.
   """
 
-  require Logger
+  require Ysc.Logging
 
   use Oban.Worker, queue: :media, max_attempts: 1
 
@@ -15,17 +15,19 @@ defmodule YscWeb.Workers.ImageReprocessor do
 
   @impl Oban.Worker
   def perform(%Oban.Job{} = job) do
-    Logger.info("Starting image reprocessor job", job_id: job.id)
+    Ysc.Logging.info("Starting image reprocessor job", job_id: job.id)
 
     # Find all images that need processing
     images = Media.list_unprocessed_images()
 
-    Logger.info("Found #{length(images)} images to reprocess", job_id: job.id)
+    Ysc.Logging.info("Found #{length(images)} images to reprocess",
+      job_id: job.id
+    )
 
     # Process each image by enqueueing individual ImageProcessor jobs
     results =
       Enum.map(images, fn image ->
-        Logger.info("Enqueueing reprocessing for image: #{image.id}",
+        Ysc.Logging.info("Enqueueing reprocessing for image: #{image.id}",
           job_id: job.id
         )
 
@@ -34,7 +36,7 @@ defmodule YscWeb.Workers.ImageReprocessor do
             {:ok, image.id}
 
           {:error, reason} ->
-            Logger.error(
+            Ysc.Logging.error(
               "Failed to enqueue image #{image.id}: #{inspect(reason)}",
               job_id: job.id
             )
@@ -46,7 +48,7 @@ defmodule YscWeb.Workers.ImageReprocessor do
     successful = Enum.count(results, fn r -> match?({:ok, _}, r) end)
     failed = Enum.count(results, fn r -> match?({:error, _, _}, r) end)
 
-    Logger.info(
+    Ysc.Logging.info(
       "Image reprocessor job completed. Successful: #{successful}, Failed: #{failed}",
       job_id: job.id
     )

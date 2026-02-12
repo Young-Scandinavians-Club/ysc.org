@@ -515,7 +515,7 @@ defmodule Ysc.Events do
   end
 
   defp schedule_event_notifications(event, published_at) do
-    require Logger
+    require Ysc.Logging
 
     try do
       YscWeb.Workers.EventNotificationWorker.schedule_notifications(
@@ -523,13 +523,13 @@ defmodule Ysc.Events do
         published_at
       )
 
-      Logger.info("Scheduled event notification emails",
+      Ysc.Logging.info("Scheduled event notification emails",
         event_id: event.id,
         published_at: published_at
       )
     rescue
       error ->
-        Logger.error("Failed to schedule event notification emails",
+        Ysc.Logging.error("Failed to schedule event notification emails",
           event_id: event.id,
           error: Exception.message(error)
         )

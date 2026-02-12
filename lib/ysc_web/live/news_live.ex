@@ -346,8 +346,8 @@ defmodule YscWeb.NewsLive do
   end
 
   def handle_async(:load_news_data, {:exit, reason}, socket) do
-    require Logger
-    Logger.error("Failed to load news data async: #{inspect(reason)}")
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load news data async: #{inspect(reason)}")
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 

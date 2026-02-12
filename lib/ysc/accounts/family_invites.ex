@@ -167,9 +167,9 @@ defmodule Ysc.Accounts.FamilyInvites do
                   e ->
                     # In test mode, silently ignore errors to keep test output clean
                     unless is_test do
-                      require Logger
+                      require Ysc.Logging
 
-                      Logger.error(
+                      Ysc.Logging.error(
                         "Failed to create Stripe customer in background task",
                         user_id: updated_user.id,
                         error: Exception.format(:error, e, __STACKTRACE__)
@@ -179,9 +179,9 @@ defmodule Ysc.Accounts.FamilyInvites do
                   kind, reason ->
                     # Catch all other errors (throws, exits, etc.)
                     unless is_test do
-                      require Logger
+                      require Ysc.Logging
 
-                      Logger.error(
+                      Ysc.Logging.error(
                         "Failed to create Stripe customer in background task",
                         user_id: updated_user.id,
                         kind: kind,
@@ -492,9 +492,9 @@ defmodule Ysc.Accounts.FamilyInvites do
         {:ok, address}
 
       {:error, changeset} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.warning("Failed to copy billing address for sub-account",
+        Ysc.Logging.warning("Failed to copy billing address for sub-account",
           user_id: sub_account.id,
           primary_user_id: primary_user_id,
           errors: inspect(changeset.errors)

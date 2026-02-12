@@ -4,7 +4,7 @@ defmodule Ysc.Keila.Client do
   """
   @behaviour Ysc.Keila.Behaviour
 
-  require Logger
+  require Ysc.Logging
 
   @impl true
   def subscribe_email(email, opts) do

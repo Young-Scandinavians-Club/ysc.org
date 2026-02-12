@@ -1813,9 +1813,9 @@ defmodule YscWeb.AdminUserDetailsLive do
 
       {:error, changeset} ->
         # Log the actual error for debugging
-        require Logger
+        require Ysc.Logging
 
-        Logger.error(
+        Ysc.Logging.error(
           "Failed to update user with address: #{inspect(changeset.errors)}"
         )
 
@@ -1908,9 +1908,9 @@ defmodule YscWeb.AdminUserDetailsLive do
 
                 {:error, error} ->
                   # Log error but don't fail the lifetime membership update
-                  require Logger
+                  require Ysc.Logging
 
-                  Logger.warning(
+                  Ysc.Logging.warning(
                     "Failed to cancel subscription when awarding lifetime membership",
                     user_id: updated_user.id,
                     subscription_id: active_subscription.id,

@@ -5,14 +5,16 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
   This worker processes Stripe payouts asynchronously and creates Deposits in QuickBooks.
   """
 
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Ysc.Quickbooks.Sync
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"payout_id" => payout_id}}) do
-    Logger.info("Starting QuickBooks sync for payout", payout_id: payout_id)
+    Ysc.Logging.info("Starting QuickBooks sync for payout",
+      payout_id: payout_id
+    )
 
     alias Ysc.Repo
     alias Ysc.Ledgers.Payout
@@ -34,7 +36,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
            |> Repo.one()
          end) do
       {:ok, nil} ->
-        Logger.warning("Payout not found for QuickBooks sync",
+        Ysc.Logging.warning("Payout not found for QuickBooks sync",
           payout_id: payout_id
         )
 
@@ -44,7 +46,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
         # Check if already synced (double-check after acquiring lock)
         if payout.quickbooks_sync_status == "synced" &&
              payout.quickbooks_deposit_id do
-          Logger.info(
+          Ysc.Logging.info(
             "Payout already synced to QuickBooks (checked after lock)",
             payout_id: payout_id,
             deposit_id: payout.quickbooks_deposit_id
@@ -57,7 +59,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
 
           case Sync.sync_payout(payout) do
             {:ok, deposit} ->
-              Logger.info("Successfully synced payout to QuickBooks",
+              Ysc.Logging.info("Successfully synced payout to QuickBooks",
                 payout_id: payout_id,
                 deposit_id: Map.get(deposit, "Id")
               )
@@ -65,22 +67,9 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
               :ok
 
             {:error, reason} ->
-              Logger.warning("Failed to sync payout to QuickBooks",
+              Ysc.Logging.warning("Failed to sync payout to QuickBooks",
                 payout_id: payout_id,
                 error: inspect(reason)
-              )
-
-              # Report to Sentry
-              Sentry.capture_message("QuickBooks payout sync worker failed",
-                level: :error,
-                extra: %{
-                  payout_id: payout_id,
-                  error: inspect(reason)
-                },
-                tags: %{
-                  quickbooks_worker: "sync_payout",
-                  error_type: "sync_failed"
-                }
               )
 
               # Oban will retry based on max_attempts
@@ -90,14 +79,14 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
 
       {:error, %Postgrex.Error{postgres: %{code: :lock_not_available}}} ->
         # Another worker is processing this payout
-        Logger.info("Payout is locked by another worker, skipping",
+        Ysc.Logging.info("Payout is locked by another worker, skipping",
           payout_id: payout_id
         )
 
         :ok
 
       {:error, reason} ->
-        Logger.warning("Failed to lock payout for QuickBooks sync",
+        Ysc.Logging.warning("Failed to lock payout for QuickBooks sync",
           payout_id: payout_id,
           error: inspect(reason)
         )
@@ -107,17 +96,6 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
                  %Postgrex.Error{postgres: %{code: :lock_not_available}},
                  reason
                ) do
-          Sentry.capture_message("Failed to lock payout for QuickBooks sync",
-            level: :error,
-            extra: %{
-              payout_id: payout_id,
-              error: inspect(reason)
-            },
-            tags: %{
-              quickbooks_worker: "sync_payout",
-              error_type: "lock_failed"
-            }
-          )
         end
 
         {:error, reason}

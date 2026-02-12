@@ -34,7 +34,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
   alias Ysc.ExpenseReports.ExpenseReport
   alias YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker
 
-  require Logger
+  require Ysc.Logging
 
   setup do
     user = user_fixture()

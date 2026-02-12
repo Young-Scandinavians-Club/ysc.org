@@ -13,17 +13,17 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
 
   use Oban.Worker, queue: :maintenance, max_attempts: 3
 
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Ledgers
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
-    Logger.info("Starting daily ledger balance check")
+    Ysc.Logging.info("Starting daily ledger balance check")
 
     case Ledgers.get_ledger_imbalance_details() do
       {:ok, :balanced} ->
-        Logger.info("Ledger balance check completed: BALANCED ✓")
+        Ysc.Logging.info("Ledger balance check completed: BALANCED ✓")
         {:ok, :balanced}
 
       {:error, {:imbalanced, difference, imbalanced_accounts}} ->
@@ -43,22 +43,11 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
   # Handle ledger imbalance by sending alerts and logging details
   defp handle_imbalance(difference, imbalanced_accounts) do
     # Critical condition: report to Sentry instead of emitting error-level logs.
-    Logger.warning("CRITICAL: Ledger imbalance detected during scheduled check",
+    Ysc.Logging.warning(
+      "CRITICAL: Ledger imbalance detected during scheduled check",
       difference: Money.to_string!(difference),
       account_count: length(imbalanced_accounts),
       timestamp: DateTime.utc_now()
-    )
-
-    Sentry.capture_message("Ledger imbalance detected during scheduled check",
-      level: :error,
-      extra: %{
-        difference: Money.to_string!(difference),
-        account_count: length(imbalanced_accounts),
-        timestamp: DateTime.utc_now()
-      },
-      tags: %{
-        ledger: "scheduled_balance_check"
-      }
     )
 
     # Group accounts by type for the alert
@@ -93,10 +82,10 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
 
   # Log details about each imbalanced account
   defp log_imbalanced_accounts(imbalanced_accounts) do
-    Logger.warning("Imbalanced accounts breakdown:")
+    Ysc.Logging.warning("Imbalanced accounts breakdown:")
 
     Enum.each(imbalanced_accounts, fn {account, balance} ->
-      Logger.warning(
+      Ysc.Logging.warning(
         "  - #{account.name} (#{account.account_type}): #{Money.to_string!(balance)}"
       )
     end)
@@ -163,7 +152,7 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
     ```
     """
 
-    Logger.error(alert_message)
+    Ysc.Logging.error(alert_message)
 
     # NOTE: Integrate with your alerting system
     # Examples:

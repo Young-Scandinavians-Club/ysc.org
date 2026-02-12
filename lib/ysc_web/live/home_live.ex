@@ -209,8 +209,8 @@ defmodule YscWeb.HomeLive do
   end
 
   def handle_async(:load_home_data, {:exit, reason}, socket) do
-    require Logger
-    Logger.error("Failed to load home data async: #{inspect(reason)}")
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load home data async: #{inspect(reason)}")
     # Mark as loaded to avoid infinite loading state
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
@@ -233,7 +233,7 @@ defmodule YscWeb.HomeLive do
 
         <h1 class="text-6xl md:text-8xl font-black text-white drop-shadow-2xl">
           <span class="block font-serif italic text-2xl md:text-4xl mb-4 text-white/80 font-light tracking-tight">
-            Celebrating 75 Years of
+            Celebrating <%= div(Date.utc_today().year - 1950, 5) * 5 %> Years of
           </span>
           Young Scandinavians Club
         </h1>

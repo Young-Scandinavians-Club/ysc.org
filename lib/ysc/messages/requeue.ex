@@ -6,7 +6,7 @@ defmodule Ysc.Messages.Requeue do
   Mix tasks (development) and Release module functions (production).
   """
 
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Repo
   alias Oban.Job

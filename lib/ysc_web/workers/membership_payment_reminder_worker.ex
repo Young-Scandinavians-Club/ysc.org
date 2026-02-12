@@ -4,7 +4,7 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
 
   Checks if a user has paid for membership and sends a reminder email if they haven't.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
 
   alias Ysc.Accounts
@@ -19,14 +19,14 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
   def perform(%Oban.Job{
         args: %{"user_id" => user_id, "reminder_type" => reminder_type}
       }) do
-    Logger.info("Processing membership payment reminder",
+    Ysc.Logging.info("Processing membership payment reminder",
       user_id: user_id,
       reminder_type: reminder_type
     )
 
     case Accounts.get_user(user_id) do
       nil ->
-        Logger.warning("User not found for membership payment reminder",
+        Ysc.Logging.warning("User not found for membership payment reminder",
           user_id: user_id,
           reminder_type: reminder_type
         )
@@ -36,7 +36,8 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
       user ->
         # Check if user has active membership
         if Accounts.has_active_membership?(user) do
-          Logger.info("User already has active membership, skipping reminder",
+          Ysc.Logging.info(
+            "User already has active membership, skipping reminder",
             user_id: user_id,
             reminder_type: reminder_type
           )
@@ -50,7 +51,7 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
   end
 
   defp send_reminder_email(user, "7day") do
-    require Logger
+    require Ysc.Logging
 
     email_module = MembershipPaymentReminder7Day
     email_data = email_module.prepare_email_data(user)
@@ -60,7 +61,7 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
     # Generate idempotency key to prevent duplicate emails
     idempotency_key = "membership_payment_reminder_7day_#{user.id}"
 
-    Logger.info("Sending 7-day membership payment reminder",
+    Ysc.Logging.info("Sending 7-day membership payment reminder",
       user_id: user.id,
       email: user.email
     )
@@ -75,31 +76,18 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
            user.id
          ) do
       %Oban.Job{} ->
-        Logger.info("7-day membership payment reminder scheduled successfully",
+        Ysc.Logging.info(
+          "7-day membership payment reminder scheduled successfully",
           user_id: user.id
         )
 
         :ok
 
       {:error, reason} ->
-        Logger.error("Failed to schedule 7-day membership payment reminder",
+        Ysc.Logging.error(
+          "Failed to schedule 7-day membership payment reminder",
           user_id: user.id,
           error: inspect(reason)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message(
-          "Failed to schedule 7-day membership payment reminder",
-          level: :error,
-          extra: %{
-            user_id: user.id,
-            email: user.email,
-            error: inspect(reason)
-          },
-          tags: %{
-            email_template: template_name,
-            reminder_type: "7day"
-          }
         )
 
         {:error, reason}
@@ -107,7 +95,7 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
   end
 
   defp send_reminder_email(user, "30day") do
-    require Logger
+    require Ysc.Logging
 
     email_module = MembershipPaymentReminder30Day
     email_data = email_module.prepare_email_data(user)
@@ -117,7 +105,7 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
     # Generate idempotency key to prevent duplicate emails
     idempotency_key = "membership_payment_reminder_30day_#{user.id}"
 
-    Logger.info("Sending 30-day membership payment reminder",
+    Ysc.Logging.info("Sending 30-day membership payment reminder",
       user_id: user.id,
       email: user.email
     )
@@ -132,31 +120,18 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
            user.id
          ) do
       %Oban.Job{} ->
-        Logger.info("30-day membership payment reminder scheduled successfully",
+        Ysc.Logging.info(
+          "30-day membership payment reminder scheduled successfully",
           user_id: user.id
         )
 
         :ok
 
       {:error, reason} ->
-        Logger.error("Failed to schedule 30-day membership payment reminder",
+        Ysc.Logging.error(
+          "Failed to schedule 30-day membership payment reminder",
           user_id: user.id,
           error: inspect(reason)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message(
-          "Failed to schedule 30-day membership payment reminder",
-          level: :error,
-          extra: %{
-            user_id: user.id,
-            email: user.email,
-            error: inspect(reason)
-          },
-          tags: %{
-            email_template: template_name,
-            reminder_type: "30day"
-          }
         )
 
         {:error, reason}
@@ -164,9 +139,9 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
   end
 
   defp send_reminder_email(_user, reminder_type) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.warning("Unknown reminder type",
+    Ysc.Logging.warning("Unknown reminder type",
       reminder_type: reminder_type
     )
 

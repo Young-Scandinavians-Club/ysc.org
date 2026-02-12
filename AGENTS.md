@@ -60,6 +60,29 @@ This is a web application written using the Phoenix web framework.
 - Read the docs and options before using tasks (by using `mix help task_name`)
 - To debug test failures, run tests in a specific file with `mix test test/my_test.exs` or run all previously failed tests with `mix test --failed`
 - `mix deps.clean --all` is **almost never needed**. **Avoid** using it unless you have good reason
+
+## Logging guidelines
+
+- **Always** use the custom `Ysc.Logging` module instead of Elixir's standard `Logger` module
+- **Never** use `Logger.error`, `Logger.warning`, `Logger.info`, or `Logger.debug` directly. Instead use `Ysc.Logging.error`, `Ysc.Logging.warning`, `Ysc.Logging.info`, and `Ysc.Logging.debug`
+- The `Ysc.Logging` module provides automatic Sentry error reporting for error-level logs and is silent during tests
+- You **must** add `require Ysc.Logging` at the module level before using any `Ysc.Logging` functions
+- For error logging with Sentry integration, use `Ysc.Logging.error/2` with options like `:error`, `:stacktrace`, `:extra`, and `:tags`
+
+  Example:
+
+      defmodule MyModule do
+        require Ysc.Logging
+
+        def my_function do
+          Ysc.Logging.error("Something went wrong", 
+            error: exception,
+            stacktrace: __STACKTRACE__,
+            extra: %{user_id: user.id}
+          )
+        end
+      end
+
   <!-- phoenix:elixir-end -->
   <!-- phoenix:phoenix-start -->
 

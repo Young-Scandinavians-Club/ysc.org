@@ -122,8 +122,14 @@ defmodule Ysc.Stripe.WebhookReconciliationWorkerTest do
         {:error, :api_connection_error}
       end)
 
-      assert {:error, _reason} =
-               WebhookReconciliationWorker.perform(build_job())
+      try do
+        Logger.put_module_level(WebhookReconciliationWorker, :none)
+
+        assert {:error, _reason} =
+                 WebhookReconciliationWorker.perform(build_job())
+      after
+        Logger.put_module_level(WebhookReconciliationWorker, :error)
+      end
     end
   end
 

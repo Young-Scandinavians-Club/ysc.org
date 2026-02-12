@@ -4,7 +4,7 @@ defmodule Ysc.Messages do
 
   Handles creation and tracking of messages with idempotency guarantees.
   """
-  require Logger
+  require Ysc.Logging
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
@@ -33,7 +33,7 @@ defmodule Ysc.Messages do
   end
 
   def run_send_message_idempotent(email, attrs) do
-    Logger.debug("run_send_message_idempotent called",
+    Ysc.Logging.debug("run_send_message_idempotent called",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       message_template: attrs[:message_template]
@@ -64,14 +64,14 @@ defmodule Ysc.Messages do
   end
 
   defp send_email_via_mailer(email, attrs, repo) do
-    Logger.debug("Sending email via Mailer.deliver",
+    Ysc.Logging.debug("Sending email via Mailer.deliver",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key]
     )
 
     case Mailer.deliver(email) do
       {:ok, _metadata} ->
-        Logger.debug("Mailer.deliver succeeded",
+        Ysc.Logging.debug("Mailer.deliver succeeded",
           recipient: email.to,
           idempotency_key: attrs[:idempotency_key]
         )
@@ -84,14 +84,10 @@ defmodule Ysc.Messages do
   end
 
   defp handle_mailer_deliver_error(error, email, attrs, repo) do
-    Logger.error("Mailer.deliver failed",
+    Ysc.Logging.error("Mailer.deliver failed",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
-      error: inspect(error)
-    )
-
-    Sentry.capture_message("Mailer.deliver failed",
-      level: :error,
+      error: inspect(error),
       extra:
         build_email_sentry_extra(email, attrs, %{
           error: inspect(error, limit: :infinity)
@@ -120,7 +116,7 @@ defmodule Ysc.Messages do
   end
 
   defp handle_successful_email(email, attrs) do
-    Logger.debug("Email transaction succeeded",
+    Ysc.Logging.debug("Email transaction succeeded",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key]
     )
@@ -130,7 +126,8 @@ defmodule Ysc.Messages do
   end
 
   defp handle_email_idempotency_duplicate(email, attrs, changeset) do
-    Logger.info("Duplicate message detected (idempotency), treating as success",
+    Ysc.Logging.info(
+      "Duplicate message detected (idempotency), treating as success",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       errors: inspect(changeset.errors)
@@ -141,15 +138,11 @@ defmodule Ysc.Messages do
   end
 
   defp handle_email_transaction_error(email, attrs, operation, reason) do
-    Logger.error("Email transaction failed",
+    Ysc.Logging.error("Email transaction failed",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       operation: operation,
-      reason: inspect(reason)
-    )
-
-    Sentry.capture_message("Email transaction failed",
-      level: :error,
+      reason: inspect(reason),
       extra:
         build_email_sentry_extra(email, attrs, %{
           operation: to_string(operation),
@@ -170,14 +163,10 @@ defmodule Ysc.Messages do
   end
 
   defp handle_unexpected_email_error(email, attrs, error) do
-    Logger.error("Email transaction failed with unexpected error",
+    Ysc.Logging.error("Email transaction failed with unexpected error",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
-      error: inspect(error)
-    )
-
-    Sentry.capture_message("Email transaction failed with unexpected error",
-      level: :error,
+      error: inspect(error),
       extra:
         build_email_sentry_extra(email, attrs, %{
           error: inspect(error, limit: :infinity)
@@ -226,7 +215,7 @@ defmodule Ysc.Messages do
          attrs,
          constraint_string
        ) do
-    Logger.info(
+    Ysc.Logging.info(
       "Duplicate message detected (idempotency constraint), treating as success",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
@@ -243,24 +232,12 @@ defmodule Ysc.Messages do
          attrs,
          constraint_string
        ) do
-    Logger.error(
+    Ysc.Logging.error(
       "Email transaction raised unique constraint error (not idempotency)",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       constraint: constraint_string,
       error: inspect(error)
-    )
-
-    Sentry.capture_exception(error,
-      extra:
-        build_email_sentry_extra(email, attrs, %{
-          constraint: constraint_string,
-          constraint_type: error.type
-        }),
-      tags:
-        build_email_sentry_tags(attrs, "unique_constraint_error", %{
-          constraint: constraint_string
-        })
     )
 
     emit_email_send_failed_telemetry(email, attrs, %{
@@ -272,24 +249,12 @@ defmodule Ysc.Messages do
   end
 
   defp handle_email_non_unique_constraint_error(error, email, attrs) do
-    Logger.error("Email transaction raised constraint error (not unique)",
+    Ysc.Logging.error("Email transaction raised constraint error (not unique)",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       constraint: error.constraint,
       type: error.type,
       error: inspect(error)
-    )
-
-    Sentry.capture_exception(error,
-      extra:
-        build_email_sentry_extra(email, attrs, %{
-          constraint: to_string(error.constraint),
-          constraint_type: error.type
-        }),
-      tags:
-        build_email_sentry_tags(attrs, "constraint_error", %{
-          constraint: to_string(error.constraint)
-        })
     )
 
     emit_email_send_failed_telemetry(email, attrs, %{
@@ -301,21 +266,11 @@ defmodule Ysc.Messages do
   end
 
   defp handle_email_transaction_exception(error, email, attrs, stacktrace) do
-    Logger.error("Email transaction raised exception",
+    Ysc.Logging.error("Email transaction raised exception",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       error: inspect(error),
       stacktrace: Exception.format_stacktrace(stacktrace)
-    )
-
-    Sentry.capture_exception(error,
-      stacktrace: stacktrace,
-      extra:
-        build_email_sentry_extra(email, attrs, %{
-          error_type: inspect(error.__struct__),
-          error_message: Exception.message(error)
-        }),
-      tags: build_email_sentry_tags(attrs, "email_transaction_exception")
     )
 
     emit_email_send_failed_telemetry(email, attrs, %{error: inspect(error)})
@@ -438,7 +393,7 @@ defmodule Ysc.Messages do
   @spec run_send_sms_idempotent(String.t(), String.t(), keyword()) ::
           {:ok, map()} | {:error, String.t()}
   def run_send_sms_idempotent(phone_number, body, attrs) do
-    Logger.debug("run_send_sms_idempotent called",
+    Ysc.Logging.debug("run_send_sms_idempotent called",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       message_template: attrs[:message_template]
@@ -461,14 +416,10 @@ defmodule Ysc.Messages do
   end
 
   defp handle_rate_limit_exceeded(phone_number, attrs, reason) do
-    Logger.warning("SMS rate limit check failed",
+    Ysc.Logging.warning("SMS rate limit check failed",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
-      reason: reason
-    )
-
-    Sentry.capture_message("SMS rate limit exceeded",
-      level: :warning,
+      reason: reason,
       extra: build_sentry_extra(phone_number, attrs, %{reason: reason}),
       tags: build_sentry_tags(attrs, "sms_rate_limit_exceeded")
     )
@@ -503,25 +454,14 @@ defmodule Ysc.Messages do
          error,
          phone_number,
          attrs,
-         body,
+         _body,
          stacktrace
        ) do
-    Logger.error("SMS transaction raised exception",
+    Ysc.Logging.error("SMS transaction raised exception",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       error: inspect(error),
       stacktrace: Exception.format_stacktrace(stacktrace)
-    )
-
-    Sentry.capture_exception(error,
-      stacktrace: stacktrace,
-      extra:
-        build_sentry_extra(phone_number, attrs, %{
-          message_body: body,
-          error_type: inspect(error.__struct__),
-          error_message: Exception.message(error)
-        }),
-      tags: build_sentry_tags(attrs, "sms_transaction_exception")
     )
 
     emit_send_failed_telemetry(phone_number, attrs, %{error: inspect(error)})
@@ -550,7 +490,7 @@ defmodule Ysc.Messages do
   end
 
   defp send_sms_via_client(phone_number, body, attrs) do
-    Logger.debug("Sending SMS via FlowRoute Client",
+    Ysc.Logging.debug("Sending SMS via FlowRoute Client",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key]
     )
@@ -559,7 +499,7 @@ defmodule Ysc.Messages do
 
     case Client.send_sms(sms_opts) do
       {:ok, %{id: message_id}} = result ->
-        Logger.debug("FlowRoute Client.send_sms succeeded",
+        Ysc.Logging.debug("FlowRoute Client.send_sms succeeded",
           recipient: phone_number,
           idempotency_key: attrs[:idempotency_key],
           message_id: message_id
@@ -583,14 +523,10 @@ defmodule Ysc.Messages do
   end
 
   defp handle_send_sms_error(error, phone_number, attrs, body) do
-    Logger.error("FlowRoute Client.send_sms failed",
+    Ysc.Logging.error("FlowRoute Client.send_sms failed",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
-      error: inspect(error)
-    )
-
-    Sentry.capture_message("FlowRoute Client.send_sms failed",
-      level: :error,
+      error: inspect(error),
       extra:
         build_sentry_extra(phone_number, attrs, %{
           message_body: body,
@@ -620,7 +556,7 @@ defmodule Ysc.Messages do
   end
 
   defp handle_successful_sms(phone_number, attrs, message_id) do
-    Logger.debug("SMS transaction succeeded",
+    Ysc.Logging.debug("SMS transaction succeeded",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       message_id: message_id
@@ -638,7 +574,8 @@ defmodule Ysc.Messages do
   end
 
   defp handle_idempotency_duplicate(phone_number, attrs, changeset) do
-    Logger.info("Duplicate SMS detected (idempotency), treating as success",
+    Ysc.Logging.info(
+      "Duplicate SMS detected (idempotency), treating as success",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       errors: inspect(changeset.errors)
@@ -654,15 +591,11 @@ defmodule Ysc.Messages do
   end
 
   defp handle_transaction_error(phone_number, attrs, operation, reason) do
-    Logger.error("SMS transaction failed",
+    Ysc.Logging.error("SMS transaction failed",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       operation: operation,
-      reason: inspect(reason)
-    )
-
-    Sentry.capture_message("SMS transaction failed",
-      level: :error,
+      reason: inspect(reason),
       extra:
         build_sentry_extra(phone_number, attrs, %{
           operation: to_string(operation),
@@ -683,14 +616,10 @@ defmodule Ysc.Messages do
   end
 
   defp handle_unexpected_transaction_error(phone_number, attrs, error) do
-    Logger.error("SMS transaction failed with unexpected error",
+    Ysc.Logging.error("SMS transaction failed with unexpected error",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
-      error: inspect(error)
-    )
-
-    Sentry.capture_message("SMS transaction failed with unexpected error",
-      level: :error,
+      error: inspect(error),
       extra:
         build_sentry_extra(phone_number, attrs, %{
           error: inspect(error, limit: :infinity)
@@ -740,7 +669,7 @@ defmodule Ysc.Messages do
          attrs,
          constraint_string
        ) do
-    Logger.info(
+    Ysc.Logging.info(
       "Duplicate SMS detected (idempotency constraint), treating as success",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
@@ -762,24 +691,12 @@ defmodule Ysc.Messages do
          attrs,
          constraint_string
        ) do
-    Logger.error(
+    Ysc.Logging.error(
       "SMS transaction raised unique constraint error (not idempotency)",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       constraint: constraint_string,
       error: inspect(error)
-    )
-
-    Sentry.capture_exception(error,
-      extra:
-        build_sentry_extra(phone_number, attrs, %{
-          constraint: constraint_string,
-          constraint_type: error.type
-        }),
-      tags:
-        build_sentry_tags(attrs, "unique_constraint_error", %{
-          constraint: constraint_string
-        })
     )
 
     emit_send_failed_telemetry(phone_number, attrs, %{
@@ -790,26 +707,13 @@ defmodule Ysc.Messages do
     {:error, "failed to send SMS"}
   end
 
-  defp handle_non_unique_constraint_error(error, phone_number, attrs, body) do
-    Logger.error("SMS transaction raised constraint error (not unique)",
+  defp handle_non_unique_constraint_error(error, phone_number, attrs, _body) do
+    Ysc.Logging.error("SMS transaction raised constraint error (not unique)",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       constraint: error.constraint,
       type: error.type,
       error: inspect(error)
-    )
-
-    Sentry.capture_exception(error,
-      extra:
-        build_sentry_extra(phone_number, attrs, %{
-          message_body: body,
-          constraint: to_string(error.constraint),
-          constraint_type: error.type
-        }),
-      tags:
-        build_sentry_tags(attrs, "constraint_error", %{
-          constraint: to_string(error.constraint)
-        })
     )
 
     emit_send_failed_telemetry(phone_number, attrs, %{

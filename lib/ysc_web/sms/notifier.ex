@@ -6,7 +6,7 @@ defmodule YscWeb.Sms.Notifier do
   Handles user preference checking and phone number validation.
   """
 
-  require Logger
+  require Ysc.Logging
 
   @template_mappings %{
     "booking_checkin_reminder" => YscWeb.Sms.BookingCheckinReminder,
@@ -61,7 +61,7 @@ defmodule YscWeb.Sms.Notifier do
 
         case Oban.insert(job) do
           {:ok, %Oban.Job{} = inserted_job} ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "Sms.Notifier.schedule_sms: SMS job inserted successfully",
               job_id: inserted_job.id,
               phone_number: validated_phone_number,
@@ -72,29 +72,12 @@ defmodule YscWeb.Sms.Notifier do
             {:ok, inserted_job}
 
           {:error, reason} = error ->
-            Logger.error("Sms.Notifier.schedule_sms: Failed to insert SMS job",
+            Ysc.Logging.error(
+              "Sms.Notifier.schedule_sms: Failed to insert SMS job",
               phone_number: validated_phone_number,
               template: template,
               idempotency_key: idempotency_key,
               error: inspect(reason, limit: :infinity)
-            )
-
-            Sentry.capture_message("Failed to insert SMS job",
-              level: :error,
-              extra: %{
-                phone_number: validated_phone_number,
-                template: template,
-                idempotency_key: idempotency_key,
-                user_id: user_id,
-                category: category,
-                error: inspect(reason, limit: :infinity)
-              },
-              tags: %{
-                sms_template: template,
-                sms_category: to_string(category),
-                error_type: "oban_insert_failed",
-                has_user_id: !is_nil(user_id)
-              }
             )
 
             error
@@ -106,7 +89,7 @@ defmodule YscWeb.Sms.Notifier do
   end
 
   defp validate_and_get_phone_number(phone_number, template, user_id, category) do
-    Logger.debug("validate_and_get_phone_number called",
+    Ysc.Logging.debug("validate_and_get_phone_number called",
       phone_number: phone_number,
       phone_number_type:
         if(is_binary(phone_number),
@@ -127,7 +110,7 @@ defmodule YscWeb.Sms.Notifier do
     if user_id do
       case Ysc.Accounts.get_user(user_id) do
         nil ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "SMS scheduled without user validation - user not found",
             user_id: user_id,
             template: template
@@ -137,7 +120,7 @@ defmodule YscWeb.Sms.Notifier do
           normalized = normalize_phone_number(phone_number)
           is_valid = valid_phone_number?(phone_number)
 
-          Logger.debug("Phone number validation (user not found)",
+          Ysc.Logging.debug("Phone number validation (user not found)",
             phone_number: phone_number,
             normalized: normalized,
             is_valid: is_valid
@@ -146,7 +129,8 @@ defmodule YscWeb.Sms.Notifier do
           if is_valid do
             {:ok, normalized}
           else
-            Logger.warning("SMS not scheduled - invalid phone number format",
+            Ysc.Logging.warning(
+              "SMS not scheduled - invalid phone number format",
               phone_number: phone_number,
               normalized: normalized,
               template: template
@@ -163,7 +147,7 @@ defmodule YscWeb.Sms.Notifier do
               normalized = normalize_phone_number(validated_phone)
               is_valid = valid_phone_number?(validated_phone)
 
-              Logger.debug("Phone number validation (with user)",
+              Ysc.Logging.debug("Phone number validation (with user)",
                 provided_phone_number: phone_number,
                 user_phone_number: user.phone_number,
                 validated_phone: validated_phone,
@@ -174,7 +158,7 @@ defmodule YscWeb.Sms.Notifier do
               if is_valid do
                 {:ok, normalized}
               else
-                Logger.warning(
+                Ysc.Logging.warning(
                   "SMS not scheduled - invalid phone number format",
                   phone_number: validated_phone,
                   normalized: normalized,
@@ -184,7 +168,7 @@ defmodule YscWeb.Sms.Notifier do
                 {:error, :invalid_phone_number}
               end
             else
-              Logger.info("SMS not scheduled - user has no phone number",
+              Ysc.Logging.info("SMS not scheduled - user has no phone number",
                 user_id: user_id,
                 template: template
               )
@@ -192,7 +176,8 @@ defmodule YscWeb.Sms.Notifier do
               {:error, :no_phone_number}
             end
           else
-            Logger.info("SMS not scheduled - user has disabled notifications",
+            Ysc.Logging.info(
+              "SMS not scheduled - user has disabled notifications",
               user_id: user_id,
               template: template,
               category: category
@@ -206,7 +191,7 @@ defmodule YscWeb.Sms.Notifier do
       normalized = normalize_phone_number(phone_number)
       is_valid = valid_phone_number?(phone_number)
 
-      Logger.debug("Phone number validation (no user_id)",
+      Ysc.Logging.debug("Phone number validation (no user_id)",
         phone_number: phone_number,
         normalized: normalized,
         is_valid: is_valid
@@ -215,7 +200,7 @@ defmodule YscWeb.Sms.Notifier do
       if is_valid do
         {:ok, normalized}
       else
-        Logger.warning("SMS not scheduled - invalid phone number format",
+        Ysc.Logging.warning("SMS not scheduled - invalid phone number format",
           phone_number: phone_number,
           normalized: normalized,
           template: template
@@ -252,7 +237,7 @@ defmodule YscWeb.Sms.Notifier do
     if is_nil(template_module) do
       error_message = "Template module not found for template: #{template}"
 
-      Logger.warning(error_message)
+      Ysc.Logging.warning(error_message)
 
       {:error, error_message}
     else
@@ -302,7 +287,7 @@ defmodule YscWeb.Sms.Notifier do
     # Also ensure normalized string is not empty
     is_valid = normalized != "" && Regex.match?(~r/^1\d{10}$/, normalized)
 
-    Logger.debug("valid_phone_number? check",
+    Ysc.Logging.debug("valid_phone_number? check",
       original: phone_number,
       normalized: normalized,
       is_valid: is_valid,
@@ -324,7 +309,7 @@ defmodule YscWeb.Sms.Notifier do
       # Remove all non-digit characters
       |> String.replace(~r/[^\d]/, "")
 
-    Logger.debug("normalize_phone_number",
+    Ysc.Logging.debug("normalize_phone_number",
       original: phone_number,
       normalized: normalized,
       original_length: String.length(phone_number),

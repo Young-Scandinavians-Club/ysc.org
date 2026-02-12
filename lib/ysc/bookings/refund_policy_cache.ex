@@ -8,7 +8,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
   Cache is invalidated via PubSub when refund policies or rules are created/updated/deleted.
   """
 
-  require Logger
+  require Ysc.Logging
   import Ecto.Query
   alias Ysc.Bookings.{RefundPolicy, RefundPolicyRule}
   alias Ysc.Repo
@@ -82,18 +82,27 @@ defmodule Ysc.Bookings.RefundPolicyCache do
           )
         end
 
-        Logger.debug("Refund policy cache invalidated", version: new_version)
+        Ysc.Logging.debug("Refund policy cache invalidated",
+          version: new_version
+        )
+
         :ok
 
       {:error, _reason} ->
         # Cache not available (e.g., in seed scripts) - silently ignore
-        Logger.debug("Refund policy cache not available, skipping invalidation")
+        Ysc.Logging.debug(
+          "Refund policy cache not available, skipping invalidation"
+        )
+
         :ok
     end
   rescue
     ArgumentError ->
       # Cache table doesn't exist (e.g., in seed scripts) - silently ignore
-      Logger.debug("Refund policy cache not initialized, skipping invalidation")
+      Ysc.Logging.debug(
+        "Refund policy cache not initialized, skipping invalidation"
+      )
+
       :ok
   end
 

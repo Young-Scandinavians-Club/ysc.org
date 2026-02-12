@@ -210,7 +210,7 @@ defmodule YscWeb.UserSessionController do
   end
 
   def passkey_login(conn, params) do
-    require Logger
+    require Ysc.Logging
 
     # Merge query params into params (in case they're not merged automatically)
     merged_params = Map.merge(params || %{}, conn.query_params || %{})
@@ -223,7 +223,7 @@ defmodule YscWeb.UserSessionController do
           merged_params
 
         malformed_key ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "[UserSessionController] Found malformed query key, parsing manually",
             %{
               malformed_key: malformed_key
@@ -237,7 +237,7 @@ defmodule YscWeb.UserSessionController do
           |> Map.merge(parsed)
       end
 
-    Logger.info("[UserSessionController] passkey_login called", %{
+    Ysc.Logging.info("[UserSessionController] passkey_login called", %{
       params: params,
       query_params: conn.query_params,
       path_params: conn.path_params,
@@ -255,7 +255,7 @@ defmodule YscWeb.UserSessionController do
         passkey_login_with_params(conn, encoded_user_id, "")
 
       _ ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "[UserSessionController] passkey_login called with invalid params",
           %{
             params: params,
@@ -288,7 +288,7 @@ defmodule YscWeb.UserSessionController do
 
   # sobelow_skip ["XSS.SendResp"]
   defp passkey_login_with_params(conn, encoded_user_id, redirect_to) do
-    require Logger
+    require Ysc.Logging
 
     # Per-identifier rate limit (same account targeted repeatedly)
     case Ysc.AuthRateLimit.check_identifier(encoded_user_id) do
@@ -312,12 +312,15 @@ defmodule YscWeb.UserSessionController do
   end
 
   defp do_passkey_login_with_params(conn, encoded_user_id, redirect_to) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("[UserSessionController] passkey_login_with_params called", %{
-      encoded_user_id: encoded_user_id,
-      redirect_to: redirect_to
-    })
+    Ysc.Logging.info(
+      "[UserSessionController] passkey_login_with_params called",
+      %{
+        encoded_user_id: encoded_user_id,
+        redirect_to: redirect_to
+      }
+    )
 
     # Passkey-based login - skip CSRF protection (similar to auto_login)
     # Handle invalid base64 or invalid ULID gracefully
@@ -326,15 +329,18 @@ defmodule YscWeb.UserSessionController do
         Base.url_decode64!(encoded_user_id, padding: false)
       rescue
         ArgumentError ->
-          Logger.warning("[UserSessionController] Invalid base64 user_id", %{
-            encoded_user_id: encoded_user_id
-          })
+          Ysc.Logging.warning(
+            "[UserSessionController] Invalid base64 user_id",
+            %{
+              encoded_user_id: encoded_user_id
+            }
+          )
 
           nil
       end
 
     if user_id do
-      Logger.debug("[UserSessionController] Decoded user_id", %{
+      Ysc.Logging.debug("[UserSessionController] Decoded user_id", %{
         user_id_hex: Base.encode16(user_id, case: :lower),
         user_id_length: byte_size(user_id)
       })
@@ -347,9 +353,12 @@ defmodule YscWeb.UserSessionController do
           Accounts.get_user(user_id)
         rescue
           Ecto.Query.CastError ->
-            Logger.warning("[UserSessionController] Invalid ULID format", %{
-              user_id: user_id
-            })
+            Ysc.Logging.warning(
+              "[UserSessionController] Invalid ULID format",
+              %{
+                user_id: user_id
+              }
+            )
 
             nil
         end
@@ -371,11 +380,14 @@ defmodule YscWeb.UserSessionController do
             nil
           end
 
-        Logger.info("[UserSessionController] Logging in user successfully", %{
-          user_id: user.id,
-          user_email: user.email,
-          validated_redirect: validated_redirect
-        })
+        Ysc.Logging.info(
+          "[UserSessionController] Logging in user successfully",
+          %{
+            user_id: user.id,
+            user_email: user.email,
+            validated_redirect: validated_redirect
+          }
+        )
 
         conn
         |> delete_session(:failed_login_attempts)
@@ -383,10 +395,13 @@ defmodule YscWeb.UserSessionController do
         |> UserAuth.log_in_user(user, %{}, validated_redirect)
       else
         # Account not active
-        Logger.warning("[UserSessionController] User account not active", %{
-          user_id: user.id,
-          user_state: user.state
-        })
+        Ysc.Logging.warning(
+          "[UserSessionController] User account not active",
+          %{
+            user_id: user.id,
+            user_state: user.state
+          }
+        )
 
         conn
         |> put_flash(:error, "Your account is not currently active.")
@@ -394,7 +409,7 @@ defmodule YscWeb.UserSessionController do
       end
     else
       # Invalid user ID
-      Logger.warning("[UserSessionController] User not found", %{
+      Ysc.Logging.warning("[UserSessionController] User not found", %{
         user_id_hex: Base.encode16(user_id, case: :lower),
         encoded_user_id: encoded_user_id
       })

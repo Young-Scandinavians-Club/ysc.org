@@ -6,7 +6,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
   For users who paid with cash or other offline methods, this sends a courtesy
   reminder to add a payment method before their renewal date.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
   import Ecto.Query
@@ -17,7 +17,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
-    Logger.info("Starting membership renewal payment method check")
+    Ysc.Logging.info("Starting membership renewal payment method check")
 
     # Calculate the date 14 days from now
     fourteen_days_from_now =
@@ -29,7 +29,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
     day_start = DateTime.new!(fourteen_days_from_now, ~T[00:00:00], "Etc/UTC")
     day_end = DateTime.new!(fourteen_days_from_now, ~T[23:59:59], "Etc/UTC")
 
-    Logger.info(
+    Ysc.Logging.info(
       "Checking for subscriptions renewing on #{fourteen_days_from_now}"
     )
 
@@ -44,7 +44,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
       )
       |> Repo.all()
 
-    Logger.info(
+    Ysc.Logging.info(
       "Found #{length(subscriptions)} subscriptions renewing in 14 days"
     )
 
@@ -62,7 +62,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
         _ -> false
       end)
 
-    Logger.info(
+    Ysc.Logging.info(
       "Membership renewal payment method check complete",
       success_count: success_count,
       error_count: error_count,
@@ -79,7 +79,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
     case Payments.get_default_payment_method(user) do
       nil ->
         # No payment method on file, send reminder
-        Logger.info("User has no payment method, sending reminder",
+        Ysc.Logging.info("User has no payment method, sending reminder",
           user_id: user.id,
           subscription_id: subscription.id,
           renewal_date: subscription.current_period_end
@@ -89,7 +89,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
 
       _payment_method ->
         # User has payment method, no need to send reminder
-        Logger.debug("User has payment method on file, skipping reminder",
+        Ysc.Logging.debug("User has payment method on file, skipping reminder",
           user_id: user.id,
           subscription_id: subscription.id
         )
@@ -111,7 +111,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
     idempotency_key =
       "membership_renewal_payment_method_reminder_#{user.id}_#{renewal_date}"
 
-    Logger.info("Sending membership renewal payment method reminder",
+    Ysc.Logging.info("Sending membership renewal payment method reminder",
       user_id: user.id,
       email: user.email,
       renewal_date: subscription.current_period_end
@@ -127,7 +127,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
            user.id
          ) do
       %Oban.Job{} ->
-        Logger.info(
+        Ysc.Logging.info(
           "Membership renewal payment method reminder scheduled successfully",
           user_id: user.id,
           subscription_id: subscription.id
@@ -136,28 +136,11 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
         :ok
 
       {:error, reason} ->
-        Logger.error(
+        Ysc.Logging.error(
           "Failed to schedule membership renewal payment method reminder",
           user_id: user.id,
           subscription_id: subscription.id,
           error: inspect(reason)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message(
-          "Failed to schedule membership renewal payment method reminder",
-          level: :error,
-          extra: %{
-            user_id: user.id,
-            subscription_id: subscription.id,
-            email: user.email,
-            renewal_date: subscription.current_period_end,
-            error: inspect(reason)
-          },
-          tags: %{
-            email_template: template_name,
-            worker: "membership_renewal_payment_method_checker"
-          }
         )
 
         {:error, reason}

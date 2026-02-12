@@ -82,7 +82,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
 
   @impl true
   def handle_event("save", %{"event" => event_params}, socket) do
-    require Logger
+    require Ysc.Logging
 
     publish_at_string = event_params["publish_at"]
 
@@ -91,7 +91,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
         Events.schedule_event(socket.assigns.event, publish_at_string)
       rescue
         error ->
-          Logger.error("Error scheduling event",
+          Ysc.Logging.error("Error scheduling event",
             event_id: socket.assigns.event.id,
             error: Exception.message(error)
           )
@@ -119,7 +119,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
             "#{field}: #{message}"
           end)
 
-        Logger.error("Failed to schedule event",
+        Ysc.Logging.error("Failed to schedule event",
           event_id: socket.assigns.event.id,
           errors: error_details
         )

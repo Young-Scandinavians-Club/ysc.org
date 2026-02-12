@@ -3,27 +3,27 @@ defmodule YscWeb.ExpenseReportFileController do
 
   alias Ysc.ExpenseReports
   alias Ysc.S3Config
-  require Logger
+  require Ysc.Logging
 
   @doc """
   Generates a presigned URL for viewing an expense report file (receipt or proof document).
   Only the owner of the expense report or an admin can access the file.
   """
   def show(conn, %{"encoded_path" => encoded_path}) do
-    Logger.info("ExpenseReportFileController.show called",
+    Ysc.Logging.info("ExpenseReportFileController.show called",
       encoded_path: encoded_path,
       request_path: conn.request_path
     )
 
     user = conn.assigns[:current_user]
 
-    Logger.info("Current user check",
+    Ysc.Logging.info("Current user check",
       has_user: !is_nil(user),
       user_id: if(user, do: user.id, else: nil)
     )
 
     if is_nil(user) do
-      Logger.warning("No current_user in ExpenseReportFileController")
+      Ysc.Logging.warning("No current_user in ExpenseReportFileController")
 
       conn
       |> put_status(:forbidden)
@@ -40,7 +40,7 @@ defmodule YscWeb.ExpenseReportFileController do
         handle_decoded_path(conn, user, s3_path)
 
       :error ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "Invalid base64 encoded path in expense report file request",
           user_id: user.id,
           encoded_path: encoded_path
@@ -64,7 +64,7 @@ defmodule YscWeb.ExpenseReportFileController do
         )
 
       {:error, :not_found} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "User attempted to access file not found in any expense report",
           user_id: user.id,
           s3_path: s3_path
@@ -76,7 +76,7 @@ defmodule YscWeb.ExpenseReportFileController do
         |> render(:"404")
 
       {:error, :unauthorized} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "User attempted to access file from expense report they don't own",
           user_id: user.id,
           s3_path: s3_path
@@ -104,7 +104,7 @@ defmodule YscWeb.ExpenseReportFileController do
            expires_in: expires_in
          ) do
       {:ok, presigned_url} ->
-        Logger.debug("Generated presigned URL for expense report file",
+        Ysc.Logging.debug("Generated presigned URL for expense report file",
           user_id: user.id,
           s3_path: normalized_path,
           expense_report_id:
@@ -115,7 +115,8 @@ defmodule YscWeb.ExpenseReportFileController do
         redirect(conn, external: presigned_url)
 
       {:error, reason} ->
-        Logger.error("Failed to generate presigned URL for expense report file",
+        Ysc.Logging.error(
+          "Failed to generate presigned URL for expense report file",
           user_id: user.id,
           s3_path: s3_path,
           error: inspect(reason)

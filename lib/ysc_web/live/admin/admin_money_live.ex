@@ -514,9 +514,9 @@ defmodule YscWeb.AdminMoneyLive do
                     "Refund processed successfully (no booking or ticket order found to release)"
 
                   {:error, reason} ->
-                    require Logger
+                    require Ysc.Logging
 
-                    Logger.warning(
+                    Ysc.Logging.warning(
                       "Refund processed but failed to release availability",
                       payment_id: payment.id,
                       reason: reason
@@ -3260,9 +3260,9 @@ defmodule YscWeb.AdminMoneyLive do
       # Mark as refunded and release inventory
       case BookingLocker.refund_complete_booking(booking.id, true) do
         {:ok, _refunded_booking} ->
-          require Logger
+          require Ysc.Logging
 
-          Logger.info("Booking refunded and dates released after refund",
+          Ysc.Logging.info("Booking refunded and dates released after refund",
             booking_id: booking.id,
             payment_id: payment_id
           )
@@ -3288,9 +3288,9 @@ defmodule YscWeb.AdminMoneyLive do
                "Refund processed - tickets released"
              ) do
           {:ok, _canceled_order} ->
-            require Logger
+            require Ysc.Logging
 
-            Logger.info(
+            Ysc.Logging.info(
               "Ticket order canceled and tickets released after refund",
               ticket_order_id: ticket_order.id,
               payment_id: payment_id

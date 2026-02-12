@@ -43,7 +43,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   - External API calls should be minimized within transactions
   - Email sending must be async to prevent cascading failures
   """
+  require Ysc.Logging
+
   import Ecto.Query, warn: false
+
   alias Ysc.Customers
   alias Ysc.Subscriptions
   alias Ysc.Ledgers
@@ -61,9 +64,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   def handle_event(event) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Processing Stripe webhook event",
+    Ysc.Logging.info("Processing Stripe webhook event",
       event_id: event.id,
       event_type: event.type
     )
@@ -87,7 +90,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           process_webhook(event)
 
         {:error, :webhook_too_old} = error ->
-          Logger.warning("Rejecting old webhook event (possible replay attack)",
+          Ysc.Logging.warning(
+            "Rejecting old webhook event (possible replay attack)",
             event_id: event.id,
             event_type: event.type,
             event_created: event.created,
@@ -162,7 +166,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Process webhook after age validation
   defp process_webhook(event) do
-    require Logger
+    require Ysc.Logging
 
     # CRITICAL: Write the webhook event to the database first
     # This ensures we ALWAYS have a record of the webhook, even if processing fails
@@ -181,7 +185,7 @@ defmodule Ysc.Stripe.WebhookHandler do
              event.id
            ) do
         {:ok, webhook_event} ->
-          Logger.info("Locked newly created webhook event for processing",
+          Ysc.Logging.info("Locked newly created webhook event for processing",
             event_id: event.id,
             event_type: event.type
           )
@@ -190,11 +194,12 @@ defmodule Ysc.Stripe.WebhookHandler do
           # The webhook is stored, so we can safely return :ok to Stripe
           # even if processing fails (we'll mark it as failed for retry)
           process_webhook_event(webhook_event, event)
+
           :ok
 
         {:error, :already_processing} ->
           # Another process locked it first, that's fine - event is stored
-          Logger.info(
+          Ysc.Logging.info(
             "Newly created webhook event already being processed by another process",
             event_id: event.id,
             event_type: event.type
@@ -205,13 +210,10 @@ defmodule Ysc.Stripe.WebhookHandler do
         {:error, :not_found} ->
           # This should never happen - we just created it!
           # This is a critical error, but event is stored so we return :ok
-          Logger.error("Newly created webhook event not found after creation",
+          Ysc.Logging.error(
+            "Newly created webhook event not found after creation",
             event_id: event.id,
-            event_type: event.type
-          )
-
-          Sentry.capture_message("Webhook event not found after creation",
-            level: :error,
+            event_type: event.type,
             extra: %{
               event_id: event.id,
               event_type: event.type
@@ -223,8 +225,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             }
           )
 
-          # Event is stored, so return :ok to Stripe
-          :ok
+          {:error, :webhook_not_found}
       end
     rescue
       Ysc.Webhooks.DuplicateWebhookEventError ->
@@ -237,15 +238,10 @@ defmodule Ysc.Stripe.WebhookHandler do
           nil ->
             # Race condition: event was just deleted or something very wrong happened.
             # Return error so Stripe retries - we cannot be sure the event was processed.
-            Logger.error(
+            Ysc.Logging.error(
               "Webhook event not found after duplicate error - race condition",
               event_id: event.id,
-              event_type: event.type
-            )
-
-            Sentry.capture_message(
-              "Webhook event not found after duplicate error",
-              level: :error,
+              event_type: event.type,
               extra: %{
                 event_id: event.id,
                 event_type: event.type
@@ -264,7 +260,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             case webhook_event.state do
               :processed ->
                 # Already processed successfully
-                Logger.info("Duplicate webhook already processed",
+                Ysc.Logging.info("Duplicate webhook already processed",
                   event_id: event.id,
                   event_type: event.type
                 )
@@ -273,7 +269,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
               :failed ->
                 # Previous processing failed, try to lock and reprocess
-                Logger.info(
+                Ysc.Logging.info(
                   "Duplicate webhook previously failed, attempting reprocessing",
                   event_id: event.id,
                   event_type: event.type
@@ -288,7 +284,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                     :ok
 
                   {:error, :already_processing} ->
-                    Logger.info("Failed webhook already being reprocessed",
+                    Ysc.Logging.info("Failed webhook already being reprocessed",
                       event_id: event.id
                     )
 
@@ -301,7 +297,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
               :processing ->
                 # Currently being processed by another process
-                Logger.info("Duplicate webhook currently being processed",
+                Ysc.Logging.info("Duplicate webhook currently being processed",
                   event_id: event.id,
                   event_type: event.type
                 )
@@ -310,7 +306,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
               :pending ->
                 # Still pending, try to lock and process
-                Logger.info(
+                Ysc.Logging.info(
                   "Duplicate webhook still pending, attempting to process",
                   event_id: event.id,
                   event_type: event.type
@@ -325,7 +321,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                     :ok
 
                   {:error, :already_processing} ->
-                    Logger.info("Pending webhook locked by another process",
+                    Ysc.Logging.info(
+                      "Pending webhook locked by another process",
                       event_id: event.id
                     )
 
@@ -357,7 +354,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Used by the live webhook endpoint and by Ysc.Stripe.WebhookReconciliationWorker.
   @doc false
   def process_webhook_event(webhook_event, event) do
-    require Logger
+    require Ysc.Logging
 
     # CRITICAL: Use a transaction to ensure atomicity
     # Either the handler succeeds AND state is marked processed, or both rollback
@@ -369,7 +366,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           case Repo.get(Ysc.Webhooks.WebhookEvent, webhook_event.id) do
             nil ->
               # Webhook was deleted or doesn't exist - this shouldn't happen
-              Logger.error(
+              Ysc.Logging.error(
                 "Webhook event not found within transaction",
                 webhook_event_id: webhook_event.id,
                 event_id: event.id,
@@ -390,7 +387,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                      :processed
                    ) do
                 {:ok, _updated_webhook} ->
-                  Logger.info("Webhook event processed successfully",
+                  Ysc.Logging.info("Webhook event processed successfully",
                     event_id: event.id,
                     event_type: event.type
                   )
@@ -399,7 +396,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
                 {:error, changeset} ->
                   # Failed to mark as processed - rollback everything
-                  Logger.error(
+                  Ysc.Logging.error(
                     "Failed to mark webhook as processed after successful handling",
                     event_id: event.id,
                     event_type: event.type,
@@ -413,7 +410,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         rescue
           error ->
             # Processing failed - rollback the transaction
-            Logger.warning(
+            Ysc.Logging.warning(
               "Webhook event processing failed, rolling back transaction",
               event_id: event.id,
               event_type: event.type,
@@ -433,7 +430,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       {:error, :webhook_not_found} ->
         # Webhook disappeared during processing - mark as failed if we can find it
-        Logger.error("Webhook disappeared during transaction",
+        Ysc.Logging.error("Webhook disappeared during transaction",
           event_id: event.id,
           webhook_event_id: webhook_event.id
         )
@@ -442,9 +439,11 @@ defmodule Ysc.Stripe.WebhookHandler do
         case Repo.get(Ysc.Webhooks.WebhookEvent, webhook_event.id) do
           nil ->
             # Can't find it - just log and return ok
-            Logger.error("Cannot mark webhook as failed - not found",
+            Ysc.Logging.error("Cannot mark webhook as failed - not found",
               event_id: event.id
             )
+
+            raise "Webhook not found after transaction rollback"
 
           webhook_event_fresh ->
             Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
@@ -462,19 +461,13 @@ defmodule Ysc.Stripe.WebhookHandler do
           nil ->
             # Webhook not found - may have been deleted or transaction fully rolled back
             # This shouldn't happen in normal operation
-            Logger.error(
+            Ysc.Logging.error(
               "Cannot mark webhook as failed - webhook record not found after transaction rollback",
               event_id: event.id,
               event_type: event.type,
               error: Exception.message(error),
               note:
-                "Webhook was stored initially but not found after rollback - check database constraints"
-            )
-
-            # Report to Sentry - this is unexpected
-            Sentry.capture_message(
-              "Webhook record not found after processing error and rollback",
-              level: :error,
+                "Webhook was stored initially but not found after rollback - check database constraints",
               extra: %{
                 event_id: event.id,
                 event_type: event.type,
@@ -489,11 +482,14 @@ defmodule Ysc.Stripe.WebhookHandler do
               }
             )
 
+            raise "Webhook not found after transaction rollback"
+
           webhook_event_fresh ->
             # Mark as failed so it can be retried
             Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
 
-            Logger.warning("Webhook event processing failed, marked as failed",
+            Ysc.Logging.warning(
+              "Webhook event processing failed, marked as failed",
               event_id: event.id,
               event_type: event.type,
               webhook_state: webhook_event_fresh.state,
@@ -501,19 +497,13 @@ defmodule Ysc.Stripe.WebhookHandler do
             )
 
             # Report to Sentry with full context
-            Sentry.capture_exception(error,
-              stacktrace: stacktrace,
-              extra: %{
-                event_id: event.id,
-                event_type: event.type,
-                webhook_event_id: webhook_event.id,
-                error_message: Exception.message(error)
-              },
-              tags: %{
-                webhook_provider: "stripe",
-                event_type: event.type,
-                worker: "WebhookHandler"
-              }
+            Ysc.Logging.error(
+              "Webhook event processing failed, marked as failed",
+              event_id: event.id,
+              event_type: event.type,
+              webhook_state: webhook_event_fresh.state,
+              error: Exception.message(error),
+              stacktrace: stacktrace
             )
         end
 
@@ -527,34 +517,21 @@ defmodule Ysc.Stripe.WebhookHandler do
                event.id
              ) do
           nil ->
-            Logger.error(
+            Ysc.Logging.error(
               "Cannot mark webhook as failed - not found after mark-processed failure",
               event_id: event.id,
               event_type: event.type
             )
 
-            Sentry.capture_message(
-              "Webhook not found after failed to mark as processed",
-              level: :error,
-              extra: %{
-                event_id: event.id,
-                event_type: event.type,
-                webhook_event_id: webhook_event.id
-              }
-            )
+            raise "Webhook not found after mark-processed failure"
 
           webhook_event_fresh ->
             Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
 
-            Logger.error(
+            Ysc.Logging.error(
               "Webhook processing succeeded but failed to mark as processed",
               event_id: event.id,
-              event_type: event.type
-            )
-
-            Sentry.capture_message(
-              "Webhook processing succeeded but failed to mark as processed",
-              level: :error,
+              event_type: event.type,
               extra: %{
                 event_id: event.id,
                 event_type: event.type,
@@ -573,15 +550,11 @@ defmodule Ysc.Stripe.WebhookHandler do
                event.id
              ) do
           nil ->
-            Logger.error(
+            Ysc.Logging.error(
               "Cannot mark webhook as failed - not found after unknown error",
               event_id: event.id,
               event_type: event.type,
-              error: inspect(other_error)
-            )
-
-            Sentry.capture_message("Webhook not found after unknown error",
-              level: :error,
+              error: inspect(other_error),
               extra: %{
                 event_id: event.id,
                 event_type: event.type,
@@ -590,18 +563,15 @@ defmodule Ysc.Stripe.WebhookHandler do
               }
             )
 
+            raise "Webhook not found after unknown error"
+
           webhook_event_fresh ->
             Ysc.Webhooks.update_webhook_state(webhook_event_fresh, :failed)
 
-            Logger.error("Webhook transaction failed with unknown error",
+            Ysc.Logging.error("Webhook transaction failed with unknown error",
               event_id: event.id,
               event_type: event.type,
-              error: inspect(other_error)
-            )
-
-            Sentry.capture_message(
-              "Webhook transaction failed with unknown error",
-              level: :error,
+              error: inspect(other_error),
               extra: %{
                 event_id: event.id,
                 event_type: event.type,
@@ -616,8 +586,6 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("customer.deleted", %Stripe.Customer{} = event) do
-    require Logger
-
     user = Ysc.Accounts.get_user_from_stripe_id(event.id)
 
     if user do
@@ -632,7 +600,8 @@ defmodule Ysc.Stripe.WebhookHandler do
               :ok
 
             {:error, reason} ->
-              Logger.error("Failed to cancel subscription in customer.deleted",
+              Ysc.Logging.error(
+                "Failed to cancel subscription in customer.deleted",
                 subscription_id: subscription.id,
                 user_id: user.id,
                 customer_id: event.id,
@@ -644,7 +613,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           end
         end)
 
-        Logger.info("All subscriptions cancelled for deleted customer",
+        Ysc.Logging.info("All subscriptions cancelled for deleted customer",
           user_id: user.id,
           customer_id: event.id,
           subscriptions_count: length(subscriptions)
@@ -656,8 +625,6 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("customer.created", %Stripe.Customer{} = event) do
-    require Logger
-
     # Try to find user by user_id in metadata first, then by email
     user =
       case event.metadata do
@@ -680,7 +647,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
         case Repo.update(changeset) do
           {:ok, updated_user} ->
-            Logger.info("Successfully linked Stripe customer to user",
+            Ysc.Logging.info("Successfully linked Stripe customer to user",
               user_id: user.id,
               stripe_customer_id: event.id,
               method:
@@ -693,7 +660,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             {:ok, updated_user}
 
           {:error, changeset} ->
-            Logger.error("Failed to update user with stripe_id",
+            Ysc.Logging.error("Failed to update user with stripe_id",
               user_id: user.id,
               stripe_customer_id: event.id,
               changeset_errors: inspect(changeset.errors)
@@ -705,7 +672,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
       else
         # User already has stripe_id set
-        Logger.info("User already has Stripe customer ID, skipping update",
+        Ysc.Logging.info("User already has Stripe customer ID, skipping update",
           user_id: user.id,
           existing_stripe_id: user.stripe_id,
           webhook_stripe_id: event.id
@@ -714,7 +681,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         :ok
       end
     else
-      Logger.warning("No user found for customer.created webhook",
+      Ysc.Logging.warning("No user found for customer.created webhook",
         stripe_customer_id: event.id,
         email: event.email,
         user_id_metadata: event.metadata["user_id"]
@@ -730,9 +697,7 @@ defmodule Ysc.Stripe.WebhookHandler do
     if user do
       # Temporarily disable automatic syncing to prevent race conditions
       # The user-initiated payment method selection should handle this
-      require Logger
-
-      Logger.info(
+      Ysc.Logging.info(
         "Customer updated webhook received, skipping automatic sync to prevent race conditions",
         user_id: user.id,
         customer_id: event.id
@@ -760,8 +725,6 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("customer.subscription.updated", %Stripe.Subscription{} = event) do
-    require Logger
-
     subscription = Subscriptions.get_subscription_by_stripe_id(event.id)
 
     if subscription do
@@ -780,7 +743,8 @@ defmodule Ysc.Stripe.WebhookHandler do
               :ok
 
             {:error, reason} ->
-              Logger.error("Failed to delete incomplete_expired subscription",
+              Ysc.Logging.error(
+                "Failed to delete incomplete_expired subscription",
                 subscription_id: subscription.id,
                 error: inspect(reason)
               )
@@ -833,7 +797,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                       updated_subscription.user_id
                     )
 
-                    Logger.info(
+                    Ysc.Logging.info(
                       "Subscription expired/cancelled via webhook, cache invalidated",
                       subscription_id: updated_subscription.id,
                       user_id: updated_subscription.user_id,
@@ -848,7 +812,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 {:ok, updated_subscription}
 
               {:error, changeset} ->
-                Logger.error("Failed to update subscription",
+                Ysc.Logging.error("Failed to update subscription",
                   subscription_id: subscription.id,
                   errors: inspect(changeset.errors)
                 )
@@ -862,7 +826,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             :ok
 
           {:error, reason} ->
-            Logger.error("Subscription update transaction failed",
+            Ysc.Logging.error("Subscription update transaction failed",
               subscription_id: subscription.id,
               stripe_subscription_id: event.id,
               error: inspect(reason)
@@ -918,9 +882,8 @@ defmodule Ysc.Stripe.WebhookHandler do
 
         {:error, _} ->
           # Still log the error but don't fail the webhook
-          require Logger
-
-          Logger.warning("Failed to upsert payment method from Stripe webhook",
+          Ysc.Logging.warning(
+            "Failed to upsert payment method from Stripe webhook",
             user_id: user.id,
             payment_method_id: payment_method.id
           )
@@ -960,9 +923,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("setup_intent.created", %Stripe.SetupIntent{} = setup_intent) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Setup intent created",
+    Ysc.Logging.info("Setup intent created",
       setup_intent_id: setup_intent.id,
       user_id: setup_intent.customer
     )
@@ -1032,14 +995,14 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("invoice.payment.failed", invoice) when is_map(invoice) do
-    require Logger
+    require Ysc.Logging
 
     invoice_id = invoice[:id] || invoice["id"]
     customer_id = invoice[:customer] || invoice["customer"]
     subscription_id_raw = invoice[:subscription] || invoice["subscription"]
     billing_reason = invoice[:billing_reason] || invoice["billing_reason"]
 
-    Logger.info("Handling invoice.payment.failed webhook",
+    Ysc.Logging.info("Handling invoice.payment.failed webhook",
       invoice_id: invoice_id,
       customer_id: customer_id,
       subscription_id: subscription_id_raw,
@@ -1053,7 +1016,7 @@ defmodule Ysc.Stripe.WebhookHandler do
     case subscription_id do
       nil ->
         # Not a subscription invoice, skip
-        Logger.info(
+        Ysc.Logging.info(
           "Invoice payment failed is not for a subscription, skipping",
           invoice_id: invoice_id,
           customer_id: customer_id,
@@ -1077,7 +1040,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           membership_type =
             get_membership_type_from_subscription_id(subscription_id)
 
-          Logger.info("Processing membership payment failure",
+          Ysc.Logging.info("Processing membership payment failure",
             invoice_id: invoice_id,
             user_id: user.id,
             subscription_id: subscription_id,
@@ -1108,7 +1071,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 # Invalidate membership cache to ensure immediate access revocation
                 Ysc.Accounts.MembershipCache.invalidate_user(user.id)
 
-                Logger.info(
+                Ysc.Logging.info(
                   "Renewal payment failed and subscription expired, cache invalidated",
                   user_id: user.id,
                   subscription_id: subscription_id,
@@ -1120,7 +1083,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           :ok
         else
-          Logger.warning("No user found for invoice payment failure",
+          Ysc.Logging.warning("No user found for invoice payment failure",
             invoice_id: invoice_id,
             customer_id: customer_id,
             subscription_id: subscription_id
@@ -1149,7 +1112,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("invoice.payment_succeeded", invoice) when is_map(invoice) do
-    require Logger
+    require Ysc.Logging
 
     # This webhook is specifically for subscription payments
     # It's more reliable than payment_intent.succeeded for subscription billing
@@ -1172,7 +1135,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           existing_payment = Ledgers.get_payment_by_external_id(invoice_id)
 
           if existing_payment do
-            Logger.info("Payment already exists for invoice",
+            Ysc.Logging.info("Payment already exists for invoice",
               invoice_id: invoice_id,
               payment_id: existing_payment.id
             )
@@ -1213,7 +1176,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             case Ledgers.process_payment(payment_attrs) do
               {:ok, {payment, _transaction, _entries}} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Subscription payment processed successfully in ledger",
                   invoice_id: invoice_id,
                   user_id: user.id,
@@ -1264,7 +1227,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                 :ok
 
               {:error, reason} ->
-                Logger.error("Failed to process subscription payment in ledger",
+                Ysc.Logging.error(
+                  "Failed to process subscription payment in ledger",
                   invoice_id: invoice_id,
                   user_id: user.id,
                   subscription_id: subscription_id,
@@ -1276,7 +1240,8 @@ defmodule Ysc.Stripe.WebhookHandler do
             end
           end
         else
-          Logger.warning("No user found for invoice payment",
+          Ysc.Logging.warning(
+            "No user found for invoice payment",
             invoice_id: invoice_id,
             customer_id: customer_id
           )
@@ -1308,9 +1273,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   defp handle("payment_intent.succeeded", payment_intent)
        when is_map(payment_intent) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Payment intent succeeded",
+    Ysc.Logging.info("Payment intent succeeded",
       payment_intent_id: payment_intent.id,
       payment_intent_status: payment_intent.status,
       customer_id: payment_intent.customer
@@ -1335,11 +1300,11 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("payout.paid", payout) when is_map(payout) do
-    require Logger
+    require Ysc.Logging
 
     payout_id = payout[:id] || payout["id"]
 
-    Logger.info("Processing Stripe payout",
+    Ysc.Logging.info("Processing Stripe payout",
       payout_id: payout_id,
       amount: payout[:amount] || payout["amount"],
       currency: payout[:currency] || payout["currency"],
@@ -1354,7 +1319,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       existing_payout ->
         # Payout already exists, skip processing
-        Logger.info("Payout already processed, skipping (idempotency)",
+        Ysc.Logging.info("Payout already processed, skipping (idempotency)",
           payout_id: payout_id,
           existing_payout_id: existing_payout.id
         )
@@ -1364,10 +1329,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("charge.dispute.created", %Stripe.Dispute{} = dispute) do
-    require Logger
+    require Ysc.Logging
 
     # Handle chargeback/dispute - you may want to create a liability entry
-    Logger.info("Chargeback/dispute created",
+    Ysc.Logging.info("Chargeback/dispute created",
       dispute_id: dispute.id,
       charge_id: dispute.charge
     )
@@ -1377,9 +1342,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("charge.refunded", %Stripe.Charge{} = charge) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Charge refunded event received",
+    Ysc.Logging.info("Charge refunded event received",
       charge_id: charge.id,
       payment_intent_id: charge.payment_intent
     )
@@ -1397,7 +1362,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           case result do
             {:error, {:already_processed, _, _}} ->
-              Logger.debug(
+              Ysc.Logging.debug(
                 "Refund already processed (from charge.refunded event)",
                 refund_id: Map.get(refund, :id),
                 charge_id: charge.id
@@ -1409,7 +1374,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         end)
 
       _ ->
-        Logger.warning("No refunds data in charge.refunded event",
+        Ysc.Logging.warning("No refunds data in charge.refunded event",
           charge_id: charge.id
         )
     end
@@ -1418,9 +1383,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("refund.created", %Stripe.Refund{} = refund) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Refund created",
+    Ysc.Logging.info("Refund created",
       refund_id: refund.id,
       charge_id: refund.charge,
       amount: refund.amount
@@ -1432,7 +1397,7 @@ defmodule Ysc.Stripe.WebhookHandler do
     # Handle idempotency case
     case result do
       {:error, {:already_processed, _, _}} ->
-        Logger.info("Refund already processed, skipping (idempotency)",
+        Ysc.Logging.info("Refund already processed, skipping (idempotency)",
           refund_id: refund.id,
           charge_id: refund.charge
         )
@@ -1445,12 +1410,12 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("refund.created", refund) when is_map(refund) do
-    require Logger
+    require Ysc.Logging
 
     refund_id = refund[:id] || refund["id"]
     charge_id = refund[:charge] || refund["charge"]
 
-    Logger.info("Refund created (map)",
+    Ysc.Logging.info("Refund created (map)",
       refund_id: refund_id,
       charge_id: charge_id,
       amount: refund[:amount] || refund["amount"]
@@ -1462,7 +1427,7 @@ defmodule Ysc.Stripe.WebhookHandler do
     # Handle idempotency case
     case result do
       {:error, {:already_processed, _, _}} ->
-        Logger.info("Refund already processed, skipping (idempotency)",
+        Ysc.Logging.info("Refund already processed, skipping (idempotency)",
           refund_id: refund_id,
           charge_id: charge_id
         )
@@ -1475,9 +1440,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("refund.updated", %Stripe.Refund{} = refund) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Refund updated",
+    Ysc.Logging.info("Refund updated",
       refund_id: refund.id,
       charge_id: refund.charge,
       amount: refund.amount,
@@ -1489,12 +1454,12 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("refund.updated", refund) when is_map(refund) do
-    require Logger
+    require Ysc.Logging
 
     refund_id = refund[:id] || refund["id"]
     charge_id = refund[:charge] || refund["charge"]
 
-    Logger.info("Refund updated (map)",
+    Ysc.Logging.info("Refund updated (map)",
       refund_id: refund_id,
       charge_id: charge_id,
       amount: refund[:amount] || refund["amount"],
@@ -1508,9 +1473,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp handle(event_name, event_object) when is_binary(event_name) do
     # Log unhandled invoice-related events for debugging
     if String.starts_with?(event_name, "invoice.") do
-      require Logger
+      require Ysc.Logging
 
-      Logger.debug("Unhandled invoice webhook event",
+      Ysc.Logging.debug("Unhandled invoice webhook event",
         event_type: event_name,
         event_object_type:
           if(is_map(event_object),
@@ -1527,7 +1492,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to process a new payout
   defp process_new_payout(payout) do
-    require Logger
+    require Ysc.Logging
 
     payout_id = payout[:id] || payout["id"]
     amount_cents = payout[:amount] || payout["amount"]
@@ -1568,7 +1533,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     fee_total = Money.new(MoneyHelper.cents_to_dollars(fee_cents), currency)
 
-    Logger.debug("Processing Stripe payout with fees",
+    Ysc.Logging.debug("Processing Stripe payout with fees",
       payout_id: payout_id,
       amount: Money.to_string!(payout_amount),
       fee_total: Money.to_string!(fee_total),
@@ -1587,7 +1552,7 @@ defmodule Ysc.Stripe.WebhookHandler do
            metadata: metadata
          }) do
       {:ok, {_payout_payment, _transaction, _entries, payout}} ->
-        Logger.info("Stripe payout processed successfully in ledger",
+        Ysc.Logging.info("Stripe payout processed successfully in ledger",
           payout_id: payout_id,
           amount: Money.to_string!(payout_amount),
           fee_total:
@@ -1605,15 +1570,10 @@ defmodule Ysc.Stripe.WebhookHandler do
         :ok
 
       {:error, reason} ->
-        Logger.error("Failed to process Stripe payout in ledger",
+        Ysc.Logging.error("Failed to process Stripe payout in ledger",
           payout_id: payout_id,
           amount: Money.to_string!(payout_amount),
-          error: reason
-        )
-
-        # Report to Sentry
-        Sentry.capture_message("Failed to process Stripe payout in ledger",
-          level: :error,
+          error: reason,
           extra: %{
             payout_id: payout_id,
             amount: Money.to_string!(payout_amount),
@@ -1647,9 +1607,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   """
   def debug_payout_transactions(stripe_payout_id)
       when is_binary(stripe_payout_id) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Debugging payout transactions",
+    Ysc.Logging.info("Debugging payout transactions",
       stripe_payout_id: stripe_payout_id
     )
 
@@ -1754,9 +1714,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   - `%Ysc.Ledgers.Payout{}` - The updated payout with linked payments/refunds
   """
   def relink_payout_transactions(%Ledgers.Payout{} = payout) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Manually relinking payout transactions",
+    Ysc.Logging.info("Manually relinking payout transactions",
       payout_id: payout.id,
       stripe_payout_id: payout.stripe_payout_id
     )
@@ -1829,7 +1789,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   """
   def fetch_actual_stripe_fee_from_charge(charge_id)
       when is_binary(charge_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Fetch the charge with expanded balance transaction to get actual fees
@@ -1840,7 +1800,7 @@ defmodule Ysc.Stripe.WebhookHandler do
          }} ->
           # fee is already in cents, convert to dollars
           # Log the fee for debugging
-          Logger.info("Extracted Stripe fee from balance transaction",
+          Ysc.Logging.info("Extracted Stripe fee from balance transaction",
             charge_id: charge_id,
             fee_cents: fee,
             fee_dollars: MoneyHelper.cents_to_dollars(fee)
@@ -1849,7 +1809,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           Money.new(MoneyHelper.cents_to_dollars(fee), :USD)
 
         {:ok, %Stripe.Charge{}} ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "Charge retrieved but no balance transaction fee found",
             charge_id: charge_id
           )
@@ -1858,7 +1818,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           calculate_estimated_fee_from_charge_amount(charge_id)
 
         {:error, reason} ->
-          Logger.error("Failed to fetch charge for fee calculation",
+          Ysc.Logging.error("Failed to fetch charge for fee calculation",
             charge_id: charge_id,
             error: reason
           )
@@ -1868,7 +1828,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     rescue
       error ->
-        Logger.error("Exception while fetching charge for fee calculation",
+        Ysc.Logging.error("Exception while fetching charge for fee calculation",
           charge_id: charge_id,
           error: Exception.message(error)
         )
@@ -1879,8 +1839,8 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   def fetch_actual_stripe_fee_from_charge(nil) do
-    require Logger
-    Logger.warning("No charge ID provided for fee calculation")
+    require Ysc.Logging
+    Ysc.Logging.warning("No charge ID provided for fee calculation")
     # Return zero fee if no charge ID
     Money.new(0, :USD)
   end
@@ -1897,7 +1857,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   - `%Money{}` - The estimated Stripe fee amount
   """
   def calculate_estimated_fee_from_charge_amount(charge_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Try to get the charge amount to calculate estimated fee
@@ -1908,7 +1868,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           calculate_estimated_fee(amount_dollars)
 
         {:error, reason} ->
-          Logger.error("Failed to fetch charge amount for fee estimation",
+          Ysc.Logging.error("Failed to fetch charge amount for fee estimation",
             charge_id: charge_id,
             error: reason
           )
@@ -1918,7 +1878,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     rescue
       error ->
-        Logger.error(
+        Ysc.Logging.error(
           "Exception while fetching charge amount for fee estimation",
           charge_id: charge_id,
           error: Exception.message(error)
@@ -1965,9 +1925,9 @@ defmodule Ysc.Stripe.WebhookHandler do
       customer_id = invoice[:customer] || invoice["customer"]
 
       if billing_reason == "subscription_create" && customer_id do
-        require Logger
+        require Ysc.Logging
 
-        Logger.info(
+        Ysc.Logging.info(
           "Subscription ID missing in invoice, attempting to resolve from customer",
           customer_id: customer_id,
           billing_reason: billing_reason
@@ -1978,7 +1938,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         if user do
           case Ysc.Subscriptions.list_subscriptions(user) do
             [] ->
-              Logger.warning(
+              Ysc.Logging.warning(
                 "No subscriptions found for user when resolving invoice",
                 user_id: user.id
               )
@@ -1994,7 +1954,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                 |> List.first()
 
               if subscription do
-                Logger.info("Resolved subscription ID from user subscriptions",
+                Ysc.Logging.info(
+                  "Resolved subscription ID from user subscriptions",
                   resolved_subscription_id: subscription.stripe_id
                 )
 
@@ -2004,7 +1965,8 @@ defmodule Ysc.Stripe.WebhookHandler do
               end
           end
         else
-          Logger.warning("User not found when resolving invoice subscription",
+          Ysc.Logging.warning(
+            "User not found when resolving invoice subscription",
             stripe_customer_id: customer_id
           )
 
@@ -2021,14 +1983,14 @@ defmodule Ysc.Stripe.WebhookHandler do
   # NOTE: This function makes external API calls to Stripe, so it should be called
   # BEFORE entering a transaction to avoid long-running transactions
   defp find_or_create_subscription_reference(stripe_subscription_id, user) do
-    require Logger
+    require Ysc.Logging
 
     # Try to find existing subscription
     case Ysc.Subscriptions.get_subscription_by_stripe_id(stripe_subscription_id) do
       nil ->
         # Subscription doesn't exist locally yet
         # Fetch from Stripe and create it to ensure proper entity_id linkage
-        Logger.info(
+        Ysc.Logging.info(
           "Subscription not found locally, fetching from Stripe to prevent race condition",
           stripe_subscription_id: stripe_subscription_id,
           user_id: user.id
@@ -2043,7 +2005,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                    stripe_subscription
                  ) do
               {:ok, subscription} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Created subscription from Stripe before processing payment",
                   subscription_id: subscription.id,
                   stripe_subscription_id: stripe_subscription_id,
@@ -2053,7 +2015,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 subscription.id
 
               {:error, reason} ->
-                Logger.error("Failed to create subscription from Stripe",
+                Ysc.Logging.error("Failed to create subscription from Stripe",
                   stripe_subscription_id: stripe_subscription_id,
                   user_id: user.id,
                   error: inspect(reason)
@@ -2064,7 +2026,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             end
 
           {:error, reason} ->
-            Logger.error("Failed to fetch subscription from Stripe",
+            Ysc.Logging.error("Failed to fetch subscription from Stripe",
               stripe_subscription_id: stripe_subscription_id,
               user_id: user.id,
               error: inspect(reason)
@@ -2091,8 +2053,6 @@ defmodule Ysc.Stripe.WebhookHandler do
   - `%Money{}` - The Stripe fee amount
   """
   def extract_stripe_fee_from_invoice(invoice) do
-    require Logger
-
     # Check if fee is provided in metadata first
     metadata = invoice[:metadata] || invoice["metadata"] || %{}
     charge_id = invoice[:charge] || invoice["charge"]
@@ -2105,7 +2065,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             # If fee seems too large (likely already in dollars), treat as dollars
             # A fee over $1000 would be unusual for most payments
             if fee > 100_000 do
-              Logger.warning(
+              Ysc.Logging.warning(
                 "Fee in metadata seems unusually large, treating as dollars",
                 fee_value: fee,
                 charge_id: charge_id
@@ -2122,7 +2082,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             # Try parsing as decimal (might be in dollars already)
             case Decimal.parse(fee_str) do
               {decimal, _} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Fee in metadata parsed as decimal (treating as dollars)",
                   fee_value: fee_str,
                   charge_id: charge_id
@@ -2131,7 +2091,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 Money.new(decimal, :USD)
 
               :error ->
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Could not parse fee from metadata, fetching from charge",
                   fee_value: fee_str,
                   charge_id: charge_id
@@ -2159,7 +2119,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   - `%Money{}` - The Stripe fee amount
   """
   def extract_stripe_fee_from_payment_intent(payment_intent) do
-    require Logger
+    require Ysc.Logging
 
     payment_intent_id = get_payment_intent_id(payment_intent)
 
@@ -2250,7 +2210,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper to estimate fee from payment intent amount
   defp estimate_fee_from_payment_intent(payment_intent) do
-    require Logger
+    require Ysc.Logging
 
     amount_cents = get_payment_intent_amount(payment_intent)
 
@@ -2258,7 +2218,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       amount_dollars = MoneyHelper.cents_to_dollars(amount_cents)
       calculate_estimated_fee(amount_dollars)
     else
-      Logger.warning(
+      Ysc.Logging.warning(
         "Could not determine payment intent amount for fee estimation"
       )
 
@@ -2307,7 +2267,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Helper function to extract and sync payment method from Stripe invoice
   # Creates the payment method in our database if it doesn't exist
   defp extract_payment_method_from_invoice(invoice) do
-    require Logger
+    require Ysc.Logging
 
     # Get the charge ID from the invoice
     charge_id = invoice[:charge] || invoice["charge"]
@@ -2316,7 +2276,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     case charge_id do
       nil ->
-        Logger.info("No charge found in invoice", invoice_id: invoice_id)
+        Ysc.Logging.info("No charge found in invoice", invoice_id: invoice_id)
         nil
 
       charge_id when is_binary(charge_id) ->
@@ -2339,7 +2299,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             case payment_method_id do
               nil ->
-                Logger.info("No payment method found in charge",
+                Ysc.Logging.info("No payment method found in charge",
                   charge_id: charge_id,
                   invoice_id: invoice_id
                 )
@@ -2359,7 +2319,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                        ) do
                     nil ->
                       # Payment method doesn't exist, retrieve from Stripe and create it
-                      Logger.info(
+                      Ysc.Logging.info(
                         "Payment method not found in local database, creating it",
                         stripe_payment_method_id: stripe_payment_method_id,
                         charge_id: charge_id,
@@ -2376,7 +2336,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                                  stripe_payment_method
                                ) do
                             {:ok, payment_method} ->
-                              Logger.info("Created payment method for invoice",
+                              Ysc.Logging.info(
+                                "Created payment method for invoice",
                                 payment_method_id: payment_method.id,
                                 stripe_payment_method_id:
                                   stripe_payment_method_id,
@@ -2387,7 +2348,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                               payment_method.id
 
                             {:error, reason} ->
-                              Logger.error(
+                              Ysc.Logging.error(
                                 "Failed to create payment method from Stripe",
                                 stripe_payment_method_id:
                                   stripe_payment_method_id,
@@ -2400,7 +2361,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                           end
 
                         {:error, error} ->
-                          Logger.error(
+                          Ysc.Logging.error(
                             "Failed to retrieve payment method from Stripe",
                             stripe_payment_method_id: stripe_payment_method_id,
                             charge_id: charge_id,
@@ -2413,7 +2374,8 @@ defmodule Ysc.Stripe.WebhookHandler do
 
                     existing_payment_method ->
                       # Payment method already exists
-                      Logger.info("Found existing payment method for invoice",
+                      Ysc.Logging.info(
+                        "Found existing payment method for invoice",
                         payment_method_id: existing_payment_method.id,
                         stripe_payment_method_id: stripe_payment_method_id,
                         charge_id: charge_id,
@@ -2423,7 +2385,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                       existing_payment_method.id
                   end
                 else
-                  Logger.warning(
+                  Ysc.Logging.warning(
                     "User not found for customer, cannot create payment method",
                     customer_id: customer_id,
                     invoice_id: invoice_id,
@@ -2435,7 +2397,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             end
 
           {:error, error} ->
-            Logger.warning("Failed to retrieve charge from Stripe",
+            Ysc.Logging.warning("Failed to retrieve charge from Stripe",
               charge_id: charge_id,
               error:
                 if(is_struct(error), do: error.message, else: inspect(error)),
@@ -2454,7 +2416,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp process_refund_from_refund_object(refund) when is_map(refund) do
-    require Logger
+    require Ysc.Logging
 
     # Extract fields from refund (handles both struct and map)
     refund_id = Map.get(refund, :id) || Map.get(refund, "id")
@@ -2474,7 +2436,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             charge.payment_intent
 
           {:error, reason} ->
-            Logger.warning("Failed to retrieve charge for refund",
+            Ysc.Logging.warning("Failed to retrieve charge for refund",
               charge_id: charge_id,
               refund_id: refund_id,
               error: inspect(reason)
@@ -2510,7 +2472,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                external_refund_id: refund_id
              }) do
           {:ok, {_refund, _refund_transaction, _entries}} ->
-            Logger.info("Refund processed successfully in ledger",
+            Ysc.Logging.info("Refund processed successfully in ledger",
               payment_id: payment.id,
               refund_id: refund_id,
               amount: Money.to_string!(refund_amount)
@@ -2523,7 +2485,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             {:error, {:already_processed, refund, refund_transaction}}
 
           {:error, reason} ->
-            Logger.error("Failed to process refund in ledger",
+            Ysc.Logging.error("Failed to process refund in ledger",
               payment_id: payment.id,
               refund_id: refund_id,
               error: inspect(reason)
@@ -2532,7 +2494,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             {:error, reason}
         end
       else
-        Logger.warning("Payment not found for refund",
+        Ysc.Logging.warning("Payment not found for refund",
           payment_intent_id: payment_intent_id,
           refund_id: refund_id
         )
@@ -2540,7 +2502,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         :ok
       end
     else
-      Logger.warning("No payment intent ID found in refund",
+      Ysc.Logging.warning("No payment intent ID found in refund",
         refund_id: refund_id,
         charge_id: charge_id
       )
@@ -2556,7 +2518,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp do_fetch_transactions(payout_id, acc, starting_after) do
-    require Logger
+    require Ysc.Logging
 
     params = %{
       payout: payout_id,
@@ -2583,7 +2545,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       {:ok, %{data: data, has_more: true}} when is_list(data) ->
         last_id = List.last(data) |> extract_balance_transaction_id()
 
-        Logger.debug("Fetched balance transactions page",
+        Ysc.Logging.debug("Fetched balance transactions page",
           payout_id: payout_id,
           page_size: length(data),
           has_more: true,
@@ -2593,7 +2555,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         if last_id do
           do_fetch_transactions(payout_id, acc ++ data, last_id)
         else
-          Logger.warning(
+          Ysc.Logging.warning(
             "Could not extract last_id from balance transactions, stopping pagination",
             payout_id: payout_id,
             page_size: length(data)
@@ -2603,7 +2565,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
 
       {:ok, %{data: data, has_more: false}} when is_list(data) ->
-        Logger.debug("Fetched final balance transactions page",
+        Ysc.Logging.debug("Fetched final balance transactions page",
           payout_id: payout_id,
           page_size: length(data),
           has_more: false
@@ -2615,7 +2577,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         # Handle Stripe.List struct format (backwards compatibility)
         last_id = List.last(data) |> extract_balance_transaction_id()
 
-        Logger.debug("Fetched balance transactions page (List format)",
+        Ysc.Logging.debug("Fetched balance transactions page (List format)",
           payout_id: payout_id,
           page_size: length(data),
           has_more: true,
@@ -2625,7 +2587,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         if last_id do
           do_fetch_transactions(payout_id, acc ++ data, last_id)
         else
-          Logger.warning(
+          Ysc.Logging.warning(
             "Could not extract last_id from balance transactions, stopping pagination",
             payout_id: payout_id,
             page_size: length(data)
@@ -2636,7 +2598,8 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       {:ok, %Stripe.List{data: data, has_more: false}} when is_list(data) ->
         # Handle Stripe.List struct format (backwards compatibility)
-        Logger.debug("Fetched final balance transactions page (List format)",
+        Ysc.Logging.debug(
+          "Fetched final balance transactions page (List format)",
           payout_id: payout_id,
           page_size: length(data),
           has_more: false
@@ -2645,7 +2608,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         {:ok, acc ++ data}
 
       {:error, reason} ->
-        Logger.error("Failed to fetch balance transactions",
+        Ysc.Logging.error("Failed to fetch balance transactions",
           payout_id: payout_id,
           error: inspect(reason),
           error_type:
@@ -2655,7 +2618,8 @@ defmodule Ysc.Stripe.WebhookHandler do
         {:error, reason}
 
       unexpected ->
-        Logger.error("Unexpected response format from BalanceTransaction.all",
+        Ysc.Logging.error(
+          "Unexpected response format from BalanceTransaction.all",
           payout_id: payout_id,
           response_type: inspect(unexpected.__struct__ || :map),
           response_keys:
@@ -2688,9 +2652,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to link payments and refunds to a payout
   defp link_payout_transactions(payout, stripe_payout_id) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info(
+    Ysc.Logging.info(
       "[Payout] link_payout_transactions: Starting to link transactions to payout",
       payout_id: payout.id,
       stripe_payout_id: stripe_payout_id,
@@ -2708,7 +2672,7 @@ defmodule Ysc.Stripe.WebhookHandler do
            balance_transaction: %Stripe.BalanceTransaction{fee: fee_cents} = bt
          }}
         when is_integer(fee_cents) and fee_cents > 0 ->
-          Logger.info("Retrieved payout balance transaction with fee",
+          Ysc.Logging.info("Retrieved payout balance transaction with fee",
             payout_id: stripe_payout_id,
             balance_transaction_id: bt.id,
             fee_cents: fee_cents
@@ -2720,7 +2684,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           fee_total =
             Money.new(MoneyHelper.cents_to_dollars(fee_cents), currency_atom)
 
-          Logger.info("Extracted fee from payout balance transaction",
+          Ysc.Logging.info("Extracted fee from payout balance transaction",
             payout_id: stripe_payout_id,
             fee_cents: fee_cents,
             fee_total: Money.to_string!(fee_total)
@@ -2732,7 +2696,8 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           case Repo.update(changeset) do
             {:ok, updated} ->
-              Logger.info("Updated payout fee_total from balance transaction",
+              Ysc.Logging.info(
+                "Updated payout fee_total from balance transaction",
                 payout_id: stripe_payout_id,
                 fee_total: Money.to_string!(fee_total)
               )
@@ -2740,7 +2705,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               updated
 
             {:error, changeset} ->
-              Logger.error("Failed to update payout fee_total",
+              Ysc.Logging.error("Failed to update payout fee_total",
                 payout_id: stripe_payout_id,
                 errors: inspect(changeset.errors)
               )
@@ -2752,7 +2717,7 @@ defmodule Ysc.Stripe.WebhookHandler do
          %Stripe.Payout{
            balance_transaction: %Stripe.BalanceTransaction{fee: fee_cents}
          }} ->
-          Logger.debug("Payout balance transaction has no fee or zero fee",
+          Ysc.Logging.debug("Payout balance transaction has no fee or zero fee",
             payout_id: stripe_payout_id,
             fee_cents: fee_cents
           )
@@ -2761,7 +2726,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           try_calculate_fees_from_balance_transactions(payout, stripe_payout_id)
 
         {:ok, %Stripe.Payout{balance_transaction: nil}} ->
-          Logger.warning("Payout balance transaction is nil",
+          Ysc.Logging.warning("Payout balance transaction is nil",
             payout_id: stripe_payout_id
           )
 
@@ -2769,7 +2734,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           try_calculate_fees_from_balance_transactions(payout, stripe_payout_id)
 
         {:ok, %Stripe.Payout{}} ->
-          Logger.debug("Payout retrieved but balance transaction not expanded",
+          Ysc.Logging.debug(
+            "Payout retrieved but balance transaction not expanded",
             payout_id: stripe_payout_id
           )
 
@@ -2777,7 +2743,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           try_calculate_fees_from_balance_transactions(payout, stripe_payout_id)
 
         {:error, reason} ->
-          Logger.warning("Failed to retrieve payout with balance transaction",
+          Ysc.Logging.warning(
+            "Failed to retrieve payout with balance transaction",
             payout_id: stripe_payout_id,
             error: inspect(reason)
           )
@@ -2792,7 +2759,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       # Balance transactions show all charges, refunds, and fees included in the payout
       case list_payout_transactions(stripe_payout_id) do
         {:ok, balance_transactions} when is_list(balance_transactions) ->
-          Logger.info("[Payout] Found balance transactions for payout",
+          Ysc.Logging.info("[Payout] Found balance transactions for payout",
             payout_id: stripe_payout_id,
             balance_transactions_count: length(balance_transactions),
             balance_transaction_types:
@@ -2818,7 +2785,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               end
             end)
 
-          Logger.info(
+          Ysc.Logging.info(
             "[Payout] Finished linking balance transactions to payout",
             payout_id: stripe_payout_id,
             total_balance_transactions: length(balance_transactions),
@@ -2830,7 +2797,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           updated_payout =
             Repo.reload!(updated_payout) |> Repo.preload([:payments, :refunds])
 
-          Logger.info("[Payout] Final payout transaction counts after linking",
+          Ysc.Logging.info(
+            "[Payout] Final payout transaction counts after linking",
             payout_id: stripe_payout_id,
             payments_count: length(updated_payout.payments),
             refunds_count: length(updated_payout.refunds),
@@ -2847,7 +2815,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           updated_payout
 
         {:error, reason} ->
-          Logger.warning("Failed to fetch balance transactions for payout",
+          Ysc.Logging.warning("Failed to fetch balance transactions for payout",
             payout_id: stripe_payout_id,
             error: inspect(reason)
           )
@@ -2857,20 +2825,11 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     rescue
       error ->
-        Logger.error("Exception while linking balance transactions",
+        Ysc.Logging.error("Exception while linking balance transactions",
           payout_id: stripe_payout_id,
           error: Exception.message(error),
           error_type: error.__struct__,
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry for visibility
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            payout_id: stripe_payout_id,
-            function: "link_payout_transactions"
-          }
         )
 
         # Return the payout even if linking failed (caller can check status)
@@ -2880,12 +2839,12 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Fallback: Calculate fees from listing all balance transactions for the payout
   defp try_calculate_fees_from_balance_transactions(payout, stripe_payout_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       case list_payout_transactions(stripe_payout_id) do
         {:ok, balance_transactions} when is_list(balance_transactions) ->
-          Logger.info(
+          Ysc.Logging.info(
             "Found #{length(balance_transactions)} balance transactions for fee calculation",
             payout_id: stripe_payout_id
           )
@@ -2911,7 +2870,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 end
               rescue
                 error ->
-                  Logger.warning(
+                  Ysc.Logging.warning(
                     "Error processing balance transaction for fee calculation",
                     error: Exception.message(error),
                     balance_transaction_id:
@@ -2932,7 +2891,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                 currency_atom
               )
 
-            Logger.info("Calculated total fees from balance transactions list",
+            Ysc.Logging.info(
+              "Calculated total fees from balance transactions list",
               payout_id: stripe_payout_id,
               fee_cents: total_fee_cents,
               fee_total: Money.to_string!(fee_total)
@@ -2943,7 +2903,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             case Repo.update(changeset) do
               {:ok, updated} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Updated payout fee_total from balance transactions list",
                   payout_id: stripe_payout_id,
                   fee_total: Money.to_string!(fee_total)
@@ -2952,7 +2912,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 updated
 
               {:error, changeset} ->
-                Logger.error("Failed to update payout fee_total",
+                Ysc.Logging.error("Failed to update payout fee_total",
                   payout_id: stripe_payout_id,
                   errors: inspect(changeset.errors)
                 )
@@ -2960,7 +2920,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 payout
             end
           else
-            Logger.debug("No fees found in balance transactions list",
+            Ysc.Logging.debug("No fees found in balance transactions list",
               payout_id: stripe_payout_id
             )
 
@@ -2968,7 +2928,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           end
 
         {:error, reason} ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "Failed to fetch balance transactions for fee calculation",
             payout_id: stripe_payout_id,
             error: inspect(reason)
@@ -2978,21 +2938,12 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     rescue
       error ->
-        Logger.error(
+        Ysc.Logging.error(
           "Exception while calculating fees from balance transactions",
           payout_id: stripe_payout_id,
           error: Exception.message(error),
           error_type: error.__struct__,
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry for visibility
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            payout_id: stripe_payout_id,
-            function: "try_calculate_fees_from_balance_transactions"
-          }
         )
 
         payout
@@ -3001,7 +2952,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to link a single balance transaction to a payout
   defp link_balance_transaction_to_payout(payout, balance_transaction) do
-    require Logger
+    require Ysc.Logging
 
     # Get transaction type - skip payout balance transactions (the payout itself)
     transaction_type =
@@ -3009,7 +2960,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     # Skip the payout balance transaction itself (type: "payout")
     if transaction_type == "payout" do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[Payout] Skipping payout balance transaction (the payout itself)",
         payout_id: payout.stripe_payout_id,
         transaction_type: transaction_type
@@ -3025,7 +2976,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       source = extract_source(balance_transaction)
       source_id = extract_source_id(source)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[Payout] link_balance_transaction_to_payout: Processing balance transaction",
         payout_id: payout.stripe_payout_id,
         transaction_type: transaction_type,
@@ -3050,7 +3001,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           _ ->
             # Other types (fees, adjustments, payout, etc.) - skip for now
-            Logger.debug("[Payout] Skipping balance transaction type",
+            Ysc.Logging.debug("[Payout] Skipping balance transaction type",
               payout_id: payout.stripe_payout_id,
               transaction_type: transaction_type,
               reporting_category: reporting_category,
@@ -3092,7 +3043,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Helper function to link a charge to a payout
   # source may be an expanded Charge object or nil (if we need to fetch by ID)
   defp link_charge_to_payout(payout, source, charge_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # If source is already an expanded Charge object, use it directly
@@ -3120,7 +3071,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 charge
 
               {:error, reason} ->
-                Logger.warning("Failed to retrieve charge",
+                Ysc.Logging.warning("Failed to retrieve charge",
                   charge_id: charge_id,
                   error: inspect(reason)
                 )
@@ -3177,7 +3128,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         if payment do
           {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
 
-          Logger.info("[Payout] Successfully linked payment to payout",
+          Ysc.Logging.info("[Payout] Successfully linked payment to payout",
             payout_id: payout.stripe_payout_id,
             payout_db_id: payout.id,
             payment_id: payment.id,
@@ -3191,7 +3142,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           :ok
         else
-          Logger.warning(
+          Ysc.Logging.warning(
             "[Payout] Payment not found for charge - cannot link to payout",
             payout_id: payout.stripe_payout_id,
             charge_id: charge_id,
@@ -3208,20 +3159,11 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     rescue
       error ->
-        Logger.error("Exception while linking charge to payout",
+        Ysc.Logging.error("Exception while linking charge to payout",
           charge_id: charge_id,
           error: Exception.message(error),
           error_type: error.__struct__,
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry for visibility
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            charge_id: charge_id,
-            function: "link_charge_to_payout"
-          }
         )
 
         :skipped
@@ -3231,7 +3173,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Helper function to link a Stripe refund to a payout
   # source may be an expanded Refund object or nil (if we need to fetch by ID)
   defp link_stripe_refund_to_payout(payout, source, stripe_refund_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # If source is already an expanded Refund object, use it directly
@@ -3257,7 +3199,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                 refund
 
               {:error, reason} ->
-                Logger.warning("Failed to retrieve refund",
+                Ysc.Logging.warning("Failed to retrieve refund",
                   stripe_refund_id: stripe_refund_id,
                   error: inspect(reason)
                 )
@@ -3301,7 +3243,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                   if db_refund do
                     {:ok, _} = Ledgers.link_refund_to_payout(payout, db_refund)
 
-                    Logger.info("[Payout] Successfully linked refund to payout",
+                    Ysc.Logging.info(
+                      "[Payout] Successfully linked refund to payout",
                       payout_id: payout.stripe_payout_id,
                       payout_db_id: payout.id,
                       refund_id: db_refund.id,
@@ -3313,7 +3256,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
                     :ok
                   else
-                    Logger.warning(
+                    Ysc.Logging.warning(
                       "[Payout] Refund not found for Stripe refund ID - cannot link to payout",
                       payout_id: payout.stripe_payout_id,
                       payment_id: payment.id,
@@ -3325,7 +3268,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                     :skipped
                   end
                 else
-                  Logger.warning("[Payout] Payment not found for refund",
+                  Ysc.Logging.warning("[Payout] Payment not found for refund",
                     payout_id: payout.stripe_payout_id,
                     payment_intent_id: payment_intent_id,
                     stripe_refund_id: stripe_refund_id
@@ -3334,7 +3277,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                   :skipped
                 end
               else
-                Logger.warning(
+                Ysc.Logging.warning(
                   "[Payout] Charge has no payment_intent for refund",
                   payout_id: payout.stripe_payout_id,
                   charge_id: charge_id,
@@ -3345,7 +3288,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               end
 
             {:error, reason} ->
-              Logger.warning("Failed to retrieve charge for refund",
+              Ysc.Logging.warning("Failed to retrieve charge for refund",
                 charge_id: charge_id,
                 error: inspect(reason)
               )
@@ -3353,7 +3296,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               :skipped
           end
         else
-          Logger.warning("[Payout] Refund has no charge",
+          Ysc.Logging.warning("[Payout] Refund has no charge",
             payout_id: payout.stripe_payout_id,
             stripe_refund_id: stripe_refund_id
           )
@@ -3365,20 +3308,11 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     rescue
       error ->
-        Logger.error("Exception while linking refund to payout",
+        Ysc.Logging.error("Exception while linking refund to payout",
           stripe_refund_id: stripe_refund_id,
           error: Exception.message(error),
           error_type: error.__struct__,
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry for visibility
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            stripe_refund_id: stripe_refund_id,
-            function: "link_stripe_refund_to_payout"
-          }
         )
 
         :skipped
@@ -3387,7 +3321,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to get membership type from subscription ID
   defp get_membership_type_from_subscription_id(subscription_id) do
-    require Logger
+    require Ysc.Logging
 
     # Try to get subscription from our database first
     case Subscriptions.get_subscription_by_stripe_id(subscription_id) do
@@ -3416,7 +3350,8 @@ defmodule Ysc.Stripe.WebhookHandler do
               :single
           end
 
-        Logger.debug("Membership type determined from database subscription",
+        Ysc.Logging.debug(
+          "Membership type determined from database subscription",
           subscription_id: subscription_id,
           membership_type: membership_type
         )
@@ -3427,8 +3362,6 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to get membership type from Stripe subscription API
   defp get_membership_type_from_stripe_subscription(subscription_id) do
-    require Logger
-
     case Stripe.Subscription.retrieve(subscription_id,
            expand: ["items.data.price"]
          ) do
@@ -3453,7 +3386,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               :single
           end
 
-        Logger.debug("Membership type determined from Stripe subscription",
+        Ysc.Logging.debug("Membership type determined from Stripe subscription",
           subscription_id: subscription_id,
           membership_type: membership_type
         )
@@ -3461,7 +3394,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         membership_type
 
       {:error, reason} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "Failed to retrieve subscription from Stripe, defaulting to single",
           subscription_id: subscription_id,
           error: inspect(reason)
@@ -3478,8 +3411,6 @@ defmodule Ysc.Stripe.WebhookHandler do
          amount,
          renewal_date
        ) do
-    require Logger
-
     try do
       email_module = YscWeb.Emails.MembershipRenewalSuccess
 
@@ -3498,7 +3429,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       idempotency_key =
         "membership_renewal_success_#{user.id}_#{Date.to_iso8601(renewal_date)}"
 
-      Logger.info("Enqueuing membership renewal success email",
+      Ysc.Logging.info("Enqueuing membership renewal success email",
         user_id: user.id,
         email: user.email,
         membership_type: membership_type,
@@ -3521,20 +3452,10 @@ defmodule Ysc.Stripe.WebhookHandler do
     rescue
       error ->
         # Log error but don't fail webhook processing
-        Logger.error("Failed to enqueue membership renewal success email",
+        Ysc.Logging.error("Failed to enqueue membership renewal success email",
           user_id: user.id,
           error: Exception.message(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry but continue
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            user_id: user.id,
-            membership_type: membership_type,
-            function: "enqueue_membership_renewal_success_email"
-          }
         )
 
         :ok
@@ -3549,10 +3470,10 @@ defmodule Ysc.Stripe.WebhookHandler do
          payment_date,
          paid_elsewhere
        ) do
-    require Logger
+    require Ysc.Logging
 
     try do
-      Logger.info("Enqueuing membership payment confirmation email",
+      Ysc.Logging.info("Enqueuing membership payment confirmation email",
         user_id: user.id,
         email: user.email,
         membership_type: membership_type,
@@ -3574,20 +3495,11 @@ defmodule Ysc.Stripe.WebhookHandler do
     rescue
       error ->
         # Log error but don't fail webhook processing
-        Logger.error("Failed to enqueue membership payment confirmation email",
+        Ysc.Logging.error(
+          "Failed to enqueue membership payment confirmation email",
           user_id: user.id,
           error: Exception.message(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry but continue
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            user_id: user.id,
-            membership_type: membership_type,
-            function: "enqueue_membership_payment_confirmation_email"
-          }
         )
 
         :ok
@@ -3601,7 +3513,7 @@ defmodule Ysc.Stripe.WebhookHandler do
          is_renewal,
          invoice_id
        ) do
-    require Logger
+    require Ysc.Logging
 
     try do
       email_module = YscWeb.Emails.MembershipPaymentFailure
@@ -3620,7 +3532,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       # Generate idempotency key from invoice ID to prevent duplicate emails
       idempotency_key = "membership_payment_failure_#{invoice_id}"
 
-      Logger.info("Enqueuing membership payment failure email",
+      Ysc.Logging.info("Enqueuing membership payment failure email",
         user_id: user.id,
         email: user.email,
         membership_type: membership_type,
@@ -3643,22 +3555,11 @@ defmodule Ysc.Stripe.WebhookHandler do
     rescue
       error ->
         # Log error but don't fail webhook processing
-        Logger.error("Failed to enqueue membership payment failure email",
+        Ysc.Logging.error("Failed to enqueue membership payment failure email",
           user_id: user.id,
           invoice_id: invoice_id,
           error: Exception.message(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        # Report to Sentry but continue
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            user_id: user.id,
-            membership_type: membership_type,
-            invoice_id: invoice_id,
-            function: "enqueue_membership_payment_failure_email"
-          }
         )
 
         :ok
@@ -3670,7 +3571,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   # 2. Fee_total is populated
   # 3. Linking is complete (at least one payment or refund linked, or none expected)
   defp enqueue_quickbooks_sync_payout_if_ready(%Ledgers.Payout{} = payout) do
-    require Logger
+    require Ysc.Logging
 
     # Reload payout with payments and refunds
     payout = Ledgers.get_payout!(payout.id)
@@ -3702,7 +3603,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         else: true
 
     if fee_total_populated && linking_complete do
-      Logger.info("Payout ready for QuickBooks sync - all conditions met",
+      Ysc.Logging.info("Payout ready for QuickBooks sync - all conditions met",
         payout_id: payout.id,
         payments_count: length(payout.payments),
         refunds_count: length(payout.refunds),
@@ -3733,7 +3634,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       unsynced_refunds =
         Enum.count(payout.refunds, &(&1.quickbooks_sync_status != "synced"))
 
-      Logger.info(
+      Ysc.Logging.info(
         "Payout not ready for QuickBooks sync - waiting for conditions to be met",
         payout_id: payout.id,
         fee_total_populated: fee_total_populated,
@@ -3749,9 +3650,10 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   rescue
     error ->
-      require Logger
+      require Ysc.Logging
 
-      Logger.error("Failed to check if payout is ready for QuickBooks sync",
+      Ysc.Logging.error(
+        "Failed to check if payout is ready for QuickBooks sync",
         payout_id: payout.id,
         error: inspect(error)
       )

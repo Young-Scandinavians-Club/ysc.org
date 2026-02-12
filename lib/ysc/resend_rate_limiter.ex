@@ -64,9 +64,9 @@ defmodule Ysc.ResendRateLimiter do
         :ok
 
       {:error, reason} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("[ResendRateLimiter] Failed to cache rate limit", %{
+        Ysc.Logging.error("[ResendRateLimiter] Failed to cache rate limit", %{
           cache_key: cache_key,
           reason: reason
         })

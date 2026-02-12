@@ -6,7 +6,7 @@ defmodule Ysc.PropertyOutages.Scraper do
   the database with the latest outage information.
   """
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.PropertyOutages.OutageTracker
   alias Ysc.Repo
   alias Ysc.Bookings
@@ -25,7 +25,7 @@ defmodule Ysc.PropertyOutages.Scraper do
   Scrapes outages from all configured providers.
   """
   def scrape_all do
-    Logger.info("Starting outage scraping for all providers")
+    Ysc.Logging.info("Starting outage scraping for all providers")
 
     providers = get_providers()
 
@@ -38,7 +38,7 @@ defmodule Ysc.PropertyOutages.Scraper do
     successful = Enum.count(results, &match?({:ok, _}, &1))
     failed = Enum.count(results, &match?({:error, _}, &1))
 
-    Logger.info("Outage scraping completed",
+    Ysc.Logging.info("Outage scraping completed",
       successful: successful,
       failed: failed,
       total_providers: length(providers)
@@ -51,12 +51,12 @@ defmodule Ysc.PropertyOutages.Scraper do
   Scrapes outages from a specific provider.
   """
   def scrape_provider(provider) do
-    Logger.info("Scraping outages from provider", provider: provider)
+    Ysc.Logging.info("Scraping outages from provider", provider: provider)
 
     try do
       outages = fetch_outages_from_provider(provider)
 
-      Logger.info("Processing outages for provider",
+      Ysc.Logging.info("Processing outages for provider",
         provider: provider,
         count: length(outages)
       )
@@ -65,7 +65,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         Enum.map(outages, fn outage_data ->
           case upsert_outage(outage_data) do
             {:ok, outage} ->
-              Logger.debug("Upserted outage",
+              Ysc.Logging.debug("Upserted outage",
                 provider: provider,
                 incident_id: outage.incident_id,
                 incident_type: outage.incident_type
@@ -74,7 +74,7 @@ defmodule Ysc.PropertyOutages.Scraper do
               :ok
 
             {:error, changeset} ->
-              Logger.error("Failed to upsert outage",
+              Ysc.Logging.error("Failed to upsert outage",
                 provider: provider,
                 incident_id: outage_data[:incident_id],
                 errors: inspect(changeset.errors)
@@ -87,7 +87,7 @@ defmodule Ysc.PropertyOutages.Scraper do
       successful = Enum.count(results, &(&1 == :ok))
       failed = Enum.count(results, &(&1 == :error))
 
-      Logger.info("Successfully scraped outages from provider",
+      Ysc.Logging.info("Successfully scraped outages from provider",
         provider: provider,
         total_outages: length(outages),
         successful_upserts: successful,
@@ -107,7 +107,7 @@ defmodule Ysc.PropertyOutages.Scraper do
             %{error: inspect(error)}
           end
 
-        Logger.error(
+        Ysc.Logging.error(
           "Failed to scrape outages from provider",
           Map.merge(
             %{
@@ -132,24 +132,24 @@ defmodule Ysc.PropertyOutages.Scraper do
   end
 
   defp fetch_outages_from_provider(:optimum) do
-    Logger.info("Fetching outages from Optimum (Kubra.io)",
+    Ysc.Logging.info("Fetching outages from Optimum (Kubra.io)",
       url: @optimum_api_url
     )
 
     case fetch_optimum_outages() do
       {:ok, outages} ->
-        Logger.info("Successfully fetched Optimum outages",
+        Ysc.Logging.info("Successfully fetched Optimum outages",
           count: length(outages)
         )
 
         outages
 
       {:error, :not_found} ->
-        Logger.info("No outages found (404 response from Optimum)")
+        Ysc.Logging.info("No outages found (404 response from Optimum)")
         []
 
       {:error, reason} ->
-        Logger.error("Failed to fetch Optimum outages",
+        Ysc.Logging.error("Failed to fetch Optimum outages",
           error: reason,
           error_type: inspect(reason),
           url: @optimum_api_url
@@ -161,35 +161,38 @@ defmodule Ysc.PropertyOutages.Scraper do
 
   defp fetch_outages_from_provider(:pge) do
     # NOTE: Implement PG&E API scraping
-    Logger.info("Fetching outages from PG&E")
+    Ysc.Logging.info("Fetching outages from PG&E")
     []
   end
 
   defp fetch_outages_from_provider(:scg) do
     # NOTE: Implement SCG (Southwest Gas) API scraping
-    Logger.info("Fetching outages from SCG")
+    Ysc.Logging.info("Fetching outages from SCG")
     []
   end
 
   defp fetch_outages_from_provider(:liberty) do
-    Logger.info("Fetching outages from Liberty Utilities",
+    Ysc.Logging.info("Fetching outages from Liberty Utilities",
       url: @liberty_api_url
     )
 
     case fetch_liberty_outages() do
       {:ok, outages} ->
-        Logger.info("Successfully fetched Liberty Utilities outages",
+        Ysc.Logging.info("Successfully fetched Liberty Utilities outages",
           count: length(outages)
         )
 
         outages
 
       {:error, :not_found} ->
-        Logger.info("No outages found (404 response from Liberty Utilities)")
+        Ysc.Logging.info(
+          "No outages found (404 response from Liberty Utilities)"
+        )
+
         []
 
       {:error, reason} ->
-        Logger.error("Failed to fetch Liberty Utilities outages",
+        Ysc.Logging.error("Failed to fetch Liberty Utilities outages",
           error: reason,
           error_type: inspect(reason),
           url: @liberty_api_url
@@ -200,7 +203,7 @@ defmodule Ysc.PropertyOutages.Scraper do
   end
 
   defp fetch_outages_from_provider(provider) do
-    Logger.warning("Unknown provider, skipping", provider: provider)
+    Ysc.Logging.warning("Unknown provider, skipping", provider: provider)
     []
   end
 
@@ -241,7 +244,7 @@ defmodule Ysc.PropertyOutages.Scraper do
               nil
           end)
 
-        Logger.debug("Optimum API response headers",
+        Ysc.Logging.debug("Optimum API response headers",
           content_encoding: content_encoding,
           body_size: if(is_binary(body), do: byte_size(body), else: 0)
         )
@@ -260,7 +263,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
             "zstd" ->
               # Zstd not commonly available in Elixir, try to parse as-is first
-              Logger.warning(
+              Ysc.Logging.warning(
                 "Zstd compression detected but may not be supported"
               )
 
@@ -281,11 +284,13 @@ defmodule Ysc.PropertyOutages.Scraper do
             inspect(decompressed_body)
           end
 
-        Logger.debug("Optimum API response preview", body_preview: body_preview)
+        Ysc.Logging.debug("Optimum API response preview",
+          body_preview: body_preview
+        )
 
         case Jason.decode(decompressed_body) do
           {:ok, json} ->
-            Logger.debug("Successfully parsed Optimum JSON",
+            Ysc.Logging.debug("Successfully parsed Optimum JSON",
               keys: Map.keys(json)
             )
 
@@ -293,7 +298,7 @@ defmodule Ysc.PropertyOutages.Scraper do
             {:ok, outages}
 
           {:error, reason} ->
-            Logger.error("Failed to parse Optimum JSON response",
+            Ysc.Logging.error("Failed to parse Optimum JSON response",
               error: inspect(reason),
               body_preview: body_preview,
               body_length:
@@ -307,7 +312,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         end
 
       {:ok, %{status: 404}} ->
-        Logger.info("Optimum API returned 404 - no outages")
+        Ysc.Logging.info("Optimum API returned 404 - no outages")
         {:error, :not_found}
 
       {:ok, %{status: status, body: body}} ->
@@ -318,7 +323,7 @@ defmodule Ysc.PropertyOutages.Scraper do
             inspect(body)
           end
 
-        Logger.error("Unexpected status code from Optimum API",
+        Ysc.Logging.error("Unexpected status code from Optimum API",
           status: status,
           body_preview: body_preview
         )
@@ -344,7 +349,7 @@ defmodule Ysc.PropertyOutages.Scraper do
               other
           end
 
-        Logger.error("Network error fetching Optimum outages",
+        Ysc.Logging.error("Network error fetching Optimum outages",
           error: inspect(reason),
           error_details: inspect(error_details),
           error_type: get_error_type(reason),
@@ -427,7 +432,7 @@ defmodule Ysc.PropertyOutages.Scraper do
   # Liberty Utilities-specific scraping functions
 
   defp fetch_liberty_outages do
-    Logger.debug("Building Liberty Utilities API request",
+    Ysc.Logging.debug("Building Liberty Utilities API request",
       url: @liberty_api_url,
       account_id: @liberty_account_id
     )
@@ -456,7 +461,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
     request = Finch.build(:get, @liberty_api_url, headers)
 
-    Logger.debug("Sending Liberty Utilities API request",
+    Ysc.Logging.debug("Sending Liberty Utilities API request",
       method: "GET",
       url: @liberty_api_url,
       header_count: length(headers)
@@ -481,7 +486,7 @@ defmodule Ysc.PropertyOutages.Scraper do
               nil
           end)
 
-        Logger.debug("Liberty Utilities API response headers",
+        Ysc.Logging.debug("Liberty Utilities API response headers",
           content_encoding: content_encoding,
           body_size: if(is_binary(body), do: byte_size(body), else: 0)
         )
@@ -493,7 +498,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           case Jason.decode(body) do
             {:ok, json} ->
               # Body is already decompressed and valid JSON
-              Logger.debug("Body is already decompressed JSON")
+              Ysc.Logging.debug("Body is already decompressed JSON")
               {:ok, json}
 
             {:error, _} ->
@@ -501,19 +506,19 @@ defmodule Ysc.PropertyOutages.Scraper do
               decompressed_body =
                 case content_encoding do
                   encoding when encoding in ["gzip", "x-gzip"] ->
-                    Logger.debug("Attempting gzip decompression")
+                    Ysc.Logging.debug("Attempting gzip decompression")
                     decompress_gzip(body)
 
                   "deflate" ->
-                    Logger.debug("Attempting deflate decompression")
+                    Ysc.Logging.debug("Attempting deflate decompression")
                     decompress_deflate(body)
 
                   "br" ->
-                    Logger.debug("Attempting brotli decompression")
+                    Ysc.Logging.debug("Attempting brotli decompression")
                     decompress_brotli(body)
 
                   "zstd" ->
-                    Logger.warning(
+                    Ysc.Logging.warning(
                       "Zstd compression detected but may not be supported"
                     )
 
@@ -522,7 +527,7 @@ defmodule Ysc.PropertyOutages.Scraper do
                   _ ->
                     # No compression detected, but JSON parsing failed
                     # Log the body for debugging
-                    Logger.warning(
+                    Ysc.Logging.warning(
                       "Content-encoding is nil/unknown but JSON parsing failed"
                     )
 
@@ -532,7 +537,7 @@ defmodule Ysc.PropertyOutages.Scraper do
               # Try parsing again after decompression
               case Jason.decode(decompressed_body) do
                 {:ok, json} ->
-                  Logger.debug("Successfully parsed after decompression")
+                  Ysc.Logging.debug("Successfully parsed after decompression")
                   {:ok, json}
 
                 {:error, reason} ->
@@ -551,7 +556,7 @@ defmodule Ysc.PropertyOutages.Scraper do
                       inspect(decompressed_body)
                     end
 
-                  Logger.error(
+                  Ysc.Logging.error(
                     "Failed to parse Liberty Utilities JSON response",
                     error: inspect(reason),
                     content_encoding: content_encoding,
@@ -569,7 +574,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
         case result do
           {:ok, json} ->
-            Logger.debug("Successfully parsed Liberty Utilities JSON",
+            Ysc.Logging.debug("Successfully parsed Liberty Utilities JSON",
               keys: Map.keys(json)
             )
 
@@ -581,7 +586,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         end
 
       {:ok, %{status: 404}} ->
-        Logger.info("Liberty Utilities API returned 404 - no outages")
+        Ysc.Logging.info("Liberty Utilities API returned 404 - no outages")
         {:error, :not_found}
 
       {:ok, %{status: status, body: body, headers: headers}} ->
@@ -607,7 +612,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           end)
           |> Enum.into(%{})
 
-        Logger.error("Unexpected status code from Liberty Utilities API",
+        Ysc.Logging.error("Unexpected status code from Liberty Utilities API",
           status: status,
           url: @liberty_api_url,
           body_preview: body_preview,
@@ -640,7 +645,7 @@ defmodule Ysc.PropertyOutages.Scraper do
               other
           end
 
-        Logger.error("Network error fetching Liberty Utilities outages",
+        Ysc.Logging.error("Network error fetching Liberty Utilities outages",
           error: inspect(reason),
           error_details: inspect(error_details),
           error_type: get_error_type(reason),
@@ -654,7 +659,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
   defp parse_liberty_response(%{"data" => data}, _raw_json)
        when is_list(data) do
-    Logger.debug("Parsing Liberty Utilities response",
+    Ysc.Logging.debug("Parsing Liberty Utilities response",
       total_incidents: length(data),
       account_id: @liberty_account_id
     )
@@ -669,7 +674,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         has_account =
           has_account_in_affected_areas?(incident, @liberty_account_id)
 
-        Logger.debug("Checking incident",
+        Ysc.Logging.debug("Checking incident",
           incident_id: incident["incidentId"],
           commodity_type: incident["commodity_Type"],
           is_electricity: is_electricity,
@@ -684,7 +689,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         is_electricity && has_account
       end)
 
-    Logger.info("Filtered Liberty Utilities incidents",
+    Ysc.Logging.info("Filtered Liberty Utilities incidents",
       total_incidents: length(data),
       electricity_incidents:
         Enum.count(data, fn i -> i["commodity_Type"] == "E" end),
@@ -771,7 +776,8 @@ defmodule Ysc.PropertyOutages.Scraper do
   end
 
   defp parse_liberty_response(_, _raw_json) do
-    Logger.warning("Liberty Utilities response does not match expected format",
+    Ysc.Logging.warning(
+      "Liberty Utilities response does not match expected format",
       expected: "data array in response"
     )
 
@@ -849,7 +855,10 @@ defmodule Ysc.PropertyOutages.Scraper do
       |> :zlib.gunzip()
     rescue
       error ->
-        Logger.error("Failed to decompress gzip data", error: inspect(error))
+        Ysc.Logging.error("Failed to decompress gzip data",
+          error: inspect(error)
+        )
+
         compressed_data
     end
   end
@@ -863,7 +872,10 @@ defmodule Ysc.PropertyOutages.Scraper do
       IO.iodata_to_binary(decompressed)
     rescue
       error ->
-        Logger.error("Failed to decompress deflate data", error: inspect(error))
+        Ysc.Logging.error("Failed to decompress deflate data",
+          error: inspect(error)
+        )
+
         compressed_data
     end
   end
@@ -872,7 +884,7 @@ defmodule Ysc.PropertyOutages.Scraper do
     # Brotli decompression - Finch should handle this automatically,
     # but if it doesn't, we'll need a brotli library at runtime
     # For now, log a warning and try to parse as-is
-    Logger.warning(
+    Ysc.Logging.warning(
       "Brotli compression detected but runtime decompression not available. Finch should handle this automatically."
     )
 
@@ -892,7 +904,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
         case Repo.insert(changeset) do
           {:ok, outage} ->
-            Logger.debug("Inserted new outage",
+            Ysc.Logging.debug("Inserted new outage",
               incident_id: outage.incident_id,
               incident_type: outage.incident_type
             )
@@ -903,7 +915,7 @@ defmodule Ysc.PropertyOutages.Scraper do
             {:ok, outage}
 
           {:error, changeset} ->
-            Logger.error("Failed to insert outage",
+            Ysc.Logging.error("Failed to insert outage",
               incident_id: incident_id,
               errors: inspect(changeset.errors)
             )
@@ -917,7 +929,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
         case Repo.update(changeset) do
           {:ok, outage} ->
-            Logger.debug("Updated existing outage",
+            Ysc.Logging.debug("Updated existing outage",
               incident_id: outage.incident_id,
               incident_type: outage.incident_type
             )
@@ -925,7 +937,7 @@ defmodule Ysc.PropertyOutages.Scraper do
             {:ok, outage}
 
           {:error, changeset} ->
-            Logger.error("Failed to update outage",
+            Ysc.Logging.error("Failed to update outage",
               incident_id: incident_id,
               errors: inspect(changeset.errors)
             )
@@ -936,7 +948,7 @@ defmodule Ysc.PropertyOutages.Scraper do
   end
 
   defp notify_active_bookings(outage) do
-    Logger.info("Notifying active bookings about new outage",
+    Ysc.Logging.info("Notifying active bookings about new outage",
       incident_id: outage.incident_id,
       property: outage.property,
       incident_date: outage.incident_date
@@ -946,7 +958,7 @@ defmodule Ysc.PropertyOutages.Scraper do
     active_bookings =
       get_active_bookings_for_outage(outage.property, outage.incident_date)
 
-    Logger.info("Found active bookings for outage notification",
+    Ysc.Logging.info("Found active bookings for outage notification",
       count: length(active_bookings),
       property: outage.property,
       incident_date: outage.incident_date
@@ -1062,14 +1074,14 @@ defmodule Ysc.PropertyOutages.Scraper do
              booking.user.id
            ) do
         %Oban.Job{} ->
-          Logger.info("Scheduled outage notification email",
+          Ysc.Logging.info("Scheduled outage notification email",
             booking_id: booking.id,
             user_email: booking.user.email,
             outage_id: outage.incident_id
           )
 
         {:error, reason} ->
-          Logger.error("Failed to schedule outage notification email",
+          Ysc.Logging.error("Failed to schedule outage notification email",
             booking_id: booking.id,
             user_email: booking.user.email,
             outage_id: outage.incident_id,
@@ -1077,7 +1089,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           )
       end
     else
-      Logger.warning(
+      Ysc.Logging.warning(
         "Cannot send outage notification - booking has no user or email",
         booking_id: booking.id,
         outage_id: outage.incident_id

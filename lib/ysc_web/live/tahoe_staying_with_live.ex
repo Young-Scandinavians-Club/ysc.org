@@ -69,9 +69,9 @@ defmodule YscWeb.TahoeStayingWithLive do
 
     # Ensure we have valid JSON
     if calendar_data_json == nil || calendar_data_json == "" do
-      require Logger
+      require Ysc.Logging
 
-      Logger.error(
+      Ysc.Logging.error(
         "[TahoeStayingWithLive] Failed to generate calendar_data_json"
       )
     end

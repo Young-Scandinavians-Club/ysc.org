@@ -30,7 +30,7 @@ defmodule Mix.Tasks.Message.Requeue do
   """
 
   use Mix.Task
-  require Logger
+  require Ysc.Logging
 
   @shortdoc "Re-queue failed email messages"
 
@@ -61,83 +61,85 @@ defmodule Mix.Tasks.Message.Requeue do
   defp list_failed_jobs(opts) do
     opts = parse_opts(opts)
 
-    Logger.info("Listing failed email jobs...")
+    Ysc.Logging.info("Listing failed email jobs...")
 
     failed_jobs = Requeue.list_failed_jobs(opts)
 
     if Enum.empty?(failed_jobs) do
-      Logger.info("No failed email jobs found.")
+      Ysc.Logging.info("No failed email jobs found.")
     else
-      Logger.info("Found #{length(failed_jobs)} failed email jobs:")
-      Logger.info("")
+      Ysc.Logging.info("Found #{length(failed_jobs)} failed email jobs:")
+      Ysc.Logging.info("")
 
       Enum.each(failed_jobs, fn job ->
         recipient = get_in(job.args, ["recipient"]) || "unknown"
         template = get_in(job.args, ["template"]) || "unknown"
 
-        Logger.info("Job ID: #{job.id}")
-        Logger.info("  State: #{job.state}")
-        Logger.info("  Queue: #{job.queue}")
-        Logger.info("  Worker: #{job.worker}")
-        Logger.info("  Recipient: #{recipient}")
-        Logger.info("  Template: #{template}")
-        Logger.info("  Attempt: #{job.attempt}/#{job.max_attempts}")
+        Ysc.Logging.info("Job ID: #{job.id}")
+        Ysc.Logging.info("  State: #{job.state}")
+        Ysc.Logging.info("  Queue: #{job.queue}")
+        Ysc.Logging.info("  Worker: #{job.worker}")
+        Ysc.Logging.info("  Recipient: #{recipient}")
+        Ysc.Logging.info("  Template: #{template}")
+        Ysc.Logging.info("  Attempt: #{job.attempt}/#{job.max_attempts}")
 
-        Logger.info(
+        Ysc.Logging.info(
           "  Failed At: #{format_datetime(job.discarded_at || job.inserted_at)}"
         )
 
-        Logger.info("  Created At: #{format_datetime(job.inserted_at)}")
+        Ysc.Logging.info("  Created At: #{format_datetime(job.inserted_at)}")
 
         if job.errors && job.errors != [] do
           last_error = List.last(job.errors)
-          Logger.info("  Last Error: #{inspect(last_error.message)}")
+          Ysc.Logging.info("  Last Error: #{inspect(last_error.message)}")
         end
 
-        Logger.info("")
+        Ysc.Logging.info("")
       end)
     end
   end
 
   defp show_stats do
-    Logger.info("Failed email job statistics:")
-    Logger.info("")
+    Ysc.Logging.info("Failed email job statistics:")
+    Ysc.Logging.info("")
 
     stats = Requeue.get_stats()
 
-    Logger.info("Total Failed: #{stats.total_failed}")
-    Logger.info("Discarded (exhausted retries): #{stats.discarded}")
-    Logger.info("Retryable (can still retry): #{stats.retryable}")
-    Logger.info("Recent Failures (24h): #{stats.recent_failures_24h}")
-    Logger.info("")
+    Ysc.Logging.info("Total Failed: #{stats.total_failed}")
+    Ysc.Logging.info("Discarded (exhausted retries): #{stats.discarded}")
+    Ysc.Logging.info("Retryable (can still retry): #{stats.retryable}")
+    Ysc.Logging.info("Recent Failures (24h): #{stats.recent_failures_24h}")
+    Ysc.Logging.info("")
 
     if not Enum.empty?(stats.by_template) do
-      Logger.info("By Template:")
+      Ysc.Logging.info("By Template:")
 
       Enum.each(stats.by_template, fn {template, count} ->
-        Logger.info("  #{template}: #{count}")
+        Ysc.Logging.info("  #{template}: #{count}")
       end)
 
-      Logger.info("")
+      Ysc.Logging.info("")
     end
   end
 
   defp requeue_single_job(job_id) do
-    Logger.info("Re-queuing job: #{job_id}")
+    Ysc.Logging.info("Re-queuing job: #{job_id}")
 
     case Requeue.requeue_job_by_id(job_id) do
       {:ok, new_job} ->
-        Logger.info("✅ Successfully re-queued job #{job_id}")
-        Logger.info("New Job ID: #{new_job.id}")
+        Ysc.Logging.info("✅ Successfully re-queued job #{job_id}")
+        Ysc.Logging.info("New Job ID: #{new_job.id}")
 
       {:error, :not_found} ->
-        Logger.error("❌ Job #{job_id} not found")
+        Ysc.Logging.error("❌ Job #{job_id} not found")
 
       {:error, :not_an_email_job} ->
-        Logger.error("❌ Job #{job_id} is not an email job")
+        Ysc.Logging.error("❌ Job #{job_id} is not an email job")
 
       {:error, reason} ->
-        Logger.error("❌ Failed to re-queue job #{job_id}: #{inspect(reason)}")
+        Ysc.Logging.error(
+          "❌ Failed to re-queue job #{job_id}: #{inspect(reason)}"
+        )
     end
   end
 
@@ -145,18 +147,21 @@ defmodule Mix.Tasks.Message.Requeue do
     opts = parse_opts(opts)
 
     if opts[:dry_run] do
-      Logger.info("🔍 Dry run - showing what would be re-queued...")
+      Ysc.Logging.info("🔍 Dry run - showing what would be re-queued...")
     else
-      Logger.info("Re-queuing all failed email jobs...")
+      Ysc.Logging.info("Re-queuing all failed email jobs...")
     end
 
     result = Requeue.requeue_all(opts)
 
     if result.total_found == 0 do
-      Logger.info("No failed email jobs found to re-queue.")
+      Ysc.Logging.info("No failed email jobs found to re-queue.")
     else
-      Logger.info("Found #{result.total_found} failed email jobs to re-queue.")
-      Logger.info("")
+      Ysc.Logging.info(
+        "Found #{result.total_found} failed email jobs to re-queue."
+      )
+
+      Ysc.Logging.info("")
 
       if opts[:dry_run] do
         failed_jobs =
@@ -169,30 +174,30 @@ defmodule Mix.Tasks.Message.Requeue do
           recipient = get_in(job.args, ["recipient"]) || "unknown"
           template = get_in(job.args, ["template"]) || "unknown"
 
-          Logger.info(
+          Ysc.Logging.info(
             "Would re-queue: Job #{job.id} - #{recipient} (#{template})"
           )
         end)
       end
 
-      Logger.info("")
-      Logger.info("Summary:")
-      Logger.info("Total Found: #{result.total_found}")
+      Ysc.Logging.info("")
+      Ysc.Logging.info("Summary:")
+      Ysc.Logging.info("Total Found: #{result.total_found}")
 
       if not opts[:dry_run] do
-        Logger.info("Successfully Re-queued: #{result.successful}")
-        Logger.info("Failed to Re-queue: #{result.failed}")
+        Ysc.Logging.info("Successfully Re-queued: #{result.successful}")
+        Ysc.Logging.info("Failed to Re-queue: #{result.failed}")
 
         if result.failed > 0 do
-          Logger.info("")
-          Logger.info("Failed job details:")
+          Ysc.Logging.info("")
+          Ysc.Logging.info("Failed job details:")
 
           Enum.each(result.results, fn
             {:ok, _} ->
               :ok
 
             {:error, job_id, reason} ->
-              Logger.error("  Job #{job_id}: #{inspect(reason)}")
+              Ysc.Logging.error("  Job #{job_id}: #{inspect(reason)}")
           end)
         end
       end
@@ -235,7 +240,7 @@ defmodule Mix.Tasks.Message.Requeue do
   end
 
   defp show_help do
-    Logger.info("""
+    Ysc.Logging.info("""
     Message Re-queue Tool
 
     Usage:

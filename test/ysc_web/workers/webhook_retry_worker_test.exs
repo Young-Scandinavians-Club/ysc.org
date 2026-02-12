@@ -284,7 +284,9 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           payload: nil
         })
 
+      Logger.put_module_level(WebhookRetryWorker, :none)
       result = WebhookRetryWorker.retry_webhook(webhook)
+      Logger.put_module_level(WebhookRetryWorker, :error)
 
       # Should handle gracefully and mark as failed
       assert match?({:error, _}, result)

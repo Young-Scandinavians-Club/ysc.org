@@ -33,7 +33,7 @@ defmodule Ysc.Alerts.Discord do
       )
   """
 
-  require Logger
+  require Ysc.Logging
 
   # Discord color codes
   @colors %{
@@ -159,14 +159,17 @@ defmodule Ysc.Alerts.Discord do
   def send_alert(opts) do
     cond do
       !enabled?() ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "Discord alerts disabled, skipping message: #{inspect(opts[:title])}"
         )
 
         {:ok, :disabled}
 
       !webhook_url() ->
-        Logger.warning("Discord webhook URL not configured, cannot send alert")
+        Ysc.Logging.warning(
+          "Discord webhook URL not configured, cannot send alert"
+        )
+
         {:error, :no_webhook_url}
 
       true ->
@@ -175,11 +178,14 @@ defmodule Ysc.Alerts.Discord do
 
         case send_webhook(payload) do
           {:ok, _response} ->
-            Logger.info("Discord alert sent successfully", title: opts[:title])
+            Ysc.Logging.info("Discord alert sent successfully",
+              title: opts[:title]
+            )
+
             {:ok, :sent}
 
           {:error, reason} ->
-            Logger.warning("Failed to send Discord alert",
+            Ysc.Logging.warning("Failed to send Discord alert",
               title: opts[:title],
               reason: inspect(reason)
             )

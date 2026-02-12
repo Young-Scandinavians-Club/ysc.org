@@ -43,7 +43,7 @@ defmodule Ysc.Flowroute.Client do
   - Smart quotes are known to cause errors - use neutral (vertical) quotes
   """
 
-  require Logger
+  require Ysc.Logging
 
   @api_base_url "https://api.flowroute.com/v2.1"
   @api_endpoint "/messages"
@@ -145,7 +145,7 @@ defmodule Ysc.Flowroute.Client do
       headers = build_headers(access_key, secret_key)
       request_body = build_request_body(to, from, body, is_mms, media_urls)
 
-      Logger.info("Sending SMS via FlowRoute",
+      Ysc.Logging.info("Sending SMS via FlowRoute",
         to: to,
         from: from,
         body_length: String.length(body),
@@ -158,7 +158,7 @@ defmodule Ysc.Flowroute.Client do
         {:ok, %Finch.Response{status: 202, body: response_body}} ->
           case Jason.decode(response_body) do
             {:ok, %{"data" => %{"id" => message_id}}} ->
-              Logger.info("Successfully sent SMS via FlowRoute",
+              Ysc.Logging.info("Successfully sent SMS via FlowRoute",
                 to: to,
                 from: from,
                 message_id: message_id
@@ -178,7 +178,7 @@ defmodule Ysc.Flowroute.Client do
               {:ok, %{id: message_id}}
 
             {:ok, data} ->
-              Logger.warning("Unexpected FlowRoute response format",
+              Ysc.Logging.warning("Unexpected FlowRoute response format",
                 to: to,
                 from: from,
                 response: inspect(data)
@@ -199,7 +199,7 @@ defmodule Ysc.Flowroute.Client do
               {:ok, %{id: message_id}}
 
             {:error, error} ->
-              Logger.error("Failed to parse FlowRoute response",
+              Ysc.Logging.error("Failed to parse FlowRoute response",
                 to: to,
                 from: from,
                 error: inspect(error),
@@ -210,7 +210,7 @@ defmodule Ysc.Flowroute.Client do
           end
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
-          Logger.error("FlowRoute API returned error status",
+          Ysc.Logging.error("FlowRoute API returned error status",
             to: to,
             from: from,
             status: status,
@@ -221,7 +221,7 @@ defmodule Ysc.Flowroute.Client do
           {:error, error_reason}
 
         {:error, error} ->
-          Logger.error("Failed to send SMS via FlowRoute",
+          Ysc.Logging.error("Failed to send SMS via FlowRoute",
             to: to,
             from: from,
             error: inspect(error)
@@ -236,7 +236,7 @@ defmodule Ysc.Flowroute.Client do
     # Generate a fake message ID in the same format as FlowRoute
     fake_message_id = "mdr2-#{generate_fake_id()}"
 
-    Logger.info("FlowRoute SMS no-op (lower environment)",
+    Ysc.Logging.info("FlowRoute SMS no-op (lower environment)",
       to: to,
       from: from,
       body_length: String.length(body),
@@ -304,14 +304,14 @@ defmodule Ysc.Flowroute.Client do
 
       case Ysc.Sms.create_sms_message(attrs) do
         {:ok, _sms_message} ->
-          Logger.debug("Stored SMS message in database",
+          Ysc.Logging.debug("Stored SMS message in database",
             provider: :flowroute,
             provider_message_id: message_id
           )
 
         {:error, changeset} ->
           # Log but don't fail - this is not critical
-          Logger.warning("Failed to store SMS message in database",
+          Ysc.Logging.warning("Failed to store SMS message in database",
             provider: :flowroute,
             provider_message_id: message_id,
             errors: inspect(changeset.errors)
@@ -320,7 +320,7 @@ defmodule Ysc.Flowroute.Client do
     rescue
       error ->
         # Log but don't fail - this is not critical
-        Logger.warning("Error storing SMS message in database",
+        Ysc.Logging.warning("Error storing SMS message in database",
           provider: :flowroute,
           provider_message_id: message_id,
           error: Exception.message(error)

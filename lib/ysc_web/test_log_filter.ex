@@ -8,7 +8,7 @@ defmodule YscWeb.TestLogFilter do
   test output.
   """
 
-  require Logger
+  require Ysc.Logging
 
   @doc """
   Filters out expected database connection cleanup errors during tests.

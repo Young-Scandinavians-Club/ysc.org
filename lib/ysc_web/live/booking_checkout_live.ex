@@ -6,7 +6,7 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   @impl true
   def mount(%{"booking_id" => booking_id}, _session, socket) do
@@ -973,10 +973,10 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_event("validate-guest-info", %{"guests" => guest_params}, socket) do
-    require Logger
-    Logger.debug("[validate-guest-info] Event received")
+    require Ysc.Logging
+    Ysc.Logging.debug("[validate-guest-info] Event received")
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] Received guest_params: #{inspect(guest_params)}"
     )
 
@@ -986,11 +986,11 @@ defmodule YscWeb.BookingCheckoutLive do
 
     other_family_members = socket.assigns.other_family_members || []
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] selected_family_members: #{inspect(selected_family_members)}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] other_family_members count: #{length(other_family_members)}"
     )
 
@@ -1025,7 +1025,7 @@ defmodule YscWeb.BookingCheckoutLive do
       end)
       |> Map.new()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] updated_guest_params after family member merge: #{inspect(updated_guest_params)}"
     )
 
@@ -1033,11 +1033,11 @@ defmodule YscWeb.BookingCheckoutLive do
     guest_info_form =
       socket.assigns.guest_info_form || to_form(%{}, as: "guests")
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] guest_info_form.source keys: #{inspect(Map.keys(guest_info_form.source))}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] guest_info_form.source: #{inspect(guest_info_form.source)}"
     )
 
@@ -1076,42 +1076,42 @@ defmodule YscWeb.BookingCheckoutLive do
         end)
       end)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] After merging form source, updated_guest_params keys: #{inspect(Map.keys(updated_guest_params))}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] Final updated_guest_params keys: #{inspect(Map.keys(updated_guest_params))}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] Final updated_guest_params: #{inspect(updated_guest_params)}"
     )
 
     # Update the form with new params to preserve user input
     updated_form = to_form(updated_guest_params, as: "guests")
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] Building changesets for booking: #{socket.assigns.booking.id}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[validate-guest-info] Booking guests_count: #{socket.assigns.booking.guests_count}, children_count: #{socket.assigns.booking.children_count}"
     )
 
     case build_guest_changesets(socket.assigns.booking, updated_guest_params) do
       {:ok, changesets} ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "[validate-guest-info] Built #{length(changesets)} changesets"
         )
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "[validate-guest-info] Changesets valid status: #{inspect(Enum.map(changesets, & &1.valid?))}"
         )
 
         # Check if all changesets are valid
         all_valid = Enum.all?(changesets, & &1.valid?)
-        Logger.debug("[validate-guest-info] All valid: #{all_valid}")
+        Ysc.Logging.debug("[validate-guest-info] All valid: #{all_valid}")
 
         if all_valid do
           {:noreply,
@@ -1166,7 +1166,7 @@ defmodule YscWeb.BookingCheckoutLive do
         end
 
       {:error, error_message} when is_binary(error_message) ->
-        Logger.error(
+        Ysc.Logging.error(
           "[validate-guest-info] Error building changesets: #{error_message}"
         )
 
@@ -1217,9 +1217,9 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_event("select-guest-attendee", params, socket) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[select-guest-attendee] Event received with params: #{inspect(params)}"
     )
 
@@ -1259,7 +1259,7 @@ defmodule YscWeb.BookingCheckoutLive do
         end
       end
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[select-guest-attendee] guest_index: #{inspect(guest_index)}, selected_value: #{inspect(selected_value)}"
     )
 
@@ -1325,7 +1325,7 @@ defmodule YscWeb.BookingCheckoutLive do
               existing_guest_data =
                 Map.get(guest_info_form.source, guest_index, %{})
 
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[select-guest-attendee] Existing guest data for index #{guest_index}: #{inspect(existing_guest_data)}"
               )
 
@@ -1343,7 +1343,7 @@ defmodule YscWeb.BookingCheckoutLive do
                   )
               }
 
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[select-guest-attendee] Form data for index #{guest_index}: #{inspect(form_data)}"
               )
 
@@ -1352,7 +1352,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
               updated_form = %{guest_info_form | source: updated_form_source}
 
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[select-guest-attendee] Updated form source keys: #{inspect(Map.keys(updated_form_source))}"
               )
 
@@ -1393,15 +1393,15 @@ defmodule YscWeb.BookingCheckoutLive do
         end)
         |> Map.new()
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[select-guest-attendee] Triggering validation with params: #{inspect(validate_params)}"
       )
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[select-guest-attendee] Form source before validation: #{inspect(updated_form.source)}"
       )
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[select-guest-attendee] Before validation - selected_family_members: #{inspect(updated_selected_family_members)}"
       )
 
@@ -1421,7 +1421,7 @@ defmodule YscWeb.BookingCheckoutLive do
              :selected_family_members_for_guests
            ) !=
              updated_selected_family_members do
-          Logger.debug(
+          Ysc.Logging.debug(
             "[select-guest-attendee] Restoring selected_family_members after validation was lost"
           )
 
@@ -1434,17 +1434,17 @@ defmodule YscWeb.BookingCheckoutLive do
           validated_socket
         end
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[select-guest-attendee] After validation - selected_family_members: #{inspect(final_socket.assigns.selected_family_members_for_guests)}"
       )
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[select-guest-attendee] Form source after validation: #{inspect(final_socket.assigns.guest_info_form.source)}"
       )
 
       {:noreply, final_socket}
     else
-      Logger.warning(
+      Ysc.Logging.warning(
         "select-guest-attendee: Missing guest_index or selected_value. guest_index=#{inspect(guest_index)}, selected_value=#{inspect(selected_value)}, all_params=#{inspect(params)}"
       )
 
@@ -1454,10 +1454,10 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_event("save-guest-info", %{"guests" => guest_params}, socket) do
-    require Logger
-    Logger.debug("[save-guest-info] Event received")
+    require Ysc.Logging
+    Ysc.Logging.debug("[save-guest-info] Event received")
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] Received guest_params: #{inspect(guest_params)}"
     )
 
@@ -1467,11 +1467,11 @@ defmodule YscWeb.BookingCheckoutLive do
 
     other_family_members = socket.assigns.other_family_members || []
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] selected_family_members: #{inspect(selected_family_members)}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] other_family_members count: #{length(other_family_members)}"
     )
 
@@ -1506,7 +1506,7 @@ defmodule YscWeb.BookingCheckoutLive do
       end)
       |> Map.new()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] updated_guest_params after family member merge: #{inspect(updated_guest_params)}"
     )
 
@@ -1514,11 +1514,11 @@ defmodule YscWeb.BookingCheckoutLive do
     guest_info_form =
       socket.assigns.guest_info_form || to_form(%{}, as: "guests")
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] guest_info_form.source keys: #{inspect(Map.keys(guest_info_form.source))}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] guest_info_form.source: #{inspect(guest_info_form.source)}"
     )
 
@@ -1557,27 +1557,29 @@ defmodule YscWeb.BookingCheckoutLive do
         end)
       end)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] After merging form source, updated_guest_params keys: #{inspect(Map.keys(updated_guest_params))}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] Final updated_guest_params: #{inspect(updated_guest_params)}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] Building changesets for booking: #{socket.assigns.booking.id}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[save-guest-info] Booking guests_count: #{socket.assigns.booking.guests_count}, children_count: #{socket.assigns.booking.children_count}"
     )
 
     case build_guest_changesets(socket.assigns.booking, updated_guest_params) do
       {:ok, changesets} ->
-        Logger.debug("[save-guest-info] Built #{length(changesets)} changesets")
+        Ysc.Logging.debug(
+          "[save-guest-info] Built #{length(changesets)} changesets"
+        )
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "[save-guest-info] Changesets valid status: #{inspect(Enum.map(changesets, & &1.valid?))}"
         )
 
@@ -1644,7 +1646,7 @@ defmodule YscWeb.BookingCheckoutLive do
         end
 
       {:error, error_message} when is_binary(error_message) ->
-        Logger.error(
+        Ysc.Logging.error(
           "[save-guest-info] Error building changesets: #{error_message}"
         )
 
@@ -1951,11 +1953,14 @@ defmodule YscWeb.BookingCheckoutLive do
         {:ok, payment_intent}
 
       {:error, %Stripe.Error{} = error} ->
-        Logger.error("Stripe payment intent creation failed: #{inspect(error)}")
+        Ysc.Logging.error(
+          "Stripe payment intent creation failed: #{inspect(error)}"
+        )
+
         {:error, error.message}
 
       {:error, reason} ->
-        Logger.error("Payment intent creation failed: #{inspect(reason)}")
+        Ysc.Logging.error("Payment intent creation failed: #{inspect(reason)}")
         {:error, "Payment initialization failed"}
     end
   end
@@ -1985,7 +1990,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
           # Check if booking is already confirmed (e.g., by webhook)
           if reloaded_booking.status == :complete do
-            Logger.info(
+            Ysc.Logging.info(
               "Booking already confirmed (likely by webhook), returning existing booking",
               booking_id: booking.id,
               payment_intent_id: payment_intent_id
@@ -2009,14 +2014,15 @@ defmodule YscWeb.BookingCheckoutLive do
                       |> Repo.preload([:rooms, :user])
 
                     if final_booking.status == :complete do
-                      Logger.info(
+                      Ysc.Logging.info(
                         "Booking confirmed by another process, returning confirmed booking",
                         booking_id: booking.id
                       )
 
                       {:ok, final_booking}
                     else
-                      Logger.error("Failed to confirm booking: invalid status",
+                      Ysc.Logging.error(
+                        "Failed to confirm booking: invalid status",
                         booking_id: booking.id,
                         status: final_booking.status
                       )
@@ -2025,7 +2031,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     end
 
                   {:error, reason} ->
-                    Logger.error(
+                    Ysc.Logging.error(
                       "Failed to confirm booking: #{inspect(reason)}"
                     )
 
@@ -2033,7 +2039,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 end
 
               {:error, reason} ->
-                Logger.error(
+                Ysc.Logging.error(
                   "Failed to process ledger payment: #{inspect(reason)}"
                 )
 
@@ -2045,7 +2051,10 @@ defmodule YscWeb.BookingCheckoutLive do
         end
 
       {:error, reason} ->
-        Logger.error("Failed to retrieve payment intent: #{inspect(reason)}")
+        Ysc.Logging.error(
+          "Failed to retrieve payment intent: #{inspect(reason)}"
+        )
+
         {:error, :payment_verification_failed}
     end
   end
@@ -2340,7 +2349,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
     case stripe_payment_method_id do
       nil ->
-        Logger.info("No payment method found in payment intent",
+        Ysc.Logging.info("No payment method found in payment intent",
           payment_intent_id: payment_intent.id
         )
 
@@ -2362,7 +2371,7 @@ defmodule YscWeb.BookingCheckoutLive do
                    stripe_payment_method
                  ) do
               {:ok, payment_method} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Successfully synced payment method for booking payment",
                   payment_method_id: payment_method.id,
                   stripe_payment_method_id: pm_id,
@@ -2372,7 +2381,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 payment_method.id
 
               {:error, reason} ->
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to sync payment method for booking payment",
                   stripe_payment_method_id: pm_id,
                   user_id: user_id,
@@ -2383,7 +2392,7 @@ defmodule YscWeb.BookingCheckoutLive do
             end
 
           {:error, error} ->
-            Logger.warning("Failed to retrieve payment method from Stripe",
+            Ysc.Logging.warning("Failed to retrieve payment method from Stripe",
               payment_method_id: pm_id,
               payment_intent_id: payment_intent.id,
               error: error.message
@@ -2682,9 +2691,9 @@ defmodule YscWeb.BookingCheckoutLive do
       end
 
     # Log for debugging
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Initializing guest forms",
+    Ysc.Logging.info("Initializing guest forms",
       booking_id: booking.id,
       guests_count: guests_count,
       children_count: children_count,
@@ -2713,9 +2722,9 @@ defmodule YscWeb.BookingCheckoutLive do
     guests = [user_guest] ++ additional_guests
 
     # Log the guest list for debugging
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Built guest list",
+    Ysc.Logging.info("Built guest list",
       total_guests: length(guests),
       user_guest: true,
       additional_adults: remaining_adults,
@@ -2754,9 +2763,9 @@ defmodule YscWeb.BookingCheckoutLive do
       |> Map.new()
 
     if actual_total != expected_total do
-      require Logger
+      require Ysc.Logging
 
-      Logger.warning("Guest count mismatch - filtering form",
+      Ysc.Logging.warning("Guest count mismatch - filtering form",
         expected: expected_total,
         actual: actual_total,
         guests_count: guests_count,
@@ -2806,17 +2815,17 @@ defmodule YscWeb.BookingCheckoutLive do
 
   defp build_guest_changesets(booking, guest_params)
        when is_map(guest_params) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[build_guest_changesets] Called with booking_id: #{booking.id}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[build_guest_changesets] guest_params keys: #{inspect(Map.keys(guest_params))}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[build_guest_changesets] guest_params: #{inspect(guest_params)}"
     )
 
@@ -2824,7 +2833,7 @@ defmodule YscWeb.BookingCheckoutLive do
     children_count = booking.children_count || 0
     total_expected = guests_count + children_count
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[build_guest_changesets] guests_count: #{guests_count}, children_count: #{children_count}, total_expected: #{total_expected}"
     )
 
@@ -2837,11 +2846,11 @@ defmodule YscWeb.BookingCheckoutLive do
       |> Enum.sort_by(fn {index, _} -> index end)
       |> Enum.map(fn {_index, attrs} -> attrs end)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[build_guest_changesets] guests_list length: #{length(guests_list)}"
     )
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[build_guest_changesets] guests_list: #{inspect(guests_list)}"
     )
 
@@ -2849,7 +2858,7 @@ defmodule YscWeb.BookingCheckoutLive do
       error_msg =
         "Expected #{total_expected} guests, got #{length(guests_list)}"
 
-      Logger.error("[build_guest_changesets] #{error_msg}")
+      Ysc.Logging.error("[build_guest_changesets] #{error_msg}")
       {:error, error_msg}
     else
       # Validate that exactly one guest is marked as booking user
@@ -2869,7 +2878,7 @@ defmodule YscWeb.BookingCheckoutLive do
           is_booking_user == true
         end)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[build_guest_changesets] booking_user_count: #{booking_user_count}"
       )
 
@@ -2877,7 +2886,7 @@ defmodule YscWeb.BookingCheckoutLive do
         error_msg =
           "Exactly one guest must be marked as the booking user, got #{booking_user_count}"
 
-        Logger.error("[build_guest_changesets] #{error_msg}")
+        Ysc.Logging.error("[build_guest_changesets] #{error_msg}")
         {:error, error_msg}
       else
         # Validate child count
@@ -2896,11 +2905,13 @@ defmodule YscWeb.BookingCheckoutLive do
             is_child == true
           end)
 
-        Logger.debug("[build_guest_changesets] child_count: #{child_count}")
+        Ysc.Logging.debug(
+          "[build_guest_changesets] child_count: #{child_count}"
+        )
 
         if child_count != children_count do
           error_msg = "Expected #{children_count} children, got #{child_count}"
-          Logger.error("[build_guest_changesets] #{error_msg}")
+          Ysc.Logging.error("[build_guest_changesets] #{error_msg}")
           {:error, error_msg}
         else
           # Build changesets
@@ -2915,11 +2926,11 @@ defmodule YscWeb.BookingCheckoutLive do
               )
             end)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[build_guest_changesets] Built #{length(changesets)} changesets"
           )
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[build_guest_changesets] Changesets valid status: #{inspect(Enum.map(changesets, & &1.valid?))}"
           )
 
@@ -2928,13 +2939,16 @@ defmodule YscWeb.BookingCheckoutLive do
             Enum.filter(changesets, fn changeset -> not changeset.valid? end)
 
           if invalid_changesets != [] do
-            Logger.error(
+            Ysc.Logging.error(
               "[build_guest_changesets] Found #{length(invalid_changesets)} invalid changesets"
             )
 
             {:error, invalid_changesets}
           else
-            Logger.debug("[build_guest_changesets] All changesets are valid")
+            Ysc.Logging.debug(
+              "[build_guest_changesets] All changesets are valid"
+            )
+
             {:ok, changesets}
           end
         end

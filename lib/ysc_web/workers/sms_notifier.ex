@@ -4,7 +4,7 @@ defmodule YscWeb.Workers.SmsNotifier do
 
   Processes SMS templates and sends them to recipients asynchronously.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
 
   @impl Oban.Worker
@@ -13,7 +13,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     phone_number = get_in(job.args, ["phone_number"])
 
     # Log immediately - this should ALWAYS appear if the function is called
-    Logger.info("SmsNotifier.perform called - JOB RECEIVED",
+    Ysc.Logging.info("SmsNotifier.perform called - JOB RECEIVED",
       job_id: job.id,
       worker: inspect(job.worker),
       queue: job.queue,
@@ -66,7 +66,7 @@ defmodule YscWeb.Workers.SmsNotifier do
             )
 
           _ ->
-            Logger.warning("SmsNotifier job received invalid args",
+            Ysc.Logging.warning("SmsNotifier job received invalid args",
               job_id: job.id,
               args: args,
               expected_keys: [
@@ -138,7 +138,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     phone_number_type = get_type_string(phone_number)
     params_type = get_type_string(params)
 
-    Logger.info("SmsNotifier.perform_with_args called",
+    Ysc.Logging.info("SmsNotifier.perform_with_args called",
       job_id: job.id,
       phone_number: phone_number,
       phone_number_type: phone_number_type,
@@ -163,7 +163,7 @@ defmodule YscWeb.Workers.SmsNotifier do
        ) do
     case Ysc.Accounts.get_user(user_id) do
       nil ->
-        Logger.warning("SMS sent without user validation - user not found",
+        Ysc.Logging.warning("SMS sent without user validation - user not found",
           job_id: job.id,
           user_id: user_id,
           template: template
@@ -208,7 +208,7 @@ defmodule YscWeb.Workers.SmsNotifier do
 
     if is_nil(template_module) do
       error_message = "Template module not found for template: #{template}"
-      Logger.warning("Template module not found for template: #{template}")
+      Ysc.Logging.warning("Template module not found for template: #{template}")
       {:error, error_message}
     else
       if Ysc.Accounts.SmsCategories.should_send_sms?(user, template) do
@@ -223,7 +223,7 @@ defmodule YscWeb.Workers.SmsNotifier do
           user
         )
       else
-        Logger.info("SMS not sent - user has disabled notifications",
+        Ysc.Logging.info("SMS not sent - user has disabled notifications",
           job_id: job.id,
           user_id: user_id,
           template: template,
@@ -265,7 +265,7 @@ defmodule YscWeb.Workers.SmsNotifier do
         category
       )
     else
-      Logger.info("SMS not sent - user has no phone number",
+      Ysc.Logging.info("SMS not sent - user has no phone number",
         job_id: job.id,
         user_id: user_id,
         template: template
@@ -283,7 +283,7 @@ defmodule YscWeb.Workers.SmsNotifier do
        ) do
     final_phone_number_type = get_phone_number_type_string(final_phone_number)
 
-    Logger.info("Using final phone number for SMS",
+    Ysc.Logging.info("Using final phone number for SMS",
       job_id: job.id,
       provided_phone_number: provided_phone_number,
       user_phone_number: user_phone_number,
@@ -352,7 +352,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     phone_number_type = get_phone_number_type_string(phone_number)
     params_type = get_params_type_string(params)
 
-    Logger.info("SmsNotifier.send_sms called",
+    Ysc.Logging.info("SmsNotifier.send_sms called",
       job_id: job.id,
       phone_number: phone_number,
       phone_number_type: phone_number_type,
@@ -381,7 +381,7 @@ defmodule YscWeb.Workers.SmsNotifier do
   defp prepare_and_atomize_params(job, params) do
     params_type_before = get_params_type_string(params)
 
-    Logger.info("About to atomize params",
+    Ysc.Logging.info("About to atomize params",
       job_id: job.id,
       params_before: inspect(params, limit: :infinity),
       params_type: params_type_before
@@ -391,7 +391,7 @@ defmodule YscWeb.Workers.SmsNotifier do
 
     atomized_params_type = get_params_type_string(atomized_params)
 
-    Logger.info("Atomized params completed",
+    Ysc.Logging.info("Atomized params completed",
       job_id: job.id,
       atomized_params: inspect(atomized_params, limit: :infinity),
       atomized_params_type: atomized_params_type
@@ -411,7 +411,7 @@ defmodule YscWeb.Workers.SmsNotifier do
        ) do
     phone_number_type_before_call = get_phone_number_type_string(phone_number)
 
-    Logger.info("About to call send_sms_idempotent",
+    Ysc.Logging.info("About to call send_sms_idempotent",
       job_id: job.id,
       phone_number: phone_number,
       phone_number_type: phone_number_type_before_call,
@@ -430,7 +430,7 @@ defmodule YscWeb.Workers.SmsNotifier do
         user_id
       )
 
-    Logger.info("send_sms_idempotent returned",
+    Ysc.Logging.info("send_sms_idempotent returned",
       job_id: job.id,
       result: inspect(result, limit: :infinity)
     )
@@ -455,7 +455,7 @@ defmodule YscWeb.Workers.SmsNotifier do
          _user_id,
          _category
        ) do
-    Logger.info("SMS sent successfully",
+    Ysc.Logging.info("SMS sent successfully",
       job_id: job.id,
       phone_number: phone_number,
       template: template,
@@ -472,34 +472,15 @@ defmodule YscWeb.Workers.SmsNotifier do
          phone_number,
          idempotency_key,
          template,
-         user_id,
-         category
+         _user_id,
+         _category
        ) do
-    Logger.error("Failed to send SMS",
+    Ysc.Logging.error("Failed to send SMS",
       job_id: job.id,
       phone_number: phone_number,
       template: template,
       idempotency_key: idempotency_key,
       reason: inspect(reason)
-    )
-
-    Sentry.capture_message("Failed to send SMS",
-      level: :error,
-      extra: %{
-        job_id: job.id,
-        phone_number: phone_number,
-        idempotency_key: idempotency_key,
-        template: template,
-        user_id: user_id,
-        category: category,
-        reason: inspect(reason, limit: :infinity)
-      },
-      tags: %{
-        sms_template: template,
-        sms_category: to_string(category),
-        error_type: "sms_send_failed",
-        has_user_id: !is_nil(user_id)
-      }
     )
 
     {:error, reason}
@@ -517,7 +498,7 @@ defmodule YscWeb.Workers.SmsNotifier do
             key_type =
               if is_struct(key), do: inspect(key.__struct__), else: "not_struct"
 
-            Logger.error(
+            Ysc.Logging.error(
               "Failed to convert key to existing atom in atomize_keys",
               key: key,
               key_type: key_type,
@@ -536,7 +517,7 @@ defmodule YscWeb.Workers.SmsNotifier do
   end
 
   defp atomize_keys(value) when is_list(value) do
-    Logger.debug("Atomizing list value",
+    Ysc.Logging.debug("Atomizing list value",
       list_length: length(value),
       list_preview: inspect(value, limit: 5)
     )
@@ -548,7 +529,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     value_type =
       if is_struct(value), do: inspect(value.__struct__), else: "not_struct"
 
-    Logger.debug("Atomizing non-map, non-list value",
+    Ysc.Logging.debug("Atomizing non-map, non-list value",
       value_type: value_type,
       value_preview: inspect(value, limit: 100)
     )

@@ -9,7 +9,7 @@ defmodule Mix.Tasks.CheckQuickbooksSync do
   """
 
   use Mix.Task
-  require Logger
+  require Ysc.Logging
 
   @shortdoc "Check QuickBooks sync status for expense reports"
 
@@ -37,41 +37,41 @@ defmodule Mix.Tasks.CheckQuickbooksSync do
   end
 
   defp check_and_trigger(expense_report_id, should_trigger) do
-    Logger.info("=== Checking Expense Report: #{expense_report_id} ===")
+    Ysc.Logging.info("=== Checking Expense Report: #{expense_report_id} ===")
 
     # Get the expense report
     case Repo.get(ExpenseReports.ExpenseReport, expense_report_id) do
       nil ->
-        Logger.error("Expense report not found: #{expense_report_id}")
+        Ysc.Logging.error("Expense report not found: #{expense_report_id}")
 
       expense_report ->
-        Logger.info("Expense Report Status:")
-        Logger.info("  ID: #{expense_report.id}")
-        Logger.info("  Status: #{expense_report.status}")
+        Ysc.Logging.info("Expense Report Status:")
+        Ysc.Logging.info("  ID: #{expense_report.id}")
+        Ysc.Logging.info("  Status: #{expense_report.status}")
 
-        Logger.info(
+        Ysc.Logging.info(
           "  QuickBooks Sync Status: #{expense_report.quickbooks_sync_status}"
         )
 
-        Logger.info(
+        Ysc.Logging.info(
           "  QuickBooks Bill ID: #{inspect(expense_report.quickbooks_bill_id)}"
         )
 
-        Logger.info(
+        Ysc.Logging.info(
           "  QuickBooks Vendor ID: #{inspect(expense_report.quickbooks_vendor_id)}"
         )
 
-        Logger.info(
+        Ysc.Logging.info(
           "  Last Sync Attempt: #{inspect(expense_report.quickbooks_last_sync_attempt_at)}"
         )
 
-        Logger.info(
+        Ysc.Logging.info(
           "  Synced At: #{inspect(expense_report.quickbooks_synced_at)}"
         )
 
         # Check for Oban jobs
-        Logger.info("")
-        Logger.info("=== Checking Oban Jobs ===")
+        Ysc.Logging.info("")
+        Ysc.Logging.info("=== Checking Oban Jobs ===")
 
         jobs =
           from(j in Oban.Job,
@@ -88,41 +88,42 @@ defmodule Mix.Tasks.CheckQuickbooksSync do
           |> Repo.all()
 
         if Enum.empty?(jobs) do
-          Logger.warning("No Oban jobs found for this expense report")
+          Ysc.Logging.warning("No Oban jobs found for this expense report")
         else
-          Logger.info("Found #{length(jobs)} job(s):")
+          Ysc.Logging.info("Found #{length(jobs)} job(s):")
 
           Enum.each(jobs, fn job ->
-            Logger.info("  Job ID: #{job.id}")
-            Logger.info("    State: #{job.state}")
-            Logger.info("    Queue: #{job.queue}")
-            Logger.info("    Attempt: #{job.attempt}/#{job.max_attempts}")
-            Logger.info("    Inserted: #{job.inserted_at}")
-            Logger.info("    Scheduled: #{job.scheduled_at}")
+            Ysc.Logging.info("  Job ID: #{job.id}")
+            Ysc.Logging.info("    State: #{job.state}")
+            Ysc.Logging.info("    Queue: #{job.queue}")
+            Ysc.Logging.info("    Attempt: #{job.attempt}/#{job.max_attempts}")
+            Ysc.Logging.info("    Inserted: #{job.inserted_at}")
+            Ysc.Logging.info("    Scheduled: #{job.scheduled_at}")
 
             if job.attempted_at,
-              do: Logger.info("    Attempted: #{job.attempted_at}")
+              do: Ysc.Logging.info("    Attempted: #{job.attempted_at}")
 
-            if job.errors, do: Logger.info("    Errors: #{inspect(job.errors)}")
+            if job.errors,
+              do: Ysc.Logging.info("    Errors: #{inspect(job.errors)}")
           end)
         end
 
         if should_trigger do
-          Logger.info("")
-          Logger.info("=== Triggering QuickBooks Sync ===")
+          Ysc.Logging.info("")
+          Ysc.Logging.info("=== Triggering QuickBooks Sync ===")
 
           case QuickbooksSyncExpenseReportWorker.new(%{
                  "expense_report_id" => expense_report_id
                })
                |> Oban.insert() do
             {:ok, job} ->
-              Logger.info("Successfully enqueued QuickBooks sync job",
+              Ysc.Logging.info("Successfully enqueued QuickBooks sync job",
                 job_id: job.id,
                 queue: job.queue
               )
 
             {:error, reason} ->
-              Logger.error("Failed to enqueue QuickBooks sync job",
+              Ysc.Logging.error("Failed to enqueue QuickBooks sync job",
                 error: inspect(reason)
               )
           end
@@ -131,7 +132,7 @@ defmodule Mix.Tasks.CheckQuickbooksSync do
   end
 
   defp list_pending_reports do
-    Logger.info("=== Pending QuickBooks Sync Reports ===")
+    Ysc.Logging.info("=== Pending QuickBooks Sync Reports ===")
 
     pending_reports =
       from(er in ExpenseReports.ExpenseReport,
@@ -143,15 +144,15 @@ defmodule Mix.Tasks.CheckQuickbooksSync do
       |> Repo.all()
 
     if Enum.empty?(pending_reports) do
-      Logger.info("No pending expense reports found")
+      Ysc.Logging.info("No pending expense reports found")
     else
-      Logger.info("Found #{length(pending_reports)} pending report(s):")
+      Ysc.Logging.info("Found #{length(pending_reports)} pending report(s):")
 
       Enum.each(pending_reports, fn report ->
-        Logger.info("  ID: #{report.id}")
-        Logger.info("    Purpose: #{report.purpose}")
-        Logger.info("    Created: #{report.inserted_at}")
-        Logger.info("    Status: #{report.status}")
+        Ysc.Logging.info("  ID: #{report.id}")
+        Ysc.Logging.info("    Purpose: #{report.purpose}")
+        Ysc.Logging.info("    Created: #{report.inserted_at}")
+        Ysc.Logging.info("    Status: #{report.status}")
       end)
     end
   end
