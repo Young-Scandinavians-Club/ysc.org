@@ -548,7 +548,7 @@ defmodule YscWeb.HomeLive do
                     class="w-5 h-5 text-teal-500 flex-shrink-0"
                   />
                   <span>
-                    Member-only rates: <strong>$50.00 / night</strong>
+                    Member-only rates: <strong>$25.00 / night</strong>
                   </span>
                 </li>
               </ul>

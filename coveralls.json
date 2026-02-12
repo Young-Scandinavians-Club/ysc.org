@@ -45,6 +45,7 @@
         "ysc/quickbooks/client\\.ex",
         "ysc/quickbooks/client_behaviour\\.ex",
         "ysc/stripe_behaviour\\.ex",
-        "ysc/stripe/.*_behaviour\\.ex"
+        "ysc/stripe/.*_behaviour\\.ex",
+        "ysc/release.ex"
     ]
 }
