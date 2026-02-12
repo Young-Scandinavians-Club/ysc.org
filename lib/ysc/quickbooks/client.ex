@@ -16,6 +16,9 @@ defmodule Ysc.Quickbooks.Client do
   @token_url "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
   # Latest minor version as of 2024
   @minor_version "65"
+  @max_429_retries 3
+  @default_429_backoff_seconds 2
+  @request_id_max_length 255
 
   @doc """
   Creates a SalesReceipt in QuickBooks.
@@ -463,7 +466,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -915,6 +923,9 @@ defmodule Ysc.Quickbooks.Client do
          {:ok, company_id} <- get_company_id() do
       item_type = Keyword.get(opts, :type, "Service")
 
+      # QuickBooks requires ExpenseAccountRef for Service and NonInventory items
+      opts = ensure_expense_account_ref_for_item(opts, item_type)
+
       # Support idempotency via requestid parameter
       idempotency_key =
         case Keyword.get(opts, :idempotency_key) do
@@ -936,7 +947,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -1017,6 +1033,38 @@ defmodule Ysc.Quickbooks.Client do
     end
   end
 
+  # QuickBooks requires ExpenseAccountRef for Service and NonInventory item types.
+  # Resolve a default (e.g. "Cost of Goods Sold") when not provided.
+  # Config :default_expense_account_name can override the name to query (e.g. "Purchases").
+  defp ensure_expense_account_ref_for_item(opts, type)
+       when type in ["Service", "NonInventory"] do
+    if Keyword.get(opts, :expense_account_ref) do
+      opts
+    else
+      default_names =
+        Application.get_env(:ysc, :quickbooks, [])[
+          :default_expense_account_name
+        ]
+        |> case do
+          name when is_binary(name) -> [name]
+          _ -> ["Cost of Goods Sold", "Purchases"]
+        end
+
+      Enum.reduce_while(default_names, opts, fn account_name, acc ->
+        case query_account_by_name(account_name) do
+          {:ok, account_id} ->
+            {:halt,
+             Keyword.put(acc, :expense_account_ref, %{value: account_id})}
+
+          _ ->
+            {:cont, acc}
+        end
+      end)
+    end
+  end
+
+  defp ensure_expense_account_ref_for_item(opts, _type), do: opts
+
   defp build_item_body(name, type, opts) do
     base = %{
       "Name" => name,
@@ -1076,10 +1124,11 @@ defmodule Ysc.Quickbooks.Client do
     # Build query parameters
     query_params = ["minorversion=#{@minor_version}"]
 
-    # Add requestid for idempotency if provided
+    # Add requestid for idempotency if provided (max 255 chars)
     query_params =
       if idempotency_key = Keyword.get(opts, :requestid) do
-        ["requestid=#{URI.encode(idempotency_key)}" | query_params]
+        truncated = truncate_request_id(idempotency_key)
+        ["requestid=#{URI.encode(truncated)}" | query_params]
       else
         query_params
       end
@@ -1095,6 +1144,12 @@ defmodule Ysc.Quickbooks.Client do
       _ -> @default_api_base_url
     end
   end
+
+  @doc false
+  def truncate_request_id(key) when is_binary(key),
+    do: String.slice(key, 0, @request_id_max_length)
+
+  def truncate_request_id(other), do: other
 
   defp build_headers(access_token) do
     [
@@ -1968,7 +2023,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:get, url, headers)
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -2127,6 +2187,44 @@ defmodule Ysc.Quickbooks.Client do
 
       {:error, _} ->
         response_body
+    end
+  end
+
+  # QuickBooks returns 429 when rate limited (e.g. 500 req/min per company).
+  # Retry the request with exponential backoff, optionally honoring Retry-After.
+  defp request_with_429_retry(callback, attempt \\ 0) do
+    case callback.() do
+      {:ok, %Finch.Response{status: 429} = resp}
+      when attempt < @max_429_retries ->
+        backoff_sec =
+          retry_after_seconds_from_response(resp) ||
+            :math.pow(@default_429_backoff_seconds, attempt) |> round()
+
+        Ysc.Logging.warning(
+          "[QB Client] Rate limited (429), retrying after backoff",
+          attempt: attempt + 1,
+          max_retries: @max_429_retries,
+          backoff_seconds: backoff_sec
+        )
+
+        Process.sleep(backoff_sec * 1000)
+        request_with_429_retry(callback, attempt + 1)
+
+      other ->
+        other
+    end
+  end
+
+  defp retry_after_seconds_from_response(%Finch.Response{headers: headers}) do
+    case List.keyfind(headers, "retry-after", 0) do
+      {"retry-after", value} ->
+        case Integer.parse(String.trim(value)) do
+          {sec, _} when sec > 0 -> sec
+          _ -> nil
+        end
+
+      _ ->
+        nil
     end
   end
 

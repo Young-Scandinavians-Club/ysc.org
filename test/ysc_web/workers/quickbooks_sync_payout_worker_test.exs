@@ -59,7 +59,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
         {:ok, %{"Id" => "cust_1"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:ok, %{"Id" => "sr_1", "TotalAmt" => "100.00"}}
       end)
 
@@ -132,11 +132,11 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
         {:ok, %{"Id" => "cust_1"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:ok, %{"Id" => "sr_1", "TotalAmt" => "100.00"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _, _opts ->
         {:ok, %{"Id" => "dep_456", "TotalAmt" => "100.00"}}
       end)
 
@@ -204,11 +204,11 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
         {:ok, %{"Id" => "cust_1"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:ok, %{"Id" => "sr_1", "TotalAmt" => "100.00"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _, _opts ->
         {:error, "QuickBooks API unavailable"}
       end)
 

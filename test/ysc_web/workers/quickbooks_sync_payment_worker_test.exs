@@ -59,7 +59,8 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -115,7 +116,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
         {:ok, "item_123"}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:error, "QuickBooks API error"}
       end)
 

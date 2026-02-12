@@ -128,7 +128,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
       {:ok, %{"Id" => "qb_customer_default"}}
     end)
 
-    stub(ClientMock, :create_sales_receipt, fn _params ->
+    stub(ClientMock, :create_sales_receipt, fn _params, _opts ->
       {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
     end)
 
@@ -420,7 +420,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify we have two line items
         assert length(params.line) == 2
 
@@ -529,7 +529,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Should have only one line item (donation)
         assert length(params.line) == 1
 
@@ -676,7 +676,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify two line items
         assert length(params.line) == 2
 

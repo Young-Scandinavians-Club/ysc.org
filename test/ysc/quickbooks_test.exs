@@ -319,7 +319,7 @@ defmodule Ysc.QuickbooksTest do
         {:ok, "admin_class_123"}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         assert params.customer_ref == %{value: "cust_123"}
         assert params.total_amt == Decimal.new("150.00")
         assert [line] = params.line
@@ -346,7 +346,7 @@ defmodule Ysc.QuickbooksTest do
     end
 
     test "creates sales receipt with optional class_ref, txn_date, memo" do
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         assert params.customer_ref == %{value: "cust_1"}
         assert params.total_amt == Decimal.new("200.00")
         assert params.txn_date == "2024-06-15"
@@ -376,7 +376,7 @@ defmodule Ysc.QuickbooksTest do
 
   describe "create_refund_sales_receipt/1" do
     test "creates refund sales receipt with positive amounts" do
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         assert params.customer_ref == %{value: "cust_ref"}
         assert params.total_amt == Decimal.new("50.00")
         assert [line] = params.line
@@ -396,7 +396,7 @@ defmodule Ysc.QuickbooksTest do
     end
 
     test "creates refund sales receipt with optional class_ref, txn_date, memo, private_note" do
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         assert params.txn_date == "2025-01-10"
         assert params.memo == "Refund memo"
         assert params.private_note == "Internal note"
@@ -426,7 +426,7 @@ defmodule Ysc.QuickbooksTest do
 
   describe "create_refund_receipt/1" do
     test "creates refund receipt with refund_from_account_ref" do
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         assert params.customer_ref == %{value: "cust_r"}
         assert params.refund_from_account_ref == %{value: "undeposited_1"}
         assert params.total_amt == Decimal.new("75.00")
@@ -449,7 +449,7 @@ defmodule Ysc.QuickbooksTest do
 
   describe "create_stripe_payout_deposit/1" do
     test "creates deposit with required params" do
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         assert params.deposit_to_account_ref == %{value: "bank_1"}
         assert params.total_amt == 500.00
         assert [line] = params.line
@@ -469,7 +469,7 @@ defmodule Ysc.QuickbooksTest do
     end
 
     test "creates deposit with optional txn_date, memo, class_ref" do
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         assert params.txn_date == "2024-12-01"
         assert params.memo == "Payout for November"
         assert [line] = params.line

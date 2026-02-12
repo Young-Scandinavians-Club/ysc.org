@@ -111,15 +111,15 @@ defmodule Ysc.TestHelpers do
       {:ok, %{"Id" => "qb_customer_default"}}
     end)
 
-    stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+    stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params, _opts ->
       {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
     end)
 
-    stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _params ->
+    stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _params, _opts ->
       {:ok, %{"Id" => "qb_refund_receipt_default", "TotalAmt" => "0.00"}}
     end)
 
-    stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+    stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params, _opts ->
       {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
     end)
 

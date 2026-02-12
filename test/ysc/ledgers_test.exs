@@ -137,7 +137,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -305,7 +306,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -471,7 +473,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -819,7 +822,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -893,7 +897,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1055,7 +1060,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1189,7 +1195,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1300,7 +1307,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1476,7 +1484,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1555,7 +1564,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1644,7 +1654,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1787,7 +1798,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -2007,7 +2019,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -2213,7 +2226,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -2407,7 +2421,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -2471,7 +2486,8 @@ defmodule Ysc.LedgersTest do
         {:ok, %{"Id" => "qb_customer_default"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 

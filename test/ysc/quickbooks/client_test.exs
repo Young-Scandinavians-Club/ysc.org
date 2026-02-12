@@ -120,6 +120,31 @@ defmodule Ysc.Quickbooks.ClientTest do
     end
   end
 
+  describe "request id truncation" do
+    test "truncate_request_id/1 limits string to 255 characters" do
+      long_key = String.duplicate("a", 300)
+      result = Client.truncate_request_id(long_key)
+      assert byte_size(result) == 255
+      assert result == String.duplicate("a", 255)
+    end
+
+    test "truncate_request_id/1 leaves short keys unchanged" do
+      short_key = "sr_pay_01KH807N26YWN52VF8A4FKG9FD"
+      assert Client.truncate_request_id(short_key) == short_key
+    end
+
+    test "truncate_request_id/1 leaves key of exactly 255 characters unchanged" do
+      exact_key = String.duplicate("b", 255)
+      assert Client.truncate_request_id(exact_key) == exact_key
+      assert byte_size(Client.truncate_request_id(exact_key)) == 255
+    end
+
+    test "truncate_request_id/1 returns non-string unchanged" do
+      assert Client.truncate_request_id(:atom) == :atom
+      assert Client.truncate_request_id(123) == 123
+    end
+  end
+
   describe "integration test coverage" do
     test "comprehensive integration tests exist in sync_test.exs" do
       # Verify the integration test file exists
