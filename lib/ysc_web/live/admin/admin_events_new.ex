@@ -793,6 +793,8 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("toggle-unlimited-capacity", _, socket) do
+    # Reload event to ensure we have the latest lock_version
+    current_event = Events.get_event!(socket.assigns[:event].id)
     current_unlimited = socket.assigns.capacity_form[:unlimited_capacity].value
 
     # Toggle the unlimited_capacity virtual field
@@ -801,24 +803,36 @@ defmodule YscWeb.AdminEventsNewLive do
     # Create changeset with the new unlimited_capacity value
     # The handle_unlimited_capacity function will set max_attendees accordingly
     changeset =
-      Event.changeset(socket.assigns[:event], %{
+      Event.changeset(current_event, %{
         "unlimited_capacity" => new_unlimited
       })
 
-    if changeset.valid? do
-      # Extract the processed max_attendees value from the changeset
-      new_max_attendees = Ecto.Changeset.get_field(changeset, :max_attendees)
+    updated_event =
+      if changeset.valid? do
+        # Extract the processed max_attendees value from the changeset
+        new_max_attendees = Ecto.Changeset.get_field(changeset, :max_attendees)
 
-      Events.update_event(socket.assigns[:event], %{
-        "max_attendees" => new_max_attendees
-      })
-    end
+        case Events.update_event(current_event, %{
+               "max_attendees" => new_max_attendees
+             }) do
+          {:ok, event} -> event
+          {:error, _} -> current_event
+        end
+      else
+        current_event
+      end
 
-    {:noreply, assign(socket, :capacity_form, to_form(changeset))}
+    {:noreply,
+     socket
+     |> assign(:event, updated_event)
+     |> assign(:capacity_form, to_form(Event.changeset(updated_event, %{})))}
   end
 
   @impl true
   def handle_event("validate-capacity", params, socket) do
+    # Reload event to ensure we have the latest lock_version
+    current_event = Events.get_event!(socket.assigns[:event].id)
+
     # Handle both expected and unexpected parameter formats
     capacity_params =
       case params do
@@ -829,18 +843,37 @@ defmodule YscWeb.AdminEventsNewLive do
       end
 
     changeset =
-      Event.changeset(socket.assigns[:event], capacity_params)
+      Event.changeset(current_event, capacity_params)
       |> Map.put(:action, :validate)
 
-    if changeset.valid? do
-      Events.update_event(socket.assigns[:event], capacity_params)
-    end
+    {updated_event, updated_changeset} =
+      if changeset.valid? do
+        case Events.update_event(current_event, capacity_params) do
+          {:ok, event} ->
+            updated_changeset =
+              Event.changeset(event, capacity_params)
+              |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, :capacity_form, to_form(changeset))}
+            {event, updated_changeset}
+
+          {:error, _} ->
+            {current_event, changeset}
+        end
+      else
+        {current_event, changeset}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:event, updated_event)
+     |> assign(:capacity_form, to_form(updated_changeset))}
   end
 
   @impl true
   def handle_event("save-capacity", params, socket) do
+    # Reload event to ensure we have the latest lock_version
+    current_event = Events.get_event!(socket.assigns[:event].id)
+
     # Handle both expected and unexpected parameter formats
     capacity_params =
       case params do
@@ -850,7 +883,7 @@ defmodule YscWeb.AdminEventsNewLive do
         other -> other
       end
 
-    case Events.update_event(socket.assigns[:event], capacity_params) do
+    case Events.update_event(current_event, capacity_params) do
       {:ok, event} ->
         {:noreply,
          socket
@@ -935,6 +968,7 @@ defmodule YscWeb.AdminEventsNewLive do
        |> assign(:end_date, event.end_date)
        |> assign(:start_time, event.start_time)
        |> assign(:end_time, event.end_time)
+       |> assign(:capacity_form, to_form(changeset))
        |> assign_form(changeset)}
     else
       {:noreply, socket}
