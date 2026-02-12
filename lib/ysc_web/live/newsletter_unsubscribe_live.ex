@@ -62,7 +62,7 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
         </h1>
 
         <p :if={@subscriber && !@unsubscribed} class="mt-4 text-zinc-600">
-          You are subscribed as <strong>{@subscriber.email}</strong>. Click below to stop receiving our newsletter.
+          You are subscribed as <strong><%= @subscriber.email %></strong>. Click below to stop receiving our newsletter.
         </p>
 
         <p :if={@subscriber && @unsubscribed} class="mt-4 text-zinc-600">

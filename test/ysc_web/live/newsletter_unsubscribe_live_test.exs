@@ -50,6 +50,43 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       assert has_element?(view, "button", "Unsubscribe")
     end
 
+    test "properly interpolates and displays the subscriber's email address", %{
+      conn: conn
+    } do
+      test_email = "test.user@example.com"
+
+      {:ok, sub} =
+        Newsletter.subscribe(test_email, source: "public_signup")
+
+      {:ok, view, html} =
+        live(conn, ~p"/newsletter/unsubscribe/#{sub.subscription_token}")
+
+      # Verify the email is properly interpolated in the HTML
+      assert html =~ "You are subscribed as"
+      assert html =~ test_email
+
+      # Verify it appears within a strong tag for emphasis
+      assert html =~ "<strong>#{test_email}</strong>"
+
+      # Also verify through element selector
+      assert has_element?(view, "strong", test_email)
+    end
+
+    test "displays email correctly with special characters", %{conn: conn} do
+      # Test email with plus addressing and dots
+      test_email = "user.name+tag@example.co.uk"
+
+      {:ok, sub} =
+        Newsletter.subscribe(test_email, source: "public_signup")
+
+      {:ok, _view, html} =
+        live(conn, ~p"/newsletter/unsubscribe/#{sub.subscription_token}")
+
+      # Ensure special characters are properly displayed (not HTML-escaped or broken)
+      assert html =~ test_email
+      assert html =~ "<strong>#{test_email}</strong>"
+    end
+
     test "page has predictable id for accessibility and testing", %{conn: conn} do
       {:ok, sub} =
         Newsletter.subscribe("id-check@example.com", source: "public_signup")
