@@ -6,6 +6,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Accounts.UserNotifier
   alias Ysc.Customers
   alias Ysc.Ledgers
+  alias Ysc.Newsletter
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -2630,24 +2631,9 @@ defmodule YscWeb.UserSettingsLive do
     # Ensure account_notifications is always true
     user_params = Map.put(user_params, "account_notifications", "true")
 
-    # Helper function to convert form checkbox value to boolean
-    to_bool = fn
-      "true" -> true
-      true -> true
-      _ -> false
-    end
-
-    # Check if newsletter preference changed
-    old_newsletter_pref = user.newsletter_notifications
-
     case Accounts.update_notification_preferences(user, user_params) do
       {:ok, updated_user} ->
-        # Sync with Keila if newsletter preference changed
-        new_newsletter_pref = to_bool.(user_params["newsletter_notifications"])
-
-        if old_newsletter_pref != new_newsletter_pref do
-          sync_keila_subscription(updated_user, new_newsletter_pref)
-        end
+        Newsletter.sync_user_preference(updated_user)
 
         notification_form =
           Accounts.change_notification_preferences(updated_user, user_params)
@@ -3842,62 +3828,6 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp add_payment_amount(acc, _), do: acc
-
-  defp sync_keila_subscription(user, should_subscribe) do
-    # Subscribe or unsubscribe from Keila asynchronously
-    # Failures are logged but don't affect preference update
-    action = if should_subscribe, do: "subscribe", else: "unsubscribe"
-
-    # Build job args with enhanced data for subscriptions
-    job_args =
-      if should_subscribe do
-        # Include full user data when subscribing
-        metadata = %{
-          "user_id" => user.id,
-          "signup_date" => DateTime.utc_now() |> DateTime.to_iso8601(),
-          "role" => to_string(user.role || "member"),
-          "state" => to_string(user.state || "active")
-        }
-
-        %{
-          "email" => user.email,
-          "action" => action,
-          "first_name" => user.first_name,
-          "last_name" => user.last_name,
-          "data" => metadata
-        }
-      else
-        # For unsubscribe, only need email and action
-        %{"email" => user.email, "action" => action}
-      end
-
-    case job_args
-         |> YscWeb.Workers.KeilaSubscriber.new()
-         |> Oban.insert() do
-      {:ok, _job} ->
-        require Ysc.Logging
-
-        Ysc.Logging.info("Keila subscription sync job enqueued",
-          user_id: user.id,
-          email: user.email,
-          action: action
-        )
-
-        :ok
-
-      {:error, changeset} ->
-        require Ysc.Logging
-
-        Ysc.Logging.warning("Failed to enqueue Keila subscription sync job",
-          user_id: user.id,
-          email: user.email,
-          action: action,
-          errors: inspect(changeset.errors)
-        )
-
-        :ok
-    end
-  end
 
   defp get_price_id(memberhip_type) do
     plans = Application.get_env(:ysc, :membership_plans)

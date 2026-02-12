@@ -2,17 +2,17 @@
 
 ## Overview
 
-Added comprehensive documentation about email testing in development, covering both application emails (via Swoosh) and newsletter emails (via Keila/Mailpit).
+Added comprehensive documentation about email testing in development using the Phoenix dev inbox (Swoosh local adapter).
 
-## Two Email Systems
+## Email in Development
 
-The YSC application uses **two different email systems** for different purposes:
+The YSC application uses **Swoosh** with the Local adapter in development. All emails are stored in memory and viewable in the browser.
 
-### 1. Swoosh Mailbox (Application Emails)
+### Swoosh Mailbox (Dev Inbox)
 
 **URL**: http://localhost:4000/dev/mailbox
 
-**Purpose**: View transactional emails sent by the YSC application
+**Purpose**: View all emails sent by the YSC application in development
 
 **Emails Captured**:
 - User registration confirmations
@@ -36,33 +36,11 @@ YSC App → Swoosh.Adapters.Local → In-memory storage → /dev/mailbox
 - Enabled in development by default
 - Accessible at `/dev/mailbox` endpoint
 
-### 2. Mailpit (Newsletter Emails)
-
-**URL**: http://localhost:8025
-
-**Purpose**: Catch newsletter emails sent by Keila
-
-**Emails Captured**:
-- Newsletter campaigns
-- Newsletter subscription confirmations
-- Marketing emails
-
-**How it works**:
-```
-Keila → Mailpit SMTP (port 1025) → Mailpit UI (port 8025)
-```
-
-**Key characteristics**:
-- External Docker container
-- Separate SMTP server
-- Used exclusively by Keila
-- Persists across restarts (until container restart)
-
 ## Documentation Added
 
 ### 1. README.md - "Testing Emails in Development" Section
 
-**Location**: Before "Testing Newsletters with Keila" section
+**Location**: Before "Newsletter subscriptions" section
 
 **Content**:
 - Introduction to Swoosh email testing
@@ -74,8 +52,6 @@ Keila → Mailpit SMTP (port 1025) → Mailpit UI (port 8025)
   - Password reset emails
   - Event/ticket emails
 - Email preview features explanation
-- Comparison table: Swoosh Mailbox vs Mailpit
-- Why two systems are needed
 - Email template testing workflow
 - Troubleshooting email testing issues
 
@@ -113,16 +89,13 @@ Complete guide under "Common Development Tasks":
 
 ## Key Information
 
-### Quick Access URLs
+### Quick Access
 
 ```
-Application Emails:  http://localhost:4000/dev/mailbox
-Newsletter Emails:   http://localhost:8025
+All app emails in development:  http://localhost:4000/dev/mailbox
 ```
 
-### When to Use Each
-
-**Use Swoosh Mailbox when testing:**
+**Use the dev mailbox when testing:**
 - User registration/login flows
 - Password reset functionality
 - Account notification emails
@@ -130,12 +103,6 @@ Newsletter Emails:   http://localhost:8025
 - Ticket confirmations
 - Event notifications
 - Any email sent by the YSC app
-
-**Use Mailpit when testing:**
-- Newsletter campaigns
-- Newsletter subscriptions
-- Marketing emails
-- Any email sent by Keila
 
 ### Testing Workflows
 
@@ -215,19 +182,6 @@ The `/dev/mailbox` route is only available when `dev_routes` is enabled (default
 - No need for external SMTP server
 - Emails disappear on restart (regenerate as needed)
 - Perfect for rapid development and testing
-
-### Mailpit
-
-**Persists**: While Docker container is running
-**Cleared when**: Container restarts
-**Storage**: Container filesystem
-**External dependencies**: Docker
-
-**Implications**:
-- Survives Phoenix restarts
-- Good for testing newsletter campaigns
-- Requires Docker to be running
-- Separate from app lifecycle
 
 ## Email Template Development
 
@@ -347,7 +301,7 @@ Email testing documentation now provides:
 
 Developers now have complete understanding of:
 - How to test application emails (Swoosh)
-- How to test newsletter emails (Keila/Mailpit)
+- How to test emails (dev mailbox)
 - Which tool to use for which purpose
 - How to debug email issues
 

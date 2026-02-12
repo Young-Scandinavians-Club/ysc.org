@@ -4,7 +4,7 @@ defmodule YscWeb.HomeLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Accounts, Events, Posts, Keila, Tickets}
+  alias Ysc.{Accounts, Events, Newsletter, Posts, Tickets}
   alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
@@ -2159,16 +2159,14 @@ defmodule YscWeb.HomeLive do
   end
 
   defp subscribe_to_newsletter(email, socket) do
-    # For unauthenticated users, only collect email with minimal metadata
     metadata = %{
-      "source" => "public_signup",
       "signup_date" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    opts = [data: metadata]
+    opts = [source: "public_signup", metadata: metadata]
 
-    case Keila.subscribe_email(email, opts) do
-      :ok ->
+    case Newsletter.subscribe(email, opts) do
+      {:ok, _subscriber} ->
         {:noreply,
          socket
          |> assign(
@@ -2186,20 +2184,18 @@ defmodule YscWeb.HomeLive do
            newsletter_error: "Please enter a valid email address."
          )}
 
-      {:error, :not_configured} ->
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_error: "Newsletter subscription is currently unavailable."
-         )}
+      {:error, %Ecto.Changeset{} = changeset} ->
+        error_message =
+          case changeset.errors do
+            [{:email, {msg, _}} | _] -> msg
+            _ -> "Something went wrong. Please try again later."
+          end
 
-      {:error, _error} ->
         {:noreply,
          socket
          |> assign(
            newsletter_email: email,
-           newsletter_error: "Something went wrong. Please try again later."
+           newsletter_error: error_message
          )}
     end
   end
