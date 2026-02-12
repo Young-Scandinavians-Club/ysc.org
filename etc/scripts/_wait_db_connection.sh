@@ -1,4 +1,6 @@
-#!/usr/bin/env bash -e
+#!/usr/bin/env bash
+
+set -e
 
 # USAGE
 # DBNAME=postgres://... ./wait-for-postgres
