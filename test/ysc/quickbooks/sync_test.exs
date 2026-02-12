@@ -54,15 +54,15 @@ defmodule Ysc.Quickbooks.SyncTest do
       {:ok, %{"Id" => "qb_customer_default", "DisplayName" => "Test User"}}
     end)
 
-    stub(ClientMock, :create_sales_receipt, fn _params ->
+    stub(ClientMock, :create_sales_receipt, fn _params, _opts ->
       {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
     end)
 
-    stub(ClientMock, :create_refund_receipt, fn _params ->
+    stub(ClientMock, :create_refund_receipt, fn _params, _opts ->
       {:ok, %{"Id" => "qb_refund_receipt_default", "TotalAmt" => "0.00"}}
     end)
 
-    stub(ClientMock, :create_deposit, fn _params ->
+    stub(ClientMock, :create_deposit, fn _params, _opts ->
       {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
     end)
 
@@ -104,7 +104,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_pending", "TotalAmt" => "100.00"}}
       end)
 
@@ -137,7 +137,7 @@ defmodule Ysc.Quickbooks.SyncTest do
           {:ok, %{"Id" => "qb_customer_123", "DisplayName" => "Test User"}}
         end)
 
-        expect(ClientMock, :create_sales_receipt, fn params ->
+        expect(ClientMock, :create_sales_receipt, fn params, _opts ->
           # Verify the amount is positive
           assert params.total_amt == Decimal.new("10000.00")
 
@@ -218,7 +218,7 @@ defmodule Ysc.Quickbooks.SyncTest do
           {:ok, %{"Id" => "qb_customer_123"}}
         end)
 
-        expect(ClientMock, :create_sales_receipt, fn params ->
+        expect(ClientMock, :create_sales_receipt, fn params, _opts ->
           # Verify class is set correctly for events
           line_detail =
             params.line |> List.first() |> Map.get(:sales_item_line_detail)
@@ -262,7 +262,7 @@ defmodule Ysc.Quickbooks.SyncTest do
           {:ok, %{"Id" => "qb_customer_123"}}
         end)
 
-        expect(ClientMock, :create_sales_receipt, fn params ->
+        expect(ClientMock, :create_sales_receipt, fn params, _opts ->
           line_detail =
             params.line |> List.first() |> Map.get(:sales_item_line_detail)
 
@@ -275,13 +275,53 @@ defmodule Ysc.Quickbooks.SyncTest do
       end
     end
 
+    test "passes idempotency key with length at most 255 to create_sales_receipt",
+         %{
+           user: user
+         } do
+      setup_default_mocks()
+
+      expect(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_123"}}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn _params, opts ->
+        key = opts[:idempotency_key]
+        assert key != nil, "idempotency_key should be present in opts"
+
+        assert byte_size(key) <= 255,
+               "idempotency_key must not exceed 255 bytes (QuickBooks requestid limit), got #{byte_size(key)}"
+
+        {:ok, %{"Id" => "qb_sr_123", "TotalAmt" => "100.00"}}
+      end)
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_idempotency_test",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Idempotency test",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment = Repo.reload!(payment)
+
+      if payment.quickbooks_sync_status != "synced" do
+        assert {:ok, _} = Sync.sync_payment(payment)
+      end
+    end
+
     test "handles QuickBooks API errors gracefully", %{user: user} do
       # Set up mocks that will fail for automatic sync
       stub(ClientMock, :create_customer, fn _params ->
         {:error, "Test - automatic sync should fail"}
       end)
 
-      stub(ClientMock, :create_sales_receipt, fn _params ->
+      stub(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:error, "Test - automatic sync should fail"}
       end)
 
@@ -331,7 +371,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:error, "QuickBooks API error: Invalid request"}
       end)
 
@@ -460,7 +500,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # Mock RefundReceipt creation for refund
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # CRITICAL: Verify refund_from_account_ref is present (Quickbooks.create_refund_receipt
         # converts refund_from_account_id to refund_from_account_ref before calling the client)
         assert Map.has_key?(params, :refund_from_account_ref)
@@ -570,7 +610,7 @@ defmodule Ysc.Quickbooks.SyncTest do
           {:ok, %{"Id" => "qb_customer_123"}}
         end)
 
-        expect(ClientMock, :create_sales_receipt, fn _params ->
+        expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
           {:ok,
            %{"Id" => "qb_payment_sales_receipt_123", "TotalAmt" => "100.00"}}
         end)
@@ -622,7 +662,7 @@ defmodule Ysc.Quickbooks.SyncTest do
           _ -> {:error, :not_found}
         end)
 
-        expect(ClientMock, :create_refund_receipt, fn params ->
+        expect(ClientMock, :create_refund_receipt, fn params, _opts ->
           # CRITICAL: Verify refund_from_account_id is present
           assert Map.has_key?(params, :refund_from_account_ref)
 
@@ -700,7 +740,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # CRITICAL: Verify refund_from_account_id is present
         assert Map.has_key?(params, :refund_from_account_ref)
         # Should not have original payment SalesReceipt ID in note
@@ -805,7 +845,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_err"}}
       end)
 
-      expect(ClientMock, :create_refund_receipt, fn _params ->
+      expect(ClientMock, :create_refund_receipt, fn _params, _opts ->
         {:error, "QuickBooks API error: Rate limited"}
       end)
 
@@ -865,7 +905,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123", "DisplayName" => "Test User"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify we have two line items
         assert length(params.line) == 2
 
@@ -989,7 +1029,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Should have only one line item (donation)
         assert length(params.line) == 1
 
@@ -1057,7 +1097,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Should have only one line item (event)
         assert length(params.line) == 1
 
@@ -1127,7 +1167,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify event line has Events class
         event_line =
           Enum.find(params.line, fn line ->
@@ -1323,7 +1363,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, 2, fn params ->
+      expect(ClientMock, :create_sales_receipt, 2, fn params, _opts ->
         sales_receipt_id =
           if params.total_amt == Decimal.new("10000.00"),
             do: "qb_sr_1",
@@ -1387,7 +1427,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # Mock Deposit creation
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # CRITICAL: Verify amounts are correct
         # Total should be $15000.00 (sum of $10000.00 + $5000.00)
         assert params.total_amt == Decimal.new("15000.00")
@@ -1501,7 +1541,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_payment", "TotalAmt" => "100.00"}}
       end)
 
@@ -1552,7 +1592,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # CRITICAL: Verify refund_from_account_id is present
         assert Map.has_key?(params, :refund_from_account_ref)
         {:ok, %{"Id" => "qb_refund_receipt_123", "TotalAmt" => "-3000.00"}}
@@ -1602,7 +1642,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert List.first(payout.refunds).quickbooks_sync_status == "synced"
 
       # Mock Deposit creation
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # CRITICAL: Verify net amount calculation
         # Total should be $7000.00 ($10000.00 - $3000.00)
         assert params.total_amt == Decimal.new("7000.00")
@@ -1749,7 +1789,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         end)
       end
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_payment", "TotalAmt" => "100.00"}}
       end)
 
@@ -1768,7 +1808,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => user.quickbooks_customer_id || "qb_customer_default"}}
       end)
 
-      stub(ClientMock, :create_sales_receipt, fn _params ->
+      stub(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
       end)
 
@@ -1905,9 +1945,43 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # Mock Deposit creation (simple deposit without line items)
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         assert params.total_amt == Decimal.new("10000.00")
         {:ok, %{"Id" => "qb_deposit_123", "TotalAmt" => "10000.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payout(payout)
+    end
+
+    test "passes idempotency key with length at most 255 to create_deposit", %{
+      user: _user
+    } do
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(5_000, :USD),
+          stripe_payout_id: "po_idempotency_test",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      payout = Repo.preload(payout, [:payments, :refunds])
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_deposit, fn _params, opts ->
+        key = opts[:idempotency_key]
+        assert key != nil, "idempotency_key should be present in opts"
+
+        assert byte_size(key) <= 255,
+               "idempotency_key must not exceed 255 bytes (QuickBooks requestid limit), got #{byte_size(key)}"
+
+        {:ok, %{"Id" => "qb_deposit_123", "TotalAmt" => "5000.00"}}
       end)
 
       assert {:ok, _} = Sync.sync_payout(payout)
@@ -2009,7 +2083,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_deposit, fn _params ->
+      expect(ClientMock, :create_deposit, fn _params, _opts ->
         {:error, "QuickBooks API error: Deposit failed"}
       end)
 
@@ -2043,7 +2117,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_123", "TotalAmt" => "100.00"}}
       end)
 
@@ -2130,7 +2204,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       end
 
       # Mock deposit creation (for payout sync)
-      expect(ClientMock, :create_deposit, fn _params ->
+      expect(ClientMock, :create_deposit, fn _params, _opts ->
         {:ok, %{"Id" => "qb_deposit_123", "TotalAmt" => "100.00"}}
       end)
 
@@ -2191,13 +2265,13 @@ defmodule Ysc.Quickbooks.SyncTest do
         end)
       end
 
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # CRITICAL: Verify refund_from_account_id is present
         assert Map.has_key?(params, :refund_from_account_ref)
         {:ok, %{"Id" => "qb_refund_receipt_123", "TotalAmt" => "-3000.00"}}
       end)
 
-      stub(ClientMock, :create_sales_receipt, fn _params ->
+      stub(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_payment", "TotalAmt" => "10000.00"}}
       end)
 
@@ -2285,7 +2359,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         assert Map.has_key?(params, :refund_from_account_ref)
         {:ok, %{"Id" => "qb_refund_receipt_123", "TotalAmt" => "30.00"}}
       end)
@@ -2313,7 +2387,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         )
 
       # Mock deposit creation (for payout sync)
-      expect(ClientMock, :create_deposit, fn _params ->
+      expect(ClientMock, :create_deposit, fn _params, _opts ->
         {:ok, %{"Id" => "qb_deposit_123", "TotalAmt" => "70.00"}}
       end)
 
@@ -2380,7 +2454,7 @@ defmodule Ysc.Quickbooks.SyncTest do
             {:ok, %{"Id" => "qb_customer_123"}}
           end)
 
-          expect(ClientMock, :create_sales_receipt, fn params ->
+          expect(ClientMock, :create_sales_receipt, fn params, _opts ->
             # CRITICAL: Verify amount is positive
             assert Decimal.positive?(params.total_amt)
             assert params.total_amt == expected_decimal
@@ -2487,7 +2561,7 @@ defmodule Ysc.Quickbooks.SyncTest do
           _ -> {:error, :not_found}
         end)
 
-        expect(ClientMock, :create_refund_receipt, fn params ->
+        expect(ClientMock, :create_refund_receipt, fn params, _opts ->
           # CRITICAL: Verify refund_from_account_ref is present (Quickbooks.create_refund_receipt
           # converts refund_from_account_id to refund_from_account_ref before calling the client)
           assert Map.has_key?(params, :refund_from_account_ref)
@@ -2543,7 +2617,7 @@ defmodule Ysc.Quickbooks.SyncTest do
             {:ok, %{"Id" => "qb_customer_123"}}
           end)
 
-          expect(ClientMock, :create_sales_receipt, fn params ->
+          expect(ClientMock, :create_sales_receipt, fn params, _opts ->
             assert Decimal.negative?(params.total_amt)
             assert params.total_amt == expected_decimal
 
@@ -2670,7 +2744,7 @@ defmodule Ysc.Quickbooks.SyncTest do
             Money.to_decimal(amount)
             |> Decimal.round(2)
 
-          expect(ClientMock, :create_sales_receipt, fn params ->
+          expect(ClientMock, :create_sales_receipt, fn params, _opts ->
             assert params.total_amt == expected_total
 
             {:ok,
@@ -2760,7 +2834,7 @@ defmodule Ysc.Quickbooks.SyncTest do
             _ -> {:error, :not_found}
           end)
 
-          expect(ClientMock, :create_refund_receipt, fn params ->
+          expect(ClientMock, :create_refund_receipt, fn params, _opts ->
             # CRITICAL: Verify refund_from_account_ref is present (Quickbooks.create_refund_receipt
             # converts refund_from_account_id to refund_from_account_ref before calling the client)
             assert Map.has_key?(params, :refund_from_account_ref)
@@ -2866,7 +2940,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # Mock Deposit creation
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # CRITICAL: Verify net amount is correct
         assert params.total_amt == expected_net
 
@@ -2997,7 +3071,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # CRITICAL TEST: Verify refund receipt uses Tahoe class
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # Verify the line item has the correct class
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
@@ -3108,7 +3182,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # CRITICAL TEST: Verify refund receipt uses Clear Lake class
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # Verify the line item has the correct class
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
@@ -3220,7 +3294,7 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # CRITICAL TEST: Verify the refund correctly inherits Tahoe property
       # even though we didn't explicitly pass it to process_refund
-      expect(ClientMock, :create_refund_receipt, fn params ->
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
 
@@ -3302,7 +3376,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify membership uses Administration class
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
@@ -3381,7 +3455,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
 
@@ -3457,7 +3531,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
 
@@ -3596,7 +3670,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, "qb_dynamic_item_123"}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok,
          %{
            "Id" => "qb_sr_dynamic_item",
@@ -3737,7 +3811,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:error, "Sales receipt creation failed"}
       end)
 
@@ -3811,7 +3885,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_refund_receipt, fn _params ->
+      expect(ClientMock, :create_refund_receipt, fn _params, _opts ->
         {:error, "Refund receipt creation failed"}
       end)
 
@@ -3875,7 +3949,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn _params ->
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok,
          %{
            "Id" => "qb_sr_retry_success",
@@ -3955,7 +4029,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, "stripe_fee_item_123"}
       end)
 
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # Verify Stripe fee line item is included
         assert length(params.line) == 2
 
@@ -4086,7 +4160,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, "stripe_fee_item_123"}
       end)
 
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # Should have 4 line items: 3 payments + 1 fee line
         assert length(params.line) == 4
 
@@ -4162,7 +4236,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # Should only have 1 line item (payment), no fee line
         assert length(params.line) == 1
 
@@ -4243,7 +4317,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:error, :api_error}
       end)
 
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # Should only have payment line item, no fee line (gracefully degraded)
         assert length(params.line) == 1
 
@@ -4347,7 +4421,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         {:ok, "stripe_fee_item_123"}
       end)
 
-      expect(ClientMock, :create_deposit, fn params ->
+      expect(ClientMock, :create_deposit, fn params, _opts ->
         # Should have 3 line items: 1 payment + 1 refund + 1 fee
         assert length(params.line) == 3
 
@@ -4405,7 +4479,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify Administration class is assigned
         line_item = List.first(params.line)
 
@@ -4445,7 +4519,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         line_item = List.first(params.line)
 
         assert line_item.sales_item_line_detail.class_ref.value ==
@@ -4484,7 +4558,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         line_item = List.first(params.line)
 
         assert line_item.sales_item_line_detail.class_ref.value ==
@@ -4523,7 +4597,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         line_item = List.first(params.line)
 
         assert line_item.sales_item_line_detail.class_ref.value ==
@@ -4563,7 +4637,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify all required QuickBooks fields are present
         assert params.customer_ref != nil
         assert params.customer_ref.value != nil
@@ -4611,7 +4685,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :create_sales_receipt, fn params ->
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify transaction date is present (could be Date or DateTime)
         assert Map.has_key?(params, :txn_date),
                "txn_date key missing from params"

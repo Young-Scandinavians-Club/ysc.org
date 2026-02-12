@@ -21,6 +21,21 @@ defmodule Ysc.Quickbooks.Sync do
     Application.get_env(:ysc, :quickbooks_client, Ysc.Quickbooks.Client)
   end
 
+  # Idempotency keys for QuickBooks API (requestid, max 255 chars).
+  # Same entity always uses the same key so retries/duplicate jobs do not create duplicates.
+  @qb_request_id_max_length 255
+
+  defp qb_idempotency_key(prefix, struct) do
+    key = build_qb_idempotency_key(prefix, struct)
+    String.slice(key, 0, @qb_request_id_max_length)
+  end
+
+  defp build_qb_idempotency_key("sr_pay", %Payment{id: id}), do: "sr_pay_#{id}"
+  defp build_qb_idempotency_key("rr_ref", %Refund{id: id}), do: "rr_ref_#{id}"
+
+  defp build_qb_idempotency_key("dep_payout", %Payout{id: id}),
+    do: "dep_payout_#{id}"
+
   # QuickBooks Account and Class mappings
   @account_class_mapping %{
     # Event tickets
@@ -1284,7 +1299,10 @@ defmodule Ysc.Quickbooks.Sync do
         params: inspect(params, limit: :infinity)
       )
 
-      result = Quickbooks.create_purchase_sales_receipt(params)
+      result =
+        Quickbooks.create_purchase_sales_receipt(params,
+          idempotency_key: qb_idempotency_key("sr_pay", payment)
+        )
 
       Ysc.Logging.debug(
         "[QB Sync] create_payment_sales_receipt: Quickbooks.create_purchase_sales_receipt result",
@@ -1477,7 +1495,10 @@ defmodule Ysc.Quickbooks.Sync do
         client_module: inspect(client_module)
       )
 
-      result = client_module.create_sales_receipt(sales_receipt_params)
+      result =
+        client_module.create_sales_receipt(sales_receipt_params,
+          idempotency_key: qb_idempotency_key("sr_pay", payment)
+        )
 
       Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Client.create_sales_receipt result",
@@ -1865,7 +1886,10 @@ defmodule Ysc.Quickbooks.Sync do
       params: inspect(params, limit: :infinity)
     )
 
-    result = Quickbooks.create_refund_receipt(params)
+    result =
+      Quickbooks.create_refund_receipt(params,
+        idempotency_key: qb_idempotency_key("rr_ref", refund)
+      )
 
     Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Quickbooks.create_refund_receipt result",
@@ -1957,7 +1981,9 @@ defmodule Ysc.Quickbooks.Sync do
           params: inspect(params, limit: :infinity)
         )
 
-        client_module().create_deposit(params)
+        client_module().create_deposit(params,
+          idempotency_key: qb_idempotency_key("dep_payout", payout)
+        )
       else
         # Build line items for each payment and refund
         Ysc.Logging.debug(
@@ -2010,7 +2036,10 @@ defmodule Ysc.Quickbooks.Sync do
             params: inspect(params, limit: :infinity)
           )
 
-          result = Quickbooks.create_stripe_payout_deposit(params)
+          result =
+            Quickbooks.create_stripe_payout_deposit(params,
+              idempotency_key: qb_idempotency_key("dep_payout", payout)
+            )
 
           Ysc.Logging.debug(
             "[QB Sync] create_payout_deposit: Quickbooks.create_stripe_payout_deposit result",
@@ -2447,7 +2476,10 @@ defmodule Ysc.Quickbooks.Sync do
       client_module: inspect(client_module)
     )
 
-    result = client_module.create_deposit(deposit_params)
+    result =
+      client_module.create_deposit(deposit_params,
+        idempotency_key: qb_idempotency_key("dep_payout", payout)
+      )
 
     Ysc.Logging.debug(
       "[QB Sync] create_payout_deposit_with_lines: Client.create_deposit result",

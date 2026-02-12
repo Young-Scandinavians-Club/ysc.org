@@ -57,7 +57,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
         {:ok, %{"Id" => "cust_1"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:ok, %{"Id" => "sr_1", "TotalAmt" => "100.00"}}
       end)
 
@@ -116,7 +116,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
         {:ok, %{"Id" => "cust_1"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:ok, %{"Id" => "sr_1", "TotalAmt" => "100.00"}}
       end)
 
@@ -124,7 +124,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
         {:ok, "item_event_123"}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _, _opts ->
         {:ok, %{"Id" => "rr_1", "TotalAmt" => "20.00"}}
       end)
 
@@ -203,7 +203,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
         {:ok, %{"Id" => "cust_1"}}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _, _opts ->
         {:ok, %{"Id" => "sr_1", "TotalAmt" => "100.00"}}
       end)
 
@@ -211,7 +211,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
         {:ok, "item_event_123"}
       end)
 
-      stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _ ->
+      stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _, _opts ->
         {:error, "Rate limited"}
       end)
 

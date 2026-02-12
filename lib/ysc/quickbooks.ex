@@ -70,9 +70,9 @@ defmodule Ysc.Quickbooks do
       - `tax_code_ref` (optional) - Tax code reference
 
   """
-  @spec create_purchase_sales_receipt(map()) ::
+  @spec create_purchase_sales_receipt(map(), keyword()) ::
           {:ok, map()} | {:error, atom() | String.t()}
-  def create_purchase_sales_receipt(params) do
+  def create_purchase_sales_receipt(params, opts \\ []) do
     # Validate required parameters early to provide better error messages
     cond do
       is_nil(params[:customer_id]) or params[:customer_id] == "" ->
@@ -92,11 +92,11 @@ defmodule Ysc.Quickbooks do
         {:error, :missing_item_id}
 
       true ->
-        do_create_purchase_sales_receipt(params)
+        do_create_purchase_sales_receipt(params, opts)
     end
   end
 
-  defp do_create_purchase_sales_receipt(params) do
+  defp do_create_purchase_sales_receipt(params, opts) do
     total_amt = Decimal.mult(Decimal.new(params.quantity), params.unit_price)
 
     # Convert quantity to Decimal if it's not already
@@ -208,7 +208,7 @@ defmodule Ysc.Quickbooks do
         do: Map.put(sales_receipt_params, :private_note, params.private_note),
         else: sales_receipt_params
 
-    client_module().create_sales_receipt(sales_receipt_params)
+    client_module().create_sales_receipt(sales_receipt_params, opts)
   end
 
   @doc """
@@ -233,9 +233,9 @@ defmodule Ysc.Quickbooks do
       - `tax_code_ref` (optional) - Tax code reference
 
   """
-  @spec create_refund_sales_receipt(map()) ::
+  @spec create_refund_sales_receipt(map(), keyword()) ::
           {:ok, map()} | {:error, atom() | String.t()}
-  def create_refund_sales_receipt(params) do
+  def create_refund_sales_receipt(params, opts \\ []) do
     # Refund Receipts use positive amounts - the transaction type determines direction
     unit_price = Decimal.abs(params.unit_price)
     total_amt = Decimal.mult(Decimal.new(params.quantity), unit_price)
@@ -308,7 +308,7 @@ defmodule Ysc.Quickbooks do
         do: Map.put(sales_receipt_params, :private_note, params.private_note),
         else: sales_receipt_params
 
-    client_module().create_sales_receipt(sales_receipt_params)
+    client_module().create_sales_receipt(sales_receipt_params, opts)
   end
 
   @doc """
@@ -334,9 +334,9 @@ defmodule Ysc.Quickbooks do
       - `tax_code_ref` (optional) - Tax code reference
 
   """
-  @spec create_refund_receipt(map()) ::
+  @spec create_refund_receipt(map(), keyword()) ::
           {:ok, map()} | {:error, atom() | String.t()}
-  def create_refund_receipt(params) do
+  def create_refund_receipt(params, opts \\ []) do
     # RefundReceipts use positive amounts - the transaction type determines direction
     unit_price = Decimal.abs(params.unit_price)
     total_amt = Decimal.mult(Decimal.new(params.quantity), unit_price)
@@ -430,7 +430,7 @@ defmodule Ysc.Quickbooks do
         do: Map.put(refund_receipt_params, :private_note, params.private_note),
         else: refund_receipt_params
 
-    client_module().create_refund_receipt(refund_receipt_params)
+    client_module().create_refund_receipt(refund_receipt_params, opts)
   end
 
   @doc """
@@ -449,9 +449,9 @@ defmodule Ysc.Quickbooks do
       - `payment_method_ref` (optional) - Payment method reference
 
   """
-  @spec create_stripe_payout_deposit(map()) ::
+  @spec create_stripe_payout_deposit(map(), keyword()) ::
           {:ok, map()} | {:error, atom() | String.t()}
-  def create_stripe_payout_deposit(params) do
+  def create_stripe_payout_deposit(params, opts \\ []) do
     deposit_line_detail = %{
       account_ref: %{value: params.stripe_account_id}
     }
@@ -498,7 +498,7 @@ defmodule Ysc.Quickbooks do
         do: Map.put(deposit_params, :private_note, params.private_note),
         else: deposit_params
 
-    client_module().create_deposit(deposit_params)
+    client_module().create_deposit(deposit_params, opts)
   end
 
   @doc """
