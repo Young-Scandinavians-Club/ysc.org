@@ -140,12 +140,6 @@ config :ysc,
     }
   ]
 
-config :ysc, :keila,
-  api_url: "http://localhost:4001",
-  api_key: "h4ANq5tAf4fLTW1HpjSc1nszdCpcKOxBsLbnxe8-XDs",
-  project_id: "np_weLJnLY5",
-  form_id: "nfrm_BzLMaLXv"
-
 # Include HEEx debug annotations as HTML comments in rendered markup
 config :phoenix_live_view, :debug_heex_annotations, true
 

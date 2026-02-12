@@ -223,21 +223,6 @@ defmodule YscWeb.ContactLive do
             <div class="not-prose space-y-4 mt-6">
               <div class="flex items-start gap-4">
                 <.icon
-                  name="hero-phone"
-                  class="w-6 h-6 text-zinc-400 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <p class="font-semibold text-zinc-900 mb-1">Phone</p>
-                  <a
-                    href="tel:+14157230844"
-                    class="text-blue-600 hover:text-blue-700 hover:underline transition"
-                  >
-                    +1 (415) 723-0844
-                  </a>
-                </div>
-              </div>
-              <div class="flex items-start gap-4">
-                <.icon
                   name="hero-map-pin"
                   class="w-6 h-6 text-zinc-400 flex-shrink-0 mt-0.5"
                 />

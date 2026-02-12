@@ -217,14 +217,6 @@ config :ysc,
     }
   ]
 
-# Keila configuration
-# For production, set KEILA_API_URL, KEILA_API_KEY, KEILA_PROJECT_ID, and KEILA_FORM_ID environment variables
-config :ysc, :keila,
-  api_url: System.get_env("KEILA_API_URL"),
-  api_key: System.get_env("KEILA_API_KEY"),
-  project_id: System.get_env("KEILA_PROJECT_ID"),
-  form_id: System.get_env("KEILA_FORM_ID")
-
 # Accounting settings
 config :ysc, :accounting,
   default_currency: :USD,

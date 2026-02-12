@@ -8,8 +8,6 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=ysc_dev
     command: postgres -c shared_preload_libraries=pg_stat_statements
-    volumes:
-      - ./postgres-init-keila.sql:/docker-entrypoint-initdb.d/10-keila.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -37,35 +35,6 @@ services:
     volumes:
       - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
-
-  # Mailpit for Keila testing
-  mailpit:
-    image: axllent/mailpit:latest
-    ports:
-      - "8025:8025"
-      - "1025:1025"
-
-  keila:
-    image: ysc-keila:latest
-    ports:
-      - "4001:4000"
-    environment:
-      - URL=http://localhost:4001
-      - SECRET_KEY_BASE=SomeSuperSecretKeyBaseAtLeast64BytesLongForLocalDevEnvironment12345
-      - DATABASE_URL=postgres://keila:keila@postgres:5432/keila
-      - DB_URL=postgres://keila:keila@postgres:5432/keila
-      - MAILER_TYPE=smtp
-      - MAILER_SMTP_FROM_EMAIL=keila@localhost
-      - MAILER_SMTP_HOST=mailpit
-      - MAILER_SMTP_PORT=1025
-      - MAILER_SMTP_PASSWORD=local
-      - ERL_FLAGS=-noshell -noinput
-    command: ["start", "--", "-noshell", "-noinput"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      mailpit:
-        condition: service_started
 
 volumes:
   pgadmin-data:

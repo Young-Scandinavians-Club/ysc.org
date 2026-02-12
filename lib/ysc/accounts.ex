@@ -21,6 +21,8 @@ defmodule Ysc.Accounts do
     UserPasskey
   }
 
+  alias Ysc.Newsletter
+
   ## Database getters
 
   @doc """
@@ -597,10 +599,8 @@ defmodule Ysc.Accounts do
   end
 
   defp subscribe_user_to_newsletter(user) do
-    # Subscribe user to Keila newsletter asynchronously via Oban
-    # Failures are logged but don't affect user registration
-
-    # Build custom metadata
+    # Subscribe user to newsletter. Failures are logged but don't affect user registration.
+    # If the email was already subscribed (e.g. public signup), the record is linked to the user.
     metadata = %{
       "user_id" => user.id,
       "signup_date" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -608,25 +608,23 @@ defmodule Ysc.Accounts do
       "state" => to_string(user.state || "active")
     }
 
-    # Build job args with all available user data
-    job_args = %{
-      "email" => user.email,
-      "action" => "subscribe",
-      "first_name" => user.first_name,
-      "last_name" => user.last_name,
-      "data" => metadata
-    }
+    case Newsletter.subscribe(user.email,
+           user_id: user.id,
+           first_name: user.first_name,
+           last_name: user.last_name,
+           source: "user_registration",
+           metadata: metadata
+         ) do
+      {:ok, _subscriber} ->
+        :ok
 
-    case job_args
-         |> YscWeb.Workers.KeilaSubscriber.new()
-         |> Oban.insert() do
-      {:ok, _job} ->
+      {:error, :invalid_email} ->
         :ok
 
       {:error, changeset} ->
         require Ysc.Logging
 
-        Ysc.Logging.warning("Failed to enqueue Keila subscription job",
+        Ysc.Logging.warning("Failed to subscribe user to newsletter",
           user_id: user.id,
           email: user.email,
           errors: inspect(changeset.errors)
@@ -638,32 +636,29 @@ defmodule Ysc.Accounts do
 
   @doc """
   Updates newsletter subscription when user changes email.
-  Only subscribes the new email if user has newsletter_notifications enabled.
-  Unsubscribes the old email.
+  Unsubscribes the old email. Subscribes the new email only if user has
+  newsletter_notifications enabled.
   """
   def update_newsletter_on_email_change(user, old_email, new_email) do
     require Ysc.Logging
 
-    # Unsubscribe old email
-    case %{"email" => old_email, "action" => "unsubscribe"}
-         |> YscWeb.Workers.KeilaSubscriber.new()
-         |> Oban.insert() do
-      {:ok, _job} ->
-        Ysc.Logging.debug("Enqueued newsletter unsubscription for old email",
+    case Newsletter.unsubscribe(old_email) do
+      {:ok, _} ->
+        Ysc.Logging.debug("Unsubscribed old email from newsletter",
           user_id: user.id,
           old_email: old_email
         )
 
-      {:error, changeset} ->
-        Ysc.Logging.warning(
-          "Failed to enqueue newsletter unsubscription for old email",
+      {:error, :not_found} ->
+        :ok
+
+      {:error, _} ->
+        Ysc.Logging.warning("Failed to unsubscribe old email from newsletter",
           user_id: user.id,
-          old_email: old_email,
-          errors: inspect(changeset.errors)
+          old_email: old_email
         )
     end
 
-    # Subscribe new email only if user has newsletter_notifications enabled
     if user.newsletter_notifications do
       metadata = %{
         "user_id" => user.id,
@@ -672,31 +667,25 @@ defmodule Ysc.Accounts do
         "state" => to_string(user.state || "active")
       }
 
-      job_args = %{
-        "email" => new_email,
-        "action" => "subscribe",
-        "first_name" => user.first_name,
-        "last_name" => user.last_name,
-        "data" => metadata
-      }
-
-      case job_args
-           |> YscWeb.Workers.KeilaSubscriber.new()
-           |> Oban.insert() do
-        {:ok, _job} ->
-          Ysc.Logging.debug("Enqueued newsletter subscription for new email",
+      case Newsletter.subscribe(new_email,
+             user_id: user.id,
+             first_name: user.first_name,
+             last_name: user.last_name,
+             source: "email_change",
+             metadata: metadata
+           ) do
+        {:ok, _} ->
+          Ysc.Logging.debug("Subscribed new email to newsletter",
             user_id: user.id,
             new_email: new_email
           )
 
           :ok
 
-        {:error, changeset} ->
-          Ysc.Logging.warning(
-            "Failed to enqueue newsletter subscription for new email",
+        {:error, _} ->
+          Ysc.Logging.warning("Failed to subscribe new email to newsletter",
             user_id: user.id,
-            new_email: new_email,
-            errors: inspect(changeset.errors)
+            new_email: new_email
           )
 
           :ok

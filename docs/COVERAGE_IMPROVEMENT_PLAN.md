@@ -210,7 +210,7 @@ These files don't require testing due to their nature:
 
 **Behaviour Definitions (Interface Only):**
 - `lib/ysc/customers/behaviour.ex`
-- `lib/ysc/keila/behaviour.ex`
+- `lib/ysc/newsletter.ex` (optional, if behaviour added later)
 - `lib/ysc/payments/behaviour.ex`
 - `lib/ysc/quickbooks/client_behaviour.ex`
 - `lib/ysc/stripe_behaviour.ex`

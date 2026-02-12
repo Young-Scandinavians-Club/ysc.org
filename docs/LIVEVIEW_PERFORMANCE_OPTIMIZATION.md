@@ -54,7 +54,7 @@ This document outlines optimizations based on Phoenix LiveView best practices fo
 ## 3. Handling User Input & External Tasks
 
 ### ✅ Already Implemented
-- **Background jobs**: Keila subscription sync uses Oban workers
+- **Background jobs**: Newsletter subscription updates are synchronous (no Oban worker)
 - **Debouncing**: Most form inputs use phx-debounce
 
 ### 🔧 Opportunities

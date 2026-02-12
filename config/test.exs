@@ -71,7 +71,6 @@ config :ysc, :stripe_customer, Stripe.CustomerMock
 config :ysc, :stripe_client, Ysc.TestStripeClient
 config :ysc, :stripe_subscription_retriever, Ysc.StripeSubscriptionRetrieverMock
 config :ysc, :accounts_module, Ysc.AccountsMock
-config :ysc, :keila_client, Ysc.Keila.ClientStub
 
 # Discord alerts configuration for testing
 config :ysc, Ysc.Alerts.Discord,

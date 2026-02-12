@@ -193,13 +193,6 @@ defmodule YscWeb.ContactLiveTest do
   end
 
   describe "other contact methods" do
-    test "displays phone number", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/contact")
-
-      assert html =~ "+1 (415) 723-0844"
-      assert html =~ "tel:+14157230844"
-    end
-
     test "displays mailing address", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/contact")
 
@@ -284,8 +277,8 @@ defmodule YscWeb.ContactLiveTest do
       assert html =~ "hero-home"
       assert html =~ "hero-user-group"
       assert html =~ "hero-users"
+      assert html =~ "hero-computer-desktop"
       assert html =~ "hero-envelope"
-      assert html =~ "hero-phone"
       assert html =~ "hero-map-pin"
     end
   end

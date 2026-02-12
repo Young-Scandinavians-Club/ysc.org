@@ -40,7 +40,6 @@ defmodule Ysc.MixProject do
           Mix.Tasks.TestSubscriptionExpiration,
           Mix.Tasks.Webhook.Reprocess,
           Ysc.Customers.Behaviour,
-          Ysc.Keila.Behaviour,
           Ysc.Payments.Behaviour,
           Ysc.Quickbooks.Client,
           Ysc.Quickbooks.ClientBehaviour,

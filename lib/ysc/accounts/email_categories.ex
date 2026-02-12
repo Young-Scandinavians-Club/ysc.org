@@ -43,7 +43,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "booking_refund_pending" => :account,
     "account_setup_verification" => :account
     # Newsletter notifications (can be disabled)
-    # Note: Newsletter emails are handled by Keila, not through this system
+    # Note: Newsletter emails are handled by the in-house newsletter system (Ysc.Newsletter), not through this system
   }
 
   @doc """

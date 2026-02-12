@@ -30,25 +30,14 @@ This document provides a visual overview of how all the pieces fit together in y
 │  │                            │                                        │  │
 │  │  ┌─────────────────────────▼───────────┐                           │  │
 │  │  │     PostgreSQL (Port 5432)          │                           │  │
-│  │  │  ┌──────────┐  ┌──────────┐         │                           │  │
-│  │  │  │ ysc_dev  │  │  keila   │         │                           │  │
-│  │  │  │   DB     │  │    DB    │         │                           │  │
-│  │  │  └──────────┘  └──────────┘         │                           │  │
+│  │  │  ┌─────────────────────┐             │                           │  │
+│  │  │  │     ysc_dev DB      │             │                           │  │
+│  │  │  └─────────────────────┘             │                           │  │
 │  │  └─────────────────────────────────────┘                           │  │
 │  │           │                                                         │  │
 │  │  ┌────────▼────────────────────────────┐                           │  │
 │  │  │  LocalStack (Port 4566)             │                           │  │
 │  │  │  (Simulates AWS S3 for file upload) │                           │  │
-│  │  └─────────────────────────────────────┘                           │  │
-│  │           │                                                         │  │
-│  │  ┌────────▼────────────────────────────┐                           │  │
-│  │  │  Keila (Port 4001)                  │                           │  │
-│  │  │  (Email marketing service)          │                           │  │
-│  │  └─────────────────────────────────────┘                           │  │
-│  │           │                                                         │  │
-│  │  ┌────────▼────────────────────────────┐                           │  │
-│  │  │  Mailpit (Port 8025)                │                           │  │
-│  │  │  (Email testing UI)                 │                           │  │
 │  │  └─────────────────────────────────────┘                           │  │
 │  │           │                                                         │  │
 │  │  ┌────────▼────────────────────────────┐                           │  │
@@ -140,29 +129,22 @@ Trigger Event → Enqueue Oban Job → PostgreSQL (jobs table)
 User subscribes → Phoenix LiveView → Save to YSC DB
                          │
                          ▼
-              Enqueue KeilaSubscriber Job
+              Update newsletter_subscribers
                          │
                          ▼
               Oban Worker (async processing)
                          │
                          ▼
-                   Keila API Call
+                   Ysc.Newsletter
                          │
                          ▼
-              Save to Keila Database
-                         │
-                         ▼
-           Send Confirmation Email (via Mailpit)
-                         │
-                         ▼
-            Viewable at http://localhost:8025
+              Save to newsletter_subscribers
 ```
 
 **Key Points:**
-- Newsletter subscriptions are processed asynchronously via Oban
-- Keila manages all newsletter contacts and campaigns
-- In development, emails are caught by Mailpit (never sent to real addresses)
-- Subscription status is tracked in both YSC and Keila databases
+- Newsletter subscriptions are stored in the app database (newsletter_subscribers)
+- Subscription status is tracked in the YSC database
+- In development, app emails (including any newsletter-related) use Swoosh local adapter and are viewable at /dev/mailbox
 
 
 ## Port Reference
@@ -173,9 +155,6 @@ User subscribes → Phoenix LiveView → Save to YSC DB
 | Swoosh Mailbox| 4000 | http://localhost:4000/dev/mailbox| App email preview          |
 | PostgreSQL    | 5432 | localhost:5432                   | Database                   |
 | LocalStack S3 | 4566 | http://localhost:4566            | Local S3 simulation        |
-| Keila         | 4001 | http://localhost:4001            | Email marketing            |
-| Mailpit UI    | 8025 | http://localhost:8025            | Email testing UI           |
-| Mailpit SMTP  | 1025 | localhost:1025                   | Email SMTP (for Keila)     |
 | PgAdmin       | 8888 | http://localhost:8888            | Database management UI     |
 
 ## Environment Files
@@ -264,16 +243,15 @@ ysc-redesign-ex/
 - **Stripe**: Payment processing
 - **QuickBooks**: Accounting integration
 - **Flowroute**: SMS services
-- **Keila**: Email marketing and newsletter management
+- **Newsletter**: In-house subscription management (Ysc.Newsletter)
   - Open-source newsletter platform
   - Runs locally in Docker for development
   - Manages subscriber lists and campaigns
   - Integrated via API calls from Oban workers
 
 ### Development Services (Docker)
-- **PostgreSQL**: Database for both YSC app and Keila
+- **PostgreSQL**: Database for the YSC app
 - **LocalStack**: AWS S3 simulation
-- **Mailpit**: SMTP server for catching emails locally
 - **PgAdmin**: Database management UI
 
 ## Understanding the Codebase
@@ -284,9 +262,8 @@ lib/
 │   ├── accounts/                 # User accounts and auth
 │   ├── bookings/                 # Booking system
 │   ├── events/                   # Event management
-│   ├── keila/                    # Newsletter integration
-│   │   ├── behaviour.ex          # Keila API behaviour
-│   │   └── client.ex             # Keila API client
+│   ├── newsletter/               # Newsletter subscriptions
+│   │   └── subscriber.ex         # Newsletter subscriber schema
 │   ├── ledgers/                  # Financial ledgers
 │   ├── memberships/              # Membership management
 │   ├── payments/                 # Payment processing
@@ -300,7 +277,6 @@ lib/
 │   ├── live/                     # LiveView pages
 │   ├── emails/                   # Email templates
 │   ├── workers/                  # Background jobs (Oban)
-│   │   └── keila_subscriber.ex   # Newsletter subscription worker
 │   └── ...
 │
 └── ysc_web.ex                    # Web module definition
@@ -369,29 +345,20 @@ lib/
 1. Subscribe a test email
    ├── Via homepage: http://localhost:4000 (newsletter form)
    ├── Via user settings: Settings → Notifications → Newsletter
-   └── Via IEx: Ysc.Keila.subscribe_email("test@example.com")
+   └── Via IEx: Ysc.Newsletter.subscribe("test@example.com")
 
 2. Verify subscription
-   ├── Check Keila: http://localhost:4001 → Contacts
-   ├── Check Oban jobs: http://localhost:4000/admin/settings
-   └── Check email: http://localhost:8025 (Mailpit)
+   ├── Check newsletter_subscribers table
+   └── Open /newsletter/unsubscribe/:token for unsubscribe links
 
-3. Create test campaign
-   ├── Open Keila: http://localhost:4001
-   ├── Navigate to Campaigns → New Campaign
-   ├── Design newsletter content
-   ├── Send to test contacts
-   └── View in Mailpit: http://localhost:8025
-
-4. Check subscription status
-   └── In IEx: Ysc.Keila.get_subscription_status("test@example.com")
+3. Check subscription status
+   └── In IEx: Ysc.Newsletter.get_subscriber_by_email("test@example.com")
 ```
 
 **Key Files for Newsletter Integration:**
-- `lib/ysc/keila.ex` - Main Keila context
-- `lib/ysc/keila/client.ex` - Keila API client
-- `lib/ysc_web/workers/keila_subscriber.ex` - Oban worker for async subscriptions
-- `test/ysc/keila_test.exs` - Keila integration tests
+- `lib/ysc/newsletter.ex` - Newsletter context
+- `lib/ysc/newsletter/subscriber.ex` - Subscriber schema
+- `lib/ysc_web/live/newsletter_unsubscribe_live.ex` - Public unsubscribe page
 
 ### Testing Application Emails
 
@@ -414,12 +381,11 @@ lib/
    └── Check /dev/mailbox for confirmations
 ```
 
-**Email Systems:**
+**Email in development:**
 
-| System | URL | Purpose | Emails |
-|--------|-----|---------|--------|
-| Swoosh Mailbox | http://localhost:4000/dev/mailbox | App emails | Registration, tickets, notifications |
-| Mailpit | http://localhost:8025 | Newsletter emails | Keila campaigns, subscriptions |
+| System | URL | Purpose |
+|--------|-----|---------|
+| Swoosh Mailbox | http://localhost:4000/dev/mailbox | App emails (registration, tickets, notifications) |
 
 **Key Email Files:**
 - `lib/ysc_web/emails/` - Email templates (MJML)

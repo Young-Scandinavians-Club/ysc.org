@@ -441,12 +441,6 @@ The following services are available while running the dev environment:
 - **PgAdmin** (Database UI): [http://localhost:8888](http://localhost:8888)
   - Email: `admin@ysc.org`
   - Password: `password`
-- **Keila** (Email marketing/newsletters): [http://localhost:4001](http://localhost:4001)
-  - Pre-configured for local testing
-  - See [Newsletter Testing Guide](#testing-newsletters-with-keila) below
-- **Mailpit** (Email testing UI): [http://localhost:8025](http://localhost:8025)
-  - Catches all emails sent by Keila
-  - View newsletters and subscription confirmations
 - **LocalStack** (Local AWS S3): [http://localhost:4566](http://localhost:4566)
 
 ### Testing Emails in Development
@@ -527,21 +521,6 @@ The Swoosh mailbox preview provides:
 - **Live updates** - New emails appear automatically
 - **Search/filter** - Find specific emails easily
 
-#### Difference: Swoosh Mailbox vs Mailpit
-
-The application uses **two different email systems**:
-
-| System             | Purpose           | URL                               | Emails                                           |
-| ------------------ | ----------------- | --------------------------------- | ------------------------------------------------ |
-| **Swoosh Mailbox** | YSC app emails    | http://localhost:4000/dev/mailbox | Registration, notifications, tickets, etc.       |
-| **Mailpit**        | Keila newsletters | http://localhost:8025             | Newsletter campaigns, subscription confirmations |
-
-**Why two systems?**
-
-- **Swoosh** is built into Phoenix - handles transactional emails from the app
-- **Mailpit** is an external SMTP server - handles Keila's newsletter emails
-- They serve different purposes and operate independently
-
 #### Testing Email Templates
 
 If you're developing email templates:
@@ -584,220 +563,36 @@ open http://localhost:4000/dev/mailbox
 
 **Need to test actual email delivery:**
 
-- Use a test SMTP service (Mailpit, MailHog, or Mailtrap)
+- Use a test SMTP service (e.g. MailHog or Mailtrap)
 - Configure in `config/dev.exs` or use environment variables
-- For most development, the local adapter is sufficient
+- For most development, the Swoosh local adapter and dev mailbox are sufficient
 
-### Testing Newsletters with Keila
+### Newsletter subscriptions
 
-The application uses [Keila](https://www.keila.io/) for email marketing and newsletter management. Your local development environment includes a fully functional Keila instance that's pre-configured and ready to use.
+The application uses an in-house newsletter system (`Ysc.Newsletter`) for managing subscriptions. Subscriptions are stored in the `newsletter_subscribers` table.
 
-#### What is Keila?
+**Where users can subscribe or manage preferences:**
 
-Keila is an open-source email marketing platform that handles:
+- **Homepage** (unauthenticated): Newsletter signup form at the bottom of the page
+- **User settings** (authenticated): Notifications → Newsletter checkbox
+- **Public unsubscribe**: Each subscriber has a unique link to unsubscribe: `/newsletter/unsubscribe/:token`
 
-- Newsletter subscriptions and unsubscriptions
-- Email campaign management
-- Contact list management
-- Subscription status tracking
-
-#### Accessing Keila
-
-1. **Open Keila**: Navigate to [http://localhost:4001](http://localhost:4001)
-2. **Login credentials**: (These are created during first run)
-   - The system is pre-configured with API credentials
-   - You can create an admin account through the Keila UI if needed
-
-#### How Newsletter Integration Works
-
-```
-User subscribes → YSC App → Oban Job → Keila API → Keila Database
-                                    ↓
-                              Email sent via Mailpit
-```
-
-**Key components:**
-
-- **YSC Application** - Handles newsletter checkbox in user settings and homepage
-- **Oban Worker** (`YscWeb.Workers.KeilaSubscriber`) - Processes subscription requests asynchronously
-- **Keila API** - Manages contacts and subscriptions
-- **Mailpit** - Catches all outgoing emails for testing
-
-#### Testing Newsletter Subscriptions
-
-**1. Subscribe via Homepage:**
-
-```bash
-# Start your dev environment
-make dev
-
-# Open http://localhost:4000
-# Scroll to newsletter section
-# Enter an email and click "Subscribe"
-```
-
-**2. Subscribe via User Settings:**
-
-```bash
-# Login to the application
-# Go to Settings → Notifications
-# Check "Newsletter" checkbox
-# Save changes
-```
-
-**3. Verify in Keila:**
-
-```bash
-# Open http://localhost:4001
-# Navigate to Contacts
-# You should see the subscribed email address
-# Status should show as "active"
-```
-
-**4. Check Emails in Mailpit:**
-
-```bash
-# Open http://localhost:8025
-# View subscription confirmation emails
-# View any newsletter campaigns sent
-```
-
-#### Testing Newsletter Features
-
-**Subscribe a test user:**
+**Testing in IEx:**
 
 ```elixir
-# In IEx shell (make shell)
-Ysc.Keila.subscribe_email("test@example.com")
+# Subscribe an email
+Ysc.Newsletter.subscribe("test@example.com", source: "public_signup")
+
+# Find subscriber
+Ysc.Newsletter.get_subscriber_by_email("test@example.com")
+
+# Unsubscribe
+Ysc.Newsletter.unsubscribe("test@example.com")
+# Or by token:
+Ysc.Newsletter.unsubscribe(subscriber.subscription_token)
 ```
 
-**Check subscription status:**
-
-```elixir
-# In IEx shell
-Ysc.Keila.get_subscription_status("test@example.com")
-# Returns: {:ok, :active} or {:ok, :unsubscribed}
-```
-
-**Unsubscribe a user:**
-
-```elixir
-# In IEx shell
-Ysc.Keila.unsubscribe_email("test@example.com")
-```
-
-**Monitor Oban jobs:**
-
-```bash
-# Check Oban job status in the app
-# Visit http://localhost:4000/admin/settings
-# Look for KeilaSubscriber jobs in the queue
-```
-
-#### Configuration
-
-The local Keila instance is pre-configured in `config/dev.exs`:
-
-```elixir
-config :ysc, :keila,
-  api_url: "http://localhost:4001",
-  api_key: "h4ANq5tAf4fLTW1HpjSc1nszdCpcKOxBsLbnxe8-XDs",
-  project_id: "np_weLJnLY5",
-  form_id: "nfrm_BzLMaLXv"
-```
-
-**You don't need to change these values** - they're automatically configured for local development.
-
-#### Sending Test Newsletters
-
-1. **Create a campaign in Keila:**
-   - Open http://localhost:4001
-   - Go to "Campaigns"
-   - Click "New Campaign"
-   - Design your newsletter
-   - Send to your test contacts
-
-2. **View sent emails:**
-   - Open http://localhost:8025 (Mailpit)
-   - See all emails sent by Keila
-   - Test links and formatting
-
-#### Common Scenarios
-
-**Test newsletter subscription flow:**
-
-```bash
-# 1. Subscribe on homepage
-curl -X POST http://localhost:4000/api/newsletter/subscribe \
-  -H "Content-Type: application/json" \
-  -d '{"email": "newuser@example.com"}'
-
-# 2. Check Keila has the contact
-# Open http://localhost:4001 → Contacts
-
-# 3. Check Mailpit for confirmation email
-# Open http://localhost:8025
-```
-
-**Test user settings integration:**
-
-```bash
-# 1. Create a test user in the app
-# 2. Go to Settings → Notifications
-# 3. Toggle newsletter preference
-# 4. Check Oban jobs are enqueued
-# 5. Verify in Keila that status changed
-```
-
-#### Troubleshooting Keila
-
-**Keila container not running:**
-
-```bash
-# Check container status
-docker-compose -f etc/docker/docker-compose.yml ps keila
-
-# Restart Keila
-docker-compose -f etc/docker/docker-compose.yml restart keila
-
-# Check logs
-docker-compose -f etc/docker/docker-compose.yml logs keila
-```
-
-**Subscription not working:**
-
-```bash
-# Check Oban queue
-# Visit http://localhost:4000/admin/settings
-# Look for failed KeilaSubscriber jobs
-
-# Check application logs
-# Look for "KeilaSubscriber" messages in terminal
-
-# Verify Keila API is accessible
-curl http://localhost:4001
-```
-
-**Emails not appearing in Mailpit:**
-
-```bash
-# Check Mailpit is running
-docker-compose -f etc/docker/docker-compose.yml ps mailpit
-
-# Restart Mailpit
-docker-compose -f etc/docker/docker-compose.yml restart mailpit
-
-# Open Mailpit UI
-open http://localhost:8025
-```
-
-#### Important Notes
-
-- **Local development only uses Keila** - Emails are caught by Mailpit and never sent to real addresses
-- **Keila depends on PostgreSQL** - The keila database is created automatically
-- **API credentials are pre-configured** - No setup needed for local development
-- **Subscriptions are async** - They're processed by Oban workers in the background
-- **Test mode** - In test environment, a stub client is used instead of real Keila API calls
+Newsletter sending/campaigns are not part of this system; it only manages subscription state.
 
 ### Next Steps
 

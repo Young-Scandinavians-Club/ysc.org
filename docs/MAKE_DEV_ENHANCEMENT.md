@@ -189,7 +189,7 @@ Potential additions for the future:
 - Check if Stripe CLI is running (webhook forwarding)
 - Verify S3 buckets are created
 - Check Node.js/npm for asset compilation
-- Validate other optional services (Keila, Mailpit)
+- Validate other optional services
 - Add `--skip-checks` flag for advanced users
 - Add more detailed health checks (disk space, memory, etc.)
 

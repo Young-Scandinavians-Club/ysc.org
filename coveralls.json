@@ -40,7 +40,6 @@
         "lib/ysc_web/authorization/policy.ex",
         "lib/ysc.ex",
         "ysc/customers/behaviour\\.ex",
-        "ysc/keila/behaviour\\.ex",
         "ysc/payments/behaviour\\.ex",
         "ysc/quickbooks/client\\.ex",
         "ysc/quickbooks/client_behaviour\\.ex",

@@ -106,13 +106,6 @@ make dev-setup        # Set up everything from scratch
 - **PgAdmin** (Database UI): http://localhost:8888
   - Email: `admin@ysc.org`
   - Password: `password`
-- **Keila** (Newsletters): http://localhost:4001
-  - Email marketing and newsletter management
-  - Pre-configured for local testing
-- **Mailpit UI** (Email testing): http://localhost:8025
-  - View all emails sent by Keila and the app
-  - No emails are actually sent in development
-- **Mailpit SMTP**: localhost:1025 (used by Keila)
 - **LocalStack** (Local AWS S3): http://localhost:4566
 
 ## Stripe Testing
@@ -175,6 +168,8 @@ git push -u origin feature/my-feature
 
 ## Newsletter Testing
 
+Newsletter subscriptions use the in-house `Ysc.Newsletter` context and `newsletter_subscribers` table.
+
 ### Quick Test Flow
 
 ```bash
@@ -182,53 +177,25 @@ git push -u origin feature/my-feature
 make dev
 
 # 2. Test subscription via homepage
-# Visit http://localhost:4000
-# Enter email in newsletter section
+# Visit http://localhost:4000, scroll to newsletter section, enter email
 
-# 3. View contact in Keila
-open http://localhost:4001  # Check Contacts tab
-
-# 4. View confirmation email in Mailpit
-open http://localhost:8025
+# 3. Unsubscribe page: /newsletter/unsubscribe/:token (token from subscriber record)
 ```
 
 ### Testing in IEx
 
 ```elixir
-# Open IEx shell
 make shell
 
-# Subscribe a test email
-Ysc.Keila.subscribe_email("test@example.com")
+# Subscribe
+Ysc.Newsletter.subscribe("test@example.com", source: "public_signup")
 
-# Check status
-Ysc.Keila.get_subscription_status("test@example.com")
-# => {:ok, :active}
+# Get subscriber
+Ysc.Newsletter.get_subscriber_by_email("test@example.com")
 
 # Unsubscribe
-Ysc.Keila.unsubscribe_email("test@example.com")
+Ysc.Newsletter.unsubscribe("test@example.com")
 ```
-
-### Monitoring Newsletter Jobs
-
-```bash
-# Check Oban job queue for newsletter subscriptions
-# Visit http://localhost:4000/admin/settings
-# Look for "KeilaSubscriber" jobs
-
-# View logs in terminal for newsletter activity
-# Look for "KeilaSubscriber:" messages
-```
-
-### Sending Test Newsletters
-
-1. Open Keila: http://localhost:4001
-2. Go to "Campaigns" → "New Campaign"
-3. Create your newsletter
-4. Send to test contacts
-5. View in Mailpit: http://localhost:8025
-
-**Note**: All emails are caught by Mailpit in development - nothing is sent to real email addresses.
 
 ## Email Testing
 
@@ -268,14 +235,9 @@ open http://localhost:4000/dev/mailbox
 # Check /dev/mailbox for confirmation
 ```
 
-### Email Systems Comparison
+### Email in development
 
-| System             | URL                               | Purpose                                  |
-| ------------------ | --------------------------------- | ---------------------------------------- |
-| **Swoosh Mailbox** | http://localhost:4000/dev/mailbox | App emails (registration, tickets, etc.) |
-| **Mailpit**        | http://localhost:8025             | Newsletter emails from Keila             |
-
-**Tip**: Use Swoosh mailbox for app emails, Mailpit for newsletter testing.
+All app emails (registration, notifications, tickets, etc.) are caught by the Swoosh local adapter and viewable at http://localhost:4000/dev/mailbox.
 
 ## Environment Variables
 
