@@ -327,9 +327,13 @@ defmodule YscWeb.EventsLiveTest do
     end
 
     test "limits maximum past events to 50", %{conn: conn} do
-      # Create many past events
+      # Create many past events (unique reference_id to avoid collisions)
       for i <- 1..60 do
-        create_event(%{title: "Past Event #{i}", past: true})
+        create_event(%{
+          title: "Past Event #{i}",
+          past: true,
+          reference_id: "EVT-TEST-#{i}-#{System.unique_integer()}"
+        })
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
