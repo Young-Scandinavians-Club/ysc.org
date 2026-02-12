@@ -113,7 +113,7 @@ defmodule YscWeb.AdminMediaLive do
                   Atom.to_string(@selected_image_version)
                 ) %>
               </p>
-              <%= if @active_image.width && @active_image.height do %>
+              <%= if @selected_image_version == :optimized && @active_image.width && @active_image.height do %>
                 <p>
                   <strong>Dimensions:</strong> <%= @active_image.width %> × <%= @active_image.height %> px
                 </p>
@@ -125,12 +125,74 @@ defmodule YscWeb.AdminMediaLive do
                   ) %>
                 </p>
               <% end %>
-              <p>
-                <strong>Path:</strong>
-                <span class="font-mono text-xs break-all">
-                  <%= get_image_version_path(@active_image, @selected_image_version) %>
-                </span>
-              </p>
+              <div class="flex items-center gap-2">
+                <strong class="flex-shrink-0">Path:</strong>
+                <div class="flex-1 min-w-0 flex items-center gap-2">
+                  <span class="font-mono text-xs truncate overflow-hidden flex-1">
+                    <%= get_image_version_path(
+                      @active_image,
+                      @selected_image_version
+                    ) %>
+                  </span>
+                  <button
+                    type="button"
+                    phx-click={
+                      JS.dispatch("phx:copy",
+                        to: "#image-path-text-#{@selected_image_version}"
+                      )
+                      |> JS.add_class("text-green-600 border-green-600",
+                        to: "#copy-icon-#{@selected_image_version}"
+                      )
+                      |> JS.remove_class("text-zinc-600 border-zinc-300",
+                        to: "#copy-icon-#{@selected_image_version}"
+                      )
+                      |> JS.transition("opacity-0",
+                        to: "#copy-feedback-#{@selected_image_version}",
+                        time: 0
+                      )
+                      |> JS.show(to: "#copy-feedback-#{@selected_image_version}")
+                      |> JS.transition("opacity-100",
+                        to: "#copy-feedback-#{@selected_image_version}",
+                        time: 200
+                      )
+                      |> JS.hide(
+                        to: "#copy-feedback-#{@selected_image_version}",
+                        time: 200,
+                        transition: "opacity-0"
+                      )
+                      |> JS.add_class("text-zinc-600 border-zinc-300",
+                        to: "#copy-icon-#{@selected_image_version}",
+                        time: 2000
+                      )
+                      |> JS.remove_class("text-green-600 border-green-600",
+                        to: "#copy-icon-#{@selected_image_version}",
+                        time: 2000
+                      )
+                    }
+                    class="flex-shrink-0 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 p-1.5 rounded transition-colors relative"
+                    title="Copy path to clipboard"
+                  >
+                    <.icon
+                      name="hero-clipboard"
+                      id={"copy-icon-#{@selected_image_version}"}
+                      class="w-4 h-4 text-zinc-600 transition-colors border-zinc-300"
+                    />
+                    <span
+                      id={"copy-feedback-#{@selected_image_version}"}
+                      class="hidden absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none"
+                    >
+                      Copied!
+                    </span>
+                  </button>
+                  <input
+                    type="hidden"
+                    id={"image-path-text-#{@selected_image_version}"}
+                    value={
+                      get_image_version_path(@active_image, @selected_image_version)
+                    }
+                  />
+                </div>
+              </div>
             </div>
           <% else %>
             <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
