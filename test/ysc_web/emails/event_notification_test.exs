@@ -34,17 +34,17 @@ defmodule YscWeb.Emails.EventNotificationTest do
   describe "get_subject/1" do
     test "returns subject with event title when event provided", %{event: event} do
       subject = EventNotification.get_subject(event)
-      assert subject == "New Event: #{event.title}"
+      assert subject == "Will we see you at #{event.title}?"
     end
 
     test "returns generic subject when event is nil" do
       subject = EventNotification.get_subject(nil)
-      assert subject == "New Event"
+      assert subject == "New on the calendar"
     end
 
     test "returns generic subject when no argument provided" do
       subject = EventNotification.get_subject()
-      assert subject == "New Event"
+      assert subject == "New on the calendar"
     end
   end
 

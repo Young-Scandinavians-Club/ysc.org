@@ -17,9 +17,9 @@ defmodule YscWeb.Emails.EventNotification do
 
   def get_subject(event \\ nil) do
     if event do
-      "New Event: #{event.title}"
+      "Will we see you at #{event.title}?"
     else
-      "New Event"
+      "New on the calendar"
     end
   end
 

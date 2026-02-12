@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>New Event: <%= @event.title %></strong>
+      <strong>Will we see you at <%= @event.title %>?</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -39,7 +39,7 @@
       <strong>📍 Location:</strong> <%= @event.location_name %><br />
       <% end %>
       <%= if @event.address do %>
-      <span style="color: #6B7280; font-size: 14px; margin-left: 25px;"><%= @event.address %></span><br />
+      <span style="color: #6B7280; font-size: 14px;"><%= @event.address %></span><br />
       <% end %>
       <%= if @event.age_restriction && @event.age_restriction > 0 do %>
       <strong>🎂 Age Restriction:</strong> <%= @event.age_restriction %>+ years old
