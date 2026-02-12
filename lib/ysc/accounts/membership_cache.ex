@@ -6,7 +6,7 @@ defmodule Ysc.Accounts.MembershipCache do
   This reduces database queries when users interact with the UI.
   """
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Accounts
   alias Ysc.Customers
   alias Ysc.Subscriptions
@@ -107,7 +107,7 @@ defmodule Ysc.Accounts.MembershipCache do
     Cachex.del(@cache_name, active_key)
     Cachex.del(@cache_name, plan_type_key)
 
-    Logger.debug("Membership cache invalidated for user", user_id: user_id)
+    Ysc.Logging.debug("Membership cache invalidated for user", user_id: user_id)
     :ok
   end
 
@@ -126,7 +126,7 @@ defmodule Ysc.Accounts.MembershipCache do
         |> Enum.filter(&String.starts_with?(&1, @cache_prefix))
         |> Enum.each(&Cachex.del(@cache_name, &1))
 
-        Logger.debug("All membership caches invalidated")
+        Ysc.Logging.debug("All membership caches invalidated")
         :ok
 
       {:error, _reason} ->

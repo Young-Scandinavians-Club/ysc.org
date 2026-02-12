@@ -18,7 +18,7 @@ defmodule YscWeb.TahoeBookingLive do
   alias Ysc.Accounts
   alias Ysc.Subscriptions
   alias Ysc.Repo
-  require Logger
+  require Ysc.Logging
   import Ecto.Query
 
   @impl true
@@ -582,8 +582,8 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   def handle_async(:load_date_tooltips, {:exit, reason}, socket) do
-    require Logger
-    Logger.error("Failed to load date tooltips async: #{inspect(reason)}")
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load date tooltips async: #{inspect(reason)}")
     {:noreply, assign(socket, :date_tooltips, %{})}
   end
 
@@ -5272,7 +5272,7 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp log_update_available_rooms_start(socket) do
-    Logger.info(
+    Ysc.Logging.info(
       "[TahoeBookingLive] update_available_rooms called. " <>
         "Check-in: #{socket.assigns.checkin_date}, " <>
         "Check-out: #{socket.assigns.checkout_date}, " <>
@@ -5287,7 +5287,7 @@ defmodule YscWeb.TahoeBookingLive do
     guests_count = parse_guests_count(raw_guests)
     children_count = parse_children_count(raw_children)
 
-    Logger.info(
+    Ysc.Logging.info(
       "[TahoeBookingLive] Guest counts - Raw: guests=#{inspect(raw_guests)}, children=#{inspect(raw_children)}. " <>
         "Parsed: guests=#{guests_count}, children=#{children_count}"
     )
@@ -5314,7 +5314,7 @@ defmodule YscWeb.TahoeBookingLive do
       )
       |> Repo.all()
 
-    Logger.info(
+    Ysc.Logging.info(
       "[TahoeBookingLive] Found #{length(rooms)} rooms for property #{property}"
     )
 

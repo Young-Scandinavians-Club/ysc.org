@@ -17,7 +17,7 @@ defmodule YscWeb.ExpenseReportLive do
   alias YscWeb.Validators.FileValidator
 
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   @impl true
   def mount(_params, _session, socket) do
@@ -427,11 +427,14 @@ defmodule YscWeb.ExpenseReportLive do
             {:ok, s3_path}
           rescue
             e ->
-              Logger.error("Error uploading receipt to S3", error: inspect(e))
+              Ysc.Logging.error("Error uploading receipt to S3",
+                error: inspect(e)
+              )
+
               {:error, Exception.message(e)}
           catch
             :exit, reason ->
-              Logger.error("Exit while uploading receipt to S3",
+              Ysc.Logging.error("Exit while uploading receipt to S3",
                 reason: inspect(reason)
               )
 
@@ -462,14 +465,14 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply, socket |> put_flash(:error, "Upload is still in progress")}
 
         {:error, reason} ->
-          Logger.error("Failed to upload receipt", reason: inspect(reason))
+          Ysc.Logging.error("Failed to upload receipt", reason: inspect(reason))
 
           {:noreply,
            socket |> put_flash(:error, "Failed to upload receipt: #{reason}")}
 
         # consume_uploaded_entry can return the value directly if callback returns {:ok, value}
         s3_path when is_binary(s3_path) ->
-          Logger.debug("consume_uploaded_entry returned string directly",
+          Ysc.Logging.debug("consume_uploaded_entry returned string directly",
             path: s3_path
           )
 
@@ -491,7 +494,7 @@ defmodule YscWeb.ExpenseReportLive do
            |> put_flash(:info, "Receipt uploaded successfully")}
 
         other ->
-          Logger.error("Unexpected result from consume_uploaded_entry",
+          Ysc.Logging.error("Unexpected result from consume_uploaded_entry",
             result: inspect(other, limit: 100)
           )
 
@@ -545,11 +548,14 @@ defmodule YscWeb.ExpenseReportLive do
             {:ok, s3_path}
           rescue
             e ->
-              Logger.error("Error uploading proof to S3", error: inspect(e))
+              Ysc.Logging.error("Error uploading proof to S3",
+                error: inspect(e)
+              )
+
               {:error, Exception.message(e)}
           catch
             :exit, reason ->
-              Logger.error("Exit while uploading proof to S3",
+              Ysc.Logging.error("Exit while uploading proof to S3",
                 reason: inspect(reason)
               )
 
@@ -580,14 +586,14 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply, socket |> put_flash(:error, "Upload is still in progress")}
 
         {:error, reason} ->
-          Logger.error("Failed to upload proof", reason: inspect(reason))
+          Ysc.Logging.error("Failed to upload proof", reason: inspect(reason))
 
           {:noreply,
            socket |> put_flash(:error, "Failed to upload proof: #{reason}")}
 
         # consume_uploaded_entry can return the value directly if callback returns {:ok, value}
         s3_path when is_binary(s3_path) ->
-          Logger.debug("consume_uploaded_entry returned string directly",
+          Ysc.Logging.debug("consume_uploaded_entry returned string directly",
             path: s3_path
           )
 
@@ -609,7 +615,7 @@ defmodule YscWeb.ExpenseReportLive do
            |> put_flash(:info, "Proof document uploaded successfully")}
 
         other ->
-          Logger.error("Unexpected result from consume_uploaded_entry",
+          Ysc.Logging.error("Unexpected result from consume_uploaded_entry",
             result: inspect(other, limit: 100)
           )
 
@@ -667,15 +673,18 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   def handle_event("save", params, socket) do
-    require Logger
-    Logger.debug("HANDLE EVENT save", params: inspect(params, limit: :infinity))
+    require Ysc.Logging
+
+    Ysc.Logging.debug("HANDLE EVENT save",
+      params: inspect(params, limit: :infinity)
+    )
 
     # Check if this is a submit action
     action =
       params["_action"] ||
         (params["expense_report"] && params["expense_report"]["_action"])
 
-    Logger.debug("Submit action check",
+    Ysc.Logging.debug("Submit action check",
       action: action,
       has_action: Map.has_key?(params, "_action")
     )
@@ -683,17 +692,17 @@ defmodule YscWeb.ExpenseReportLive do
     # Also check the form source for validation errors
     changeset = socket.assigns.form.source
 
-    Logger.debug("Form validation",
+    Ysc.Logging.debug("Form validation",
       valid?: changeset.valid?,
       errors: inspect(changeset.errors, limit: 10)
     )
 
     if action == "submit" do
-      Logger.debug("Processing submit action")
+      Ysc.Logging.debug("Processing submit action")
       expense_report_params = params["expense_report"] || %{}
       user = socket.assigns.current_user
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "Before merge - expense_items count: #{map_size(expense_report_params["expense_items"] || %{})}"
       )
 
@@ -708,11 +717,11 @@ defmodule YscWeb.ExpenseReportLive do
         |> normalize_params_keys()
         |> Map.put("status", "submitted")
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "After merge - expense_items count: #{map_size(expense_report_params["expense_items"] || %{})}, status: #{expense_report_params["status"]}"
       )
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "Calling create_expense_report with purpose: #{inspect(expense_report_params["purpose"])}"
       )
 
@@ -720,7 +729,7 @@ defmodule YscWeb.ExpenseReportLive do
 
       case result do
         {:ok, expense_report} ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "create_expense_report SUCCESS - id: #{expense_report.id}, status: #{expense_report.status}"
           )
 
@@ -733,7 +742,7 @@ defmodule YscWeb.ExpenseReportLive do
            )}
 
         {:error, changeset} ->
-          Logger.error(
+          Ysc.Logging.error(
             "create_expense_report FAILED - errors: #{inspect(changeset.errors, limit: 20)}"
           )
 

@@ -11,7 +11,7 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
   use Oban.Worker, queue: :default, max_attempts: 3
 
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Bookings.{Booking, BookingLocker}
 
@@ -38,7 +38,7 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
     Enum.each(expired_bookings, fn booking ->
       case BookingLocker.release_hold(booking.id) do
         {:ok, _updated_booking} ->
-          Logger.info("Expired booking hold due to timeout",
+          Ysc.Logging.info("Expired booking hold due to timeout",
             booking_id: booking.id,
             reference_id: booking.reference_id,
             user_id: booking.user_id,
@@ -59,7 +59,7 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
           )
 
         {:error, reason} ->
-          Logger.error("Failed to expire booking hold",
+          Ysc.Logging.error("Failed to expire booking hold",
             booking_id: booking.id,
             reference_id: booking.reference_id,
             user_id: booking.user_id,

@@ -17,7 +17,7 @@ defmodule Ysc.Bookings do
   - These bookings do NOT overlap and can both be accepted.
   """
   import Ecto.Query, warn: false
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Repo
   alias Stripe
@@ -1351,14 +1351,14 @@ defmodule Ysc.Bookings do
   defp validate_booking_dates(checkin_date, checkout_date) do
     cond do
       not is_struct(checkin_date, Date) ->
-        Logger.error(
+        Ysc.Logging.error(
           "[Bookings] calculate_booking_price: invalid checkin_date: #{inspect(checkin_date)}"
         )
 
         {:error, :invalid_checkin_date}
 
       not is_struct(checkout_date, Date) ->
-        Logger.error(
+        Ysc.Logging.error(
           "[Bookings] calculate_booking_price: invalid checkout_date: #{inspect(checkout_date)}"
         )
 
@@ -3115,7 +3115,7 @@ defmodule Ysc.Bookings do
   end
 
   defp send_booking_refund_pending_email(pending_refund, booking, payment) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Reload associations
@@ -3150,7 +3150,8 @@ defmodule Ysc.Bookings do
 
         case result do
           %Oban.Job{} = job ->
-            Logger.info("Booking refund pending email scheduled successfully",
+            Ysc.Logging.info(
+              "Booking refund pending email scheduled successfully",
               pending_refund_id: pending_refund.id,
               booking_id: booking.id,
               user_id: booking.user_id,
@@ -3159,7 +3160,7 @@ defmodule Ysc.Bookings do
             )
 
           {:error, reason} ->
-            Logger.error("Failed to schedule booking refund pending email",
+            Ysc.Logging.error("Failed to schedule booking refund pending email",
               pending_refund_id: pending_refund.id,
               booking_id: booking.id,
               user_id: booking.user_id,
@@ -3167,7 +3168,7 @@ defmodule Ysc.Bookings do
             )
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping booking refund pending email - missing associations",
           pending_refund_id: pending_refund.id,
           booking_id: booking && booking.id,
@@ -3176,7 +3177,7 @@ defmodule Ysc.Bookings do
       end
     rescue
       error ->
-        Logger.error("Failed to send booking refund pending email",
+        Ysc.Logging.error("Failed to send booking refund pending email",
           pending_refund_id: pending_refund.id,
           booking_id: booking && booking.id,
           error: inspect(error),
@@ -3191,7 +3192,7 @@ defmodule Ysc.Bookings do
          pending_refund,
          reason
        ) do
-    require Logger
+    require Ysc.Logging
     import Ecto.Query
 
     try do
@@ -3237,7 +3238,7 @@ defmodule Ysc.Bookings do
             reason
           )
         else
-          Logger.warning("No cabin master found for property",
+          Ysc.Logging.warning("No cabin master found for property",
             property: booking.property,
             booking_id: booking.id
           )
@@ -3253,19 +3254,19 @@ defmodule Ysc.Bookings do
             reason
           )
         else
-          Logger.warning("No treasurer found",
+          Ysc.Logging.warning("No treasurer found",
             booking_id: booking.id
           )
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping cancellation notification emails - missing booking or user",
           booking_id: booking && booking.id
         )
       end
     rescue
       error ->
-        Logger.error("Failed to send cancellation notification emails",
+        Ysc.Logging.error("Failed to send cancellation notification emails",
           booking_id: booking && booking.id,
           error: inspect(error),
           stacktrace: __STACKTRACE__
@@ -3280,7 +3281,7 @@ defmodule Ysc.Bookings do
          pending_refund,
          reason
        ) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Prepare email data
@@ -3315,7 +3316,8 @@ defmodule Ysc.Bookings do
 
       case result do
         %Oban.Job{} = job ->
-          Logger.info("Cabin master cancellation email scheduled successfully",
+          Ysc.Logging.info(
+            "Cabin master cancellation email scheduled successfully",
             booking_id: booking.id,
             cabin_master_id: cabin_master.id,
             cabin_master_email: cabin_master.email,
@@ -3323,7 +3325,8 @@ defmodule Ysc.Bookings do
           )
 
         {:error, reason} ->
-          Logger.error("Failed to schedule cabin master cancellation email",
+          Ysc.Logging.error(
+            "Failed to schedule cabin master cancellation email",
             booking_id: booking.id,
             cabin_master_id: cabin_master.id,
             error: reason
@@ -3331,7 +3334,7 @@ defmodule Ysc.Bookings do
       end
     rescue
       error ->
-        Logger.error("Failed to send cabin master cancellation email",
+        Ysc.Logging.error("Failed to send cabin master cancellation email",
           booking_id: booking.id,
           cabin_master_id: cabin_master.id,
           error: inspect(error),
@@ -3347,7 +3350,7 @@ defmodule Ysc.Bookings do
          pending_refund,
          reason
        ) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Prepare email data
@@ -3382,7 +3385,8 @@ defmodule Ysc.Bookings do
 
       case result do
         %Oban.Job{} = job ->
-          Logger.info("Treasurer cancellation email scheduled successfully",
+          Ysc.Logging.info(
+            "Treasurer cancellation email scheduled successfully",
             booking_id: booking.id,
             treasurer_id: treasurer.id,
             treasurer_email: treasurer.email,
@@ -3390,7 +3394,7 @@ defmodule Ysc.Bookings do
           )
 
         {:error, reason} ->
-          Logger.error("Failed to schedule treasurer cancellation email",
+          Ysc.Logging.error("Failed to schedule treasurer cancellation email",
             booking_id: booking.id,
             treasurer_id: treasurer.id,
             error: reason
@@ -3398,7 +3402,7 @@ defmodule Ysc.Bookings do
       end
     rescue
       error ->
-        Logger.error("Failed to send treasurer cancellation email",
+        Ysc.Logging.error("Failed to send treasurer cancellation email",
           booking_id: booking.id,
           treasurer_id: treasurer.id,
           error: inspect(error),
@@ -3414,7 +3418,7 @@ defmodule Ysc.Bookings do
          is_pending_refund,
          reason
        ) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Reload booking with user association
@@ -3450,7 +3454,7 @@ defmodule Ysc.Bookings do
 
         case result do
           %Oban.Job{} = job ->
-            Logger.info(
+            Ysc.Logging.info(
               "Booking cancellation confirmation email scheduled successfully",
               booking_id: booking.id,
               user_id: booking.user_id,
@@ -3459,7 +3463,7 @@ defmodule Ysc.Bookings do
             )
 
           {:error, reason} ->
-            Logger.error(
+            Ysc.Logging.error(
               "Failed to schedule booking cancellation confirmation email",
               booking_id: booking.id,
               user_id: booking.user_id,
@@ -3467,14 +3471,15 @@ defmodule Ysc.Bookings do
             )
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping booking cancellation confirmation email - missing booking or user",
           booking_id: booking && booking.id
         )
       end
     rescue
       error ->
-        Logger.error("Failed to send booking cancellation confirmation email",
+        Ysc.Logging.error(
+          "Failed to send booking cancellation confirmation email",
           booking_id: booking && booking.id,
           error: inspect(error),
           stacktrace: __STACKTRACE__
@@ -3531,7 +3536,7 @@ defmodule Ysc.Bookings do
   # - `{:ok, %Stripe.Refund{}}` on success
   # - `{:error, reason}` on failure
   defp create_stripe_refund(payment_intent_id, amount_cents, reason) do
-    require Logger
+    require Ysc.Logging
 
     # First, retrieve the payment intent to get the charge ID
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
@@ -3575,7 +3580,7 @@ defmodule Ysc.Bookings do
             amount_cents
           )
         else
-          Logger.error("No charge found in payment intent",
+          Ysc.Logging.error("No charge found in payment intent",
             payment_intent_id: payment_intent_id
           )
 
@@ -3583,7 +3588,7 @@ defmodule Ysc.Bookings do
         end
 
       {:error, %Stripe.Error{} = error} ->
-        Logger.warning("Failed to retrieve payment intent for refund",
+        Ysc.Logging.warning("Failed to retrieve payment intent for refund",
           payment_intent_id: payment_intent_id,
           error: error.message
         )
@@ -3591,7 +3596,7 @@ defmodule Ysc.Bookings do
         {:error, "Failed to retrieve payment intent: #{error.message}"}
 
       {:error, reason} ->
-        Logger.warning("Failed to retrieve payment intent for refund",
+        Ysc.Logging.warning("Failed to retrieve payment intent for refund",
           payment_intent_id: payment_intent_id,
           error: inspect(reason)
         )
@@ -3624,7 +3629,7 @@ defmodule Ysc.Bookings do
   defp log_ledger_result(ledger_result, pending_refund, payment, stripe_refund) do
     case ledger_result do
       {:ok, _} ->
-        Logger.info("Refund processed successfully in ledger",
+        Ysc.Logging.info("Refund processed successfully in ledger",
           pending_refund_id: pending_refund.id,
           payment_id: payment.id,
           stripe_refund_id: stripe_refund.id
@@ -3632,7 +3637,7 @@ defmodule Ysc.Bookings do
 
       {:error, {:already_processed, _, _}} ->
         # Refund was already processed (likely by webhook) - this is fine
-        Logger.info("Refund already processed in ledger (idempotency)",
+        Ysc.Logging.info("Refund already processed in ledger (idempotency)",
           pending_refund_id: pending_refund.id,
           payment_id: payment.id,
           stripe_refund_id: stripe_refund.id
@@ -3640,7 +3645,7 @@ defmodule Ysc.Bookings do
 
       {:error, reason} ->
         # Log error but don't fail - refund was created in Stripe
-        Logger.warning(
+        Ysc.Logging.warning(
           "Failed to process refund in ledger (refund created in Stripe)",
           pending_refund_id: pending_refund.id,
           payment_id: payment.id,
@@ -3658,7 +3663,7 @@ defmodule Ysc.Bookings do
     if Ysc.Env.test?() do
       refund = %Stripe.Refund{id: "re_test_#{payment_intent_id}"}
 
-      Logger.info("Stripe refund created successfully (test stub)",
+      Ysc.Logging.info("Stripe refund created successfully (test stub)",
         refund_id: refund.id,
         payment_intent_id: payment_intent_id,
         amount_cents: amount_cents
@@ -3668,7 +3673,7 @@ defmodule Ysc.Bookings do
     else
       case Stripe.Refund.create(refund_params) do
         {:ok, refund} ->
-          Logger.info("Stripe refund created successfully",
+          Ysc.Logging.info("Stripe refund created successfully",
             refund_id: refund.id,
             payment_intent_id: payment_intent_id,
             amount_cents: amount_cents
@@ -3677,7 +3682,7 @@ defmodule Ysc.Bookings do
           {:ok, refund}
 
         {:error, %Stripe.Error{} = error} ->
-          Logger.warning("Stripe refund creation failed",
+          Ysc.Logging.warning("Stripe refund creation failed",
             payment_intent_id: payment_intent_id,
             error: error.message
           )
@@ -3685,7 +3690,7 @@ defmodule Ysc.Bookings do
           {:error, error.message}
 
         {:error, reason} ->
-          Logger.warning("Stripe refund creation failed",
+          Ysc.Logging.warning("Stripe refund creation failed",
             payment_intent_id: payment_intent_id,
             error: inspect(reason)
           )

@@ -11,7 +11,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
   use Oban.Worker, queue: :tickets, max_attempts: 3
 
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Tickets
 
@@ -72,7 +72,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
                  lock: "FOR UPDATE NOWAIT"
              ) do
           nil ->
-            Logger.warning("Ticket order not found for expiration",
+            Ysc.Logging.warning("Ticket order not found for expiration",
               ticket_order_id: ticket_order_id
             )
 
@@ -87,7 +87,8 @@ defmodule Ysc.Tickets.TimeoutWorker do
 
               case Tickets.expire_ticket_order(ticket_order_with_tickets) do
                 {:ok, _expired_order} ->
-                  Logger.info("Expired specific ticket order due to timeout",
+                  Ysc.Logging.info(
+                    "Expired specific ticket order due to timeout",
                     ticket_order_id: ticket_order.id,
                     reference_id: ticket_order.reference_id,
                     user_id: ticket_order.user_id
@@ -96,7 +97,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
                   :expired
 
                 {:error, reason} ->
-                  Logger.error("Failed to expire specific ticket order",
+                  Ysc.Logging.error("Failed to expire specific ticket order",
                     ticket_order_id: ticket_order.id,
                     reference_id: ticket_order.reference_id,
                     error: reason
@@ -106,7 +107,8 @@ defmodule Ysc.Tickets.TimeoutWorker do
                   Ysc.Repo.rollback({:error, reason})
               end
             else
-              Logger.info("Ticket order already processed, skipping expiration",
+              Ysc.Logging.info(
+                "Ticket order already processed, skipping expiration",
                 ticket_order_id: ticket_order.id,
                 status: ticket_order.status
               )
@@ -148,7 +150,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
          failed_count
        )
        when offset >= @max_orders_per_run do
-    Logger.info("Reached maximum orders per run limit",
+    Ysc.Logging.info("Reached maximum orders per run limit",
       max_orders: @max_orders_per_run,
       expired_count: expired_count,
       failed_count: failed_count
@@ -171,14 +173,14 @@ defmodule Ysc.Tickets.TimeoutWorker do
       |> Ysc.Repo.all()
 
     if Enum.empty?(expired_orders) do
-      Logger.info("Completed expiration batch processing",
+      Ysc.Logging.info("Completed expiration batch processing",
         total_expired: expired_count,
         total_failed: failed_count
       )
 
       {expired_count, failed_count}
     else
-      Logger.info("Processing expiration batch",
+      Ysc.Logging.info("Processing expiration batch",
         batch_size: length(expired_orders),
         offset: offset,
         total_processed: expired_count + failed_count
@@ -190,7 +192,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
                                                {acc_expired, acc_failed} ->
           case Tickets.expire_ticket_order(ticket_order) do
             {:ok, _expired_order} ->
-              Logger.info("Expired ticket order due to timeout",
+              Ysc.Logging.info("Expired ticket order due to timeout",
                 ticket_order_id: ticket_order.id,
                 reference_id: ticket_order.reference_id,
                 user_id: ticket_order.user_id
@@ -199,7 +201,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
               {acc_expired + 1, acc_failed}
 
             {:error, reason} ->
-              Logger.error("Failed to expire ticket order",
+              Ysc.Logging.error("Failed to expire ticket order",
                 ticket_order_id: ticket_order.id,
                 reference_id: ticket_order.reference_id,
                 error: reason
@@ -247,7 +249,8 @@ defmodule Ysc.Tickets.TimeoutWorker do
 
       delay_seconds <= 0 ->
         # Order has already expired, schedule immediate expiration
-        Logger.warning("Order already expired, scheduling immediate expiration",
+        Ysc.Logging.warning(
+          "Order already expired, scheduling immediate expiration",
           ticket_order_id: ticket_order_id,
           expires_at: expires_at,
           delay_seconds: delay_seconds

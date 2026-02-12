@@ -14,7 +14,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
   Scheduled to run every 6 hours via Oban.Plugins.Cron.
   """
 
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :maintenance
 
   alias Ysc.Repo
@@ -24,11 +24,11 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: _args}) do
-    Logger.info("Starting QuickBooks expense report backup sync job")
+    Ysc.Logging.info("Starting QuickBooks expense report backup sync job")
 
     count = enqueue_unsynced_expense_reports()
 
-    Logger.info("QuickBooks expense report backup sync job completed",
+    Ysc.Logging.info("QuickBooks expense report backup sync job completed",
       expense_reports_enqueued: count
     )
 
@@ -60,7 +60,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
       total_count = length(unsynced_reports)
 
       if total_count > 0 do
-        Logger.info("Found unsynced expense reports (after locking)",
+        Ysc.Logging.info("Found unsynced expense reports (after locking)",
           count: total_count
         )
 
@@ -89,7 +89,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
         enqueued_count = length(reports_to_sync)
 
         if enqueued_count > 0 do
-          Logger.info("Enqueueing sync jobs for expense reports",
+          Ysc.Logging.info("Enqueueing sync jobs for expense reports",
             total_unsynced: total_count,
             already_queued: total_count - enqueued_count,
             newly_enqueued: enqueued_count
@@ -110,41 +110,29 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
                  })
                  |> Oban.insert() do
               {:ok, job} ->
-                Logger.debug("Enqueued QuickBooks sync for expense report",
+                Ysc.Logging.debug("Enqueued QuickBooks sync for expense report",
                   expense_report_id: expense_report_id,
                   job_id: job.id
                 )
 
               {:error, reason} ->
-                Logger.error(
+                Ysc.Logging.error(
                   "Failed to enqueue QuickBooks sync for expense report",
                   expense_report_id: expense_report_id,
                   error: inspect(reason)
                 )
-
-                Sentry.capture_message(
-                  "Failed to enqueue QuickBooks sync for expense report in backup worker",
-                  level: :error,
-                  extra: %{
-                    expense_report_id: expense_report_id,
-                    error: inspect(reason)
-                  },
-                  tags: %{
-                    quickbooks_worker: "backup_sync_expense_report",
-                    error_type: "enqueue_failed"
-                  }
-                )
             end
           end)
         else
-          Logger.info("All unsynced expense reports already have jobs enqueued",
+          Ysc.Logging.info(
+            "All unsynced expense reports already have jobs enqueued",
             total_unsynced: total_count
           )
         end
 
         enqueued_count
       else
-        Logger.info("No unsynced expense reports found")
+        Ysc.Logging.info("No unsynced expense reports found")
         0
       end
     end)
@@ -153,7 +141,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
         count
 
       {:error, reason} ->
-        Logger.error("Failed to enqueue unsynced expense reports",
+        Ysc.Logging.error("Failed to enqueue unsynced expense reports",
           error: inspect(reason)
         )
 

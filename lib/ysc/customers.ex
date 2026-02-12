@@ -60,9 +60,9 @@ defmodule Ysc.Customers do
 
             {:error, %Ecto.StaleEntryError{}} ->
               # User was updated concurrently, reload and retry once
-              require Logger
+              require Ysc.Logging
 
-              Logger.warning(
+              Ysc.Logging.warning(
                 "Stale user entry when updating stripe_id, retrying",
                 user_id: user.id,
                 stripe_customer_id: stripe_customer.id
@@ -81,7 +81,7 @@ defmodule Ysc.Customers do
                   {:ok, stripe_customer}
 
                 {:error, changeset} ->
-                  Logger.error(
+                  Ysc.Logging.error(
                     "Failed to update user with stripe_id after retry",
                     user_id: user.id,
                     stripe_customer_id: stripe_customer.id,
@@ -94,9 +94,9 @@ defmodule Ysc.Customers do
               end
 
             {:error, changeset} ->
-              require Logger
+              require Ysc.Logging
 
-              Logger.error("Failed to update user with stripe_id",
+              Ysc.Logging.error("Failed to update user with stripe_id",
                 user_id: user.id,
                 stripe_customer_id: stripe_customer.id,
                 changeset_errors: inspect(changeset.errors)
@@ -159,9 +159,9 @@ defmodule Ysc.Customers do
             {:ok, stripe_customer}
 
           {:error, error} ->
-            require Logger
+            require Ysc.Logging
 
-            Logger.error("Failed to update Stripe customer",
+            Ysc.Logging.error("Failed to update Stripe customer",
               user_id: user.id,
               stripe_customer_id: user.stripe_id,
               error: inspect(error)

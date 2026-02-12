@@ -8,7 +8,7 @@ defmodule Ysc.Tickets.WebhookHandler do
   - payment_intent.canceled: Cancel ticket orders
   """
 
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Tickets.StripeService
 
@@ -27,7 +27,10 @@ defmodule Ysc.Tickets.WebhookHandler do
         handle_payment_canceled(event_data)
 
       _ ->
-        Logger.info("Unhandled ticket webhook event", event_type: event_type)
+        Ysc.Logging.info("Unhandled ticket webhook event",
+          event_type: event_type
+        )
+
         :ok
     end
   end
@@ -35,13 +38,13 @@ defmodule Ysc.Tickets.WebhookHandler do
   ## Private Functions
 
   defp handle_payment_succeeded(%{"id" => payment_intent_id}) do
-    Logger.info("Processing successful ticket payment",
+    Ysc.Logging.info("Processing successful ticket payment",
       payment_intent_id: payment_intent_id
     )
 
     case StripeService.process_successful_payment(payment_intent_id) do
       {:ok, ticket_order} ->
-        Logger.info("Successfully processed ticket order payment",
+        Ysc.Logging.info("Successfully processed ticket order payment",
           ticket_order_id: ticket_order.id,
           reference_id: ticket_order.reference_id,
           payment_intent_id: payment_intent_id
@@ -50,7 +53,7 @@ defmodule Ysc.Tickets.WebhookHandler do
         :ok
 
       {:error, reason} ->
-        Logger.warning("Failed to process ticket order payment",
+        Ysc.Logging.warning("Failed to process ticket order payment",
           payment_intent_id: payment_intent_id,
           error: reason
         )
@@ -60,7 +63,7 @@ defmodule Ysc.Tickets.WebhookHandler do
   end
 
   defp handle_payment_failed(%{"id" => payment_intent_id}) do
-    Logger.info("Processing failed ticket payment",
+    Ysc.Logging.info("Processing failed ticket payment",
       payment_intent_id: payment_intent_id
     )
 
@@ -69,7 +72,8 @@ defmodule Ysc.Tickets.WebhookHandler do
            "Payment failed"
          ) do
       {:ok, ticket_order} ->
-        Logger.info("Successfully canceled ticket order due to payment failure",
+        Ysc.Logging.info(
+          "Successfully canceled ticket order due to payment failure",
           ticket_order_id: ticket_order.id,
           reference_id: ticket_order.reference_id,
           payment_intent_id: payment_intent_id
@@ -78,7 +82,8 @@ defmodule Ysc.Tickets.WebhookHandler do
         :ok
 
       {:error, reason} ->
-        Logger.warning("Failed to cancel ticket order after payment failure",
+        Ysc.Logging.warning(
+          "Failed to cancel ticket order after payment failure",
           payment_intent_id: payment_intent_id,
           error: reason
         )
@@ -88,7 +93,7 @@ defmodule Ysc.Tickets.WebhookHandler do
   end
 
   defp handle_payment_canceled(%{"id" => payment_intent_id}) do
-    Logger.info("Processing canceled ticket payment",
+    Ysc.Logging.info("Processing canceled ticket payment",
       payment_intent_id: payment_intent_id
     )
 
@@ -97,7 +102,7 @@ defmodule Ysc.Tickets.WebhookHandler do
            "Payment canceled"
          ) do
       {:ok, ticket_order} ->
-        Logger.info(
+        Ysc.Logging.info(
           "Successfully canceled ticket order due to payment cancellation",
           ticket_order_id: ticket_order.id,
           reference_id: ticket_order.reference_id,
@@ -107,7 +112,7 @@ defmodule Ysc.Tickets.WebhookHandler do
         :ok
 
       {:error, reason} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "Failed to cancel ticket order after payment cancellation",
           payment_intent_id: payment_intent_id,
           error: reason

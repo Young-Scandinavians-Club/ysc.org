@@ -10,7 +10,7 @@ defmodule Ysc.Events.EventPublishWorker do
   use Oban.Worker, queue: :default, max_attempts: 3
 
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Events.Event
   alias Ysc.Repo
@@ -36,7 +36,7 @@ defmodule Ysc.Events.EventPublishWorker do
     |> Enum.each(fn event ->
       case Ysc.Events.publish_event(event) do
         {:ok, published_event} ->
-          Logger.info("Published scheduled event",
+          Ysc.Logging.info("Published scheduled event",
             event_id: event.id,
             reference_id: event.reference_id,
             title: event.title,
@@ -45,26 +45,11 @@ defmodule Ysc.Events.EventPublishWorker do
           )
 
         {:error, changeset} ->
-          Logger.error("Failed to publish scheduled event",
+          Ysc.Logging.error("Failed to publish scheduled event",
             event_id: event.id,
             reference_id: event.reference_id,
             title: event.title,
             errors: inspect(changeset.errors)
-          )
-
-          # Report to Sentry
-          Sentry.capture_message("Failed to publish scheduled event",
-            level: :error,
-            extra: %{
-              event_id: event.id,
-              reference_id: event.reference_id,
-              title: event.title,
-              errors: inspect(changeset.errors)
-            },
-            tags: %{
-              worker: "event_publish_worker",
-              event_state: "scheduled"
-            }
           )
       end
     end)

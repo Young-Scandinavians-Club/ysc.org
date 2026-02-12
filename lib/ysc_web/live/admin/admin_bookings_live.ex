@@ -18,7 +18,7 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   @impl true
   def render(assigns) do
@@ -5867,7 +5867,7 @@ defmodule YscWeb.AdminBookingsLive do
          |> assign(:refund_policy_rule_form, rule_form)}
 
       {:error, changeset} ->
-        Logger.error("Failed to create refund policy rule",
+        Ysc.Logging.error("Failed to create refund policy rule",
           errors: inspect(changeset.errors),
           params: inspect(rule_params)
         )

@@ -19,12 +19,12 @@ defmodule Ysc.Ledgers.Reconciliation do
       {:ok, payment_report} = Reconciliation.reconcile_payments()
       {:ok, refund_report} = Reconciliation.reconcile_refunds()
   """
+  require Ysc.Logging
 
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Ledgers
   alias Ysc.Ledgers.{Payment, Refund, LedgerEntry, LedgerTransaction}
-  require Logger
 
   @doc """
   Runs a full reconciliation check across all financial entities.
@@ -32,7 +32,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   Returns a comprehensive report with all findings.
   """
   def run_full_reconciliation do
-    Logger.info("Starting full reconciliation process")
+    Ysc.Logging.info("Starting full reconciliation process")
     start_time = System.monotonic_time(:millisecond)
 
     # Run all reconciliation checks
@@ -104,7 +104,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   - Payment amounts match ledger entry totals
   """
   def reconcile_payments do
-    Logger.info("Reconciling payments with ledger entries")
+    Ysc.Logging.info("Reconciling payments with ledger entries")
 
     # Get all payments
     payments = Repo.all(Payment)
@@ -155,7 +155,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   - Refund amounts match ledger entry totals
   """
   def reconcile_refunds do
-    Logger.info("Reconciling refunds with ledger entries")
+    Ysc.Logging.info("Reconciling refunds with ledger entries")
 
     # Get all refunds
     refunds = Repo.all(Refund)
@@ -227,7 +227,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   Checks for orphaned ledger entries (entries without valid parent records).
   """
   def check_orphaned_entries do
-    Logger.info("Checking for orphaned ledger entries")
+    Ysc.Logging.info("Checking for orphaned ledger entries")
 
     # Check for entries with invalid payment_id
     orphaned_payment_entries = find_orphaned_payment_entries()
@@ -254,7 +254,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   Reconciles entity-specific totals (bookings, tickets, subscriptions) with ledger entries.
   """
   def reconcile_entity_totals do
-    Logger.info("Reconciling entity-specific totals")
+    Ysc.Logging.info("Reconciling entity-specific totals")
 
     membership_check = reconcile_membership_payments()
     booking_check = reconcile_booking_payments()
@@ -412,16 +412,11 @@ defmodule Ysc.Ledgers.Reconciliation do
           sum
 
         other ->
-          Logger.error("Invalid debit_credit value in ledger entry",
+          Ysc.Logging.error("Invalid debit_credit value in ledger entry",
             entry_id: entry.id,
             value: inspect(other),
             account_id: entry.account_id,
-            payment_id: entry.payment_id
-          )
-
-          # Report to Sentry
-          Sentry.capture_message("Invalid debit_credit in reconciliation",
-            level: :error,
+            payment_id: entry.payment_id,
             extra: %{
               entry_id: entry.id,
               debit_credit: inspect(other),
@@ -662,23 +657,18 @@ defmodule Ysc.Ledgers.Reconciliation do
   defp log_reconciliation_results(report) do
     case report.overall_status do
       :ok ->
-        Logger.info("✅ Reconciliation completed successfully",
+        Ysc.Logging.info("✅ Reconciliation completed successfully",
           duration_ms: report.duration_ms,
           timestamp: report.timestamp
         )
 
       :error ->
-        Logger.warning("❌ Reconciliation found discrepancies",
+        Ysc.Logging.warning("❌ Reconciliation found discrepancies",
           duration_ms: report.duration_ms,
           timestamp: report.timestamp,
           payment_issues: report.checks.payments.discrepancies_count,
           refund_issues: report.checks.refunds.discrepancies_count,
-          ledger_balanced: report.checks.ledger_balance.balanced
-        )
-
-        # Report to Sentry with comprehensive context
-        Sentry.capture_message("Financial reconciliation found discrepancies",
-          level: :error,
+          ledger_balanced: report.checks.ledger_balance.balanced,
           extra: %{
             duration_ms: report.duration_ms,
             timestamp: report.timestamp,
@@ -717,13 +707,8 @@ defmodule Ysc.Ledgers.Reconciliation do
 
         # Log specific issues
         if report.checks.payments.discrepancies_count > 0 do
-          Logger.warning("Payment discrepancies found",
-            count: report.checks.payments.discrepancies_count
-          )
-
-          # Report payment discrepancies to Sentry with details
-          Sentry.capture_message("Payment reconciliation discrepancies found",
-            level: :error,
+          Ysc.Logging.warning("Payment discrepancies found",
+            count: report.checks.payments.discrepancies_count,
             extra: %{
               discrepancies_count: report.checks.payments.discrepancies_count,
               total_payments: report.checks.payments.total_payments,
@@ -742,13 +727,8 @@ defmodule Ysc.Ledgers.Reconciliation do
         end
 
         if report.checks.refunds.discrepancies_count > 0 do
-          Logger.warning("Refund discrepancies found",
-            count: report.checks.refunds.discrepancies_count
-          )
-
-          # Report refund discrepancies to Sentry with details
-          Sentry.capture_message("Refund reconciliation discrepancies found",
-            level: :error,
+          Ysc.Logging.warning("Refund discrepancies found",
+            count: report.checks.refunds.discrepancies_count,
             extra: %{
               discrepancies_count: report.checks.refunds.discrepancies_count,
               total_refunds: report.checks.refunds.total_refunds,
@@ -767,14 +747,9 @@ defmodule Ysc.Ledgers.Reconciliation do
         end
 
         if !report.checks.ledger_balance.balanced do
-          Logger.warning("Ledger is imbalanced",
+          Ysc.Logging.warning("Ledger is imbalanced",
             difference:
-              Money.to_string!(report.checks.ledger_balance.difference)
-          )
-
-          # Report ledger imbalance to Sentry
-          Sentry.capture_message("Ledger is imbalanced",
-            level: :error,
+              Money.to_string!(report.checks.ledger_balance.difference),
             extra: %{
               difference:
                 Money.to_string!(report.checks.ledger_balance.difference),
@@ -788,13 +763,8 @@ defmodule Ysc.Ledgers.Reconciliation do
         end
 
         if report.checks.orphaned_entries.orphaned_entries_count > 0 do
-          Logger.warning("Orphaned ledger entries found",
-            count: report.checks.orphaned_entries.orphaned_entries_count
-          )
-
-          # Report orphaned entries to Sentry
-          Sentry.capture_message("Orphaned ledger entries found",
-            level: :error,
+          Ysc.Logging.warning("Orphaned ledger entries found",
+            count: report.checks.orphaned_entries.orphaned_entries_count,
             extra: %{
               orphaned_entries_count:
                 report.checks.orphaned_entries.orphaned_entries_count,
@@ -880,9 +850,8 @@ defmodule Ysc.Ledgers.Reconciliation do
             end
 
           if entity_issues != [] do
-            Sentry.capture_message(
+            Ysc.Logging.warning(
               "Entity total reconciliation mismatches found",
-              level: :error,
               extra: %{
                 entity_issues: entity_issues,
                 memberships_match:

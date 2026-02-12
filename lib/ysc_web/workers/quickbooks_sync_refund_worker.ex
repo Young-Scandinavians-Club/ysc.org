@@ -5,7 +5,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
   This worker processes refunds asynchronously and creates SalesReceipts (with negative amounts) in QuickBooks.
   """
 
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Ysc.Repo
@@ -14,7 +14,9 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"refund_id" => refund_id}}) do
-    Logger.info("Starting QuickBooks sync for refund", refund_id: refund_id)
+    Ysc.Logging.info("Starting QuickBooks sync for refund",
+      refund_id: refund_id
+    )
 
     import Ecto.Query
 
@@ -34,7 +36,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
            |> Repo.one()
          end) do
       {:ok, nil} ->
-        Logger.warning("Refund not found for QuickBooks sync",
+        Ysc.Logging.warning("Refund not found for QuickBooks sync",
           refund_id: refund_id
         )
 
@@ -44,7 +46,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
         # Check if already synced (double-check after acquiring lock)
         if refund.quickbooks_sync_status == "synced" &&
              refund.quickbooks_sales_receipt_id do
-          Logger.info(
+          Ysc.Logging.info(
             "Refund already synced to QuickBooks (checked after lock)",
             refund_id: refund_id,
             sales_receipt_id: refund.quickbooks_sales_receipt_id
@@ -54,7 +56,7 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
         else
           case Sync.sync_refund(refund) do
             {:ok, sales_receipt} ->
-              Logger.info("Successfully synced refund to QuickBooks",
+              Ysc.Logging.info("Successfully synced refund to QuickBooks",
                 refund_id: refund_id,
                 sales_receipt_id: Map.get(sales_receipt, "Id")
               )
@@ -62,22 +64,9 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
               :ok
 
             {:error, reason} ->
-              Logger.warning("Failed to sync refund to QuickBooks",
+              Ysc.Logging.warning("Failed to sync refund to QuickBooks",
                 refund_id: refund_id,
                 error: inspect(reason)
-              )
-
-              # Report to Sentry
-              Sentry.capture_message("QuickBooks refund sync worker failed",
-                level: :error,
-                extra: %{
-                  refund_id: refund_id,
-                  error: inspect(reason)
-                },
-                tags: %{
-                  quickbooks_worker: "sync_refund",
-                  error_type: "sync_failed"
-                }
               )
 
               # Oban will retry based on max_attempts
@@ -87,14 +76,14 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
 
       {:error, %Postgrex.Error{postgres: %{code: :lock_not_available}}} ->
         # Another worker is processing this refund
-        Logger.info("Refund is locked by another worker, skipping",
+        Ysc.Logging.info("Refund is locked by another worker, skipping",
           refund_id: refund_id
         )
 
         :ok
 
       {:error, reason} ->
-        Logger.warning("Failed to lock refund for QuickBooks sync",
+        Ysc.Logging.warning("Failed to lock refund for QuickBooks sync",
           refund_id: refund_id,
           error: inspect(reason)
         )
@@ -104,17 +93,6 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
                  %Postgrex.Error{postgres: %{code: :lock_not_available}},
                  reason
                ) do
-          Sentry.capture_message("Failed to lock refund for QuickBooks sync",
-            level: :error,
-            extra: %{
-              refund_id: refund_id,
-              error: inspect(reason)
-            },
-            tags: %{
-              quickbooks_worker: "sync_refund",
-              error_type: "lock_failed"
-            }
-          )
         end
 
         {:error, reason}

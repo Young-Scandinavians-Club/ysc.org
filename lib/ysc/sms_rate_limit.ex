@@ -8,7 +8,7 @@ defmodule Ysc.SmsRateLimit do
 
   Uses a sliding window approach by storing timestamps for each phone number.
   """
-  require Logger
+  require Ysc.Logging
 
   @cache_name :ysc_cache
   @cache_prefix "sms_rate_limit:"
@@ -54,7 +54,7 @@ defmodule Ysc.SmsRateLimit do
     minute_count = Enum.count(timestamps, fn ts -> ts >= one_minute_ago end)
 
     if minute_count >= @max_per_minute do
-      Logger.warning("SMS rate limit exceeded: per-minute limit",
+      Ysc.Logging.warning("SMS rate limit exceeded: per-minute limit",
         phone_number: phone_number,
         count: minute_count,
         limit: @max_per_minute
@@ -68,7 +68,7 @@ defmodule Ysc.SmsRateLimit do
       hour_count = Enum.count(timestamps, fn ts -> ts >= one_hour_ago end)
 
       if hour_count >= @max_per_hour do
-        Logger.warning("SMS rate limit exceeded: per-hour limit",
+        Ysc.Logging.warning("SMS rate limit exceeded: per-hour limit",
           phone_number: phone_number,
           count: hour_count,
           limit: @max_per_hour

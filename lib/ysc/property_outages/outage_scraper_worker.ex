@@ -6,18 +6,21 @@ defmodule Ysc.PropertyOutages.OutageScraperWorker do
   utility providers and update the database.
   """
 
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Ysc.PropertyOutages.Scraper
 
   @impl Oban.Worker
   def perform(%Oban.Job{} = job) do
-    Logger.info("Starting outage scraper job", job_id: job.id)
+    Ysc.Logging.info("Starting outage scraper job", job_id: job.id)
 
     {:ok, _results} = Scraper.scrape_all()
 
-    Logger.info("Outage scraper job completed successfully", job_id: job.id)
+    Ysc.Logging.info("Outage scraper job completed successfully",
+      job_id: job.id
+    )
+
     :ok
   end
 

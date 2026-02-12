@@ -13,9 +13,9 @@ defmodule Ysc.ExpenseReports.Scheduler do
   This should be called during application startup.
   """
   def start_scheduler do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info(
+    Ysc.Logging.info(
       "Expense report QuickBooks sync scheduler initialized - enqueueing initial sync job"
     )
 
@@ -33,18 +33,19 @@ defmodule Ysc.ExpenseReports.Scheduler do
     |> Oban.insert()
     |> case do
       {:ok, job} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.debug("Scheduled expense report QuickBooks sync job",
+        Ysc.Logging.debug("Scheduled expense report QuickBooks sync job",
           job_id: job.id
         )
 
         {:ok, job}
 
       {:error, reason} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to schedule expense report QuickBooks sync job",
+        Ysc.Logging.error(
+          "Failed to schedule expense report QuickBooks sync job",
           error: inspect(reason)
         )
 

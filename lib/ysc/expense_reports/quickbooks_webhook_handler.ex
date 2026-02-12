@@ -5,7 +5,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
   Processes BillPayment webhooks to update expense report status to "paid"
   when payments are initiated in QuickBooks.
   """
-  require Logger
+  require Ysc.Logging
 
   @doc """
   Processes a QuickBooks webhook event.
@@ -13,7 +13,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
   This function is called by the webhook processor to handle BillPayment events.
   """
   def handle_webhook_event(webhook_event) do
-    Logger.info("Processing QuickBooks webhook event",
+    Ysc.Logging.info("Processing QuickBooks webhook event",
       webhook_id: webhook_event.id,
       event_type: webhook_event.event_type,
       event_id: webhook_event.event_id
@@ -39,7 +39,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
               # Queue background job to process the payment
               enqueue_bill_payment_processing(webhook_event.id, entity_id)
             else
-              Logger.debug("Skipping non-BillPayment webhook event",
+              Ysc.Logging.debug("Skipping non-BillPayment webhook event",
                 entity_name: entity_name,
                 operation: operation
               )
@@ -48,7 +48,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
             end
 
           [] ->
-            Logger.warning("No entities in QuickBooks webhook event",
+            Ysc.Logging.warning("No entities in QuickBooks webhook event",
               webhook_id: webhook_event.id
             )
 
@@ -56,7 +56,8 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
         end
 
       [] ->
-        Logger.warning("No event notifications in QuickBooks webhook event",
+        Ysc.Logging.warning(
+          "No event notifications in QuickBooks webhook event",
           webhook_id: webhook_event.id
         )
 
@@ -76,7 +77,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
 
     case job do
       {:ok, job} ->
-        Logger.info("Enqueued BillPayment processing job",
+        Ysc.Logging.info("Enqueued BillPayment processing job",
           webhook_event_id: webhook_event_id,
           bill_payment_id: bill_payment_id,
           job_id: job.id
@@ -85,14 +86,10 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
         :ok
 
       {:error, reason} ->
-        Logger.error("Failed to enqueue BillPayment processing job",
+        Ysc.Logging.error("Failed to enqueue BillPayment processing job",
           webhook_event_id: webhook_event_id,
           bill_payment_id: bill_payment_id,
-          error: inspect(reason)
-        )
-
-        Sentry.capture_message("Failed to enqueue BillPayment processing job",
-          level: :error,
+          error: inspect(reason),
           extra: %{
             webhook_event_id: webhook_event_id,
             bill_payment_id: bill_payment_id,

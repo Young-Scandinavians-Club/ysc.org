@@ -5,7 +5,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   Sends emails to all users with event notifications enabled 1 hour after an event is published.
   Only sends if the event is still published at that time.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
 
   alias Ysc.Repo
@@ -16,13 +16,13 @@ defmodule YscWeb.Workers.EventNotificationWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"event_id" => event_id}}) do
-    Logger.info("Processing event notification",
+    Ysc.Logging.info("Processing event notification",
       event_id: event_id
     )
 
     case Repo.get(Event, event_id) |> Repo.preload([:organizer]) do
       nil ->
-        Logger.warning("Event not found for notification",
+        Ysc.Logging.warning("Event not found for notification",
           event_id: event_id
         )
 
@@ -35,7 +35,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
           if event_in_future?(event) do
             send_event_notifications(event)
           else
-            Logger.info(
+            Ysc.Logging.info(
               "Event is retroactive (past date), skipping notifications",
               event_id: event_id,
               start_date: event.start_date,
@@ -45,7 +45,8 @@ defmodule YscWeb.Workers.EventNotificationWorker do
             :ok
           end
         else
-          Logger.info("Event is no longer published, skipping notifications",
+          Ysc.Logging.info(
+            "Event is no longer published, skipping notifications",
             event_id: event_id,
             state: event.state
           )
@@ -59,7 +60,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   Send event notification emails to all users with event notifications enabled.
   """
   def send_event_notifications(event) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Get all users with event notifications enabled
@@ -70,7 +71,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
         )
         |> Repo.all()
 
-      Logger.info("Sending event notifications",
+      Ysc.Logging.info("Sending event notifications",
         event_id: event.id,
         event_title: event.title,
         user_count: length(users)
@@ -86,7 +87,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       success_count = Enum.count(results, &match?({:ok, _}, &1))
       failure_count = length(results) - success_count
 
-      Logger.info("Event notifications sent",
+      Ysc.Logging.info("Event notifications sent",
         event_id: event.id,
         success_count: success_count,
         failure_count: failure_count
@@ -95,23 +96,10 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       :ok
     rescue
       error ->
-        Logger.error("Failed to send event notifications",
+        Ysc.Logging.error("Failed to send event notifications",
           event_id: event.id,
           error: Exception.message(error),
           stacktrace: __STACKTRACE__
-        )
-
-        # Report to Sentry
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            event_id: event.id,
-            event_title: event.title
-          },
-          tags: %{
-            email_template: "event_notification",
-            notification_type: "event_notification"
-          }
         )
 
         {:error, error}
@@ -119,7 +107,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   end
 
   defp send_event_notification_email(event, user) do
-    require Logger
+    require Ysc.Logging
 
     try do
       email_module = EventNotification
@@ -143,7 +131,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
           {:ok, :scheduled}
 
         {:error, reason} ->
-          Logger.error("Failed to schedule event notification",
+          Ysc.Logging.error("Failed to schedule event notification",
             event_id: event.id,
             user_id: user.id,
             error: inspect(reason)
@@ -153,7 +141,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       end
     rescue
       error ->
-        Logger.error("Failed to send event notification",
+        Ysc.Logging.error("Failed to send event notification",
           event_id: event.id,
           user_id: user.id,
           error: Exception.message(error)
@@ -169,7 +157,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   The emails will be sent 1 hour after the event is published.
   """
   def schedule_notifications(event_id, published_at) do
-    require Logger
+    require Ysc.Logging
 
     # Calculate 1 hour after publish time
     notification_datetime = DateTime.add(published_at, 3600, :second)
@@ -185,14 +173,14 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       |> new(scheduled_at: notification_datetime)
       |> Oban.insert()
 
-      Logger.info("Scheduled event notification emails",
+      Ysc.Logging.info("Scheduled event notification emails",
         event_id: event_id,
         published_at: published_at,
         scheduled_at: notification_datetime
       )
     else
       # If 1 hour has already passed, send immediately
-      Logger.info(
+      Ysc.Logging.info(
         "1 hour has already passed since publish, sending notifications immediately",
         event_id: event_id,
         published_at: published_at
@@ -201,7 +189,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       # Load event and send emails immediately
       case Repo.get(Event, event_id) |> Repo.preload([:organizer]) do
         nil ->
-          Logger.warning("Event not found for immediate notification",
+          Ysc.Logging.warning("Event not found for immediate notification",
             event_id: event_id
           )
 
@@ -214,7 +202,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
             if event_in_future?(event) do
               send_event_notifications(event)
             else
-              Logger.info(
+              Ysc.Logging.info(
                 "Event is retroactive (past date), skipping immediate notification",
                 event_id: event_id,
                 start_date: event.start_date,
@@ -224,7 +212,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
               :ok
             end
           else
-            Logger.info(
+            Ysc.Logging.info(
               "Event is not published, skipping immediate notification",
               event_id: event_id,
               state: event.state

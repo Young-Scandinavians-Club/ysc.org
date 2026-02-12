@@ -446,9 +446,9 @@ defmodule Ysc.Accounts do
 
             {:error, changeset} ->
               # Log the error but don't fail registration
-              require Logger
+              require Ysc.Logging
 
-              Logger.warning(
+              Ysc.Logging.warning(
                 "Failed to create billing address during registration",
                 user_id: user.id,
                 errors: inspect(changeset.errors)
@@ -474,18 +474,18 @@ defmodule Ysc.Accounts do
               Ysc.Customers.create_stripe_customer(user)
             rescue
               e ->
-                require Logger
+                require Ysc.Logging
 
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to create Stripe customer in background task",
                   user_id: user.id,
                   error: Exception.format(:error, e, __STACKTRACE__)
                 )
             catch
               kind, reason ->
-                require Logger
+                require Ysc.Logging
 
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to create Stripe customer in background task",
                   user_id: user.id,
                   kind: kind,
@@ -543,9 +543,9 @@ defmodule Ysc.Accounts do
                 {:error, changeset}
             end
           else
-            require Logger
+            require Ysc.Logging
 
-            Logger.warning(
+            Ysc.Logging.warning(
               "Skipping billing address creation - missing required fields",
               user_id: user.id,
               has_address: !is_nil(signup_application.address),
@@ -566,9 +566,9 @@ defmodule Ysc.Accounts do
         if user_with_form.registration_form do
           create_billing_address_from_signup(user_with_form)
         else
-          require Logger
+          require Ysc.Logging
 
-          Logger.warning(
+          Ysc.Logging.warning(
             "Skipping billing address creation - registration_form not found",
             user_id: user.id
           )
@@ -578,9 +578,9 @@ defmodule Ysc.Accounts do
 
       # Association loaded but nil
       true ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping billing address creation - registration_form is nil",
           user_id: user.id
         )
@@ -624,9 +624,9 @@ defmodule Ysc.Accounts do
         :ok
 
       {:error, changeset} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.warning("Failed to enqueue Keila subscription job",
+        Ysc.Logging.warning("Failed to enqueue Keila subscription job",
           user_id: user.id,
           email: user.email,
           errors: inspect(changeset.errors)
@@ -642,20 +642,20 @@ defmodule Ysc.Accounts do
   Unsubscribes the old email.
   """
   def update_newsletter_on_email_change(user, old_email, new_email) do
-    require Logger
+    require Ysc.Logging
 
     # Unsubscribe old email
     case %{"email" => old_email, "action" => "unsubscribe"}
          |> YscWeb.Workers.KeilaSubscriber.new()
          |> Oban.insert() do
       {:ok, _job} ->
-        Logger.debug("Enqueued newsletter unsubscription for old email",
+        Ysc.Logging.debug("Enqueued newsletter unsubscription for old email",
           user_id: user.id,
           old_email: old_email
         )
 
       {:error, changeset} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "Failed to enqueue newsletter unsubscription for old email",
           user_id: user.id,
           old_email: old_email,
@@ -684,7 +684,7 @@ defmodule Ysc.Accounts do
            |> YscWeb.Workers.KeilaSubscriber.new()
            |> Oban.insert() do
         {:ok, _job} ->
-          Logger.debug("Enqueued newsletter subscription for new email",
+          Ysc.Logging.debug("Enqueued newsletter subscription for new email",
             user_id: user.id,
             new_email: new_email
           )
@@ -692,7 +692,7 @@ defmodule Ysc.Accounts do
           :ok
 
         {:error, changeset} ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "Failed to enqueue newsletter subscription for new email",
             user_id: user.id,
             new_email: new_email,
@@ -702,7 +702,7 @@ defmodule Ysc.Accounts do
           :ok
       end
     else
-      Logger.debug(
+      Ysc.Logging.debug(
         "Skipping newsletter subscription for new email (notifications disabled)",
         user_id: user.id,
         new_email: new_email

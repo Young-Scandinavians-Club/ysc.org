@@ -49,9 +49,9 @@ defmodule Ysc.Tickets do
   - `{:error, :membership_required}` if user doesn't have active membership
   """
   def create_ticket_order(user_id, event_id, ticket_selections) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Creating ticket order",
+    Ysc.Logging.info("Creating ticket order",
       user_id: user_id,
       event_id: event_id,
       ticket_selections: ticket_selections
@@ -92,9 +92,9 @@ defmodule Ysc.Tickets do
         end
 
       error ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.warning("Failed to create ticket order",
+        Ysc.Logging.warning("Failed to create ticket order",
           user_id: user_id,
           event_id: event_id,
           ticket_selections: ticket_selections,
@@ -305,9 +305,9 @@ defmodule Ysc.Tickets do
           reason: reason
         }
 
-        require Logger
+        require Ysc.Logging
 
-        Logger.info("Broadcasting CheckoutSessionCancelled event",
+        Ysc.Logging.info("Broadcasting CheckoutSessionCancelled event",
           user_id: updated_order.user_id,
           event_id: updated_order.event_id,
           reason: reason
@@ -455,9 +455,9 @@ defmodule Ysc.Tickets do
 
     case result do
       {:ok, refund_info} ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.info("Refunded individual tickets",
+        Ysc.Logging.info("Refunded individual tickets",
           ticket_order_id: ticket_order.id,
           ticket_ids: ticket_ids,
           refund_amount: Money.to_string!(refund_info.refund_amount),
@@ -475,7 +475,7 @@ defmodule Ysc.Tickets do
   Expires a ticket order that has exceeded the payment timeout.
   """
   def expire_ticket_order(ticket_order) do
-    require Logger
+    require Ysc.Logging
 
     result =
       Repo.transaction(fn ->
@@ -485,13 +485,14 @@ defmodule Ysc.Tickets do
                  ticket_order.payment_intent_id
                ) do
             :ok ->
-              Logger.info("Canceled PaymentIntent for expired ticket order",
+              Ysc.Logging.info(
+                "Canceled PaymentIntent for expired ticket order",
                 ticket_order_id: ticket_order.id,
                 payment_intent_id: ticket_order.payment_intent_id
               )
 
             {:error, reason} ->
-              Logger.warning(
+              Ysc.Logging.warning(
                 "Failed to cancel PaymentIntent for expired ticket order (continuing anyway)",
                 ticket_order_id: ticket_order.id,
                 payment_intent_id: ticket_order.payment_intent_id,
@@ -513,7 +514,7 @@ defmodule Ysc.Tickets do
               order
 
             {:error, changeset} ->
-              Logger.error("Failed to update ticket order status",
+              Ysc.Logging.error("Failed to update ticket order status",
                 ticket_order_id: ticket_order.id,
                 errors: inspect(changeset.errors)
               )
@@ -538,7 +539,7 @@ defmodule Ysc.Tickets do
                 {:ok, updated_ticket}
 
               {:error, changeset} ->
-                Logger.error("Failed to expire ticket",
+                Ysc.Logging.error("Failed to expire ticket",
                   ticket_id: ticket.id,
                   ticket_order_id: ticket_order.id,
                   errors: inspect(changeset.errors)
@@ -553,7 +554,7 @@ defmodule Ysc.Tickets do
           Enum.filter(ticket_update_results, &match?({:error, _, _}, &1))
 
         if Enum.any?(failed_updates) do
-          Logger.error("Failed to expire some tickets",
+          Ysc.Logging.error("Failed to expire some tickets",
             ticket_order_id: ticket_order.id,
             failed_count: length(failed_updates),
             total_count: length(tickets)
@@ -761,7 +762,7 @@ defmodule Ysc.Tickets do
   - `{:error, reason}` if there was an error
   """
   def expire_all_pending_checkout_sessions do
-    require Logger
+    require Ysc.Logging
 
     try do
       pending_orders =
@@ -773,7 +774,7 @@ defmodule Ysc.Tickets do
       count = length(pending_orders)
 
       if count > 0 do
-        Logger.info("Manually expiring all pending checkout sessions",
+        Ysc.Logging.info("Manually expiring all pending checkout sessions",
           total_sessions: count
         )
 
@@ -781,19 +782,19 @@ defmodule Ysc.Tickets do
           expire_ticket_order(ticket_order)
         end)
 
-        Logger.info("Successfully expired all pending checkout sessions",
+        Ysc.Logging.info("Successfully expired all pending checkout sessions",
           expired_count: count
         )
       else
-        Logger.info("No pending checkout sessions found to expire")
+        Ysc.Logging.info("No pending checkout sessions found to expire")
       end
 
       {:ok, count}
     rescue
       error ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to expire pending checkout sessions",
+        Ysc.Logging.error("Failed to expire pending checkout sessions",
           error: error
         )
 
@@ -812,7 +813,7 @@ defmodule Ysc.Tickets do
   - `{:error, reason}` if there was an error
   """
   def expire_user_pending_checkout_sessions(user_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       pending_orders =
@@ -824,7 +825,7 @@ defmodule Ysc.Tickets do
       count = length(pending_orders)
 
       if count > 0 do
-        Logger.info("Manually expiring pending checkout sessions for user",
+        Ysc.Logging.info("Manually expiring pending checkout sessions for user",
           user_id: user_id,
           total_sessions: count
         )
@@ -833,12 +834,13 @@ defmodule Ysc.Tickets do
           expire_ticket_order(ticket_order)
         end)
 
-        Logger.info("Successfully expired user's pending checkout sessions",
+        Ysc.Logging.info(
+          "Successfully expired user's pending checkout sessions",
           user_id: user_id,
           expired_count: count
         )
       else
-        Logger.info("No pending checkout sessions found for user",
+        Ysc.Logging.info("No pending checkout sessions found for user",
           user_id: user_id
         )
       end
@@ -846,9 +848,9 @@ defmodule Ysc.Tickets do
       {:ok, count}
     rescue
       error ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to expire user's pending checkout sessions",
+        Ysc.Logging.error("Failed to expire user's pending checkout sessions",
           user_id: user_id,
           error: error
         )
@@ -868,7 +870,7 @@ defmodule Ysc.Tickets do
   - `{:error, reason}` if there was an error
   """
   def expire_event_pending_checkout_sessions(event_id) do
-    require Logger
+    require Ysc.Logging
 
     try do
       pending_orders =
@@ -880,7 +882,8 @@ defmodule Ysc.Tickets do
       count = length(pending_orders)
 
       if count > 0 do
-        Logger.info("Manually expiring pending checkout sessions for event",
+        Ysc.Logging.info(
+          "Manually expiring pending checkout sessions for event",
           event_id: event_id,
           total_sessions: count
         )
@@ -889,12 +892,13 @@ defmodule Ysc.Tickets do
           expire_ticket_order(ticket_order)
         end)
 
-        Logger.info("Successfully expired event's pending checkout sessions",
+        Ysc.Logging.info(
+          "Successfully expired event's pending checkout sessions",
           event_id: event_id,
           expired_count: count
         )
       else
-        Logger.info("No pending checkout sessions found for event",
+        Ysc.Logging.info("No pending checkout sessions found for event",
           event_id: event_id
         )
       end
@@ -902,9 +906,9 @@ defmodule Ysc.Tickets do
       {:ok, count}
     rescue
       error ->
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to expire event's pending checkout sessions",
+        Ysc.Logging.error("Failed to expire event's pending checkout sessions",
           event_id: event_id,
           error: error
         )
@@ -1224,11 +1228,11 @@ defmodule Ysc.Tickets do
   end
 
   defp extract_payment_method_id(payment_intent, user_id) do
-    require Logger
+    require Ysc.Logging
 
     case payment_intent.payment_method do
       nil ->
-        Logger.info("No payment method found in payment intent",
+        Ysc.Logging.info("No payment method found in payment intent",
           payment_intent_id: payment_intent.id
         )
 
@@ -1246,7 +1250,7 @@ defmodule Ysc.Tickets do
                    stripe_payment_method
                  ) do
               {:ok, payment_method} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "Successfully synced payment method for ticket payment",
                   payment_method_id: payment_method.id,
                   stripe_payment_method_id: payment_method_id,
@@ -1256,7 +1260,7 @@ defmodule Ysc.Tickets do
                 payment_method.id
 
               {:error, reason} ->
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to sync payment method for ticket payment",
                   stripe_payment_method_id: payment_method_id,
                   user_id: user_id,
@@ -1267,7 +1271,7 @@ defmodule Ysc.Tickets do
             end
 
           {:error, error} ->
-            Logger.warning("Failed to retrieve payment method from Stripe",
+            Ysc.Logging.warning("Failed to retrieve payment method from Stripe",
               payment_method_id: payment_method_id,
               payment_intent_id: payment_intent.id,
               error: error.message
@@ -1358,9 +1362,9 @@ defmodule Ysc.Tickets do
 
   defp broadcast_to_user(user_id, event) do
     topic_name = topic(user_id)
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Broadcasting to user topic",
+    Ysc.Logging.info("Broadcasting to user topic",
       user_id: user_id,
       topic: topic_name,
       event_type: event.__struct__,
@@ -1370,7 +1374,7 @@ defmodule Ysc.Tickets do
     result =
       Phoenix.PubSub.broadcast(Ysc.PubSub, topic_name, {__MODULE__, event})
 
-    Logger.info("PubSub broadcast result",
+    Ysc.Logging.info("PubSub broadcast result",
       user_id: user_id,
       topic: topic_name,
       result: result
@@ -1381,9 +1385,9 @@ defmodule Ysc.Tickets do
 
   defp broadcast_to_event(event_id, event) do
     topic_name = topic_event(event_id)
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Broadcasting to event topic",
+    Ysc.Logging.info("Broadcasting to event topic",
       event_id: event_id,
       topic: topic_name,
       event_type: event.__struct__
@@ -1406,9 +1410,10 @@ defmodule Ysc.Tickets do
   This is useful for debugging PubSub connectivity.
   """
   def test_broadcast_checkout_cancelled(user_id) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("TEST: Manually broadcasting CheckoutSessionCancelled event",
+    Ysc.Logging.info(
+      "TEST: Manually broadcasting CheckoutSessionCancelled event",
       user_id: user_id,
       topic: topic(user_id)
     )
@@ -1422,7 +1427,7 @@ defmodule Ysc.Tickets do
 
     broadcast_to_user(user_id, event)
 
-    Logger.info("TEST: Broadcast completed")
+    Ysc.Logging.info("TEST: Broadcast completed")
     :ok
   end
 
@@ -1430,9 +1435,9 @@ defmodule Ysc.Tickets do
   Sends a ticket purchase confirmation email for a completed ticket order.
   """
   def send_ticket_confirmation_email(ticket_order) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Starting ticket confirmation email process",
+    Ysc.Logging.info("Starting ticket confirmation email process",
       ticket_order_id: ticket_order.id,
       user_id: ticket_order.user_id,
       user_email: ticket_order.user.email,
@@ -1441,24 +1446,26 @@ defmodule Ysc.Tickets do
 
     try do
       # Prepare email data
-      Logger.info("Preparing email data for ticket order #{ticket_order.id}")
+      Ysc.Logging.info(
+        "Preparing email data for ticket order #{ticket_order.id}"
+      )
 
       email_data =
         YscWeb.Emails.TicketPurchaseConfirmation.prepare_email_data(
           ticket_order
         )
 
-      Logger.info("Email data prepared successfully",
+      Ysc.Logging.info("Email data prepared successfully",
         email_data_keys: Map.keys(email_data)
       )
 
       # Generate idempotency key
       idempotency_key = "ticket_confirmation_#{ticket_order.id}"
 
-      Logger.info("Generated idempotency key: #{idempotency_key}")
+      Ysc.Logging.info("Generated idempotency key: #{idempotency_key}")
 
       # Schedule the email
-      Logger.info("Scheduling email with Oban")
+      Ysc.Logging.info("Scheduling email with Oban")
 
       result =
         YscWeb.Emails.Notifier.schedule_email(
@@ -1473,7 +1480,7 @@ defmodule Ysc.Tickets do
 
       case result do
         %Oban.Job{} = job ->
-          Logger.info("Ticket confirmation email scheduled successfully",
+          Ysc.Logging.info("Ticket confirmation email scheduled successfully",
             ticket_order_id: ticket_order.id,
             user_id: ticket_order.user_id,
             user_email: ticket_order.user.email,
@@ -1484,7 +1491,7 @@ defmodule Ysc.Tickets do
           :ok
 
         {:error, reason} ->
-          Logger.error("Failed to schedule email",
+          Ysc.Logging.error("Failed to schedule email",
             ticket_order_id: ticket_order.id,
             user_id: ticket_order.user_id,
             error: reason
@@ -1494,7 +1501,7 @@ defmodule Ysc.Tickets do
       end
     rescue
       error ->
-        Logger.error("Failed to send ticket confirmation email",
+        Ysc.Logging.error("Failed to send ticket confirmation email",
           ticket_order_id: ticket_order.id,
           user_id: ticket_order.user_id,
           user_email: ticket_order.user.email,

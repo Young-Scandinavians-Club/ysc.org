@@ -4,14 +4,14 @@ defmodule YscWeb.Workers.FileExportCleanUp do
 
   Removes export files that are older than a specified retention period.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 1
 
   @spec perform(any()) :: :ok
   def perform(_) do
-    Logger.info("Running export directory cleanup")
+    Ysc.Logging.info("Running export directory cleanup")
     directory = "#{:code.priv_dir(:ysc)}/static/exports"
-    Logger.info(directory)
+    Ysc.Logging.info(directory)
 
     files =
       File.ls!(directory)
@@ -30,7 +30,7 @@ defmodule YscWeb.Workers.FileExportCleanUp do
         acc + maybe_delete_file(f, creation_date)
       end)
 
-    Logger.info("Cleaned up #{deleted_files} files")
+    Ysc.Logging.info("Cleaned up #{deleted_files} files")
 
     :ok
   end
@@ -38,14 +38,14 @@ defmodule YscWeb.Workers.FileExportCleanUp do
   # sobelow_skip ["Traversal.FileModule"]
   def maybe_delete_file(f, create_date) do
     if Timex.before?(create_date, Timex.shift(Timex.now(), hours: -1)) do
-      Logger.info("Deleting #{f}")
+      Ysc.Logging.info("Deleting #{f}")
 
       case File.rm(f) do
         :ok ->
           1
 
         {:error, reason} ->
-          Logger.warning("Error occured: #{reason}")
+          Ysc.Logging.warning("Error occured: #{reason}")
           0
       end
     else

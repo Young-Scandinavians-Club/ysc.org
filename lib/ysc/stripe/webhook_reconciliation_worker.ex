@@ -24,7 +24,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
     queue: :maintenance,
     max_attempts: 3
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Webhooks
   alias Ysc.Stripe.WebhookHandler
   alias Ysc.Alerts.Discord
@@ -36,7 +36,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
   def perform(%Oban.Job{}) do
     start_time = System.monotonic_time()
 
-    Logger.info("Webhook reconciliation started",
+    Ysc.Logging.info("Webhook reconciliation started",
       event: :webhook_reconciliation_started
     )
 
@@ -45,7 +45,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
         duration_ms = duration_ms(start_time)
         stats = Map.put(stats, :duration_ms, duration_ms)
 
-        Logger.info("Webhook reconciliation completed",
+        Ysc.Logging.info("Webhook reconciliation completed",
           event: :webhook_reconciliation_completed,
           total_checked: stats.total_checked,
           missing_found: stats.missing_found,
@@ -60,16 +60,10 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
       {:error, reason} ->
         duration_ms = duration_ms(start_time)
 
-        Logger.error("Webhook reconciliation failed",
+        Ysc.Logging.error("Webhook reconciliation failed",
           event: :webhook_reconciliation_failed,
           reason: inspect(reason),
           duration_ms: duration_ms
-        )
-
-        Sentry.capture_message("Stripe webhook reconciliation failed",
-          level: :error,
-          extra: %{reason: inspect(reason), duration_ms: duration_ms},
-          tags: %{worker: "WebhookReconciliationWorker"}
         )
 
         Discord.send_webhook_reconciliation_report(
@@ -85,7 +79,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
   Manually triggers webhook reconciliation immediately.
   """
   def run_now do
-    Logger.info("Manually triggering Stripe webhook reconciliation")
+    Ysc.Logging.info("Manually triggering Stripe webhook reconciliation")
 
     start_time = System.monotonic_time()
 
@@ -93,7 +87,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
       {:ok, stats} ->
         duration_ms = duration_ms(start_time)
         stats = Map.put(stats, :duration_ms, duration_ms)
-        Logger.info("Webhook reconciliation completed", stats: stats)
+        Ysc.Logging.info("Webhook reconciliation completed", stats: stats)
         send_discord_report(stats)
         {:ok, stats}
 
@@ -123,7 +117,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
     created_gte =
       DateTime.utc_now() |> DateTime.add(-24, :hour) |> DateTime.to_unix()
 
-    Logger.info("Fetching Stripe events",
+    Ysc.Logging.info("Fetching Stripe events",
       event: :fetching_stripe_events,
       created_gte: created_gte
     )
@@ -194,7 +188,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
            event_id
          ) do
       nil ->
-        Logger.info("Missing webhook found",
+        Ysc.Logging.info("Missing webhook found",
           event: :missing_webhook_found,
           event_id: event_id,
           event_type: stripe_event.type
@@ -204,7 +198,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
 
         case store_and_process(stripe_event) do
           :ok ->
-            Logger.info("Webhook processed successfully",
+            Ysc.Logging.info("Webhook processed successfully",
               event: :webhook_processed_successfully,
               event_id: event_id,
               event_type: stripe_event.type
@@ -213,7 +207,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
             %{stats | processed_success: stats.processed_success + 1}
 
           {:error, _reason} ->
-            Logger.warning("Webhook processing failed",
+            Ysc.Logging.warning("Webhook processing failed",
               event: :webhook_processing_failed,
               event_id: event_id,
               event_type: stripe_event.type
@@ -257,10 +251,11 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
           :ok
         rescue
           error ->
-            Sentry.capture_exception(error,
-              stacktrace: __STACKTRACE__,
-              extra: %{event_id: stripe_event.id, event_type: stripe_event.type},
-              tags: %{worker: "WebhookReconciliationWorker"}
+            Ysc.Logging.error("Webhook reconciliation failed",
+              error: error,
+              event_id: stripe_event.id,
+              event_type: stripe_event.type,
+              stacktrace: __STACKTRACE__
             )
 
             {:error, error}

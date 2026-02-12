@@ -6,7 +6,7 @@ defmodule Ysc.Quickbooks.Sync do
   mapping entity types to the appropriate QuickBooks accounts and classes.
   """
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Repo
   alias Ysc.Ledgers.{Payment, Refund, Payout, LedgerEntry}
   alias Ysc.Quickbooks
@@ -43,7 +43,7 @@ defmodule Ysc.Quickbooks.Sync do
   @spec sync_payment(Payment.t()) ::
           {:ok, map()} | {:error, atom() | String.t()}
   def sync_payment(%Payment{} = payment) do
-    Logger.debug("[QB Sync] Starting sync_payment",
+    Ysc.Logging.debug("[QB Sync] Starting sync_payment",
       payment_id: payment.id,
       reference_id: payment.reference_id,
       amount: inspect(payment.amount),
@@ -55,13 +55,13 @@ defmodule Ysc.Quickbooks.Sync do
     # Check if already synced
     if payment.quickbooks_sync_status == "synced" &&
          payment.quickbooks_sales_receipt_id do
-      Logger.info("[QB Sync] Payment already synced to QuickBooks",
+      Ysc.Logging.info("[QB Sync] Payment already synced to QuickBooks",
         payment_id: payment.id,
         sales_receipt_id: payment.quickbooks_sales_receipt_id
       )
 
       # Even if already synced, check if any payouts are now ready to sync
-      Logger.debug("[QB Sync] Checking for payouts to sync after payment",
+      Ysc.Logging.debug("[QB Sync] Checking for payouts to sync after payment",
         payment_id: payment.id
       )
 
@@ -69,7 +69,8 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:ok, %{"Id" => payment.quickbooks_sales_receipt_id}}
     else
-      Logger.debug("[QB Sync] Payment not yet synced, proceeding with sync",
+      Ysc.Logging.debug(
+        "[QB Sync] Payment not yet synced, proceeding with sync",
         payment_id: payment.id,
         current_status: payment.quickbooks_sync_status
       )
@@ -85,7 +86,7 @@ defmodule Ysc.Quickbooks.Sync do
   """
   @spec sync_refund(Refund.t()) :: {:ok, map()} | {:error, atom() | String.t()}
   def sync_refund(%Refund{} = refund) do
-    Logger.debug("[QB Sync] Starting sync_refund",
+    Ysc.Logging.debug("[QB Sync] Starting sync_refund",
       refund_id: refund.id,
       reference_id: refund.reference_id,
       amount: inspect(refund.amount),
@@ -97,13 +98,13 @@ defmodule Ysc.Quickbooks.Sync do
     # Check if already synced
     if refund.quickbooks_sync_status == "synced" &&
          refund.quickbooks_sales_receipt_id do
-      Logger.info("[QB Sync] Refund already synced to QuickBooks",
+      Ysc.Logging.info("[QB Sync] Refund already synced to QuickBooks",
         refund_id: refund.id,
         sales_receipt_id: refund.quickbooks_sales_receipt_id
       )
 
       # Even if already synced, check if any payouts are now ready to sync
-      Logger.debug("[QB Sync] Checking for payouts to sync after refund",
+      Ysc.Logging.debug("[QB Sync] Checking for payouts to sync after refund",
         refund_id: refund.id
       )
 
@@ -111,7 +112,7 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:ok, %{"Id" => refund.quickbooks_sales_receipt_id}}
     else
-      Logger.debug("[QB Sync] Refund not yet synced, proceeding with sync",
+      Ysc.Logging.debug("[QB Sync] Refund not yet synced, proceeding with sync",
         refund_id: refund.id,
         current_status: refund.quickbooks_sync_status
       )
@@ -127,7 +128,7 @@ defmodule Ysc.Quickbooks.Sync do
   """
   @spec sync_payout(Payout.t()) :: {:ok, map()} | {:error, atom() | String.t()}
   def sync_payout(%Payout{} = payout) do
-    Logger.debug("[QB Sync] Starting sync_payout",
+    Ysc.Logging.debug("[QB Sync] Starting sync_payout",
       payout_id: payout.id,
       stripe_payout_id: payout.stripe_payout_id,
       amount: inspect(payout.amount),
@@ -138,14 +139,14 @@ defmodule Ysc.Quickbooks.Sync do
 
     # Check if already synced
     if payout.quickbooks_sync_status == "synced" && payout.quickbooks_deposit_id do
-      Logger.info("[QB Sync] Payout already synced to QuickBooks",
+      Ysc.Logging.info("[QB Sync] Payout already synced to QuickBooks",
         payout_id: payout.id,
         deposit_id: payout.quickbooks_deposit_id
       )
 
       {:ok, %{"Id" => payout.quickbooks_deposit_id}}
     else
-      Logger.debug("[QB Sync] Payout not yet synced, proceeding with sync",
+      Ysc.Logging.debug("[QB Sync] Payout not yet synced, proceeding with sync",
         payout_id: payout.id,
         current_status: payout.quickbooks_sync_status
       )
@@ -157,33 +158,36 @@ defmodule Ysc.Quickbooks.Sync do
   # Private functions
 
   defp do_sync_payment(%Payment{} = payment) do
-    Logger.debug("[QB Sync] do_sync_payment: Starting payment sync process",
+    Ysc.Logging.debug(
+      "[QB Sync] do_sync_payment: Starting payment sync process",
       payment_id: payment.id
     )
 
     # Reload payment to ensure we have the latest state
-    Logger.debug("[QB Sync] do_sync_payment: Reloading payment from database",
+    Ysc.Logging.debug(
+      "[QB Sync] do_sync_payment: Reloading payment from database",
       payment_id: payment.id
     )
 
     payment = Repo.reload!(payment)
 
     # Mark as attempting sync
-    Logger.debug("[QB Sync] do_sync_payment: Marking payment as pending sync",
+    Ysc.Logging.debug(
+      "[QB Sync] do_sync_payment: Marking payment as pending sync",
       payment_id: payment.id
     )
 
     update_sync_status(payment, "pending", nil, nil)
 
     # Reload again after status update to ensure we have the updated payment
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] do_sync_payment: Reloading payment after status update",
       payment_id: payment.id
     )
 
     payment = Repo.reload!(payment)
 
-    Logger.debug("[QB Sync] do_sync_payment: Starting sync pipeline",
+    Ysc.Logging.debug("[QB Sync] do_sync_payment: Starting sync pipeline",
       payment_id: payment.id,
       user_id: payment.user_id
     )
@@ -201,7 +205,7 @@ defmodule Ysc.Quickbooks.Sync do
            ) do
       sales_receipt_id = Map.get(sales_receipt, "Id")
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] do_sync_payment: Sales receipt created successfully",
         payment_id: payment.id,
         sales_receipt_id: sales_receipt_id,
@@ -209,7 +213,7 @@ defmodule Ysc.Quickbooks.Sync do
       )
 
       # Update payment with sync success
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] do_sync_payment: Updating payment with sync success",
         payment_id: payment.id,
         sales_receipt_id: sales_receipt_id
@@ -217,13 +221,14 @@ defmodule Ysc.Quickbooks.Sync do
 
       update_sync_success(payment, sales_receipt_id, sales_receipt)
 
-      Logger.info("[QB Sync] Successfully synced payment to QuickBooks",
+      Ysc.Logging.info("[QB Sync] Successfully synced payment to QuickBooks",
         payment_id: payment.id,
         sales_receipt_id: sales_receipt_id
       )
 
       # Check if any payouts are now ready to sync
-      Logger.debug("[QB Sync] do_sync_payment: Checking for payouts to sync",
+      Ysc.Logging.debug(
+        "[QB Sync] do_sync_payment: Checking for payouts to sync",
         payment_id: payment.id
       )
 
@@ -232,19 +237,14 @@ defmodule Ysc.Quickbooks.Sync do
       {:ok, sales_receipt}
     else
       {:error, reason} = error ->
-        Logger.warning(
+        Ysc.Logging.error(
           "[QB Sync] do_sync_payment: Sync failed in pipeline - Error: #{inspect(reason)}, Payment ID: #{payment.id}, Reference ID: #{payment.reference_id}, User ID: #{payment.user_id}",
           payment_id: payment.id,
           payment_reference_id: payment.reference_id,
           error_reason: reason,
           error_type: inspect(reason),
           full_error: inspect(error),
-          user_id: payment.user_id
-        )
-
-        # Report to Sentry
-        Sentry.capture_message("QuickBooks payment sync failed",
-          level: :error,
+          user_id: payment.user_id,
           extra: %{
             payment_id: payment.id,
             payment_reference_id: payment.reference_id,
@@ -265,19 +265,20 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp do_sync_refund(%Refund{} = refund) do
-    Logger.debug("[QB Sync] do_sync_refund: Starting refund sync process",
+    Ysc.Logging.debug("[QB Sync] do_sync_refund: Starting refund sync process",
       refund_id: refund.id,
       payment_id: refund.payment_id
     )
 
     # Mark as attempting sync
-    Logger.debug("[QB Sync] do_sync_refund: Marking refund as pending sync",
+    Ysc.Logging.debug(
+      "[QB Sync] do_sync_refund: Marking refund as pending sync",
       refund_id: refund.id
     )
 
     update_sync_status_refund(refund, "pending", nil, nil)
 
-    Logger.debug("[QB Sync] do_sync_refund: Starting sync pipeline",
+    Ysc.Logging.debug("[QB Sync] do_sync_refund: Starting sync pipeline",
       refund_id: refund.id,
       payment_id: refund.payment_id
     )
@@ -296,7 +297,7 @@ defmodule Ysc.Quickbooks.Sync do
            ) do
       refund_receipt_id = Map.get(refund_receipt, "Id")
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] do_sync_refund: Refund receipt created successfully",
         refund_id: refund.id,
         refund_receipt_id: refund_receipt_id,
@@ -304,7 +305,7 @@ defmodule Ysc.Quickbooks.Sync do
       )
 
       # Update refund with sync success
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] do_sync_refund: Updating refund with sync success",
         refund_id: refund.id,
         refund_receipt_id: refund_receipt_id
@@ -312,13 +313,14 @@ defmodule Ysc.Quickbooks.Sync do
 
       update_sync_success_refund(refund, refund_receipt_id, refund_receipt)
 
-      Logger.info("[QB Sync] Successfully synced refund to QuickBooks",
+      Ysc.Logging.info("[QB Sync] Successfully synced refund to QuickBooks",
         refund_id: refund.id,
         refund_receipt_id: refund_receipt_id
       )
 
       # Check if any payouts are now ready to sync
-      Logger.debug("[QB Sync] do_sync_refund: Checking for payouts to sync",
+      Ysc.Logging.debug(
+        "[QB Sync] do_sync_refund: Checking for payouts to sync",
         refund_id: refund.id
       )
 
@@ -327,19 +329,14 @@ defmodule Ysc.Quickbooks.Sync do
       {:ok, refund_receipt}
     else
       {:error, reason} = error ->
-        Logger.warning(
+        Ysc.Logging.error(
           "[QB Sync] do_sync_refund: Sync failed in pipeline - Error: #{inspect(reason)}, Refund ID: #{refund.id}, Reference ID: #{refund.reference_id}, Payment ID: #{refund.payment_id}",
           refund_id: refund.id,
           refund_reference_id: refund.reference_id,
           error_reason: reason,
           error_type: inspect(reason),
           full_error: inspect(error),
-          payment_id: refund.payment_id
-        )
-
-        # Report to Sentry
-        Sentry.capture_message("QuickBooks refund sync failed",
-          level: :error,
+          payment_id: refund.payment_id,
           extra: %{
             refund_id: refund.id,
             refund_reference_id: refund.reference_id,
@@ -360,19 +357,20 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp do_sync_payout(%Payout{} = payout) do
-    Logger.debug("[QB Sync] do_sync_payout: Starting payout sync process",
+    Ysc.Logging.debug("[QB Sync] do_sync_payout: Starting payout sync process",
       payout_id: payout.id
     )
 
     # Mark as attempting sync
-    Logger.debug("[QB Sync] do_sync_payout: Marking payout as pending sync",
+    Ysc.Logging.debug(
+      "[QB Sync] do_sync_payout: Marking payout as pending sync",
       payout_id: payout.id
     )
 
     update_sync_status_payout(payout, "pending", nil, nil)
 
     # Load payout with payments and refunds
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] do_sync_payout: Loading payout with payments and refunds",
       payout_id: payout.id
     )
@@ -382,7 +380,7 @@ defmodule Ysc.Quickbooks.Sync do
     payout = Repo.get!(Payout, payout.id)
     payout = Repo.preload(payout, [:payments, :refunds])
 
-    Logger.info("[QB Sync] do_sync_payout: Loaded payout data",
+    Ysc.Logging.info("[QB Sync] do_sync_payout: Loaded payout data",
       payout_id: payout.id,
       stripe_payout_id: payout.stripe_payout_id,
       payout_amount: Money.to_string!(payout.amount),
@@ -398,7 +396,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     # Verify all linked payments and refunds are synced before proceeding
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] do_sync_payout: Verifying all transactions are synced",
       payout_id: payout.id
     )
@@ -407,14 +405,15 @@ defmodule Ysc.Quickbooks.Sync do
          {:ok, deposit} <- create_payout_deposit(payout) do
       deposit_id = Map.get(deposit, "Id")
 
-      Logger.debug("[QB Sync] do_sync_payout: Deposit created successfully",
+      Ysc.Logging.debug(
+        "[QB Sync] do_sync_payout: Deposit created successfully",
         payout_id: payout.id,
         deposit_id: deposit_id,
         deposit: inspect(deposit, limit: :infinity)
       )
 
       # Update payout with sync success
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] do_sync_payout: Updating payout with sync success",
         payout_id: payout.id,
         deposit_id: deposit_id
@@ -422,7 +421,7 @@ defmodule Ysc.Quickbooks.Sync do
 
       update_sync_success_payout(payout, deposit_id, deposit)
 
-      Logger.info("[QB Sync] Successfully synced payout to QuickBooks",
+      Ysc.Logging.info("[QB Sync] Successfully synced payout to QuickBooks",
         payout_id: payout.id,
         deposit_id: deposit_id,
         payments_count: length(payout.payments),
@@ -432,7 +431,7 @@ defmodule Ysc.Quickbooks.Sync do
       {:ok, deposit}
     else
       {:error, reason} = error ->
-        Logger.warning(
+        Ysc.Logging.error(
           "[QB Sync] do_sync_payout: Sync failed in pipeline - Error: #{inspect(reason)}, Payout ID: #{payout.id}, Stripe Payout ID: #{inspect(payout.stripe_payout_id)}, Payments: #{length(payout.payments)}, Refunds: #{length(payout.refunds)}",
           payout_id: payout.id,
           stripe_payout_id: payout.stripe_payout_id,
@@ -440,12 +439,7 @@ defmodule Ysc.Quickbooks.Sync do
           error_type: inspect(reason),
           full_error: inspect(error),
           payments_count: length(payout.payments),
-          refunds_count: length(payout.refunds)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message("QuickBooks payout sync failed",
-          level: :error,
+          refunds_count: length(payout.refunds),
           extra: %{
             payout_id: payout.id,
             stripe_payout_id: payout.stripe_payout_id,
@@ -467,25 +461,25 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_user(nil) do
-    Logger.debug("[QB Sync] get_user: user_id is nil")
+    Ysc.Logging.debug("[QB Sync] get_user: user_id is nil")
     {:error, :user_not_found}
   end
 
   defp get_user(user_id) do
-    Logger.debug("[QB Sync] get_user: Fetching user",
+    Ysc.Logging.debug("[QB Sync] get_user: Fetching user",
       user_id: user_id
     )
 
     case Repo.get(User, user_id) do
       nil ->
-        Logger.warning("[QB Sync] get_user: User not found",
+        Ysc.Logging.warning("[QB Sync] get_user: User not found",
           user_id: user_id
         )
 
         {:error, :user_not_found}
 
       user ->
-        Logger.debug("[QB Sync] get_user: User found",
+        Ysc.Logging.debug("[QB Sync] get_user: User found",
           user_id: user_id,
           user_email: user.email
         )
@@ -495,20 +489,20 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_payment(payment_id) do
-    Logger.debug("[QB Sync] get_payment: Fetching payment",
+    Ysc.Logging.debug("[QB Sync] get_payment: Fetching payment",
       payment_id: payment_id
     )
 
     case Repo.get(Payment, payment_id) do
       nil ->
-        Logger.warning("[QB Sync] get_payment: Payment not found",
+        Ysc.Logging.warning("[QB Sync] get_payment: Payment not found",
           payment_id: payment_id
         )
 
         {:error, :payment_not_found}
 
       payment ->
-        Logger.debug("[QB Sync] get_payment: Payment found",
+        Ysc.Logging.debug("[QB Sync] get_payment: Payment found",
           payment_id: payment_id,
           reference_id: payment.reference_id,
           amount: inspect(payment.amount)
@@ -519,7 +513,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_or_create_customer(user) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] get_or_create_customer: Getting or creating QuickBooks customer",
       user_id: user.id,
       user_email: user.email,
@@ -528,7 +522,8 @@ defmodule Ysc.Quickbooks.Sync do
 
     case Quickbooks.get_or_create_customer(user) do
       {:ok, customer_id} ->
-        Logger.debug("[QB Sync] get_or_create_customer: Customer ID obtained",
+        Ysc.Logging.debug(
+          "[QB Sync] get_or_create_customer: Customer ID obtained",
           user_id: user.id,
           customer_id: customer_id
         )
@@ -536,19 +531,14 @@ defmodule Ysc.Quickbooks.Sync do
         {:ok, customer_id}
 
       {:error, reason} = error ->
-        Logger.warning(
+        Ysc.Logging.error(
           "[QB Sync] get_or_create_customer: Failed to get or create customer - Error: #{inspect(reason)}, User ID: #{user.id}, Email: #{user.email}, Existing QB Customer ID: #{inspect(user.quickbooks_customer_id)}",
           user_id: user.id,
           user_email: user.email,
           existing_quickbooks_customer_id: user.quickbooks_customer_id,
           error_reason: reason,
           error_type: inspect(reason),
-          full_error: inspect(error)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message("QuickBooks customer creation failed",
-          level: :error,
+          full_error: inspect(error),
           extra: %{
             user_id: user.id,
             user_email: user.email,
@@ -564,17 +554,11 @@ defmodule Ysc.Quickbooks.Sync do
         error
 
       error ->
-        Logger.warning(
+        Ysc.Logging.error(
           "[QB Sync] get_or_create_customer: Failed to get or create customer (unexpected error format) - Error: #{inspect(error)}, User ID: #{user.id}, Email: #{user.email}",
           user_id: user.id,
           user_email: user.email,
-          full_error: inspect(error)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message(
-          "QuickBooks customer creation failed (unexpected error)",
-          level: :error,
+          full_error: inspect(error),
           extra: %{
             user_id: user.id,
             user_email: user.email,
@@ -591,7 +575,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_payment_entity_info(%Payment{} = payment) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] get_payment_entity_info: Fetching entity info for payment",
       payment_id: payment.id
     )
@@ -615,7 +599,8 @@ defmodule Ysc.Quickbooks.Sync do
       )
       |> Repo.all()
 
-    Logger.debug("[QB Sync] get_payment_entity_info: Found revenue entries",
+    Ysc.Logging.debug(
+      "[QB Sync] get_payment_entity_info: Found revenue entries",
       payment_id: payment.id,
       entries_count: length(entries),
       entry_types: Enum.map(entries, fn e -> e.related_entity_type end)
@@ -630,7 +615,7 @@ defmodule Ysc.Quickbooks.Sync do
         e.related_entity_type in [:donation, "donation"]
       end)
 
-    Logger.debug("[QB Sync] get_payment_entity_info: Entry analysis",
+    Ysc.Logging.debug("[QB Sync] get_payment_entity_info: Entry analysis",
       payment_id: payment.id,
       has_event_entry: !is_nil(event_entry),
       has_donation_entry: !is_nil(donation_entry)
@@ -640,7 +625,7 @@ defmodule Ysc.Quickbooks.Sync do
       cond do
         # Mixed event/donation payment
         event_entry && donation_entry ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Detected mixed event/donation payment",
             payment_id: payment.id,
             event_amount: inspect(event_entry.amount),
@@ -664,7 +649,7 @@ defmodule Ysc.Quickbooks.Sync do
               string when is_binary(string) -> String.to_existing_atom(string)
             end
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Detected event entry",
             payment_id: payment.id,
             entity_type: entity_type
@@ -672,7 +657,7 @@ defmodule Ysc.Quickbooks.Sync do
 
           property =
             if entity_type == :booking do
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[QB Sync] get_payment_entity_info: Determining booking property",
                 payment_id: payment.id
               )
@@ -682,7 +667,7 @@ defmodule Ysc.Quickbooks.Sync do
               nil
             end
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Event entity info determined",
             payment_id: payment.id,
             entity_type: entity_type,
@@ -699,7 +684,7 @@ defmodule Ysc.Quickbooks.Sync do
               string when is_binary(string) -> String.to_existing_atom(string)
             end
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Detected donation entry",
             payment_id: payment.id,
             entity_type: entity_type
@@ -716,7 +701,7 @@ defmodule Ysc.Quickbooks.Sync do
               string when is_binary(string) -> String.to_existing_atom(string)
             end
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Using first revenue entry",
             payment_id: payment.id,
             entity_type: entity_type
@@ -724,7 +709,7 @@ defmodule Ysc.Quickbooks.Sync do
 
           property =
             if entity_type == :booking do
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[QB Sync] get_payment_entity_info: Determining booking property",
                 payment_id: payment.id
               )
@@ -747,7 +732,7 @@ defmodule Ysc.Quickbooks.Sync do
               string when is_binary(string) -> String.to_existing_atom(string)
             end
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Detected membership entry",
             payment_id: payment.id,
             entity_type: entity_type,
@@ -760,7 +745,7 @@ defmodule Ysc.Quickbooks.Sync do
               membership_entry.related_entity_id
             )
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Membership type determined",
             payment_id: payment.id,
             membership_type: membership_type
@@ -775,7 +760,7 @@ defmodule Ysc.Quickbooks.Sync do
 
         # Default to membership if no entity type found
         true ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: No entity type found, defaulting to membership",
             payment_id: payment.id
           )
@@ -783,7 +768,7 @@ defmodule Ysc.Quickbooks.Sync do
           {:ok, %{entity_type: :membership, property: :single, entry: nil}}
       end
 
-    Logger.debug("[QB Sync] get_payment_entity_info: Final result",
+    Ysc.Logging.debug("[QB Sync] get_payment_entity_info: Final result",
       payment_id: payment.id,
       result: inspect(result, limit: :infinity)
     )
@@ -794,7 +779,7 @@ defmodule Ysc.Quickbooks.Sync do
   defp get_membership_type_from_entity_id(nil), do: :single
 
   defp get_membership_type_from_entity_id(subscription_id) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] get_membership_type_from_entity_id: Getting membership type",
       subscription_id: subscription_id
     )
@@ -821,7 +806,7 @@ defmodule Ysc.Quickbooks.Sync do
               :single
           end
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] get_membership_type_from_entity_id: Membership type determined",
           subscription_id: subscription_id,
           membership_type: membership_type
@@ -830,7 +815,7 @@ defmodule Ysc.Quickbooks.Sync do
         membership_type
 
       _ ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] get_membership_type_from_entity_id: Subscription not found, defaulting to single",
           subscription_id: subscription_id
         )
@@ -840,7 +825,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp determine_booking_property(%Payment{} = payment) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] determine_booking_property: Determining property for booking",
       payment_id: payment.id
     )
@@ -856,7 +841,7 @@ defmodule Ysc.Quickbooks.Sync do
 
     result =
       if booking_entry && booking_entry.related_entity_id do
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] determine_booking_property: Found booking entry, fetching booking",
           payment_id: payment.id,
           booking_id: booking_entry.related_entity_id
@@ -865,7 +850,7 @@ defmodule Ysc.Quickbooks.Sync do
         try do
           booking = Bookings.get_booking!(booking_entry.related_entity_id)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] determine_booking_property: Got booking, using property field",
             payment_id: payment.id,
             booking_id: booking.id,
@@ -881,7 +866,7 @@ defmodule Ysc.Quickbooks.Sync do
               :clear_lake
 
             _ ->
-              Logger.warning(
+              Ysc.Logging.warning(
                 "[QB Sync] determine_booking_property: Unknown booking property, falling back to account check",
                 payment_id: payment.id,
                 booking_property: booking.property
@@ -891,7 +876,7 @@ defmodule Ysc.Quickbooks.Sync do
           end
         rescue
           Ecto.NoResultsError ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "[QB Sync] determine_booking_property: Booking not found, falling back to account check",
               payment_id: payment.id,
               booking_id: booking_entry.related_entity_id
@@ -900,7 +885,7 @@ defmodule Ysc.Quickbooks.Sync do
             nil
         end
       else
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] determine_booking_property: No booking entry found, checking account names",
           payment_id: payment.id
         )
@@ -911,7 +896,7 @@ defmodule Ysc.Quickbooks.Sync do
     # If we couldn't determine from booking, check account names
     result =
       if is_nil(result) do
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] determine_booking_property: Checking ledger account names",
           payment_id: payment.id
         )
@@ -926,7 +911,7 @@ defmodule Ysc.Quickbooks.Sync do
           )
           |> Repo.all()
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] determine_booking_property: Found entries with account names",
           payment_id: payment.id,
           entries_count: length(entries),
@@ -935,7 +920,7 @@ defmodule Ysc.Quickbooks.Sync do
 
         case entries do
           [%{account: %{name: "tahoe_booking_revenue"}} | _] ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "[QB Sync] determine_booking_property: Determined as Tahoe from account name",
               payment_id: payment.id
             )
@@ -943,7 +928,7 @@ defmodule Ysc.Quickbooks.Sync do
             :tahoe
 
           [%{account: %{name: "clear_lake_booking_revenue"}} | _] ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "[QB Sync] determine_booking_property: Determined as Clear Lake from account name",
               payment_id: payment.id
             )
@@ -951,7 +936,7 @@ defmodule Ysc.Quickbooks.Sync do
             :clear_lake
 
           _ ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "[QB Sync] determine_booking_property: Could not determine property",
               payment_id: payment.id
             )
@@ -962,7 +947,7 @@ defmodule Ysc.Quickbooks.Sync do
         result
       end
 
-    Logger.debug("[QB Sync] determine_booking_property: Final result",
+    Ysc.Logging.debug("[QB Sync] determine_booking_property: Final result",
       payment_id: payment.id,
       property: result
     )
@@ -971,7 +956,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_item_id_for_entity(%{entity_type: :mixed_event_donation}) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] get_item_id_for_entity: Mixed event/donation payment, item_id not needed"
     )
 
@@ -980,7 +965,8 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_item_id_for_entity(entity_info) do
-    Logger.debug("[QB Sync] get_item_id_for_entity: Getting item ID for entity",
+    Ysc.Logging.debug(
+      "[QB Sync] get_item_id_for_entity: Getting item ID for entity",
       entity_type: entity_info.entity_type,
       property: entity_info.property
     )
@@ -989,14 +975,15 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_quickbooks_item_id(%{entity_type: entity_type, property: property}) do
-    Logger.debug("[QB Sync] get_quickbooks_item_id: Getting or creating item",
+    Ysc.Logging.debug(
+      "[QB Sync] get_quickbooks_item_id: Getting or creating item",
       entity_type: entity_type,
       property: property
     )
 
     item_name = determine_item_name(entity_type, property)
 
-    Logger.debug("[QB Sync] get_quickbooks_item_id: Item name determined",
+    Ysc.Logging.debug("[QB Sync] get_quickbooks_item_id: Item name determined",
       entity_type: entity_type,
       property: property,
       item_name: item_name
@@ -1009,7 +996,7 @@ defmodule Ysc.Quickbooks.Sync do
         get_or_create_item_via_api(item_name, entity_type, property)
 
       configured_item_id ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] get_quickbooks_item_id: Using configured item ID override",
           item_name: item_name,
           item_id: configured_item_id
@@ -1046,14 +1033,15 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_or_create_item_via_api(item_name, entity_type, property) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] get_quickbooks_item_id: No config override, getting/creating via API",
       item_name: item_name
     )
 
     income_account_name = determine_income_account_name(entity_type, property)
 
-    Logger.debug("[QB Sync] get_quickbooks_item_id: Getting income account",
+    Ysc.Logging.debug(
+      "[QB Sync] get_quickbooks_item_id: Getting income account",
       income_account_name: income_account_name
     )
 
@@ -1063,7 +1051,7 @@ defmodule Ysc.Quickbooks.Sync do
            income_account_ref: income_account_ref
          ) do
       {:ok, item_id} ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] get_quickbooks_item_id: Item ID obtained via API",
           item_name: item_name,
           item_id: item_id
@@ -1072,7 +1060,7 @@ defmodule Ysc.Quickbooks.Sync do
         {:ok, item_id}
 
       error ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "[QB Sync] get_quickbooks_item_id: Failed to get or create item",
           item_name: item_name,
           error: inspect(error)
@@ -1096,7 +1084,8 @@ defmodule Ysc.Quickbooks.Sync do
   defp query_income_account(income_account_name) do
     case client_module().query_account_by_name(income_account_name) do
       {:ok, account_id} ->
-        Logger.debug("[QB Sync] get_quickbooks_item_id: Found income account",
+        Ysc.Logging.debug(
+          "[QB Sync] get_quickbooks_item_id: Found income account",
           account_name: income_account_name,
           account_id: account_id
         )
@@ -1104,7 +1093,7 @@ defmodule Ysc.Quickbooks.Sync do
         %{value: account_id}
 
       {:error, :not_found} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "[QB Sync] get_quickbooks_item_id: Income account not found, item creation may fail",
           account_name: income_account_name
         )
@@ -1112,7 +1101,7 @@ defmodule Ysc.Quickbooks.Sync do
         nil
 
       error ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "[QB Sync] get_quickbooks_item_id: Failed to query income account, item creation may fail",
           account_name: income_account_name,
           error: inspect(error)
@@ -1123,7 +1112,8 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_account_and_class(%{entity_type: entity_type, property: property}) do
-    Logger.debug("[QB Sync] get_account_and_class: Getting account and class",
+    Ysc.Logging.debug(
+      "[QB Sync] get_account_and_class: Getting account and class",
       entity_type: entity_type,
       property: property
     )
@@ -1149,7 +1139,7 @@ defmodule Ysc.Quickbooks.Sync do
           %{account: nil, class: "Administration"}
       end
 
-    Logger.debug("[QB Sync] get_account_and_class: Result",
+    Ysc.Logging.debug("[QB Sync] get_account_and_class: Result",
       entity_type: entity_type,
       property: property,
       account: result && result.account,
@@ -1160,7 +1150,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp create_payment_sales_receipt(payment, customer_id, item_id, entity_info) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_payment_sales_receipt: Creating sales receipt",
       payment_id: payment.id,
       customer_id: customer_id,
@@ -1170,14 +1160,14 @@ defmodule Ysc.Quickbooks.Sync do
 
     # Handle mixed event/donation payments with separate line items
     if entity_info.entity_type == :mixed_event_donation do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_payment_sales_receipt: Creating mixed payment sales receipt",
         payment_id: payment.id
       )
 
       create_mixed_payment_sales_receipt(payment, customer_id, entity_info)
     else
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_payment_sales_receipt: Creating single entity payment sales receipt",
         payment_id: payment.id,
         entity_type: entity_info.entity_type
@@ -1189,7 +1179,8 @@ defmodule Ysc.Quickbooks.Sync do
         Money.to_decimal(payment.amount)
         |> Decimal.round(2)
 
-      Logger.debug("[QB Sync] create_payment_sales_receipt: Calculated amount",
+      Ysc.Logging.debug(
+        "[QB Sync] create_payment_sales_receipt: Calculated amount",
         payment_id: payment.id,
         amount_cents: inspect(payment.amount),
         amount_dollars: Decimal.to_string(amount)
@@ -1201,7 +1192,7 @@ defmodule Ysc.Quickbooks.Sync do
       deposit_account_ref =
         case client_module().query_account_by_name("Undeposited Funds") do
           {:ok, account_id} ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "[QB Sync] create_payment_sales_receipt: Found Undeposited Funds account",
               payment_id: payment.id,
               account_id: account_id
@@ -1210,7 +1201,7 @@ defmodule Ysc.Quickbooks.Sync do
             %{value: account_id, name: "Undeposited Funds"}
 
           {:error, :not_found} ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "[QB Sync] create_payment_sales_receipt: Undeposited Funds account not found, sales receipt may fail",
               payment_id: payment.id
             )
@@ -1218,7 +1209,7 @@ defmodule Ysc.Quickbooks.Sync do
             nil
 
           error ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "[QB Sync] create_payment_sales_receipt: Failed to query Undeposited Funds account",
               payment_id: payment.id,
               error: inspect(error)
@@ -1244,7 +1235,7 @@ defmodule Ysc.Quickbooks.Sync do
       # Query QuickBooks to get the class ID (not just the name)
       class_name = account_class.class
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_payment_sales_receipt: Querying for class ID",
         payment_id: payment.id,
         class_name: class_name
@@ -1253,7 +1244,7 @@ defmodule Ysc.Quickbooks.Sync do
       class_ref =
         case client_module().query_class_by_name(class_name) do
           {:ok, class_id} ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "[QB Sync] create_payment_sales_receipt: Found class ID",
               payment_id: payment.id,
               class_name: class_name,
@@ -1263,7 +1254,7 @@ defmodule Ysc.Quickbooks.Sync do
             %{value: class_id, name: class_name}
 
           {:error, :not_found} ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "[QB Sync] create_payment_sales_receipt: Class '#{class_name}' not found, falling back to Administration",
               payment_id: payment.id,
               class_name: class_name
@@ -1273,7 +1264,7 @@ defmodule Ysc.Quickbooks.Sync do
             get_administration_class_ref()
 
           error ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "[QB Sync] create_payment_sales_receipt: Failed to query class, falling back to Administration",
               payment_id: payment.id,
               class_name: class_name,
@@ -1287,7 +1278,7 @@ defmodule Ysc.Quickbooks.Sync do
       # ALWAYS include class_ref - it's required for all QuickBooks exports
       params = Map.put(params, :class_ref, class_ref)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_payment_sales_receipt: Calling Quickbooks.create_purchase_sales_receipt",
         payment_id: payment.id,
         params: inspect(params, limit: :infinity)
@@ -1295,7 +1286,7 @@ defmodule Ysc.Quickbooks.Sync do
 
       result = Quickbooks.create_purchase_sales_receipt(params)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_payment_sales_receipt: Quickbooks.create_purchase_sales_receipt result",
         payment_id: payment.id,
         result: inspect(result, limit: :infinity)
@@ -1306,14 +1297,14 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp create_mixed_payment_sales_receipt(payment, customer_id, entity_info) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_mixed_payment_sales_receipt: Creating mixed payment sales receipt",
       payment_id: payment.id,
       customer_id: customer_id
     )
 
     # Get or create item IDs for event and donation
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_mixed_payment_sales_receipt: Getting or creating item IDs",
       payment_id: payment.id
     )
@@ -1330,7 +1321,7 @@ defmodule Ysc.Quickbooks.Sync do
              :donation_item_id,
              "Donations"
            ) do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Item IDs obtained",
         payment_id: payment.id,
         event_item_id: event_item_id,
@@ -1341,7 +1332,7 @@ defmodule Ysc.Quickbooks.Sync do
       line_items = []
 
       # Add event line item if event entry exists and has positive amount
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Checking event entry",
         payment_id: payment.id,
         has_event_entry: !is_nil(entity_info.event_entry),
@@ -1360,7 +1351,7 @@ defmodule Ysc.Quickbooks.Sync do
             Money.to_decimal(entity_info.event_entry.amount)
             |> Decimal.round(2)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_mixed_payment_sales_receipt: Building event line item",
             payment_id: payment.id,
             event_amount: Decimal.to_string(event_amount)
@@ -1374,7 +1365,7 @@ defmodule Ysc.Quickbooks.Sync do
               @account_class_mapping[:event].class
             )
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_mixed_payment_sales_receipt: Event line item built",
             payment_id: payment.id,
             line_item: inspect(event_line_item, limit: :infinity)
@@ -1382,7 +1373,7 @@ defmodule Ysc.Quickbooks.Sync do
 
           [event_line_item | line_items]
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_mixed_payment_sales_receipt: Skipping event line item",
             payment_id: payment.id
           )
@@ -1391,7 +1382,7 @@ defmodule Ysc.Quickbooks.Sync do
         end
 
       # Add donation line item if donation entry exists and has positive amount
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Checking donation entry",
         payment_id: payment.id,
         has_donation_entry: !is_nil(entity_info.donation_entry),
@@ -1410,7 +1401,7 @@ defmodule Ysc.Quickbooks.Sync do
             Money.to_decimal(entity_info.donation_entry.amount)
             |> Decimal.round(2)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_mixed_payment_sales_receipt: Building donation line item",
             payment_id: payment.id,
             donation_amount: Decimal.to_string(donation_amount)
@@ -1424,7 +1415,7 @@ defmodule Ysc.Quickbooks.Sync do
               @account_class_mapping[:donation].class
             )
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_mixed_payment_sales_receipt: Donation line item built",
             payment_id: payment.id,
             line_item: inspect(donation_line_item, limit: :infinity)
@@ -1432,7 +1423,7 @@ defmodule Ysc.Quickbooks.Sync do
 
           [donation_line_item | line_items]
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_mixed_payment_sales_receipt: Skipping donation line item",
             payment_id: payment.id
           )
@@ -1440,7 +1431,7 @@ defmodule Ysc.Quickbooks.Sync do
           line_items
         end
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Line items built",
         payment_id: payment.id,
         line_items_count: length(line_items),
@@ -1453,7 +1444,7 @@ defmodule Ysc.Quickbooks.Sync do
           Decimal.add(acc, item.amount)
         end)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Total calculated",
         payment_id: payment.id,
         total_amount: Decimal.to_string(total_amount)
@@ -1470,7 +1461,7 @@ defmodule Ysc.Quickbooks.Sync do
         private_note: "External Payment ID: #{payment.external_payment_id}"
       }
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Sales receipt params built",
         payment_id: payment.id,
         params: inspect(sales_receipt_params, limit: :infinity)
@@ -1480,7 +1471,7 @@ defmodule Ysc.Quickbooks.Sync do
       client_module =
         Application.get_env(:ysc, :quickbooks_client, Ysc.Quickbooks.Client)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Calling client.create_sales_receipt",
         payment_id: payment.id,
         client_module: inspect(client_module)
@@ -1488,7 +1479,7 @@ defmodule Ysc.Quickbooks.Sync do
 
       result = client_module.create_sales_receipt(sales_receipt_params)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Client.create_sales_receipt result",
         payment_id: payment.id,
         result: inspect(result, limit: :infinity)
@@ -1497,7 +1488,7 @@ defmodule Ysc.Quickbooks.Sync do
       result
     else
       error ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "[QB Sync] create_mixed_payment_sales_receipt: Failed to get or create item IDs",
           payment_id: payment.id,
           error: inspect(error)
@@ -1521,7 +1512,7 @@ defmodule Ysc.Quickbooks.Sync do
           if income_account_name do
             case client_module().query_account_by_name(income_account_name) do
               {:ok, account_id} ->
-                Logger.debug(
+                Ysc.Logging.debug(
                   "[QB Sync] get_or_create_item_with_fallback: Found income account",
                   account_name: income_account_name,
                   account_id: account_id
@@ -1553,12 +1544,8 @@ defmodule Ysc.Quickbooks.Sync do
         %{value: class_id, name: "Administration"}
 
       _ ->
-        Logger.warning(
-          "[QB Sync] get_administration_class_ref: CRITICAL - Administration class not found! Using hardcoded fallback (this may fail)"
-        )
-
-        Sentry.capture_message("QuickBooks Administration class not found",
-          level: :error,
+        Ysc.Logging.error(
+          "[QB Sync] get_administration_class_ref: CRITICAL - Administration class not found! Using hardcoded fallback (this may fail)",
           tags: %{quickbooks_operation: "get_administration_class_ref"}
         )
 
@@ -1581,7 +1568,8 @@ defmodule Ysc.Quickbooks.Sync do
           # Query for class ID
           case client_module().query_class_by_name(class_name) do
             {:ok, class_id} ->
-              Logger.debug("[QB Sync] build_sales_line_item: Found class ID",
+              Ysc.Logging.debug(
+                "[QB Sync] build_sales_line_item: Found class ID",
                 class_name: class_name,
                 class_id: class_id
               )
@@ -1589,7 +1577,7 @@ defmodule Ysc.Quickbooks.Sync do
               %{value: class_id, name: class_name}
 
             _ ->
-              Logger.warning(
+              Ysc.Logging.warning(
                 "[QB Sync] build_sales_line_item: Class '#{class_name}' not found, falling back to Administration",
                 class_name: class_name
               )
@@ -1600,14 +1588,14 @@ defmodule Ysc.Quickbooks.Sync do
 
         _ ->
           # Default to "Administration" if not provided
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] build_sales_line_item: Using default Administration class"
           )
 
           get_administration_class_ref()
       end
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] build_sales_line_item: Building line item with class",
       item_id: item_id,
       class_ref: inspect(class_ref_map),
@@ -1641,7 +1629,7 @@ defmodule Ysc.Quickbooks.Sync do
   defp create_refund_sales_receipt(refund, customer_id, item_id, entity_info) do
     # Best Practice: Use the same ItemRef as the original sale for correct revenue reversal
     # We get entity_info from the original payment, ensuring we use the same item
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Creating refund receipt",
       refund_id: refund.id,
       customer_id: customer_id,
@@ -1656,7 +1644,8 @@ defmodule Ysc.Quickbooks.Sync do
       Money.to_decimal(refund.amount)
       |> Decimal.round(2)
 
-    Logger.debug("[QB Sync] create_refund_sales_receipt: Calculated amount",
+    Ysc.Logging.debug(
+      "[QB Sync] create_refund_sales_receipt: Calculated amount",
       refund_id: refund.id,
       amount_cents: inspect(refund.amount),
       amount_dollars: Decimal.to_string(amount)
@@ -1671,7 +1660,7 @@ defmodule Ysc.Quickbooks.Sync do
     refund_from_account_ref =
       case client_module().query_account_by_name("Undeposited Funds") do
         {:ok, account_id} ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_refund_sales_receipt: Found Undeposited Funds account",
             refund_id: refund.id,
             account_id: account_id
@@ -1680,7 +1669,7 @@ defmodule Ysc.Quickbooks.Sync do
           %{value: account_id, name: "Undeposited Funds"}
 
         {:error, :not_found} ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "[QB Sync] create_refund_sales_receipt: Undeposited Funds account not found, refund receipt may fail",
             refund_id: refund.id
           )
@@ -1688,7 +1677,7 @@ defmodule Ysc.Quickbooks.Sync do
           nil
 
         error ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "[QB Sync] create_refund_sales_receipt: Failed to query Undeposited Funds account",
             refund_id: refund.id,
             error: inspect(error)
@@ -1700,7 +1689,7 @@ defmodule Ysc.Quickbooks.Sync do
     # Best Practice: Add traceability via PrivateNote
     # QuickBooks doesn't support direct linking of RefundReceipt to SalesReceipt,
     # so we include the original transaction ID in PrivateNote for audit trail
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Getting original payment",
       refund_id: refund.id,
       payment_id: refund.payment_id
@@ -1715,7 +1704,7 @@ defmodule Ysc.Quickbooks.Sync do
                payment.quickbooks_sales_receipt_id != "" and
                payment.quickbooks_sales_receipt_id != "qb_sr_default" and
                payment.quickbooks_sync_status == "synced" ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_refund_sales_receipt: Found original payment sales receipt",
             refund_id: refund.id,
             payment_sales_receipt_id: payment.quickbooks_sales_receipt_id
@@ -1724,7 +1713,7 @@ defmodule Ysc.Quickbooks.Sync do
           "External Refund ID: #{refund.external_refund_id}\nOriginal Payment SalesReceipt: #{payment.quickbooks_sales_receipt_id}"
 
         _ ->
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_refund_sales_receipt: No original payment sales receipt found",
             refund_id: refund.id
           )
@@ -1754,14 +1743,14 @@ defmodule Ysc.Quickbooks.Sync do
       else
         # Fallback: try to get "Undeposited Funds" account ID directly
         # If that fails, we'll use a hardcoded value (this should not happen in production)
-        Logger.warning(
+        Ysc.Logging.warning(
           "[QB Sync] create_refund_sales_receipt: refund_from_account_ref is nil, attempting fallback",
           refund_id: refund.id
         )
 
         case client_module().query_account_by_name("Undeposited Funds") do
           {:ok, account_id} ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "[QB Sync] create_refund_sales_receipt: Found Undeposited Funds account via fallback",
               refund_id: refund.id,
               account_id: account_id
@@ -1773,14 +1762,9 @@ defmodule Ysc.Quickbooks.Sync do
             })
 
           _ ->
-            Logger.warning(
+            Ysc.Logging.error(
               "[QB Sync] create_refund_sales_receipt: CRITICAL - Cannot find Undeposited Funds account, refund receipt will fail",
-              refund_id: refund.id
-            )
-
-            Sentry.capture_message(
-              "QuickBooks Undeposited Funds account not found",
-              level: :error,
+              refund_id: refund.id,
               extra: %{refund_id: refund.id},
               tags: %{quickbooks_operation: "create_refund_sales_receipt"}
             )
@@ -1797,7 +1781,8 @@ defmodule Ysc.Quickbooks.Sync do
     # Query QuickBooks to get the class ID (not just the name)
     class_name = account_class.class
 
-    Logger.debug("[QB Sync] create_refund_sales_receipt: Querying for class ID",
+    Ysc.Logging.debug(
+      "[QB Sync] create_refund_sales_receipt: Querying for class ID",
       refund_id: refund.id,
       class_name: class_name
     )
@@ -1805,7 +1790,8 @@ defmodule Ysc.Quickbooks.Sync do
     class_ref =
       case client_module().query_class_by_name(class_name) do
         {:ok, class_id} ->
-          Logger.debug("[QB Sync] create_refund_sales_receipt: Found class ID",
+          Ysc.Logging.debug(
+            "[QB Sync] create_refund_sales_receipt: Found class ID",
             refund_id: refund.id,
             class_name: class_name,
             class_id: class_id
@@ -1814,7 +1800,7 @@ defmodule Ysc.Quickbooks.Sync do
           %{value: class_id, name: class_name}
 
         {:error, :not_found} ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "[QB Sync] create_refund_sales_receipt: Class '#{class_name}' not found, falling back to Administration",
             refund_id: refund.id,
             class_name: class_name
@@ -1824,7 +1810,7 @@ defmodule Ysc.Quickbooks.Sync do
           get_administration_class_ref()
 
         error ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "[QB Sync] create_refund_sales_receipt: Failed to query class, falling back to Administration",
             refund_id: refund.id,
             class_name: class_name,
@@ -1862,7 +1848,7 @@ defmodule Ysc.Quickbooks.Sync do
 
         # Fallback: this shouldn't happen, but provide a default
         true ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "[QB Sync] create_refund_sales_receipt: refund_from_account_id not set, using fallback",
             refund_id: refund.id
           )
@@ -1873,7 +1859,7 @@ defmodule Ysc.Quickbooks.Sync do
           })
       end
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Calling Quickbooks.create_refund_receipt",
       refund_id: refund.id,
       params: inspect(params, limit: :infinity)
@@ -1881,7 +1867,7 @@ defmodule Ysc.Quickbooks.Sync do
 
     result = Quickbooks.create_refund_receipt(params)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Quickbooks.create_refund_receipt result",
       refund_id: refund.id,
       result: inspect(result, limit: :infinity)
@@ -1891,7 +1877,8 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp create_payout_deposit(%Payout{} = payout) do
-    Logger.debug("[QB Sync] create_payout_deposit: Creating payout deposit",
+    Ysc.Logging.debug(
+      "[QB Sync] create_payout_deposit: Creating payout deposit",
       payout_id: payout.id
     )
 
@@ -1900,7 +1887,7 @@ defmodule Ysc.Quickbooks.Sync do
     stripe_account_id =
       Application.get_env(:ysc, :quickbooks)[:stripe_account_id]
 
-    Logger.debug("[QB Sync] create_payout_deposit: Account IDs",
+    Ysc.Logging.debug("[QB Sync] create_payout_deposit: Account IDs",
       payout_id: payout.id,
       bank_account_id: bank_account_id,
       stripe_account_id: stripe_account_id
@@ -1911,7 +1898,8 @@ defmodule Ysc.Quickbooks.Sync do
       payments_count = length(payout.payments || [])
       refunds_count = length(payout.refunds || [])
 
-      Logger.info("[QB Sync] create_payout_deposit: Payout transaction counts",
+      Ysc.Logging.info(
+        "[QB Sync] create_payout_deposit: Payout transaction counts",
         payout_id: payout.id,
         stripe_payout_id: payout.stripe_payout_id,
         payments_count: payments_count,
@@ -1926,7 +1914,7 @@ defmodule Ysc.Quickbooks.Sync do
       )
 
       if payments_count == 0 && refunds_count == 0 do
-        Logger.warning(
+        Ysc.Logging.warning(
           "[QB Sync] create_payout_deposit: Payout has no linked payments or refunds - creating simple deposit",
           payout_id: payout.id,
           stripe_payout_id: payout.stripe_payout_id,
@@ -1963,7 +1951,8 @@ defmodule Ysc.Quickbooks.Sync do
           private_note: "Payout with no linked transactions"
         }
 
-        Logger.debug("[QB Sync] create_payout_deposit: Simple deposit params",
+        Ysc.Logging.debug(
+          "[QB Sync] create_payout_deposit: Simple deposit params",
           payout_id: payout.id,
           params: inspect(params, limit: :infinity)
         )
@@ -1971,20 +1960,21 @@ defmodule Ysc.Quickbooks.Sync do
         client_module().create_deposit(params)
       else
         # Build line items for each payment and refund
-        Logger.debug("[QB Sync] create_payout_deposit: Building line items",
+        Ysc.Logging.debug(
+          "[QB Sync] create_payout_deposit: Building line items",
           payout_id: payout.id
         )
 
         line_items = build_payout_line_items(payout)
 
-        Logger.debug("[QB Sync] create_payout_deposit: Line items built",
+        Ysc.Logging.debug("[QB Sync] create_payout_deposit: Line items built",
           payout_id: payout.id,
           line_items_count: length(line_items),
           line_items: inspect(line_items, limit: :infinity)
         )
 
         if Enum.empty?(line_items) do
-          Logger.warning(
+          Ysc.Logging.warning(
             "[QB Sync] No synced payments or refunds found for payout, creating single line item",
             payout_id: payout.id
           )
@@ -1995,7 +1985,7 @@ defmodule Ysc.Quickbooks.Sync do
             Money.to_decimal(payout.amount)
             |> Decimal.round(2)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_payout_deposit: Using fallback single line item",
             payout_id: payout.id,
             amount: Decimal.to_string(amount)
@@ -2014,7 +2004,7 @@ defmodule Ysc.Quickbooks.Sync do
             class_ref: administration_class_ref
           }
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_payout_deposit: Calling Quickbooks.create_stripe_payout_deposit",
             payout_id: payout.id,
             params: inspect(params, limit: :infinity)
@@ -2022,7 +2012,7 @@ defmodule Ysc.Quickbooks.Sync do
 
           result = Quickbooks.create_stripe_payout_deposit(params)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_payout_deposit: Quickbooks.create_stripe_payout_deposit result",
             payout_id: payout.id,
             result: inspect(result, limit: :infinity)
@@ -2034,7 +2024,7 @@ defmodule Ysc.Quickbooks.Sync do
           # Fall back to calculating from ledger entries if fee_total is not available (for old payouts)
           stripe_fees =
             if payout.fee_total do
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[QB Sync] create_payout_deposit: Using cached fee_total from payout",
                 payout_id: payout.id,
                 fee_total: Money.to_string!(payout.fee_total)
@@ -2042,7 +2032,7 @@ defmodule Ysc.Quickbooks.Sync do
 
               payout.fee_total
             else
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[QB Sync] create_payout_deposit: fee_total not available, calculating from ledger entries",
                 payout_id: payout.id
               )
@@ -2050,7 +2040,7 @@ defmodule Ysc.Quickbooks.Sync do
               calculate_payout_stripe_fees(payout, payout.payments)
             end
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] create_payout_deposit: Stripe fees determined",
             payout_id: payout.id,
             stripe_fees: inspect(stripe_fees),
@@ -2085,7 +2075,7 @@ defmodule Ysc.Quickbooks.Sync do
                       "Stripe processing fees for payout #{payout.stripe_payout_id}"
                   }
 
-                  Logger.debug(
+                  Ysc.Logging.debug(
                     "[QB Sync] create_payout_deposit: Added Stripe fees line item",
                     payout_id: payout.id,
                     fee_amount: Decimal.to_string(fee_amount),
@@ -2095,7 +2085,7 @@ defmodule Ysc.Quickbooks.Sync do
                   [fee_line_item | line_items]
 
                 error ->
-                  Logger.warning(
+                  Ysc.Logging.warning(
                     "[QB Sync] create_payout_deposit: Failed to get/create Stripe fee item, continuing without fee line item",
                     payout_id: payout.id,
                     error: inspect(error)
@@ -2104,7 +2094,7 @@ defmodule Ysc.Quickbooks.Sync do
                   line_items
               end
             else
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[QB Sync] create_payout_deposit: No Stripe fees to include",
                 payout_id: payout.id
               )
@@ -2118,7 +2108,7 @@ defmodule Ysc.Quickbooks.Sync do
               Decimal.add(acc, item.amount)
             end)
 
-          Logger.debug("[QB Sync] create_payout_deposit: Total calculated",
+          Ysc.Logging.debug("[QB Sync] create_payout_deposit: Total calculated",
             payout_id: payout.id,
             total_amount: Decimal.to_string(total_amount),
             line_items_count: length(line_items)
@@ -2134,7 +2124,7 @@ defmodule Ysc.Quickbooks.Sync do
         end
       end
     else
-      Logger.warning(
+      Ysc.Logging.warning(
         "[QB Sync] create_payout_deposit: QuickBooks accounts not configured",
         payout_id: payout.id,
         bank_account_id: bank_account_id,
@@ -2146,7 +2136,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp build_payout_line_items(%Payout{payments: payments, refunds: refunds}) do
-    Logger.debug("[QB Sync] build_payout_line_items: Building line items",
+    Ysc.Logging.debug("[QB Sync] build_payout_line_items: Building line items",
       payments_count: length(payments),
       refunds_count: length(refunds)
     )
@@ -2155,13 +2145,14 @@ defmodule Ysc.Quickbooks.Sync do
     administration_class_ref = get_administration_class_ref()
 
     # Build line items for payments (positive amounts)
-    Logger.debug("[QB Sync] build_payout_line_items: Processing payments",
+    Ysc.Logging.debug("[QB Sync] build_payout_line_items: Processing payments",
       payments_count: length(payments)
     )
 
     payment_lines =
       Enum.map(payments, fn payment ->
-        Logger.debug("[QB Sync] build_payout_line_items: Processing payment",
+        Ysc.Logging.debug(
+          "[QB Sync] build_payout_line_items: Processing payment",
           payment_id: payment.id,
           sync_status: payment.quickbooks_sync_status,
           sales_receipt_id: payment.quickbooks_sales_receipt_id
@@ -2175,7 +2166,7 @@ defmodule Ysc.Quickbooks.Sync do
             Money.to_decimal(payment.amount)
             |> Decimal.round(2)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] build_payout_line_items: Payment line item created",
             payment_id: payment.id,
             amount: Decimal.to_string(amount),
@@ -2198,7 +2189,7 @@ defmodule Ysc.Quickbooks.Sync do
             description: "Payment #{payment.reference_id}"
           }
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] build_payout_line_items: Skipping unsynced payment",
             payment_id: payment.id,
             sync_status: payment.quickbooks_sync_status,
@@ -2210,7 +2201,8 @@ defmodule Ysc.Quickbooks.Sync do
       end)
       |> Enum.filter(&(&1 != nil))
 
-    Logger.info("[QB Sync] build_payout_line_items: Payment line items built",
+    Ysc.Logging.info(
+      "[QB Sync] build_payout_line_items: Payment line items built",
       payment_lines_count: length(payment_lines),
       payment_line_details:
         Enum.map(payment_lines, fn line ->
@@ -2223,13 +2215,14 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     # Build line items for refunds (negative amounts)
-    Logger.debug("[QB Sync] build_payout_line_items: Processing refunds",
+    Ysc.Logging.debug("[QB Sync] build_payout_line_items: Processing refunds",
       refunds_count: length(refunds)
     )
 
     refund_lines =
       Enum.map(refunds, fn refund ->
-        Logger.debug("[QB Sync] build_payout_line_items: Processing refund",
+        Ysc.Logging.debug(
+          "[QB Sync] build_payout_line_items: Processing refund",
           refund_id: refund.id,
           sync_status: refund.quickbooks_sync_status,
           sales_receipt_id: refund.quickbooks_sales_receipt_id
@@ -2245,7 +2238,7 @@ defmodule Ysc.Quickbooks.Sync do
             |> Decimal.round(2)
             |> Decimal.negate()
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] build_payout_line_items: Refund line item created",
             refund_id: refund.id,
             amount: Decimal.to_string(amount),
@@ -2268,7 +2261,7 @@ defmodule Ysc.Quickbooks.Sync do
             description: "Refund #{refund.reference_id}"
           }
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "[QB Sync] build_payout_line_items: Skipping unsynced refund",
             refund_id: refund.id,
             sync_status: refund.quickbooks_sync_status,
@@ -2280,7 +2273,8 @@ defmodule Ysc.Quickbooks.Sync do
       end)
       |> Enum.filter(&(&1 != nil))
 
-    Logger.info("[QB Sync] build_payout_line_items: Refund line items built",
+    Ysc.Logging.info(
+      "[QB Sync] build_payout_line_items: Refund line items built",
       refund_lines_count: length(refund_lines),
       refund_line_details:
         Enum.map(refund_lines, fn line ->
@@ -2294,7 +2288,7 @@ defmodule Ysc.Quickbooks.Sync do
 
     all_lines = payment_lines ++ refund_lines
 
-    Logger.info("[QB Sync] build_payout_line_items: All line items built",
+    Ysc.Logging.info("[QB Sync] build_payout_line_items: All line items built",
       total_lines_count: length(all_lines),
       total_amount:
         Enum.reduce(all_lines, Decimal.new(0), fn line, acc ->
@@ -2307,7 +2301,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp calculate_payout_stripe_fees(%Payout{} = payout, payments) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] calculate_payout_stripe_fees: Calculating total Stripe fees",
       payout_id: payout.id,
       payments_count: length(payments),
@@ -2318,7 +2312,7 @@ defmodule Ysc.Quickbooks.Sync do
     payment_ids = Enum.map(payments, & &1.id)
 
     if Enum.empty?(payment_ids) do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] calculate_payout_stripe_fees: No payments, returning zero",
         payout_id: payout.id
       )
@@ -2342,7 +2336,7 @@ defmodule Ysc.Quickbooks.Sync do
           _ -> Money.new(0, :USD)
         end
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] calculate_payout_stripe_fees: Total fees calculated",
         payout_id: payout.id,
         total_fees: inspect(total_fees),
@@ -2358,7 +2352,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_or_create_stripe_fee_item do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] get_or_create_stripe_fee_item: Getting or creating Stripe Fees item"
     )
 
@@ -2366,7 +2360,7 @@ defmodule Ysc.Quickbooks.Sync do
     case Application.get_env(:ysc, :quickbooks, [])[:stripe_fee_item_id] do
       nil ->
         # No override, get or create via API
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] get_or_create_stripe_fee_item: No config override, using API"
         )
 
@@ -2375,7 +2369,7 @@ defmodule Ysc.Quickbooks.Sync do
         income_account_ref =
           case client_module().query_account_by_name("Stripe Fees") do
             {:ok, account_id} ->
-              Logger.debug(
+              Ysc.Logging.debug(
                 "[QB Sync] get_or_create_stripe_fee_item: Found Stripe Fees account",
                 account_id: account_id
               )
@@ -2386,7 +2380,7 @@ defmodule Ysc.Quickbooks.Sync do
               # Fallback to a general revenue account if Stripe Fees account not found
               case client_module().query_account_by_name("General Revenue") do
                 {:ok, account_id} ->
-                  Logger.debug(
+                  Ysc.Logging.debug(
                     "[QB Sync] get_or_create_stripe_fee_item: Using General Revenue as fallback",
                     account_id: account_id
                   )
@@ -2403,7 +2397,7 @@ defmodule Ysc.Quickbooks.Sync do
         )
 
       configured_item_id ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] get_or_create_stripe_fee_item: Using configured item ID",
           item_id: configured_item_id
         )
@@ -2418,7 +2412,7 @@ defmodule Ysc.Quickbooks.Sync do
          line_items,
          total_amount
        ) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_payout_deposit_with_lines: Creating deposit with line items",
       payout_id: payout.id,
       bank_account_id: bank_account_id,
@@ -2437,7 +2431,7 @@ defmodule Ysc.Quickbooks.Sync do
         "Payout includes #{length(payout.payments)} payments and #{length(payout.refunds)} refunds"
     }
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_payout_deposit_with_lines: Deposit params built",
       payout_id: payout.id,
       params: inspect(deposit_params, limit: :infinity)
@@ -2447,7 +2441,7 @@ defmodule Ysc.Quickbooks.Sync do
     client_module =
       Application.get_env(:ysc, :quickbooks_client, Ysc.Quickbooks.Client)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_payout_deposit_with_lines: Calling client.create_deposit",
       payout_id: payout.id,
       client_module: inspect(client_module)
@@ -2455,7 +2449,7 @@ defmodule Ysc.Quickbooks.Sync do
 
     result = client_module.create_deposit(deposit_params)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] create_payout_deposit_with_lines: Client.create_deposit result",
       payout_id: payout.id,
       result: inspect(result, limit: :infinity)
@@ -2473,7 +2467,7 @@ defmodule Ysc.Quickbooks.Sync do
   defp format_payout_date(nil), do: nil
 
   defp check_and_enqueue_payout_syncs_for_payment(%Payment{} = payment) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_payment: Finding payouts for payment",
       payment_id: payment.id
     )
@@ -2486,7 +2480,7 @@ defmodule Ysc.Quickbooks.Sync do
         _ -> payment.id
       end
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_payment: Payment ID binary",
       payment_id: payment.id,
       payment_id_binary: inspect(payment_id_binary)
@@ -2501,7 +2495,7 @@ defmodule Ysc.Quickbooks.Sync do
       )
       |> Repo.all()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_payment: Found payouts",
       payment_id: payment.id,
       payouts_count: length(payouts),
@@ -2509,7 +2503,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     Enum.each(payouts, fn payout ->
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] check_and_enqueue_payout_syncs_for_payment: Checking payout",
         payment_id: payment.id,
         payout_id: payout.id
@@ -2520,7 +2514,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp check_and_enqueue_payout_syncs_for_refund(%Refund{} = refund) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_refund: Finding payouts for refund",
       refund_id: refund.id
     )
@@ -2533,7 +2527,7 @@ defmodule Ysc.Quickbooks.Sync do
         _ -> refund.id
       end
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_refund: Refund ID binary",
       refund_id: refund.id,
       refund_id_binary: inspect(refund_id_binary)
@@ -2548,7 +2542,7 @@ defmodule Ysc.Quickbooks.Sync do
       )
       |> Repo.all()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_refund: Found payouts",
       refund_id: refund.id,
       payouts_count: length(payouts),
@@ -2556,7 +2550,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     Enum.each(payouts, fn payout ->
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] check_and_enqueue_payout_syncs_for_refund: Checking payout",
         refund_id: refund.id,
         payout_id: payout.id
@@ -2567,7 +2561,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp check_and_enqueue_payout_sync(%Payout{} = payout) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_sync: Checking if payout can be synced",
       payout_id: payout.id
     )
@@ -2575,7 +2569,8 @@ defmodule Ysc.Quickbooks.Sync do
     # Reload payout with payments and refunds
     payout = Repo.preload(payout, [:payments, :refunds])
 
-    Logger.debug("[QB Sync] check_and_enqueue_payout_sync: Loaded payout data",
+    Ysc.Logging.debug(
+      "[QB Sync] check_and_enqueue_payout_sync: Loaded payout data",
       payout_id: payout.id,
       payments_count: length(payout.payments),
       refunds_count: length(payout.refunds)
@@ -2588,7 +2583,8 @@ defmodule Ysc.Quickbooks.Sync do
           payment.quickbooks_sales_receipt_id != nil
       end)
 
-    Logger.debug("[QB Sync] check_and_enqueue_payout_sync: Payment sync status",
+    Ysc.Logging.debug(
+      "[QB Sync] check_and_enqueue_payout_sync: Payment sync status",
       payout_id: payout.id,
       all_payments_synced: all_payments_synced,
       payment_statuses:
@@ -2608,7 +2604,8 @@ defmodule Ysc.Quickbooks.Sync do
           refund.quickbooks_sales_receipt_id != nil
       end)
 
-    Logger.debug("[QB Sync] check_and_enqueue_payout_sync: Refund sync status",
+    Ysc.Logging.debug(
+      "[QB Sync] check_and_enqueue_payout_sync: Refund sync status",
       payout_id: payout.id,
       all_refunds_synced: all_refunds_synced,
       refund_statuses:
@@ -2624,7 +2621,7 @@ defmodule Ysc.Quickbooks.Sync do
     # Only enqueue if we have transactions and they're all synced
     if all_payments_synced && all_refunds_synced &&
          (payout.payments != [] || payout.refunds != []) do
-      Logger.info(
+      Ysc.Logging.info(
         "[QB Sync] All payments and refunds synced, enqueueing QuickBooks sync for payout",
         payout_id: payout.id,
         payments_count: length(payout.payments),
@@ -2632,7 +2629,7 @@ defmodule Ysc.Quickbooks.Sync do
       )
 
       # Mark payout as pending sync
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] check_and_enqueue_payout_sync: Marking payout as pending",
         payout_id: payout.id
       )
@@ -2642,7 +2639,7 @@ defmodule Ysc.Quickbooks.Sync do
       |> Repo.update()
 
       # Enqueue sync job
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] check_and_enqueue_payout_sync: Enqueueing sync job",
         payout_id: payout.id
       )
@@ -2652,12 +2649,12 @@ defmodule Ysc.Quickbooks.Sync do
         |> QuickbooksSyncPayoutWorker.new()
         |> Oban.insert()
 
-      Logger.debug("[QB Sync] check_and_enqueue_payout_sync: Job enqueued",
+      Ysc.Logging.debug("[QB Sync] check_and_enqueue_payout_sync: Job enqueued",
         payout_id: payout.id,
         job: inspect(job, limit: :infinity)
       )
     else
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] check_and_enqueue_payout_sync: Not ready to sync payout",
         payout_id: payout.id,
         all_payments_synced: all_payments_synced,
@@ -2671,7 +2668,7 @@ defmodule Ysc.Quickbooks.Sync do
          payments: payments,
          refunds: refunds
        }) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] verify_all_transactions_synced: Verifying all transactions are synced",
       payments_count: length(payments),
       refunds_count: length(refunds)
@@ -2684,7 +2681,8 @@ defmodule Ysc.Quickbooks.Sync do
           payment.quickbooks_sales_receipt_id == nil
       end)
 
-    Logger.info("[QB Sync] verify_all_transactions_synced: Payment sync check",
+    Ysc.Logging.info(
+      "[QB Sync] verify_all_transactions_synced: Payment sync check",
       total_payments: length(payments),
       unsynced_payments_count: length(unsynced_payments),
       unsynced_payment_ids: Enum.map(unsynced_payments, & &1.id),
@@ -2706,7 +2704,8 @@ defmodule Ysc.Quickbooks.Sync do
           refund.quickbooks_sales_receipt_id == nil
       end)
 
-    Logger.info("[QB Sync] verify_all_transactions_synced: Refund sync check",
+    Ysc.Logging.info(
+      "[QB Sync] verify_all_transactions_synced: Refund sync check",
       total_refunds: length(refunds),
       unsynced_refunds_count: length(unsynced_refunds),
       unsynced_refund_ids: Enum.map(unsynced_refunds, & &1.id),
@@ -2722,7 +2721,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     if Enum.empty?(unsynced_payments) && Enum.empty?(unsynced_refunds) do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[QB Sync] verify_all_transactions_synced: All transactions synced",
         payments_count: length(payments),
         refunds_count: length(refunds)
@@ -2730,7 +2729,7 @@ defmodule Ysc.Quickbooks.Sync do
 
       :ok
     else
-      Logger.warning(
+      Ysc.Logging.warning(
         "[QB Sync] Cannot sync payout - some payments or refunds are not synced yet",
         unsynced_payments_count: length(unsynced_payments),
         unsynced_refunds_count: length(unsynced_refunds),
@@ -2744,7 +2743,8 @@ defmodule Ysc.Quickbooks.Sync do
 
   # Update functions for Payment
   defp update_sync_status(%Payment{} = payment, status, error, response) do
-    Logger.debug("[QB Sync] update_sync_status: Updating payment sync status",
+    Ysc.Logging.debug(
+      "[QB Sync] update_sync_status: Updating payment sync status",
       payment_id: payment.id,
       status: status
     )
@@ -2759,7 +2759,7 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug("[QB Sync] update_sync_status: Payment status updated",
+    Ysc.Logging.debug("[QB Sync] update_sync_status: Payment status updated",
       payment_id: payment.id,
       status: status,
       result: inspect(result, limit: :infinity)
@@ -2769,7 +2769,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp update_sync_success(%Payment{} = payment, sales_receipt_id, response) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_success: Updating payment with sync success",
       payment_id: payment.id,
       sales_receipt_id: sales_receipt_id
@@ -2786,7 +2786,8 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug("[QB Sync] update_sync_success: Payment updated with success",
+    Ysc.Logging.debug(
+      "[QB Sync] update_sync_success: Payment updated with success",
       payment_id: payment.id,
       sales_receipt_id: sales_receipt_id,
       result: inspect(result, limit: :infinity)
@@ -2796,7 +2797,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp update_sync_failure(%Payment{} = payment, reason) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_failure: Updating payment with sync failure",
       payment_id: payment.id,
       reason: inspect(reason)
@@ -2818,7 +2819,7 @@ defmodule Ysc.Quickbooks.Sync do
          })
          |> Repo.update() do
       {:ok, _updated_payment} ->
-        Logger.debug(
+        Ysc.Logging.debug(
           "[QB Sync] update_sync_failure: Payment updated with failure",
           payment_id: payment.id
         )
@@ -2826,14 +2827,9 @@ defmodule Ysc.Quickbooks.Sync do
         :ok
 
       {:error, changeset} ->
-        Logger.warning("[QB Sync] Failed to update payment sync failure",
+        Ysc.Logging.error("[QB Sync] Failed to update payment sync failure",
           payment_id: payment.id,
-          error: inspect(changeset.errors)
-        )
-
-        # Report to Sentry
-        Sentry.capture_message("Failed to update payment sync failure status",
-          level: :error,
+          error: inspect(changeset.errors),
           extra: %{
             payment_id: payment.id,
             changeset_errors: inspect(changeset.errors)
@@ -2848,7 +2844,7 @@ defmodule Ysc.Quickbooks.Sync do
 
   # Update functions for Refund
   defp update_sync_status_refund(%Refund{} = refund, status, error, response) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_status_refund: Updating refund sync status",
       refund_id: refund.id,
       status: status
@@ -2864,7 +2860,8 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug("[QB Sync] update_sync_status_refund: Refund status updated",
+    Ysc.Logging.debug(
+      "[QB Sync] update_sync_status_refund: Refund status updated",
       refund_id: refund.id,
       status: status,
       result: inspect(result, limit: :infinity)
@@ -2878,7 +2875,7 @@ defmodule Ysc.Quickbooks.Sync do
          sales_receipt_id,
          response
        ) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_success_refund: Updating refund with sync success",
       refund_id: refund.id,
       sales_receipt_id: sales_receipt_id
@@ -2895,7 +2892,7 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_success_refund: Refund updated with success",
       refund_id: refund.id,
       sales_receipt_id: sales_receipt_id,
@@ -2906,7 +2903,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp update_sync_failure_refund(%Refund{} = refund, reason) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_failure_refund: Updating refund with sync failure",
       refund_id: refund.id,
       reason: inspect(reason)
@@ -2926,7 +2923,7 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_failure_refund: Refund updated with failure",
       refund_id: refund.id,
       result: inspect(result, limit: :infinity)
@@ -2937,7 +2934,7 @@ defmodule Ysc.Quickbooks.Sync do
 
   # Update functions for Payout
   defp update_sync_status_payout(%Payout{} = payout, status, error, response) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_status_payout: Updating payout sync status",
       payout_id: payout.id,
       status: status
@@ -2953,7 +2950,8 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug("[QB Sync] update_sync_status_payout: Payout status updated",
+    Ysc.Logging.debug(
+      "[QB Sync] update_sync_status_payout: Payout status updated",
       payout_id: payout.id,
       status: status,
       result: inspect(result, limit: :infinity)
@@ -2963,7 +2961,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp update_sync_success_payout(%Payout{} = payout, deposit_id, response) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_success_payout: Updating payout with sync success",
       payout_id: payout.id,
       deposit_id: deposit_id
@@ -2980,7 +2978,7 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_success_payout: Payout updated with success",
       payout_id: payout.id,
       deposit_id: deposit_id,
@@ -2991,7 +2989,7 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp update_sync_failure_payout(%Payout{} = payout, reason) do
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_failure_payout: Updating payout with sync failure",
       payout_id: payout.id,
       reason: inspect(reason)
@@ -3011,7 +3009,7 @@ defmodule Ysc.Quickbooks.Sync do
       })
       |> Repo.update()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[QB Sync] update_sync_failure_payout: Payout updated with failure",
       payout_id: payout.id,
       result: inspect(result, limit: :infinity)

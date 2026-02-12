@@ -281,8 +281,8 @@ defmodule YscWeb.EventsLive do
   end
 
   def handle_async(:load_events_data, {:exit, reason}, socket) do
-    require Logger
-    Logger.error("Failed to load events data async: #{inspect(reason)}")
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load events data async: #{inspect(reason)}")
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 

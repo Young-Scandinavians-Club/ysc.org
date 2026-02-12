@@ -4,7 +4,7 @@ defmodule Ysc.Forms do
 
   Handles creation and processing of volunteer applications and conduct violation reports.
   """
-  require Logger
+  require Ysc.Logging
   import Ecto.Query, warn: false
   alias Ysc.Repo
 
@@ -82,7 +82,7 @@ defmodule Ysc.Forms do
   end
 
   defp send_conduct_violation_emails(report) do
-    Logger.info("Starting conduct violation email process",
+    Ysc.Logging.info("Starting conduct violation email process",
       report_id: report.id,
       email: report.email,
       submitted_at: report.inserted_at
@@ -100,7 +100,7 @@ defmodule Ysc.Forms do
       confirmation_idempotency_key =
         "conduct_violation_confirmation_#{report.id}"
 
-      Logger.info("Scheduling confirmation email",
+      Ysc.Logging.info("Scheduling confirmation email",
         report_id: report.id,
         email: report.email
       )
@@ -117,7 +117,7 @@ defmodule Ysc.Forms do
 
       case confirmation_result do
         %Oban.Job{} = job ->
-          Logger.info(
+          Ysc.Logging.info(
             "Conduct violation confirmation email scheduled successfully",
             report_id: report.id,
             email: report.email,
@@ -126,7 +126,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Logger.error(
+          Ysc.Logging.error(
             "Failed to schedule conduct violation confirmation email",
             report_id: report.id,
             email: report.email,
@@ -149,7 +149,9 @@ defmodule Ysc.Forms do
       board_idempotency_key =
         "conduct_violation_board_notification_#{report.id}"
 
-      Logger.info("Scheduling board notification email", report_id: report.id)
+      Ysc.Logging.info("Scheduling board notification email",
+        report_id: report.id
+      )
 
       board_result =
         YscWeb.Emails.Notifier.schedule_email_to_board(
@@ -161,7 +163,7 @@ defmodule Ysc.Forms do
 
       case board_result do
         %Oban.Job{} = job ->
-          Logger.info(
+          Ysc.Logging.info(
             "Conduct violation board notification email scheduled successfully",
             report_id: report.id,
             job_id: job.id,
@@ -169,7 +171,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Logger.error(
+          Ysc.Logging.error(
             "Failed to schedule conduct violation board notification email",
             report_id: report.id,
             error: reason
@@ -177,7 +179,7 @@ defmodule Ysc.Forms do
       end
     rescue
       error ->
-        Logger.error("Failed to send conduct violation emails",
+        Ysc.Logging.error("Failed to send conduct violation emails",
           report_id: report.id,
           email: report.email,
           error: error,
@@ -187,7 +189,7 @@ defmodule Ysc.Forms do
   end
 
   defp send_volunteer_emails(volunteer) do
-    Logger.info("Starting volunteer email process",
+    Ysc.Logging.info("Starting volunteer email process",
       volunteer_id: volunteer.id,
       email: volunteer.email,
       submitted_at: volunteer.inserted_at
@@ -204,7 +206,7 @@ defmodule Ysc.Forms do
 
       confirmation_idempotency_key = "volunteer_confirmation_#{volunteer.id}"
 
-      Logger.info("Scheduling confirmation email",
+      Ysc.Logging.info("Scheduling confirmation email",
         volunteer_id: volunteer.id,
         email: volunteer.email
       )
@@ -221,7 +223,8 @@ defmodule Ysc.Forms do
 
       case confirmation_result do
         %Oban.Job{} = job ->
-          Logger.info("Volunteer confirmation email scheduled successfully",
+          Ysc.Logging.info(
+            "Volunteer confirmation email scheduled successfully",
             volunteer_id: volunteer.id,
             email: volunteer.email,
             job_id: job.id,
@@ -229,7 +232,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Logger.error("Failed to schedule volunteer confirmation email",
+          Ysc.Logging.error("Failed to schedule volunteer confirmation email",
             volunteer_id: volunteer.id,
             email: volunteer.email,
             error: reason
@@ -247,7 +250,7 @@ defmodule Ysc.Forms do
 
       board_idempotency_key = "volunteer_board_notification_#{volunteer.id}"
 
-      Logger.info("Scheduling board notification email",
+      Ysc.Logging.info("Scheduling board notification email",
         volunteer_id: volunteer.id
       )
 
@@ -261,7 +264,7 @@ defmodule Ysc.Forms do
 
       case board_result do
         %Oban.Job{} = job ->
-          Logger.info(
+          Ysc.Logging.info(
             "Volunteer board notification email scheduled successfully",
             volunteer_id: volunteer.id,
             job_id: job.id,
@@ -269,14 +272,15 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Logger.error("Failed to schedule volunteer board notification email",
+          Ysc.Logging.error(
+            "Failed to schedule volunteer board notification email",
             volunteer_id: volunteer.id,
             error: reason
           )
       end
     rescue
       error ->
-        Logger.error("Failed to send volunteer emails",
+        Ysc.Logging.error("Failed to send volunteer emails",
           volunteer_id: volunteer.id,
           email: volunteer.email,
           error: error,
@@ -286,7 +290,7 @@ defmodule Ysc.Forms do
   end
 
   defp send_contact_form_emails(contact_form) do
-    Logger.info("Starting contact form email process",
+    Ysc.Logging.info("Starting contact form email process",
       contact_form_id: contact_form.id,
       email: contact_form.email,
       subject: contact_form.subject,
@@ -307,7 +311,7 @@ defmodule Ysc.Forms do
       board_idempotency_key =
         "contact_form_board_notification_#{contact_form.id}"
 
-      Logger.info("Scheduling board notification email",
+      Ysc.Logging.info("Scheduling board notification email",
         contact_form_id: contact_form.id
       )
 
@@ -321,7 +325,7 @@ defmodule Ysc.Forms do
 
       case board_result do
         %Oban.Job{} = job ->
-          Logger.info(
+          Ysc.Logging.info(
             "Contact form board notification email scheduled successfully",
             contact_form_id: contact_form.id,
             job_id: job.id,
@@ -329,7 +333,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Logger.error(
+          Ysc.Logging.error(
             "Failed to schedule contact form board notification email",
             contact_form_id: contact_form.id,
             error: reason
@@ -337,7 +341,7 @@ defmodule Ysc.Forms do
       end
     rescue
       error ->
-        Logger.error("Failed to send contact form emails",
+        Ysc.Logging.error("Failed to send contact form emails",
           contact_form_id: contact_form.id,
           email: contact_form.email,
           error: error,

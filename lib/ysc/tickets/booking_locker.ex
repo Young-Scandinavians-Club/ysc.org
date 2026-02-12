@@ -63,9 +63,9 @@ defmodule Ysc.Tickets.BookingLocker do
         ticket_order
       else
         {:error, reason} ->
-          require Logger
+          require Ysc.Logging
 
-          Logger.warning("BookingLocker.atomic_booking failed",
+          Ysc.Logging.warning("BookingLocker.atomic_booking failed",
             user_id: user_id,
             event_id: event_id,
             ticket_selections: ticket_selections,

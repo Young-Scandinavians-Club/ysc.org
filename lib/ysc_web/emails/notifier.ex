@@ -72,7 +72,7 @@ defmodule YscWeb.Emails.Notifier do
         text_body,
         user_id
       ) do
-    require Logger
+    require Ysc.Logging
 
     # Get category for this template
     category = Ysc.Accounts.EmailCategories.get_category(template)
@@ -93,7 +93,8 @@ defmodule YscWeb.Emails.Notifier do
 
     case Oban.insert(job) do
       {:ok, %Oban.Job{} = inserted_job} ->
-        Logger.debug("Notifier.schedule_email: Email job inserted successfully",
+        Ysc.Logging.debug(
+          "Notifier.schedule_email: Email job inserted successfully",
           job_id: inserted_job.id,
           recipient: recipient,
           template: template,
@@ -103,7 +104,7 @@ defmodule YscWeb.Emails.Notifier do
         inserted_job
 
       {:error, reason} = error ->
-        Logger.error(
+        Ysc.Logging.error(
           "Notifier.schedule_email: Failed to insert email job - Full error details:\n#{inspect(reason, limit: :infinity)}",
           recipient: recipient,
           template: template,
@@ -111,58 +112,6 @@ defmodule YscWeb.Emails.Notifier do
           error: inspect(reason, limit: :infinity),
           error_type: determine_error_type(reason)
         )
-
-        # Report to Sentry with detailed context
-        error_type = determine_error_type(reason)
-
-        # If reason is a changeset, capture it as an exception
-        if match?(%Ecto.Changeset{}, reason) do
-          Sentry.capture_message(
-            "Failed to insert email job (Oban.insert returned changeset)",
-            level: :error,
-            extra: %{
-              recipient: recipient,
-              template: template,
-              idempotency_key: idempotency_key,
-              subject: subject,
-              user_id: user_id,
-              category: category,
-              changeset_valid: reason.valid?,
-              changeset_errors:
-                if(reason.valid?,
-                  do: :none,
-                  else: inspect(reason.errors, limit: :infinity)
-                ),
-              changeset_changes: inspect(reason.changes, limit: :infinity)
-            },
-            tags: %{
-              email_template: template,
-              email_category: to_string(category),
-              error_type: "oban_insert_failed",
-              has_user_id: !is_nil(user_id)
-            }
-          )
-        else
-          Sentry.capture_message("Failed to insert email job",
-            level: :error,
-            extra: %{
-              recipient: recipient,
-              template: template,
-              idempotency_key: idempotency_key,
-              subject: subject,
-              user_id: user_id,
-              category: category,
-              error: inspect(reason, limit: :infinity),
-              error_type: error_type
-            },
-            tags: %{
-              email_template: template,
-              email_category: to_string(category),
-              error_type: "oban_insert_failed",
-              has_user_id: !is_nil(user_id)
-            }
-          )
-        end
 
         error
     end

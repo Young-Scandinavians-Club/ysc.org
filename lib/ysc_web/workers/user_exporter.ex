@@ -5,7 +5,7 @@ defmodule YscWeb.Workers.UserExporter do
   Handles asynchronous export of user information with customizable fields
   and filtering options.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :exports, max_attempts: 1
 
   import Ecto.Query, warn: false
@@ -25,7 +25,7 @@ defmodule YscWeb.Workers.UserExporter do
           "only_subscribed" => only_subscribed
         }
       }) do
-    Logger.info(
+    Ysc.Logging.info(
       "UserExporter: Starting export with fields: #{inspect(fields)}, only_subscribed: #{only_subscribed}"
     )
 
@@ -35,8 +35,8 @@ defmodule YscWeb.Workers.UserExporter do
       :ok
     rescue
       e ->
-        Logger.error("UserExporter: Error during export: #{inspect(e)}")
-        Logger.error(Exception.format(:error, e, __STACKTRACE__))
+        Ysc.Logging.error("UserExporter: Error during export: #{inspect(e)}")
+        Ysc.Logging.error(Exception.format(:error, e, __STACKTRACE__))
 
         YscWeb.Endpoint.broadcast(
           channel,
@@ -51,12 +51,12 @@ defmodule YscWeb.Workers.UserExporter do
   # sobelow_skip ["Traversal.FileModule"]
   defp build_csv(fields, only_subscribed) do
     job_pid = self()
-    Logger.info("UserExporter: Starting build_csv")
+    Ysc.Logging.info("UserExporter: Starting build_csv")
 
     # Check how many entries we have to write out
     # helps us report back progress to parent caller
     Task.async(fn ->
-      Logger.info("UserExporter: Task started")
+      Ysc.Logging.info("UserExporter: Task started")
       # Build the base query (without preloads for counting)
       base_query = from(u in User)
 
@@ -93,10 +93,10 @@ defmodule YscWeb.Workers.UserExporter do
       total_count =
         Repo.one(from q in subquery(filtered_query), select: count(q.id))
 
-      Logger.info("UserExporter: Total count: #{total_count}")
+      Ysc.Logging.info("UserExporter: Total count: #{total_count}")
 
       output_path = generate_output_path()
-      Logger.info("UserExporter: Output path: #{output_path}")
+      Ysc.Logging.info("UserExporter: Output path: #{output_path}")
       file = File.open!(output_path, [:write, :utf8])
 
       # Note: Can't use preloads in streams, so we'll load subscriptions manually
@@ -141,7 +141,7 @@ defmodule YscWeb.Workers.UserExporter do
       end)
 
       File.close(file)
-      Logger.info("UserExporter: File written and closed")
+      Ysc.Logging.info("UserExporter: File written and closed")
 
       send(job_pid, {:complete, output_path})
 
@@ -338,7 +338,7 @@ defmodule YscWeb.Workers.UserExporter do
   defp await_csv(channel) do
     receive do
       {:progress, percent} ->
-        Logger.info(
+        Ysc.Logging.info(
           "Broadcasting to `user_export:progress` with value #{percent}"
         )
 
@@ -346,7 +346,7 @@ defmodule YscWeb.Workers.UserExporter do
         await_csv(channel)
 
       {:complete, export_path} ->
-        Logger.info(
+        Ysc.Logging.info(
           "Broadcasting to `user_export:complete` with value #{export_path}"
         )
 

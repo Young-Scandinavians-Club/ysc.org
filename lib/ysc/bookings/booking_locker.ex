@@ -32,7 +32,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
   import Ecto.Query, warn: false
   import RetryOn, only: [retry_on_stale: 2]
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Repo
 
@@ -82,7 +82,7 @@ defmodule Ysc.Bookings.BookingLocker do
     retry_on_stale(
       fn attempt ->
         if attempt > 1 do
-          Logger.info("Retrying buyout booking after stale error",
+          Ysc.Logging.info("Retrying buyout booking after stale error",
             user_id: user_id,
             property: property,
             checkin_date: checkin_date,
@@ -409,7 +409,7 @@ defmodule Ysc.Bookings.BookingLocker do
     retry_on_stale(
       fn attempt ->
         if attempt > 1 do
-          Logger.info("Retrying room booking after stale error",
+          Ysc.Logging.info("Retrying room booking after stale error",
             user_id: user_id,
             room_ids: room_ids,
             checkin_date: checkin_date,
@@ -886,7 +886,7 @@ defmodule Ysc.Bookings.BookingLocker do
     retry_on_stale(
       fn attempt ->
         if attempt > 1 do
-          Logger.info("Retrying per-guest booking after stale error",
+          Ysc.Logging.info("Retrying per-guest booking after stale error",
             user_id: user_id,
             property: property,
             checkin_date: checkin_date,
@@ -1155,7 +1155,7 @@ defmodule Ysc.Bookings.BookingLocker do
       # This handles the race condition where multiple processes (redirect + webhook/polling)
       # might try to confirm the same booking after payment succeeds
       if booking.status == :complete do
-        Logger.info(
+        Ysc.Logging.info(
           "Booking already confirmed, returning existing booking (idempotent)",
           booking_id: booking.id
         )
@@ -1473,7 +1473,7 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp schedule_checkin_reminder(booking) do
-    require Logger
+    require Ysc.Logging
 
     try do
       YscWeb.Workers.BookingCheckinReminderWorker.schedule_reminder(
@@ -1481,13 +1481,13 @@ defmodule Ysc.Bookings.BookingLocker do
         booking.checkin_date
       )
 
-      Logger.info("Scheduled check-in reminder email",
+      Ysc.Logging.info("Scheduled check-in reminder email",
         booking_id: booking.id,
         checkin_date: booking.checkin_date
       )
     rescue
       error ->
-        Logger.error("Failed to schedule check-in reminder",
+        Ysc.Logging.error("Failed to schedule check-in reminder",
           booking_id: booking.id,
           error: Exception.message(error)
         )
@@ -1495,7 +1495,7 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp schedule_checkout_reminder(booking) do
-    require Logger
+    require Ysc.Logging
 
     try do
       YscWeb.Workers.BookingCheckoutReminderWorker.schedule_reminder(
@@ -1503,13 +1503,13 @@ defmodule Ysc.Bookings.BookingLocker do
         booking.checkout_date
       )
 
-      Logger.info("Scheduled checkout reminder email",
+      Ysc.Logging.info("Scheduled checkout reminder email",
         booking_id: booking.id,
         checkout_date: booking.checkout_date
       )
     rescue
       error ->
-        Logger.error("Failed to schedule checkout reminder",
+        Ysc.Logging.error("Failed to schedule checkout reminder",
           booking_id: booking.id,
           error: Exception.message(error)
         )
@@ -1517,7 +1517,7 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp send_booking_confirmation_email(booking) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Reload booking with associations
@@ -1547,7 +1547,8 @@ defmodule Ysc.Bookings.BookingLocker do
 
         case result do
           %Oban.Job{} = job ->
-            Logger.info("Booking confirmation email scheduled successfully",
+            Ysc.Logging.info(
+              "Booking confirmation email scheduled successfully",
               booking_id: booking.id,
               user_id: booking.user_id,
               user_email: booking.user.email,
@@ -1555,21 +1556,21 @@ defmodule Ysc.Bookings.BookingLocker do
             )
 
           {:error, reason} ->
-            Logger.error("Failed to schedule booking confirmation email",
+            Ysc.Logging.error("Failed to schedule booking confirmation email",
               booking_id: booking.id,
               user_id: booking.user_id,
               error: reason
             )
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping booking confirmation email - missing booking or user",
           booking_id: booking && booking.id
         )
       end
     rescue
       error ->
-        Logger.error("Failed to send booking confirmation email",
+        Ysc.Logging.error("Failed to send booking confirmation email",
           booking_id: booking && booking.id,
           error: inspect(error),
           stacktrace: __STACKTRACE__
@@ -1598,9 +1599,9 @@ defmodule Ysc.Bookings.BookingLocker do
 
         {:error, reason} ->
           # Log error but don't fail the main operation
-          require Logger
+          require Ysc.Logging
 
-          Logger.warning(
+          Ysc.Logging.warning(
             "Failed to release hold booking #{hold_booking.id} when confirming booking #{exclude_booking_id}: #{inspect(reason)}"
           )
       end
@@ -1618,7 +1619,7 @@ defmodule Ysc.Bookings.BookingLocker do
   - `{:error, reason}` on failure
   """
   def release_hold(booking_id) do
-    require Logger
+    require Ysc.Logging
 
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
@@ -1715,7 +1716,7 @@ defmodule Ysc.Bookings.BookingLocker do
   # Note: This searches recent PaymentIntents since bookings don't store payment_intent_id.
   # For better performance, consider storing payment_intent_id in the booking schema.
   defp cancel_booking_payment_intent(booking) do
-    require Logger
+    require Ysc.Logging
 
     # Search for recent PaymentIntents (last 100) with this booking_id in metadata
     # Since bookings expire after 30 minutes, we only need to check recent PaymentIntents
@@ -1749,13 +1750,13 @@ defmodule Ysc.Bookings.BookingLocker do
                    matching_intent.id
                  ) do
               :ok ->
-                Logger.info("Canceled PaymentIntent for expired booking",
+                Ysc.Logging.info("Canceled PaymentIntent for expired booking",
                   booking_id: booking.id,
                   payment_intent_id: matching_intent.id
                 )
 
               {:error, reason} ->
-                Logger.warning(
+                Ysc.Logging.warning(
                   "Failed to cancel PaymentIntent for expired booking (continuing anyway)",
                   booking_id: booking.id,
                   payment_intent_id: matching_intent.id,
@@ -1763,21 +1764,21 @@ defmodule Ysc.Bookings.BookingLocker do
                 )
             end
           else
-            Logger.debug("PaymentIntent already in non-cancelable state",
+            Ysc.Logging.debug("PaymentIntent already in non-cancelable state",
               booking_id: booking.id,
               payment_intent_id: matching_intent.id,
               status: matching_intent.status
             )
           end
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "No PaymentIntent found for expired booking (may have been canceled already)",
             booking_id: booking.id
           )
         end
 
       {:error, error} ->
-        Logger.warning(
+        Ysc.Logging.warning(
           "Failed to search for PaymentIntent for expired booking (continuing anyway)",
           booking_id: booking.id,
           error: inspect(error)

@@ -28,7 +28,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
   - Comprehensive logging and Sentry reporting
   - Age validation to prevent processing very old (possibly invalid) webhooks
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :maintenance, max_attempts: 2
 
   import Ecto.Query
@@ -47,7 +47,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
-    Logger.info("Starting webhook retry worker")
+    Ysc.Logging.info("Starting webhook retry worker")
 
     start_time = System.monotonic_time()
 
@@ -57,7 +57,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
     max_age_cutoff = DateTime.add(now, -@max_age_days, :day)
     stuck_cutoff = DateTime.add(now, -@stuck_threshold_minutes, :minute)
 
-    Logger.info("Webhook retry time boundaries",
+    Ysc.Logging.info("Webhook retry time boundaries",
       min_age_cutoff: min_age_cutoff,
       max_age_cutoff: max_age_cutoff,
       stuck_cutoff: stuck_cutoff
@@ -67,7 +67,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
     webhooks_to_retry =
       find_webhooks_to_retry(min_age_cutoff, max_age_cutoff, stuck_cutoff)
 
-    Logger.info("Found webhooks to retry",
+    Ysc.Logging.info("Found webhooks to retry",
       total: length(webhooks_to_retry),
       batch_size: @batch_size
     )
@@ -83,7 +83,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
     duration = System.monotonic_time() - start_time
     duration_ms = System.convert_time_unit(duration, :native, :millisecond)
 
-    Logger.info("Webhook retry worker completed",
+    Ysc.Logging.info("Webhook retry worker completed",
       duration_ms: duration_ms,
       total_found: length(webhooks_to_retry),
       success: stats.success,
@@ -94,17 +94,6 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
 
     # Report to Sentry if there were significant issues
     if stats.failed > 0 do
-      Sentry.capture_message("Webhook retry worker completed with failures",
-        level: :warning,
-        extra: %{
-          duration_ms: duration_ms,
-          total_found: length(webhooks_to_retry),
-          stats: stats
-        },
-        tags: %{
-          worker: "webhook_retry"
-        }
-      )
     end
 
     # Emit telemetry
@@ -175,7 +164,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
   - `{:error, reason}` if processing failed
   """
   def retry_webhook(%WebhookEvent{} = webhook_event) do
-    Logger.info("Attempting to retry webhook",
+    Ysc.Logging.info("Attempting to retry webhook",
       webhook_id: webhook_event.id,
       event_id: webhook_event.event_id,
       event_type: webhook_event.event_type,
@@ -189,7 +178,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
       if webhook_event.state in [:failed, :processing] do
         case Ysc.Webhooks.update_webhook_state(webhook_event, :pending) do
           {:ok, updated} ->
-            Logger.info("Reset webhook state to pending for retry",
+            Ysc.Logging.info("Reset webhook state to pending for retry",
               webhook_id: webhook_event.id,
               old_state: webhook_event.state
             )
@@ -197,7 +186,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
             updated
 
           {:error, _} ->
-            Logger.warning("Failed to reset webhook state, using original",
+            Ysc.Logging.warning("Failed to reset webhook state, using original",
               webhook_id: webhook_event.id
             )
 
@@ -210,7 +199,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
     # Parse the raw event data
     case parse_webhook_event(webhook_event) do
       {:ok, :already_processed} ->
-        Logger.info("Webhook already processed, skipping",
+        Ysc.Logging.info("Webhook already processed, skipping",
           webhook_id: webhook_event.id,
           event_id: webhook_event.event_id
         )
@@ -221,7 +210,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
         # Attempt to process the webhook using the handler
         case WebhookHandler.handle_event(stripe_event) do
           :ok ->
-            Logger.info("Successfully retried webhook",
+            Ysc.Logging.info("Successfully retried webhook",
               webhook_id: webhook_event.id,
               event_id: webhook_event.event_id,
               event_type: webhook_event.event_type
@@ -231,7 +220,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
 
           {:error, :webhook_too_old} ->
             # Webhook is too old, mark as failed
-            Logger.warning("Webhook too old to retry, marking as failed",
+            Ysc.Logging.warning("Webhook too old to retry, marking as failed",
               webhook_id: webhook_event.id,
               event_id: webhook_event.event_id,
               age_days:
@@ -246,7 +235,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
             {:ok, :skipped}
 
           {:error, reason} = error ->
-            Logger.warning("Failed to retry webhook",
+            Ysc.Logging.warning("Failed to retry webhook",
               webhook_id: webhook_event.id,
               event_id: webhook_event.event_id,
               error: inspect(reason)
@@ -256,7 +245,7 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
         end
 
       {:error, reason} = error ->
-        Logger.error("Failed to parse webhook event",
+        Ysc.Logging.error("Failed to parse webhook event",
           webhook_id: webhook_event.id,
           event_id: webhook_event.event_id,
           error: inspect(reason)
@@ -265,37 +254,15 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
         # Mark as failed if we can't even parse it
         Ysc.Webhooks.update_webhook_state(webhook_event, :failed)
 
-        Sentry.capture_message("Failed to parse webhook event for retry",
-          level: :error,
-          extra: %{
-            webhook_id: webhook_event.id,
-            event_id: webhook_event.event_id,
-            event_type: webhook_event.event_type,
-            error: inspect(reason)
-          }
-        )
-
         error
     end
   rescue
     error ->
-      Logger.error("Exception while retrying webhook",
+      Ysc.Logging.error("Exception while retrying webhook",
         webhook_id: webhook_event.id,
         event_id: webhook_event.event_id,
         error: Exception.message(error),
         stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-      )
-
-      Sentry.capture_exception(error,
-        stacktrace: __STACKTRACE__,
-        extra: %{
-          webhook_id: webhook_event.id,
-          event_id: webhook_event.event_id,
-          event_type: webhook_event.event_type
-        },
-        tags: %{
-          worker: "webhook_retry"
-        }
       )
 
       {:error, error}

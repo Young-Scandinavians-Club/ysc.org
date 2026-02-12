@@ -36,7 +36,7 @@ defmodule Mix.Tasks.Webhook.Reprocess do
   """
 
   use Mix.Task
-  require Logger
+  require Ysc.Logging
 
   @shortdoc "Re-process failed webhook events"
 
@@ -68,77 +68,80 @@ defmodule Mix.Tasks.Webhook.Reprocess do
   defp list_failed_webhooks(opts) do
     opts = parse_opts(opts)
 
-    Logger.info("Listing failed webhook events...")
+    Ysc.Logging.info("Listing failed webhook events...")
 
     failed_webhooks = Ysc.Webhooks.Reprocessor.list_failed_webhooks(opts)
 
     if Enum.empty?(failed_webhooks) do
-      Logger.info("No failed webhook events found.")
+      Ysc.Logging.info("No failed webhook events found.")
     else
-      Logger.info("Found #{length(failed_webhooks)} failed webhook events:")
-      Logger.info("")
+      Ysc.Logging.info(
+        "Found #{length(failed_webhooks)} failed webhook events:"
+      )
+
+      Ysc.Logging.info("")
 
       Enum.each(failed_webhooks, fn webhook ->
-        Logger.info("ID: #{webhook.id}")
-        Logger.info("  Provider: #{webhook.provider}")
-        Logger.info("  Event Type: #{webhook.event_type}")
-        Logger.info("  Event ID: #{webhook.event_id}")
-        Logger.info("  Failed At: #{webhook.updated_at}")
-        Logger.info("  Created At: #{webhook.inserted_at}")
-        Logger.info("")
+        Ysc.Logging.info("ID: #{webhook.id}")
+        Ysc.Logging.info("  Provider: #{webhook.provider}")
+        Ysc.Logging.info("  Event Type: #{webhook.event_type}")
+        Ysc.Logging.info("  Event ID: #{webhook.event_id}")
+        Ysc.Logging.info("  Failed At: #{webhook.updated_at}")
+        Ysc.Logging.info("  Created At: #{webhook.inserted_at}")
+        Ysc.Logging.info("")
       end)
     end
   end
 
   defp show_stats do
-    Logger.info("Failed webhook statistics:")
-    Logger.info("")
+    Ysc.Logging.info("Failed webhook statistics:")
+    Ysc.Logging.info("")
 
     stats = Ysc.Webhooks.Reprocessor.get_failed_webhook_stats()
 
-    Logger.info("Total Failed: #{stats.total_failed}")
-    Logger.info("Recent Failures (24h): #{stats.recent_failures_24h}")
-    Logger.info("")
+    Ysc.Logging.info("Total Failed: #{stats.total_failed}")
+    Ysc.Logging.info("Recent Failures (24h): #{stats.recent_failures_24h}")
+    Ysc.Logging.info("")
 
     if not Enum.empty?(stats.by_provider) do
-      Logger.info("By Provider:")
+      Ysc.Logging.info("By Provider:")
 
       Enum.each(stats.by_provider, fn {provider, count} ->
-        Logger.info("  #{provider}: #{count}")
+        Ysc.Logging.info("  #{provider}: #{count}")
       end)
 
-      Logger.info("")
+      Ysc.Logging.info("")
     end
 
     if not Enum.empty?(stats.by_event_type) do
-      Logger.info("By Event Type:")
+      Ysc.Logging.info("By Event Type:")
 
       Enum.each(stats.by_event_type, fn {event_type, count} ->
-        Logger.info("  #{event_type}: #{count}")
+        Ysc.Logging.info("  #{event_type}: #{count}")
       end)
 
-      Logger.info("")
+      Ysc.Logging.info("")
     end
   end
 
   defp reprocess_single_webhook(webhook_id) do
-    Logger.info("Re-processing webhook: #{webhook_id}")
+    Ysc.Logging.info("Re-processing webhook: #{webhook_id}")
 
     case Ysc.Webhooks.Reprocessor.reprocess_webhook(webhook_id) do
       {:ok, result} ->
-        Logger.info("✅ Successfully re-processed webhook #{webhook_id}")
-        Logger.info("Result: #{inspect(result)}")
+        Ysc.Logging.info("✅ Successfully re-processed webhook #{webhook_id}")
+        Ysc.Logging.info("Result: #{inspect(result)}")
 
       {:error, :not_found} ->
-        Logger.error("❌ Webhook #{webhook_id} not found")
+        Ysc.Logging.error("❌ Webhook #{webhook_id} not found")
 
       {:error, {:not_failed, state}} ->
-        Logger.error(
+        Ysc.Logging.error(
           "❌ Webhook #{webhook_id} is not in failed state (current state: #{state})"
         )
 
       {:error, reason} ->
-        Logger.error(
+        Ysc.Logging.error(
           "❌ Failed to re-process webhook #{webhook_id}: #{inspect(reason)}"
         )
     end
@@ -148,52 +151,52 @@ defmodule Mix.Tasks.Webhook.Reprocess do
     opts = parse_opts(opts)
 
     if opts[:dry_run] do
-      Logger.info("🔍 Dry run - showing what would be processed...")
+      Ysc.Logging.info("🔍 Dry run - showing what would be processed...")
     else
-      Logger.info("Re-processing all failed webhook events...")
+      Ysc.Logging.info("Re-processing all failed webhook events...")
     end
 
     result = Ysc.Webhooks.Reprocessor.reprocess_all_failed_webhooks(opts)
 
-    Logger.info("")
-    Logger.info("Summary: #{result.summary}")
-    Logger.info("Total Found: #{result.total_found}")
+    Ysc.Logging.info("")
+    Ysc.Logging.info("Summary: #{result.summary}")
+    Ysc.Logging.info("Total Found: #{result.total_found}")
 
     if not opts[:dry_run] do
-      Logger.info("Successful: #{result.successful}")
-      Logger.info("Failed: #{result.failed}")
+      Ysc.Logging.info("Successful: #{result.successful}")
+      Ysc.Logging.info("Failed: #{result.failed}")
 
       if result.failed > 0 do
-        Logger.info("")
-        Logger.info("Failed webhook details:")
+        Ysc.Logging.info("")
+        Ysc.Logging.info("Failed webhook details:")
 
         Enum.each(result.results, fn
           {:ok, _} -> :ok
-          {:error, reason} -> Logger.error("  #{inspect(reason)}")
+          {:error, reason} -> Ysc.Logging.error("  #{inspect(reason)}")
         end)
       end
     end
   end
 
   defp reset_webhook(webhook_id) do
-    Logger.info("Resetting webhook #{webhook_id} to pending state...")
+    Ysc.Logging.info("Resetting webhook #{webhook_id} to pending state...")
 
     case Ysc.Webhooks.Reprocessor.reset_webhook_to_pending(webhook_id) do
       {:ok, _webhook} ->
-        Logger.info(
+        Ysc.Logging.info(
           "✅ Successfully reset webhook #{webhook_id} to pending state"
         )
 
       {:error, :not_found} ->
-        Logger.error("❌ Webhook #{webhook_id} not found")
+        Ysc.Logging.error("❌ Webhook #{webhook_id} not found")
 
       {:error, {:not_failed, state}} ->
-        Logger.error(
+        Ysc.Logging.error(
           "❌ Webhook #{webhook_id} is not in failed state (current state: #{state})"
         )
 
       {:error, changeset} ->
-        Logger.error(
+        Ysc.Logging.error(
           "❌ Failed to reset webhook #{webhook_id}: #{inspect(changeset)}"
         )
     end
@@ -221,7 +224,7 @@ defmodule Mix.Tasks.Webhook.Reprocess do
   end
 
   defp show_help do
-    Logger.info("""
+    Ysc.Logging.info("""
     Webhook Re-processor
 
     Usage:

@@ -414,9 +414,9 @@ defmodule YscWeb.AdminMediaLive do
 
   @impl true
   def handle_params(params, uri, socket) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "handle_params called with params: #{inspect(params)}, uri: #{inspect(uri)}"
     )
 
@@ -427,7 +427,7 @@ defmodule YscWeb.AdminMediaLive do
     # Store current URL parameters in assigns for use when building return URLs
     socket = assign(socket, :url_year_param, year_param)
 
-    Logger.debug("Year param: #{inspect(year_param)}")
+    Ysc.Logging.debug("Year param: #{inspect(year_param)}")
 
     # Load images based on year param, even when on edit route
     # But only load if stream is empty or year has changed
@@ -438,7 +438,7 @@ defmodule YscWeb.AdminMediaLive do
             do: String.to_integer(year_param),
             else: year_param
 
-        Logger.debug(
+        Ysc.Logging.debug(
           "Processing year: #{year}, current: #{socket.assigns.selected_year}"
         )
 
@@ -462,7 +462,7 @@ defmodule YscWeb.AdminMediaLive do
                 limit: ^socket.assigns.per_page
             )
 
-          Logger.debug("Loaded #{length(images)} images for year #{year}")
+          Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
 
           stream_items = Timeline.inject_date_headers(images)
 
@@ -729,12 +729,12 @@ defmodule YscWeb.AdminMediaLive do
 
   @impl true
   def handle_event("load-more", _params, socket) do
-    require Logger
+    require Ysc.Logging
 
     # Safety check: ensure we have images in the stream before trying to load more
     current_count = Enum.count(socket.assigns.streams.images.inserts)
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "Load-more: current stream count: #{current_count}, end_of_timeline: #{socket.assigns.end_of_timeline?}"
     )
 
@@ -751,7 +751,7 @@ defmodule YscWeb.AdminMediaLive do
           {_id, _at, image, _meta} -> image.inserted_at
         end
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "Load-more: last_image_date=#{inspect(last_image_date)}, selected_year=#{inspect(socket.assigns.selected_year)}"
       )
 
@@ -777,7 +777,7 @@ defmodule YscWeb.AdminMediaLive do
                   limit: ^socket.assigns.per_page
               )
 
-            Logger.debug(
+            Ysc.Logging.debug(
               "Load-more: loaded #{length(images)} images for year #{year}"
             )
 
@@ -789,14 +789,14 @@ defmodule YscWeb.AdminMediaLive do
                 limit: socket.assigns.per_page
               )
 
-            Logger.debug(
+            Ysc.Logging.debug(
               "Load-more: loaded #{length(images)} images (no year filter)"
             )
 
             images
           end
         else
-          Logger.warning(
+          Ysc.Logging.warning(
             "Load-more: no last_image_date found, cannot load more"
           )
 
@@ -805,7 +805,7 @@ defmodule YscWeb.AdminMediaLive do
 
       case new_images do
         [] ->
-          Logger.debug("Load-more: no new images, marking end_of_timeline")
+          Ysc.Logging.debug("Load-more: no new images, marking end_of_timeline")
           {:noreply, assign(socket, :end_of_timeline?, true)}
 
         [_ | _] = new_images ->
@@ -845,7 +845,7 @@ defmodule YscWeb.AdminMediaLive do
                 new_images
               end
 
-            Logger.debug(
+            Ysc.Logging.debug(
               "Load-more: adding #{length(stream_items)} items to stream (needs_header: #{needs_header})"
             )
 
@@ -870,7 +870,7 @@ defmodule YscWeb.AdminMediaLive do
              |> update_years_from_stream()
              |> stream(:images, stream_items, at: -1, dom_id: &get_dom_id/1)}
           else
-            Logger.warning(
+            Ysc.Logging.warning(
               "Load-more: new_images list is empty, marking end_of_timeline"
             )
 
@@ -878,7 +878,7 @@ defmodule YscWeb.AdminMediaLive do
           end
       end
     else
-      Logger.debug("Load-more: end_of_timeline is true, ignoring")
+      Ysc.Logging.debug("Load-more: end_of_timeline is true, ignoring")
       {:noreply, socket}
     end
   end

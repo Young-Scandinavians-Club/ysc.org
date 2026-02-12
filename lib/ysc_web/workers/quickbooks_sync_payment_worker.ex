@@ -5,14 +5,16 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
   This worker processes payments asynchronously and creates SalesReceipts in QuickBooks.
   """
 
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Ysc.Quickbooks.Sync
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"payment_id" => payment_id}}) do
-    Logger.info("Starting QuickBooks sync for payment", payment_id: payment_id)
+    Ysc.Logging.info("Starting QuickBooks sync for payment",
+      payment_id: payment_id
+    )
 
     alias Ysc.Repo
     alias Ysc.Ledgers.Payment
@@ -34,7 +36,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
            |> Repo.one()
          end) do
       {:ok, nil} ->
-        Logger.warning("Payment not found for QuickBooks sync",
+        Ysc.Logging.warning("Payment not found for QuickBooks sync",
           payment_id: payment_id
         )
 
@@ -44,7 +46,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
         # Check if already synced (double-check after acquiring lock)
         if payment.quickbooks_sync_status == "synced" &&
              payment.quickbooks_sales_receipt_id do
-          Logger.info(
+          Ysc.Logging.info(
             "Payment already synced to QuickBooks (checked after lock)",
             payment_id: payment_id,
             sales_receipt_id: payment.quickbooks_sales_receipt_id
@@ -54,7 +56,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
         else
           case Sync.sync_payment(payment) do
             {:ok, sales_receipt} ->
-              Logger.info("Successfully synced payment to QuickBooks",
+              Ysc.Logging.info("Successfully synced payment to QuickBooks",
                 payment_id: payment_id,
                 sales_receipt_id: Map.get(sales_receipt, "Id")
               )
@@ -62,22 +64,9 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
               :ok
 
             {:error, reason} ->
-              Logger.warning("Failed to sync payment to QuickBooks",
+              Ysc.Logging.warning("Failed to sync payment to QuickBooks",
                 payment_id: payment_id,
                 error: inspect(reason)
-              )
-
-              # Report to Sentry
-              Sentry.capture_message("QuickBooks payment sync worker failed",
-                level: :error,
-                extra: %{
-                  payment_id: payment_id,
-                  error: inspect(reason)
-                },
-                tags: %{
-                  quickbooks_worker: "sync_payment",
-                  error_type: "sync_failed"
-                }
               )
 
               # Oban will retry based on max_attempts
@@ -87,14 +76,14 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
 
       {:error, %Postgrex.Error{postgres: %{code: :lock_not_available}}} ->
         # Another worker is processing this payment
-        Logger.info("Payment is locked by another worker, skipping",
+        Ysc.Logging.info("Payment is locked by another worker, skipping",
           payment_id: payment_id
         )
 
         :ok
 
       {:error, reason} ->
-        Logger.warning("Failed to lock payment for QuickBooks sync",
+        Ysc.Logging.warning("Failed to lock payment for QuickBooks sync",
           payment_id: payment_id,
           error: inspect(reason)
         )
@@ -104,17 +93,6 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
                  %Postgrex.Error{postgres: %{code: :lock_not_available}},
                  reason
                ) do
-          Sentry.capture_message("Failed to lock payment for QuickBooks sync",
-            level: :error,
-            extra: %{
-              payment_id: payment_id,
-              error: inspect(reason)
-            },
-            tags: %{
-              quickbooks_worker: "sync_payment",
-              error_type: "lock_failed"
-            }
-          )
         end
 
         {:error, reason}

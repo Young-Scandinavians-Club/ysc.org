@@ -13,7 +13,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   use Oban.Worker, queue: :default, max_attempts: 3
 
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Repo
@@ -47,7 +47,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
       |> preload(:user)
       |> Repo.all()
 
-    Logger.info("Found potentially expired subscriptions",
+    Ysc.Logging.info("Found potentially expired subscriptions",
       count: length(expired_subscriptions)
     )
 
@@ -67,9 +67,9 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   end
 
   defp process_expired_subscription(%Subscription{} = subscription) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Processing expired subscription",
+    Ysc.Logging.info("Processing expired subscription",
       subscription_id: subscription.id,
       stripe_id: subscription.stripe_id,
       user_id: subscription.user_id,
@@ -88,7 +88,8 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
           if updated_subscription.user_id do
             MembershipCache.invalidate_user(updated_subscription.user_id)
 
-            Logger.info("Expired subscription processed and cache invalidated",
+            Ysc.Logging.info(
+              "Expired subscription processed and cache invalidated",
               subscription_id: updated_subscription.id,
               user_id: updated_subscription.user_id,
               stripe_status: updated_subscription.stripe_status
@@ -98,7 +99,8 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
           :ok
         else
           # Subscription was renewed or reactivated in Stripe
-          Logger.info("Subscription was renewed in Stripe, no action needed",
+          Ysc.Logging.info(
+            "Subscription was renewed in Stripe, no action needed",
             subscription_id: updated_subscription.id,
             stripe_status: updated_subscription.stripe_status
           )
@@ -107,7 +109,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
         end
 
       {:error, reason} ->
-        Logger.error("Failed to sync subscription from Stripe",
+        Ysc.Logging.error("Failed to sync subscription from Stripe",
           subscription_id: subscription.id,
           stripe_id: subscription.stripe_id,
           error: inspect(reason)
@@ -121,7 +123,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
                not Subscriptions.active?(subscription) do
             MembershipCache.invalidate_user(subscription.user_id)
 
-            Logger.warning(
+            Ysc.Logging.warning(
               "Expired subscription detected locally, cache invalidated despite Stripe sync failure",
               subscription_id: subscription.id,
               user_id: subscription.user_id
@@ -142,7 +144,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   end
 
   defp sync_subscription_from_stripe(%Subscription{} = subscription) do
-    require Logger
+    require Ysc.Logging
 
     case subscription_retriever().retrieve(subscription.stripe_id) do
       {:ok, stripe_subscription} ->
@@ -183,7 +185,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
             {:ok, updated_subscription}
 
           {:error, changeset} ->
-            Logger.error("Failed to update subscription after Stripe sync",
+            Ysc.Logging.error("Failed to update subscription after Stripe sync",
               subscription_id: subscription.id,
               errors: inspect(changeset.errors)
             )
@@ -192,7 +194,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
         end
 
       {:error, %Stripe.Error{} = error} ->
-        Logger.error("Stripe API error when retrieving subscription",
+        Ysc.Logging.error("Stripe API error when retrieving subscription",
           subscription_id: subscription.id,
           stripe_id: subscription.stripe_id,
           error: error.message
@@ -201,7 +203,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
         {:error, error}
 
       {:error, reason} ->
-        Logger.error(
+        Ysc.Logging.error(
           "Unexpected error when retrieving subscription from Stripe",
           subscription_id: subscription.id,
           stripe_id: subscription.stripe_id,

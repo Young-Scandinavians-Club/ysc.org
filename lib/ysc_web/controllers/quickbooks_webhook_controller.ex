@@ -8,7 +8,7 @@ defmodule YscWeb.QuickbooksWebhookController do
   """
   use YscWeb, :controller
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Webhooks
   alias Ysc.ExpenseReports.QuickbooksWebhookHandler
 
@@ -34,7 +34,7 @@ defmodule YscWeb.QuickbooksWebhookController do
   }
   """
   def webhook(conn, params) do
-    Logger.info("Received QuickBooks webhook",
+    Ysc.Logging.info("Received QuickBooks webhook",
       payload: inspect(params, limit: 100)
     )
 
@@ -66,11 +66,11 @@ defmodule YscWeb.QuickbooksWebhookController do
 
           {:error, %Ysc.Webhooks.DuplicateWebhookEventError{}} ->
             # Duplicate webhook - already processed, return 200 OK
-            Logger.info("Duplicate QuickBooks webhook event, returning OK")
+            Ysc.Logging.info("Duplicate QuickBooks webhook event, returning OK")
             send_resp(conn, 200, "OK")
 
           {:error, reason} ->
-            Logger.error("Failed to create QuickBooks webhook event",
+            Ysc.Logging.error("Failed to create QuickBooks webhook event",
               error: inspect(reason),
               payload: inspect(params, limit: 100)
             )
@@ -79,7 +79,7 @@ defmodule YscWeb.QuickbooksWebhookController do
         end
 
       {:error, reason} ->
-        Logger.warning("QuickBooks webhook signature verification failed",
+        Ysc.Logging.warning("QuickBooks webhook signature verification failed",
           reason: reason,
           headers: inspect(conn.req_headers, limit: 20)
         )
@@ -99,7 +99,7 @@ defmodule YscWeb.QuickbooksWebhookController do
         ])
 
     if is_nil(verifier_token) || verifier_token == "" do
-      Logger.warning("QuickBooks webhook verifier token not configured")
+      Ysc.Logging.warning("QuickBooks webhook verifier token not configured")
       {:error, :verifier_token_not_configured}
     else
       # Get the intuit-signature header
@@ -125,7 +125,7 @@ defmodule YscWeb.QuickbooksWebhookController do
           end
 
         nil ->
-          Logger.warning(
+          Ysc.Logging.warning(
             "Missing intuit-signature header in QuickBooks webhook"
           )
 
@@ -177,7 +177,7 @@ defmodule YscWeb.QuickbooksWebhookController do
                   {:error, %Ysc.Webhooks.DuplicateWebhookEventError{}}
               end
             else
-              Logger.debug(
+              Ysc.Logging.debug(
                 "Skipping QuickBooks webhook for non-BillPayment entity",
                 entity_name: entity_name,
                 operation: operation
@@ -187,12 +187,18 @@ defmodule YscWeb.QuickbooksWebhookController do
             end
 
           [] ->
-            Logger.warning("No entities in QuickBooks webhook notification")
+            Ysc.Logging.warning(
+              "No entities in QuickBooks webhook notification"
+            )
+
             {:ok, :no_entities}
         end
 
       [] ->
-        Logger.warning("No event notifications in QuickBooks webhook payload")
+        Ysc.Logging.warning(
+          "No event notifications in QuickBooks webhook payload"
+        )
+
         {:ok, :no_notifications}
     end
   end

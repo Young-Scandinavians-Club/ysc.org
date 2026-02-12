@@ -36,7 +36,7 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
   use Ysc.DataCase, async: false
 
   import ExUnit.CaptureLog
-  require Logger
+  require Ysc.Logging
 
   alias Ysc.Ledgers.ReconciliationWorker
 

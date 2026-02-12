@@ -228,9 +228,9 @@ defmodule Ysc.Webhooks.Reprocessor do
 
   # Private function to actually re-process a webhook event
   defp reprocess_webhook_event(%WebhookEvent{} = webhook_event) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("Re-processing failed webhook event",
+    Ysc.Logging.info("Re-processing failed webhook event",
       webhook_id: webhook_event.id,
       provider: webhook_event.provider,
       event_type: webhook_event.event_type,
@@ -250,7 +250,7 @@ defmodule Ysc.Webhooks.Reprocessor do
           # Update the webhook state to processed
           case Webhooks.update_webhook_state(webhook_event, :processed) do
             {:ok, _updated_webhook} ->
-              Logger.info("Successfully re-processed webhook event",
+              Ysc.Logging.info("Successfully re-processed webhook event",
                 webhook_id: webhook_event.id,
                 event_type: webhook_event.event_type
               )
@@ -258,7 +258,7 @@ defmodule Ysc.Webhooks.Reprocessor do
               {:ok, result}
 
             {:error, changeset} ->
-              Logger.error(
+              Ysc.Logging.error(
                 "Failed to update webhook state after successful re-processing",
                 webhook_id: webhook_event.id,
                 error: changeset
@@ -274,7 +274,8 @@ defmodule Ysc.Webhooks.Reprocessor do
           # Update the webhook state to processed
           case Webhooks.update_webhook_state(webhook_event, :processed) do
             {:ok, _updated_webhook} ->
-              Logger.info("Successfully re-processed QuickBooks webhook event",
+              Ysc.Logging.info(
+                "Successfully re-processed QuickBooks webhook event",
                 webhook_id: webhook_event.id,
                 event_type: webhook_event.event_type
               )
@@ -282,7 +283,7 @@ defmodule Ysc.Webhooks.Reprocessor do
               {:ok, result}
 
             {:error, changeset} ->
-              Logger.error(
+              Ysc.Logging.error(
                 "Failed to update webhook state after successful re-processing",
                 webhook_id: webhook_event.id,
                 error: changeset
@@ -296,7 +297,7 @@ defmodule Ysc.Webhooks.Reprocessor do
       end
     rescue
       error ->
-        Logger.error("Failed to re-process webhook event",
+        Ysc.Logging.error("Failed to re-process webhook event",
           webhook_id: webhook_event.id,
           error: Exception.message(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
@@ -311,12 +312,12 @@ defmodule Ysc.Webhooks.Reprocessor do
          payload: payload,
          event_type: event_type
        }) do
-    require Logger
+    require Ysc.Logging
 
     # Extract the data object from the payload
     data_object = payload["data"]["object"]
 
-    Logger.info("Processing Stripe webhook from payload",
+    Ysc.Logging.info("Processing Stripe webhook from payload",
       event_type: event_type,
       invoice_id: data_object["id"],
       customer_id: data_object["customer"],
@@ -332,7 +333,8 @@ defmodule Ysc.Webhooks.Reprocessor do
           # Convert the data object to a Stripe.Invoice struct-like map
           invoice_data = convert_map_to_stripe_invoice(data_object)
 
-          Logger.info("Calling webhook handler for invoice.payment_succeeded",
+          Ysc.Logging.info(
+            "Calling webhook handler for invoice.payment_succeeded",
             invoice_id: invoice_data.id,
             customer_id: invoice_data.customer,
             subscription_id: invoice_data.subscription,
@@ -349,7 +351,8 @@ defmodule Ysc.Webhooks.Reprocessor do
           payment_intent_data =
             convert_map_to_stripe_payment_intent(data_object)
 
-          Logger.info("Calling webhook handler for payment_intent.succeeded",
+          Ysc.Logging.info(
+            "Calling webhook handler for payment_intent.succeeded",
             payment_intent_id: payment_intent_data.id,
             customer_id: payment_intent_data.customer,
             amount: payment_intent_data.amount
@@ -362,14 +365,14 @@ defmodule Ysc.Webhooks.Reprocessor do
 
         _ ->
           # For other event types, try to call the handler with the raw data
-          Logger.info("Calling webhook handler for unknown event type",
+          Ysc.Logging.info("Calling webhook handler for unknown event type",
             event_type: event_type
           )
 
           WebhookHandler.handle_webhook_event(event_type, data_object)
       end
 
-    Logger.info("Webhook handler result", result: result)
+    Ysc.Logging.info("Webhook handler result", result: result)
     result
   end
 

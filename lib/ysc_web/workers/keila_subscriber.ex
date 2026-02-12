@@ -5,7 +5,7 @@ defmodule YscWeb.Workers.KeilaSubscriber do
   Processes newsletter subscriptions and unsubscriptions asynchronously to avoid blocking
   user registration or other operations.
   """
-  require Logger
+  require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
 
   alias Ysc.Keila
@@ -20,7 +20,7 @@ defmodule YscWeb.Workers.KeilaSubscriber do
     last_name = args["last_name"]
     data = args["data"]
 
-    Logger.info("KeilaSubscriber: Starting subscription",
+    Ysc.Logging.info("KeilaSubscriber: Starting subscription",
       email: email,
       project_id: project_id,
       form_id: form_id,
@@ -38,22 +38,28 @@ defmodule YscWeb.Workers.KeilaSubscriber do
 
     case Keila.subscribe_email(email, opts) do
       :ok ->
-        Logger.info("KeilaSubscriber: Successfully subscribed", email: email)
+        Ysc.Logging.info("KeilaSubscriber: Successfully subscribed",
+          email: email
+        )
+
         :ok
 
       {:error, :not_configured} ->
-        Logger.debug("KeilaSubscriber: Keila not configured, skipping",
+        Ysc.Logging.debug("KeilaSubscriber: Keila not configured, skipping",
           email: email
         )
 
         :ok
 
       {:error, :invalid_email} ->
-        Logger.warning("KeilaSubscriber: Invalid email address", email: email)
+        Ysc.Logging.warning("KeilaSubscriber: Invalid email address",
+          email: email
+        )
+
         {:error, "Invalid email address"}
 
       {:error, error} ->
-        Logger.warning("KeilaSubscriber: Failed to subscribe",
+        Ysc.Logging.warning("KeilaSubscriber: Failed to subscribe",
           email: email,
           error: inspect(error)
         )
@@ -67,7 +73,7 @@ defmodule YscWeb.Workers.KeilaSubscriber do
       }) do
     project_id = args["project_id"]
 
-    Logger.info("KeilaSubscriber: Starting unsubscribe",
+    Ysc.Logging.info("KeilaSubscriber: Starting unsubscribe",
       email: email,
       project_id: project_id
     )
@@ -77,22 +83,28 @@ defmodule YscWeb.Workers.KeilaSubscriber do
 
     case Keila.unsubscribe_email(email, opts) do
       :ok ->
-        Logger.info("KeilaSubscriber: Successfully unsubscribed", email: email)
+        Ysc.Logging.info("KeilaSubscriber: Successfully unsubscribed",
+          email: email
+        )
+
         :ok
 
       {:error, :not_configured} ->
-        Logger.debug("KeilaSubscriber: Keila not configured, skipping",
+        Ysc.Logging.debug("KeilaSubscriber: Keila not configured, skipping",
           email: email
         )
 
         :ok
 
       {:error, :invalid_email} ->
-        Logger.warning("KeilaSubscriber: Invalid email address", email: email)
+        Ysc.Logging.warning("KeilaSubscriber: Invalid email address",
+          email: email
+        )
+
         {:error, "Invalid email address"}
 
       {:error, error} ->
-        Logger.warning("KeilaSubscriber: Failed to unsubscribe",
+        Ysc.Logging.warning("KeilaSubscriber: Failed to unsubscribe",
           email: email,
           error: inspect(error)
         )
@@ -107,7 +119,7 @@ defmodule YscWeb.Workers.KeilaSubscriber do
   end
 
   def perform(%Oban.Job{args: args}) do
-    Logger.warning("KeilaSubscriber: Invalid job args", args: args)
+    Ysc.Logging.warning("KeilaSubscriber: Invalid job args", args: args)
     {:error, "Invalid job args: email is required"}
   end
 end

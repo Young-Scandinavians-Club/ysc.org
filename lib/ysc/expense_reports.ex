@@ -2,7 +2,7 @@ defmodule Ysc.ExpenseReports do
   @moduledoc """
   Context module for managing expense reports.
   """
-  require Logger
+  require Ysc.Logging
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
@@ -65,7 +65,7 @@ defmodule Ysc.ExpenseReports do
   end
 
   def create_expense_report(attrs, %User{} = user) do
-    require Logger
+    require Ysc.Logging
 
     # Set status to "submitted" if not already set (for submissions)
     attrs = Map.put_new(attrs, "status", "submitted")
@@ -80,13 +80,13 @@ defmodule Ysc.ExpenseReports do
       |> validate_reimbursement_setup(user)
       |> validate_all_expense_items_have_receipts_for_submission()
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "Expense report changeset - valid?: #{changeset.valid?}, errors: #{inspect(changeset.errors, limit: 20)}"
     )
 
     # Check for nested association errors
     expense_items = Ecto.Changeset.get_field(changeset, :expense_items, [])
-    Logger.debug("Expense items count: #{length(expense_items)}")
+    Ysc.Logging.debug("Expense items count: #{length(expense_items)}")
 
     Enum.with_index(expense_items)
     |> Enum.each(fn {item, idx} ->
@@ -94,14 +94,14 @@ defmodule Ysc.ExpenseReports do
         %Ecto.Changeset{} = cs ->
           receipt_path = Ecto.Changeset.get_field(cs, :receipt_s3_path)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "Expense item #{idx} - valid?: #{cs.valid?}, errors: #{inspect(cs.errors, limit: 10)}, receipt: #{inspect(receipt_path)}"
           )
 
         struct ->
           receipt_path = Map.get(struct, :receipt_s3_path)
 
-          Logger.debug(
+          Ysc.Logging.debug(
             "Expense item #{idx} - struct, receipt: #{inspect(receipt_path)}"
           )
       end
@@ -109,7 +109,7 @@ defmodule Ysc.ExpenseReports do
 
     # Also check if there are changeset errors in the associations
     if Map.has_key?(changeset.changes, :expense_items) do
-      Logger.debug("expense_items in changes - checking for errors")
+      Ysc.Logging.debug("expense_items in changes - checking for errors")
 
       case changeset.changes[:expense_items] do
         list when is_list(list) ->
@@ -117,7 +117,7 @@ defmodule Ysc.ExpenseReports do
           |> Enum.each(fn {item, idx} ->
             case item do
               %Ecto.Changeset{} = cs ->
-                Logger.debug(
+                Ysc.Logging.debug(
                   "Changed expense item #{idx} - valid?: #{cs.valid?}, errors: #{inspect(cs.errors, limit: 10)}"
                 )
 
@@ -137,7 +137,7 @@ defmodule Ysc.ExpenseReports do
     case result do
       {:ok, expense_report} ->
         if expense_report.status == "submitted" do
-          Logger.debug(
+          Ysc.Logging.debug(
             "Expense report created with submitted status, enqueueing QuickBooks sync",
             expense_report_id: expense_report.id
           )
@@ -145,7 +145,7 @@ defmodule Ysc.ExpenseReports do
           enqueue_quickbooks_sync(expense_report)
           send_expense_report_emails(expense_report)
         else
-          Logger.debug(
+          Ysc.Logging.debug(
             "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
             expense_report_id: expense_report.id
           )
@@ -267,7 +267,7 @@ defmodule Ysc.ExpenseReports do
   end
 
   defp enqueue_quickbooks_sync(%ExpenseReport{} = expense_report) do
-    Logger.debug("Starting enqueue_quickbooks_sync",
+    Ysc.Logging.debug("Starting enqueue_quickbooks_sync",
       expense_report_id: expense_report.id,
       current_status: expense_report.quickbooks_sync_status
     )
@@ -280,7 +280,7 @@ defmodule Ysc.ExpenseReports do
 
     case update_result do
       {:ok, updated_report} ->
-        Logger.debug("Marked expense report as pending sync",
+        Ysc.Logging.debug("Marked expense report as pending sync",
           expense_report_id: updated_report.id
         )
 
@@ -292,7 +292,7 @@ defmodule Ysc.ExpenseReports do
 
         case job_result do
           {:ok, job} ->
-            Logger.info("Enqueued QuickBooks sync for expense report",
+            Ysc.Logging.info("Enqueued QuickBooks sync for expense report",
               expense_report_id: expense_report.id,
               job_id: job.id,
               queue: job.queue,
@@ -300,14 +300,10 @@ defmodule Ysc.ExpenseReports do
             )
 
           {:error, reason} ->
-            Logger.error("Failed to enqueue QuickBooks sync for expense report",
-              expense_report_id: expense_report.id,
-              error: inspect(reason)
-            )
-
-            Sentry.capture_message(
+            Ysc.Logging.error(
               "Failed to enqueue QuickBooks sync for expense report",
-              level: :error,
+              expense_report_id: expense_report.id,
+              error: inspect(reason),
               extra: %{
                 expense_report_id: expense_report.id,
                 error: inspect(reason)
@@ -319,7 +315,7 @@ defmodule Ysc.ExpenseReports do
         end
 
       {:error, changeset} ->
-        Logger.error("Failed to mark expense report as pending sync",
+        Ysc.Logging.error("Failed to mark expense report as pending sync",
           expense_report_id: expense_report.id,
           errors: inspect(changeset.errors)
         )
@@ -327,11 +323,11 @@ defmodule Ysc.ExpenseReports do
   end
 
   defp send_expense_report_emails(%ExpenseReport{} = expense_report) do
-    require Logger
+    require Ysc.Logging
 
     # Ensure expense report has an ID (must be saved to database)
     if is_nil(expense_report.id) do
-      Logger.warning("Cannot send emails for expense report without ID",
+      Ysc.Logging.warning("Cannot send emails for expense report without ID",
         expense_report: inspect(expense_report, limit: 100)
       )
 
@@ -349,7 +345,7 @@ defmodule Ysc.ExpenseReports do
              :address
            ]) do
         nil ->
-          Logger.error(
+          Ysc.Logging.error(
             "Expense report not found in database when sending emails",
             expense_report_id: expense_report.id
           )
@@ -363,9 +359,9 @@ defmodule Ysc.ExpenseReports do
   end
 
   defp send_expense_report_emails_impl(%ExpenseReport{} = expense_report) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.info("send_expense_report_emails_impl: Starting email sending",
+    Ysc.Logging.info("send_expense_report_emails_impl: Starting email sending",
       expense_report_id: expense_report.id,
       user_id: expense_report.user_id,
       user_loaded: Ecto.assoc_loaded?(expense_report.user),
@@ -383,7 +379,7 @@ defmodule Ysc.ExpenseReports do
 
     # Send confirmation email to user
     try do
-      Logger.info(
+      Ysc.Logging.info(
         "send_expense_report_emails_impl: Preparing confirmation email data",
         expense_report_id: expense_report.id,
         user_email:
@@ -392,7 +388,7 @@ defmodule Ysc.ExpenseReports do
 
       email_data = ExpenseReportConfirmation.prepare_email_data(expense_report)
 
-      Logger.info("send_expense_report_emails_impl: Email data prepared",
+      Ysc.Logging.info("send_expense_report_emails_impl: Email data prepared",
         expense_report_id: expense_report.id,
         email_data_keys: Map.keys(email_data),
         email_data_expense_report_keys:
@@ -415,7 +411,7 @@ defmodule Ysc.ExpenseReports do
 
       template_name = ExpenseReportConfirmation.get_template_name()
 
-      Logger.info(
+      Ysc.Logging.info(
         "send_expense_report_emails_impl: Calling Notifier.schedule_email",
         expense_report_id: expense_report.id,
         recipient: expense_report.user.email,
@@ -441,14 +437,15 @@ defmodule Ysc.ExpenseReports do
 
       case result do
         {:error, _reason} ->
-          Logger.warning("Failed to schedule expense report confirmation email",
+          Ysc.Logging.warning(
+            "Failed to schedule expense report confirmation email",
             expense_report_id: expense_report.id,
             recipient: expense_report.user.email,
             result: inspect(result, limit: 100)
           )
 
         _ ->
-          Logger.debug("Scheduled expense report confirmation email",
+          Ysc.Logging.debug("Scheduled expense report confirmation email",
             expense_report_id: expense_report.id,
             recipient: expense_report.user.email
           )
@@ -459,7 +456,7 @@ defmodule Ysc.ExpenseReports do
         exception_message = Exception.message(e)
         stacktrace = Exception.format_stacktrace(__STACKTRACE__)
 
-        Logger.error(
+        Ysc.Logging.error(
           "send_expense_report_emails_impl: Failed to schedule expense report confirmation email - #{exception_type}: #{exception_message}\n\nStacktrace:\n#{stacktrace}",
           expense_report_id: expense_report.id,
           exception_type: inspect(exception_type),
@@ -475,7 +472,8 @@ defmodule Ysc.ExpenseReports do
 
     # Send notification email to Treasurer
     try do
-      Logger.info("send_expense_report_emails_impl: Querying for treasurer",
+      Ysc.Logging.info(
+        "send_expense_report_emails_impl: Querying for treasurer",
         expense_report_id: expense_report.id
       )
 
@@ -485,7 +483,8 @@ defmodule Ysc.ExpenseReports do
         )
         |> Repo.one()
 
-      Logger.info("send_expense_report_emails_impl: Treasurer query result",
+      Ysc.Logging.info(
+        "send_expense_report_emails_impl: Treasurer query result",
         expense_report_id: expense_report.id,
         treasurer_found: !is_nil(treasurer),
         treasurer_email: if(treasurer, do: treasurer.email, else: nil),
@@ -493,7 +492,7 @@ defmodule Ysc.ExpenseReports do
       )
 
       if treasurer do
-        Logger.info(
+        Ysc.Logging.info(
           "send_expense_report_emails_impl: Preparing treasurer notification email data",
           expense_report_id: expense_report.id,
           treasurer_email: treasurer.email
@@ -502,7 +501,7 @@ defmodule Ysc.ExpenseReports do
         email_data =
           ExpenseReportTreasurerNotification.prepare_email_data(expense_report)
 
-        Logger.info(
+        Ysc.Logging.info(
           "send_expense_report_emails_impl: Treasurer email data prepared",
           expense_report_id: expense_report.id,
           email_data_keys: Map.keys(email_data),
@@ -525,7 +524,7 @@ defmodule Ysc.ExpenseReports do
 
         template_name = ExpenseReportTreasurerNotification.get_template_name()
 
-        Logger.info(
+        Ysc.Logging.info(
           "send_expense_report_emails_impl: Calling Notifier.schedule_email for treasurer",
           expense_report_id: expense_report.id,
           recipient: treasurer.email,
@@ -551,7 +550,7 @@ defmodule Ysc.ExpenseReports do
 
         case result do
           {:error, _reason} ->
-            Logger.warning(
+            Ysc.Logging.warning(
               "Failed to schedule expense report treasurer notification email",
               expense_report_id: expense_report.id,
               recipient: treasurer.email,
@@ -559,14 +558,14 @@ defmodule Ysc.ExpenseReports do
             )
 
           _ ->
-            Logger.debug(
+            Ysc.Logging.debug(
               "Scheduled expense report treasurer notification email",
               expense_report_id: expense_report.id,
               recipient: treasurer.email
             )
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "No active treasurer found, skipping treasurer notification email",
           expense_report_id: expense_report.id
         )
@@ -577,7 +576,7 @@ defmodule Ysc.ExpenseReports do
         exception_message = Exception.message(e)
         stacktrace = Exception.format_stacktrace(__STACKTRACE__)
 
-        Logger.error(
+        Ysc.Logging.error(
           "send_expense_report_emails_impl: Failed to schedule expense report treasurer notification email - #{exception_type}: #{exception_message}\n\nStacktrace:\n#{stacktrace}",
           expense_report_id: expense_report.id,
           exception_type: inspect(exception_type),
@@ -728,7 +727,7 @@ defmodule Ysc.ExpenseReports do
     - `:original_filename` - The original filename from the client (preserves file extension)
   """
   def upload_receipt_to_s3(path, opts \\ []) do
-    require Logger
+    require Ysc.Logging
     original_filename = Keyword.get(opts, :original_filename)
 
     # Use original filename if provided to preserve extension, otherwise use basename of temp file
@@ -750,7 +749,7 @@ defmodule Ysc.ExpenseReports do
     unique_key = "receipts/#{timestamp}_#{file_name}"
     bucket_name = S3Config.expense_reports_bucket_name()
 
-    Logger.debug("Uploading receipt to S3",
+    Ysc.Logging.debug("Uploading receipt to S3",
       path: path,
       bucket: bucket_name,
       key: unique_key,
@@ -769,11 +768,11 @@ defmodule Ysc.ExpenseReports do
           upload_module.upload(path, bucket_name, unique_key)
       end
 
-    Logger.debug("S3 upload result", result: inspect(result, limit: 10))
+    Ysc.Logging.debug("S3 upload result", result: inspect(result, limit: 10))
 
     # Return the S3 path (key) - the full URL can be constructed using S3Config.object_url/2
     key = result[:body][:key] || unique_key
-    Logger.debug("Returning S3 key", key: key)
+    Ysc.Logging.debug("Returning S3 key", key: key)
     key
   end
 
@@ -924,7 +923,7 @@ defmodule Ysc.ExpenseReports do
   defp validate_and_send_expense_report_emails(loaded_report) do
     # Validate that we have required associations
     if is_nil(loaded_report.user) do
-      Logger.error(
+      Ysc.Logging.error(
         "Cannot send emails: expense report missing user association",
         expense_report_id: loaded_report.id
       )

@@ -207,9 +207,9 @@ defmodule Ysc.Ledgers do
       existing_payment ->
         # Payment already exists - this is a duplicate request (e.g., from CashApp retry)
         # If payment is completed, return existing payment with its transaction and entries
-        require Logger
+        require Ysc.Logging
 
-        Logger.info("Payment already exists, returning existing payment",
+        Ysc.Logging.info("Payment already exists, returning existing payment",
           external_payment_id: external_payment_id,
           payment_id: existing_payment.id,
           status: existing_payment.status
@@ -253,31 +253,15 @@ defmodule Ysc.Ledgers do
 
       error ->
         # Report to Sentry
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to process payment in ledger",
+        Ysc.Logging.error("Failed to process payment in ledger",
           user_id: user_id,
           amount: Money.to_string!(amount),
           entity_type: entity_type,
           entity_id: entity_id,
           external_payment_id: external_payment_id,
           error: inspect(error)
-        )
-
-        Sentry.capture_message("Failed to process payment in ledger",
-          level: :error,
-          extra: %{
-            user_id: user_id,
-            amount: Money.to_string!(amount),
-            entity_type: inspect(entity_type),
-            entity_id: entity_id,
-            external_payment_id: external_payment_id,
-            error: inspect(error)
-          },
-          tags: %{
-            ledger_operation: "process_payment",
-            entity_type: inspect(entity_type)
-          }
         )
 
         error
@@ -369,9 +353,9 @@ defmodule Ysc.Ledgers do
 
       error ->
         # Report to Sentry
-        require Logger
+        require Ysc.Logging
 
-        Logger.error(
+        Ysc.Logging.error(
           "Failed to process event payment with donations and discounts in ledger",
           user_id: user_id,
           total_amount: Money.to_string!(total_amount),
@@ -381,25 +365,6 @@ defmodule Ysc.Ledgers do
           event_id: event_id,
           external_payment_id: external_payment_id,
           error: inspect(error)
-        )
-
-        Sentry.capture_message(
-          "Failed to process event payment with discounts in ledger",
-          level: :error,
-          extra: %{
-            user_id: user_id,
-            total_amount: Money.to_string!(total_amount),
-            gross_event_amount: Money.to_string!(gross_event_amount),
-            donation_amount: Money.to_string!(donation_amount),
-            discount_amount: Money.to_string!(discount_amount),
-            event_id: event_id,
-            external_payment_id: external_payment_id,
-            error: inspect(error)
-          },
-          tags: %{
-            ledger_operation: "process_event_payment_with_discounts",
-            entity_type: "event"
-          }
         )
 
         error
@@ -483,9 +448,10 @@ defmodule Ysc.Ledgers do
 
       error ->
         # Report to Sentry
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to process mixed event/donation payment in ledger",
+        Ysc.Logging.error(
+          "Failed to process mixed event/donation payment in ledger",
           user_id: user_id,
           total_amount: Money.to_string!(total_amount),
           event_amount: Money.to_string!(event_amount),
@@ -493,24 +459,6 @@ defmodule Ysc.Ledgers do
           event_id: event_id,
           external_payment_id: external_payment_id,
           error: inspect(error)
-        )
-
-        Sentry.capture_message(
-          "Failed to process mixed event/donation payment in ledger",
-          level: :error,
-          extra: %{
-            user_id: user_id,
-            total_amount: Money.to_string!(total_amount),
-            event_amount: Money.to_string!(event_amount),
-            donation_amount: Money.to_string!(donation_amount),
-            event_id: event_id,
-            external_payment_id: external_payment_id,
-            error: inspect(error)
-          },
-          tags: %{
-            ledger_operation: "process_mixed_event_donation_payment",
-            entity_type: "event_donation"
-          }
         )
 
         error
@@ -531,23 +479,11 @@ defmodule Ysc.Ledgers do
     :ok
   rescue
     error ->
-      require Logger
+      require Ysc.Logging
 
-      Logger.warning("Failed to enqueue QuickBooks sync for payment",
+      Ysc.Logging.warning("Failed to enqueue QuickBooks sync for payment",
         payment_id: payment.id,
         error: inspect(error)
-      )
-
-      # Report to Sentry
-      Sentry.capture_exception(error,
-        stacktrace: __STACKTRACE__,
-        extra: %{
-          payment_id: payment.id,
-          error_message: Exception.message(error)
-        },
-        tags: %{
-          ledger_operation: "enqueue_quickbooks_sync_payment"
-        }
       )
 
       :ok
@@ -615,33 +551,7 @@ defmodule Ysc.Ledgers do
               "clear_lake_booking_revenue"
 
             _ ->
-              require Logger
-
-              error_message =
-                "Booking payment requires property to be specified (tahoe or clear_lake)"
-
-              Logger.warning(
-                error_message,
-                entity_id: entity_id,
-                property: property
-              )
-
-              # Report to Sentry before raising
-              Sentry.capture_message(error_message,
-                level: :error,
-                extra: %{
-                  entity_id: entity_id,
-                  property: inspect(property),
-                  entity_type: "booking"
-                },
-                tags: %{
-                  ledger_operation: "create_payment_entries",
-                  entity_type: "booking",
-                  error_type: "missing_property"
-                }
-              )
-
-              raise error_message
+              raise "Booking payment requires property to be specified (tahoe or clear_lake)"
           end
 
         :donation ->
@@ -1102,9 +1012,9 @@ defmodule Ysc.Ledgers do
         existing_refund = get_refund_by_external_id(external_refund_id)
 
         if existing_refund do
-          require Logger
+          require Ysc.Logging
 
-          Logger.info(
+          Ysc.Logging.info(
             "Refund already processed, returning existing refund (idempotency)",
             external_refund_id: external_refund_id,
             refund_id: existing_refund.id
@@ -1192,26 +1102,13 @@ defmodule Ysc.Ledgers do
 
       error ->
         # Report to Sentry
-        require Logger
+        require Ysc.Logging
 
-        Logger.error("Failed to process refund in ledger",
+        Ysc.Logging.error("Failed to process refund in ledger",
           payment_id: payment_id,
           refund_amount: Money.to_string!(refund_amount),
           external_refund_id: external_refund_id,
           error: inspect(error)
-        )
-
-        Sentry.capture_message("Failed to process refund in ledger",
-          level: :error,
-          extra: %{
-            payment_id: payment_id,
-            refund_amount: Money.to_string!(refund_amount),
-            external_refund_id: external_refund_id,
-            error: inspect(error)
-          },
-          tags: %{
-            ledger_operation: "process_refund"
-          }
         )
 
         error
@@ -1219,7 +1116,7 @@ defmodule Ysc.Ledgers do
   end
 
   defp send_refund_email(refund, payment) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Reload payment with associations
@@ -1238,43 +1135,30 @@ defmodule Ysc.Ledgers do
 
           _ ->
             # Unknown entity type, skip email
-            Logger.debug("Skipping refund email - unknown entity type",
+            Ysc.Logging.debug("Skipping refund email - unknown entity type",
               refund_id: refund.id,
               payment_id: payment.id
             )
         end
       else
-        Logger.warning("Skipping refund email - payment missing user",
+        Ysc.Logging.warning("Skipping refund email - payment missing user",
           refund_id: refund.id,
           payment_id: payment.id
         )
       end
     rescue
       error ->
-        Logger.error("Failed to send refund email",
+        Ysc.Logging.error("Failed to send refund email",
           refund_id: refund.id,
           payment_id: payment.id,
           error: inspect(error),
           stacktrace: __STACKTRACE__
         )
-
-        # Report to Sentry
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{
-            refund_id: refund.id,
-            payment_id: payment.id,
-            error_message: Exception.message(error)
-          },
-          tags: %{
-            ledger_operation: "send_refund_email"
-          }
-        )
     end
   end
 
   defp send_booking_refund_processed_email(refund, booking, payment) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Reload booking with associations
@@ -1307,7 +1191,8 @@ defmodule Ysc.Ledgers do
 
         case result do
           %Oban.Job{} = job ->
-            Logger.info("Booking refund processed email scheduled successfully",
+            Ysc.Logging.info(
+              "Booking refund processed email scheduled successfully",
               refund_id: refund.id,
               booking_id: booking.id,
               user_id: payment.user_id,
@@ -1316,7 +1201,8 @@ defmodule Ysc.Ledgers do
             )
 
           {:error, reason} ->
-            Logger.error("Failed to schedule booking refund processed email",
+            Ysc.Logging.error(
+              "Failed to schedule booking refund processed email",
               refund_id: refund.id,
               booking_id: booking.id,
               user_id: payment.user_id,
@@ -1324,7 +1210,7 @@ defmodule Ysc.Ledgers do
             )
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping booking refund processed email - missing booking or user",
           refund_id: refund.id,
           booking_id: booking && booking.id
@@ -1332,7 +1218,7 @@ defmodule Ysc.Ledgers do
       end
     rescue
       error ->
-        Logger.error("Failed to send booking refund processed email",
+        Ysc.Logging.error("Failed to send booking refund processed email",
           refund_id: refund.id,
           booking_id: booking && booking.id,
           error: inspect(error),
@@ -1342,14 +1228,14 @@ defmodule Ysc.Ledgers do
   end
 
   defp send_ticket_order_refund_email(refund, ticket_order) do
-    require Logger
+    require Ysc.Logging
 
     try do
       # Reload ticket order with associations
       ticket_order =
         case Ysc.Tickets.get_ticket_order(ticket_order.id) do
           nil ->
-            Logger.warning("Ticket order not found for refund email",
+            Ysc.Logging.warning("Ticket order not found for refund email",
               refund_id: refund.id,
               ticket_order_id: ticket_order.id
             )
@@ -1373,7 +1259,7 @@ defmodule Ysc.Ledgers do
           |> Repo.all()
 
         if Enum.empty?(refunded_tickets) do
-          Logger.warning(
+          Ysc.Logging.warning(
             "No refunded tickets found for ticket order refund email",
             refund_id: refund.id,
             ticket_order_id: ticket_order.id
@@ -1404,7 +1290,8 @@ defmodule Ysc.Ledgers do
 
           case result do
             %Oban.Job{} = job ->
-              Logger.info("Ticket order refund email scheduled successfully",
+              Ysc.Logging.info(
+                "Ticket order refund email scheduled successfully",
                 refund_id: refund.id,
                 ticket_order_id: ticket_order.id,
                 user_id: ticket_order.user_id,
@@ -1413,7 +1300,7 @@ defmodule Ysc.Ledgers do
               )
 
             {:error, reason} ->
-              Logger.error("Failed to schedule ticket order refund email",
+              Ysc.Logging.error("Failed to schedule ticket order refund email",
                 refund_id: refund.id,
                 ticket_order_id: ticket_order.id,
                 user_id: ticket_order.user_id,
@@ -1422,7 +1309,7 @@ defmodule Ysc.Ledgers do
           end
         end
       else
-        Logger.warning(
+        Ysc.Logging.warning(
           "Skipping ticket order refund email - missing ticket order or user",
           refund_id: refund.id,
           ticket_order_id: ticket_order && ticket_order.id
@@ -1430,7 +1317,7 @@ defmodule Ysc.Ledgers do
       end
     rescue
       error ->
-        Logger.error("Failed to send ticket order refund email",
+        Ysc.Logging.error("Failed to send ticket order refund email",
           refund_id: refund.id,
           ticket_order_id: ticket_order && ticket_order.id,
           error: inspect(error),
@@ -1453,9 +1340,9 @@ defmodule Ysc.Ledgers do
     :ok
   rescue
     error ->
-      require Logger
+      require Ysc.Logging
 
-      Logger.warning("Failed to enqueue QuickBooks sync for refund",
+      Ysc.Logging.warning("Failed to enqueue QuickBooks sync for refund",
         refund_id: refund.id,
         error: inspect(error)
       )
@@ -3392,7 +3279,7 @@ defmodule Ysc.Ledgers do
 
   """
   def verify_ledger_balance do
-    require Logger
+    require Ysc.Logging
 
     # Get total debits (all amounts with debit_credit = 'debit')
     total_debits_query =
@@ -3421,7 +3308,7 @@ defmodule Ysc.Ledgers do
     {:ok, balance} = Money.sub(total_debits, total_credits)
 
     if Money.equal?(balance, Money.new(0, :USD)) do
-      Logger.info("Ledger balance verified",
+      Ysc.Logging.info("Ledger balance verified",
         total_debits: Money.to_string!(total_debits),
         total_credits: Money.to_string!(total_credits),
         balance: "balanced"
@@ -3430,22 +3317,10 @@ defmodule Ysc.Ledgers do
       {:ok, :balanced}
     else
       # Critical condition: report to Sentry instead of emitting error-level logs.
-      Logger.warning("LEDGER IMBALANCE DETECTED!",
+      Ysc.Logging.warning("LEDGER IMBALANCE DETECTED!",
         total_debits: Money.to_string!(total_debits),
         total_credits: Money.to_string!(total_credits),
         difference: Money.to_string!(balance)
-      )
-
-      Sentry.capture_message("Ledger imbalance detected",
-        level: :error,
-        extra: %{
-          total_debits: Money.to_string!(total_debits),
-          total_credits: Money.to_string!(total_credits),
-          difference: Money.to_string!(balance)
-        },
-        tags: %{
-          ledger: "balance_check"
-        }
       )
 
       {:error, {:imbalanced, balance}}
@@ -3537,7 +3412,7 @@ defmodule Ysc.Ledgers do
 
   """
   def get_ledger_imbalance_details do
-    require Logger
+    require Ysc.Logging
 
     case verify_ledger_balance() do
       {:ok, :balanced} = result ->
@@ -3553,7 +3428,7 @@ defmodule Ysc.Ledgers do
             account.account_type
           end)
 
-        Logger.warning("Ledger imbalance details",
+        Ysc.Logging.warning("Ledger imbalance details",
           total_difference: Money.to_string!(difference),
           account_count: length(account_balances),
           asset_accounts: length(Map.get(balances_by_type, "asset", [])),
@@ -3565,7 +3440,7 @@ defmodule Ysc.Ledgers do
 
         # Log each account with significant balance
         Enum.each(account_balances, fn {account, balance} ->
-          Logger.warning("Account balance",
+          Ysc.Logging.warning("Account balance",
             account_name: account.name,
             account_type: account.account_type,
             balance: Money.to_string!(balance)

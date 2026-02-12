@@ -55,19 +55,19 @@ defmodule Ysc.Release do
       for repo <- repos() do
         {:ok, _, result} =
           Ecto.Migrator.with_repo(repo, fn _repo ->
-            require Logger
+            require Ysc.Logging
 
-            Logger.info("Re-queuing failed email messages...")
+            Ysc.Logging.info("Re-queuing failed email messages...")
 
             result = Ysc.Messages.Requeue.requeue_all(opts)
 
-            Logger.info("Summary:")
-            Logger.info("Total Found: #{result.total_found}")
-            Logger.info("Successfully Re-queued: #{result.successful}")
-            Logger.info("Failed to Re-queue: #{result.failed}")
+            Ysc.Logging.info("Summary:")
+            Ysc.Logging.info("Total Found: #{result.total_found}")
+            Ysc.Logging.info("Successfully Re-queued: #{result.successful}")
+            Ysc.Logging.info("Failed to Re-queue: #{result.failed}")
 
             if result.failed > 0 do
-              Logger.warning(
+              Ysc.Logging.warning(
                 "Some jobs failed to re-queue. Check logs for details."
               )
             end
@@ -95,59 +95,59 @@ defmodule Ysc.Release do
       for repo <- repos() do
         {:ok, _, stats} =
           Ecto.Migrator.with_repo(repo, fn _repo ->
-            require Logger
+            require Ysc.Logging
 
             stats = Ysc.Messages.Requeue.get_stats()
 
-            Logger.info("")
+            Ysc.Logging.info("")
 
-            Logger.info(
+            Ysc.Logging.info(
               "═══════════════════════════════════════════════════════════"
             )
 
-            Logger.info("  Failed Email Job Statistics")
+            Ysc.Logging.info("  Failed Email Job Statistics")
 
-            Logger.info(
+            Ysc.Logging.info(
               "═══════════════════════════════════════════════════════════"
             )
 
-            Logger.info("")
-            Logger.info("  Total Failed:        #{stats.total_failed}")
+            Ysc.Logging.info("")
+            Ysc.Logging.info("  Total Failed:        #{stats.total_failed}")
 
-            Logger.info(
+            Ysc.Logging.info(
               "  ├─ Discarded:        #{stats.discarded} (exhausted retries)"
             )
 
-            Logger.info(
+            Ysc.Logging.info(
               "  └─ Retryable:        #{stats.retryable} (can still retry)"
             )
 
-            Logger.info("")
+            Ysc.Logging.info("")
 
-            Logger.info(
+            Ysc.Logging.info(
               "  Recent Failures:     #{stats.recent_failures_24h} (last 24 hours)"
             )
 
-            Logger.info("")
+            Ysc.Logging.info("")
 
             if not Enum.empty?(stats.by_template) do
-              Logger.info("  Breakdown by Template:")
-              Logger.info("")
+              Ysc.Logging.info("  Breakdown by Template:")
+              Ysc.Logging.info("")
 
               Enum.each(stats.by_template, fn {template, count} ->
-                Logger.info(
+                Ysc.Logging.info(
                   "    • #{String.pad_trailing(template, 40)} #{count}"
                 )
               end)
 
-              Logger.info("")
+              Ysc.Logging.info("")
             end
 
-            Logger.info(
+            Ysc.Logging.info(
               "═══════════════════════════════════════════════════════════"
             )
 
-            Logger.info("")
+            Ysc.Logging.info("")
 
             stats
           end)
@@ -178,26 +178,26 @@ defmodule Ysc.Release do
     for repo <- repos() do
       {:ok, _, result} =
         Ecto.Migrator.with_repo(repo, fn _repo ->
-          require Logger
+          require Ysc.Logging
 
-          Logger.info("Re-queuing job: #{job_id}")
+          Ysc.Logging.info("Re-queuing job: #{job_id}")
 
           case Ysc.Messages.Requeue.requeue_job_by_id(job_id) do
             {:ok, new_job} ->
-              Logger.info("✅ Successfully re-queued job #{job_id}")
-              Logger.info("New Job ID: #{new_job.id}")
+              Ysc.Logging.info("✅ Successfully re-queued job #{job_id}")
+              Ysc.Logging.info("New Job ID: #{new_job.id}")
               {:ok, new_job}
 
             {:error, :not_found} ->
-              Logger.error("❌ Job #{job_id} not found")
+              Ysc.Logging.error("❌ Job #{job_id} not found")
               {:error, :not_found}
 
             {:error, :not_an_email_job} ->
-              Logger.error("❌ Job #{job_id} is not an email job")
+              Ysc.Logging.error("❌ Job #{job_id} is not an email job")
               {:error, :not_an_email_job}
 
             {:error, reason} ->
-              Logger.error(
+              Ysc.Logging.error(
                 "❌ Failed to re-queue job #{job_id}: #{inspect(reason)}"
               )
 

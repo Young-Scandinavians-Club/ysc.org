@@ -8,7 +8,7 @@ defmodule Ysc.Bookings.PricingRuleCache do
   Cache is invalidated via PubSub when pricing rules are created/updated/deleted.
   """
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Bookings.PricingRule
 
   @cache_name :ysc_cache
@@ -197,7 +197,7 @@ defmodule Ysc.Bookings.PricingRuleCache do
       {:pricing_rule_cache_invalidated, new_version}
     )
 
-    Logger.debug("Pricing rule cache invalidated", version: new_version)
+    Ysc.Logging.debug("Pricing rule cache invalidated", version: new_version)
     :ok
   end
 

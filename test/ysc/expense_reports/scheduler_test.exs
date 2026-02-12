@@ -12,7 +12,7 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
 
   alias Ysc.ExpenseReports.Scheduler
 
-  require Logger
+  require Ysc.Logging
 
   describe "start_scheduler/0" do
     test "returns :ok" do

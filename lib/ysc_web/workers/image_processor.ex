@@ -4,7 +4,7 @@ defmodule YscWeb.Workers.ImageProcessor do
 
   Handles image transformations, resizing, and optimization tasks asynchronously.
   """
-  require Logger
+  require Ysc.Logging
 
   use Oban.Worker, queue: :media
 
@@ -19,7 +19,7 @@ defmodule YscWeb.Workers.ImageProcessor do
     image = Media.fetch_image(id)
 
     if is_nil(image) do
-      Logger.warning("Image not found", image_id: id)
+      Ysc.Logging.warning("Image not found", image_id: id)
       {:error, "Image not found"}
     else
       tmp_output_file = "#{@temp_dir}/#{image.id}"
@@ -28,13 +28,13 @@ defmodule YscWeb.Workers.ImageProcessor do
       optimized_output_path = "#{tmp_output_file}_optimized"
       thumbnail_output_path = "#{tmp_output_file}_thumb"
 
-      Logger.info(tmp_output_file)
-      Logger.info(optimized_output_path)
-      Logger.info(thumbnail_output_path)
+      Ysc.Logging.info(tmp_output_file)
+      Ysc.Logging.info(optimized_output_path)
+      Ysc.Logging.info(thumbnail_output_path)
 
       make_temp_dir(@temp_dir)
 
-      Logger.info("Started work on Image: #{image.id}")
+      Ysc.Logging.info("Started work on Image: #{image.id}")
 
       try do
         # Start working on this image
@@ -61,7 +61,10 @@ defmodule YscWeb.Workers.ImageProcessor do
             :ok
 
           {:error, reason} ->
-            Logger.error("Image validation failed for #{image.id}: #{reason}")
+            Ysc.Logging.error(
+              "Image validation failed for #{image.id}: #{reason}"
+            )
+
             Media.set_image_processing_state(image, :failed)
             raise "File validation failed: #{reason}"
         end
@@ -74,8 +77,11 @@ defmodule YscWeb.Workers.ImageProcessor do
             optimized_output_path
           )
 
-        Logger.info("Image processing completed successfully for: #{image.id}")
-        Logger.info("Result: #{inspect(result)}")
+        Ysc.Logging.info(
+          "Image processing completed successfully for: #{image.id}"
+        )
+
+        Ysc.Logging.info("Result: #{inspect(result)}")
 
         # Get the actual file paths with correct extensions for cleanup
         # The process_image_upload function will have set the correct extensions
@@ -86,10 +92,13 @@ defmodule YscWeb.Workers.ImageProcessor do
         {:ok, result}
       rescue
         e ->
-          Logger.error("Image processing failed for #{image.id}: #{inspect(e)}")
-          Logger.error("Error type: #{inspect(e.__struct__)}")
-          Logger.error("Stacktrace:")
-          Logger.error(Exception.format_stacktrace(__STACKTRACE__))
+          Ysc.Logging.error(
+            "Image processing failed for #{image.id}: #{inspect(e)}"
+          )
+
+          Ysc.Logging.error("Error type: #{inspect(e.__struct__)}")
+          Ysc.Logging.error("Stacktrace:")
+          Ysc.Logging.error(Exception.format_stacktrace(__STACKTRACE__))
 
           # Update image state to failed
           try do
@@ -101,12 +110,12 @@ defmodule YscWeb.Workers.ImageProcessor do
           {:error, e}
       catch
         kind, reason ->
-          Logger.error(
+          Ysc.Logging.error(
             "Image processing caught error for #{image.id}: #{inspect(kind)}, #{inspect(reason)}"
           )
 
-          Logger.error("Stacktrace:")
-          Logger.error(Exception.format_stacktrace(__STACKTRACE__))
+          Ysc.Logging.error("Stacktrace:")
+          Ysc.Logging.error(Exception.format_stacktrace(__STACKTRACE__))
 
           # Update image state to failed
           try do
@@ -117,7 +126,7 @@ defmodule YscWeb.Workers.ImageProcessor do
 
           {:error, {kind, reason}}
       after
-        Logger.info("Cleaning up generated files")
+        Ysc.Logging.info("Cleaning up generated files")
         # Clean up files - try multiple possible extensions
         cleanup_file(tmp_output_file)
         cleanup_file_with_extensions("#{tmp_output_file}_optimized")

@@ -13,7 +13,7 @@ defmodule YscWeb.PaymentSuccessLive do
   alias Ysc.Tickets
   alias Ysc.Repo
   import Ecto.Query
-  require Logger
+  require Ysc.Logging
 
   # Retry configuration
   @max_retries 5
@@ -42,7 +42,7 @@ defmodule YscWeb.PaymentSuccessLive do
                 {:ok, redirect(socket, to: redirect_path)}
 
               {:error, reason} ->
-                Logger.error(
+                Ysc.Logging.error(
                   "Failed to redirect from payment success after retries",
                   payment_intent_id: payment_intent_id,
                   user_id: user.id,
@@ -81,7 +81,7 @@ defmodule YscWeb.PaymentSuccessLive do
                  |> redirect(to: redirect_path)}
 
               {:error, reason} ->
-                Logger.error("Failed to redirect from payment failure",
+                Ysc.Logging.error("Failed to redirect from payment failure",
                   payment_intent_id: payment_intent_id,
                   user_id: user.id,
                   redirect_status: redirect_status,
@@ -165,7 +165,7 @@ defmodule YscWeb.PaymentSuccessLive do
 
     cond do
       elapsed >= @total_timeout_ms ->
-        Logger.warning("Retry timeout exceeded",
+        Ysc.Logging.warning("Retry timeout exceeded",
           elapsed_ms: elapsed,
           attempt: attempt
         )
@@ -173,7 +173,7 @@ defmodule YscWeb.PaymentSuccessLive do
         {:error, :timeout}
 
       attempt >= @max_retries ->
-        Logger.warning("Max retries exceeded",
+        Ysc.Logging.warning("Max retries exceeded",
           attempt: attempt,
           elapsed_ms: elapsed
         )
@@ -184,7 +184,7 @@ defmodule YscWeb.PaymentSuccessLive do
         case fun.() do
           {:ok, _} = success ->
             if attempt > 0 do
-              Logger.info("Payment intent found after retry",
+              Ysc.Logging.info("Payment intent found after retry",
                 attempt: attempt,
                 elapsed_ms: elapsed
               )
@@ -241,7 +241,7 @@ defmodule YscWeb.PaymentSuccessLive do
         end
 
       {:error, reason} ->
-        Logger.debug("Failed to retrieve payment intent (will retry)",
+        Ysc.Logging.debug("Failed to retrieve payment intent (will retry)",
           payment_intent_id: payment_intent_id,
           error: reason
         )
@@ -313,7 +313,8 @@ defmodule YscWeb.PaymentSuccessLive do
         end
 
       {:error, reason} ->
-        Logger.debug("Failed to retrieve payment intent for failure redirect",
+        Ysc.Logging.debug(
+          "Failed to retrieve payment intent for failure redirect",
           payment_intent_id: payment_intent_id,
           error: reason
         )

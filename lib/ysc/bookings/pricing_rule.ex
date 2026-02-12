@@ -172,9 +172,9 @@ defmodule Ysc.Bookings.PricingRule do
         price_unit
       ) do
     alias Ysc.Bookings.PricingRuleCache
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[PricingRule] find_most_specific called. " <>
         "Property: #{property}, Season ID: #{inspect(season_id)}, " <>
         "Room ID: #{inspect(room_id)}, Room Category ID: #{inspect(room_category_id)}, " <>
@@ -202,7 +202,7 @@ defmodule Ysc.Bookings.PricingRule do
         price_unit
       ) do
     alias Ysc.Bookings.PricingRule
-    require Logger
+    require Ysc.Logging
 
     base_query = build_base_query(property, booking_mode, price_unit)
     query = apply_season_filter(base_query, season_id)
@@ -212,7 +212,7 @@ defmodule Ysc.Bookings.PricingRule do
     result = Ysc.Repo.one(query)
 
     if result do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[PricingRule] Found pricing rule: ID=#{result.id}, " <>
           "Amount=#{inspect(result.amount)}, " <>
           "Room ID=#{inspect(result.room_id)}, " <>
@@ -220,7 +220,7 @@ defmodule Ysc.Bookings.PricingRule do
           "Season ID=#{inspect(result.season_id)}"
       )
     else
-      Logger.debug(
+      Ysc.Logging.debug(
         "[PricingRule] No pricing rule found matching criteria. " <>
           "Checking if any rules exist for property #{property}..."
       )
@@ -233,7 +233,7 @@ defmodule Ysc.Bookings.PricingRule do
 
       total_count = Ysc.Repo.one(count_query)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[PricingRule] Total pricing rules for property #{property}: #{total_count}"
       )
 
@@ -247,7 +247,7 @@ defmodule Ysc.Bookings.PricingRule do
 
       matching_count = Ysc.Repo.one(matching_count_query)
 
-      Logger.debug(
+      Ysc.Logging.debug(
         "[PricingRule] Pricing rules matching booking_mode=#{booking_mode}, " <>
           "price_unit=#{price_unit}, property=#{property}: #{matching_count}"
       )
@@ -351,9 +351,9 @@ defmodule Ysc.Bookings.PricingRule do
         price_unit
       ) do
     alias Ysc.Bookings.PricingRuleCache
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[PricingRule] find_children_pricing_rule called. " <>
         "Property: #{property}, Season ID: #{inspect(season_id)}, " <>
         "Room ID: #{inspect(room_id)}, Room Category ID: #{inspect(room_category_id)}, " <>
@@ -380,9 +380,9 @@ defmodule Ysc.Bookings.PricingRule do
         booking_mode,
         price_unit
       ) do
-    require Logger
+    require Ysc.Logging
 
-    Logger.debug(
+    Ysc.Logging.debug(
       "[PricingRule] find_children_pricing_rule_db called. " <>
         "Property: #{property}, Season ID: #{inspect(season_id)}, " <>
         "Room ID: #{inspect(room_id)}, Room Category ID: #{inspect(room_category_id)}, " <>
@@ -397,7 +397,7 @@ defmodule Ysc.Bookings.PricingRule do
     result = Ysc.Repo.one(query)
 
     if result do
-      Logger.debug(
+      Ysc.Logging.debug(
         "[PricingRule] Found children pricing rule: ID=#{result.id}, " <>
           "Children Amount=#{inspect(result.children_amount)}, " <>
           "Room ID=#{inspect(result.room_id)}, " <>
@@ -405,7 +405,7 @@ defmodule Ysc.Bookings.PricingRule do
           "Season ID=#{inspect(result.season_id)}"
       )
     else
-      Logger.debug(
+      Ysc.Logging.debug(
         "[PricingRule] No children pricing rule found matching criteria."
       )
     end

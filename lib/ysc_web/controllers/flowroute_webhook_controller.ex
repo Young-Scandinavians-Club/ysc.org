@@ -4,7 +4,7 @@ defmodule YscWeb.FlowrouteWebhookController do
   """
   use YscWeb, :controller
 
-  require Logger
+  require Ysc.Logging
   alias Ysc.Sms
   alias Ysc.Accounts
 
@@ -12,7 +12,7 @@ defmodule YscWeb.FlowrouteWebhookController do
   Handles inbound SMS webhook from FlowRoute.
   """
   def handle_inbound_sms(conn, params) do
-    Logger.info("Received FlowRoute inbound SMS webhook",
+    Ysc.Logging.info("Received FlowRoute inbound SMS webhook",
       payload: inspect(params)
     )
 
@@ -23,7 +23,7 @@ defmodule YscWeb.FlowrouteWebhookController do
       message_id = get_in(data, ["id"])
 
       if is_nil(message_id) or is_nil(attributes) do
-        Logger.warning("Invalid inbound SMS webhook payload",
+        Ysc.Logging.warning("Invalid inbound SMS webhook payload",
           payload: inspect(params)
         )
 
@@ -70,7 +70,7 @@ defmodule YscWeb.FlowrouteWebhookController do
 
         case Sms.create_sms_received(attrs) do
           {:ok, sms_received} ->
-            Logger.info("Created SMS received record",
+            Ysc.Logging.info("Created SMS received record",
               provider: sms_received.provider,
               provider_message_id: sms_received.provider_message_id,
               from: sms_received.from,
@@ -86,7 +86,7 @@ defmodule YscWeb.FlowrouteWebhookController do
             send_resp(conn, 200, "OK")
 
           {:error, changeset} ->
-            Logger.warning("Failed to create SMS received record",
+            Ysc.Logging.warning("Failed to create SMS received record",
               provider: :flowroute,
               provider_message_id: message_id,
               errors: inspect(changeset.errors)
@@ -97,14 +97,9 @@ defmodule YscWeb.FlowrouteWebhookController do
       end
     rescue
       error ->
-        Logger.warning("Error processing inbound SMS webhook",
+        Ysc.Logging.warning("Error processing inbound SMS webhook",
           error: Exception.message(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{payload: params}
         )
 
         send_resp(conn, 500, "Internal error")
@@ -115,7 +110,7 @@ defmodule YscWeb.FlowrouteWebhookController do
   Handles delivery receipt (DLR) webhook from FlowRoute.
   """
   def handle_delivery_receipt(conn, params) do
-    Logger.info("Received FlowRoute delivery receipt webhook",
+    Ysc.Logging.info("Received FlowRoute delivery receipt webhook",
       payload: inspect(params)
     )
 
@@ -126,7 +121,7 @@ defmodule YscWeb.FlowrouteWebhookController do
       message_id = get_in(data, ["id"])
 
       if is_nil(message_id) or is_nil(attributes) do
-        Logger.warning("Invalid delivery receipt webhook payload",
+        Ysc.Logging.warning("Invalid delivery receipt webhook payload",
           payload: inspect(params)
         )
 
@@ -165,7 +160,7 @@ defmodule YscWeb.FlowrouteWebhookController do
 
         case Sms.create_delivery_receipt(attrs) do
           {:ok, delivery_receipt} ->
-            Logger.info("Created delivery receipt record",
+            Ysc.Logging.info("Created delivery receipt record",
               provider: delivery_receipt.provider,
               provider_message_id: delivery_receipt.provider_message_id,
               status: delivery_receipt.status,
@@ -183,7 +178,7 @@ defmodule YscWeb.FlowrouteWebhookController do
             send_resp(conn, 200, "OK")
 
           {:error, changeset} ->
-            Logger.warning("Failed to create delivery receipt record",
+            Ysc.Logging.warning("Failed to create delivery receipt record",
               provider: :flowroute,
               provider_message_id: message_id,
               errors: inspect(changeset.errors)
@@ -194,14 +189,9 @@ defmodule YscWeb.FlowrouteWebhookController do
       end
     rescue
       error ->
-        Logger.error("Error processing delivery receipt webhook",
+        Ysc.Logging.error("Error processing delivery receipt webhook",
           error: Exception.message(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-        )
-
-        Sentry.capture_exception(error,
-          stacktrace: __STACKTRACE__,
-          extra: %{payload: params}
         )
 
         send_resp(conn, 500, "Internal error")
@@ -302,7 +292,7 @@ defmodule YscWeb.FlowrouteWebhookController do
   defp handle_opt_in(sms_received) do
     case Accounts.get_user_by_phone_number(sms_received.from) do
       nil ->
-        Logger.info("Opt-in request from unknown phone number",
+        Ysc.Logging.info("Opt-in request from unknown phone number",
           phone_number: sms_received.from,
           provider_message_id: sms_received.provider_message_id
         )
@@ -311,7 +301,7 @@ defmodule YscWeb.FlowrouteWebhookController do
         send_opt_in_response(sms_received.from, sms_received.to)
 
       user ->
-        Logger.info("Processing opt-in request",
+        Ysc.Logging.info("Processing opt-in request",
           user_id: user.id,
           phone_number: sms_received.from,
           provider_message_id: sms_received.provider_message_id
@@ -323,7 +313,7 @@ defmodule YscWeb.FlowrouteWebhookController do
                "event_notifications_sms" => "true"
              }) do
           {:ok, _updated_user} ->
-            Logger.info("User opted in to SMS notifications",
+            Ysc.Logging.info("User opted in to SMS notifications",
               user_id: user.id,
               phone_number: sms_received.from
             )
@@ -331,19 +321,11 @@ defmodule YscWeb.FlowrouteWebhookController do
             send_opt_in_response(sms_received.from, sms_received.to)
 
           {:error, changeset} ->
-            Logger.error("Failed to update notification preferences for opt-in",
+            Ysc.Logging.error(
+              "Failed to update notification preferences for opt-in",
               user_id: user.id,
               phone_number: sms_received.from,
               errors: inspect(changeset.errors)
-            )
-
-            Sentry.capture_message("Failed to process SMS opt-in",
-              level: :error,
-              extra: %{
-                user_id: user.id,
-                phone_number: sms_received.from,
-                errors: inspect(changeset.errors)
-              }
             )
 
             # Still send response even if update failed
@@ -356,7 +338,7 @@ defmodule YscWeb.FlowrouteWebhookController do
   defp handle_opt_out(sms_received) do
     case Accounts.get_user_by_phone_number(sms_received.from) do
       nil ->
-        Logger.info("Opt-out request from unknown phone number",
+        Ysc.Logging.info("Opt-out request from unknown phone number",
           phone_number: sms_received.from,
           provider_message_id: sms_received.provider_message_id
         )
@@ -365,7 +347,7 @@ defmodule YscWeb.FlowrouteWebhookController do
         send_opt_out_response(sms_received.from, sms_received.to)
 
       user ->
-        Logger.info("Processing opt-out request",
+        Ysc.Logging.info("Processing opt-out request",
           user_id: user.id,
           phone_number: sms_received.from,
           provider_message_id: sms_received.provider_message_id
@@ -377,7 +359,7 @@ defmodule YscWeb.FlowrouteWebhookController do
                "event_notifications_sms" => "false"
              }) do
           {:ok, _updated_user} ->
-            Logger.info("User opted out of SMS notifications",
+            Ysc.Logging.info("User opted out of SMS notifications",
               user_id: user.id,
               phone_number: sms_received.from
             )
@@ -385,20 +367,11 @@ defmodule YscWeb.FlowrouteWebhookController do
             send_opt_out_response(sms_received.from, sms_received.to)
 
           {:error, changeset} ->
-            Logger.error(
+            Ysc.Logging.error(
               "Failed to update notification preferences for opt-out",
               user_id: user.id,
               phone_number: sms_received.from,
               errors: inspect(changeset.errors)
-            )
-
-            Sentry.capture_message("Failed to process SMS opt-out",
-              level: :error,
-              extra: %{
-                user_id: user.id,
-                phone_number: sms_received.from,
-                errors: inspect(changeset.errors)
-              }
             )
 
             # Still send response even if update failed
@@ -409,7 +382,7 @@ defmodule YscWeb.FlowrouteWebhookController do
 
   # Handle help request
   defp handle_help(sms_received) do
-    Logger.info("Processing help request",
+    Ysc.Logging.info("Processing help request",
       phone_number: sms_received.from,
       provider_message_id: sms_received.provider_message_id
     )
@@ -455,28 +428,18 @@ defmodule YscWeb.FlowrouteWebhookController do
 
     case Ysc.Messages.run_send_sms_idempotent(to, body, attrs) do
       {:ok, %{id: _message_id}} ->
-        Logger.info("Sent SMS response",
+        Ysc.Logging.info("Sent SMS response",
           template: template,
           to: to,
           from: from
         )
 
       {:error, reason} ->
-        Logger.error("Failed to send SMS response",
+        Ysc.Logging.error("Failed to send SMS response",
           template: template,
           to: to,
           from: from,
           error: reason
-        )
-
-        Sentry.capture_message("Failed to send SMS response",
-          level: :error,
-          extra: %{
-            template: template,
-            to: to,
-            from: from,
-            error: inspect(reason)
-          }
         )
     end
   end
