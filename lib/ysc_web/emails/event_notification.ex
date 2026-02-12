@@ -49,10 +49,12 @@ defmodule YscWeb.Emails.EventNotification do
 
     # Ensure event is loaded with necessary associations
     event =
-      if Ecto.assoc_loaded?(event.organizer) do
+      if Ecto.assoc_loaded?(event.organizer) &&
+           Ecto.assoc_loaded?(event.cover_image) do
         event
       else
-        case Repo.get(Event, event.id) |> Repo.preload([:organizer]) do
+        case Repo.get(Event, event.id)
+             |> Repo.preload([:organizer, :cover_image]) do
           nil ->
             raise ArgumentError, "Event not found: #{event.id}"
 
@@ -63,6 +65,9 @@ defmodule YscWeb.Emails.EventNotification do
 
     # Format event date and time
     event_date_time = format_event_datetime(event)
+
+    # Get event image URL
+    event_image_url = get_event_image_url(event)
 
     # Convert event struct to plain map for JSON serialization
     # Only include fields needed by the email template
@@ -91,7 +96,8 @@ defmodule YscWeb.Emails.EventNotification do
       first_name: user.first_name || "Valued Member",
       event: event_map,
       event_date_time: event_date_time,
-      event_url: event_url(event.id)
+      event_url: event_url(event.id),
+      event_image_url: event_image_url
     }
   end
 
@@ -116,6 +122,20 @@ defmodule YscWeb.Emails.EventNotification do
         # Convert to PST
         pst_datetime = DateTime.shift_zone!(datetime, "America/Los_Angeles")
         Calendar.strftime(pst_datetime, "%B %d, %Y at %I:%M %p %Z")
+    end
+  end
+
+  defp get_event_image_url(event) do
+    cond do
+      # If cover_image association is loaded and exists
+      Ecto.assoc_loaded?(event.cover_image) && event.cover_image ->
+        # Prefer optimized image, fall back to raw image
+        event.cover_image.optimized_image_path ||
+          event.cover_image.raw_image_path
+
+      # No image available
+      true ->
+        nil
     end
   end
 end

@@ -6,6 +6,13 @@
     </mj-text>
   </mj-column>
 </mj-section>
+<%= if @event_image_url do %>
+<mj-section background-color="#fff" padding="0px 48px">
+  <mj-column padding="0">
+    <mj-image src="<%= @event_image_url %>" alt="<%= @event.title %>" border-radius="8px" padding="0px"></mj-image>
+  </mj-column>
+</mj-section>
+<% end %>
 <mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
   <mj-column padding="0">
     <mj-spacer height="12px"></mj-spacer>
