@@ -1669,12 +1669,14 @@ defmodule YscWeb.AdminMoneyLive do
                     </.badge>
                     <%= if expense_report.quickbooks_sync_error do %>
                       <.tooltip
-                        tooltip_text={expense_report.quickbooks_sync_error}
+                        tooltip_text={
+                          format_qb_error(expense_report.quickbooks_sync_error)
+                        }
                         max_width="max-w-md"
                         text_align="text-left"
                       >
                         <span class="text-xs text-red-600 mt-1 truncate max-w-xs cursor-help">
-                          <%= expense_report.quickbooks_sync_error %>
+                          <%= format_qb_error(expense_report.quickbooks_sync_error) %>
                         </span>
                       </.tooltip>
                     <% end %>
@@ -2141,6 +2143,81 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
           </div>
         </div>
+        <!-- QuickBooks Information -->
+        <div class="mb-6 p-4 bg-amber-50 rounded border border-amber-200">
+          <h4 class="text-md font-semibold text-zinc-800 mb-3">
+            QuickBooks Information
+          </h4>
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="font-medium text-zinc-700">Sync Status</p>
+              <p class="text-zinc-900">
+                <.badge type={
+                  get_quickbooks_sync_status_badge_type(
+                    @selected_payout.quickbooks_sync_status
+                  )
+                }>
+                  <%= String.capitalize(
+                    @selected_payout.quickbooks_sync_status || "not_synced"
+                  ) %>
+                </.badge>
+              </p>
+            </div>
+            <%= if @selected_payout.quickbooks_payout_id do %>
+              <div>
+                <p class="font-medium text-zinc-700">QuickBooks Payout ID</p>
+                <p class="text-zinc-900 font-mono text-xs">
+                  <%= @selected_payout.quickbooks_payout_id %>
+                </p>
+              </div>
+            <% end %>
+            <%= if @selected_payout.quickbooks_synced_at do %>
+              <div>
+                <p class="font-medium text-zinc-700">Synced At</p>
+                <p class="text-zinc-900 text-xs">
+                  <%= Calendar.strftime(
+                    @selected_payout.quickbooks_synced_at,
+                    "%Y-%m-%d %H:%M:%S"
+                  ) %>
+                </p>
+              </div>
+            <% end %>
+            <%= if @selected_payout.quickbooks_last_sync_attempt_at do %>
+              <div>
+                <p class="font-medium text-zinc-700">Last Sync Attempt</p>
+                <p class="text-zinc-900 text-xs">
+                  <%= Calendar.strftime(
+                    @selected_payout.quickbooks_last_sync_attempt_at,
+                    "%Y-%m-%d %H:%M:%S"
+                  ) %>
+                </p>
+              </div>
+            <% end %>
+            <%= if @selected_payout.quickbooks_sync_error do %>
+              <div class="col-span-2">
+                <p class="font-medium text-zinc-700">Sync Error</p>
+                <.tooltip
+                  tooltip_text={
+                    format_qb_error(@selected_payout.quickbooks_sync_error)
+                  }
+                  max_width="max-w-md"
+                  text_align="text-left"
+                >
+                  <p class="text-red-600 text-xs cursor-help">
+                    <%= format_qb_error(@selected_payout.quickbooks_sync_error) %>
+                  </p>
+                </.tooltip>
+              </div>
+            <% end %>
+            <%= if !@selected_payout.quickbooks_payout_id && !@selected_payout.quickbooks_sync_status do %>
+              <div class="col-span-2">
+                <p class="text-zinc-500 text-xs italic">
+                  Not yet synced to QuickBooks
+                </p>
+              </div>
+            <% end %>
+          </div>
+        </div>
         <!-- Associated Payments -->
         <div class="mb-6">
           <h4 class="text-md font-semibold text-zinc-800 mb-3">
@@ -2164,6 +2241,9 @@ defmodule YscWeb.AdminMoneyLive do
                   </th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
                     Status
+                  </th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    QB Status
                   </th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
                     Date
@@ -2196,6 +2276,32 @@ defmodule YscWeb.AdminMoneyLive do
                     <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
                       <%= payment.status %>
                     </span>
+                  </td>
+                  <td class="px-4 py-2 whitespace-nowrap">
+                    <div class="flex flex-col">
+                      <.badge type={
+                        get_quickbooks_sync_status_badge_type(
+                          payment.quickbooks_sync_status
+                        )
+                      }>
+                        <%= String.capitalize(
+                          payment.quickbooks_sync_status || "not_synced"
+                        ) %>
+                      </.badge>
+                      <%= if payment.quickbooks_sync_error do %>
+                        <.tooltip
+                          tooltip_text={
+                            format_qb_error(payment.quickbooks_sync_error)
+                          }
+                          max_width="max-w-md"
+                          text_align="text-left"
+                        >
+                          <span class="text-xs text-red-600 mt-1 cursor-help">
+                            Error
+                          </span>
+                        </.tooltip>
+                      <% end %>
+                    </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
                     <%= Calendar.strftime(payment.payment_date, "%Y-%m-%d %H:%M") %>
@@ -2258,6 +2364,9 @@ defmodule YscWeb.AdminMoneyLive do
                     Status
                   </th>
                   <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    QB Status
+                  </th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
                     Date
                   </th>
                 </tr>
@@ -2293,6 +2402,32 @@ defmodule YscWeb.AdminMoneyLive do
                     <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
                       <%= refund.status %>
                     </span>
+                  </td>
+                  <td class="px-4 py-2 whitespace-nowrap">
+                    <div class="flex flex-col">
+                      <.badge type={
+                        get_quickbooks_sync_status_badge_type(
+                          refund.quickbooks_sync_status
+                        )
+                      }>
+                        <%= String.capitalize(
+                          refund.quickbooks_sync_status || "not_synced"
+                        ) %>
+                      </.badge>
+                      <%= if refund.quickbooks_sync_error do %>
+                        <.tooltip
+                          tooltip_text={
+                            format_qb_error(refund.quickbooks_sync_error)
+                          }
+                          max_width="max-w-md"
+                          text_align="text-left"
+                        >
+                          <span class="text-xs text-red-600 mt-1 cursor-help">
+                            Error
+                          </span>
+                        </.tooltip>
+                      <% end %>
+                    </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
                     <%= Calendar.strftime(refund.inserted_at, "%Y-%m-%d %H:%M") %>
@@ -2466,11 +2601,72 @@ defmodule YscWeb.AdminMoneyLive do
                 <%= String.slice(@selected_payment.external_payment_id, 0..20) %>...
               </p>
             </div>
-            <div :if={@selected_payment.quickbooks_sales_receipt_id}>
-              <p class="text-sm font-medium text-zinc-700">QuickBooks Receipt ID</p>
-              <p class="text-sm text-green-600 font-mono text-xs">
-                <%= @selected_payment.quickbooks_sales_receipt_id %>
-              </p>
+          </div>
+          <!-- QuickBooks Information -->
+          <div class="mt-4 p-4 bg-amber-50 rounded border border-amber-200">
+            <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+              QuickBooks Information
+            </h4>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="font-medium text-zinc-700">Sync Status</p>
+                <p class="text-zinc-900">
+                  <.badge type={
+                    get_quickbooks_sync_status_badge_type(
+                      @selected_payment.quickbooks_sync_status
+                    )
+                  }>
+                    <%= String.capitalize(
+                      @selected_payment.quickbooks_sync_status || "not_synced"
+                    ) %>
+                  </.badge>
+                </p>
+              </div>
+              <%= if @selected_payment.quickbooks_sales_receipt_id do %>
+                <div>
+                  <p class="font-medium text-zinc-700">Sales Receipt ID</p>
+                  <p class="text-zinc-900 font-mono text-xs">
+                    <%= @selected_payment.quickbooks_sales_receipt_id %>
+                  </p>
+                </div>
+              <% end %>
+              <%= if @selected_payment.quickbooks_synced_at do %>
+                <div>
+                  <p class="font-medium text-zinc-700">Synced At</p>
+                  <p class="text-zinc-900 text-xs">
+                    <%= Calendar.strftime(
+                      @selected_payment.quickbooks_synced_at,
+                      "%Y-%m-%d %H:%M:%S"
+                    ) %>
+                  </p>
+                </div>
+              <% end %>
+              <%= if @selected_payment.quickbooks_last_sync_attempt_at do %>
+                <div>
+                  <p class="font-medium text-zinc-700">Last Sync Attempt</p>
+                  <p class="text-zinc-900 text-xs">
+                    <%= Calendar.strftime(
+                      @selected_payment.quickbooks_last_sync_attempt_at,
+                      "%Y-%m-%d %H:%M:%S"
+                    ) %>
+                  </p>
+                </div>
+              <% end %>
+              <%= if @selected_payment.quickbooks_sync_error do %>
+                <div class="col-span-2">
+                  <p class="font-medium text-zinc-700">Sync Error</p>
+                  <p class="text-red-600 text-xs">
+                    <%= format_qb_error(@selected_payment.quickbooks_sync_error) %>
+                  </p>
+                </div>
+              <% end %>
+              <%= if !@selected_payment.quickbooks_sales_receipt_id && !@selected_payment.quickbooks_sync_status do %>
+                <div class="col-span-2">
+                  <p class="text-zinc-500 text-xs italic">
+                    Not yet synced to QuickBooks
+                  </p>
+                </div>
+              <% end %>
             </div>
           </div>
           <!-- Related Entity -->
@@ -2548,6 +2744,9 @@ defmodule YscWeb.AdminMoneyLive do
                       Status
                     </th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                      QB Status
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
                       Date
                     </th>
                   </tr>
@@ -2569,6 +2768,32 @@ defmodule YscWeb.AdminMoneyLive do
                       <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
                         <%= String.capitalize(to_string(refund.status || "unknown")) %>
                       </span>
+                    </td>
+                    <td class="px-4 py-2 whitespace-nowrap">
+                      <div class="flex flex-col">
+                        <.badge type={
+                          get_quickbooks_sync_status_badge_type(
+                            refund.quickbooks_sync_status
+                          )
+                        }>
+                          <%= String.capitalize(
+                            refund.quickbooks_sync_status || "not_synced"
+                          ) %>
+                        </.badge>
+                        <%= if refund.quickbooks_sync_error do %>
+                          <.tooltip
+                            tooltip_text={
+                              format_qb_error(refund.quickbooks_sync_error)
+                            }
+                            max_width="max-w-md"
+                            text_align="text-left"
+                          >
+                            <span class="text-xs text-red-600 mt-1 cursor-help">
+                              Error
+                            </span>
+                          </.tooltip>
+                        <% end %>
+                      </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-xs">
                       <%= Calendar.strftime(refund.inserted_at, "%Y-%m-%d %H:%M") %>
@@ -2856,7 +3081,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div class="col-span-2">
                 <p class="font-medium text-zinc-700">Sync Error</p>
                 <p class="text-red-600 text-xs">
-                  <%= @selected_expense_report.quickbooks_sync_error %>
+                  <%= format_qb_error(
+                    @selected_expense_report.quickbooks_sync_error
+                  ) %>
                 </p>
               </div>
             <% end %>
@@ -3056,6 +3283,19 @@ defmodule YscWeb.AdminMoneyLive do
       {:error, _} -> DateTime.utc_now()
     end
   end
+
+  # Format QuickBooks sync error for display (can be string, map, or nil)
+  defp format_qb_error(nil), do: ""
+  defp format_qb_error(error) when is_binary(error), do: error
+
+  defp format_qb_error(error) when is_map(error) do
+    case Jason.encode(error, pretty: true) do
+      {:ok, json} -> json
+      {:error, _} -> inspect(error)
+    end
+  end
+
+  defp format_qb_error(error), do: inspect(error)
 
   defp get_payment_type_color(payment_type) do
     case payment_type do
