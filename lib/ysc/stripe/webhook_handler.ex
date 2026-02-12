@@ -193,13 +193,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           # Process in a separate function that handles its own errors
           # The webhook is stored, so we can safely return :ok to Stripe
           # even if processing fails (we'll mark it as failed for retry)
-          case process_webhook_event(webhook_event, event) do
-            :ok ->
-              :ok
-
-            {:error, :webhook_not_found} ->
-              {:error, :webhook_not_found}
-          end
+          process_webhook_event(webhook_event, event)
 
           :ok
 
