@@ -749,13 +749,46 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           }
         },
         event_date_time: "Dec 1, 2024 at 10:00 AM",
-        event_url: "https://example.com/events/123"
+        event_url: "https://example.com/events/123",
+        event_image_url: nil
       }
 
       html = EventNotification.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
       assert EventNotification.get_template_name() == "event_notification"
+    end
+
+    test "EventNotification renders with event image", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        event: %{
+          id: "EVT-123",
+          title: "Test Event with Image",
+          description: "A test event with cover image",
+          start_date: ~D[2024-12-01],
+          start_time: ~T[10:00:00],
+          end_date: nil,
+          end_time: nil,
+          location_name: "Test Location",
+          address: "123 Test St",
+          age_restriction: 21,
+          organizer: %{
+            first_name: "John",
+            last_name: "Doe"
+          }
+        },
+        event_date_time: "Dec 1, 2024 at 10:00 AM",
+        event_url: "https://example.com/events/123",
+        event_image_url: "https://example.com/images/event-cover.jpg"
+      }
+
+      html = EventNotification.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      # Verify image URL is in the rendered HTML
+      assert html =~ "https://example.com/images/event-cover.jpg"
+      assert html =~ "Test Event with Image"
     end
 
     test "ExpenseReportConfirmation renders", %{user: user} do

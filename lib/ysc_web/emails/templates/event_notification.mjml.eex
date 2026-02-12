@@ -1,58 +1,59 @@
-<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding="48px 48px 24px 48px">
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>New Event: <%= @event.title %></strong>
+      <strong>Will we see you at <%= @event.title %>?</strong>
     </mj-text>
   </mj-column>
 </mj-section>
-<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+<%= if @event_image_url do %>
+<mj-section background-color="#fff" padding="0px 48px">
   <mj-column padding="0">
-    <mj-spacer height="12px"></mj-spacer>
+    <mj-image src="<%= @event_image_url %>" alt="<%= @event.title %>" border-radius="8px" padding="0px"></mj-image>
+  </mj-column>
+</mj-section>
+<% end %>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding="20px 48px 48px 48px">
+  <mj-column padding="0">
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
-    <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We're excited to announce a new event! <%= @event.title %> has just been published.</mj-text>
-    <mj-spacer height="24px"></mj-spacer>
-    <!-- Event Details -->
-    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Event Details</mj-text>
-    <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
-      <strong><%= @event.title %></strong>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      We've just added a new event to the calendar. We'd love to see you there!
     </mj-text>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-text align="left" font-size="22px" line-height="1.4" padding="0px" font-weight="bold" color="#1447e6">
+      <%= @event.title %>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
     <%= if @event.description do %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @event.description %></mj-text>
-    <% end %>
-    <mj-spacer height="12px"></mj-spacer>
-    <%= if @event_date_time do %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Date & Time:</strong> <%= @event_date_time %>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#444444">
+      <%= @event.description %>
     </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
     <% end %>
-    <%= if @event.location_name do %>
-    <mj-spacer height="4px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Location:</strong> <%= @event.location_name %>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px">
+      <%= if @event_date_time do %>
+      <strong>📅 Date &amp; Time:</strong> <%= @event_date_time %><br />
+      <% end %>
+      <%= if @event.location_name do %>
+      <strong>📍 Location:</strong> <%= @event.location_name %><br />
+      <% end %>
+      <%= if @event.address do %>
+      <span style="color: #6B7280; font-size: 14px;"><%= @event.address %></span><br />
+      <% end %>
+      <%= if @event.age_restriction && @event.age_restriction > 0 do %>
+      <strong>🎂 Age Restriction:</strong> <%= @event.age_restriction %>+ years old
+      <% end %>
     </mj-text>
-    <% end %>
-    <%= if @event.address do %>
-    <mj-spacer height="4px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Address:</strong> <%= @event.address %>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="16px 32px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" font-weight="bold" border-radius="6px">
+      View Event &amp; RSVP →
+    </mj-button>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
+      Vi ses!<br />
+      <strong>The Young Scandinavians Club</strong>
     </mj-text>
-    <% end %>
-    <%= if @event.age_restriction && @event.age_restriction > 0 do %>
-    <mj-spacer height="4px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Age Restriction:</strong> <%= @event.age_restriction %>+ years old
-    </mj-text>
-    <% end %>
-    <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Event Details →</mj-button>
-    <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We hope to see you there!</mj-text>
-    <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
-    <mj-spacer height="12px"></mj-spacer>
   </mj-column>
 </mj-section>
 
