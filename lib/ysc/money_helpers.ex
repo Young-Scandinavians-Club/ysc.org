@@ -18,18 +18,28 @@ defmodule Ysc.MoneyHelper do
   def parse_money(""), do: nil
 
   def parse_money(string) when is_binary(string) do
-    case string |> String.replace(",", "") |> Decimal.parse() do
-      :error ->
-        nil
+    cleaned =
+      string
+      |> String.replace(",", "")
+      |> String.replace("$", "")
+      |> String.trim()
 
-      {decimal, ""} ->
-        Money.new(:USD, decimal)
+    if cleaned == "" do
+      nil
+    else
+      case Decimal.parse(cleaned) do
+        :error ->
+          nil
 
-      {decimal, _} ->
-        Money.new(:USD, decimal)
+        {decimal, ""} ->
+          Money.new(:USD, decimal)
 
-      _ ->
-        nil
+        {decimal, _} ->
+          Money.new(:USD, decimal)
+
+        _ ->
+          nil
+      end
     end
   end
 

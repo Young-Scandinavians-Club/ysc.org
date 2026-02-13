@@ -208,17 +208,29 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     # Handle cases where params might not have the expected structure
     ticket_tier_params = params["ticket_tier"] || params
 
-    ticket_tier_params =
-      ticket_tier_params
+    # Merge with existing form values to preserve fields that may be missing from params
+    # (e.g. price when conditionally rendered, or when type changes before price is entered)
+    existing_values =
+      if socket.assigns[:form] do
+        get_existing_form_values(socket.assigns.form)
+      else
+        %{}
+      end
+
+    merged_params =
+      Map.merge(existing_values, ticket_tier_params)
+      # Preserve price when params has empty price but form had valid price (e.g. quantity
+      # change triggers phx-change; price input may not submit its value in some cases)
+      |> preserve_price_if_empty(existing_values)
       |> maybe_parse_price()
       |> maybe_set_free_price()
       |> maybe_set_unlimited_quantity()
 
     changeset =
       if socket.assigns[:ticket_tier] do
-        TicketTier.changeset(socket.assigns.ticket_tier, ticket_tier_params)
+        TicketTier.changeset(socket.assigns.ticket_tier, merged_params)
       else
-        TicketTier.changeset(%TicketTier{}, ticket_tier_params)
+        TicketTier.changeset(%TicketTier{}, merged_params)
       end
       |> Map.put(:action, :validate)
 
@@ -333,6 +345,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     NaiveDateTime.to_iso8601(dt)
   end
 
+  # nil must come before is_atom - prevents storing literal "nil" string for empty fields
+  defp format_form_value(nil), do: ""
+
   defp format_form_value(value) when is_atom(value) do
     Atom.to_string(value)
   end
@@ -356,11 +371,46 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     start
   end
 
+  # When incoming params have empty price but form had valid price (e.g. user changed
+  # quantity and price input didn't submit), preserve the existing price for paid tiers.
+  defp preserve_price_if_empty(merged_params, existing_values) do
+    incoming_price = merged_params["price"]
+    existing_price = existing_values["price"]
+    type = merged_params["type"]
+
+    price_is_empty =
+      incoming_price in [nil, ""] or
+        (is_binary(incoming_price) and String.trim(incoming_price) == "")
+
+    existing_has_valid_price =
+      existing_price != nil &&
+        existing_price != "" &&
+        (is_binary(existing_price) && String.trim(existing_price) != "")
+
+    if price_is_empty and existing_has_valid_price and paid_type?(type) do
+      Map.put(merged_params, "price", existing_price)
+    else
+      merged_params
+    end
+  end
+
   defp maybe_parse_price(params) do
     case params["price"] do
-      nil -> params
-      "" -> params
-      price -> Map.put(params, "price", Ysc.MoneyHelper.parse_money(price))
+      nil ->
+        params
+
+      "" ->
+        params
+
+      price when is_binary(price) ->
+        if String.trim(price) == "" do
+          params
+        else
+          Map.put(params, "price", Ysc.MoneyHelper.parse_money(price))
+        end
+
+      price ->
+        Map.put(params, "price", Ysc.MoneyHelper.parse_money(price))
     end
   end
 

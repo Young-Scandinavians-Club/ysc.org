@@ -9,6 +9,11 @@ defmodule Ysc.MoneyHelperTest do
       assert Money.new(:USD, "0.99") == MoneyHelper.parse_money("0.99")
     end
 
+    test "parses strings with dollar sign" do
+      assert Money.new(:USD, "23.00") == MoneyHelper.parse_money("$23.00")
+      assert Money.new(:USD, "1.50") == MoneyHelper.parse_money("$1.50")
+    end
+
     test "returns nil for invalid input" do
       assert nil == MoneyHelper.parse_money("invalid")
       assert nil == MoneyHelper.parse_money(nil)
