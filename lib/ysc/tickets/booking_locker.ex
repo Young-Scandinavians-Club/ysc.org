@@ -669,7 +669,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
     case %TicketOrder{}
          |> TicketOrder.create_changeset(attrs)
-         |> Repo.insert() do
+         |> Repo.insert_with_reference_retry(TicketOrder) do
       {:ok, ticket_order} ->
         # Schedule timeout check for this specific order
         Ysc.Tickets.TimeoutWorker.schedule_order_timeout(
@@ -784,11 +784,18 @@ defmodule Ysc.Tickets.BookingLocker do
         reserved_tickets ++ non_reserved_tickets
       end)
 
-    # Insert all tickets
-    Enum.map(tickets, &Repo.insert!/1)
-    |> case do
-      tickets when is_list(tickets) -> {:ok, tickets}
-      error -> {:error, error}
+    # Insert all tickets (with reference_id retry on collision)
+    tickets_result =
+      Enum.reduce_while(tickets, {:ok, []}, fn ticket_cs, {:ok, acc} ->
+        case Repo.insert_with_reference_retry(ticket_cs, Ticket) do
+          {:ok, t} -> {:cont, {:ok, [t | acc]}}
+          {:error, cs} -> {:halt, {:error, cs}}
+        end
+      end)
+
+    case tickets_result do
+      {:ok, list} -> {:ok, Enum.reverse(list)}
+      {:error, _} = err -> err
     end
   end
 

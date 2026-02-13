@@ -2,6 +2,7 @@ defmodule YscWeb.AdminSettingsLive do
   alias Ysc.Settings
   alias Ysc.Repo
   alias Oban.Job
+  alias Phoenix.LiveView.JS
 
   use Phoenix.LiveView,
     layout: {YscWeb.Layouts, :admin_app}
@@ -15,6 +16,7 @@ defmodule YscWeb.AdminSettingsLive do
 
   import Ecto.Query
 
+  @impl true
   def render(assigns) do
     ~H"""
     <.side_menu
@@ -92,12 +94,101 @@ defmodule YscWeb.AdminSettingsLive do
             /> System Dashboard
           </.link>
         </div>
+        <!-- Queue Statistics -->
+        <div class="w-full py-4">
+          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-4">
+            Queue Statistics
+          </h2>
+          <div
+            :if={!@oban_data_loaded}
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            <%= for _i <- 1..3 do %>
+              <div class="bg-white shadow rounded-lg p-4 animate-pulse">
+                <div class="h-5 bg-zinc-200 rounded w-24 mb-3"></div>
+                <div class="space-y-2">
+                  <%= for _j <- 1..6 do %>
+                    <div class="flex justify-between">
+                      <div class="h-4 bg-zinc-100 rounded w-20"></div>
+                      <div class="h-4 bg-zinc-100 rounded w-8"></div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+          <div
+            :if={@oban_data_loaded}
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            <%= for {queue, stats} <- @queue_stats do %>
+              <div class="bg-white shadow rounded-lg p-4">
+                <h3 class="font-semibold text-zinc-900 mb-3"><%= queue %></h3>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="text-zinc-600">Available</span>
+                    <.badge type="default" class="!me-0">
+                      <%= Map.get(stats, "available", 0) %>
+                    </.badge>
+                  </div>
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="text-zinc-600">Executing</span>
+                    <.badge type="yellow" class="!me-0">
+                      <%= Map.get(stats, "executing", 0) %>
+                    </.badge>
+                  </div>
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="text-zinc-600">Scheduled</span>
+                    <.badge type="sky" class="!me-0">
+                      <%= Map.get(stats, "scheduled", 0) %>
+                    </.badge>
+                  </div>
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="text-zinc-600">Retryable</span>
+                    <.badge type="yellow" class="!me-0">
+                      <%= Map.get(stats, "retryable", 0) %>
+                    </.badge>
+                  </div>
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="text-zinc-600">Completed</span>
+                    <.badge type="green" class="!me-0">
+                      <%= Map.get(stats, "completed", 0) %>
+                    </.badge>
+                  </div>
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="text-zinc-600">Discarded</span>
+                    <.badge type="red" class="!me-0">
+                      <%= Map.get(stats, "discarded", 0) %>
+                    </.badge>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
         <!-- Recent Oban Jobs -->
         <div class="w-full py-4">
           <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-4">
             Recent Oban Jobs
           </h2>
-          <div class="bg-white shadow rounded-lg overflow-hidden">
+          <div
+            :if={!@oban_data_loaded}
+            class="bg-white shadow rounded-lg overflow-hidden animate-pulse"
+          >
+            <div class="h-12 bg-zinc-100"></div>
+            <%= for _i <- 1..5 do %>
+              <div class="h-14 border-t border-zinc-200 flex items-center px-6 gap-4">
+                <div class="h-4 bg-zinc-200 rounded w-32"></div>
+                <div class="h-4 bg-zinc-200 rounded w-40"></div>
+                <div class="h-4 bg-zinc-200 rounded w-16"></div>
+                <div class="h-4 bg-zinc-200 rounded w-24"></div>
+              </div>
+            <% end %>
+          </div>
+          <div
+            :if={@oban_data_loaded}
+            class="bg-white shadow rounded-lg overflow-hidden"
+          >
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
@@ -117,6 +208,9 @@ defmodule YscWeb.AdminSettingsLive do
                     Processed At
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Execution
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                     Attempts
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -125,7 +219,19 @@ defmodule YscWeb.AdminSettingsLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={job <- @recent_jobs}>
+                <tr
+                  :for={job <- @recent_jobs}
+                  phx-click="show_job_details"
+                  phx-value-job_id={job.id}
+                  class={[
+                    "cursor-pointer transition-colors",
+                    if(job.state == "executing",
+                      do:
+                        "bg-orange-50/70 hover:bg-orange-100/70 border-l-4 border-orange-500",
+                      else: "hover:bg-zinc-50"
+                    )
+                  ]}
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
                     <%= String.slice(to_string(job.id), 0..20) %>...
                   </td>
@@ -136,7 +242,18 @@ defmodule YscWeb.AdminSettingsLive do
                     <%= job.queue %>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_job_state_color(job.state)}"}>
+                    <span class={[
+                      "px-2 inline-flex items-center gap-1.5 text-xs leading-5 font-semibold rounded-full",
+                      get_job_state_color(job.state),
+                      job.state == "executing" && "animate-pulse"
+                    ]}>
+                      <%= if job.state == "executing" do %>
+                        <span
+                          class="inline-block w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"
+                          aria-hidden="true"
+                        >
+                        </span>
+                      <% end %>
                       <%= job.state %>
                     </span>
                   </td>
@@ -186,21 +303,35 @@ defmodule YscWeb.AdminSettingsLive do
                     <% end %>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <%= if job.completed_at && job.attempted_at do %>
+                      <%= format_duration(
+                        DateTime.diff(
+                          job.completed_at,
+                          job.attempted_at,
+                          :millisecond
+                        )
+                      ) %>
+                    <% else %>
+                      N/A
+                    <% end %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                     <%= job.attempt %>/<%= job.max_attempts %>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <.button
-                      phx-click="reschedule_job"
-                      phx-value-job_id={job.id}
-                      class="bg-green-600 hover:bg-green-700"
-                    >
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium"
+                    phx-click="reschedule_job"
+                    phx-value-job_id={job.id}
+                    onclick="event.stopPropagation()"
+                  >
+                    <.button class="bg-green-600 hover:bg-green-700">
                       Re-schedule
                     </.button>
                   </td>
                 </tr>
                 <tr :if={Enum.empty?(@recent_jobs)}>
                   <td
-                    colspan="7"
+                    colspan="8"
                     class="px-6 py-4 text-center text-sm text-zinc-500"
                   >
                     No jobs found.
@@ -210,26 +341,130 @@ defmodule YscWeb.AdminSettingsLive do
             </table>
           </div>
         </div>
+        <.modal
+          :if={@show_job_modal}
+          id="job-details-modal"
+          show={true}
+          on_cancel={JS.push("close_job_modal")}
+        >
+          <div :if={@selected_job} class="space-y-4">
+            <h2 class="text-xl font-semibold text-zinc-900">Job Details</h2>
+            <div>
+              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Worker</h3>
+              <p class="text-sm text-zinc-900 font-mono">
+                <%= @selected_job.worker %>
+              </p>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Arguments</h3>
+              <pre
+                phx-no-curly-interpolation
+                class="text-xs bg-zinc-50 p-3 rounded border border-zinc-200 overflow-x-auto"
+              ><%= Jason.encode!(@selected_job.args, pretty: true) %></pre>
+            </div>
+            <div :if={@selected_job.meta != %{} && @selected_job.meta != nil}>
+              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Metadata</h3>
+              <pre
+                phx-no-curly-interpolation
+                class="text-xs bg-zinc-50 p-3 rounded border border-zinc-200 overflow-x-auto"
+              ><%= Jason.encode!(@selected_job.meta, pretty: true) %></pre>
+            </div>
+            <div :if={@selected_job.errors != [] && @selected_job.errors != nil}>
+              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Errors</h3>
+              <div class="space-y-2">
+                <%= for error <- @selected_job.errors do %>
+                  <div class="bg-red-50 p-3 rounded border border-red-200">
+                    <p class="text-xs text-red-900 font-mono">
+                      <%= Map.get(error, :error) || Map.get(error, "error") %>
+                    </p>
+                    <p class="text-xs text-red-600 mt-1">
+                      Attempt <%= Map.get(error, :attempt) ||
+                        Map.get(error, "attempt") %>
+                      <%= if at = Map.get(error, :at) || Map.get(error, "at") do %>
+                        at <%= if is_struct(at),
+                          do: DateTime.to_iso8601(at),
+                          else: to_string(at) %>
+                      <% end %>
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="font-semibold text-zinc-700">Queue:</span>
+                <span class="text-zinc-900"><%= @selected_job.queue %></span>
+              </div>
+              <div>
+                <span class="font-semibold text-zinc-700">Priority:</span>
+                <span class="text-zinc-900"><%= @selected_job.priority %></span>
+              </div>
+              <div>
+                <span class="font-semibold text-zinc-700">Attempts:</span>
+                <span class="text-zinc-900">
+                  <%= @selected_job.attempt %>/<%= @selected_job.max_attempts %>
+                </span>
+              </div>
+              <div>
+                <span class="font-semibold text-zinc-700">State:</span>
+                <span class={[
+                  "inline-flex items-center gap-1.5 px-2 text-xs leading-5 font-semibold rounded-full",
+                  get_job_state_color(@selected_job.state),
+                  @selected_job.state == "executing" && "animate-pulse"
+                ]}>
+                  <%= if @selected_job.state == "executing" do %>
+                    <span
+                      class="inline-block w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"
+                      aria-hidden="true"
+                    >
+                    </span>
+                  <% end %>
+                  <%= @selected_job.state %>
+                </span>
+              </div>
+            </div>
+          </div>
+        </.modal>
       </div>
     </.side_menu>
     """
   end
 
+  @impl true
   def mount(_params, _session, socket) do
     scopes = Settings.setting_scopes()
     all_settings = Settings.settings_grouped_by_scope()
 
     form = to_form(all_settings, as: "settings")
-    recent_jobs = list_recent_jobs(limit: 50)
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Admin Settings")
-     |> assign(:active_page, :admin_settings)
-     |> assign(:grouped_settings, all_settings)
-     |> assign(:scopes, scopes)
-     |> assign(:recent_jobs, recent_jobs)
-     |> assign(form: form),
+    socket =
+      socket
+      |> assign(:page_title, "Admin Settings")
+      |> assign(:active_page, :admin_settings)
+      |> assign(:grouped_settings, all_settings)
+      |> assign(:scopes, scopes)
+      |> assign(:recent_jobs, [])
+      |> assign(:queue_stats, %{})
+      |> assign(:oban_data_loaded, false)
+      |> assign(:selected_job, nil)
+      |> assign(:show_job_modal, false)
+      |> assign(form: form)
+      |> then(fn s ->
+        if connected?(s) do
+          Oban.Notifier.listen([:insert, :gossip])
+
+          start_async(s, :load_oban_data, fn ->
+            %{
+              recent_jobs: list_recent_jobs(limit: 50),
+              queue_stats: get_queue_stats()
+            }
+          end)
+        else
+          s
+        end
+      end)
+
+    {:ok, socket,
      temporary_assigns: [
        scopes: [],
        grouped_settings: %{},
@@ -238,6 +473,30 @@ defmodule YscWeb.AdminSettingsLive do
      ]}
   end
 
+  @impl true
+  def handle_async(
+        :load_oban_data,
+        {:ok, %{recent_jobs: recent_jobs, queue_stats: queue_stats}},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:recent_jobs, recent_jobs)
+     |> assign(:queue_stats, queue_stats)
+     |> assign(:oban_data_loaded, true)}
+  end
+
+  def handle_async(:load_oban_data, {:exit, reason}, socket) do
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load Oban data async", error: reason)
+
+    {:noreply,
+     socket
+     |> put_flash(:error, "Failed to load job statistics")
+     |> assign(:oban_data_loaded, true)}
+  end
+
+  @impl true
   def handle_event("update-settings", %{"settings" => settings}, socket) do
     for {k, v} <- settings do
       case Settings.update_setting(k, Map.get(v, "value")) do
@@ -257,17 +516,68 @@ defmodule YscWeb.AdminSettingsLive do
     case reschedule_job(job_id) do
       {:ok, _new_job} ->
         recent_jobs = list_recent_jobs(limit: 50)
+        queue_stats = get_queue_stats()
 
         {:noreply,
          socket
          |> put_flash(:info, "Job re-scheduled successfully")
-         |> assign(:recent_jobs, recent_jobs)}
+         |> assign(:recent_jobs, recent_jobs)
+         |> assign(:queue_stats, queue_stats)}
 
       {:error, reason} ->
         {:noreply,
          socket
          |> put_flash(:error, "Failed to re-schedule job: #{inspect(reason)}")}
     end
+  end
+
+  def handle_event("show_job_details", %{"job_id" => job_id_raw}, socket) do
+    job_id = parse_job_id(job_id_raw)
+
+    case Repo.get(Job, job_id) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Job not found")
+         |> assign(:show_job_modal, false)
+         |> assign(:selected_job, nil)}
+
+      job ->
+        {:noreply,
+         socket
+         |> assign(:selected_job, job)
+         |> assign(:show_job_modal, true)}
+    end
+  end
+
+  def handle_event("close_job_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_job_modal, false)
+     |> assign(:selected_job, nil)}
+  end
+
+  @impl true
+  def handle_info({:notification, :insert, _payload}, socket) do
+    recent_jobs = list_recent_jobs(limit: 50)
+    queue_stats = get_queue_stats()
+
+    {:noreply,
+     socket
+     |> assign(:recent_jobs, recent_jobs)
+     |> assign(:queue_stats, queue_stats)
+     |> assign(:oban_data_loaded, true)}
+  end
+
+  def handle_info({:notification, :gossip, _payload}, socket) do
+    recent_jobs = list_recent_jobs(limit: 50)
+    queue_stats = get_queue_stats()
+
+    {:noreply,
+     socket
+     |> assign(:recent_jobs, recent_jobs)
+     |> assign(:queue_stats, queue_stats)
+     |> assign(:oban_data_loaded, true)}
   end
 
   defp list_recent_jobs(opts) do
@@ -290,6 +600,47 @@ defmodule YscWeb.AdminSettingsLive do
     )
     |> Repo.all()
   end
+
+  defp get_queue_stats do
+    from(j in Job,
+      group_by: [j.queue, j.state],
+      select: {j.queue, j.state, count(j.id)}
+    )
+    |> Repo.all()
+    |> Enum.group_by(&elem(&1, 0), fn {_queue, state, count} ->
+      {state, count}
+    end)
+    |> Enum.map(fn {queue, state_counts} ->
+      stats =
+        Enum.into(state_counts, %{}, fn {state, count} -> {state, count} end)
+
+      {queue, stats}
+    end)
+    |> Enum.into(%{})
+  end
+
+  defp parse_job_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, _} -> int
+      :error -> id
+    end
+  end
+
+  defp parse_job_id(id) when is_integer(id), do: id
+
+  defp format_duration(ms) when is_number(ms) and ms < 1000,
+    do: "#{round(ms)}ms"
+
+  defp format_duration(ms) when is_number(ms) and ms < 60_000,
+    do: "#{Float.round(ms / 1000, 2)}s"
+
+  defp format_duration(ms) when is_number(ms) and ms < 3_600_000,
+    do: "#{Float.round(ms / 60_000, 2)}m"
+
+  defp format_duration(ms) when is_number(ms),
+    do: "#{Float.round(ms / 3_600_000, 2)}h"
+
+  defp format_duration(_), do: "N/A"
 
   defp reschedule_job(job_id) do
     case Repo.get(Job, job_id) do
