@@ -359,7 +359,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     case %Booking{}
          |> Booking.changeset(attrs, skip_validation: true)
-         |> Repo.insert() do
+         |> Repo.insert_with_reference_retry(Booking) do
       {:ok, booking} ->
         booking
 
@@ -703,7 +703,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     case %Booking{}
          |> Booking.changeset(attrs, rooms: params.rooms, skip_validation: true)
-         |> Repo.insert() do
+         |> Repo.insert_with_reference_retry(Booking) do
       {:ok, booking} ->
         # Preload rooms for return
         Repo.preload(booking, :rooms)
@@ -1128,7 +1128,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     case %Booking{}
          |> Booking.changeset(attrs, skip_validation: true)
-         |> Repo.insert() do
+         |> Repo.insert_with_reference_retry(Booking) do
       {:ok, booking} ->
         booking
 
@@ -1329,7 +1329,7 @@ defmodule Ysc.Bookings.BookingLocker do
         %Booking{}
         |> Booking.changeset(attrs, rooms: rooms, skip_validation: true)
 
-      case Repo.insert(changeset) do
+      case Repo.insert_with_reference_retry(changeset, Booking) do
         {:ok, booking} ->
           # Reload with associations
           booking = Repo.preload(booking, [:rooms, :user])

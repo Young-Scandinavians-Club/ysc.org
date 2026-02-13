@@ -110,6 +110,18 @@ defmodule Ysc.Tickets.TicketOrder do
     |> validate_required([:payment_intent_id])
   end
 
+  @doc """
+  Puts a new reference_id on the changeset (for retry after unique constraint).
+  Call this when insert fails with a reference_id unique constraint.
+  """
+  def put_new_reference_id(changeset) do
+    put_change(
+      changeset,
+      :reference_id,
+      ReferenceGenerator.generate_reference_id(@reference_prefix)
+    )
+  end
+
   defp put_reference_id(changeset) do
     case get_field(changeset, :reference_id) do
       nil ->

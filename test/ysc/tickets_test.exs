@@ -91,19 +91,29 @@ defmodule Ysc.TicketsTest do
 
     test "returns error when event capacity exceeded", %{
       user: user,
-      event: event,
-      tier1: tier1
+      event: event
     } do
-      # Fill up the tier to capacity (tier1 has quantity: 50)
-      # Create orders up to tier capacity
-      Enum.each(1..50, fn _i ->
+      # Use a small-capacity tier so we only need a few tickets (avoids reference_id collisions)
+      {:ok, small_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Limited Tier",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 3,
+          event_id: event.id
+        })
+
+      # Fill up the tier to capacity
+      Enum.each(1..3, fn _i ->
         {:ok, _order} =
-          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+          Tickets.create_ticket_order(user.id, event.id, %{small_tier.id => 1})
       end)
 
       # Try to create one more order (will fail with tier validation error)
       assert {:error, :tier_validation_failed} =
-               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 small_tier.id => 1
+               })
     end
   end
 
