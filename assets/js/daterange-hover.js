@@ -44,7 +44,6 @@ const DaterangeHover = {
 
         // Store component ID for use in event handlers
         this.componentId = componentId;
-        console.log("[DaterangeHover] Component ID:", componentId);
 
         // Find the component element for pushEventTo
         // LiveView components have a root element with data-phx-component attribute
@@ -53,24 +52,16 @@ const DaterangeHover = {
             // First try to find by ID
             try {
                 this.componentEl = document.getElementById(componentId);
-                if (this.componentEl) {
-                    console.log("[DaterangeHover] Found component by ID:", this.componentEl);
-                }
             } catch (e) {
                 // Invalid ID, skip
-                console.warn("[DaterangeHover] Invalid component ID:", e);
             }
 
             // If not found, try to find by data-phx-component attribute
             if (!this.componentEl) {
                 try {
                     this.componentEl = document.querySelector(`[data-phx-component="${componentId}"]`);
-                    if (this.componentEl) {
-                        console.log("[DaterangeHover] Found component by data-phx-component:", this.componentEl);
-                    }
                 } catch (e) {
                     // Invalid selector, skip
-                    console.warn("[DaterangeHover] Invalid selector:", e);
                 }
             }
 
@@ -79,14 +70,11 @@ const DaterangeHover = {
                 const buttonWithTarget = this.el.querySelector(`button[phx-target]`);
                 if (buttonWithTarget) {
                     const targetSelector = buttonWithTarget.getAttribute("phx-target");
-                    console.log("[DaterangeHover] Found button with phx-target:", targetSelector);
                     if (targetSelector) {
                         try {
                             // Try to find the component element using the phx-target selector
                             this.componentEl = document.querySelector(targetSelector);
-                            if (this.componentEl) {
-                                console.log("[DaterangeHover] Found component from phx-target:", this.componentEl);
-                            } else {
+                            if (!this.componentEl) {
                                 // If selector doesn't work, try to find the parent component
                                 // by walking up the DOM tree
                                 let parent = this.el.parentElement;
@@ -95,7 +83,6 @@ const DaterangeHover = {
                                         const parentComponentId = parent.getAttribute("data-phx-component");
                                         if (parentComponentId === componentId) {
                                             this.componentEl = parent;
-                                            console.log("[DaterangeHover] Found component by walking up DOM:", this.componentEl);
                                             break;
                                         }
                                     }
@@ -104,7 +91,6 @@ const DaterangeHover = {
                             }
                         } catch (e) {
                             // Invalid selector, skip
-                            console.warn("[DaterangeHover] Invalid phx-target selector:", e);
                         }
                     }
                 }
@@ -117,15 +103,10 @@ const DaterangeHover = {
                     if (parent.id === componentId ||
                         (parent.hasAttribute && parent.getAttribute("data-phx-component") === componentId)) {
                         this.componentEl = parent;
-                        console.log("[DaterangeHover] Found component by walking up DOM tree:", this.componentEl);
                         break;
                     }
                     parent = parent.parentElement;
                 }
-            }
-
-            if (!this.componentEl) {
-                console.warn("[DaterangeHover] Could not find component element with ID:", componentId);
             }
         }
 
@@ -135,7 +116,6 @@ const DaterangeHover = {
 
             if (button && button.hasAttribute("phx-value-date") && !button.disabled) {
                 const date = button.getAttribute("phx-value-date");
-                console.log("[DaterangeHover] mouseover on date:", date, "componentId:", this.componentId, "componentEl:", this.componentEl);
 
                 // Try multiple methods to push the event
                 let eventPushed = false;
@@ -143,28 +123,25 @@ const DaterangeHover = {
                 if (this.componentEl) {
                     // Use the component element directly
                     try {
-                        console.log("[DaterangeHover] Pushing to component element");
                         this.pushEventTo(this.componentEl, "cursor-move", date);
                         eventPushed = true;
                     } catch (e) {
-                        console.warn("[DaterangeHover] Failed to push event to component element:", e);
+                        // Failed to push event to component element
                     }
                 }
 
                 if (!eventPushed && this.componentId) {
                     // Fallback: try using the ID as a selector
                     try {
-                        console.log("[DaterangeHover] Pushing to component with selector:", `#${this.componentId}`);
                         this.pushEventTo(`#${this.componentId}`, "cursor-move", date);
                         eventPushed = true;
                     } catch (e) {
-                        console.warn("[DaterangeHover] Failed to push event with selector:", e);
+                        // Failed to push event with selector
                     }
                 }
 
                 if (!eventPushed) {
                     // Final fallback: push to parent LiveView
-                    console.log("[DaterangeHover] Falling back to parent LiveView");
                     this.pushEvent("cursor-move", date);
                 }
             }
@@ -179,7 +156,7 @@ const DaterangeHover = {
                     this.pushEventTo(this.componentEl, "cursor-leave", {});
                     eventPushed = true;
                 } catch (e) {
-                    console.warn("Failed to push cursor-leave to component element:", e);
+                    // Failed to push cursor-leave to component element
                 }
             }
 
@@ -188,7 +165,7 @@ const DaterangeHover = {
                     this.pushEventTo(`#${this.componentId}`, "cursor-leave", {});
                     eventPushed = true;
                 } catch (e) {
-                    console.warn("Failed to push cursor-leave with selector:", e);
+                    // Failed to push cursor-leave with selector
                 }
             }
 
