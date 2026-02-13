@@ -113,11 +113,6 @@ const PanelResizer = {
                 icon.classList.remove("text-zinc-400");
                 icon.classList.add("text-blue-500");
             }
-
-            console.log("PanelResizer: Tracking started", {
-                startWidth: this.startWidth,
-                startCursorScreenX: this.startCursorScreenX
-            });
         };
 
         const handleMouseEnter = () => {
@@ -207,8 +202,6 @@ const PanelResizer = {
         if (width) {
             this.pushEvent("resize_panel", { width: width });
         }
-
-        console.log("PanelResizer: Tracking stopped", { finalWidth: width });
     },
 };
 
