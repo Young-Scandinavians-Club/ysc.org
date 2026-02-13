@@ -1212,8 +1212,9 @@ defmodule Ysc.Stripe.WebhookHandler do
                     payment_date
                   )
                 else
-                  # First-time membership payment
-                  paid_elsewhere = is_nil(payment.payment_method_id)
+                  # First-time membership payment - always paid online via Stripe
+                  # (paid_elsewhere is for admin-recorded in-person payments only)
+                  paid_elsewhere = false
 
                   enqueue_membership_payment_confirmation_email(
                     user,
