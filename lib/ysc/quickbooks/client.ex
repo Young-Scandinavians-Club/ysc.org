@@ -4735,4 +4735,18 @@ defmodule Ysc.Quickbooks.Client do
       end
     end
   end
+
+  # Test helper functions to expose private functions for testing
+  # These should only be used in test environment
+  if Mix.env() == :test do
+    @doc false
+    def test_parse_error_response(response_body) do
+      parse_error_response(response_body)
+    end
+
+    @doc false
+    def test_parse_error_details(response_body) do
+      parse_error_details(response_body)
+    end
+  end
 end
