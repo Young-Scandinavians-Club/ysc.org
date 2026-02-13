@@ -78,16 +78,23 @@ defmodule Ysc.Events.TicketTier do
 
   # Normalize description: empty string and literal "nil" string -> nil
   defp normalize_description(attrs) do
-    case Map.get(attrs, "description") || Map.get(attrs, :description) do
-      "" -> put_description_nil(attrs)
-      "nil" -> put_description_nil(attrs)
-      nil -> attrs
-      _ -> attrs
+    case {Map.get(attrs, "description"), Map.get(attrs, :description)} do
+      {val, _} when val in ["", "nil"] ->
+        put_description_nil(attrs, "description")
+
+      {_, val} when val in ["", "nil"] ->
+        put_description_nil(attrs, :description)
+
+      _ ->
+        attrs
     end
   end
 
-  defp put_description_nil(attrs) do
-    Map.put(attrs, "description", nil)
+  defp put_description_nil(attrs, key) do
+    attrs
+    |> Map.delete("description")
+    |> Map.delete(:description)
+    |> Map.put(key, nil)
   end
 
   # Normalize empty strings and invalid date strings to nil for date fields
