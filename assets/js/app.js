@@ -315,14 +315,12 @@ Hooks.AutoSubmit = AutoSubmit;
 // Auto-consume uploads when they reach 100% progress
 // Listen for multiple possible events
 window.addEventListener("phx:file-update", (e) => {
-    console.log("phx:file-update event:", e.detail);
     const { ref, progress } = e.detail || {};
     if (progress === 100) {
         // Find the consume button for this ref
         const consumeButton = document.getElementById(`receipt-consume-${ref}`) ||
             document.getElementById(`proof-consume-${ref}`);
         if (consumeButton && !consumeButton.disabled) {
-            console.log("Auto-consuming upload:", ref);
             // Small delay to ensure upload is fully processed
             setTimeout(() => {
                 consumeButton.click();
@@ -343,7 +341,6 @@ setInterval(() => {
         if (progressValue === 100) {
             const consumeButton = document.getElementById(`${uploadType}-consume-${ref}`);
             if (consumeButton && !consumeButton.disabled && !consumeButton.dataset.consumed) {
-                console.log("Auto-consuming upload via progress check:", ref, "progress:", progressValue);
                 consumeButton.dataset.consumed = 'true';
                 setTimeout(() => {
                     consumeButton.click();

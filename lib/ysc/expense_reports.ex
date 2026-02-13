@@ -761,7 +761,9 @@ defmodule Ysc.ExpenseReports do
         nil ->
           path
           |> ExAws.S3.Upload.stream_file()
-          |> ExAws.S3.upload(bucket_name, unique_key)
+          |> ExAws.S3.upload(bucket_name, unique_key,
+            cache_control: "public, max-age=86400"
+          )
           |> ExAws.request!()
 
         upload_module when is_atom(upload_module) ->

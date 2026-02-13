@@ -375,7 +375,9 @@ defmodule Ysc.Media do
     result =
       path
       |> ExAws.S3.Upload.stream_file()
-      |> ExAws.S3.upload(bucket_name, file_name)
+      |> ExAws.S3.upload(bucket_name, file_name,
+        cache_control: "public, max-age=86400"
+      )
       |> ExAws.request!()
 
     # Tigris doesn't return location in response, so construct it from the key

@@ -7,7 +7,6 @@ const Confetti = {
     mounted() {
         // Only fire confetti if the data attribute indicates it should
         const showConfetti = this.el.dataset.showConfetti === 'true';
-        console.log('[Confetti] Hook mounted, showConfetti:', showConfetti, 'data attribute:', this.el.dataset.showConfetti);
         if (showConfetti) {
             // Library is already imported, fire immediately
             this.fireConfetti();
@@ -15,7 +14,6 @@ const Confetti = {
     },
 
     fireConfetti() {
-        console.log('[Confetti] Firing confetti animation');
         // The UMD module sets window.confetti when imported
         const confettiFn = window.confetti;
 
@@ -49,7 +47,6 @@ const Confetti = {
                         scalar: 0.8, // Slightly smaller particles for subtlety
                         startVelocity: 15 // Lower initial velocity for gentle descent
                     });
-                    console.log(`[Confetti] Burst ${i + 1} fired`);
                 } catch (error) {
                     console.error('[Confetti] Error firing confetti:', error);
                 }
