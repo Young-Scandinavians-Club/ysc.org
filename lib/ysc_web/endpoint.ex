@@ -49,7 +49,10 @@ defmodule YscWeb.Endpoint do
     encodings: [{"zstd", ".zst"}],
     gzip: true,
     brotli: true,
-    only: YscWeb.static_paths()
+    only: YscWeb.static_paths(),
+    # Aggressive caching for Cloudflare - Phoenix digest ensures all assets are hashed
+    # 1 year cache (31536000 seconds) with immutable flag since hashed assets never change
+    cache_control_for_etags: "public, max-age=31536000, immutable"
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
