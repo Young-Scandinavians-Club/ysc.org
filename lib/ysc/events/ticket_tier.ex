@@ -46,6 +46,7 @@ defmodule Ysc.Events.TicketTier do
       attrs
       |> normalize_date_field(:start_date)
       |> normalize_date_field(:end_date)
+      |> normalize_description()
 
     ticket_tier
     |> cast(normalized_attrs, [
@@ -73,6 +74,20 @@ defmodule Ysc.Events.TicketTier do
     |> validate_money(:price)
     |> optimistic_lock(:lock_version)
     |> foreign_key_constraint(:event_id)
+  end
+
+  # Normalize description: empty string and literal "nil" string -> nil
+  defp normalize_description(attrs) do
+    case Map.get(attrs, "description") || Map.get(attrs, :description) do
+      "" -> put_description_nil(attrs)
+      "nil" -> put_description_nil(attrs)
+      nil -> attrs
+      _ -> attrs
+    end
+  end
+
+  defp put_description_nil(attrs) do
+    Map.put(attrs, "description", nil)
   end
 
   # Normalize empty strings and invalid date strings to nil for date fields

@@ -352,6 +352,35 @@ defmodule Ysc.EventsTest do
       assert {:ok, _deleted} = Events.delete_ticket_tier(tier)
       assert Events.get_ticket_tier(tier.id) == nil
     end
+
+    test "create_ticket_tier/1 normalizes 'nil' string in description to nil",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      attrs = %{
+        name: "Tier",
+        type: :paid,
+        price: Money.new(100, :USD),
+        quantity: 50,
+        event_id: event.id,
+        description: "nil"
+      }
+
+      assert {:ok, %Ysc.Events.TicketTier{} = tier} =
+               Events.create_ticket_tier(attrs)
+
+      assert tier.description == nil
+    end
   end
 
   describe "ticket counting" do
