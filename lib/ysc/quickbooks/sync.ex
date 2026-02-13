@@ -253,6 +253,18 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:ok, sales_receipt}
     else
+      {:error, :rate_limited} = error ->
+        # Rate limit is expected and not an error - log as warning
+        Ysc.Logging.warning(
+          "[QB Sync] do_sync_payment: QuickBooks rate limit exceeded, will retry",
+          payment_id: payment.id,
+          payment_reference_id: payment.reference_id
+        )
+
+        # Update payment with sync failure but mark as retriable
+        update_sync_failure(payment, :rate_limited)
+        error
+
       {:error, reason} = error ->
         Ysc.Logging.error(
           "[QB Sync] do_sync_payment: Sync failed in pipeline - Error: #{inspect(reason)}, Payment ID: #{payment.id}, Reference ID: #{payment.reference_id}, User ID: #{payment.user_id}",
@@ -344,6 +356,18 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:ok, refund_receipt}
     else
+      {:error, :rate_limited} = error ->
+        # Rate limit is expected and not an error - log as warning
+        Ysc.Logging.warning(
+          "[QB Sync] do_sync_refund: QuickBooks rate limit exceeded, will retry",
+          refund_id: refund.id,
+          refund_reference_id: refund.reference_id
+        )
+
+        # Update refund with sync failure but mark as retriable
+        update_sync_failure_refund(refund, :rate_limited)
+        error
+
       {:error, reason} = error ->
         Ysc.Logging.error(
           "[QB Sync] do_sync_refund: Sync failed in pipeline - Error: #{inspect(reason)}, Refund ID: #{refund.id}, Reference ID: #{refund.reference_id}, Payment ID: #{refund.payment_id}",
@@ -446,6 +470,18 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:ok, deposit}
     else
+      {:error, :rate_limited} = error ->
+        # Rate limit is expected and not an error - log as warning
+        Ysc.Logging.warning(
+          "[QB Sync] do_sync_payout: QuickBooks rate limit exceeded, will retry",
+          payout_id: payout.id,
+          stripe_payout_id: payout.stripe_payout_id
+        )
+
+        # Update payout with sync failure but mark as retriable
+        update_sync_failure_payout(payout, :rate_limited)
+        error
+
       {:error, reason} = error ->
         Ysc.Logging.error(
           "[QB Sync] do_sync_payout: Sync failed in pipeline - Error: #{inspect(reason)}, Payout ID: #{payout.id}, Stripe Payout ID: #{inspect(payout.stripe_payout_id)}, Payments: #{length(payout.payments)}, Refunds: #{length(payout.refunds)}",
