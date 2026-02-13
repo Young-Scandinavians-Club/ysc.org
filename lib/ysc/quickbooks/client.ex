@@ -161,7 +161,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -183,6 +188,16 @@ defmodule Ysc.Quickbooks.Client do
 
               {:error, :invalid_response}
           end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "salesreceipt",
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
 
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
@@ -243,11 +258,20 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error("QuickBooks API error",
             status: status,
             error: error,
-            endpoint: "salesreceipt"
+            endpoint: "salesreceipt",
+            error_details: error_details,
+            extra: %{
+              endpoint: "salesreceipt",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type]
+            }
           )
 
           {:error, error}
@@ -320,6 +344,16 @@ defmodule Ysc.Quickbooks.Client do
               {:error, :invalid_response}
           end
 
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "refundreceipt",
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
+
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
             "QuickBooks authentication failed, attempting token refresh"
@@ -381,11 +415,20 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error("QuickBooks API error",
             status: status,
             error: error,
-            endpoint: "refundreceipt"
+            endpoint: "refundreceipt",
+            error_details: error_details,
+            extra: %{
+              endpoint: "refundreceipt",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type]
+            }
           )
 
           {:error, error}
@@ -501,6 +544,16 @@ defmodule Ysc.Quickbooks.Client do
               {:error, :invalid_response}
           end
 
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "deposit",
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
+
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
             "QuickBooks authentication failed, attempting token refresh"
@@ -560,11 +613,20 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error("QuickBooks API error",
             status: status,
             error: error,
-            endpoint: "deposit"
+            endpoint: "deposit",
+            error_details: error_details,
+            extra: %{
+              endpoint: "deposit",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type]
+            }
           )
 
           {:error, error}
@@ -629,7 +691,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -651,6 +718,16 @@ defmodule Ysc.Quickbooks.Client do
 
               {:error, :invalid_response}
           end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "customer",
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
 
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
@@ -711,11 +788,20 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error("QuickBooks API error",
             status: status,
             error: error,
-            endpoint: "customer"
+            endpoint: "customer",
+            error_details: error_details,
+            extra: %{
+              endpoint: "customer",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type]
+            }
           )
 
           {:error, error}
@@ -985,6 +1071,17 @@ defmodule Ysc.Quickbooks.Client do
               {:error, :invalid_response}
           end
 
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "item",
+            name: name,
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
+
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
             "[QB Client] create_item: Authentication failed, attempting token refresh"
@@ -1020,11 +1117,21 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error("[QB Client] create_item: Failed to create item",
             name: name,
             status: status,
-            error: error
+            error: error,
+            error_details: error_details,
+            extra: %{
+              item_name: name,
+              item_type: Keyword.get(opts, :type, "Service"),
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type]
+            }
           )
 
           {:error, error}
@@ -1671,7 +1778,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:get, url, headers)
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -1730,6 +1842,17 @@ defmodule Ysc.Quickbooks.Client do
 
               {:error, :invalid_response}
           end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "class_query",
+            name: name,
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
 
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
@@ -2099,6 +2222,17 @@ defmodule Ysc.Quickbooks.Client do
               {:error, :invalid_response}
           end
 
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "account_query",
+            name: name,
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
+
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
             "[QB Client] query_account_by_name: Authentication failed, attempting token refresh"
@@ -2199,6 +2333,44 @@ defmodule Ysc.Quickbooks.Client do
     end
   end
 
+  # Enhanced error response parser that extracts full error details for logging
+  # Returns a map with all available error information from QuickBooks
+  defp parse_error_details(response_body) do
+    case Jason.decode(response_body) do
+      {:ok, %{"Fault" => fault}} ->
+        errors = fault["Error"] || []
+
+        %{
+          fault_type: fault["type"],
+          errors:
+            Enum.map(errors, fn error ->
+              %{
+                code: error["code"],
+                message: error["Message"],
+                detail: error["Detail"],
+                element: error["element"]
+              }
+              |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+              |> Map.new()
+            end),
+          raw_response: response_body
+        }
+
+      {:ok, data} ->
+        %{
+          parse_error: "Unexpected response format",
+          raw_response: response_body,
+          parsed_data: inspect(data, limit: 500)
+        }
+
+      {:error, _} ->
+        %{
+          parse_error: "Failed to parse JSON",
+          raw_response: String.slice(response_body, 0, 500)
+        }
+    end
+  end
+
   # QuickBooks returns 429 when rate limited (e.g. 500 req/min per company).
   # Retry the request with exponential backoff, optionally honoring Retry-After.
   defp request_with_429_retry(callback, attempt \\ 0) do
@@ -2218,6 +2390,15 @@ defmodule Ysc.Quickbooks.Client do
 
         Process.sleep(backoff_sec * 1000)
         request_with_429_retry(callback, attempt + 1)
+
+      {:ok, %Finch.Response{status: 429} = resp} ->
+        # All retries exhausted - log as warning (not error) since this is expected behavior
+        Ysc.Logging.warning(
+          "[QB Client] Rate limit retries exhausted, returning 429 response",
+          max_retries: @max_429_retries
+        )
+
+        {:error, {:rate_limited, resp}}
 
       other ->
         other
@@ -3080,12 +3261,23 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error(
-            "[QB Client] query_vendor_by_email: Query failed - Full response body:\n#{response_body}",
+            "[QB Client] query_vendor_by_email: Query failed",
             status: status,
             parsed_error: error,
-            query: query
+            query: query,
+            error_details: error_details,
+            extra: %{
+              endpoint: "vendor_query",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type],
+              query: query,
+              raw_response_preview: String.slice(response_body, 0, 500)
+            }
           )
 
           {:error, error}
@@ -3214,12 +3406,23 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error(
-            "[QB Client] query_vendor_by_display_name: Query failed - Full response body:\n#{response_body}",
+            "[QB Client] query_vendor_by_display_name: Query failed",
             status: status,
             parsed_error: error,
-            query: query
+            query: query,
+            error_details: error_details,
+            extra: %{
+              endpoint: "vendor_query",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type],
+              query: query,
+              raw_response_preview: String.slice(response_body, 0, 500)
+            }
           )
 
           {:error, error}
@@ -3267,7 +3470,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -3291,6 +3499,16 @@ defmodule Ysc.Quickbooks.Client do
 
               {:error, :invalid_response}
           end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "vendor",
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
 
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
@@ -3346,16 +3564,27 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           # Try to extract vendor ID from duplicate error response
           vendor_id_from_error = extract_vendor_id_from_error(response_body)
 
           Ysc.Logging.error(
-            "[QB Client] create_vendor: QuickBooks API error - Full response body:\n#{response_body}",
+            "[QB Client] create_vendor: QuickBooks API error",
             status: status,
             parsed_error: error,
             endpoint: "vendor",
-            extracted_vendor_id: vendor_id_from_error
+            extracted_vendor_id: vendor_id_from_error,
+            error_details: error_details,
+            extra: %{
+              endpoint: "vendor",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type],
+              extracted_vendor_id: vendor_id_from_error,
+              raw_response_preview: String.slice(response_body, 0, 500)
+            }
           )
 
           # If we found a vendor ID in the error, return it in a special format
@@ -3643,7 +3872,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -3663,6 +3897,16 @@ defmodule Ysc.Quickbooks.Client do
 
               {:error, :invalid_response}
           end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "bill",
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
 
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
@@ -3718,12 +3962,22 @@ defmodule Ysc.Quickbooks.Client do
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
 
           Ysc.Logging.error(
-            "[QB Client] create_bill: QuickBooks API error - Full response body:\n#{response_body}",
+            "[QB Client] create_bill: QuickBooks API error",
             status: status,
             parsed_error: error,
-            endpoint: "bill"
+            endpoint: "bill",
+            error_details: error_details,
+            extra: %{
+              endpoint: "bill",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type],
+              raw_response_preview: String.slice(response_body, 0, 500)
+            }
           )
 
           {:error, error}
@@ -4372,7 +4626,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:get, url, headers)
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -4393,6 +4652,17 @@ defmodule Ysc.Quickbooks.Client do
 
               {:error, :invalid_response}
           end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "billpayment",
+            bill_payment_id: bill_payment_id,
+            max_retries: @max_429_retries
+          )
+
+          {:error, :rate_limited}
 
         {:ok, %Finch.Response{status: 401, body: _response_body}} ->
           Ysc.Logging.warning(
@@ -4463,6 +4733,20 @@ defmodule Ysc.Quickbooks.Client do
 
           {:error, :request_failed}
       end
+    end
+  end
+
+  # Test helper functions to expose private functions for testing
+  # These should only be used in test environment
+  if Mix.env() == :test do
+    @doc false
+    def test_parse_error_response(response_body) do
+      parse_error_response(response_body)
+    end
+
+    @doc false
+    def test_parse_error_details(response_body) do
+      parse_error_details(response_body)
     end
   end
 end

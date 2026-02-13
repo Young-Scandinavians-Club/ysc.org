@@ -81,14 +81,17 @@ defmodule YscWeb.CoreComponents do
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
               class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1 p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
             >
-              <div class="absolute top-4 right-4 sm:top-6 sm:right-7">
+              <div class="absolute top-4 right-4 sm:top-6 sm:right-7 z-10">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="flex-none rounded hover:bg-zinc-100 p-1 -m-3 opacity-50 hover:opacity-70"
+                  class="group flex-none rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 p-2 transition-all duration-200 ease-out hover:scale-110"
                   aria-label={gettext("close")}
                 >
-                  <.icon name="hero-x-mark-solid" class="w-6 h-6" />
+                  <.icon
+                    name="hero-x-mark-solid"
+                    class="w-5 h-5 text-zinc-700 group-hover:text-zinc-900 group-hover:rotate-90 transition-all duration-200 ease-out"
+                  />
                 </button>
               </div>
               <div id={"#{@id}-content"}>

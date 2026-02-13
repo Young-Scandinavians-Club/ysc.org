@@ -2163,11 +2163,11 @@ defmodule YscWeb.AdminMoneyLive do
                 </.badge>
               </p>
             </div>
-            <%= if @selected_payout.quickbooks_payout_id do %>
+            <%= if @selected_payout.quickbooks_deposit_id do %>
               <div>
-                <p class="font-medium text-zinc-700">QuickBooks Payout ID</p>
+                <p class="font-medium text-zinc-700">QuickBooks Deposit ID</p>
                 <p class="text-zinc-900 font-mono text-xs">
-                  <%= @selected_payout.quickbooks_payout_id %>
+                  <%= @selected_payout.quickbooks_deposit_id %>
                 </p>
               </div>
             <% end %>
@@ -2209,7 +2209,7 @@ defmodule YscWeb.AdminMoneyLive do
                 </.tooltip>
               </div>
             <% end %>
-            <%= if !@selected_payout.quickbooks_payout_id && !@selected_payout.quickbooks_sync_status do %>
+            <%= if !@selected_payout.quickbooks_deposit_id && !@selected_payout.quickbooks_sync_status do %>
               <div class="col-span-2">
                 <p class="text-zinc-500 text-xs italic">
                   Not yet synced to QuickBooks
