@@ -262,7 +262,10 @@ config :ysc, :quickbooks,
   stripe_fee_item_id: System.get_env("QUICKBOOKS_STRIPE_FEE_ITEM_ID"),
   # QuickBooks Account IDs (required - cannot be auto-created)
   bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
-  stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID")
+  stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+  # Optional: QuickBooks Customer ID for payments with no user (e.g. system/anonymous).
+  # Set this to avoid :user_not_found when exporting payouts that include such payments.
+  system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")
 
 config :phoenix_template, :format_encoders, swiftui: Phoenix.HTML.Engine
 

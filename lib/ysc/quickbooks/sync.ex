@@ -140,6 +140,9 @@ defmodule Ysc.Quickbooks.Sync do
   Syncs a payout to QuickBooks as a Deposit.
 
   Returns {:ok, deposit} on success, {:error, reason} on failure.
+
+  Deposit entity API:
+  https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
   """
   @spec sync_payout(Payout.t()) :: {:ok, map()} | {:error, atom() | String.t()}
   def sync_payout(%Payout{} = payout) do
@@ -207,8 +210,7 @@ defmodule Ysc.Quickbooks.Sync do
       user_id: payment.user_id
     )
 
-    with {:ok, user} <- get_user(payment.user_id),
-         {:ok, customer_id} <- get_or_create_customer(user),
+    with {:ok, customer_id} <- get_customer_id_for_payment(payment),
          {:ok, entity_info} <- get_payment_entity_info(payment),
          {:ok, item_id} <- get_item_id_for_entity(entity_info),
          {:ok, sales_receipt} <-
@@ -299,8 +301,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     with {:ok, payment} <- get_payment(refund.payment_id),
-         {:ok, user} <- get_user(payment.user_id),
-         {:ok, customer_id} <- get_or_create_customer(user),
+         {:ok, customer_id} <- get_customer_id_for_payment(payment),
          {:ok, entity_info} <- get_payment_entity_info(payment),
          {:ok, item_id} <- get_quickbooks_item_id(entity_info),
          {:ok, refund_receipt} <-
@@ -471,6 +472,41 @@ defmodule Ysc.Quickbooks.Sync do
 
         # Update payout with sync failure
         update_sync_failure_payout(payout, reason)
+        error
+    end
+  end
+
+  # Resolves QuickBooks customer_id for a payment. Uses the payment's user when present;
+  # when user_id is nil or user not found, uses config :system_customer_id if set so
+  # system/anonymous payments can still export (e.g. for payouts).
+  defp get_customer_id_for_payment(%Payment{user_id: user_id} = payment) do
+    case get_user(user_id) do
+      {:ok, user} ->
+        get_or_create_customer(user)
+
+      {:error, :user_not_found} ->
+        system_customer_id =
+          Application.get_env(:ysc, :quickbooks, [])[:system_customer_id]
+
+        if system_customer_id && system_customer_id != "" do
+          Ysc.Logging.info(
+            "[QB Sync] Using system_customer_id for payment with no user",
+            payment_id: payment.id,
+            payment_reference_id: payment.reference_id
+          )
+
+          {:ok, system_customer_id}
+        else
+          Ysc.Logging.warning(
+            "[QB Sync] Payment has no user and quickbooks system_customer_id is not configured",
+            payment_id: payment.id,
+            payment_reference_id: payment.reference_id
+          )
+
+          {:error, :user_not_found}
+        end
+
+      {:error, _reason} = error ->
         error
     end
   end
@@ -2918,6 +2954,7 @@ defmodule Ysc.Quickbooks.Sync do
       |> Refund.changeset(%{
         quickbooks_sales_receipt_id: sales_receipt_id,
         quickbooks_sync_status: "synced",
+        quickbooks_sync_error: nil,
         quickbooks_synced_at: DateTime.utc_now(),
         quickbooks_response: response,
         quickbooks_last_sync_attempt_at: DateTime.utc_now()
