@@ -444,5 +444,7 @@ if config_env() == :prod do
     stripe_fee_item_id: System.get_env("QUICKBOOKS_STRIPE_FEE_ITEM_ID"),
     # QuickBooks Account IDs (required - cannot be auto-created)
     bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
-    stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID")
+    stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+    # Optional: QuickBooks Customer ID for payments with no user (avoids :user_not_found on payouts)
+    system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")
 end

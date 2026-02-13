@@ -372,10 +372,11 @@ defmodule Ysc.Ledgers.Reconciliation do
     end
   end
 
+  # Returns the ledger transaction for a payment. Payments can have transaction type
+  # :payment (customer payments), :payout (Stripe payout virtual payment), or :adjustment.
   defp get_transaction_for_payment(payment_id) do
     from(t in LedgerTransaction,
       where: t.payment_id == ^payment_id,
-      where: t.type == :payment,
       limit: 1
     )
     |> Repo.one()
@@ -384,7 +385,6 @@ defmodule Ysc.Ledgers.Reconciliation do
   defp get_transaction_for_refund(refund_id) do
     from(t in LedgerTransaction,
       where: t.refund_id == ^refund_id,
-      where: t.type == :refund,
       limit: 1
     )
     |> Repo.one()

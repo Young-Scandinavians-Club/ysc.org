@@ -244,6 +244,73 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert Money.equal?(result.totals.payments_table, expected)
     end
 
+    test "does not report payout payments as missing ledger transaction", %{
+      user: _user
+    } do
+      # Payout payments use LedgerTransaction type :payout, not :payment.
+      # Reconciliation must find any transaction for the payment (payment/payout/adjustment).
+      payout_amount = Money.new(90_59, :USD)
+
+      payout_payment =
+        Repo.insert!(%Payment{
+          user_id: nil,
+          amount: payout_amount,
+          external_provider: :stripe,
+          external_payment_id: "po_test_reconciliation_payout",
+          status: :completed,
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      Repo.insert!(%LedgerTransaction{
+        type: :payout,
+        payment_id: payout_payment.id,
+        total_amount: payout_amount,
+        status: :completed
+      })
+
+      cash_account = Ledgers.get_account_by_name("cash")
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: cash_account.id,
+          payment_id: payout_payment.id,
+          amount: payout_amount,
+          debit_credit: :debit,
+          description: "Payout test debit",
+          related_entity_type: :administration,
+          related_entity_id: payout_payment.id
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_account.id,
+          payment_id: payout_payment.id,
+          amount: payout_amount,
+          debit_credit: :credit,
+          description: "Payout test credit",
+          related_entity_type: :administration,
+          related_entity_id: payout_payment.id
+        })
+
+      result = Reconciliation.reconcile_payments()
+
+      payout_in_discrepancies =
+        Enum.any?(result.discrepancies, fn d ->
+          d.payment_id == payout_payment.id and
+            "No ledger transaction found" in d.issues
+        end)
+
+      refute payout_in_discrepancies,
+             "Payout payment should not be reported as missing ledger transaction (transaction type is :payout, not :payment). Discrepancies: #{inspect(result.discrepancies)}"
+
+      # The payout payment has a transaction and balanced entries, so it must not be a discrepancy
+      assert payout_payment.id not in Enum.map(
+               result.discrepancies,
+               & &1.payment_id
+             )
+    end
+
     test "detects payments without ledger transactions", %{user: user} do
       # Create a payment without going through process_payment
       payment =

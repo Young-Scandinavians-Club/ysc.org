@@ -293,7 +293,12 @@ defmodule Ysc.Quickbooks.Client do
 
       request = Finch.build(:post, url, headers, Jason.encode!(body))
 
-      case Finch.request(request, Ysc.Finch) do
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
           case Jason.decode(response_body) do
@@ -400,6 +405,8 @@ defmodule Ysc.Quickbooks.Client do
 
   Deposits are used to record money deposited into a bank account.
   This is typically used for Stripe payouts.
+
+  API reference: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
 
   ## Parameters
 
@@ -1296,6 +1303,8 @@ defmodule Ysc.Quickbooks.Client do
     body
   end
 
+  # Builds request body per Deposit entity spec:
+  # https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
   defp build_deposit_body(params) do
     %{
       "DepositToAccountRef" => params.deposit_to_account_ref,
