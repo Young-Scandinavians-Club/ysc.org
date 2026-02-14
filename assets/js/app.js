@@ -15,6 +15,9 @@
 //     import "some-package"
 //
 
+// Load Sentry bundle (exposes window.Sentry global)
+import "../vendor/bundle.tracing.replay.min.js";
+
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html";
 // Establish Phoenix Socket and LiveView configuration.
@@ -107,6 +110,43 @@ let Hooks = {
 };
 Hooks.LivePhone = LivePhone;
 
+// Initialize Sentry for JavaScript error monitoring
+// This must happen before LiveSocket is created to capture all errors
+// The Sentry bundle exposes a global window.Sentry object
+window.Sentry.init({
+    dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
+    integrations: [
+        new window.Sentry.BrowserTracing({
+            // Track LiveView navigation as transactions
+            tracePropagationTargets: ["localhost", /^\//],
+        }),
+        new window.Sentry.Replay({
+            // Capture 10% of all sessions for replay
+            sessionSampleRate: 0.1,
+            // Capture 100% of sessions with errors for replay
+            errorSampleRate: 1.0,
+        }),
+    ],
+    // Performance Monitoring
+    tracesSampleRate: 0.1, // Capture 10% of transactions in production
+    // Session Replay
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+});
+
+// Set user context if user is logged in
+if (window.currentUser) {
+    window.Sentry.setUser({
+        id: window.currentUser.id,
+        email: window.currentUser.email,
+        role: window.currentUser.role,
+        state: window.currentUser.state,
+    });
+} else {
+    // Clear user context for anonymous users
+    window.Sentry.setUser(null);
+}
+
 let csrfToken = document
     .querySelector("meta[name='csrf-token']")
     .getAttribute("content");
@@ -154,6 +194,46 @@ window.addEventListener("phx:scroll-to-price-details", () => {
 
 // connect if there are any LiveViews on the page
 liveSocket.connect();
+
+// Handle Sentry user context updates when user logs in/out
+// LiveView can push this event when authentication state changes
+window.addEventListener("phx:update-sentry-user", (e) => {
+    const { user } = e.detail || {};
+    if (user) {
+        window.Sentry.setUser({
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            state: user.state,
+        });
+        window.currentUser = user;
+    } else {
+        window.Sentry.setUser(null);
+        window.currentUser = null;
+    }
+});
+
+// Capture LiveView navigation and errors in Sentry
+window.addEventListener("phx:page-loading-start", (info) => {
+    window.Sentry.addBreadcrumb({
+        category: "navigation",
+        message: "LiveView navigation started",
+        level: "info",
+    });
+});
+
+window.addEventListener("phx:page-loading-stop", (info) => {
+    window.Sentry.addBreadcrumb({
+        category: "navigation",
+        message: "LiveView navigation completed",
+        level: "info",
+    });
+});
+
+// Capture LiveView errors
+liveSocket.on("phx:error", (error) => {
+    window.Sentry.captureException(error);
+});
 
 // Handle map toggle text updates
 window.addEventListener("phx:toggle-map-text", () => {

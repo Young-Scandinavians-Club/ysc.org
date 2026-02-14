@@ -1202,8 +1202,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     end
 
     test "handles missing QuickBooks item IDs gracefully", %{user: user} do
-      setup_default_mocks()
-
       # Remove item IDs from config so sync will call get_or_create_item
       original_config = Application.get_env(:ysc, :quickbooks)
       original_config_map = Enum.into(original_config || [], %{})
@@ -1214,44 +1212,32 @@ defmodule Ysc.Quickbooks.SyncTest do
         Map.drop(original_config_map, [:event_item_id, :donation_item_id])
       )
 
-      # Stub get_or_create_item to fail before creating payment so automatic sync also fails
-      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
-        {:error, :item_creation_failed}
-      end)
-
       total_amount = Money.new(10_000, :USD)
       event_amount = Money.new(6_000, :USD)
       donation_amount = Money.new(4_000, :USD)
       stripe_fee = Money.new(320, :USD)
       event_id = Ecto.ULID.generate()
 
-      {:ok, {payment, _transaction, _entries}} =
-        Ledgers.process_event_payment_with_donations(%{
-          user_id: user.id,
-          total_amount: total_amount,
-          event_amount: event_amount,
-          donation_amount: donation_amount,
-          event_id: event_id,
-          external_payment_id: "pi_missing_items_test_123",
-          stripe_fee: stripe_fee,
-          description: "Missing items test",
-          payment_method_id: nil
-        })
+      # Create payment without automatic sync by using manual Oban mode
+      payment =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          {:ok, {payment, _transaction, _entries}} =
+            Ledgers.process_event_payment_with_donations(%{
+              user_id: user.id,
+              total_amount: total_amount,
+              event_amount: event_amount,
+              donation_amount: donation_amount,
+              event_id: event_id,
+              external_payment_id: "pi_missing_items_test_123",
+              stripe_fee: stripe_fee,
+              description: "Missing items test",
+              payment_method_id: nil
+            })
 
-      # Reload payment
-      payment = Repo.reload!(payment)
+          payment
+        end)
 
-      # Clear sync status to force explicit sync with our mocks
-      if payment.quickbooks_sync_status == "synced" do
-        payment
-        |> Payment.changeset(%{
-          quickbooks_sync_status: "pending",
-          quickbooks_sales_receipt_id: nil
-        })
-        |> Repo.update!()
-      end
-
-      # Reload so we have pending payment before setting stubs and calling sync
+      # Reload payment to get current state
       payment = Repo.reload!(payment)
 
       # Clear user's QuickBooks customer ID to ensure create_customer is called
@@ -1263,7 +1249,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Repo.update!()
       end
 
-      # Set up mocks
+      # Set up mocks that will be used during explicit sync
       expect(ClientMock, :create_customer, fn _params ->
         {:ok, %{"Id" => "qb_customer_123"}}
       end)
@@ -1280,17 +1266,19 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      # get_or_create_item already stubbed to error above (before payment creation)
+      # Stub get_or_create_item to fail (this is the key test condition)
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:error, :item_creation_failed}
+      end)
 
       # Ensure payment is pending (avoid early return from sync_payment)
-      payment
-      |> Payment.changeset(%{
-        quickbooks_sales_receipt_id: nil,
-        quickbooks_sync_status: "pending"
-      })
-      |> Repo.update!()
-
-      payment = Repo.reload!(payment)
+      payment =
+        payment
+        |> Payment.changeset(%{
+          quickbooks_sales_receipt_id: nil,
+          quickbooks_sync_status: "pending"
+        })
+        |> Repo.update!()
 
       # Should return error when item IDs are missing and API item creation fails
       result = Sync.sync_payment(payment)
@@ -3271,52 +3259,44 @@ defmodule Ysc.Quickbooks.SyncTest do
 
     test "booking refund inherits property from original payment through ledger entries",
          %{user: user} do
-      setup_default_mocks()
-
       # Create a Tahoe booking payment WITHOUT explicitly passing property to refund
       tahoe_booking_id = Ecto.ULID.generate()
 
-      {:ok, {payment, _transaction, _entries}} =
-        Ledgers.process_payment(%{
-          user_id: user.id,
-          amount: Money.new(40_000, :USD),
-          external_payment_id: "pi_inheritance_test",
-          entity_type: :booking,
-          entity_id: tahoe_booking_id,
-          stripe_fee: Money.new(1_200, :USD),
-          description: "Tahoe booking for property inheritance test",
-          property: :tahoe,
-          payment_method_id: nil
-        })
+      # Use manual Oban mode to prevent automatic sync during payment creation
+      payment =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          {:ok, {payment, _transaction, _entries}} =
+            Ledgers.process_payment(%{
+              user_id: user.id,
+              amount: Money.new(40_000, :USD),
+              external_payment_id: "pi_inheritance_test",
+              entity_type: :booking,
+              entity_id: tahoe_booking_id,
+              stripe_fee: Money.new(1_200, :USD),
+              description: "Tahoe booking for property inheritance test",
+              property: :tahoe,
+              payment_method_id: nil
+            })
 
-      # Set up mocks again for async jobs
-      setup_default_mocks()
+          payment
+        end)
 
       # Create a refund - note that we DON'T pass property here
       # The system should inherit it from the payment's ledger entries
-      {:ok, {refund, _refund_transaction, _entries}} =
-        Ledgers.process_refund(%{
-          payment_id: payment.id,
-          refund_amount: Money.new(10_000, :USD),
-          external_refund_id: "re_inheritance_test",
-          reason: "Testing property inheritance"
-        })
+      refund =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          {:ok, {refund, _refund_transaction, _entries}} =
+            Ledgers.process_refund(%{
+              payment_id: payment.id,
+              refund_amount: Money.new(10_000, :USD),
+              external_refund_id: "re_inheritance_test",
+              reason: "Testing property inheritance"
+            })
 
-      # Wait for any async jobs to complete
-      Process.sleep(100)
-      refund = Repo.reload!(refund)
+          refund
+        end)
 
-      # Clear sync status if it was auto-synced with default stub
-      if refund.quickbooks_sync_status == "synced" do
-        refund
-        |> Refund.changeset(%{
-          quickbooks_sync_status: "pending",
-          quickbooks_sales_receipt_id: nil,
-          quickbooks_response: nil
-        })
-        |> Repo.update!()
-      end
-
+      # Reload to get current state
       refund = Repo.reload!(refund)
 
       # Clear user's QuickBooks customer ID
@@ -3328,7 +3308,7 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Repo.update!()
       end
 
-      # Ensure tahoe_booking_item_id is set (async can overwrite config)
+      # Set tahoe_booking_item_id in config
       current_qb = Application.get_env(:ysc, :quickbooks, [])
 
       current_qb =

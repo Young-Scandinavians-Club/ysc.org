@@ -173,10 +173,26 @@ defmodule YscWeb.PasskeyRegistrationLive do
   end
 
   def handle_event("verify_registration", response, socket) do
+    require Ysc.Logging
+
     challenge = socket.assigns.passkey_challenge
     user = socket.assigns.current_user
 
+    Ysc.Logging.info(
+      "[PasskeyRegistrationLive] verify_registration event received",
+      %{
+        has_challenge: !is_nil(challenge),
+        has_response: !is_nil(response),
+        user_id: user.id,
+        response_keys: if(response, do: Map.keys(response), else: [])
+      }
+    )
+
     if is_nil(challenge) do
+      Ysc.Logging.warning(
+        "[PasskeyRegistrationLive] Challenge is nil in verify_registration"
+      )
+
       {:noreply,
        assign(socket,
          error: "Registration session expired. Please try again.",
@@ -195,6 +211,14 @@ defmodule YscWeb.PasskeyRegistrationLive do
             padding: false
           )
 
+        Ysc.Logging.debug(
+          "[PasskeyRegistrationLive] Decoded registration data",
+          %{
+            attestation_object_length: byte_size(attestation_object),
+            client_data_json_length: byte_size(client_data_json)
+          }
+        )
+
         # Verify the registration
         # Wax.register returns {:ok, {auth_data, attestation_result_data}}
         case Wax.register(attestation_object, client_data_json, challenge) do
@@ -202,6 +226,14 @@ defmodule YscWeb.PasskeyRegistrationLive do
             credential_data = auth_data.attested_credential_data
             credential_id = credential_data.credential_id
             public_key = credential_data.credential_public_key
+
+            Ysc.Logging.info(
+              "[PasskeyRegistrationLive] Wax.register succeeded",
+              %{
+                credential_id_length: byte_size(credential_id),
+                credential_id_hex: Base.encode16(credential_id, case: :lower)
+              }
+            )
 
             attrs = %{
               external_id: credential_id,
@@ -211,6 +243,14 @@ defmodule YscWeb.PasskeyRegistrationLive do
 
             case Accounts.create_user_passkey(user, attrs) do
               {:ok, passkey} ->
+                Ysc.Logging.info(
+                  "[PasskeyRegistrationLive] Passkey created successfully",
+                  %{
+                    passkey_id: passkey.id,
+                    passkey_nickname: passkey.nickname
+                  }
+                )
+
                 # Send security notification email
                 UserNotifier.deliver_passkey_added_notification(
                   user,
@@ -228,7 +268,14 @@ defmodule YscWeb.PasskeyRegistrationLive do
                    "Passkey added successfully! You can now use it to sign in."
                  )}
 
-              {:error, _changeset} ->
+              {:error, changeset} ->
+                Ysc.Logging.error(
+                  "[PasskeyRegistrationLive] Failed to save passkey",
+                  error: "Database save failed",
+                  changeset_errors: inspect(changeset.errors),
+                  user_id: user.id
+                )
+
                 {:noreply,
                  assign(socket,
                    error: "Failed to save passkey. Please try again.",
@@ -238,6 +285,12 @@ defmodule YscWeb.PasskeyRegistrationLive do
             end
 
           {:error, reason} ->
+            Ysc.Logging.error("[PasskeyRegistrationLive] Wax.register failed",
+              error: inspect(reason, pretty: true, limit: :infinity),
+              user_id: user.id,
+              has_challenge: !is_nil(challenge)
+            )
+
             {:noreply,
              assign(socket,
                error:
@@ -247,10 +300,37 @@ defmodule YscWeb.PasskeyRegistrationLive do
              )}
         end
       rescue
-        _ ->
+        e in ArgumentError ->
+          Ysc.Logging.error(
+            "[PasskeyRegistrationLive] Failed to decode base64 data",
+            error: Exception.message(e),
+            stacktrace: __STACKTRACE__,
+            user_id: user.id,
+            has_attestation_object:
+              !is_nil(response["response"]["attestationObject"]),
+            has_client_data_json:
+              !is_nil(response["response"]["clientDataJSON"])
+          )
+
           {:noreply,
            assign(socket,
              error: "Invalid passkey response. Please try again.",
+             loading: false,
+             passkey_challenge: nil
+           )}
+
+        e ->
+          Ysc.Logging.error(
+            "[PasskeyRegistrationLive] Unexpected error during registration",
+            error: Exception.message(e),
+            error_type: e.__struct__,
+            stacktrace: __STACKTRACE__,
+            user_id: user.id
+          )
+
+          {:noreply,
+           assign(socket,
+             error: "An unexpected error occurred. Please try again.",
              loading: false,
              passkey_challenge: nil
            )}
@@ -286,7 +366,23 @@ defmodule YscWeb.PasskeyRegistrationLive do
      )}
   end
 
-  def handle_event("passkey_registration_error", _params, socket) do
+  def handle_event("passkey_registration_error", params, socket) do
+    require Ysc.Logging
+
+    error_name = params["error"] || "UnknownError"
+    error_message_raw = params["message"] || "Registration failed"
+
+    # Log the error with context
+    Ysc.Logging.error(
+      "[PasskeyRegistrationLive] Passkey registration error from client (fallback handler)",
+      error: error_name,
+      message: error_message_raw,
+      params: params,
+      user_id: socket.assigns.current_user.id,
+      user_agent: socket.assigns[:user_agent],
+      has_challenge: !is_nil(socket.assigns[:passkey_challenge])
+    )
+
     {:noreply,
      assign(socket,
        error: "An error occurred during registration. Please try again.",
