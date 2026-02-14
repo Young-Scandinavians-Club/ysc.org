@@ -742,6 +742,18 @@ defmodule YscWeb.UserLoginLive do
         %{"error" => error, "message" => message},
         socket
       ) do
+    require Ysc.Logging
+
+    # Log the error with context
+    Ysc.Logging.error(
+      "[UserLoginLive] Passkey authentication error from client",
+      error: error,
+      message: message,
+      user_agent: socket.assigns[:user_agent],
+      has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
+      auth_mode: socket.assigns[:passkey_auth_mode]
+    )
+
     error_message =
       case error do
         "NotAllowedError" ->
@@ -764,7 +776,17 @@ defmodule YscWeb.UserLoginLive do
      |> assign(:passkey_auth_mode, nil)}
   end
 
-  def handle_event("passkey_auth_error", _params, socket) do
+  def handle_event("passkey_auth_error", params, socket) do
+    require Ysc.Logging
+
+    # Log fallback error handler
+    Ysc.Logging.error("[UserLoginLive] Passkey authentication error (fallback)",
+      params: params,
+      user_agent: socket.assigns[:user_agent],
+      has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
+      auth_mode: socket.assigns[:passkey_auth_mode]
+    )
+
     {:noreply,
      put_flash(
        socket,

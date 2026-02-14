@@ -24,6 +24,18 @@ const PasskeyAuth = {
             this.pushEvent("passkey_support_detected", { supported: isPasskeySupported });
         } catch (error) {
             console.error("[PasskeyAuth] Error pushing passkey_support_detected event", error);
+            if (window.Sentry) {
+                window.Sentry.captureException(error, {
+                    tags: {
+                        component: "passkey_auth",
+                        event: "passkey_support_detected"
+                    },
+                    extra: {
+                        isPasskeySupported,
+                        userAgent
+                    }
+                });
+            }
         }
 
         // Send user agent to LiveView for device nickname generation
@@ -31,6 +43,17 @@ const PasskeyAuth = {
             this.pushEvent("user_agent_received", { user_agent: userAgent });
         } catch (error) {
             console.error("[PasskeyAuth] Error pushing user_agent_received event", error);
+            if (window.Sentry) {
+                window.Sentry.captureException(error, {
+                    tags: {
+                        component: "passkey_auth",
+                        event: "user_agent_received"
+                    },
+                    extra: {
+                        userAgent
+                    }
+                });
+            }
         }
 
         // If WebAuthn is not supported, return early
@@ -41,6 +64,20 @@ const PasskeyAuth = {
         // Listen for authentication challenge from LiveView
         this.handleEvent("create_authentication_challenge", async ({ options }) => {
             try {
+                // Add breadcrumb for debugging
+                if (window.Sentry) {
+                    window.Sentry.addBreadcrumb({
+                        category: "passkey",
+                        message: "Starting authentication challenge",
+                        level: "info",
+                        data: {
+                            hasChallenge: !!options?.challenge,
+                            hasRpId: !!(options?.rpId || options?.rp_id),
+                            userAgent: navigator.userAgent
+                        }
+                    });
+                }
+
                 // Check if browser supports JSON-based WebAuthn API
                 const jsonWebAuthnSupport = !!window.PublicKeyCredential?.parseRequestOptionsFromJSON;
 
@@ -62,12 +99,29 @@ const PasskeyAuth = {
                     const parseInput = { publicKey: publicKeyOptions };
                     
                     if (!parseInput.publicKey?.challenge) {
+                        const errorMsg = "Challenge is required but was not provided";
                         console.error("[PasskeyAuth] CRITICAL: Challenge is missing from parseInput!", {
                             parseInput: parseInput,
                             publicKeyOptions: publicKeyOptions,
                             originalOptions: options
                         });
-                        throw new Error("Challenge is required but was not provided");
+                        
+                        if (window.Sentry) {
+                            window.Sentry.captureException(new Error(errorMsg), {
+                                tags: {
+                                    component: "passkey_auth",
+                                    operation: "authentication",
+                                    error_type: "missing_challenge"
+                                },
+                                extra: {
+                                    parseInput,
+                                    publicKeyOptions,
+                                    originalOptions: options
+                                }
+                            });
+                        }
+                        
+                        throw new Error(errorMsg);
                     }
                     
                     // Try parseRequestOptionsFromJSON - if it fails or produces empty challenge, fall back to manual conversion
@@ -85,6 +139,20 @@ const PasskeyAuth = {
                             throw new Error("Missing rpId from parseRequestOptionsFromJSON");
                         }
                     } catch (parseError) {
+                        console.warn("[PasskeyAuth] parseRequestOptionsFromJSON failed, falling back to manual conversion", parseError);
+                        
+                        if (window.Sentry) {
+                            window.Sentry.addBreadcrumb({
+                                category: "passkey",
+                                message: "Fallback to manual challenge conversion",
+                                level: "warning",
+                                data: {
+                                    error: parseError.message,
+                                    challengeLength: publicKeyOptions.challenge?.length
+                                }
+                            });
+                        }
+                        
                         // Fallback: manually convert challenge from base64url to ArrayBuffer
                         publicKey = {
                             challenge: base64UrlToArrayBuffer(publicKeyOptions.challenge),
@@ -97,6 +165,14 @@ const PasskeyAuth = {
                     credential = await navigator.credentials.get({ publicKey });
                 } else {
                     // Fallback to traditional API (requires manual Base64 encoding/decoding)
+                    if (window.Sentry) {
+                        window.Sentry.addBreadcrumb({
+                            category: "passkey",
+                            message: "Using legacy WebAuthn API (no JSON support)",
+                            level: "info"
+                        });
+                    }
+                    
                     const publicKey = {
                         ...options,
                         challenge: base64UrlToArrayBuffer(options.challenge)
@@ -134,11 +210,51 @@ const PasskeyAuth = {
                         credential.toJSON() :
                         credential;
 
+                    if (window.Sentry) {
+                        window.Sentry.addBreadcrumb({
+                            category: "passkey",
+                            message: "Authentication credential obtained successfully",
+                            level: "info"
+                        });
+                    }
+
                     // Push the result back to the LiveView
                     this.pushEvent("verify_authentication", credentialJson);
+                } else {
+                    const errorMsg = "No credential returned from navigator.credentials.get";
+                    console.error("[PasskeyAuth]", errorMsg);
+                    
+                    if (window.Sentry) {
+                        window.Sentry.captureException(new Error(errorMsg), {
+                            tags: {
+                                component: "passkey_auth",
+                                operation: "authentication",
+                                error_type: "no_credential"
+                            }
+                        });
+                    }
                 }
             } catch (error) {
                 console.error("[PasskeyAuth] Passkey authentication failed", error);
+
+                // Capture full error context in Sentry
+                if (window.Sentry) {
+                    window.Sentry.captureException(error, {
+                        tags: {
+                            component: "passkey_auth",
+                            operation: "authentication",
+                            error_name: error.name,
+                            browser: navigator.userAgent.match(/Firefox|Chrome|Safari|Edge/)?.[0] || "unknown"
+                        },
+                        extra: {
+                            errorMessage: error.message,
+                            errorStack: error.stack,
+                            userAgent: navigator.userAgent,
+                            hasPublicKeyCredential: typeof window.PublicKeyCredential !== "undefined",
+                            hasParseRequestOptions: !!window.PublicKeyCredential?.parseRequestOptionsFromJSON
+                        }
+                    });
+                }
 
                 // Push error event to LiveView
                 this.pushEvent("passkey_auth_error", {
@@ -153,13 +269,48 @@ const PasskeyAuth = {
             const options = payload?.options || payload;
 
             if (!options) {
-                console.error("[PasskeyAuth] No options provided in create_registration_challenge event", {
+                const errorMsg = "No options provided in create_registration_challenge event";
+                console.error("[PasskeyAuth]", errorMsg, {
                     payload: payload
+                });
+                
+                if (window.Sentry) {
+                    window.Sentry.captureException(new Error(errorMsg), {
+                        tags: {
+                            component: "passkey_auth",
+                            operation: "registration",
+                            error_type: "missing_options"
+                        },
+                        extra: {
+                            payload
+                        }
+                    });
+                }
+                
+                // Push error event to LiveView so it doesn't hang
+                this.pushEvent("passkey_registration_error", {
+                    error: "ConfigurationError",
+                    message: errorMsg
                 });
                 return;
             }
 
             try {
+                // Add breadcrumb for debugging
+                if (window.Sentry) {
+                    window.Sentry.addBreadcrumb({
+                        category: "passkey",
+                        message: "Starting registration challenge",
+                        level: "info",
+                        data: {
+                            hasChallenge: !!options?.challenge,
+                            hasRp: !!options?.rp,
+                            hasUser: !!options?.user,
+                            userAgent: navigator.userAgent
+                        }
+                    });
+                }
+
                 // Check if browser supports JSON-based WebAuthn API
                 const jsonWebAuthnSupport = !!window.PublicKeyCredential?.parseCreationOptionsFromJSON;
 
@@ -168,16 +319,55 @@ const PasskeyAuth = {
                 if (jsonWebAuthnSupport) {
                     // Verify all required fields are present
                     if (!options?.challenge) {
-                        console.error("[PasskeyAuth] Challenge is missing from options!");
-                        throw new Error("Challenge is required but was not provided");
+                        const errorMsg = "Challenge is required but was not provided";
+                        console.error("[PasskeyAuth]", errorMsg);
+                        
+                        if (window.Sentry) {
+                            window.Sentry.captureException(new Error(errorMsg), {
+                                tags: {
+                                    component: "passkey_auth",
+                                    operation: "registration",
+                                    error_type: "missing_challenge"
+                                },
+                                extra: { options }
+                            });
+                        }
+                        
+                        throw new Error(errorMsg);
                     }
                     if (!options?.rp) {
-                        console.error("[PasskeyAuth] RP is missing from options!");
-                        throw new Error("RP is required but was not provided");
+                        const errorMsg = "RP is required but was not provided";
+                        console.error("[PasskeyAuth]", errorMsg);
+                        
+                        if (window.Sentry) {
+                            window.Sentry.captureException(new Error(errorMsg), {
+                                tags: {
+                                    component: "passkey_auth",
+                                    operation: "registration",
+                                    error_type: "missing_rp"
+                                },
+                                extra: { options }
+                            });
+                        }
+                        
+                        throw new Error(errorMsg);
                     }
                     if (!options?.user) {
-                        console.error("[PasskeyAuth] User is missing from options!");
-                        throw new Error("User is required but was not provided");
+                        const errorMsg = "User is required but was not provided";
+                        console.error("[PasskeyAuth]", errorMsg);
+                        
+                        if (window.Sentry) {
+                            window.Sentry.captureException(new Error(errorMsg), {
+                                tags: {
+                                    component: "passkey_auth",
+                                    operation: "registration",
+                                    error_type: "missing_user"
+                                },
+                                extra: { options }
+                            });
+                        }
+                        
+                        throw new Error(errorMsg);
                     }
                     
                     // Use modern JSON-based WebAuthn API (Chrome 108+, Safari 16.4+, Firefox 119+)
@@ -198,6 +388,21 @@ const PasskeyAuth = {
                             throw new Error("Missing or empty user.id from parseCreationOptionsFromJSON");
                         }
                     } catch (parseError) {
+                        console.warn("[PasskeyAuth] parseCreationOptionsFromJSON failed, falling back to manual conversion", parseError);
+                        
+                        if (window.Sentry) {
+                            window.Sentry.addBreadcrumb({
+                                category: "passkey",
+                                message: "Fallback to manual challenge conversion",
+                                level: "warning",
+                                data: {
+                                    error: parseError.message,
+                                    challengeLength: options.challenge?.length,
+                                    userIdLength: options.user?.id?.length
+                                }
+                            });
+                        }
+                        
                         // Fallback: manually convert challenge and user.id from base64url to ArrayBuffer
                         publicKey = {
                             challenge: base64UrlToArrayBuffer(options.challenge),
@@ -215,6 +420,14 @@ const PasskeyAuth = {
                     credential = await navigator.credentials.create({ publicKey });
                 } else {
                     // Fallback to traditional API (requires manual Base64 encoding/decoding)
+                    if (window.Sentry) {
+                        window.Sentry.addBreadcrumb({
+                            category: "passkey",
+                            message: "Using legacy WebAuthn API (no JSON support)",
+                            level: "info"
+                        });
+                    }
+                    
                     // Convert base64url strings to ArrayBuffer
                     const publicKey = {
                         ...options,
@@ -248,11 +461,51 @@ const PasskeyAuth = {
                         credential.toJSON() :
                         credential;
 
+                    if (window.Sentry) {
+                        window.Sentry.addBreadcrumb({
+                            category: "passkey",
+                            message: "Registration credential obtained successfully",
+                            level: "info"
+                        });
+                    }
+
                     // Push the result back to the LiveView
                     this.pushEvent("verify_registration", credentialJson);
+                } else {
+                    const errorMsg = "No credential returned from navigator.credentials.create";
+                    console.error("[PasskeyAuth]", errorMsg);
+                    
+                    if (window.Sentry) {
+                        window.Sentry.captureException(new Error(errorMsg), {
+                            tags: {
+                                component: "passkey_auth",
+                                operation: "registration",
+                                error_type: "no_credential"
+                            }
+                        });
+                    }
                 }
             } catch (error) {
                 console.error("[PasskeyAuth] Passkey registration failed", error);
+
+                // Capture full error context in Sentry
+                if (window.Sentry) {
+                    window.Sentry.captureException(error, {
+                        tags: {
+                            component: "passkey_auth",
+                            operation: "registration",
+                            error_name: error.name,
+                            browser: navigator.userAgent.match(/Firefox|Chrome|Safari|Edge/)?.[0] || "unknown"
+                        },
+                        extra: {
+                            errorMessage: error.message,
+                            errorStack: error.stack,
+                            userAgent: navigator.userAgent,
+                            hasPublicKeyCredential: typeof window.PublicKeyCredential !== "undefined",
+                            hasParseCreationOptions: !!window.PublicKeyCredential?.parseCreationOptionsFromJSON
+                        }
+                    });
+                }
 
                 // Push error event to LiveView
                 this.pushEvent("passkey_registration_error", {
@@ -266,41 +519,89 @@ const PasskeyAuth = {
 
 // Helper functions for Base64 URL encoding/decoding (for older browsers)
 function base64UrlToArrayBuffer(base64url) {
-    // Convert base64url to base64
-    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    try {
+        // Convert base64url to base64
+        let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
 
-    // Add padding if needed
-    while (base64.length % 4) {
-        base64 += '=';
+        // Add padding if needed
+        while (base64.length % 4) {
+            base64 += '=';
+        }
+
+        // Decode base64 to binary string
+        const binaryString = atob(base64);
+
+        // Convert binary string to ArrayBuffer
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        return bytes.buffer;
+    } catch (error) {
+        console.error("[PasskeyAuth] Error converting base64url to ArrayBuffer", {
+            error: error.message,
+            input: base64url,
+            inputType: typeof base64url,
+            inputLength: base64url?.length
+        });
+        
+        if (window.Sentry) {
+            window.Sentry.captureException(error, {
+                tags: {
+                    component: "passkey_auth",
+                    function: "base64UrlToArrayBuffer"
+                },
+                extra: {
+                    input: base64url,
+                    inputType: typeof base64url,
+                    inputLength: base64url?.length
+                }
+            });
+        }
+        
+        throw error;
     }
-
-    // Decode base64 to binary string
-    const binaryString = atob(base64);
-
-    // Convert binary string to ArrayBuffer
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    return bytes.buffer;
 }
 
 function arrayBufferToBase64Url(arrayBuffer) {
-    // Convert ArrayBuffer to Uint8Array
-    const bytes = new Uint8Array(arrayBuffer);
+    try {
+        // Convert ArrayBuffer to Uint8Array
+        const bytes = new Uint8Array(arrayBuffer);
 
-    // Convert to binary string
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
+        // Convert to binary string
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+
+        // Encode to base64
+        const base64 = btoa(binary);
+
+        // Convert base64 to base64url
+        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    } catch (error) {
+        console.error("[PasskeyAuth] Error converting ArrayBuffer to base64url", {
+            error: error.message,
+            inputType: typeof arrayBuffer,
+            inputByteLength: arrayBuffer?.byteLength
+        });
+        
+        if (window.Sentry) {
+            window.Sentry.captureException(error, {
+                tags: {
+                    component: "passkey_auth",
+                    function: "arrayBufferToBase64Url"
+                },
+                extra: {
+                    inputType: typeof arrayBuffer,
+                    inputByteLength: arrayBuffer?.byteLength
+                }
+            });
+        }
+        
+        throw error;
     }
-
-    // Encode to base64
-    const base64 = btoa(binary);
-
-    // Convert base64 to base64url
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 
