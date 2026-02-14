@@ -679,6 +679,7 @@ Contributions to this project are managed by the web tech group. Here's the gene
 3.  **Write tests**: Add tests to cover any new functionality or bug fixes.
 4.  **Run preflight checks**: Before committing, run `make preflight` to ensure all CI checks pass locally.
 5.  **Submit a pull request**: Open a pull request from your branch to the `main` branch. Provide a clear description of your changes and why they are needed.
+6.  **Link ticket**: If you have been assigned a ticket from Linear (webtech team) reference the ticket in your PR description.
 
 A team member will review your pull request. Thank you for your contribution!
 
@@ -886,3 +887,47 @@ RADAR_PUBLIC_KEY=prj_live_pk_...  # Optional, defaults to test key
 **Note:** Exported environment variables take precedence over values in the `.env` file. The `make dev` command will automatically load variables from `.env` if the file exists.
 
 **Security Note:** Never commit your `.env` file to version control. It's already included in `.gitignore`.
+
+## License
+
+This project is licensed under the **Non-Profit Open Software License (NPOSL) 3.0**.
+
+### What This Means
+
+The NPOSL 3.0 is a modern, professionally-written open source license designed specifically for non-profit organizations. It provides:
+
+**✅ You Can:**
+- Use, modify, and distribute this software freely
+- Create derivative works based on this software
+- Deploy the software on networks and servers
+- Access and modify the complete source code
+
+**📋 You Must:**
+- Keep the source code open and available
+- License any derivative works under NPOSL 3.0
+- Retain copyright and attribution notices
+- Treat network deployment (SaaS) as distribution (no "ASP loophole")
+
+**❌ Restrictions:**
+- **Only non-profit organizations** can distribute this software
+- Commercial use requires the standard OSL 3.0 license instead
+- Trademark and patent rights are reserved
+
+### Why NPOSL 3.0?
+
+According to the license author, Lawrence Rosen: *"Some licensors are non-profit organizations that derive no revenue whatsoever from the distribution of the Original Work or Derivative Works, or even from support or services associated with those works."*
+
+The NPOSL 3.0 is identical to the Open Software License (OSL 3.0) but with Section 17 amendments that:
+- Disclaim the "Warranty of Provenance" for non-profits
+- Extend liability limitations to include direct damages
+- Require the licensor to be a non-profit organization
+
+This license ensures the software remains open source while recognizing the resource constraints of non-profit organizations.
+
+### Full License Text
+
+See the [LICENSE](LICENSE) file for the complete license text.
+
+### Commercial Use
+
+If you represent a for-profit organization and wish to use, modify, or distribute this software, you should contact the project maintainers about licensing under OSL 3.0 or a commercial license instead.
