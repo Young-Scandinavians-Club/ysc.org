@@ -4020,14 +4020,105 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_info(
+        {Ysc.Events, %Ysc.MessagePassingEvents.EventAdded{event: _event}},
+        socket
+      ) do
+    # Ignore EventAdded for other events (e.g. from parallel tests or other tabs).
+    # We only care about updates to the event we're currently viewing.
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(
         {Ysc.Events, %Ysc.MessagePassingEvents.EventUpdated{event: event}},
         socket
       ) do
-    # Add pricing info to the updated event
-    # Ensure ticket_tiers is preloaded in case it wasn't included in the event update
-    event = Repo.preload(event, :ticket_tiers)
-    event_with_pricing = add_pricing_info(event)
-    {:noreply, assign(socket, :event, event_with_pricing)}
+    # Only update if this is the event we're viewing
+    if event.id == socket.assigns.event.id do
+      event = Repo.preload(event, :ticket_tiers)
+      event_with_pricing = add_pricing_info(event)
+      {:noreply, assign(socket, :event, event_with_pricing)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.TicketTierAdded{ticket_tier: tier}},
+        socket
+      ) do
+    current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
+
+    if current_event_id && tier.event_id == current_event_id do
+      event = Events.get_event!(current_event_id) |> Repo.preload(:ticket_tiers)
+      event_with_pricing = add_pricing_info(event)
+
+      ticket_tiers_with_counts =
+        Events.list_ticket_tiers_for_event(current_event_id)
+
+      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
+
+      {:noreply,
+       socket
+       |> assign(:event, event_with_pricing)
+       |> assign(:ticket_tiers, ticket_tiers)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.TicketTierUpdated{ticket_tier: tier}},
+        socket
+      ) do
+    current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
+
+    if current_event_id && tier.event_id == current_event_id do
+      event = Events.get_event!(current_event_id) |> Repo.preload(:ticket_tiers)
+      event_with_pricing = add_pricing_info(event)
+
+      ticket_tiers_with_counts =
+        Events.list_ticket_tiers_for_event(current_event_id)
+
+      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
+
+      {:noreply,
+       socket
+       |> assign(:event, event_with_pricing)
+       |> assign(:ticket_tiers, ticket_tiers)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.TicketTierDeleted{ticket_tier: tier}},
+        socket
+      ) do
+    current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
+
+    if current_event_id && tier.event_id == current_event_id do
+      event = Events.get_event!(current_event_id) |> Repo.preload(:ticket_tiers)
+      event_with_pricing = add_pricing_info(event)
+
+      ticket_tiers_with_counts =
+        Events.list_ticket_tiers_for_event(current_event_id)
+
+      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
+
+      {:noreply,
+       socket
+       |> assign(:event, event_with_pricing)
+       |> assign(:ticket_tiers, ticket_tiers)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -4401,6 +4492,10 @@ defmodule YscWeb.EventDetailsLive do
       {:noreply, socket}
     end
   end
+
+  # Catch-all for any other Ysc.Events messages (e.g. from parallel tests or future message types)
+  @impl true
+  def handle_info({Ysc.Events, _msg}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info(

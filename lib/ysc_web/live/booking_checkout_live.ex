@@ -746,51 +746,6 @@ defmodule YscWeb.BookingCheckoutLive do
                     Cancel
                   </button>
                 </div>
-                <%!-- Payment Icons --%>
-                <div class="flex items-center justify-center gap-3 pt-2">
-                  <span class="text-xs text-zinc-500 uppercase tracking-wide">
-                    Secure Payment
-                  </span>
-                  <div class="flex items-center gap-2">
-                    <%!-- Visa Logo --%>
-                    <svg
-                      class="w-10 h-6 opacity-70"
-                      viewBox="0 0 40 24"
-                      fill="none"
-                      aria-label="Visa"
-                    >
-                      <rect width="40" height="24" rx="2" fill="#1A1F71" />
-                      <path
-                        d="M16.5 8.5h-2.5l-1.5 7h2.5l1.5-7zm8.5 4.5c0-1.5-2-2.5-2-3.5 0-.5.5-1 1.5-1 .5 0 1 .2 1.5.5l.5-2.5c-.5-.2-1-.5-2-.5-2.5 0-4 1.5-4 3.5 0 1.5 1.5 2.5 2.5 3 1 .5 1.5 1 1.5 1.5 0 1-1 1.5-2 1.5-.5 0-1-.2-1.5-.5l-.5 2.5c.5.2 1 .5 2 .5 2.5 0 4.5-1.5 4.5-3.5zm-6-4.5l-2 7h-2.5l2-7h2.5z"
-                        fill="#F79E1B"
-                      />
-                    </svg>
-                    <%!-- Mastercard Logo --%>
-                    <svg
-                      class="w-10 h-6 opacity-70"
-                      viewBox="0 0 40 24"
-                      fill="none"
-                      aria-label="Mastercard"
-                    >
-                      <rect width="40" height="24" rx="2" fill="#EB001B" />
-                      <circle cx="15" cy="12" r="4" fill="#F79E1B" />
-                      <circle cx="25" cy="12" r="4" fill="#FF5F00" />
-                    </svg>
-                    <%!-- Stripe Logo --%>
-                    <svg
-                      class="w-10 h-6 opacity-70"
-                      viewBox="0 0 40 24"
-                      fill="none"
-                      aria-label="Stripe"
-                    >
-                      <rect width="40" height="24" rx="2" fill="#635BFF" />
-                      <path
-                        d="M17 10.5c0 .8-.6 1.4-1.4 1.4h-2.2v2.8h-1.3V9.1h3.5c.8 0 1.4.6 1.4 1.4zm-1.4 0c0-.3-.2-.5-.5-.5h-2.2v1h2.2c.3 0 .5-.2.5-.5zm4.4 4.2h-1.3v-5.6h1.3v5.6zm3.5 0h-1.3v-3.9c0-.5-.3-.8-.8-.8s-.8.3-.8.8v3.9h-1.3v-3.9c0-1.1.9-2 2-2s2 .9 2 2v3.9zm5.5-2.1c0-1.1-.9-2-2-2h-1.5v5.6h1.3v-2.1h.2l1.5 2.1h1.6l-1.7-2.3c.8-.3 1.2-1 1.2-1.9zm-2.2 0c0 .4.3.7.7.7h1.3v-1.4h-1.3c-.4 0-.7.3-.7.7z"
-                        fill="white"
-                      />
-                    </svg>
-                  </div>
-                </div>
               </div>
             </div>
             <!-- Expired Booking Message -->

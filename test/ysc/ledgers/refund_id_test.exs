@@ -1,5 +1,5 @@
 defmodule Ysc.Ledgers.RefundIdTest do
-  use Ysc.DataCase, async: false
+  use Ysc.DataCase, async: true
 
   alias Ysc.Ledgers
   alias Ysc.Ledgers.{Refund, Payment}
