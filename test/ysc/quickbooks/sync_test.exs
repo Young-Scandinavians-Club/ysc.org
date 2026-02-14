@@ -1495,6 +1495,18 @@ defmodule Ysc.Quickbooks.SyncTest do
          }}
       end)
 
+      # Re-apply config - another async test may have overwritten bank_account_id/stripe_account_id
+      config = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       # Sync the payout
       assert {:ok, _deposit} = Sync.sync_payout(payout)
 
@@ -3802,6 +3814,13 @@ defmodule Ysc.Quickbooks.SyncTest do
       expect(ClientMock, :get_or_create_item, fn _item_name, _opts ->
         {:error, "Failed to create item"}
       end)
+
+      # Re-apply config without event_item_id - another async test may have overwritten it
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.drop(original_config, [:event_item_id])
+      )
 
       assert {:error, "Failed to create item"} = Sync.sync_payment(payment)
 

@@ -331,12 +331,16 @@ defmodule Ysc.Ledgers.RefundIdTest do
     end
 
     test "handles multiple partial refunds correctly", %{user: user} do
+      # Use unique IDs to avoid collision with reconciliation_test.exs which uses
+      # "re_partial_#{i}" - when run in parallel, both would try to create "re_partial_1" etc.
+      unique = System.unique_integer([:positive])
+
       # Create a payment
       {:ok, {payment, _transaction, _entries}} =
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(30_000, :USD),
-          external_payment_id: "pi_multi_refund",
+          external_payment_id: "pi_multi_refund_#{unique}",
           entity_type: :membership,
           entity_id: Ecto.ULID.generate(),
           stripe_fee: Money.new(900, :USD),
@@ -351,7 +355,7 @@ defmodule Ysc.Ledgers.RefundIdTest do
           payment_id: payment.id,
           refund_amount: Money.new(10_000, :USD),
           reason: "First partial refund",
-          external_refund_id: "re_partial_1"
+          external_refund_id: "re_partial_1_#{unique}"
         })
 
       {:ok, {refund2, _t2, entries2}} =
@@ -359,7 +363,7 @@ defmodule Ysc.Ledgers.RefundIdTest do
           payment_id: payment.id,
           refund_amount: Money.new(8_000, :USD),
           reason: "Second partial refund",
-          external_refund_id: "re_partial_2"
+          external_refund_id: "re_partial_2_#{unique}"
         })
 
       {:ok, {refund3, _t3, entries3}} =
@@ -367,7 +371,7 @@ defmodule Ysc.Ledgers.RefundIdTest do
           payment_id: payment.id,
           refund_amount: Money.new(5_000, :USD),
           reason: "Third partial refund",
-          external_refund_id: "re_partial_3"
+          external_refund_id: "re_partial_3_#{unique}"
         })
 
       # Verify each refund has exactly 2 entries with correct refund_id

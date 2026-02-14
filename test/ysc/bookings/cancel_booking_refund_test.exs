@@ -7,8 +7,11 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
   - Any refund subject to policy rules (partial, full via policy, or $0) requires admin approval
   - Both properties (Tahoe and Clear Lake) are handled correctly
   - Both booking modes (room and buyout) are handled correctly
+
+  Note: Uses async: false to prevent RefundPolicyCache race conditions when
+  tests create/use refund policies (Cachex is shared across processes).
   """
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures

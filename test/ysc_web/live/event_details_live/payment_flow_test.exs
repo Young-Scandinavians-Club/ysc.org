@@ -1,5 +1,12 @@
 defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
-  use YscWeb.ConnCase, async: true
+  @moduledoc """
+  E2E payment flow tests for event ticket purchase.
+
+  Note: Uses async: false to avoid Mox stub interference. When run in parallel
+  with url_restoration_test (which stubs create_payment_intent in setup), that
+  stub can overwrite our expect(), causing "invoked 0 times" verification failures.
+  """
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory

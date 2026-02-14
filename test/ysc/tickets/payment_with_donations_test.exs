@@ -136,6 +136,14 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
       {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
     end)
 
+    # Stub get_or_create_item - sync may call this when config overrides are missing
+    # (e.g. when another async test overwrites Application config)
+    stub(ClientMock, :get_or_create_item, fn
+      "Event Tickets", _opts -> {:ok, "event_item_123"}
+      "Donations", _opts -> {:ok, "donation_item_123"}
+      _item_name, _opts -> {:ok, "qb_item_default"}
+    end)
+
     %{
       user: user,
       event: event,

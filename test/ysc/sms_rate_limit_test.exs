@@ -8,8 +8,12 @@ defmodule Ysc.SmsRateLimitTest do
   - Multiple phone number isolation
   - Cache-based timestamp tracking
   - Status reporting accuracy
+
+  Note: Uses async: false because Cachex is shared across processes. With async: true,
+  Cachex.clear in one test's setup wipes another test's data, and tests using the same
+  phone number can interfere with each other.
   """
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   alias Ysc.SmsRateLimit
 
