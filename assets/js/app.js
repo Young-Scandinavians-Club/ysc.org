@@ -66,6 +66,7 @@ import PasskeyAuth from "./passkey_auth";
 import ConfirmCloseModal from "./confirm_close_modal";
 import ClipboardCopy from "./clipboard_copy";
 import DecadeIndicator from "./decade_indicator";
+import FooterRotator from "./footer_rotator";
 
 let Hooks = {
     StickyNavbar,
@@ -107,6 +108,7 @@ let Hooks = {
     ConfirmCloseModal,
     ClipboardCopy,
     DecadeIndicator,
+    FooterRotator,
 };
 Hooks.LivePhone = LivePhone;
 
