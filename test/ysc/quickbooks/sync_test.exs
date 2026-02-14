@@ -1510,6 +1510,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "creates QuickBooks Deposit with payments and refunds (net amount)", %{
       user: user
     } do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       setup_default_mocks()
 
       # Create and sync a payment
@@ -1650,6 +1653,17 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert length(payout.refunds) == 1
       assert List.first(payout.payments).quickbooks_sync_status == "synced"
       assert List.first(payout.refunds).quickbooks_sync_status == "synced"
+
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
 
       # Mock Deposit creation
       expect(ClientMock, :create_deposit, fn params, _opts ->
@@ -3032,6 +3046,7 @@ defmodule Ysc.Quickbooks.SyncTest do
   end
 
   describe "booking refund class assignment" do
+    @tag :capture_log
     test "Tahoe booking refund uses correct QuickBooks class (Tahoe)", %{
       user: user
     } do
@@ -3095,8 +3110,17 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Repo.update!()
       end
 
-      # Restore full QB config so tahoe_booking_item_id and other keys are set (async can overwrite)
-      Application.put_env(:ysc, :quickbooks, saved_qb_config)
+      # Ensure full QB config is set right before the explicit sync call
+      # This ensures the tahoe_booking_item_id is available when get_quickbooks_item_id is called
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          tahoe_booking_item_id: "tahoe_item_123",
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
 
       # Mock customer creation
       expect(ClientMock, :create_customer, fn _params ->
