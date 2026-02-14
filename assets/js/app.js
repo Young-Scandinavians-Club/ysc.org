@@ -15,8 +15,8 @@
 //     import "some-package"
 //
 
-// Load Sentry bundle (exposes window.Sentry global)
-import "../vendor/bundle.tracing.replay.min.js";
+// Sentry is loaded via a script tag in root.html.heex to ensure window.Sentry is available
+// before this bundle executes. See priv/static/assets/sentry.min.js
 
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html";
@@ -113,13 +113,16 @@ Hooks.LivePhone = LivePhone;
 // Helper function to wait for Sentry to be available with retries
 async function waitForSentry(maxAttempts = 5, delayMs = 50) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        console.log(`waitForSentry: Attempt ${attempt}/${maxAttempts}, window.Sentry =`, window.Sentry);
         if (window.Sentry) {
+            console.log("waitForSentry: ✓ Sentry found!");
             return true;
         }
         if (attempt < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, delayMs));
         }
     }
+    console.error("waitForSentry: ✗ Sentry not found after", maxAttempts, "attempts");
     return false;
 }
 
@@ -161,7 +164,7 @@ waitForSentry().then((available) => {
             // Clear user context for anonymous users
             window.Sentry.setUser(null);
         }
-        
+
         console.log("Sentry initialized successfully");
     } else {
         console.warn("Sentry failed to load after multiple attempts - error monitoring will be disabled");

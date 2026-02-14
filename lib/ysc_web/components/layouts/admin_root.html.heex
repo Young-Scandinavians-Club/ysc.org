@@ -13,6 +13,15 @@
       href={~p"/assets/app.css"}
       nonce={@csp_nonce}
     />
+    <%!-- Sentry monitoring - loaded first without defer to ensure window.Sentry is available --%>
+    <script
+      phx-track-static
+      type="text/javascript"
+      src={~p"/assets/sentry.min.js"}
+      nonce={@csp_nonce}
+    >
+    </script>
+    <%!-- Main application bundle - deferred but will run after Sentry since it comes after --%>
     <script
       defer
       phx-track-static

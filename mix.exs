@@ -180,11 +180,13 @@ defmodule Ysc.MixProject do
         "esbuild.install --if-missing"
       ],
       "assets.build": [
+        "copy_vendor_assets",
         "generate_video_posters",
         "tailwind default",
         "esbuild default"
       ],
       "assets.deploy": [
+        "copy_vendor_assets",
         "generate_video_posters",
         "tailwind default --minify",
         "esbuild default --minify",
