@@ -2213,7 +2213,24 @@ defmodule Ysc.Quickbooks.SyncTest do
         )
       end
 
-      # Mock deposit creation (for payout sync)
+      # Mock deposit creation and required account queries (for payout sync)
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Events" -> {:ok, "events_class_default"}
+        "Administration" -> {:ok, "admin_class_default"}
+        "Tahoe" -> {:ok, "tahoe_class_default"}
+        "Clear Lake" -> {:ok, "clear_lake_class_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "qb_item_default"}
+      end)
+
       expect(ClientMock, :create_deposit, fn _params, _opts ->
         {:ok, %{"Id" => "qb_deposit_123", "TotalAmt" => "100.00"}}
       end)
@@ -3758,7 +3775,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           payment_method_id: nil
         })
 
-      setup_default_mocks()
       Process.sleep(100)
       payment = Repo.reload!(payment)
 
@@ -3788,6 +3804,12 @@ defmodule Ysc.Quickbooks.SyncTest do
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
         "Event Revenue" -> {:ok, "event_revenue_account_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Events" -> {:ok, "events_class_default"}
+        "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
       end)
 
