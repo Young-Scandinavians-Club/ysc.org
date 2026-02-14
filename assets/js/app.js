@@ -131,23 +131,33 @@ async function waitForSentry(maxAttempts = 5, delayMs = 50) {
 // The Sentry bundle exposes a global window.Sentry object
 waitForSentry().then((available) => {
     if (available) {
+        // Build integrations array - only include available integrations
+        const integrations = [];
+        
+        // Add BrowserTracing if available (Performance Bundle includes this)
+        if (typeof window.Sentry.browserTracingIntegration === 'function') {
+            integrations.push(window.Sentry.browserTracingIntegration({
+                // Track LiveView navigation as transactions
+                tracePropagationTargets: ["localhost", /^\//],
+            }));
+        }
+        
+        // Add Replay if available (some bundles include this)
+        if (typeof window.Sentry.replayIntegration === 'function') {
+            integrations.push(window.Sentry.replayIntegration({
+                // Capture 10% of all sessions for replay
+                sessionSampleRate: 0.1,
+                // Capture 100% of sessions with errors for replay
+                errorSampleRate: 1.0,
+            }));
+        }
+        
         window.Sentry.init({
             dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
-            integrations: [
-                new window.Sentry.BrowserTracing({
-                    // Track LiveView navigation as transactions
-                    tracePropagationTargets: ["localhost", /^\//],
-                }),
-                new window.Sentry.Replay({
-                    // Capture 10% of all sessions for replay
-                    sessionSampleRate: 0.1,
-                    // Capture 100% of sessions with errors for replay
-                    errorSampleRate: 1.0,
-                }),
-            ],
-            // Performance Monitoring
-            tracesSampleRate: 0.1, // Capture 10% of transactions in production
-            // Session Replay
+            integrations: integrations,
+            // Performance Monitoring - capture 10% of transactions
+            tracesSampleRate: 0.1,
+            // Session Replay (if available in bundle)
             replaysSessionSampleRate: 0.1,
             replaysOnErrorSampleRate: 1.0,
         });
@@ -165,7 +175,11 @@ waitForSentry().then((available) => {
             window.Sentry.setUser(null);
         }
 
-        console.log("Sentry initialized successfully");
+        console.log("Sentry initialized successfully with available features:", {
+            tracing: typeof window.Sentry.browserTracingIntegration === 'function',
+            replay: typeof window.Sentry.replayIntegration === 'function',
+            user: !!window.currentUser,
+        });
     } else {
         console.warn("Sentry failed to load after multiple attempts - error monitoring will be disabled");
     }
@@ -242,7 +256,7 @@ window.addEventListener("phx:update-sentry-user", (e) => {
     }
 });
 
-// Capture LiveView navigation and errors in Sentry
+// Add navigation breadcrumbs to Sentry for error context
 window.addEventListener("phx:page-loading-start", (info) => {
     if (window.Sentry) {
         window.Sentry.addBreadcrumb({
@@ -263,7 +277,7 @@ window.addEventListener("phx:page-loading-stop", (info) => {
     }
 });
 
-// Capture LiveView errors
+// Capture LiveView errors in Sentry
 liveSocket.on("phx:error", (error) => {
     if (window.Sentry) {
         window.Sentry.captureException(error);
