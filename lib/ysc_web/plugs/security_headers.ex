@@ -106,7 +106,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
 
     # Connect sources - allow WebSockets for LiveView
     # In dev, allow both ws: and wss:, in prod only wss:
-    # Also allow Stripe, Cloudflare Turnstile, Radar API, and S3 storage for uploads
+    # Also allow Stripe, Cloudflare Turnstile, Radar API, Sentry, and S3 storage for uploads
     base_connect_sources =
       if is_dev do
         [
@@ -117,7 +117,9 @@ defmodule YscWeb.Plugs.SecurityHeaders do
           "https://localhost:*",
           "https://js.stripe.com",
           "https://challenges.cloudflare.com",
-          "https://api.radar.io"
+          "https://api.radar.io",
+          "https://*.ingest.sentry.io",
+          "https://*.ingest.us.sentry.io"
         ]
       else
         [
@@ -125,7 +127,9 @@ defmodule YscWeb.Plugs.SecurityHeaders do
           "wss:",
           "https://js.stripe.com",
           "https://challenges.cloudflare.com",
-          "https://api.radar.io"
+          "https://api.radar.io",
+          "https://*.ingest.sentry.io",
+          "https://*.ingest.us.sentry.io"
         ]
       end
 

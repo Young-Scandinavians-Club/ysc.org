@@ -31,6 +31,16 @@
     </script>
     <script nonce={@csp_nonce}>
       window.radarPublicKey = "<%= Application.get_env(:ysc, :radar)[:public_key] %>";
+      <%= if assigns[:current_user] do %>
+      window.currentUser = {
+        id: "<%= @current_user.id %>",
+        email: "<%= @current_user.email %>",
+        role: "<%= @current_user.role %>",
+        state: "<%= @current_user.state %>"
+      };
+      <% else %>
+      window.currentUser = null;
+      <% end %>
     </script>
   </head>
   <body class="antialiased bg-white">

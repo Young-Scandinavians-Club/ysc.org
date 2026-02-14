@@ -51,6 +51,16 @@
     <script nonce={@csp_nonce}>
       window.stripePublishableKey = "<%= Application.get_env(:stripity_stripe, :public_key) %>";
       window.radarPublicKey = "<%= Application.get_env(:ysc, :radar)[:public_key] %>";
+      <%= if assigns[:current_user] do %>
+      window.currentUser = {
+        id: "<%= @current_user.id %>",
+        email: "<%= @current_user.email %>",
+        role: "<%= @current_user.role %>",
+        state: "<%= @current_user.state %>"
+      };
+      <% else %>
+      window.currentUser = null;
+      <% end %>
     </script>
     <Turnstile.script nonce={@csp_nonce} />
   </head>
