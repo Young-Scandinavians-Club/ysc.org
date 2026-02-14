@@ -1202,15 +1202,17 @@ defmodule Ysc.Quickbooks.SyncTest do
     end
 
     test "handles missing QuickBooks item IDs gracefully", %{user: user} do
-      # Remove item IDs from config so sync will call get_or_create_item
+      # Save the current config at the start
       original_config = Application.get_env(:ysc, :quickbooks)
-      original_config_map = Enum.into(original_config || [], %{})
 
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Map.drop(original_config_map, [:event_item_id, :donation_item_id])
-      )
+      # Remove item IDs from config so sync will call get_or_create_item
+      # Convert to keyword list for consistency
+      config_without_items =
+        original_config
+        |> Keyword.delete(:event_item_id)
+        |> Keyword.delete(:donation_item_id)
+
+      Application.put_env(:ysc, :quickbooks, config_without_items)
 
       total_amount = Money.new(10_000, :USD)
       event_amount = Money.new(6_000, :USD)
@@ -1279,6 +1281,15 @@ defmodule Ysc.Quickbooks.SyncTest do
           quickbooks_sync_status: "pending"
         })
         |> Repo.update!()
+
+      # Ensure config still has the item IDs removed right before sync
+      # (async tests might have overwritten it)
+      config_without_items =
+        original_config
+        |> Keyword.delete(:event_item_id)
+        |> Keyword.delete(:donation_item_id)
+
+      Application.put_env(:ysc, :quickbooks, config_without_items)
 
       # Should return error when item IDs are missing and API item creation fails
       result = Sync.sync_payment(payment)
