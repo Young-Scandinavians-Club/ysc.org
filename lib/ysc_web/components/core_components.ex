@@ -1353,7 +1353,7 @@ defmodule YscWeb.CoreComponents do
       <div
         id={@id}
         class={[
-          "z-10 hidden mt-1 font-normal bg-white divide-y rounded divide-zinc-100 shadow w-52 wide:w-72",
+          "z-[110] hidden mt-1 font-normal bg-white divide-y rounded divide-zinc-100 shadow w-52 wide:w-72",
           @right && "right-0",
           !@right && "left-0",
           @mobile && "block lg:absolute shadow-none lg:shadow",
@@ -1397,7 +1397,7 @@ defmodule YscWeb.CoreComponents do
       <!-- Dropdown menu -->
       <div
         id="avatar-menu"
-        class="absolute z-10 hidden w-60 mt-0 font-normal bg-white divide-y rounded shadow divide-zinc-100 right-4 mt-1"
+        class="absolute z-[110] hidden w-60 mt-0 font-normal bg-white divide-y rounded shadow divide-zinc-100 right-4 mt-1"
         phx-click-away={hide_dropdown("#avatar-menu")}
       >
         <%= render_slot(@inner_block) %>
