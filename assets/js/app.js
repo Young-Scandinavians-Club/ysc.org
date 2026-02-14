@@ -274,16 +274,16 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("paste", (event) => {
     if (event.target.matches("[data-otp-input-item]")) {
         event.preventDefault();
-        const paste = event.clipboardData.getData("text");
+        const paste = event.clipboardData.getData("text").replace(/\s/g, ""); // Remove whitespace
         const container = event.target.closest("[data-otp-input]");
         const inputs = container.querySelectorAll("[data-otp-input-item]");
-        const index = Array.from(inputs).indexOf(event.target);
 
-        // Fill inputs with pasted content
-        for (let i = 0; i < paste.length && index + i < inputs.length; i++) {
-            inputs[index + i].value = paste[i];
+        // Always start filling from the first input when pasting
+        // This ensures the full OTP code is entered correctly regardless of which box has focus
+        for (let i = 0; i < paste.length && i < inputs.length; i++) {
+            inputs[i].value = paste[i];
             // Trigger input event on each filled input to ensure LiveView picks up the change
-            inputs[index + i].dispatchEvent(new Event("input", { bubbles: true }));
+            inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
         }
 
         // Trigger change event on the form to validate the code
@@ -292,12 +292,14 @@ document.addEventListener("paste", (event) => {
             form.dispatchEvent(new Event("change", { bubbles: true }));
         }
 
-        // Focus the next empty input or the last input
-        const nextEmptyIndex = Array.from(inputs).findIndex((input, i) => i > index && !input.value);
-        if (nextEmptyIndex !== -1) {
-            inputs[nextEmptyIndex].focus();
-        } else {
-            inputs[Math.min(index + paste.length, inputs.length - 1)].focus();
+        // Focus the last filled input or the next empty input
+        const filledCount = Math.min(paste.length, inputs.length);
+        if (filledCount > 0) {
+            if (filledCount < inputs.length) {
+                inputs[filledCount].focus(); // Focus next empty input
+            } else {
+                inputs[inputs.length - 1].focus(); // Focus last input if all filled
+            }
         }
     }
 });

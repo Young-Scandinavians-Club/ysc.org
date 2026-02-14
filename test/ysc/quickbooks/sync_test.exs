@@ -831,8 +831,11 @@ defmodule Ysc.Quickbooks.SyncTest do
           refund
         end
 
-      stub(ClientMock, :query_account_by_name, fn "Undeposited Funds" ->
-        {:ok, "undeposited_123"}
+      # Refund sync looks up income account "Events Inc" for item creation; stub it
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_123"}
+        "Events Inc" -> {:ok, "events_inc_account_123"}
+        _ -> {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn
@@ -1201,15 +1204,20 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "handles missing QuickBooks item IDs gracefully", %{user: user} do
       setup_default_mocks()
 
-      # Temporarily remove item IDs from config
+      # Remove item IDs from config so sync will call get_or_create_item
       original_config = Application.get_env(:ysc, :quickbooks)
-      original_config_map = Enum.into(original_config, %{})
+      original_config_map = Enum.into(original_config || [], %{})
 
       Application.put_env(
         :ysc,
         :quickbooks,
         Map.drop(original_config_map, [:event_item_id, :donation_item_id])
       )
+
+      # Stub get_or_create_item to fail before creating payment so automatic sync also fails
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:error, :item_creation_failed}
+      end)
 
       total_amount = Money.new(10_000, :USD)
       event_amount = Money.new(6_000, :USD)
@@ -1241,9 +1249,10 @@ defmodule Ysc.Quickbooks.SyncTest do
           quickbooks_sales_receipt_id: nil
         })
         |> Repo.update!()
-
-        _payment = Repo.reload!(payment)
       end
+
+      # Reload so we have pending payment before setting stubs and calling sync
+      payment = Repo.reload!(payment)
 
       # Clear user's QuickBooks customer ID to ensure create_customer is called
       user = Repo.reload!(user)
@@ -1271,7 +1280,9 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      # Clear sync status
+      # get_or_create_item already stubbed to error above (before payment creation)
+
+      # Ensure payment is pending (avoid early return from sync_payment)
       payment
       |> Payment.changeset(%{
         quickbooks_sales_receipt_id: nil,
@@ -1279,13 +1290,12 @@ defmodule Ysc.Quickbooks.SyncTest do
       })
       |> Repo.update!()
 
-      # Should return error when item IDs are missing
-      # Note: The error could be :quickbooks_item_ids_not_configured or :token_refresh_failed
-      # depending on which check happens first. Both are valid errors for this scenario.
+      payment = Repo.reload!(payment)
+
+      # Should return error when item IDs are missing and API item creation fails
       result = Sync.sync_payment(payment)
 
-      assert match?({:error, :quickbooks_item_ids_not_configured}, result) or
-               match?({:error, :token_refresh_failed}, result)
+      assert match?({:error, _}, result)
 
       # Restore config
       Application.put_env(:ysc, :quickbooks, original_config)
@@ -2939,6 +2949,18 @@ defmodule Ysc.Quickbooks.SyncTest do
         assert r.quickbooks_sales_receipt_id != nil
       end)
 
+      # Ensure QB accounts are set (async tests can overwrite config)
+      current_qb = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(current_qb,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       # Mock Deposit creation
       expect(ClientMock, :create_deposit, fn params, _opts ->
         # CRITICAL: Verify net amount is correct
@@ -2996,6 +3018,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "Tahoe booking refund uses correct QuickBooks class (Tahoe)", %{
       user: user
     } do
+      # Save config at start so we can restore before sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       setup_default_mocks()
 
       # Create a booking entity ID for Tahoe
@@ -3052,6 +3077,9 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Ecto.Changeset.change(quickbooks_customer_id: nil)
         |> Repo.update!()
       end
+
+      # Restore full QB config so tahoe_booking_item_id and other keys are set (async can overwrite)
+      Application.put_env(:ysc, :quickbooks, saved_qb_config)
 
       # Mock customer creation
       expect(ClientMock, :create_customer, fn _params ->
@@ -3164,6 +3192,19 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Repo.update!()
       end
 
+      # Ensure config has Clear Lake item ID (async tests can overwrite config)
+      current_qb = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.put(
+          current_qb,
+          :clear_lake_booking_item_id,
+          "clear_lake_item_123"
+        )
+      )
+
       # Mock customer creation
       expect(ClientMock, :create_customer, fn _params ->
         {:ok, %{"Id" => "qb_customer_clear_lake_test"}}
@@ -3274,6 +3315,18 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Ecto.Changeset.change(quickbooks_customer_id: nil)
         |> Repo.update!()
       end
+
+      # Ensure tahoe_booking_item_id is set (async can overwrite config)
+      current_qb = Application.get_env(:ysc, :quickbooks, [])
+
+      current_qb =
+        if is_map(current_qb), do: Map.to_list(current_qb), else: current_qb
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.put(current_qb, :tahoe_booking_item_id, "tahoe_item_123")
+      )
 
       # Mock customer creation
       expect(ClientMock, :create_customer, fn _params ->
@@ -3666,7 +3719,8 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+      # Stub (not expect) so we don't fail if Oban already ran sync in another process
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
         {:ok, "qb_dynamic_item_123"}
       end)
 

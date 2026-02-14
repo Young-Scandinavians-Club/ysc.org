@@ -18,6 +18,11 @@ defmodule Ysc.LedgersTest do
   import Ysc.TicketsFixtures
   import Ysc.EventsFixtures
 
+  setup do
+    Ledgers.ensure_basic_accounts()
+    :ok
+  end
+
   describe "ledger account management" do
     test "ensure_basic_accounts/0 creates all basic accounts" do
       Ledgers.ensure_basic_accounts()
@@ -34,7 +39,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "list_accounts/0 returns all accounts" do
-      Ledgers.ensure_basic_accounts()
       accounts = Ledgers.list_accounts()
       assert is_list(accounts)
       assert accounts != []
@@ -42,7 +46,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "get_account/1 returns account by id" do
-      Ledgers.ensure_basic_accounts()
       account = Ledgers.get_account_by_name("cash")
       assert %LedgerAccount{} = Ledgers.get_account(account.id)
       assert Ledgers.get_account(account.id).id == account.id
@@ -67,7 +70,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "update_account/2 updates an account" do
-      Ledgers.ensure_basic_accounts()
       account = Ledgers.get_account_by_name("cash")
       update_attrs = %{description: "Updated description"}
 
@@ -78,8 +80,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "get_accounts_with_balances/0 returns accounts with balances" do
-      Ledgers.ensure_basic_accounts()
-
       accounts_with_balances = Ledgers.get_accounts_with_balances()
 
       assert is_list(accounts_with_balances)
@@ -93,7 +93,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "get_accounts_with_balances/2 returns accounts with balances for date range" do
-      Ledgers.ensure_basic_accounts()
       today = Date.utc_today()
       start_date = DateTime.new!(today, ~T[00:00:00], "Etc/UTC")
       end_date = DateTime.new!(today, ~T[23:59:59], "Etc/UTC")
@@ -112,7 +111,6 @@ defmodule Ysc.LedgersTest do
   describe "payment processing" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock (prevents errors when sync jobs run)
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -269,7 +267,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "get_account_balance/1 calculates correct balance" do
-      Ledgers.ensure_basic_accounts()
       cash_account = Ledgers.get_account_by_name("cash")
 
       # Initially should be zero
@@ -281,7 +278,6 @@ defmodule Ysc.LedgersTest do
   describe "refund processing" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock (prevents errors when sync jobs run)
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -448,7 +444,6 @@ defmodule Ysc.LedgersTest do
   describe "event payment with donations" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock (prevents errors when sync jobs run)
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -797,7 +792,6 @@ defmodule Ysc.LedgersTest do
   describe "credit management" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock (prevents errors when sync jobs run)
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -874,7 +868,6 @@ defmodule Ysc.LedgersTest do
   describe "payout processing" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -1037,7 +1030,6 @@ defmodule Ysc.LedgersTest do
   describe "balance calculations" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -1172,7 +1164,6 @@ defmodule Ysc.LedgersTest do
   describe "payment types" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       # Configure QuickBooks client to use mock
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
@@ -1285,7 +1276,6 @@ defmodule Ysc.LedgersTest do
   describe "payment retrieval" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -1427,7 +1417,6 @@ defmodule Ysc.LedgersTest do
 
     test "list_user_payments_paginated/3 returns empty for user with no payments" do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       {entries, total_count} =
         Ledgers.list_user_payments_paginated(user.id, 1, 10)
@@ -1462,7 +1451,6 @@ defmodule Ysc.LedgersTest do
   describe "entry management" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -1542,7 +1530,6 @@ defmodule Ysc.LedgersTest do
   describe "refund retrieval" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -1632,7 +1619,6 @@ defmodule Ysc.LedgersTest do
   describe "balance and verification" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -1736,7 +1722,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "get_ledger_imbalance_details/0 returns error with details when unbalanced" do
-      Ledgers.ensure_basic_accounts()
       account = Ledgers.get_account_by_name("cash")
 
       # Insert a single unbalanced entry (no matching credit)
@@ -1755,7 +1740,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "verify_ledger_balance!/0 raises on imbalance" do
-      Ledgers.ensure_basic_accounts()
       account = Ledgers.get_account_by_name("cash")
 
       # Manually create an unbalanced entry
@@ -1776,7 +1760,6 @@ defmodule Ysc.LedgersTest do
   describe "recent payments and entries" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -1896,7 +1879,6 @@ defmodule Ysc.LedgersTest do
   describe "payout queries" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -1997,7 +1979,6 @@ defmodule Ysc.LedgersTest do
   describe "payment type info" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -2204,7 +2185,6 @@ defmodule Ysc.LedgersTest do
   describe "get_payment_related_entity/1" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -2403,7 +2383,6 @@ defmodule Ysc.LedgersTest do
   describe "update_entry_with_balance/2" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -2468,7 +2447,6 @@ defmodule Ysc.LedgersTest do
   describe "get_payments_for_subscription/1" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
 
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
@@ -2522,7 +2500,6 @@ defmodule Ysc.LedgersTest do
   describe "create functions" do
     setup do
       user = user_fixture()
-      Ledgers.ensure_basic_accounts()
       %{user: user}
     end
 
@@ -2595,7 +2572,6 @@ defmodule Ysc.LedgersTest do
     end
 
     test "create_entry/1 creates a ledger entry", %{user: user} do
-      Ledgers.ensure_basic_accounts()
       account = Ledgers.get_account_by_name("cash")
 
       {:ok, {payment, _, _}} =

@@ -9,11 +9,10 @@ defmodule Ysc.TicketsTest do
   alias Ysc.Tickets.TicketOrder
   import Ysc.AccountsFixtures
 
-  setup do
+  defp tickets_setup do
     Ysc.Ledgers.ensure_basic_accounts()
     user = user_fixture()
 
-    # Give user lifetime membership so they can purchase tickets
     user =
       user
       |> Ecto.Changeset.change(
@@ -58,6 +57,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "create_ticket_order/3" do
+    setup do
+      tickets_setup()
+    end
+
     test "creates a ticket order with valid selections", %{
       user: user,
       event: event,
@@ -118,6 +121,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "get_ticket_order/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns ticket order with preloaded associations", %{
       user: user,
       event: event,
@@ -138,6 +145,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "get_ticket_order_by_reference/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns ticket order by reference_id", %{
       user: user,
       event: event,
@@ -156,6 +167,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "list_user_ticket_orders/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns ticket orders for user", %{
       user: user,
       event: event,
@@ -174,6 +189,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "list_user_ticket_orders_paginated/2" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns paginated ticket orders", %{
       user: user,
       event: event,
@@ -193,6 +212,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "list_user_tickets_for_event/2" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns tickets for user and event", %{
       user: user,
       event: event,
@@ -214,6 +237,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "event_at_capacity?/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns false when max_attendees is nil", %{event: event} do
       event = %{event | max_attendees: nil}
       refute Tickets.event_at_capacity?(event)
@@ -226,6 +253,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "count_confirmed_tickets_for_event/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns count of confirmed tickets", %{event: event} do
       count = Tickets.count_confirmed_tickets_for_event(event.id)
       assert is_integer(count)
@@ -234,6 +265,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "count_pending_tickets_for_event/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns count of pending tickets", %{event: event} do
       count = Tickets.count_pending_tickets_for_event(event.id)
       assert is_integer(count)
@@ -263,6 +298,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "get_ticket_order_by_payment_id/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "returns ticket order by payment ID", %{
       user: user,
       event: event,
@@ -297,6 +336,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "update_payment_intent/2" do
+    setup do
+      tickets_setup()
+    end
+
     test "updates payment intent on ticket order", %{
       user: user,
       event: event,
@@ -315,6 +358,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "calculate_event_and_donation_amounts/1" do
+    setup do
+      tickets_setup()
+    end
+
     test "calculates event and donation amounts", %{
       user: user,
       event: event,
@@ -341,6 +388,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "expire_timed_out_orders/0" do
+    setup do
+      tickets_setup()
+    end
+
     test "expires orders older than timeout period", %{
       user: user,
       event: event,

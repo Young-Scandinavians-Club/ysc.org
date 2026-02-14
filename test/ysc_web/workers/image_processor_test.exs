@@ -2,7 +2,7 @@ defmodule YscWeb.Workers.ImageProcessorTest do
   @moduledoc """
   Tests for ImageProcessor worker module.
   """
-  use Ysc.DataCase, async: false
+  use Ysc.DataCase, async: true
 
   alias YscWeb.Workers.ImageProcessor
 

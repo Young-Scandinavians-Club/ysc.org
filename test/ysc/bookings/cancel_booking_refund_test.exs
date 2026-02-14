@@ -24,7 +24,19 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
   setup do
     Ledgers.ensure_basic_accounts()
     user = user_fixture()
-    Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
+    Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+    # Stub so any cancel_booking test that triggers create_stripe_refund is covered
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      charge = %Stripe.Charge{id: "ch_#{id}"}
+
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: id,
+         charges: %Stripe.List{data: [charge]},
+         metadata: %{}
+       }}
+    end)
 
     # Ensure user is active
     user =
@@ -196,10 +208,6 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
         )
 
       # No refund policy exists - should attempt to process refund immediately
-      # Note: This will fail at Stripe call, but we can verify the logic path
-      # by checking that it doesn't create a pending refund
-
-      # Cancel booking - will fail at Stripe but we can check the logic
       result =
         Bookings.cancel_booking(booking, cancellation_date, "User requested")
 

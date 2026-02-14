@@ -6,6 +6,7 @@ defmodule EventDetailsLiveHelpers do
   testing payment flows, registration, and other complex scenarios.
   """
 
+  import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
   import Ysc.EventsFixtures
   import Mox
@@ -234,6 +235,33 @@ defmodule EventDetailsLiveHelpers do
   def wait_for_async(view, timeout \\ 500) do
     :timer.sleep(timeout)
     view
+  end
+
+  @doc """
+  Waits for an element to appear in the view (polls up to timeout ms).
+  Use instead of fixed :timer.sleep when waiting for async content.
+
+  ## Examples
+
+      wait_for_element(view, "[phx-click='increase-ticket-quantity']")
+      wait_for_element(view, "#payment-form", 1000)
+  """
+  def wait_for_element(view, selector, timeout \\ 500) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    wait_for_element_loop(view, selector, deadline)
+  end
+
+  defp wait_for_element_loop(view, selector, deadline) do
+    if has_element?(view, selector) do
+      view
+    else
+      if System.monotonic_time(:millisecond) > deadline do
+        view
+      else
+        :timer.sleep(20)
+        wait_for_element_loop(view, selector, deadline)
+      end
+    end
   end
 
   @doc """

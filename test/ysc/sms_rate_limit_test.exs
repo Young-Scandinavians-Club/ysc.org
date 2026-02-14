@@ -77,7 +77,7 @@ defmodule Ysc.SmsRateLimitTest do
     end
 
     test "blocks SMS when per-minute limit is exceeded" do
-      phone_number = "12065551234"
+      phone_number = "1206555#{System.unique_integer([:positive])}"
 
       # Record 5 SMS (at the limit)
       Enum.each(1..5, fn _ ->
@@ -150,8 +150,9 @@ defmodule Ysc.SmsRateLimitTest do
     end
 
     test "isolates rate limits per phone number" do
-      phone1 = "12065551234"
-      phone2 = "12065551235"
+      base = System.unique_integer([:positive])
+      phone1 = "1206555#{base}"
+      phone2 = "1206555#{base + 1}"
 
       # Exceed limit for phone1
       Enum.each(1..5, fn _ ->
@@ -189,7 +190,7 @@ defmodule Ysc.SmsRateLimitTest do
 
   describe "record_sms_send/1" do
     test "records SMS send in cache" do
-      phone_number = "12065551234"
+      phone_number = "1206555#{System.unique_integer([:positive])}"
 
       assert :ok = SmsRateLimit.record_sms_send(phone_number)
 
@@ -201,7 +202,7 @@ defmodule Ysc.SmsRateLimitTest do
     end
 
     test "appends new timestamp to existing list" do
-      phone_number = "12065551234"
+      phone_number = "1206555#{System.unique_integer([:positive])}"
 
       # Record first SMS
       SmsRateLimit.record_sms_send(phone_number)
@@ -278,7 +279,8 @@ defmodule Ysc.SmsRateLimitTest do
     end
 
     test "returns accurate counts for recent SMS" do
-      phone_number = "12065551234"
+      # Use a unique number per test so async tests don't share cache state
+      phone_number = "1206555#{System.unique_integer([:positive])}"
 
       # Record 3 SMS
       Enum.each(1..3, fn _ ->
@@ -295,7 +297,8 @@ defmodule Ysc.SmsRateLimitTest do
     end
 
     test "returns accurate counts at per-minute limit" do
-      phone_number = "12065551234"
+      # Use a unique number per test so async tests don't share cache state
+      phone_number = "1206555#{System.unique_integer([:positive])}"
 
       # Record 5 SMS (at the limit)
       Enum.each(1..5, fn _ ->
@@ -417,7 +420,8 @@ defmodule Ysc.SmsRateLimitTest do
     end
 
     test "status reflects current state accurately" do
-      phone_number = "12065551234"
+      # Use a unique number per test so async tests don't share cache state
+      phone_number = "1206555#{System.unique_integer([:positive])}"
 
       # Send 3 SMS
       Enum.each(1..3, fn _ ->

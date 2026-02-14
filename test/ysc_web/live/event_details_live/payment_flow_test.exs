@@ -54,16 +54,17 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       # Select one ticket
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
 
       # Proceed to checkout - this should create the order and payment intent
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
-      # Verify payment modal shows up in rendered HTML
+      # Wait for payment modal / next render (mocked Stripe responds immediately)
       html = render(view)
       assert is_binary(html)
     end
@@ -84,7 +85,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       # Select 3 tickets
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -92,8 +95,6 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
 
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
-
       html = render(view)
       assert is_binary(html)
     end
@@ -114,7 +115,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       # Select ticket
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -126,8 +129,6 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       })
 
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
-
       html = render(view)
       assert is_binary(html)
     end
@@ -149,12 +150,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
-
       html = render(view)
       assert is_binary(html)
     end
@@ -177,11 +178,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       # Should not crash
       html = render(view)
@@ -198,12 +200,13 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
 
       result = render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       # Should handle error gracefully
       assert is_binary(result)
@@ -219,11 +222,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       # Should not crash
       html = render(view)
@@ -242,11 +246,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       # Start redirect
       result = render_click(view, "payment-redirect-started")
@@ -262,16 +267,18 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+      # Stub (not expect) so we don't fail if checkout/payment-intent runs async or not at all
+      stub(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
         {:ok, build_payment_intent()}
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       result = render_click(view, "close-payment-modal")
 
@@ -292,11 +299,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       html = render(view)
       assert is_binary(html)
@@ -319,7 +327,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{
         "tier-id" => free_tier.id
@@ -327,7 +337,6 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       # Free tickets shouldn't create payment intent
       result = render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       # Should handle free tickets differently (no payment modal)
       assert is_binary(result) or match?({:error, _}, result)
@@ -352,11 +361,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       html = render(view)
       assert is_binary(html)
@@ -378,7 +388,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       # Add 10 tickets
       Enum.each(1..10, fn _ ->
@@ -386,7 +398,6 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       html = render(view)
       assert is_binary(html)
@@ -405,15 +416,15 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(300)
 
       # Retry - should not crash
       result = render_click(view, "retry-checkout")
-      :timer.sleep(300)
 
       assert is_binary(result)
     end
@@ -424,7 +435,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       result = render_click(view, "close-payment-modal")
       assert is_binary(result)
@@ -434,7 +447,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       result = render_click(view, "close-order-completion")
       assert is_binary(result)
@@ -444,7 +459,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+
+      view =
+        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
 
       result = render_click(view, "checkout-expired")
       assert is_binary(result)

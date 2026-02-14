@@ -1620,7 +1620,7 @@ defmodule Ysc.Quickbooks.Sync do
             nil
           end
 
-        Quickbooks.Client.get_or_create_item(item_name,
+        client_module().get_or_create_item(item_name,
           income_account_ref: income_account_ref
         )
 
