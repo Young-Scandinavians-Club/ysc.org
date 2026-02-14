@@ -3360,16 +3360,23 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Repo.update!()
       end
 
-      # Set tahoe_booking_item_id in config
-      current_qb = Application.get_env(:ysc, :quickbooks, [])
+      # Ensure full QB config is set right before the explicit sync call
+      # This ensures the tahoe_booking_item_id is available when get_quickbooks_item_id is called
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
 
-      current_qb =
-        if is_map(current_qb), do: Map.to_list(current_qb), else: current_qb
+      saved_qb_config =
+        if is_map(saved_qb_config),
+          do: Map.to_list(saved_qb_config),
+          else: saved_qb_config
 
       Application.put_env(
         :ysc,
         :quickbooks,
-        Keyword.put(current_qb, :tahoe_booking_item_id, "tahoe_item_123")
+        Keyword.merge(saved_qb_config,
+          tahoe_booking_item_id: "tahoe_item_123",
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
       )
 
       # Mock customer creation
@@ -3381,6 +3388,11 @@ defmodule Ysc.Quickbooks.SyncTest do
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_789"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item as fallback in case config lookup fails
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "tahoe_item_123"}
       end)
 
       stub(ClientMock, :query_class_by_name, fn

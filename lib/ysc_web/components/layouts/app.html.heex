@@ -687,12 +687,27 @@
         </div>
       </div>
       <div class="border-t border-zinc-100 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between mt-4 pt-4">
-        <p class="text-sm text-zinc-600 text-center sm:text-left">
-          © <%= DateTime.utc_now().year %> <.link
-            navigate={~p"/"}
-            class="hover:text-zinc-900 transition-colors font-medium"
-          >The Young Scandinavians Club</.link>. All Rights Reserved.
-        </p>
+        <div class="text-sm text-zinc-600 text-center sm:text-left flex flex-wrap items-baseline justify-center sm:justify-start gap-x-1">
+          <span class="whitespace-nowrap">
+            © <%= DateTime.utc_now().year %> <.link
+              navigate={~p"/"}
+              class="hover:text-zinc-900 transition-colors font-medium"
+            >The Young Scandinavians Club</.link>.
+          </span>
+          <span
+            class="relative inline-block overflow-hidden"
+            style="min-height: 1.25rem;"
+          >
+            <span
+              id="footer-rotator"
+              phx-hook="FooterRotator"
+              class="inline-block"
+              style="transform: translateY(0); opacity: 1; transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;"
+            >
+              Made with ❤️ by the YSC WebTech Team.
+            </span>
+          </span>
+        </div>
 
         <ul class="flex flex-wrap items-center justify-center sm:items-start sm:justify-start gap-2">
           <li class="">
