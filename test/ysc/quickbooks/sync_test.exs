@@ -4068,6 +4068,9 @@ defmodule Ysc.Quickbooks.SyncTest do
   describe "payout sync with Stripe fees" do
     test "sync_payout creates deposit with Stripe fee line item when fees exist",
          %{user: user} do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_payout")
@@ -4110,6 +4113,17 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Link payment to payout
       {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
 
       # Mock deposit creation with verification of fee line item
       stub(ClientMock, :query_account_by_name, fn
@@ -4162,6 +4176,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "sync_payout handles multiple payments with combined fees", %{
       user: user
     } do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_multi")
@@ -4242,6 +4259,17 @@ defmodule Ysc.Quickbooks.SyncTest do
       {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment2)
       {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment3)
 
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       # Mock deposit creation
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
@@ -4285,6 +4313,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     end
 
     test "sync_payout skips fee line item when fees are zero", %{user: user} do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_no_fees")
@@ -4328,6 +4359,17 @@ defmodule Ysc.Quickbooks.SyncTest do
       # Link payment to payout
       {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
 
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       # Mock deposit creation
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
@@ -4355,6 +4397,9 @@ defmodule Ysc.Quickbooks.SyncTest do
 
     test "sync_payout continues without fee line when fee item creation fails",
          %{user: user} do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_fee_fail")
@@ -4398,6 +4443,17 @@ defmodule Ysc.Quickbooks.SyncTest do
       # Link payment to payout
       {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
 
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       # Mock account queries
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
@@ -4436,6 +4492,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "sync_payout handles payout with mixed payments and refunds", %{
       user: user
     } do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_mixed")
@@ -4502,6 +4561,17 @@ defmodule Ysc.Quickbooks.SyncTest do
       # Link payment2 to payout (payment1 not included as it was refunded)
       {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment2)
       {:ok, payout} = Ledgers.link_refund_to_payout(payout, refund)
+
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
 
       # Mock deposit creation
       stub(ClientMock, :query_account_by_name, fn
