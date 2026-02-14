@@ -110,42 +110,63 @@ let Hooks = {
 };
 Hooks.LivePhone = LivePhone;
 
+// Helper function to wait for Sentry to be available with retries
+async function waitForSentry(maxAttempts = 5, delayMs = 50) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (window.Sentry) {
+            return true;
+        }
+        if (attempt < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+    return false;
+}
+
 // Initialize Sentry for JavaScript error monitoring
 // This must happen before LiveSocket is created to capture all errors
 // The Sentry bundle exposes a global window.Sentry object
-window.Sentry.init({
-    dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
-    integrations: [
-        new window.Sentry.BrowserTracing({
-            // Track LiveView navigation as transactions
-            tracePropagationTargets: ["localhost", /^\//],
-        }),
-        new window.Sentry.Replay({
-            // Capture 10% of all sessions for replay
-            sessionSampleRate: 0.1,
-            // Capture 100% of sessions with errors for replay
-            errorSampleRate: 1.0,
-        }),
-    ],
-    // Performance Monitoring
-    tracesSampleRate: 0.1, // Capture 10% of transactions in production
-    // Session Replay
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
-});
+waitForSentry().then((available) => {
+    if (available) {
+        window.Sentry.init({
+            dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
+            integrations: [
+                new window.Sentry.BrowserTracing({
+                    // Track LiveView navigation as transactions
+                    tracePropagationTargets: ["localhost", /^\//],
+                }),
+                new window.Sentry.Replay({
+                    // Capture 10% of all sessions for replay
+                    sessionSampleRate: 0.1,
+                    // Capture 100% of sessions with errors for replay
+                    errorSampleRate: 1.0,
+                }),
+            ],
+            // Performance Monitoring
+            tracesSampleRate: 0.1, // Capture 10% of transactions in production
+            // Session Replay
+            replaysSessionSampleRate: 0.1,
+            replaysOnErrorSampleRate: 1.0,
+        });
 
-// Set user context if user is logged in
-if (window.currentUser) {
-    window.Sentry.setUser({
-        id: window.currentUser.id,
-        email: window.currentUser.email,
-        role: window.currentUser.role,
-        state: window.currentUser.state,
-    });
-} else {
-    // Clear user context for anonymous users
-    window.Sentry.setUser(null);
-}
+        // Set user context if user is logged in
+        if (window.currentUser) {
+            window.Sentry.setUser({
+                id: window.currentUser.id,
+                email: window.currentUser.email,
+                role: window.currentUser.role,
+                state: window.currentUser.state,
+            });
+        } else {
+            // Clear user context for anonymous users
+            window.Sentry.setUser(null);
+        }
+        
+        console.log("Sentry initialized successfully");
+    } else {
+        console.warn("Sentry failed to load after multiple attempts - error monitoring will be disabled");
+    }
+});
 
 let csrfToken = document
     .querySelector("meta[name='csrf-token']")
@@ -199,40 +220,51 @@ liveSocket.connect();
 // LiveView can push this event when authentication state changes
 window.addEventListener("phx:update-sentry-user", (e) => {
     const { user } = e.detail || {};
-    if (user) {
-        window.Sentry.setUser({
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            state: user.state,
-        });
-        window.currentUser = user;
+    if (window.Sentry) {
+        if (user) {
+            window.Sentry.setUser({
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                state: user.state,
+            });
+            window.currentUser = user;
+        } else {
+            window.Sentry.setUser(null);
+            window.currentUser = null;
+        }
     } else {
-        window.Sentry.setUser(null);
-        window.currentUser = null;
+        // Just update the local user reference if Sentry is not available
+        window.currentUser = user || null;
     }
 });
 
 // Capture LiveView navigation and errors in Sentry
 window.addEventListener("phx:page-loading-start", (info) => {
-    window.Sentry.addBreadcrumb({
-        category: "navigation",
-        message: "LiveView navigation started",
-        level: "info",
-    });
+    if (window.Sentry) {
+        window.Sentry.addBreadcrumb({
+            category: "navigation",
+            message: "LiveView navigation started",
+            level: "info",
+        });
+    }
 });
 
 window.addEventListener("phx:page-loading-stop", (info) => {
-    window.Sentry.addBreadcrumb({
-        category: "navigation",
-        message: "LiveView navigation completed",
-        level: "info",
-    });
+    if (window.Sentry) {
+        window.Sentry.addBreadcrumb({
+            category: "navigation",
+            message: "LiveView navigation completed",
+            level: "info",
+        });
+    }
 });
 
 // Capture LiveView errors
 liveSocket.on("phx:error", (error) => {
-    window.Sentry.captureException(error);
+    if (window.Sentry) {
+        window.Sentry.captureException(error);
+    }
 });
 
 // Handle map toggle text updates
