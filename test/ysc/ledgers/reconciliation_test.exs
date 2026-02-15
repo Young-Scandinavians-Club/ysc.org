@@ -1139,6 +1139,57 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert result.memberships.status == :error
       assert result.memberships.match == false
     end
+
+    test "handles event refunds correctly in entity reconciliation", %{
+      user: user
+    } do
+      # Create event payment
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_event_refund_test",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "Event payment",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # Create a refund for the event payment
+      {:ok, {_refund, _transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(3000, :USD),
+          reason: "customer_request",
+          external_refund_id: "re_event_test"
+        })
+
+      # Run entity reconciliation
+      result = Reconciliation.reconcile_entity_totals()
+
+      # Should pass - net revenue should match net payments
+      # Net revenue: $100 credit - $30 debit = $70
+      # Net payments: $100 debit (excluding refund entry) = $100
+      # Wait, this should account for net properly...
+      # Actually, the payment side excludes refund entries (is_nil(refund_id))
+      # So payments_total = $100
+      # ledger_revenue should be net = $100 - $30 = $70
+      # These won't match, which indicates the payment side logic might be wrong
+
+      # Let's verify the actual values
+      assert result.events.status == :ok
+      assert result.events.match == true
+
+      # The ledger revenue should be net after refund: $70
+      assert Money.equal?(result.events.ledger_revenue, Money.new(7000, :USD))
+
+      # The payment total should also be $70 (original $100 - refunded $30)
+      assert Money.equal?(result.events.payment_total, Money.new(7000, :USD))
+    end
   end
 
   describe "format_report/1" do
