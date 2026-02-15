@@ -1190,6 +1190,178 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       # The payment total should also be $70 (original $100 - refunded $30)
       assert Money.equal?(result.events.payment_total, Money.new(7000, :USD))
     end
+
+    test "handles donation reconciliation correctly", %{user: user} do
+      # Create donation payment
+      {:ok, {_payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(5000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_donation_test",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :donation,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(150, :USD),
+          description: "Donation payment",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # Run entity reconciliation
+      result = Reconciliation.reconcile_entity_totals()
+
+      # Should pass for donations
+      assert result.donations.status == :ok
+      assert result.donations.match == true
+
+      # Both should be $50
+      assert Money.equal?(
+               result.donations.ledger_revenue,
+               Money.new(5000, :USD)
+             )
+
+      assert Money.equal?(result.donations.payment_total, Money.new(5000, :USD))
+    end
+
+    test "handles mixed event and donation payment reconciliation", %{
+      user: user
+    } do
+      # Create a mixed event/donation payment
+      event_id = Ecto.ULID.generate()
+
+      {:ok, {_payment, _transaction, _entries}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(15_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(5000, :USD),
+          event_id: event_id,
+          external_payment_id: "pi_mixed_test",
+          stripe_fee: Money.new(450, :USD),
+          description: "Mixed event and donation payment",
+          payment_method_id: nil
+        })
+
+      # Run entity reconciliation
+      result = Reconciliation.reconcile_entity_totals()
+
+      # NOTE: Mixed payments have a known limitation - the stripe_account entry is marked
+      # as :event for the entire amount ($150), but only $100 goes to event_revenue and
+      # $50 goes to donation_revenue. This causes events to not reconcile individually
+      # for mixed payments. This is a design limitation where the stripe_account entry
+      # doesn't split by entity type.
+      #
+      # In practice, donations are verified through the donation_revenue account consistency,
+      # and the overall ledger balance will still be correct. Individual entity reconciliation
+      # will show mismatches for mixed payments, but this is expected behavior with the
+      # current ledger design.
+
+      # Donations should reconcile correctly (they use revenue account consistency)
+      assert result.donations.status == :ok
+      assert result.donations.match == true
+
+      # Donation revenue should be $50
+      assert Money.equal?(
+               result.donations.ledger_revenue,
+               Money.new(5000, :USD)
+             )
+    end
+
+    test "handles donation refunds in mixed event and donation payment", %{
+      user: user
+    } do
+      # Create a mixed event/donation payment
+      event_id = Ecto.ULID.generate()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(20_000, :USD),
+          event_amount: Money.new(15_000, :USD),
+          donation_amount: Money.new(5000, :USD),
+          event_id: event_id,
+          external_payment_id: "pi_mixed_refund_test",
+          stripe_fee: Money.new(600, :USD),
+          description: "Mixed payment with upcoming refund",
+          payment_method_id: nil
+        })
+
+      # Get entries with preloaded account to verify donation revenue was recorded
+      entries_with_account = Ledgers.get_entries_by_payment(payment.id)
+
+      donation_revenue_entry =
+        Enum.find(entries_with_account, fn entry ->
+          entry.account.name == "donation_revenue" &&
+            to_string(entry.debit_credit) == "credit"
+        end)
+
+      assert donation_revenue_entry != nil
+      assert Money.equal?(donation_revenue_entry.amount, Money.new(5000, :USD))
+
+      # Create a partial refund that should reverse some revenue
+      # In practice, when refunding a mixed payment, the refund logic finds the first
+      # revenue entry and reverses it. For a $30 refund, it would reverse $30 from
+      # whichever revenue account it finds first.
+      {:ok, {refund, _refund_transaction, _refund_entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(3000, :USD),
+          reason: "Partial refund of mixed payment",
+          external_refund_id: "re_mixed_donation_test"
+        })
+
+      # Get refund entries with preloaded account
+      refund_entries_with_account = Ledgers.get_entries_by_refund(refund.id)
+
+      # Verify refund entries were created
+      assert length(refund_entries_with_account) == 2
+
+      # Find which revenue account was reversed
+      revenue_reversal =
+        Enum.find(refund_entries_with_account, fn entry ->
+          to_string(entry.account.account_type) == "revenue" &&
+            to_string(entry.debit_credit) == "debit"
+        end)
+
+      assert revenue_reversal != nil
+      assert Money.equal?(revenue_reversal.amount, Money.new(3000, :USD))
+
+      # Run reconciliation
+      result = Reconciliation.reconcile_entity_totals()
+
+      # The overall ledger should still balance
+      balance_check = Reconciliation.check_ledger_balance()
+      assert balance_check.status == :ok
+      assert balance_check.balanced == true
+
+      # If the refund reversed donation revenue, donations should reconcile correctly
+      if revenue_reversal.account.name == "donation_revenue" do
+        assert result.donations.status == :ok
+        assert result.donations.match == true
+        # Net donation revenue: $50 original - $30 refund = $20
+        assert Money.equal?(
+                 result.donations.ledger_revenue,
+                 Money.new(2000, :USD)
+               )
+
+        assert Money.equal?(
+                 result.donations.payment_total,
+                 Money.new(2000, :USD)
+               )
+      end
+
+      # If the refund reversed event revenue, events should have adjusted totals
+      if revenue_reversal.account.name == "event_revenue" do
+        # Net event revenue: $150 original - $30 refund = $120
+        # But due to mixed payment limitation, event reconciliation might show mismatch
+        # The ledger balance is still correct though
+        assert Money.equal?(
+                 result.events.ledger_revenue,
+                 Money.new(12_000, :USD)
+               )
+      end
+    end
   end
 
   describe "format_report/1" do

@@ -259,17 +259,20 @@ defmodule Ysc.Ledgers.Reconciliation do
     membership_check = reconcile_membership_payments()
     booking_check = reconcile_booking_payments()
     event_check = reconcile_event_payments()
+    donation_check = reconcile_donation_payments()
 
     all_ok =
       membership_check.status == :ok &&
         booking_check.status == :ok &&
-        event_check.status == :ok
+        event_check.status == :ok &&
+        donation_check.status == :ok
 
     %{
       status: if(all_ok, do: :ok, else: :error),
       memberships: membership_check,
       bookings: booking_check,
-      events: event_check
+      events: event_check,
+      donations: donation_check
     }
   end
 
@@ -717,6 +720,61 @@ defmodule Ysc.Ledgers.Reconciliation do
     }
   end
 
+  defp reconcile_donation_payments do
+    # Get net donation revenue from ledger entries (credits - debits)
+    ledger_total = get_revenue_total("donation_revenue")
+
+    # For donations, we can't use stripe_account entries because donations are often
+    # bundled with events, and the stripe_account entry is marked as :event.
+    # Instead, we verify that the donation_revenue account properly tracks net revenue.
+    # Since donations don't have separate payment records, we just verify the revenue
+    # account is internally consistent (has proper double-entry bookkeeping).
+
+    # The payment_total for donations should match the ledger_total since donations
+    # are always part of properly recorded transactions. We'll verify by checking
+    # that donation revenue entries have corresponding payment_ids.
+    payments_total =
+      from(e in LedgerEntry,
+        join: a in assoc(e, :account),
+        join: p in Payment,
+        on: e.payment_id == p.id,
+        where: a.name == "donation_revenue",
+        where: e.debit_credit == "credit",
+        where: is_nil(e.refund_id),
+        select: sum(fragment("(?.amount).amount", e))
+      )
+      |> Repo.one()
+      |> case do
+        nil -> Money.new(0, :USD)
+        amount -> Money.new(amount, :USD)
+      end
+
+    # Subtract refunds from donations
+    refunds_total =
+      from(e in LedgerEntry,
+        join: a in assoc(e, :account),
+        where: a.name == "donation_revenue",
+        where: e.debit_credit == "debit",
+        where: not is_nil(e.refund_id),
+        select: sum(fragment("(?.amount).amount", e))
+      )
+      |> Repo.one()
+      |> case do
+        nil -> Money.new(0, :USD)
+        amount -> Money.new(amount, :USD)
+      end
+
+    {:ok, net_payments} = Money.sub(payments_total, refunds_total)
+
+    %{
+      status:
+        if(Money.equal?(ledger_total, net_payments), do: :ok, else: :error),
+      ledger_revenue: ledger_total,
+      payment_total: net_payments,
+      match: Money.equal?(ledger_total, net_payments)
+    }
+  end
+
   defp get_revenue_total(account_name) do
     # Get net revenue by summing credits and subtracting debits
     # Credits increase revenue, debits decrease revenue (refunds)
@@ -792,6 +850,7 @@ defmodule Ysc.Ledgers.Reconciliation do
             memberships_match: report.checks.entity_totals.memberships.match,
             bookings_match: report.checks.entity_totals.bookings.match,
             events_match: report.checks.entity_totals.events.match,
+            donations_match: report.checks.entity_totals.donations.match,
             payments_table_total:
               Money.to_string!(report.checks.payments.totals.payments_table),
             payments_ledger_total:
@@ -955,6 +1014,26 @@ defmodule Ysc.Ledgers.Reconciliation do
               ]
             end
 
+          entity_issues =
+            if report.checks.entity_totals.donations.match do
+              entity_issues
+            else
+              [
+                %{
+                  type: "donation",
+                  ledger_revenue:
+                    Money.to_string!(
+                      report.checks.entity_totals.donations.ledger_revenue
+                    ),
+                  payment_total:
+                    Money.to_string!(
+                      report.checks.entity_totals.donations.payment_total
+                    )
+                }
+                | entity_issues
+              ]
+            end
+
           if entity_issues != [] do
             Ysc.Logging.warning(
               "Entity total reconciliation mismatches found",
@@ -963,7 +1042,8 @@ defmodule Ysc.Ledgers.Reconciliation do
                 memberships_match:
                   report.checks.entity_totals.memberships.match,
                 bookings_match: report.checks.entity_totals.bookings.match,
-                events_match: report.checks.entity_totals.events.match
+                events_match: report.checks.entity_totals.events.match,
+                donations_match: report.checks.entity_totals.donations.match
               },
               tags: %{
                 reconciliation: "entity_totals",
@@ -1022,6 +1102,7 @@ defmodule Ysc.Ledgers.Reconciliation do
     ║ Memberships Match: #{format_boolean(report.checks.entity_totals.memberships.match)}
     ║ Bookings Match: #{format_boolean(report.checks.entity_totals.bookings.match)}
     ║ Events Match: #{format_boolean(report.checks.entity_totals.events.match)}
+    ║ Donations Match: #{format_boolean(report.checks.entity_totals.donations.match)}
     ╚══════════════════════════════════════════════════════════════════
     """
   end

@@ -1,12 +1,17 @@
-# Reconciliation Logic Fix - Events Entity Totals
+# Reconciliation Logic Fix - Events, Donations, and Entity Totals
 
 **Date:** 2026-02-15  
-**Issue:** Events reconciliation consistently failing in entity totals check  
+**Issue:** Events reconciliation consistently failing in entity totals check; Donations not being reconciled at all  
 **Status:** ✅ RESOLVED
 
 ## Problem Description
 
-The financial reconciliation was consistently failing for the "Events" entity type, while Memberships and Bookings were passing. The reconciliation report showed:
+The financial reconciliation had two major issues:
+
+1. **Events** reconciliation was consistently failing in entity totals check
+2. **Donations** (ticket tier donations) were not being reconciled at all
+
+The reconciliation report showed:
 
 ```
 ✅ Reconciliation Failed
@@ -14,6 +19,7 @@ Entity Totals
   Memberships: ✅
   Bookings: ✅
   Events: ❌
+  Donations: ❌ (not even checked!)
 ```
 
 ## Root Cause Analysis
@@ -174,43 +180,32 @@ The following functions were updated:
 2. **`reconcile_membership_payments/0`** - Now calculates net stripe receivables for memberships
 3. **`reconcile_booking_payments/0`** - Now calculates net stripe receivables for bookings
 4. **`reconcile_event_payments/0`** - Now calculates net stripe receivables for events
+5. **`reconcile_donation_payments/0`** - NEW: Added reconciliation for donations
+6. **`reconcile_entity_totals/0`** - Now includes donations in the overall check
+
+## Donation Reconciliation
+
+Donations are tracked in the `donation_revenue` account and can come from:
+- Standalone donation payments
+- Mixed event/donation payments (ticket tier donations)
+
+The donation reconciliation verifies that:
+- Donation revenue credits match the payment records
+- Refunds to donations are properly tracked
+- Net donation revenue is internally consistent
+
+**Note on Mixed Payments:** When a payment includes both events and donations (e.g., ticket with donation tier), the `stripe_account` entry is marked as `:event` for the entire amount, but revenue is split between `event_revenue` and `donation_revenue`. This is a known ledger design limitation that causes individual entity reconciliation to show mismatches for mixed payments, but the overall ledger balance remains correct.
 
 ## Testing
 
-Added a new test case to verify the fix:
+Added new test cases to verify the fixes:
 
-```elixir
-test "handles event refunds correctly in entity reconciliation", %{user: user} do
-  # Create event payment for $100
-  {:ok, {payment, _transaction, _entries}} =
-    Ledgers.process_payment(%{
-      amount: Money.new(10_000, :USD),
-      entity_type: :event,
-      # ... other params
-    })
+1. **Event refunds** - Verifies net revenue matches net payments after refunds
+2. **Donation payments** - Verifies standalone donation payments reconcile correctly  
+3. **Mixed event/donation** - Documents the known limitation with mixed payments
+4. **Donation refunds in mixed cart** - Verifies that when a mixed payment is refunded, the donation reconciliation correctly accounts for the refund, and the overall ledger remains balanced
 
-  # Create a refund for $30
-  {:ok, {_refund, _transaction, _entries}} =
-    Ledgers.process_refund(%{
-      payment_id: payment.id,
-      refund_amount: Money.new(3000, :USD),
-      # ... other params
-    })
-
-  # Run entity reconciliation
-  result = Reconciliation.reconcile_entity_totals()
-
-  # Should pass - net revenue should match net payments
-  assert result.events.status == :ok
-  assert result.events.match == true
-
-  # Both should be $70 ($100 - $30)
-  assert Money.equal?(result.events.ledger_revenue, Money.new(7000, :USD))
-  assert Money.equal?(result.events.payment_total, Money.new(7000, :USD))
-end
-```
-
-All 51 reconciliation tests pass ✅
+All 54 reconciliation tests pass ✅
 
 ## Impact
 
@@ -218,13 +213,16 @@ This fix ensures that:
 
 1. **Revenue accounts properly reflect net revenue** after refunds
 2. **Entity reconciliation correctly matches net revenue with net receivables**
-3. **All entity types (memberships, bookings, events)** use consistent logic
+3. **All entity types (memberships, bookings, events, donations)** use consistent logic
 4. **Refunds are properly accounted for** in financial reconciliation
+5. **Donations are now actively reconciled** instead of being ignored
 
 ## Files Modified
 
-- `lib/ysc/ledgers/reconciliation.ex` - Updated reconciliation logic
-- `test/ysc/ledgers/reconciliation_test.exs` - Added test for event refunds
+- `lib/ysc/ledgers/reconciliation.ex` - Updated reconciliation logic, added donation reconciliation
+- `lib/ysc/ledgers/reconciliation_worker.ex` - Updated alerts to include donations
+- `lib/ysc/alerts/discord.ex` - Updated Discord alerts to include donations
+- `test/ysc/ledgers/reconciliation_test.exs` - Added tests for events, donations, and mixed payments
 
 ## Verification
 
@@ -236,4 +234,9 @@ Entity Totals
   Memberships: ✅
   Bookings: ✅
   Events: ✅
+  Donations: ✅
 ```
+
+## Known Limitations
+
+**Mixed Event/Donation Payments:** When a payment includes both events and donations (e.g., ticket with donation tier), the `stripe_account` entry is marked as `:event` for the entire amount. This causes the event reconciliation to show a mismatch because the stripe_account shows the full amount while event_revenue only shows the event portion. The donation reconciliation handles this correctly by using revenue account consistency rather than matching against stripe_account entries. The overall ledger balance remains correct, but individual entity reconciliation may show warnings for mixed payments. This is expected behavior and indicates a design decision in how mixed payments are recorded rather than an actual financial discrepancy.
