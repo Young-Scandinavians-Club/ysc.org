@@ -24,7 +24,7 @@ Entity Totals
 
 ## Root Cause Analysis
 
-The issue was found in the entity-specific reconciliation logic in `lib/ysc/ledgers/reconciliation.ex`. There were **two related problems**:
+The issue was found in the entity-specific reconciliation logic in `lib/ysc/ledgers/reconciliation.ex`. There were **three related problems**:
 
 ### Problem 1: Revenue Calculation Didn't Account for Refunds
 
@@ -172,6 +172,58 @@ defp reconcile_event_payments do
 end
 ```
 
+### Fix 3: Added Donation Reconciliation
+
+Created new `reconcile_donation_payments/0` function to reconcile donation revenue. Since donations are often bundled with event payments (and the `stripe_account` entry is marked as `:event`), the reconciliation uses revenue account consistency rather than matching stripe_account entries:
+
+```elixir
+defp reconcile_donation_payments do
+  ledger_total = get_revenue_total("donation_revenue")
+
+  # For donations, verify revenue account consistency by checking that
+  # donation revenue credits have corresponding payment_ids
+  payments_total =
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      join: p in Payment,
+      on: e.payment_id == p.id,
+      where: a.name == "donation_revenue",
+      where: e.debit_credit == "credit",
+      where: is_nil(e.refund_id),
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> case do
+      nil -> Money.new(0, :USD)
+      amount -> Money.new(amount, :USD)
+    end
+
+  # Subtract refunds
+  refunds_total =
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: a.name == "donation_revenue",
+      where: e.debit_credit == "debit",
+      where: not is_nil(e.refund_id),
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> case do
+      nil -> Money.new(0, :USD)
+      amount -> Money.new(amount, :USD)
+    end
+
+  {:ok, net_payments} = Money.sub(payments_total, refunds_total)
+
+  %{
+    status: if(Money.equal?(ledger_total, net_payments), do: :ok, else: :error),
+    ledger_revenue: ledger_total,
+    payment_total: net_payments,
+    match: Money.equal?(ledger_total, net_payments)
+  }
+end
+```
+
 ## Applied Fixes
 
 The following functions were updated:
@@ -180,8 +232,14 @@ The following functions were updated:
 2. **`reconcile_membership_payments/0`** - Now calculates net stripe receivables for memberships
 3. **`reconcile_booking_payments/0`** - Now calculates net stripe receivables for bookings
 4. **`reconcile_event_payments/0`** - Now calculates net stripe receivables for events
-5. **`reconcile_donation_payments/0`** - NEW: Added reconciliation for donations
+5. **`reconcile_donation_payments/0`** - NEW: Added reconciliation for donations using revenue account consistency
 6. **`reconcile_entity_totals/0`** - Now includes donations in the overall check
+
+### Additional Updates
+
+- **Reconciliation Worker** - Updated to include donations in alerts
+- **Discord Alerts** - Updated to display donation reconciliation status
+- **Format Report** - Added donations to the formatted reconciliation report
 
 ## Donation Reconciliation
 
@@ -203,9 +261,16 @@ Added new test cases to verify the fixes:
 1. **Event refunds** - Verifies net revenue matches net payments after refunds
 2. **Donation payments** - Verifies standalone donation payments reconcile correctly  
 3. **Mixed event/donation** - Documents the known limitation with mixed payments
-4. **Donation refunds in mixed cart** - Verifies that when a mixed payment is refunded, the donation reconciliation correctly accounts for the refund, and the overall ledger remains balanced
+4. **Donation refunds in mixed cart** - Comprehensive test that:
+   - Creates a mixed event/donation payment ($150 event + $50 donation)
+   - Processes a partial refund ($30)
+   - Verifies the refund correctly reverses the appropriate revenue account
+   - Confirms donations reconcile correctly after refund (if donation revenue was reversed)
+   - Ensures the overall ledger remains balanced
+   - Handles both scenarios (refund reversing donation revenue or event revenue)
 
 All 54 reconciliation tests pass ✅
+All 34 Discord alert tests pass ✅
 
 ## Impact
 
@@ -222,7 +287,8 @@ This fix ensures that:
 - `lib/ysc/ledgers/reconciliation.ex` - Updated reconciliation logic, added donation reconciliation
 - `lib/ysc/ledgers/reconciliation_worker.ex` - Updated alerts to include donations
 - `lib/ysc/alerts/discord.ex` - Updated Discord alerts to include donations
-- `test/ysc/ledgers/reconciliation_test.exs` - Added tests for events, donations, and mixed payments
+- `test/ysc/ledgers/reconciliation_test.exs` - Added 4 new tests for events, donations, and mixed payments
+- `test/ysc/alerts/discord_test.exs` - Updated test fixtures to include donations field
 
 ## Verification
 
@@ -236,6 +302,8 @@ Entity Totals
   Events: ✅
   Donations: ✅
 ```
+
+The reconciliation worker will now report on all four entity types in Discord alerts and logs.
 
 ## Known Limitations
 
