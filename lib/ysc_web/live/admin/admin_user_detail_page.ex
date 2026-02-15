@@ -2192,15 +2192,69 @@ defmodule YscWeb.AdminUserDetailsLive do
             {:noreply,
              socket |> put_flash(:error, "Invalid membership type selected")}
 
-          current_type == new_membership_type ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "User is already on that membership plan")}
-
           is_nil(current_plan) ->
             {:noreply,
              socket
              |> put_flash(:error, "Could not determine current membership plan")}
+
+          current_type == new_membership_type ->
+            # Same plan selected - call change_membership_plan to cancel any
+            # scheduled downgrade (releases Stripe schedule)
+            had_scheduled_downgrade =
+              socket.assigns[:scheduled_downgrade_info] != nil
+
+            same_price_id = current_plan.stripe_price_id
+
+            case Subscriptions.change_membership_plan(
+                   active_subscription,
+                   same_price_id,
+                   :upgrade
+                 ) do
+              {:ok, updated_subscription} ->
+                updated_subscription =
+                  updated_subscription |> Repo.preload(:subscription_items)
+
+                if had_scheduled_downgrade do
+                  MembershipCache.invalidate_user(active_subscription.user_id)
+
+                  sub_accounts =
+                    Accounts.get_sub_accounts(
+                      Accounts.get_user!(active_subscription.user_id)
+                    )
+
+                  Enum.each(sub_accounts, fn sub ->
+                    MembershipCache.invalidate_user(sub.id)
+                  end)
+                end
+
+                message =
+                  if had_scheduled_downgrade do
+                    "Scheduled downgrade cancelled. User will keep their current plan."
+                  else
+                    "User is already on that membership plan."
+                  end
+
+                {:noreply,
+                 socket
+                 |> assign(:active_subscription, updated_subscription)
+                 |> assign(:scheduled_downgrade_info, nil)
+                 |> put_flash(:info, message)}
+
+              {:error, error} ->
+                error_message =
+                  case error do
+                    %{message: msg} -> msg
+                    msg when is_binary(msg) -> msg
+                    _ -> "Failed to update membership"
+                  end
+
+                {:noreply,
+                 socket
+                 |> put_flash(
+                   :error,
+                   "Failed to update membership: #{error_message}"
+                 )}
+            end
 
           true ->
             new_price_id = new_plan.stripe_price_id
