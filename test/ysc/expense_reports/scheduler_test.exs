@@ -136,8 +136,13 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
 
   describe "integration with Oban" do
     test "uses Oban.Testing in test environment" do
-      # Verify we're using Oban in testing mode
-      assert :inline == Application.get_env(:ysc, Oban)[:testing]
+      # Verify we're using Oban in testing mode (inline or manual)
+      # Note: The exact mode may vary when tests run in parallel as other tests
+      # can temporarily use with_testing_mode to change it
+      testing_mode = Application.get_env(:ysc, Oban)[:testing]
+
+      assert testing_mode in [:inline, :manual],
+             "Expected testing mode to be :inline or :manual, got #{inspect(testing_mode)}"
     end
 
     test "scheduled jobs use QuickbooksSyncExpenseReportBackupWorker" do

@@ -104,6 +104,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:ok, %{"Id" => "qb_sr_pending", "TotalAmt" => "100.00"}}
       end)
@@ -371,6 +376,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:error, "QuickBooks API error: Invalid request"}
       end)
@@ -497,6 +507,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         "Events" -> {:ok, "events_class_default"}
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       # Mock RefundReceipt creation for refund
@@ -662,6 +677,11 @@ defmodule Ysc.Quickbooks.SyncTest do
           _ -> {:error, :not_found}
         end)
 
+        # Stub get_or_create_item in case config is not set when running in parallel
+        stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+          {:ok, "event_item_123"}
+        end)
+
         expect(ClientMock, :create_refund_receipt, fn params, _opts ->
           # CRITICAL: Verify refund_from_account_id is present
           assert Map.has_key?(params, :refund_from_account_ref)
@@ -738,6 +758,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         "Events" -> {:ok, "events_class_default"}
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
@@ -846,6 +871,11 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :create_customer, fn _params ->
         {:ok, %{"Id" => "qb_customer_err"}}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_refund_receipt, fn _params, _opts ->
@@ -1616,6 +1646,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # CRITICAL: Verify refund_from_account_id is present
         assert Map.has_key?(params, :refund_from_account_ref)
@@ -1958,6 +1993,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     end
 
     test "allows syncing payout with no linked transactions", %{user: _user} do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       # Create a payout with no linked payments/refunds
       {:ok, {_payout_payment, _transaction, _entries, payout}} =
         Ledgers.process_stripe_payout(%{
@@ -1973,10 +2011,26 @@ defmodule Ysc.Quickbooks.SyncTest do
       # Reload payout
       payout = Repo.preload(payout, [:payments, :refunds])
 
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       # Stub query functions needed for payout sync
       stub(ClientMock, :query_class_by_name, fn
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       # Mock Deposit creation (simple deposit without line items)
@@ -1991,6 +2045,9 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "passes idempotency key with length at most 255 to create_deposit", %{
       user: _user
     } do
+      # Save config at start to restore before payout sync (async tests can overwrite it)
+      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
+
       {:ok, {_payout_payment, _tx, _entries, payout}} =
         Ledgers.process_stripe_payout(%{
           payout_amount: Money.new(5_000, :USD),
@@ -2004,9 +2061,25 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       payout = Repo.preload(payout, [:payments, :refunds])
 
+      # Ensure full QB config is set right before payout sync
+      # This ensures bank_account_id and stripe_account_id are available
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.merge(saved_qb_config,
+          bank_account_id: "bank_account_123",
+          stripe_account_id: "stripe_account_123"
+        )
+      )
+
       stub(ClientMock, :query_class_by_name, fn
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_deposit, fn _params, opts ->
@@ -2116,6 +2189,11 @@ defmodule Ysc.Quickbooks.SyncTest do
       stub(ClientMock, :query_class_by_name, fn
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_deposit, fn _params, _opts ->
@@ -2411,6 +2489,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         assert Map.has_key?(params, :refund_from_account_ref)
         {:ok, %{"Id" => "qb_refund_receipt_123", "TotalAmt" => "30.00"}}
@@ -2611,6 +2694,11 @@ defmodule Ysc.Quickbooks.SyncTest do
           "Events" -> {:ok, "events_class_default"}
           "Administration" -> {:ok, "admin_class_default"}
           _ -> {:error, :not_found}
+        end)
+
+        # Stub get_or_create_item in case config is not set when running in parallel
+        stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+          {:ok, "event_item_123"}
         end)
 
         expect(ClientMock, :create_refund_receipt, fn params, _opts ->
@@ -2886,6 +2974,11 @@ defmodule Ysc.Quickbooks.SyncTest do
             _ -> {:error, :not_found}
           end)
 
+          # Stub get_or_create_item in case config is not set when running in parallel
+          stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+            {:ok, "event_item_123"}
+          end)
+
           expect(ClientMock, :create_refund_receipt, fn params, _opts ->
             # CRITICAL: Verify refund_from_account_ref is present (Quickbooks.create_refund_receipt
             # converts refund_from_account_id to refund_from_account_ref before calling the client)
@@ -3151,6 +3244,11 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # CRITICAL TEST: Verify refund receipt uses Tahoe class
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # Verify the line item has the correct class
         line_item = List.first(params.line)
@@ -3275,6 +3373,11 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       # CRITICAL TEST: Verify refund receipt uses Clear Lake class
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         # Verify the line item has the correct class
         line_item = List.first(params.line)
@@ -3403,6 +3506,11 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # CRITICAL TEST: Verify the refund correctly inherits Tahoe property
       # even though we didn't explicitly pass it to process_refund
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
@@ -3485,6 +3593,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify membership uses Administration class
         line_item = List.first(params.line)
@@ -3564,6 +3677,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
@@ -3638,6 +3756,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         "Clear Lake" -> {:ok, "clear_lake_class_123"}
         "Administration" -> {:ok, "admin_class_123"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
@@ -3933,6 +4056,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
         {:error, "Sales receipt creation failed"}
       end)
@@ -4007,6 +4135,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_refund_receipt, fn _params, _opts ->
         {:error, "Refund receipt creation failed"}
       end)
@@ -4069,6 +4202,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         "Events" -> {:ok, "events_class_123"}
         "Administration" -> {:ok, "admin_class_123"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
@@ -4829,6 +4967,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
         # Verify all required QuickBooks fields are present
         assert params.customer_ref != nil
@@ -4875,6 +5018,11 @@ defmodule Ysc.Quickbooks.SyncTest do
       stub(ClientMock, :query_class_by_name, fn
         "Events" -> {:ok, "events_class_123"}
         _ -> {:error, :not_found}
+      end)
+
+      # Stub get_or_create_item in case config is not set when running in parallel
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
       end)
 
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
