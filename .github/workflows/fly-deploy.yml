@@ -172,7 +172,12 @@ jobs:
     concurrency: deploy-group
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for git describe
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --remote-only
+      - name: Deploy to Fly.io sandbox
+        run: |
+          VERSION=$(git describe --first-parent --abbrev=10 --long --tags --dirty 2>/dev/null || echo "unknown")
+          flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --remote-only --build-arg BUILD_VERSION=$VERSION --image-label $VERSION
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
