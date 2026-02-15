@@ -1551,9 +1551,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "creates QuickBooks Deposit with payments and refunds (net amount)", %{
       user: user
     } do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       setup_default_mocks()
 
       # Create and sync a payment
@@ -1702,13 +1699,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Mock Deposit creation
@@ -1993,9 +1997,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     end
 
     test "allows syncing payout with no linked transactions", %{user: _user} do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       # Create a payout with no linked payments/refunds
       {:ok, {_payout_payment, _transaction, _entries, payout}} =
         Ledgers.process_stripe_payout(%{
@@ -2013,13 +2014,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Stub query functions needed for payout sync
@@ -2045,9 +2053,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "passes idempotency key with length at most 255 to create_deposit", %{
       user: _user
     } do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       {:ok, {_payout_payment, _tx, _entries, payout}} =
         Ledgers.process_stripe_payout(%{
           payout_amount: Money.new(5_000, :USD),
@@ -2063,13 +2068,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       stub(ClientMock, :query_class_by_name, fn
@@ -4229,9 +4241,6 @@ defmodule Ysc.Quickbooks.SyncTest do
   describe "payout sync with Stripe fees" do
     test "sync_payout creates deposit with Stripe fee line item when fees exist",
          %{user: user} do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_payout")
@@ -4277,13 +4286,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Mock deposit creation with verification of fee line item
@@ -4337,9 +4353,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "sync_payout handles multiple payments with combined fees", %{
       user: user
     } do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_multi")
@@ -4422,13 +4435,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Mock deposit creation
@@ -4474,9 +4494,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     end
 
     test "sync_payout skips fee line item when fees are zero", %{user: user} do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_no_fees")
@@ -4522,13 +4539,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Mock deposit creation
@@ -4558,9 +4582,6 @@ defmodule Ysc.Quickbooks.SyncTest do
 
     test "sync_payout continues without fee line when fee item creation fails",
          %{user: user} do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_fee_fail")
@@ -4606,13 +4627,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Mock account queries
@@ -4653,9 +4681,6 @@ defmodule Ysc.Quickbooks.SyncTest do
     test "sync_payout handles payout with mixed payments and refunds", %{
       user: user
     } do
-      # Save config at start to restore before payout sync (async tests can overwrite it)
-      saved_qb_config = Application.get_env(:ysc, :quickbooks, [])
-
       # Set user's QB customer ID
       user
       |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_mixed")
@@ -4725,13 +4750,20 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Ensure full QB config is set right before payout sync
       # This ensures bank_account_id and stripe_account_id are available
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(saved_qb_config,
-          bank_account_id: "bank_account_123",
-          stripe_account_id: "stripe_account_123"
-        )
+      # Note: We must set all required config values explicitly since async tests
+      # can overwrite the Application config
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
       )
 
       # Mock deposit creation
