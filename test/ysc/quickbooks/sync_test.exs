@@ -1,5 +1,5 @@
 defmodule Ysc.Quickbooks.SyncTest do
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures
