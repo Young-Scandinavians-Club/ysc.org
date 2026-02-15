@@ -578,7 +578,7 @@ defmodule YscWeb.HomeLive do
             <div class="flex items-center gap-2">
               <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <span class="text-sm font-black uppercase tracking-widest">
-                Happening Now
+                Happening Soon
               </span>
             </div>
             <%= if length(@upcoming_events) > 0 do %>
