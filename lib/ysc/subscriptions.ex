@@ -373,6 +373,117 @@ defmodule Ysc.Subscriptions do
   def scheduled_for_cancellation?(nil), do: false
 
   @doc """
+  Returns info about a scheduled downgrade if the subscription has one.
+
+  When a user schedules a downgrade (e.g. Family → Single at renewal), the
+  subscription has a Stripe schedule with two phases. This fetches that info.
+
+  ## Returns
+
+  - `nil` - No scheduled downgrade
+  - `%{target_plan: :single, effective_date: DateTime}` - Downgrade to Single on date
+  - `%{target_plan: :family, effective_date: DateTime}` - Downgrade to Family on date
+    (unusual but possible if plans were reordered)
+
+  ## Examples
+
+      iex> get_scheduled_downgrade_info(subscription)
+      %{target_plan: :single, effective_date: ~U[2025-02-15 00:00:00Z]}
+
+      iex> get_scheduled_downgrade_info(subscription)
+      nil
+
+  """
+  def get_scheduled_downgrade_info(nil), do: nil
+
+  def get_scheduled_downgrade_info(%Subscription{} = subscription) do
+    case Application.get_env(:ysc, :get_scheduled_downgrade_info_callback) do
+      callback when is_function(callback, 1) ->
+        callback.(subscription)
+
+      _ ->
+        do_get_scheduled_downgrade_info(subscription)
+    end
+  end
+
+  defp do_get_scheduled_downgrade_info(%Subscription{} = subscription) do
+    with {:ok, stripe_sub} <-
+           Stripe.Subscription.retrieve(subscription.stripe_id),
+         schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
+         {:ok, schedule} <- Stripe.SubscriptionSchedule.retrieve(schedule_id),
+         phases when is_list(phases) and length(phases) >= 2 <- schedule.phases,
+         next_phase <- Enum.at(phases, 1),
+         [item | _] <- next_phase[:items] || next_phase["items"],
+         price_id when is_binary(price_id) <- extract_price_id(item),
+         target_plan when not is_nil(target_plan) <- price_id_to_plan(price_id),
+         start_date when not is_nil(start_date) <-
+           next_phase[:start_date] || next_phase["start_date"] do
+      effective_date = DateTime.from_unix!(start_date)
+
+      %{target_plan: target_plan, effective_date: effective_date}
+    else
+      _ -> nil
+    end
+  end
+
+  defp extract_price_id(%{price: price}) when is_binary(price), do: price
+  defp extract_price_id(%{price: %{id: id}}) when is_binary(id), do: id
+  defp extract_price_id(%{"price" => price}) when is_binary(price), do: price
+  defp extract_price_id(%{"price" => %{"id" => id}}) when is_binary(id), do: id
+  defp extract_price_id(_), do: nil
+
+  defp price_id_to_plan(price_id) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case Enum.find(plans, &(&1.stripe_price_id == price_id)) do
+      %{id: plan_id} when plan_id in [:single, :family] -> plan_id
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Cancels a scheduled downgrade by releasing the subscription schedule in Stripe.
+  The user keeps their current plan (e.g. Family) with no change at renewal.
+
+  Returns `{:ok, subscription}` on success, `{:error, reason}` on failure.
+
+  ## Examples
+
+      iex> cancel_scheduled_downgrade(subscription)
+      {:ok, %Subscription{}}
+
+      iex> cancel_scheduled_downgrade(subscription_without_schedule)
+      {:error, :no_scheduled_downgrade}
+  """
+  def cancel_scheduled_downgrade(nil), do: {:error, "No subscription to update"}
+
+  def cancel_scheduled_downgrade(%Subscription{} = subscription) do
+    case Application.get_env(:ysc, :cancel_scheduled_downgrade_callback) do
+      callback when is_function(callback, 1) ->
+        callback.(subscription)
+
+      _ ->
+        do_cancel_scheduled_downgrade(subscription)
+    end
+  end
+
+  defp do_cancel_scheduled_downgrade(%Subscription{} = subscription) do
+    with {:ok, stripe_sub} <-
+           Stripe.Subscription.retrieve(subscription.stripe_id),
+         schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
+         {:ok, _} <- Stripe.SubscriptionSchedule.release(schedule_id) do
+      if subscription.user_id do
+        MembershipCache.invalidate_user(subscription.user_id)
+      end
+
+      {:ok, subscription}
+    else
+      nil -> {:error, :no_scheduled_downgrade}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  @doc """
   Marks a subscription as cancelled.
 
   ## Examples
@@ -697,18 +808,49 @@ defmodule Ysc.Subscriptions do
          new_price_id,
          direction
        ) do
+    case Application.get_env(:ysc, :change_membership_plan_stripe_callback) do
+      callback when is_function(callback, 3) ->
+        callback.(subscription, new_price_id, direction)
+
+      _ ->
+        do_change_membership_plan_stripe(subscription, new_price_id, direction)
+    end
+  end
+
+  defp do_change_membership_plan_stripe(
+         %Subscription{} = subscription,
+         new_price_id,
+         direction
+       ) do
     with {:ok, stripe_sub} <-
-           Stripe.Subscription.retrieve(subscription.stripe_id),
+           Stripe.Subscription.retrieve(subscription.stripe_id,
+             expand: ["items.data.price"]
+           ),
          [first_item | _] when first_item != nil <- stripe_sub.items.data do
-      current_price_id = first_item.price.id
+      current_price_id =
+        if is_binary(first_item.price),
+          do: first_item.price,
+          else: first_item.price.id
+
       stripe_item_id = first_item.id
 
-      # No-op if already on desired price
+      # Same price selected
       if current_price_id == new_price_id do
-        {:ok, subscription}
+        # If subscription has a scheduled downgrade, release it to cancel
+        if stripe_sub.schedule do
+          case Stripe.SubscriptionSchedule.release(stripe_sub.schedule) do
+            {:ok, _} -> {:ok, subscription}
+            {:error, error} -> {:error, error}
+          end
+        else
+          {:ok, subscription}
+        end
       else
         case direction do
           :upgrade ->
+            # Release any existing schedule first (e.g. scheduled downgrade user is canceling)
+            _ = maybe_release_schedule(stripe_sub)
+
             # For upgrades: charge proration delta immediately and update subscription
             # Use proration_behavior: "always_invoice" to ensure immediate charge
             update_items = [
@@ -747,43 +889,102 @@ defmodule Ysc.Subscriptions do
             end
 
           :downgrade ->
-            # For downgrades: schedule change for next renewal (no immediate charge/credit)
-            # Use proration_behavior: "none" to prevent immediate proration
-            # This keeps current period at old price, new price takes effect at renewal
-            update_items = [
-              %{id: stripe_item_id, price: new_price_id, quantity: 1}
-            ]
-
-            case Stripe.Subscription.update(subscription.stripe_id, %{
-                   items: update_items,
-                   proration_behavior: "none",
-                   billing_cycle_anchor: "unchanged"
-                 }) do
-              {:ok, stripe_subscription} ->
-                # Subscription is updated but current period remains unchanged
-                # New price will apply at next renewal
-                update_subscription(subscription, %{
-                  stripe_status: stripe_subscription.status,
-                  current_period_start:
-                    stripe_subscription.current_period_start &&
-                      DateTime.from_unix!(
-                        stripe_subscription.current_period_start
-                      ),
-                  current_period_end:
-                    stripe_subscription.current_period_end &&
-                      DateTime.from_unix!(
-                        stripe_subscription.current_period_end
-                      )
-                })
-
-              {:error, error} ->
-                {:error, error}
-            end
+            # For downgrades: use subscription schedule so change takes effect at next
+            # billing cycle. Customer keeps current plan (e.g. Family) until renewal,
+            # then switches to lower plan (e.g. Single). No immediate charge or credit.
+            schedule_downgrade_at_renewal(
+              subscription,
+              stripe_sub,
+              first_item,
+              new_price_id
+            )
         end
       end
     else
       {:error, error} -> {:error, error}
       _ -> {:error, :invalid_subscription_items}
+    end
+  end
+
+  defp maybe_release_schedule(%{schedule: nil} = stripe_sub), do: stripe_sub
+
+  defp maybe_release_schedule(%{schedule: schedule_id} = stripe_sub) do
+    case Stripe.SubscriptionSchedule.release(schedule_id) do
+      {:ok, _} -> stripe_sub
+      {:error, _} -> stripe_sub
+    end
+  end
+
+  defp schedule_downgrade_at_renewal(
+         subscription,
+         stripe_sub,
+         first_item,
+         new_price_id
+       ) do
+    current_price_id =
+      if is_binary(first_item.price),
+        do: first_item.price,
+        else: first_item.price.id
+
+    current_period_end = stripe_sub.current_period_end
+    current_period_start = stripe_sub.current_period_start
+
+    # Phase 1: current plan until period end
+    phase1_items = [
+      %{price: current_price_id, quantity: first_item.quantity || 1}
+    ]
+
+    phase1 = %{
+      items: phase1_items,
+      start_date: current_period_start,
+      end_date: current_period_end,
+      proration_behavior: "none"
+    }
+
+    # Phase 2: downgraded plan, starts at period end. Use end_date (duration
+    # param not supported in all Stripe API versions). Set to 1 year from
+    # period end for annual billing.
+    phase2_items = [%{price: new_price_id, quantity: 1}]
+
+    phase2_end_date = current_period_end + 365 * 24 * 60 * 60
+
+    phase2 = %{
+      items: phase2_items,
+      start_date: current_period_end,
+      end_date: phase2_end_date,
+      proration_behavior: "none"
+    }
+
+    result =
+      if stripe_sub.schedule do
+        # Subscription already has a schedule - update it
+        Stripe.SubscriptionSchedule.update(stripe_sub.schedule, %{
+          phases: [phase1, phase2],
+          end_behavior: "release"
+        })
+      else
+        # Create schedule from subscription, then update with phases
+        with {:ok, schedule} <-
+               Stripe.SubscriptionSchedule.create(%{
+                 from_subscription: stripe_sub.id
+               }),
+             {:ok, _} <-
+               Stripe.SubscriptionSchedule.update(schedule.id, %{
+                 phases: [phase1, phase2],
+                 end_behavior: "release"
+               }) do
+          {:ok, schedule}
+        end
+      end
+
+    case result do
+      {:ok, _} ->
+        # Do NOT update local subscription - it stays on current plan until webhook
+        # fires when schedule phase transitions at renewal
+        {:scheduled, subscription}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 

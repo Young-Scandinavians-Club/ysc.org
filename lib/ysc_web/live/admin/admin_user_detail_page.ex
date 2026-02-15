@@ -802,6 +802,33 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
 
             <div :if={@active_subscription != nil} class="space-y-6">
+              <%= if @scheduled_downgrade_info do %>
+                <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
+                  <div class="flex">
+                    <div class="flex-shrink-0">
+                      <.icon
+                        name="hero-arrow-trending-down"
+                        class="h-5 w-5 text-amber-500"
+                      />
+                    </div>
+                    <div class="ml-3">
+                      <h3 class="text-sm font-medium text-amber-800">
+                        Downgrade Scheduled
+                      </h3>
+                      <p class="mt-1 text-sm text-amber-700">
+                        This user's membership will change to
+                        <strong>
+                          <%= String.capitalize(
+                            to_string(@scheduled_downgrade_info.target_plan)
+                          ) %>
+                        </strong>
+                        on <strong><%= Calendar.strftime(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %></strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+
               <div>
                 <h3 class="text-lg font-semibold text-zinc-800 mb-4">
                   Current Membership
@@ -840,6 +867,15 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <p :if={@active_subscription.ends_at}>
                     <span class="font-semibold">Scheduled Cancellation:</span>
                     <%= format_datetime_for_display(@active_subscription.ends_at) %>
+                  </p>
+                  <p :if={@scheduled_downgrade_info}>
+                    <span class="font-semibold">Scheduled Downgrade:</span>
+                    Will change to <%= String.capitalize(
+                      to_string(@scheduled_downgrade_info.target_plan)
+                    ) %> on <%= Calendar.strftime(
+                      @scheduled_downgrade_info.effective_date,
+                      "%B %d, %Y"
+                    ) %>
                   </p>
                   <p>
                     <span class="font-semibold">Stripe Subscription ID:</span>
@@ -1663,6 +1699,14 @@ defmodule YscWeb.AdminUserDetailsLive do
         []
       end
 
+    # Fetch scheduled downgrade info from Stripe (if subscription has a schedule)
+    scheduled_downgrade_info =
+      if active_subscription do
+        Subscriptions.get_scheduled_downgrade_info(active_subscription)
+      else
+        nil
+      end
+
     # Check for lifetime membership
     has_lifetime = Accounts.has_lifetime_membership?(selected_user)
 
@@ -1719,6 +1763,7 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> assign(:selected_user_application, application)
      |> assign(:active_subscription, active_subscription)
      |> assign(:subscription_payments, subscription_payments)
+     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
      |> assign(:has_lifetime_membership, has_lifetime)
      |> assign(
        :membership_form,
@@ -2147,15 +2192,69 @@ defmodule YscWeb.AdminUserDetailsLive do
             {:noreply,
              socket |> put_flash(:error, "Invalid membership type selected")}
 
-          current_type == new_membership_type ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "User is already on that membership plan")}
-
           is_nil(current_plan) ->
             {:noreply,
              socket
              |> put_flash(:error, "Could not determine current membership plan")}
+
+          current_type == new_membership_type ->
+            # Same plan selected - call change_membership_plan to cancel any
+            # scheduled downgrade (releases Stripe schedule)
+            had_scheduled_downgrade =
+              socket.assigns[:scheduled_downgrade_info] != nil
+
+            same_price_id = current_plan.stripe_price_id
+
+            case Subscriptions.change_membership_plan(
+                   active_subscription,
+                   same_price_id,
+                   :upgrade
+                 ) do
+              {:ok, updated_subscription} ->
+                updated_subscription =
+                  updated_subscription |> Repo.preload(:subscription_items)
+
+                if had_scheduled_downgrade do
+                  MembershipCache.invalidate_user(active_subscription.user_id)
+
+                  sub_accounts =
+                    Accounts.get_sub_accounts(
+                      Accounts.get_user!(active_subscription.user_id)
+                    )
+
+                  Enum.each(sub_accounts, fn sub ->
+                    MembershipCache.invalidate_user(sub.id)
+                  end)
+                end
+
+                message =
+                  if had_scheduled_downgrade do
+                    "Scheduled downgrade cancelled. User will keep their current plan."
+                  else
+                    "User is already on that membership plan."
+                  end
+
+                {:noreply,
+                 socket
+                 |> assign(:active_subscription, updated_subscription)
+                 |> assign(:scheduled_downgrade_info, nil)
+                 |> put_flash(:info, message)}
+
+              {:error, error} ->
+                error_message =
+                  case error do
+                    %{message: msg} -> msg
+                    msg when is_binary(msg) -> msg
+                    _ -> "Failed to update membership"
+                  end
+
+                {:noreply,
+                 socket
+                 |> put_flash(
+                   :error,
+                   "Failed to update membership: #{error_message}"
+                 )}
+            end
 
           true ->
             new_price_id = new_plan.stripe_price_id
@@ -2184,6 +2283,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 {:noreply,
                  socket
                  |> assign(:active_subscription, updated_subscription)
+                 |> assign(:scheduled_downgrade_info, nil)
                  |> assign(
                    :membership_type_form,
                    to_form(membership_type_changeset, as: "membership_type")
@@ -2191,6 +2291,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                  |> put_flash(
                    :info,
                    "Membership type changed from #{String.capitalize("#{current_type}")} to #{String.capitalize("#{new_membership_type}")}"
+                 )}
+
+              {:scheduled, subscription} ->
+                # Downgrade scheduled for next renewal - refresh schedule info
+                scheduled_downgrade_info =
+                  Subscriptions.get_scheduled_downgrade_info(subscription)
+
+                {:noreply,
+                 socket
+                 |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
+                 |> put_flash(
+                   :info,
+                   "Downgrade scheduled. Membership will change to #{String.capitalize("#{new_membership_type}")} at next renewal."
                  )}
 
               {:error, error} ->

@@ -818,6 +818,53 @@ defmodule YscWeb.UserSettingsLive do
                 is_sub_account={@is_sub_account}
               />
 
+              <%= if @scheduled_downgrade_info && !@is_sub_account do %>
+                <div
+                  data-testid="scheduled-downgrade-notice"
+                  class="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4"
+                >
+                  <div class="flex">
+                    <div class="flex-shrink-0">
+                      <.icon
+                        name="hero-arrow-trending-down"
+                        class="h-5 w-5 text-amber-500"
+                      />
+                    </div>
+                    <div class="ml-3">
+                      <h3 class="text-sm font-medium text-amber-800">
+                        Downgrade Scheduled
+                      </h3>
+                      <div class="mt-2 text-sm text-amber-700">
+                        <p>
+                          Your membership will change to
+                          <strong>
+                            <%= String.capitalize(
+                              to_string(@scheduled_downgrade_info.target_plan)
+                            ) %>
+                          </strong>
+                          after <strong><%= Calendar.strftime(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %></strong>.
+                        </p>
+                        <p class="mt-1">
+                          You will keep your current plan benefits until that date.
+                        </p>
+                        <div class="mt-3">
+                          <.button
+                            id="cancel-scheduled-downgrade-btn"
+                            phx-click="cancel-scheduled-downgrade"
+                            phx-disable-with="Cancelling..."
+                            variant="outline"
+                            color="amber"
+                            data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                          >
+                            Cancel downgrade
+                          </.button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+
               <div class="space-y-4">
                 <.button
                   :if={
@@ -1813,6 +1860,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:show_new_payment_form, false)
       |> assign(:selecting_payment_method, false)
       |> assign(:membership_plans, membership_plans)
+      |> assign(:scheduled_downgrade_info, nil)
       |> assign(:active_plan_type, active_plan)
       |> assign(:email_form, to_form(email_changeset))
       |> assign(:profile_form, to_form(profile_changeset))
@@ -1896,9 +1944,17 @@ defmodule YscWeb.UserSettingsLive do
     # Rebuild address changeset with loaded billing_address
     address_changeset = Accounts.change_billing_address(user)
 
+    # Fetch scheduled downgrade info from Stripe (if user has membership with schedule)
+    scheduled_downgrade_info =
+      case socket.assigns.current_membership do
+        nil -> nil
+        membership -> Subscriptions.get_scheduled_downgrade_info(membership)
+      end
+
     {:noreply,
      socket
      |> assign(:user, user)
+     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
      |> assign(:primary_user, primary_user)
      |> assign(:payment_intent_secret, payment_secret(live_action, user))
      |> assign(:default_payment_method, default_payment_method)
@@ -2787,12 +2843,11 @@ defmodule YscWeb.UserSettingsLive do
               error: error
             )
 
+            error_message = format_payment_error(error)
+
             {:noreply,
              socket
-             |> put_flash(
-               :error,
-               "Failed to activate membership. Please try again."
-             )}
+             |> put_flash(:error, error_message)}
         end
       end
     end
@@ -3121,6 +3176,37 @@ defmodule YscWeb.UserSettingsLive do
              "Failed to cancel membership. Please try again."
            )}
       end
+    end
+  end
+
+  def handle_event("cancel-scheduled-downgrade", _params, socket) do
+    case Subscriptions.cancel_scheduled_downgrade(
+           socket.assigns.current_membership
+         ) do
+      {:ok, _subscription} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           "Scheduled downgrade cancelled. Your membership will stay at its current level."
+         )
+         |> redirect(to: ~p"/users/membership")}
+
+      {:error, :no_scheduled_downgrade} ->
+        {:noreply,
+         put_flash(socket, :error, "No scheduled downgrade found.")
+         |> redirect(to: ~p"/users/membership")}
+
+      {:error, reason} when is_binary(reason) ->
+        {:noreply, put_flash(socket, :error, reason)}
+
+      {:error, _} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Failed to cancel scheduled downgrade. Please try again."
+         )}
     end
   end
 
@@ -3648,6 +3734,28 @@ defmodule YscWeb.UserSettingsLive do
        :error,
        "Failed to change membership: #{inspect(reason)}"
      )}
+  end
+
+  defp format_payment_error(%Stripe.Error{code: code})
+       when code in [:card_declined, "card_declined"] do
+    "Your card was declined. Please try a different payment method or contact your bank."
+  end
+
+  defp format_payment_error(%Stripe.Error{message: message})
+       when is_binary(message) do
+    message
+  end
+
+  defp format_payment_error(error) when is_binary(error) do
+    if String.contains?(String.downcase(error), "declined") do
+      "Your card was declined. Please try a different payment method or contact your bank."
+    else
+      error
+    end
+  end
+
+  defp format_payment_error(_) do
+    "Failed to process payment. Please try again or contact support if the issue persists."
   end
 
   defp invalidate_membership_cache(user) do
@@ -4740,11 +4848,18 @@ defmodule YscWeb.UserSettingsLive do
            )}
 
         {:error, error_message} when is_binary(error_message) ->
+          display_message =
+            if String.contains?(String.downcase(error_message), "declined") do
+              "Your card was declined. Please try a different payment method or contact your bank."
+            else
+              "Failed to retry payment: #{error_message}. Please update your payment method and try again."
+            end
+
           {:noreply,
            put_flash(
              socket,
              :error,
-             "Failed to retry payment: #{error_message}. Please update your payment method and try again."
+             display_message
            )}
 
         {:error, _reason} ->
@@ -4752,7 +4867,7 @@ defmodule YscWeb.UserSettingsLive do
            put_flash(
              socket,
              :error,
-             "Failed to retry payment. Please update your payment method and try again, or contact support if the issue persists."
+             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, contact support."
            )}
       end
     end
