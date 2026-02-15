@@ -11,7 +11,13 @@ defmodule YscWeb.Telemetry do
     children = [
       # Telemetry poller will execute the given period measurements
       # every 10_000ms. Learn more here: https://hexdocs.pm/telemetry_metrics
-      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
+      {:telemetry_poller,
+       measurements: periodic_measurements(), period: 10_000},
+      # PostgreSQL JIT stats - separate poller at 60s to avoid performance impact.
+      # Silently skips when pg_stat_statements is unavailable (e.g., Fly Postgres).
+      {:telemetry_poller,
+       measurements: [{__MODULE__, :emit_postgres_jit_measurements, []}],
+       period: 60_000}
       # Add reporters as children of your supervision tree.
       # {Telemetry.Metrics.ConsoleReporter, metrics: metrics()}
       # Note: Ysc.Vault is started in Ysc.Application, not here
@@ -201,6 +207,40 @@ defmodule YscWeb.Telemetry do
       %{processes: memory[:processes]},
       %{}
     )
+  end
+
+  @doc false
+  def emit_postgres_jit_measurements do
+    query = """
+    SELECT
+      COALESCE(SUM(jit_functions), 0)::bigint,
+      (COALESCE(SUM(jit_generation_time), 0) + COALESCE(SUM(jit_inlining_time), 0) +
+       COALESCE(SUM(jit_optimization_time), 0) + COALESCE(SUM(jit_emission_time), 0) +
+       COALESCE(SUM(jit_deform_time), 0))::double precision,
+      COUNT(*) FILTER (WHERE jit_functions > 0)::bigint
+    FROM pg_stat_statements
+    """
+
+    case Ecto.Adapters.SQL.query(Ysc.Repo, query, [], timeout: 5_000) do
+      {:ok, %{rows: [[jit_functions, jit_time_ms, queries_using_jit]]}} ->
+        :telemetry.execute(
+          [:postgres, :jit, :stats],
+          %{
+            jit_functions: jit_functions,
+            jit_time_ms: jit_time_ms,
+            queries_using_jit: queries_using_jit
+          },
+          %{}
+        )
+
+      {:error, _} ->
+        :ok
+
+      {:ok, _} ->
+        :ok
+    end
+  rescue
+    _ -> :ok
   end
 
   @doc false

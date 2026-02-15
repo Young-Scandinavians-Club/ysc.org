@@ -29,7 +29,9 @@ defmodule Ysc.PromEx do
       # BEAM VM metrics
       Plugins.Beam,
       # Oban metrics
-      Plugins.Oban
+      Plugins.Oban,
+      # PostgreSQL JIT usage (from pg_stat_statements; no-op when extension unavailable)
+      Ysc.PromEx.Plugins.Postgres
     ]
   end
 
