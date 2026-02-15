@@ -584,4 +584,351 @@ defmodule Ysc.SubscriptionsTest do
       }
     }
   end
+
+  describe "change_membership_plan/3" do
+    test "returns {:error, _} for lifetime membership" do
+      # Lifetime membership is represented as a map, not Subscription struct
+      subscription = %{type: :lifetime}
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+
+      assert Subscriptions.change_membership_plan(
+               subscription,
+               single_plan.stripe_price_id,
+               :downgrade
+             ) == {:error, "Lifetime memberships cannot be changed"}
+    end
+
+    test "returns {:error, _} for nil subscription" do
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+
+      assert Subscriptions.change_membership_plan(
+               nil,
+               single_plan.stripe_price_id,
+               :upgrade
+             ) == {:error, "No active subscription found"}
+    end
+
+    test "returns {:error, _} when downgrading with sub-accounts" do
+      primary = user_fixture()
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+
+      sub_account =
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: unique_user_email(),
+            password: valid_user_password(),
+            first_name: "Sub",
+            last_name: "User",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: sub_account.id,
+          stripe_id: "sub_sub_account",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      # Sub-account has family (primary's plan) - we need subscription for primary
+      {:ok, primary_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: primary.id,
+          stripe_id: "sub_primary",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      primary_sub = Repo.preload(primary_sub, :user)
+
+      assert {:error, msg} =
+               Subscriptions.change_membership_plan(
+                 primary_sub,
+                 single_plan.stripe_price_id,
+                 :downgrade
+               )
+
+      assert msg =~ "sub-accounts"
+    end
+
+    test "returns {:scheduled, subscription} for downgrade when callback returns scheduled" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_downgrade",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      subscription = Repo.preload(subscription, :subscription_items)
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+
+      callback = fn sub, _price_id, :downgrade ->
+        assert sub.id == subscription.id
+        {:scheduled, sub}
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :change_membership_plan_stripe_callback,
+          callback
+        )
+
+        assert {:scheduled, returned_sub} =
+                 Subscriptions.change_membership_plan(
+                   subscription,
+                   single_plan.stripe_price_id,
+                   :downgrade
+                 )
+
+        assert returned_sub.id == subscription.id
+        # Subscription unchanged - still on family until renewal
+        assert returned_sub.stripe_id == subscription.stripe_id
+      after
+        Application.delete_env(:ysc, :change_membership_plan_stripe_callback)
+      end
+    end
+
+    test "returns {:ok, subscription} for upgrade when callback returns ok" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_upgrade",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      subscription =
+        subscription
+        |> Repo.preload(:subscription_items)
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(plans, &(&1.id == :family))
+
+      updated_subscription =
+        subscription
+        |> Ecto.Changeset.change(%{stripe_status: "active"})
+        |> Ecto.Changeset.apply_changes()
+
+      callback = fn sub, _price_id, :upgrade ->
+        assert sub.id == subscription.id
+        {:ok, updated_subscription}
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :change_membership_plan_stripe_callback,
+          callback
+        )
+
+        assert {:ok, returned_sub} =
+                 Subscriptions.change_membership_plan(
+                   subscription,
+                   family_plan.stripe_price_id,
+                   :upgrade
+                 )
+
+        assert returned_sub.id == subscription.id
+      after
+        Application.delete_env(:ysc, :change_membership_plan_stripe_callback)
+      end
+    end
+
+    test "returns {:ok, subscription} when cancelling scheduled downgrade (same plan) - callback releases" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_same_plan",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      subscription = Repo.preload(subscription, :subscription_items)
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(plans, &(&1.id == :family))
+
+      callback = fn sub, _price_id, _direction ->
+        # User selected same plan to cancel scheduled downgrade - releases schedule
+        {:ok, sub}
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :change_membership_plan_stripe_callback,
+          callback
+        )
+
+        assert {:ok, returned_sub} =
+                 Subscriptions.change_membership_plan(
+                   subscription,
+                   family_plan.stripe_price_id,
+                   :downgrade
+                 )
+
+        assert returned_sub.id == subscription.id
+      after
+        Application.delete_env(:ysc, :change_membership_plan_stripe_callback)
+      end
+    end
+  end
+
+  describe "get_scheduled_downgrade_info/1" do
+    test "returns nil for nil subscription" do
+      assert Subscriptions.get_scheduled_downgrade_info(nil) == nil
+    end
+
+    test "returns nil when callback returns nil" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_no_schedule",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      callback = fn _sub -> nil end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :get_scheduled_downgrade_info_callback,
+          callback
+        )
+
+        assert Subscriptions.get_scheduled_downgrade_info(subscription) == nil
+      after
+        Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
+      end
+    end
+
+    test "returns scheduled downgrade info when callback returns it" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_scheduled",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      effective_date = DateTime.add(DateTime.utc_now(), 30, :day)
+
+      callback = fn sub ->
+        assert sub.id == subscription.id
+        %{target_plan: :single, effective_date: effective_date}
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :get_scheduled_downgrade_info_callback,
+          callback
+        )
+
+        assert %{target_plan: :single, effective_date: ^effective_date} =
+                 Subscriptions.get_scheduled_downgrade_info(subscription)
+      after
+        Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
+      end
+    end
+  end
+
+  describe "cancel_scheduled_downgrade/1" do
+    test "returns {:error, _} for nil subscription" do
+      assert Subscriptions.cancel_scheduled_downgrade(nil) ==
+               {:error, "No subscription to update"}
+    end
+
+    test "returns {:ok, subscription} when callback succeeds" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cancel_test",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      callback = fn sub ->
+        assert sub.id == subscription.id
+        {:ok, sub}
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :cancel_scheduled_downgrade_callback,
+          callback
+        )
+
+        assert {:ok, ^subscription} =
+                 Subscriptions.cancel_scheduled_downgrade(subscription)
+      after
+        Application.delete_env(:ysc, :cancel_scheduled_downgrade_callback)
+      end
+    end
+
+    test "returns {:error, :no_scheduled_downgrade} when callback returns nil for schedule" do
+      user = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_no_schedule",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      # Simulate Stripe returning no schedule (nil)
+      callback = fn _sub -> {:error, :no_scheduled_downgrade} end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :cancel_scheduled_downgrade_callback,
+          callback
+        )
+
+        assert {:error, :no_scheduled_downgrade} =
+                 Subscriptions.cancel_scheduled_downgrade(subscription)
+      after
+        Application.delete_env(:ysc, :cancel_scheduled_downgrade_callback)
+      end
+    end
+  end
 end
