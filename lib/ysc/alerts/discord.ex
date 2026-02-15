@@ -623,6 +623,7 @@ defmodule Ysc.Alerts.Discord do
             Memberships: #{format_boolean(report.checks.entity_totals.memberships.match)}
             Bookings: #{format_boolean(report.checks.entity_totals.bookings.match)}
             Events: #{format_boolean(report.checks.entity_totals.events.match)}
+            Donations: #{format_boolean(report.checks.entity_totals.donations.match)}
             """,
             inline: false
           }

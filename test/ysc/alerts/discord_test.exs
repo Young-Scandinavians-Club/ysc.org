@@ -142,7 +142,8 @@ defmodule Ysc.Alerts.DiscordTest do
           entity_totals: %{
             memberships: %{match: true},
             bookings: %{match: true},
-            events: %{match: true}
+            events: %{match: true},
+            donations: %{match: true}
           }
         }
       }

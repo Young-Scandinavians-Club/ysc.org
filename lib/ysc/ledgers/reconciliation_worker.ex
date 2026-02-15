@@ -217,6 +217,10 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
       - Events: #{if report.checks.entity_totals.events.match, do: "✅", else: "❌"}
         Ledger: #{Money.to_string!(report.checks.entity_totals.events.ledger_revenue)}
         Payments: #{Money.to_string!(report.checks.entity_totals.events.payment_total)}
+
+      - Donations: #{if report.checks.entity_totals.donations.match, do: "✅", else: "❌"}
+        Ledger: #{Money.to_string!(report.checks.entity_totals.donations.ledger_revenue)}
+        Payments: #{Money.to_string!(report.checks.entity_totals.donations.payment_total)}
       """
 
       [entity_alert | sections]

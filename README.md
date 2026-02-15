@@ -655,20 +655,634 @@ This is a web application built with the Phoenix framework, written in Elixir. I
 
 The application provides a comprehensive set of features for managing a club or organization:
 
-- **User Management**: User accounts, authentication, and authorization.
-- **Membership Management**: Handling memberships, subscriptions, and renewals.
-- **Event Management**: Creating and managing events, including ticketing and registration.
-- **Bookings**: A system for booking resources or facilities.
-- **Content Management**: Creating and publishing posts and announcements.
-- **Financial Management**:
-  - Processing payments with Stripe.
-  - Generating expense reports.
-  - Syncing financial data with QuickBooks.
-  - Maintaining ledgers and financial records.
-- **Communication**: Sending emails and SMS messages to users.
-- **Support**: A ticketing system for handling user inquiries.
-- **File Management**: Uploading and managing files with AWS S3.
-- **Search**: A comprehensive search functionality.
+### User Management & Authentication
+
+Comprehensive user account management with multiple authentication methods and robust security features:
+
+#### Multiple Authentication Methods
+
+- **Email + Password**: Traditional authentication with secure password hashing (Bcrypt)
+- **Passkeys (WebAuthn)**: Passwordless authentication using biometric devices (Face ID, Touch ID, Windows Hello, security keys)
+  - FIDO2/WebAuthn standard implementation
+  - Support for multiple passkeys per user
+  - Device-based nicknames for easy management
+  - Sign-count tracking to detect cloned credentials
+  - User verification required for all operations
+- **OAuth 2.0 Social Login**:
+  - **Google OAuth**: Sign in with Google accounts
+  - **Facebook OAuth**: Sign in with Facebook accounts
+  - Automatic email verification for OAuth users
+  - Seamless account linking if email already exists
+- **Hybrid Authentication**: Users can combine multiple methods (e.g., password + passkey for backup)
+
+#### Passkey Features
+
+- **Registration Flow**: Simple enrollment process with device nickname selection
+- **Authentication Flow**: Fast, secure login without passwords
+- **Multiple Devices**: Support unlimited passkeys per user (laptop, phone, security keys)
+- **Cross-Platform**: Works on iOS, Android, macOS, Windows with WebAuthn-compatible devices
+- **Security**: Private keys never leave the device; public key stored on server
+- **Prompt Dismissal**: Optional one-time dismissal of passkey enrollment prompts
+- **Usage Tracking**: Last used timestamp and sign-count for each passkey
+- **Email Notifications**: Alerts when new passkeys are added
+
+#### Re-authentication System
+
+- **Sensitive Operations Protection**: Password changes and email changes require recent authentication
+- **Multiple Re-auth Methods**: Re-authenticate with password or passkey
+- **Session Validation**: Ensure user is still in control of the account before critical changes
+- **Modal Flow**: Seamless in-page re-authentication without full page redirects
+
+#### Security Features
+
+- **Rate Limiting**: Protection against credential stuffing and brute force attacks
+  - IP-based limits: 20 authentication attempts per minute
+  - Email-based limits: 5 attempts per minute per account
+  - Automatic lockout with retry-after delays
+- **Authentication Event Logging**: Comprehensive audit trail of all auth events
+  - Login successes/failures with timestamps
+  - Device information (browser, OS, device type)
+  - IP address and geolocation tracking
+  - User agent parsing
+  - Session tracking
+- **Suspicious Activity Detection**: Automated threat monitoring
+  - Rapid failed login attempts
+  - Unusual login times (after hours)
+  - New device detection
+  - Risk scoring based on threat indicators
+- **Security Notifications**: Automatic alerts for critical events
+  - Email notifications for password changes
+  - SMS alerts for password and email changes
+  - Passkey addition confirmations
+- **Password Security**:
+  - Bcrypt hashing with configurable work factor
+  - Password strength validation
+  - Secure password reset flow with time-limited tokens
+  - Change password with current password verification
+
+#### Account State Management
+
+- **User States**: Pending approval, active, rejected, suspended
+- **Email Verification**: Required for email/password signups
+- **OAuth Auto-verification**: OAuth users marked as verified automatically
+- **Account Locking**: Automatic lockout after repeated failed attempts
+
+#### Authentication Session Features
+
+- **Remember Me**: Optional extended sessions (60 days vs default)
+- **Session History**: View all login sessions with device and location info
+- **Last Login Display**: Show users their last successful login
+- **Active Session Tracking**: Monitor current and past sessions
+- **Secure Logout**: Full session termination with event logging
+
+#### Security Dashboard
+
+- **User Security Settings Page**: Centralized security management
+  - Change password
+  - Add/remove passkeys
+  - View active sessions
+  - Review authentication history
+  - Manage security preferences
+- **Security Alerts**: Real-time display of suspicious activity
+
+**Related Documentation:**
+
+- [User Authentication Guide](docs/USER_AUTHENTICATION.md)
+- [Passkey Implementation](docs/PASSKEY_SETUP.md)
+- [OAuth Setup Guide](docs/OAUTH_SETUP.md)
+- [Security & Rate Limiting](docs/SECURITY.md)
+- [Re-authentication Flow](docs/REAUTH_IMPLEMENTATION_SUMMARY.md)
+
+### Membership Management
+
+A complete membership lifecycle management system with:
+
+- **Automatic Renewals**: Seamless recurring billing through Stripe with configurable renewal periods
+- **Membership Tiers**: Support for single and family membership types
+- **Flexible Transitions**: Members can upgrade or downgrade between single and family memberships at any time
+- **Lifetime Memberships**: Special non-expiring membership tier for lifetime supporters
+- **Family Accounts**: Sub-accounts system where family members automatically inherit membership status from a parent account
+- **Member Portal**: Self-service dashboard for members to manage their subscriptions and account details
+
+**Related Documentation:**
+
+- [Membership System Overview](docs/MEMBERSHIP_SYSTEM.md)
+- [Stripe Integration Guide](docs/STRIPE_INTEGRATION.md)
+
+### Membership Application & Admin Review System
+
+A comprehensive membership application workflow with multi-step verification and admin review:
+
+#### Application Process
+
+##### Multi-Step Application Form
+
+- **Step-by-Step Flow**: Guided application process with progress tracking
+- **Account Creation**: Email and password setup with verification
+- **Personal Information**: Name, date of birth, contact details
+- **Address Collection**: Full mailing address with country, city, region, postal code
+- **Nordic Connection**: Place of birth, citizenship, most connected Nordic country
+
+##### Eligibility Verification
+
+- **Multiple Eligibility Criteria**: Applicants select all that apply
+  - Citizen of a Scandinavian country (Denmark, Finland, Iceland, Norway, Sweden)
+  - Born in Scandinavia
+  - Scandinavian parent, grandparent, or great-grandparent
+  - Lived in Scandinavia for at least 6 months
+  - Speak a Scandinavian language
+  - Spouse of a member
+- **Free-Form Responses**: Open-text fields for detailed explanations
+  - Link to Scandinavia (personal connection description)
+  - Time lived in Scandinavia (if applicable)
+  - Spoken languages
+  - How they heard about the club
+
+##### Membership Type Selection
+
+- **Single Membership**: Individual membership
+- **Family Membership**: Include spouse and/or children
+  - Family member details (name, birth date, relationship type)
+  - Multiple family members supported
+
+##### Legal Requirements
+
+- **Bylaws Agreement**: Must review and accept club bylaws
+- **Timestamp Tracking**: Agreement timestamp recorded
+- **Occupation Field**: Required for application
+
+##### Application Tracking
+
+- **Draft State**: Applications can be started and saved
+- **Submission Timestamp**: Completion time recorded with timezone
+- **Browser Timezone**: Captured for accurate time display
+
+#### Admin Review Interface
+
+##### Application Dashboard
+
+- **Pending Applications**: List view of all applications awaiting review
+  - Sortable and filterable by name, email, submission date, state
+  - Pagination with configurable limits (50-200 per page)
+  - Visual status badges (pending, approved, rejected)
+- **Search & Filters**: Find applications by email, name, phone, state, or role
+- **Submission Age**: "Time ago" display (e.g., "3 days ago")
+
+##### Detailed Application View
+
+- **Complete Application Display**: Modal view with all submitted information
+  - Applicant details (email, name, birth date)
+  - Family members (if family membership)
+  - Membership type and eligibility reasons
+  - Personal background (occupation, place of birth, citizenship)
+  - Nordic connection details
+  - Free-form responses
+- **Previous Review Info**: If already reviewed, shows outcome, date, and reviewer
+- **Visual Organization**: Categorized sections with clear headings
+
+##### Review Actions
+
+- **Approve Application**:
+  - Changes user state from `pending_approval` to `active`
+  - Sends approval email to applicant
+  - Records reviewer user ID and timestamp
+  - Sets review outcome to `approved`
+  - Logs review event in audit trail
+- **Reject Application**:
+  - Changes user state to `rejected`
+  - Sends rejection email with optional feedback
+  - Records reviewer and timestamp
+  - Sets review outcome to `rejected`
+  - Logs review event
+- **Re-review**: Previously reviewed applications can be reviewed again if needed
+
+#### User State Management
+
+##### Account States
+
+- **Pending Approval**: Initial state after application submission
+  - Limited access (can view pending page)
+  - Cannot access member-only features
+  - Waiting for admin review
+- **Active**: Approved members with full access
+  - Can purchase memberships
+  - Access to all member features
+  - Can book cabins and register for events
+- **Rejected**: Applications denied
+  - Can reapply after rejection
+  - Receives rejection notification
+- **Suspended**: Temporarily restricted access
+- **Deleted**: Soft-deleted accounts
+
+#### Admin Notes System
+
+- **Internal Notes**: Admins can add notes to any user account
+- **Note Categories**: Categorized notes for organization
+  - General notes
+  - Membership issues
+  - Conduct concerns
+  - Payment issues
+- **Immutable Records**: Notes cannot be edited once created
+- **Audit Trail**: Creator and timestamp tracked for each note
+- **Private**: Notes only visible to admins, never to users
+
+#### Notification System
+
+##### Applicant Notifications
+
+- **Application Submitted**: Confirmation email upon submission
+- **Application Approved**: Welcome email with next steps
+- **Application Rejected**: Notification with reasons (if provided)
+- **Admin Alert**: Board members notified of new applications
+
+##### Admin Notifications
+
+- **New Application Alert**: Email to admins when application submitted
+  - Includes applicant summary
+  - Direct link to review page
+  - Sent to configured admin email addresses
+
+#### Review Event Logging
+
+- **Event Tracking**: All review actions logged in audit trail
+- **Event Types**: Submitted, approved, rejected
+- **Metadata**: Reviewer ID, timestamp, outcome
+- **Historical Record**: Complete application lifecycle history
+
+#### Security & Access Control
+
+- **Admin-Only Access**: Review interface restricted to admin role
+- **Ownership Validation**: Users can only view their own applications
+- **Role-Based Permissions**: Separate permissions for viewing vs. reviewing
+- **Impersonation Support**: Admins can impersonate users for troubleshooting (separate feature)
+
+**Related Documentation:**
+
+- [Membership Application Guide](docs/MEMBERSHIP_APPLICATION.md)
+- [Admin Review Process](docs/ADMIN_REVIEW.md)
+- [User States & Permissions](docs/USER_STATES.md)
+
+### Event Management
+
+Comprehensive event creation and management with:
+
+- **Configurable Ticket Tiers**: Create multiple pricing tiers for events (e.g., General Admission, VIP, Early Bird)
+- **Optional Donations**: Allow attendees to add donations when purchasing tickets
+- **Partiful Integration**: Optional integration with Partiful for event coordination and RSVPs
+- **Event Registration**: Handle both free and paid event registrations
+- **Capacity Management**: Set attendance limits and track availability
+- **Event Calendar**: Display upcoming and past events with filtering options
+
+**Related Documentation:**
+
+- [Event Management Guide](docs/EVENT_MANAGEMENT.md)
+- [Partiful Integration](docs/PARTIFUL_INTEGRATION.md)
+
+### Content Management
+
+Creating and publishing posts and announcements with:
+
+- **News System**: Post news articles and updates with rich media support
+- **Member Comments**: Members can comment on news posts to foster community engagement
+- **Access Control**: Comments restricted to members only to maintain community quality
+- **Media Gallery**: Support for images and attachments in posts
+
+**Related Documentation:**
+
+- [Content Management Guide](docs/CONTENT_MANAGEMENT.md)
+
+### Newsletter System
+
+Manage communications with members and subscribers:
+
+- **Subscription Management**: Users can subscribe/unsubscribe through multiple touchpoints (homepage, user settings, email links)
+- **Subscription Sources**: Track where subscribers came from (public signup, user settings, etc.)
+- **Unique Unsubscribe Links**: Each subscriber receives a secure, unique token for one-click unsubscription
+- **Integration Points**:
+  - Homepage footer signup form
+  - User settings notifications panel
+  - Public unsubscribe page
+- **Privacy Controls**: Self-service subscription management without requiring login
+
+**Testing in IEx:**
+
+```elixir
+# Subscribe an email
+Ysc.Newsletter.subscribe("test@example.com", source: "public_signup")
+
+# Find subscriber
+Ysc.Newsletter.get_subscriber_by_email("test@example.com")
+
+# Unsubscribe by email or token
+Ysc.Newsletter.unsubscribe("test@example.com")
+Ysc.Newsletter.unsubscribe(subscriber.subscription_token)
+```
+
+**Related Documentation:**
+
+- [Newsletter System Guide](docs/NEWSLETTER_SYSTEM.md)
+
+### Booking System
+
+A comprehensive property booking system for cabin rentals (Tahoe and Clear Lake) with advanced features:
+
+#### Seasonal Configuration
+
+- **Recurring Seasons**: Define seasons with automatic annual recurrence (e.g., Winter: Nov 1 - Apr 30, Summer: May 1 - Oct 31)
+- **Year-Spanning Support**: Seasons can span calendar years naturally (winter seasons from November to April)
+- **Default Seasons**: Set fallback seasons for each property
+- **Per-Season Rules**: Configure different booking rules and pricing for each season
+
+#### Flexible Booking Modes
+
+- **Room-Based Bookings**: Book specific rooms with per-person-per-night pricing (Tahoe cabins)
+- **Day-Pass Bookings**: Day-only access without room assignments with per-guest-per-day pricing (Clear Lake)
+- **Property Buyouts**: Book the entire property for exclusive use at a fixed price
+
+#### Advanced Pricing Configuration
+
+- **Hierarchical Pricing Rules**: Three-tier pricing specificity
+  - Room-specific pricing (highest priority)
+  - Category-based pricing (medium priority)
+  - Property + season default pricing (fallback)
+- **Children Pricing**: Optional separate pricing tiers for children
+- **Dynamic Pricing**: Different rates by season, room category, or individual room
+- **Multiple Price Units**: Support for per-person-per-night, per-guest-per-day, and fixed buyout pricing
+
+#### Booking Rules & Restrictions
+
+- **Advance Booking Windows**: Configure how far in advance bookings can be made per season (e.g., 45 days)
+- **Maximum Night Limits**: Set maximum stay duration per season or use property defaults (Tahoe: 4 nights, Clear Lake: 30 nights)
+- **Blackout Dates**: Block specific date ranges for maintenance, events, or other reasons
+- **Minimum Billable Occupancy**: Set minimum guest requirements for rooms (e.g., family rooms requiring 2+ guests)
+- **Capacity Management**: Define maximum capacity per room with granular bed configuration (single, queen, king beds)
+
+#### Refund Policy Management
+
+- **Configurable Refund Policies**: Create property and booking-mode-specific refund policies
+- **Time-Based Refund Rules**: Define refund percentages based on days before check-in
+- **Automatic Refund Calculation**: System calculates applicable refund amounts based on cancellation timing
+- **Policy Administration**: Activate/deactivate policies as needed
+
+#### Room & Property Management
+
+- **Room Categories**: Organize rooms into categories for easier pricing management
+- **Room Features**: Track bed types, capacity, descriptions, and images
+- **Active/Inactive Rooms**: Enable or disable rooms without deleting them
+- **Property Support**: Manage multiple properties (Tahoe cabin, Clear Lake cabin)
+
+#### Check-In & Access Management
+
+- **Digital Check-In**: Track check-ins with rules agreement and timestamp
+- **Vehicle Registration**: Associate vehicles with check-ins for property access
+- **Door Code Management**: Rotate door codes with active date ranges
+- **Automatic Door Code Delivery**: Send current door codes to guests before check-in
+
+#### Booking Lifecycle
+
+- **Draft → Hold → Complete Flow**: Multi-step booking process with inventory holds
+- **Automatic Hold Expiry**: Release inventory if payment isn't completed in time
+- **Payment Integration**: Seamless Stripe integration for payment processing
+- **Confirmation Emails**: Automated booking confirmations with details and receipts
+- **Reminder System**: Automated check-in and checkout reminders via email and SMS
+
+#### Inventory Management
+
+- **Real-Time Availability**: Track room and property availability across date ranges
+- **Conflict Prevention**: Prevent double-bookings with inventory locking
+- **Booking Holds**: Temporarily reserve inventory during checkout process
+- **Multi-Room Bookings**: Support bookings spanning multiple rooms simultaneously
+
+**Related Documentation:**
+
+- [Booking System Guide](docs/BOOKING_SYSTEM.md)
+- [Pricing Configuration](docs/BOOKING_PRICING.md)
+- [Refund Policies](docs/BOOKING_REFUNDS.md)
+
+### Financial Management
+
+Comprehensive financial management tools with accounting integration and automated workflows:
+
+#### Payment Processing
+
+- **Stripe Integration**: Full payment lifecycle management
+  - Credit card payments with PCI compliance
+  - Automated refund processing
+  - Dispute handling and management
+  - Subscription and recurring billing
+  - Payment method updates
+
+#### Expense Report System
+
+A complete expense and income tracking system with QuickBooks integration:
+
+##### Report Creation & Management
+
+- **Dual-Purpose Reports**: Track both expenses (money spent) and income (money received) in a single report
+- **Expense Items**: Line-item tracking with required fields
+  - Date, vendor, description, amount
+  - Mandatory receipt uploads (stored securely in S3)
+  - Receipt validation before submission
+- **Income Items**: Track revenue and reimbursements
+  - Date, description, amount
+  - Optional proof-of-payment attachments
+- **Event Association**: Optionally link reports to specific events for better organization
+- **Draft & Submission Flow**: Save drafts and submit when ready
+
+##### Reimbursement Options
+
+- **Check Reimbursement**: Request payment via physical check
+  - Requires mailing address on file
+  - Address validation before submission
+- **Bank Transfer (ACH)**: Direct deposit to bank account
+  - Secure encrypted bank account storage (Cloak encryption)
+  - Routing number validation with checksum verification
+  - Only last 4 digits displayed (PCI-like security)
+  - Bank account ownership validation
+
+##### Bank Account Security
+
+- **Encrypted Storage**: Routing and account numbers encrypted at rest using Cloak.Ecto
+- **Minimal Exposure**: Sensitive data never logged or serialized to JSON
+- **Safe Display**: Only last 4 digits shown in UI
+- **One Account Per User**: Users can store one bank account for reimbursements
+- **Explicit Decryption**: Sensitive fields only decrypted when absolutely necessary
+
+##### Status Workflow
+
+- **Draft**: Initial state, can be edited
+- **Submitted**: Awaiting treasurer review, triggers QuickBooks sync
+- **Approved**: Approved by treasurer
+- **Rejected**: Requires revision
+- **Paid**: Reimbursement processed
+
+##### QuickBooks Integration
+
+- **Automatic Bill Creation**: Submitted reports automatically create QuickBooks bills
+  - Vendor creation/lookup for each user
+  - Line items mapped to expense categories
+  - Receipt attachments uploaded to QuickBooks
+- **Idempotent Sync**: Duplicate prevention with bill ID tracking
+  - Once synced, never creates duplicate bills
+  - Retry-safe with status tracking
+- **Async Processing**: Background workers (Oban) for reliable sync
+  - Primary sync worker for new submissions
+  - Backup sweep worker to catch any missed reports
+  - Automatic retry on transient failures
+- **Webhook Integration**: QuickBooks webhooks update payment status
+  - Bill payment notifications automatically mark reports as "paid"
+  - Real-time status updates
+- **Sync Status Tracking**: Monitor sync progress
+  - Pending, synced, error states
+  - Last sync attempt timestamp
+  - Error messages for troubleshooting
+
+##### Notifications & Confirmations
+
+- **User Confirmation**: Email sent to user upon submission with report summary
+- **Treasurer Notification**: Email alert to treasurer with report details and review link
+- **Payment Confirmation**: Automatic notification when marked as paid
+
+##### File Management
+
+- **S3 Storage**: Receipts stored in AWS S3 with secure access
+- **Direct Upload**: Client-side uploads with presigned URLs
+- **Multiple Format Support**: PDF, images (JPEG, PNG), and common document formats
+- **File Download**: Secure signed URLs for accessing uploaded receipts
+- **Attachment Tracking**: S3 paths stored with each line item
+
+##### Validation & Requirements
+
+- **Pre-Submission Validation**: All expense items must have receipts before submission
+- **Certification Requirement**: Users must accept certification statement before submitting
+- **Money Validation**: All amounts must be positive USD values
+- **Field Validation**: Required fields enforced (date, vendor, description, amount)
+- **Ownership Validation**: Users can only access their own reports
+
+##### Startup Scheduler
+
+- **Automatic Recovery**: On application start, schedules backup sync job
+- **Catch Missed Syncs**: Finds any submitted reports not yet synced to QuickBooks
+- **Resilient**: Ensures no reports slip through even after server restarts
+
+**Related Documentation:**
+
+- [Financial Management Guide](docs/FINANCIAL_MANAGEMENT.md)
+- [Expense Report System](docs/EXPENSE_REPORTS.md)
+- [QuickBooks Integration](docs/QUICKBOOKS_INTEGRATION.md)
+- [Stripe Integration Guide](docs/STRIPE_INTEGRATION.md)
+
+#### Ledger System
+
+- **Transaction History**: Maintain detailed financial records for all transactions
+- **Reconciliation Tools**: Match and verify financial transactions across systems
+- **Audit Trail**: Complete history of all financial operations
+
+### Communication & Notifications
+
+A comprehensive multi-channel notification system with user preference controls and robust delivery:
+
+#### Email System
+
+- **40+ Email Templates**: Pre-built templates for every user interaction
+  - Account management (registration, password reset, email changes)
+  - Membership lifecycle (payment confirmations, renewals, reminders)
+  - Bookings (confirmations, reminders, cancellations, refunds)
+  - Events (ticket purchases, refunds, event notifications)
+  - Volunteers & conduct reports
+  - Admin notifications (applications, treasurer alerts, board notifications)
+- **MJML-Based Templates**: Responsive email design using MJML framework for consistent rendering across all email clients
+- **Template Inheritance**: Shared header, footer, and base layout components for brand consistency
+- **Asynchronous Delivery**: All emails processed via Oban background jobs for reliability and performance
+- **Idempotency Protection**: Prevents duplicate emails using unique idempotency keys per message
+- **Development Mailbox**: Preview all emails at `/dev/mailbox` during development without sending real emails
+
+#### SMS System (Flowroute Integration)
+
+- **SMS Templates**: Text message versions of critical notifications
+  - Booking check-in reminders (3 days before arrival with door codes)
+  - Two-factor authentication codes
+  - Security alerts (password changes, email changes)
+  - Phone number verification
+- **Flowroute Integration**: Enterprise SMS provider for reliable message delivery
+- **Phone Number Validation**: Automatic validation and normalization of North American phone numbers (E.164 format)
+- **Delivery Receipts**: Track SMS delivery status and failures
+- **Inbound SMS Support**: Receive and process incoming SMS messages
+- **SMS Categories**: Organized template categories (account, security, event)
+
+#### User Notification Preferences
+
+- **Granular Controls**: Users can control notification preferences by category
+  - Email Categories: Account (required), Event (optional), Newsletter (optional)
+  - SMS Categories: Account notifications (optional), Event notifications (optional)
+  - Security SMS: Always sent regardless of preferences (2FA, verification codes)
+- **Per-User Settings**: Individual preference management in user settings
+- **Preference Enforcement**: System automatically respects user preferences before sending
+- **Phone Number Management**: Users can add/remove phone numbers for SMS notifications
+
+#### Automated Reminder System
+
+- **Scheduled Reminders**: Oban-powered cron jobs for time-based notifications
+  - **Booking Check-in Reminders**: Sent 3 days before arrival at 8:00 AM PST (email + SMS)
+  - **Booking Check-out Reminders**: Sent on check-out day (email)
+  - **Membership Payment Reminders**: 30-day and 7-day warnings before expiration
+- **Conditional Delivery**: Reminders only sent if conditions are still valid (e.g., booking not cancelled)
+- **Multi-Channel**: Critical reminders sent via both email and SMS for higher engagement
+
+#### Notification Infrastructure
+
+- **Queue-Based Processing**: Separate Oban queues for emails (`mailers`) and SMS for isolation and scaling
+- **Retry Logic**: Automatic retry with exponential backoff for failed deliveries (up to 3 attempts)
+- **Logging & Monitoring**: Comprehensive logging of all notification attempts, successes, and failures
+- **Template Routing**: Dynamic template resolution based on template names
+- **Variable Interpolation**: Rich data passing to templates for personalization
+- **Category Mapping**: Automatic categorization of templates for preference enforcement
+
+#### Email Infrastructure (Swoosh)
+
+- **Swoosh Mailer**: Production-ready email delivery using Swoosh library
+- **Multiple Adapters**: Support for various SMTP providers and services
+- **Email Composition**: HTML and plain-text versions for all transactional emails
+- **From Address Configuration**: Configurable sender addresses (info@, membership@, admin@, etc.)
+- **Testing Support**: Local adapter for development with in-memory storage
+
+#### Message Tracking & Audit
+
+- **Message History**: Database records of all sent emails and SMS
+- **Idempotency Tracking**: Prevents duplicate sends using database-backed deduplication
+- **Delivery Status**: Track delivery confirmations from Flowroute for SMS
+- **Template Metadata**: Store template name, variables, and rendered content for audit trails
+
+**Related Documentation:**
+
+- [Email System Guide](docs/EMAIL_SYSTEM.md)
+- [SMS Integration Guide](docs/SMS_INTEGRATION.md)
+- [Notification Preferences](docs/USER_PREFERENCES.md)
+- [Template Development](docs/EMAIL_TEMPLATES.md)
+
+### Support
+
+A ticketing system for handling user inquiries and support requests.
+
+**Related Documentation:**
+
+- [Support System Guide](docs/SUPPORT_SYSTEM.md)
+
+### File Management
+
+Uploading and managing files with AWS S3 integration.
+
+**Related Documentation:**
+
+- [File Storage Guide](docs/FILE_STORAGE.md)
+
+### Search
+
+A comprehensive search functionality across the application.
+
+**Related Documentation:**
+
+- [Search Implementation Guide](docs/SEARCH.md)
 
 ## Contributing
 
@@ -897,27 +1511,31 @@ This project is licensed under the **Non-Profit Open Software License (NPOSL) 3.
 The NPOSL 3.0 is a modern, professionally-written open source license designed specifically for non-profit organizations. It provides:
 
 **✅ You Can:**
+
 - Use, modify, and distribute this software freely
 - Create derivative works based on this software
 - Deploy the software on networks and servers
 - Access and modify the complete source code
 
 **📋 You Must:**
+
 - Keep the source code open and available
 - License any derivative works under NPOSL 3.0
 - Retain copyright and attribution notices
 - Treat network deployment (SaaS) as distribution (no "ASP loophole")
 
 **❌ Restrictions:**
+
 - **Only non-profit organizations** can distribute this software
 - Commercial use requires the standard OSL 3.0 license instead
 - Trademark and patent rights are reserved
 
 ### Why NPOSL 3.0?
 
-According to the license author, Lawrence Rosen: *"Some licensors are non-profit organizations that derive no revenue whatsoever from the distribution of the Original Work or Derivative Works, or even from support or services associated with those works."*
+According to the license author, Lawrence Rosen: _"Some licensors are non-profit organizations that derive no revenue whatsoever from the distribution of the Original Work or Derivative Works, or even from support or services associated with those works."_
 
 The NPOSL 3.0 is identical to the Open Software License (OSL 3.0) but with Section 17 amendments that:
+
 - Disclaim the "Warranty of Provenance" for non-profits
 - Extend liability limitations to include direct damages
 - Require the licensor to be a non-profit organization
