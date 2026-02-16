@@ -808,6 +808,51 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       subscription = Ysc.Repo.reload(subscription)
       assert subscription.stripe_status == "past_due"
     end
+
+    test "preserves period dates when subscription.updated has null dates (schedule attached)" do
+      # When a subscription is attached to a schedule (e.g. scheduled downgrade),
+      # Stripe sends null for current_period_start and current_period_end.
+      # We must preserve existing values or the user incorrectly shows "no membership"
+      user = user_with_stripe_id()
+      period_end = DateTime.add(DateTime.utc_now(), 30, :day)
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "active",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: period_end
+        })
+
+      original_period_start = subscription.current_period_start
+      original_period_end = subscription.current_period_end
+
+      # Simulate Stripe webhook when schedule is attached - null period dates
+      subscription_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "active",
+        start_date: nil,
+        current_period_start: nil,
+        current_period_end: nil,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      # Period dates must be preserved - not overwritten with nil
+      subscription = Ysc.Repo.reload(subscription)
+      assert subscription.current_period_start == original_period_start
+      assert subscription.current_period_end == original_period_end
+      assert Subscriptions.active?(subscription)
+    end
   end
 
   describe "payment method webhooks" do

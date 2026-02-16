@@ -1134,26 +1134,34 @@ defmodule Ysc.Quickbooks.Sync do
 
     income_account_ref = query_income_account(income_account_name)
 
-    case client_module().get_or_create_item(item_name,
-           income_account_ref: income_account_ref
-         ) do
-      {:ok, item_id} ->
-        Ysc.Logging.debug(
-          "[QB Sync] get_quickbooks_item_id: Item ID obtained via API",
-          item_name: item_name,
-          item_id: item_id
-        )
+    if is_nil(income_account_ref) do
+      Ysc.Logging.error(
+        "[QB Sync] get_quickbooks_item_id: Cannot create item - no revenue account found in QuickBooks. Create a revenue-type account (e.g. General Revenue) to fix error 2390."
+      )
 
-        {:ok, item_id}
+      {:error, :no_income_account_for_item}
+    else
+      case client_module().get_or_create_item(item_name,
+             income_account_ref: income_account_ref
+           ) do
+        {:ok, item_id} ->
+          Ysc.Logging.debug(
+            "[QB Sync] get_quickbooks_item_id: Item ID obtained via API",
+            item_name: item_name,
+            item_id: item_id
+          )
 
-      error ->
-        Ysc.Logging.warning(
-          "[QB Sync] get_quickbooks_item_id: Failed to get or create item",
-          item_name: item_name,
-          error: inspect(error)
-        )
+          {:ok, item_id}
 
-        error
+        error ->
+          Ysc.Logging.warning(
+            "[QB Sync] get_quickbooks_item_id: Failed to get or create item",
+            item_name: item_name,
+            error: inspect(error)
+          )
+
+          error
+      end
     end
   end
 
@@ -1169,32 +1177,44 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp query_income_account(income_account_name) do
-    case client_module().query_account_by_name(income_account_name) do
-      {:ok, account_id} ->
-        Ysc.Logging.debug(
-          "[QB Sync] get_quickbooks_item_id: Found income account",
-          account_name: income_account_name,
-          account_id: account_id
-        )
+    # Try primary account first, then fallbacks (QB error 2390 if item has no income account)
+    fallback_names = [
+      income_account_name,
+      "General Revenue",
+      "Other Income",
+      "Services",
+      "Events Inc",
+      "Donations"
+    ]
 
-        %{value: account_id}
+    result =
+      Enum.find_value(fallback_names, fn name ->
+        case client_module().query_account_by_name(name) do
+          {:ok, account_id} ->
+            if name != income_account_name do
+              Ysc.Logging.info(
+                "[QB Sync] get_quickbooks_item_id: Using fallback income account",
+                primary: income_account_name,
+                fallback: name,
+                account_id: account_id
+              )
+            end
 
-      {:error, :not_found} ->
-        Ysc.Logging.warning(
-          "[QB Sync] get_quickbooks_item_id: Income account not found, item creation may fail",
-          account_name: income_account_name
-        )
+            %{value: account_id}
 
-        nil
+          _ ->
+            nil
+        end
+      end)
 
-      error ->
-        Ysc.Logging.warning(
-          "[QB Sync] get_quickbooks_item_id: Failed to query income account, item creation may fail",
-          account_name: income_account_name,
-          error: inspect(error)
-        )
+    if result do
+      result
+    else
+      Ysc.Logging.warning(
+        "[QB Sync] get_quickbooks_item_id: No revenue account found (tried #{inspect(fallback_names)}). Item creation may fail with error 2390."
+      )
 
-        nil
+      nil
     end
   end
 

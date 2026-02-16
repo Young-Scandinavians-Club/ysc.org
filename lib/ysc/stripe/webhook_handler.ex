@@ -151,6 +151,15 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   defp normalize_currency(_), do: :USD
 
+  # Only put datetime in map when value is present. Used to avoid overwriting
+  # existing subscription period dates with nil when Stripe sends null
+  # (e.g. when subscription is attached to a schedule for scheduled downgrades).
+  defp maybe_put_datetime(map, _key, nil), do: map
+
+  defp maybe_put_datetime(map, key, unix_ts) when is_integer(unix_ts) do
+    Map.put(map, key, DateTime.from_unix!(unix_ts))
+  end
+
   # Check if webhook is within acceptable age
   defp check_webhook_age(event) do
     event_timestamp = DateTime.from_unix!(event.created)
@@ -753,20 +762,30 @@ defmodule Ysc.Stripe.WebhookHandler do
           end
         end)
       else
-        # Build update attrs from Stripe subscription
-        attrs = %{
-          stripe_status: event.status,
-          start_date: event.start_date && DateTime.from_unix!(event.start_date),
-          current_period_start:
-            event.current_period_start &&
-              DateTime.from_unix!(event.current_period_start),
-          current_period_end:
-            event.current_period_end &&
-              DateTime.from_unix!(event.current_period_end),
-          trial_ends_at:
-            event.trial_end && DateTime.from_unix!(event.trial_end),
-          ends_at: event.ended_at && DateTime.from_unix!(event.ended_at)
-        }
+        # Build update attrs from Stripe subscription.
+        # CRITICAL: When a subscription is attached to a schedule (e.g. scheduled downgrade),
+        # Stripe sends null for current_period_start and current_period_end. We must NOT
+        # overwrite existing values with nil, or active?/1 will incorrectly return false
+        # (nil current_period_end is treated as inactive), causing "no membership" for users.
+        attrs = %{stripe_status: event.status}
+        attrs = maybe_put_datetime(attrs, :start_date, event.start_date)
+
+        attrs =
+          maybe_put_datetime(
+            attrs,
+            :current_period_start,
+            event.current_period_start
+          )
+
+        attrs =
+          maybe_put_datetime(
+            attrs,
+            :current_period_end,
+            event.current_period_end
+          )
+
+        attrs = maybe_put_datetime(attrs, :trial_ends_at, event.trial_end)
+        attrs = maybe_put_datetime(attrs, :ends_at, event.ended_at)
 
         # Add cancellation info if present
         attrs =

@@ -3597,6 +3597,8 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Membership Revenue" -> {:ok, "membership_revenue_123"}
+        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 
@@ -3900,7 +3902,8 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Event Revenue" -> {:ok, "event_revenue_account_123"}
+        "Events Inc" -> {:ok, "events_inc_123"}
+        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 
@@ -3985,7 +3988,8 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Event Revenue" -> {:ok, "event_revenue_account_123"}
+        "Events Inc" -> {:ok, "events_inc_123"}
+        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 

@@ -400,7 +400,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   end
 
   describe "impersonation" do
-    test "displays Log in as User button linking to impersonate URL", %{
+    test "displays Sign in as User button linking to impersonate URL", %{
       conn: conn
     } do
       target = user_fixture(%{first_name: "Alice", last_name: "Target"})
@@ -410,11 +410,11 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert has_element?(
                view,
                "a[href*='/admin/impersonate/#{target.id}']",
-               "Log in as User"
+               "Sign in as User"
              )
     end
 
-    test "Log in as User button is not shown to non-admin", %{conn: conn} do
+    test "Sign in as User button is not shown to non-admin", %{conn: conn} do
       member = user_fixture(%{role: "member"})
       target = user_fixture()
       conn = log_in_user(conn, member)
