@@ -1134,26 +1134,34 @@ defmodule Ysc.Quickbooks.Sync do
 
     income_account_ref = query_income_account(income_account_name)
 
-    case client_module().get_or_create_item(item_name,
-           income_account_ref: income_account_ref
-         ) do
-      {:ok, item_id} ->
-        Ysc.Logging.debug(
-          "[QB Sync] get_quickbooks_item_id: Item ID obtained via API",
-          item_name: item_name,
-          item_id: item_id
-        )
+    if is_nil(income_account_ref) do
+      Ysc.Logging.error(
+        "[QB Sync] get_quickbooks_item_id: Cannot create item - no revenue account found in QuickBooks. Create a revenue-type account (e.g. General Revenue) to fix error 2390."
+      )
 
-        {:ok, item_id}
+      {:error, :no_income_account_for_item}
+    else
+      case client_module().get_or_create_item(item_name,
+             income_account_ref: income_account_ref
+           ) do
+        {:ok, item_id} ->
+          Ysc.Logging.debug(
+            "[QB Sync] get_quickbooks_item_id: Item ID obtained via API",
+            item_name: item_name,
+            item_id: item_id
+          )
 
-      error ->
-        Ysc.Logging.warning(
-          "[QB Sync] get_quickbooks_item_id: Failed to get or create item",
-          item_name: item_name,
-          error: inspect(error)
-        )
+          {:ok, item_id}
 
-        error
+        error ->
+          Ysc.Logging.warning(
+            "[QB Sync] get_quickbooks_item_id: Failed to get or create item",
+            item_name: item_name,
+            error: inspect(error)
+          )
+
+          error
+      end
     end
   end
 
@@ -1169,32 +1177,44 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp query_income_account(income_account_name) do
-    case client_module().query_account_by_name(income_account_name) do
-      {:ok, account_id} ->
-        Ysc.Logging.debug(
-          "[QB Sync] get_quickbooks_item_id: Found income account",
-          account_name: income_account_name,
-          account_id: account_id
-        )
+    # Try primary account first, then fallbacks (QB error 2390 if item has no income account)
+    fallback_names = [
+      income_account_name,
+      "General Revenue",
+      "Other Income",
+      "Services",
+      "Events Inc",
+      "Donations"
+    ]
 
-        %{value: account_id}
+    result =
+      Enum.find_value(fallback_names, fn name ->
+        case client_module().query_account_by_name(name) do
+          {:ok, account_id} ->
+            if name != income_account_name do
+              Ysc.Logging.info(
+                "[QB Sync] get_quickbooks_item_id: Using fallback income account",
+                primary: income_account_name,
+                fallback: name,
+                account_id: account_id
+              )
+            end
 
-      {:error, :not_found} ->
-        Ysc.Logging.warning(
-          "[QB Sync] get_quickbooks_item_id: Income account not found, item creation may fail",
-          account_name: income_account_name
-        )
+            %{value: account_id}
 
-        nil
+          _ ->
+            nil
+        end
+      end)
 
-      error ->
-        Ysc.Logging.warning(
-          "[QB Sync] get_quickbooks_item_id: Failed to query income account, item creation may fail",
-          account_name: income_account_name,
-          error: inspect(error)
-        )
+    if result do
+      result
+    else
+      Ysc.Logging.warning(
+        "[QB Sync] get_quickbooks_item_id: No revenue account found (tried #{inspect(fallback_names)}). Item creation may fail with error 2390."
+      )
 
-        nil
+      nil
     end
   end
 
@@ -2149,13 +2169,14 @@ defmodule Ysc.Quickbooks.Sync do
           )
 
           # Add Stripe fees line item if there are fees
-          # Get Administration class for Stripe fees (they're administrative expenses)
+          # QuickBooks Deposit only supports DepositLineDetail (not SalesItemLineDetail).
+          # Use DepositLineDetail with AccountRef to Stripe Fees expense account.
           administration_class_ref = get_administration_class_ref()
 
           line_items =
             if stripe_fees && Money.positive?(stripe_fees) do
-              case get_or_create_stripe_fee_item() do
-                {:ok, stripe_fee_item_id} ->
+              case get_stripe_fees_account_ref() do
+                {:ok, stripe_fees_account_ref} ->
                   # Fees are expenses, so they should be negative in the deposit
                   # Money.to_decimal returns dollars (database stores amounts in dollars)
                   fee_amount =
@@ -2165,11 +2186,9 @@ defmodule Ysc.Quickbooks.Sync do
 
                   fee_line_item = %{
                     amount: fee_amount,
-                    detail_type: "SalesItemLineDetail",
-                    sales_item_line_detail: %{
-                      item_ref: %{value: stripe_fee_item_id},
-                      quantity: Decimal.new(1),
-                      unit_price: fee_amount,
+                    detail_type: "DepositLineDetail",
+                    deposit_line_detail: %{
+                      account_ref: stripe_fees_account_ref,
                       class_ref: administration_class_ref
                     },
                     description:
@@ -2179,15 +2198,14 @@ defmodule Ysc.Quickbooks.Sync do
                   Ysc.Logging.debug(
                     "[QB Sync] create_payout_deposit: Added Stripe fees line item",
                     payout_id: payout.id,
-                    fee_amount: Decimal.to_string(fee_amount),
-                    item_id: stripe_fee_item_id
+                    fee_amount: Decimal.to_string(fee_amount)
                   )
 
                   [fee_line_item | line_items]
 
                 error ->
                   Ysc.Logging.warning(
-                    "[QB Sync] create_payout_deposit: Failed to get/create Stripe fee item, continuing without fee line item",
+                    "[QB Sync] create_payout_deposit: Stripe Fees account not found, continuing without fee line item",
                     payout_id: payout.id,
                     error: inspect(error)
                   )
@@ -2452,58 +2470,13 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
-  defp get_or_create_stripe_fee_item do
-    Ysc.Logging.debug(
-      "[QB Sync] get_or_create_stripe_fee_item: Getting or creating Stripe Fees item"
-    )
+  defp get_stripe_fees_account_ref do
+    case client_module().query_account_by_name("Stripe Fees") do
+      {:ok, account_id} ->
+        {:ok, %{value: account_id}}
 
-    # Check for config override first
-    case Application.get_env(:ysc, :quickbooks, [])[:stripe_fee_item_id] do
-      nil ->
-        # No override, get or create via API
-        Ysc.Logging.debug(
-          "[QB Sync] get_or_create_stripe_fee_item: No config override, using API"
-        )
-
-        # Stripe fees use the "Stripe Fees" expense account, but Service items require IncomeAccountRef
-        # Query for an income account (we'll use a general revenue account as fallback)
-        income_account_ref =
-          case client_module().query_account_by_name("Stripe Fees") do
-            {:ok, account_id} ->
-              Ysc.Logging.debug(
-                "[QB Sync] get_or_create_stripe_fee_item: Found Stripe Fees account",
-                account_id: account_id
-              )
-
-              %{value: account_id}
-
-            _ ->
-              # Fallback to a general revenue account if Stripe Fees account not found
-              case client_module().query_account_by_name("General Revenue") do
-                {:ok, account_id} ->
-                  Ysc.Logging.debug(
-                    "[QB Sync] get_or_create_stripe_fee_item: Using General Revenue as fallback",
-                    account_id: account_id
-                  )
-
-                  %{value: account_id}
-
-                _ ->
-                  nil
-              end
-          end
-
-        client_module().get_or_create_item("Stripe Fees",
-          income_account_ref: income_account_ref
-        )
-
-      configured_item_id ->
-        Ysc.Logging.debug(
-          "[QB Sync] get_or_create_stripe_fee_item: Using configured item ID",
-          item_id: configured_item_id
-        )
-
-        {:ok, configured_item_id}
+      _ ->
+        {:error, :stripe_fees_account_not_found}
     end
   end
 

@@ -3597,6 +3597,8 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Membership Revenue" -> {:ok, "membership_revenue_123"}
+        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 
@@ -3900,7 +3902,8 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Event Revenue" -> {:ok, "event_revenue_account_123"}
+        "Events Inc" -> {:ok, "events_inc_123"}
+        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 
@@ -3985,7 +3988,8 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Event Revenue" -> {:ok, "event_revenue_account_123"}
+        "Events Inc" -> {:ok, "events_inc_123"}
+        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 
@@ -4315,24 +4319,23 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :get_or_create_item, fn "Stripe Fees", _opts ->
-        {:ok, "stripe_fee_item_123"}
-      end)
-
       expect(ClientMock, :create_deposit, fn params, _opts ->
-        # Verify Stripe fee line item is included
+        # Verify Stripe fee line item is included (DepositLineDetail with Stripe Fees account)
         assert length(params.line) == 2
 
-        # Find the fee line item
+        # Find the fee line item (DepositLineDetail with account_ref to Stripe Fees)
         fee_line =
           Enum.find(params.line, fn line ->
-            line.sales_item_line_detail.item_ref.value == "stripe_fee_item_123"
+            line.detail_type == "DepositLineDetail" &&
+              line.deposit_line_detail[:account_ref] &&
+              line.deposit_line_detail[:account_ref][:value] ==
+                "stripe_fees_account_123"
           end)
 
         assert fee_line != nil
         assert Decimal.equal?(fee_line.amount, Decimal.new("-320.00"))
 
-        assert fee_line.sales_item_line_detail.class_ref.value ==
+        assert fee_line.deposit_line_detail[:class_ref][:value] ==
                  "admin_class_123"
 
         assert fee_line.description =~ "Stripe processing fees"
@@ -4464,17 +4467,16 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :get_or_create_item, fn "Stripe Fees", _opts ->
-        {:ok, "stripe_fee_item_123"}
-      end)
-
       expect(ClientMock, :create_deposit, fn params, _opts ->
         # Should have 4 line items: 3 payments + 1 fee line
         assert length(params.line) == 4
 
         fee_line =
           Enum.find(params.line, fn line ->
-            line.sales_item_line_detail.item_ref.value == "stripe_fee_item_123"
+            line.detail_type == "DepositLineDetail" &&
+              line.deposit_line_detail[:account_ref] &&
+              line.deposit_line_detail[:account_ref][:value] ==
+                "stripe_fees_account_123"
           end)
 
         assert fee_line != nil
@@ -4656,9 +4658,12 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      # Make fee item creation fail
-      expect(ClientMock, :get_or_create_item, fn "Stripe Fees", _opts ->
-        {:error, :api_error}
+      # Make Stripe Fees account lookup fail (so fee line is skipped)
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Bank Account" -> {:ok, "bank_account_123"}
+        "Stripe Fees" -> {:error, :not_found}
+        _ -> {:error, :not_found}
       end)
 
       expect(ClientMock, :create_deposit, fn params, _opts ->
@@ -4779,10 +4784,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      expect(ClientMock, :get_or_create_item, fn "Stripe Fees", _opts ->
-        {:ok, "stripe_fee_item_123"}
-      end)
-
       expect(ClientMock, :create_deposit, fn params, _opts ->
         # Should have 3 line items: 1 payment + 1 refund + 1 fee
         assert length(params.line) == 3
@@ -4797,7 +4798,10 @@ defmodule Ysc.Quickbooks.SyncTest do
 
         fee_line =
           Enum.find(params.line, fn line ->
-            line.sales_item_line_detail.item_ref.value == "stripe_fee_item_123"
+            line.detail_type == "DepositLineDetail" &&
+              line.deposit_line_detail[:account_ref] &&
+              line.deposit_line_detail[:account_ref][:value] ==
+                "stripe_fees_account_123"
           end)
 
         assert fee_line != nil
