@@ -203,7 +203,7 @@ defmodule YscWeb.Telemetry do
     )
   end
 
- @doc false
+  @doc false
   def emit_vm_system_measurements do
     # Get system info
     total_run_queue_lengths = :erlang.statistics(:total_run_queue_lengths)
