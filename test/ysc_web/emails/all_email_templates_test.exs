@@ -684,7 +684,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         first_name: user.first_name,
         membership_type: "Single",
         renewal_date: "Dec 1, 2024",
-        amount: "$50.00"
+        amount: "$50.00",
+        is_single_to_family_upgrade: false
       }
 
       html = MembershipRenewalSuccess.render(assigns)
@@ -693,6 +694,23 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
       assert MembershipRenewalSuccess.get_template_name() ==
                "membership_renewal_success"
+    end
+
+    test "MembershipRenewalSuccess renders upgrade variant", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        membership_type: "Family",
+        renewal_date: "Dec 1, 2024",
+        amount: "$65.00",
+        is_single_to_family_upgrade: true
+      }
+
+      html = MembershipRenewalSuccess.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      assert html =~ "Membership Upgrade Successful"
+      assert html =~ "Single to Family membership upgrade"
+      assert html =~ "$65.00"
     end
 
     test "MembershipPaymentReminder7Day renders", %{user: user} do

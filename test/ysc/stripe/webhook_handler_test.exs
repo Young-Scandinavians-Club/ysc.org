@@ -681,6 +681,50 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
         to: {nil, user.email}
       )
     end
+
+    test "sends upgrade-specific membership_renewal_success email on Single to Family upgrade",
+         %{} do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      # Add family subscription item so get_membership_type returns :family
+      family_plan =
+        Application.get_env(:ysc, :membership_plans, [])
+        |> Enum.find(&(&1.id in [:family, "family"]))
+
+      family_price_id = family_plan && family_plan.stripe_price_id
+
+      assert family_price_id,
+             "membership_plans must include family plan for this test"
+
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_id: "si_family_#{System.unique_integer()}",
+        stripe_product_id: "prod_family",
+        stripe_price_id: family_price_id,
+        quantity: 1
+      })
+
+      invoice_data = %{
+        "id" => "in_upgrade_#{System.unique_integer()}",
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "billing_reason" => "subscription_update",
+        "amount_paid" => 6500,
+        "description" => "Single to Family Upgrade",
+        "number" => "INV-UPGRADE",
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", invoice_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert_email_sent(
+        subject: "Your YSC Membership Has Been Upgraded to Family! 🎉",
+        to: {nil, user.email}
+      )
+    end
   end
 
   describe "subscription webhooks" do

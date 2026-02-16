@@ -880,12 +880,11 @@ defmodule YscWeb.AdminDashboardLive do
 
     all_revenue_account_ids = Map.values(accounts) |> Enum.map(& &1.id)
 
-    # Fetch all entries for all time periods in a single query, then aggregate in Elixir
-    # This is more efficient than multiple queries and avoids complex SQL fragments
+    # Fetch all entries (credits and debits) for all time periods in a single query.
+    # Credits = original revenue, debits = refund reversals. Net revenue = credits - debits.
     all_entries =
       from(e in Ysc.Ledgers.LedgerEntry,
         where: e.account_id in ^all_revenue_account_ids,
-        where: e.debit_credit == "credit",
         where:
           (e.inserted_at >= ^month_start and e.inserted_at < ^now) or
             (e.inserted_at >= ^prev_month_start and e.inserted_at < ^month_start) or
@@ -894,12 +893,13 @@ defmodule YscWeb.AdminDashboardLive do
         select: %{
           account_id: e.account_id,
           amount: fragment("ABS((?.amount).amount)", e),
+          debit_credit: e.debit_credit,
           inserted_at: e.inserted_at
         }
       )
       |> Repo.all()
 
-    # Aggregate by account and time period in Elixir
+    # Aggregate by account and time period. Credits add to revenue, debits subtract (refunds).
     revenue_data =
       Enum.reduce(
         all_entries,
@@ -907,6 +907,20 @@ defmodule YscWeb.AdminDashboardLive do
         fn entry, acc ->
           account_id = entry.account_id
           amount = entry.amount || Decimal.new(0)
+
+          # EctoEnum returns atoms (:credit/:debit); normalize for comparison
+          debit_credit =
+            case entry.debit_credit do
+              atom when is_atom(atom) -> to_string(atom)
+              str when is_binary(str) -> str
+              _ -> "debit"
+            end
+
+          signed_amount =
+            if debit_credit == "credit",
+              do: amount,
+              else: Decimal.negate(amount)
+
           inserted_at = entry.inserted_at
 
           acc =
@@ -918,9 +932,9 @@ defmodule YscWeb.AdminDashboardLive do
                     Map.update(
                       acc.current || %{},
                       account_id,
-                      amount,
+                      signed_amount,
                       fn existing ->
-                        Decimal.add(existing, amount)
+                        Decimal.add(existing, signed_amount)
                       end
                     )
               }
@@ -937,9 +951,9 @@ defmodule YscWeb.AdminDashboardLive do
                     Map.update(
                       acc.prev || %{},
                       account_id,
-                      amount,
+                      signed_amount,
                       fn existing ->
-                        Decimal.add(existing, amount)
+                        Decimal.add(existing, signed_amount)
                       end
                     )
               }
@@ -955,9 +969,9 @@ defmodule YscWeb.AdminDashboardLive do
                   Map.update(
                     acc.last_year || %{},
                     account_id,
-                    amount,
+                    signed_amount,
                     fn existing ->
-                      Decimal.add(existing, amount)
+                      Decimal.add(existing, signed_amount)
                     end
                   )
             }
