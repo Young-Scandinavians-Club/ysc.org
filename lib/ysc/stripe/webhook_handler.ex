@@ -1209,7 +1209,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                     user,
                     membership_type,
                     payment.amount,
-                    payment_date
+                    payment_date,
+                    billing_reason
                   )
                 else
                   # First-time membership payment - always paid online via Stripe
@@ -3410,7 +3411,8 @@ defmodule Ysc.Stripe.WebhookHandler do
          user,
          membership_type,
          amount,
-         renewal_date
+         renewal_date,
+         billing_reason
        ) do
     try do
       email_module = YscWeb.Emails.MembershipRenewalSuccess
@@ -3420,10 +3422,11 @@ defmodule Ysc.Stripe.WebhookHandler do
           user,
           membership_type,
           amount,
-          renewal_date
+          renewal_date,
+          billing_reason
         )
 
-      subject = email_module.get_subject()
+      subject = email_module.get_subject(email_data)
       template_name = email_module.get_template_name()
 
       # Generate idempotency key from user ID and renewal date to prevent duplicate emails

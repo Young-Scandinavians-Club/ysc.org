@@ -12,11 +12,21 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     "membership_renewal_success"
   end
 
-  def get_subject() do
-    "Your YSC Membership Has Been Renewed! 🎉"
+  def get_subject(email_data \\ %{}) do
+    if email_data[:is_single_to_family_upgrade] do
+      "Your YSC Membership Has Been Upgraded to Family! 🎉"
+    else
+      "Your YSC Membership Has Been Renewed! 🎉"
+    end
   end
 
-  def prepare_email_data(user, membership_type, amount, renewal_date) do
+  def prepare_email_data(
+        user,
+        membership_type,
+        amount,
+        renewal_date,
+        billing_reason \\ nil
+      ) do
     # Validate input
     if is_nil(user) do
       raise ArgumentError, "User cannot be nil"
@@ -32,11 +42,17 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     # Format renewal date
     renewal_date_str = format_date(renewal_date)
 
+    # Single to Family upgrade: subscription_update + Family membership means they upgraded
+    is_single_to_family_upgrade =
+      billing_reason in ["subscription_update", :subscription_update] and
+        membership_type in [:family, "family"]
+
     %{
       first_name: first_name,
       membership_type: membership_type_name,
       amount: amount_str,
-      renewal_date: renewal_date_str
+      renewal_date: renewal_date_str,
+      is_single_to_family_upgrade: is_single_to_family_upgrade
     }
   end
 
