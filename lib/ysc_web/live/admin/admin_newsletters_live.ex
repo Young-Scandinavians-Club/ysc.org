@@ -38,7 +38,7 @@ defmodule YscWeb.AdminNewslettersLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(:page_title, "Admin Newsletters")
+     |> assign(:page_title, "Newsletters")
      |> assign(:active_page, :newsletters)}
   end
 end
