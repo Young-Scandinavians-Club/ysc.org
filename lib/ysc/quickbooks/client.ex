@@ -1413,10 +1413,17 @@ defmodule Ysc.Quickbooks.Client do
   # Builds request body per Deposit entity spec:
   # https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
   defp build_deposit_body(params) do
+    total_amt_value =
+      case params.total_amt do
+        %Decimal{} = amt -> Decimal.to_float(amt)
+        amt when is_number(amt) -> amt
+        _ -> 0
+      end
+
     %{
       "DepositToAccountRef" => params.deposit_to_account_ref,
       "Line" => Enum.map(params.line, &normalize_deposit_line_item/1),
-      "TotalAmt" => params.total_amt
+      "TotalAmt" => total_amt_value
     }
     |> maybe_put("TxnDate", params[:txn_date])
     |> maybe_put("PrivateNote", params[:private_note])
@@ -1538,6 +1545,21 @@ defmodule Ysc.Quickbooks.Client do
       _ -> item_ref
     end
   end
+
+  defp normalize_ref(ref) when is_map(ref) do
+    value = ref[:value] || ref["value"]
+    name = ref[:name] || ref["name"]
+
+    if value do
+      if name,
+        do: %{"value" => to_string(value), "name" => name},
+        else: %{"value" => to_string(value)}
+    else
+      ref
+    end
+  end
+
+  defp normalize_ref(ref), do: ref
 
   defp add_tax_code_ref_if_present(sales_detail, detail) do
     if detail[:tax_code_ref] do
@@ -1662,11 +1684,25 @@ defmodule Ysc.Quickbooks.Client do
         detail = item.deposit_line_detail
         detail_map = %{}
 
+        # AccountRef: expense/source account. Also support entity_ref with type "Account" (legacy).
         detail_map =
-          if detail[:account_ref] do
-            Map.put(detail_map, "AccountRef", detail.account_ref)
-          else
-            detail_map
+          cond do
+            detail[:account_ref] ->
+              Map.put(
+                detail_map,
+                "AccountRef",
+                normalize_ref(detail.account_ref)
+              )
+
+            detail[:entity_ref] && detail[:entity_ref][:type] == "Account" ->
+              Map.put(
+                detail_map,
+                "AccountRef",
+                normalize_ref(detail.entity_ref)
+              )
+
+            true ->
+              detail_map
           end
 
         detail_map =
