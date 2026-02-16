@@ -21,6 +21,7 @@ defmodule YscWeb.AdminDashboardLive do
       last_name={@current_user.last_name}
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
+      board_position={@current_user.board_position}
     >
       <div class="bg-zinc-50/80 min-h-screen -mx-4 lg:-mx-10 px-4 lg:px-10 py-8">
         <!-- Command Center Header -->

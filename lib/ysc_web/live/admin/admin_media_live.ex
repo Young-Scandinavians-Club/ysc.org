@@ -27,6 +27,7 @@ defmodule YscWeb.AdminMediaLive do
       last_name={@current_user.last_name}
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
+      board_position={@current_user.board_position}
     >
       <.modal
         :if={@live_action == :edit}

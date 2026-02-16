@@ -28,6 +28,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       last_name={@current_user.last_name}
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
+      board_position={@current_user.board_position}
     >
       <div class="flex flex-col justify-between py-6">
         <.back navigate={~p"/admin/users"}>Back</.back>
