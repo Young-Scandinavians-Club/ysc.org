@@ -385,6 +385,9 @@ defmodule YscWeb.Router do
       live "/posts/:id/preview", AdminPostEditorLive, :preview
       live "/posts/:id/settings", AdminPostEditorLive, :settings
 
+      # Newsletters
+      live "/newsletters", AdminNewslettersLive, :index
+
       # Website specific settings (such as socials etc)
       live "/settings", AdminSettingsLive, :index
     end

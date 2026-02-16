@@ -1412,6 +1412,7 @@ defmodule YscWeb.CoreComponents do
   attr :last_name, :string
   attr :user_id, :string
   attr :most_connected_country, :string
+  attr :board_position, :any, default: nil
   slot :inner_block, required: true
 
   def side_menu(assigns) do
@@ -1537,6 +1538,38 @@ defmodule YscWeb.CoreComponents do
 
             <li>
               <.link
+                navigate="/admin/newsletters"
+                class={[
+                  "flex items-center px-3 py-4 rounded group transition-colors",
+                  if(@active_page == :newsletters,
+                    do:
+                      "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                    else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  )
+                ]}
+                aria-current={@active_page == :newsletters}
+              >
+                <.icon
+                  :if={@active_page == :newsletters}
+                  name="hero-envelope"
+                  class="w-5 h-5 transition duration-75 text-blue-400"
+                />
+                <.icon
+                  :if={@active_page != :newsletters}
+                  name="hero-envelope"
+                  class="w-5 h-5 transition duration-75 text-blue-500"
+                />
+                <span class={[
+                  "ms-3",
+                  @active_page == :newsletters && "font-semibold"
+                ]}>
+                  Newsletters
+                </span>
+              </.link>
+            </li>
+
+            <li>
+              <.link
                 navigate="/admin/bookings"
                 class={[
                   "flex items-center px-3 py-4 rounded group transition-colors",
@@ -1593,7 +1626,7 @@ defmodule YscWeb.CoreComponents do
               </.link>
             </li>
 
-            <li>
+            <li :if={@board_position == :treasurer}>
               <.link
                 navigate="/admin/money"
                 class={[
