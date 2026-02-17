@@ -75,6 +75,8 @@ defmodule YscWeb.ContactLive do
                   {"Clear Lake Cabin", "Clear Lake Cabin"},
                   {"Membership", "Membership"},
                   {"Volunteering", "Volunteering"},
+                  {"Events", "Events"},
+                  {"Website", "Website"},
                   {"Board of Directors", "Board of Directors"},
                   {"Other", "Other"}
                 ]}
