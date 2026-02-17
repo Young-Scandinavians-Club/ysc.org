@@ -1735,12 +1735,9 @@ defmodule Ysc.Quickbooks.Client do
             detail_map
           end
 
-        detail_map =
-          if detail[:payment_method_ref] do
-            Map.put(detail_map, "PaymentMethodRef", detail.payment_method_ref)
-          else
-            detail_map
-          end
+        # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail
+        # It's only valid for SalesReceipt and RefundReceipt entities
+        # Do not include it to prevent QuickBooks validation error (code 2010)
 
         result = Map.put(base, "DepositLineDetail", detail_map)
 

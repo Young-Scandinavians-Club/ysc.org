@@ -462,13 +462,9 @@ defmodule Ysc.Quickbooks do
           Map.put(deposit_line_detail, :class_ref, %{value: params.class_ref}),
         else: deposit_line_detail
 
-    deposit_line_detail =
-      if params[:payment_method_ref],
-        do:
-          Map.put(deposit_line_detail, :payment_method_ref, %{
-            value: params.payment_method_ref
-          }),
-        else: deposit_line_detail
+    # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail
+    # It's only valid for SalesReceipt and RefundReceipt entities
+    # Removed to prevent QuickBooks validation error (code 2010)
 
     line_item = %{
       amount: params.amount,
