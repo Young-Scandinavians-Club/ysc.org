@@ -581,8 +581,8 @@ defmodule YscWeb.EventDetailsLive do
               <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
-              <article class="prose prose-zinc prose-lg max-w-none text-zinc-600 font-light leading-relaxed">
-                <div id="article-body" class="post-render">
+              <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-light leading-relaxed">
+                <div id="article-body" class="post-render" phx-hook="GLightboxHook">
                   <%= raw(event_body(@event)) %>
                 </div>
               </article>

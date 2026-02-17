@@ -1164,6 +1164,26 @@ trix-editor .attachment__metadata .attachment__size {
   margin-bottom: 0em !important;
 }
 
+/* Text links inside rendered content */
+.post-render a:not(.glightbox) {
+  color: #3b82f6;
+  text-decoration: none;
+  background-image: linear-gradient(#3b82f6, #3b82f6);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s ease, color 0.3s ease;
+}
+
+.post-render a:not(.glightbox):hover {
+  color: #2563eb;
+  background-size: 100% 1px;
+}
+
+.post-render a:not(.glightbox):active {
+  color: #1d4ed8;
+}
+
 .trix-content .attachment {
   display: inline-block;
   position: relative;
@@ -1224,6 +1244,52 @@ trix-editor .attachment__metadata .attachment__size {
   padding-bottom: 1em !important;
   margin-top: 0em !important;
   margin-bottom: 0em !important;
+}
+
+/* Inline image figure created by GLightboxHook for plain <a><img>caption</a> */
+.post-render figure.post-render-image-figure {
+  display: block;
+  margin: 1.5em 0 !important;
+  padding: 0 !important;
+}
+
+.post-render .post-render-image-figure a {
+  display: block;
+  line-height: 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  cursor: zoom-in;
+  transition: opacity 0.2s ease;
+  background-image: none !important;
+  background-size: 0 !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.post-render .post-render-image-figure a:hover {
+  opacity: 0.85;
+  color: inherit !important;
+  background-size: 0 !important;
+}
+
+.post-render .post-render-image-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0 !important;
+}
+
+.post-render figcaption.post-render-caption {
+  display: block;
+  margin-top: 0.5em !important;
+  padding: 0 0.25em;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #78716c;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.01em;
 }
 
 .attachment-gallery .attachment {
