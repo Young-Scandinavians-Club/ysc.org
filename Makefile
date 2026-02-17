@@ -137,6 +137,7 @@ clean-elixir:  ## Clean up Elixir and Phoenix files
 	@echo "$(BOLD)** Cleaning up Elixir files...$(RESET)"
 	@mix clean
 	@rm -rf _build/ deps/
+	@rm -f priv/static/assets/*.gz priv/static/assets/*.br priv/static/assets/*.zst
 
 .PHONY: clean
 clean: clean-elixir clean-docker  ## Clean docker and elixir

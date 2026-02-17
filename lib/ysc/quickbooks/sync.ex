@@ -786,35 +786,8 @@ defmodule Ysc.Quickbooks.Sync do
           {:ok,
            %{entity_type: entity_type, property: nil, entry: donation_entry}}
 
-        # Try to find any revenue entry
-        entry = List.first(entries) ->
-          entity_type =
-            case entry.related_entity_type do
-              atom when is_atom(atom) -> atom
-              string when is_binary(string) -> String.to_existing_atom(string)
-            end
-
-          Ysc.Logging.debug(
-            "[QB Sync] get_payment_entity_info: Using first revenue entry",
-            payment_id: payment.id,
-            entity_type: entity_type
-          )
-
-          property =
-            if entity_type == :booking do
-              Ysc.Logging.debug(
-                "[QB Sync] get_payment_entity_info: Determining booking property",
-                payment_id: payment.id
-              )
-
-              determine_booking_property(payment)
-            else
-              nil
-            end
-
-          {:ok, %{entity_type: entity_type, property: property, entry: entry}}
-
-        # Check for membership entry
+        # Check for membership entry (must be before the generic fallback
+        # so we can determine the membership type: single vs family)
         membership_entry =
             Enum.find(entries, fn e ->
               e.related_entity_type in [:membership, "membership"]
@@ -851,14 +824,42 @@ defmodule Ysc.Quickbooks.Sync do
              entry: membership_entry
            }}
 
+        # Try to find any other revenue entry (booking, etc.)
+        entry = List.first(entries) ->
+          entity_type =
+            case entry.related_entity_type do
+              atom when is_atom(atom) -> atom
+              string when is_binary(string) -> String.to_existing_atom(string)
+            end
+
+          Ysc.Logging.debug(
+            "[QB Sync] get_payment_entity_info: Using first revenue entry",
+            payment_id: payment.id,
+            entity_type: entity_type
+          )
+
+          property =
+            if entity_type == :booking do
+              Ysc.Logging.debug(
+                "[QB Sync] get_payment_entity_info: Determining booking property",
+                payment_id: payment.id
+              )
+
+              determine_booking_property(payment)
+            else
+              nil
+            end
+
+          {:ok, %{entity_type: entity_type, property: property, entry: entry}}
+
         # Default to membership if no entity type found
         true ->
           Ysc.Logging.debug(
-            "[QB Sync] get_payment_entity_info: No entity type found, defaulting to membership",
+            "[QB Sync] get_payment_entity_info: No entity type found, defaulting to Membership Inc",
             payment_id: payment.id
           )
 
-          {:ok, %{entity_type: :membership, property: :single, entry: nil}}
+          {:ok, %{entity_type: :membership, property: nil, entry: nil}}
       end
 
     Ysc.Logging.debug("[QB Sync] get_payment_entity_info: Final result",
@@ -869,7 +870,7 @@ defmodule Ysc.Quickbooks.Sync do
     result
   end
 
-  defp get_membership_type_from_entity_id(nil), do: :single
+  defp get_membership_type_from_entity_id(nil), do: nil
 
   defp get_membership_type_from_entity_id(subscription_id) do
     Ysc.Logging.debug(
@@ -878,7 +879,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     case Subscriptions.get_subscription(subscription_id) do
-      {:ok, subscription} ->
+      %{} = subscription ->
         subscription = Repo.preload(subscription, :subscription_items)
 
         membership_type =
@@ -892,11 +893,12 @@ defmodule Ysc.Quickbooks.Sync do
                      &(&1.stripe_price_id == item.stripe_price_id)
                    ) do
                 %{id: plan_id} when plan_id in [:family, "family"] -> :family
-                _ -> :single
+                %{id: plan_id} when plan_id in [:single, "single"] -> :single
+                _ -> nil
               end
 
             _ ->
-              :single
+              nil
           end
 
         Ysc.Logging.debug(
@@ -907,13 +909,13 @@ defmodule Ysc.Quickbooks.Sync do
 
         membership_type
 
-      _ ->
+      nil ->
         Ysc.Logging.debug(
-          "[QB Sync] get_membership_type_from_entity_id: Subscription not found, defaulting to single",
+          "[QB Sync] get_membership_type_from_entity_id: Subscription not found, defaulting to Membership Inc",
           subscription_id: subscription_id
         )
 
-        :single
+        nil
     end
   end
 

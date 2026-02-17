@@ -3552,17 +3552,42 @@ defmodule Ysc.Quickbooks.SyncTest do
   end
 
   describe "sync_payment/1 with membership payments" do
-    test "creates QuickBooks SalesReceipt for membership payment", %{user: user} do
+    test "single membership payment uses Single Membership item and Administration class",
+         %{user: user} do
       setup_default_mocks()
 
+      # Create a subscription with a single membership subscription item
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_single_qb_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _item} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_single",
+          stripe_id: "si_single_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      # Use the subscription ID as entity_id so get_membership_type_from_entity_id resolves it
       {:ok, {payment, _transaction, _entries}} =
         Ledgers.process_payment(%{
           user_id: user.id,
-          amount: Money.new(15_000, :USD),
-          external_payment_id: "pi_membership_test",
+          amount: Money.new(4_500, :USD),
+          external_payment_id:
+            "pi_single_membership_#{System.unique_integer()}",
           entity_type: :membership,
-          entity_id: Ecto.ULID.generate(),
-          stripe_fee: Money.new(450, :USD),
+          entity_id: subscription.id,
+          stripe_fee: Money.new(160, :USD),
           description: "Single membership payment",
           property: :single,
           payment_method_id: nil
@@ -3591,14 +3616,25 @@ defmodule Ysc.Quickbooks.SyncTest do
         |> Repo.update!()
       end
 
+      # Configure single_membership_item_id in QuickBooks config
+      current_config = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.put(
+          current_config,
+          :single_membership_item_id,
+          "single_membership_item_123"
+        )
+      )
+
       expect(ClientMock, :create_customer, fn _params ->
-        {:ok, %{"Id" => "qb_customer_membership"}}
+        {:ok, %{"Id" => "qb_customer_single_membership"}}
       end)
 
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Membership Revenue" -> {:ok, "membership_revenue_123"}
-        "General Revenue" -> {:ok, "general_revenue_123"}
         _ -> {:error, :not_found}
       end)
 
@@ -3607,22 +3643,378 @@ defmodule Ysc.Quickbooks.SyncTest do
         _ -> {:error, :not_found}
       end)
 
-      # Stub get_or_create_item in case config is not set when running in parallel
-      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
-        {:ok, "event_item_123"}
-      end)
-
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
-        # Verify membership uses Administration class
         line_item = List.first(params.line)
         class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
+        item_ref = get_in(line_item, [:sales_item_line_detail, :item_ref])
 
+        # Verify single membership uses Administration class
         assert class_ref.name == "Administration"
+        # Verify single membership uses the correct item ID
+        assert item_ref.value == "single_membership_item_123"
 
         {:ok,
          %{
-           "Id" => "qb_membership_sr_123",
-           "TotalAmt" => "150.00",
+           "Id" => "qb_single_membership_sr",
+           "TotalAmt" => "45.00",
+           "SyncToken" => "0"
+         }}
+      end)
+
+      assert {:ok, _sales_receipt} = Sync.sync_payment(payment)
+
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+      assert payment.quickbooks_sales_receipt_id == "qb_single_membership_sr"
+    end
+
+    test "family membership payment uses Family Membership item and Administration class",
+         %{user: user} do
+      setup_default_mocks()
+
+      # Create a subscription with a family membership subscription item
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_family_qb_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _item} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: family_plan.stripe_price_id,
+          stripe_product_id: "prod_family",
+          stripe_id: "si_family_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      # Use the subscription ID as entity_id so get_membership_type_from_entity_id resolves it
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(6_500, :USD),
+          external_payment_id:
+            "pi_family_membership_#{System.unique_integer()}",
+          entity_type: :membership,
+          entity_id: subscription.id,
+          stripe_fee: Money.new(220, :USD),
+          description: "Family membership payment",
+          property: :family,
+          payment_method_id: nil
+        })
+
+      setup_default_mocks()
+      Process.sleep(100)
+      payment = Repo.reload!(payment)
+
+      if payment.quickbooks_sync_status == "synced" do
+        payment
+        |> Payment.changeset(%{
+          quickbooks_sync_status: "pending",
+          quickbooks_sales_receipt_id: nil,
+          quickbooks_response: nil
+        })
+        |> Repo.update!()
+      end
+
+      payment = Repo.reload!(payment)
+      user = Repo.reload!(user)
+
+      if user.quickbooks_customer_id do
+        user
+        |> Ecto.Changeset.change(quickbooks_customer_id: nil)
+        |> Repo.update!()
+      end
+
+      # Configure family_membership_item_id in QuickBooks config
+      current_config = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.put(
+          current_config,
+          :family_membership_item_id,
+          "family_membership_item_123"
+        )
+      )
+
+      expect(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_family_membership"}}
+      end)
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        line_item = List.first(params.line)
+        class_ref = get_in(line_item, [:sales_item_line_detail, :class_ref])
+        item_ref = get_in(line_item, [:sales_item_line_detail, :item_ref])
+
+        # Verify family membership uses Administration class
+        assert class_ref.name == "Administration"
+        # Verify family membership uses the correct item ID
+        assert item_ref.value == "family_membership_item_123"
+
+        {:ok,
+         %{
+           "Id" => "qb_family_membership_sr",
+           "TotalAmt" => "65.00",
+           "SyncToken" => "0"
+         }}
+      end)
+
+      assert {:ok, _sales_receipt} = Sync.sync_payment(payment)
+
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+      assert payment.quickbooks_sales_receipt_id == "qb_family_membership_sr"
+    end
+
+    test "family and single membership payments are routed to different items",
+         %{user: user} do
+      setup_default_mocks()
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      # Create single subscription
+      {:ok, single_sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_single_diff_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: single_sub.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_single",
+          stripe_id: "si_single_diff_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      # Create family subscription
+      {:ok, family_sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_family_diff_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: family_sub.id,
+          stripe_price_id: family_plan.stripe_price_id,
+          stripe_product_id: "prod_family",
+          stripe_id: "si_family_diff_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      # Create single membership payment
+      {:ok, {single_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(4_500, :USD),
+          external_payment_id: "pi_single_diff_#{System.unique_integer()}",
+          entity_type: :membership,
+          entity_id: single_sub.id,
+          stripe_fee: Money.new(160, :USD),
+          description: "Single membership",
+          property: :single,
+          payment_method_id: nil
+        })
+
+      # Create family membership payment
+      {:ok, {family_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(6_500, :USD),
+          external_payment_id: "pi_family_diff_#{System.unique_integer()}",
+          entity_type: :membership,
+          entity_id: family_sub.id,
+          stripe_fee: Money.new(220, :USD),
+          description: "Family membership",
+          property: :family,
+          payment_method_id: nil
+        })
+
+      setup_default_mocks()
+      Process.sleep(100)
+
+      # Reset both payments to pending
+      for payment <- [single_payment, family_payment] do
+        payment = Repo.reload!(payment)
+
+        if payment.quickbooks_sync_status == "synced" do
+          payment
+          |> Payment.changeset(%{
+            quickbooks_sync_status: "pending",
+            quickbooks_sales_receipt_id: nil,
+            quickbooks_response: nil
+          })
+          |> Repo.update!()
+        end
+      end
+
+      single_payment = Repo.reload!(single_payment)
+      family_payment = Repo.reload!(family_payment)
+      user = Repo.reload!(user)
+
+      if user.quickbooks_customer_id do
+        user
+        |> Ecto.Changeset.change(quickbooks_customer_id: nil)
+        |> Repo.update!()
+      end
+
+      # Configure separate item IDs for single and family
+      current_config = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        current_config
+        |> Keyword.put(:single_membership_item_id, "single_item_distinct")
+        |> Keyword.put(:family_membership_item_id, "family_item_distinct")
+      )
+
+      stub(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_diff_test"}}
+      end)
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      # Track which item IDs are used for each sync call
+      test_pid = self()
+
+      stub(ClientMock, :create_sales_receipt, fn params, _opts ->
+        line_item = List.first(params.line)
+        item_ref = get_in(line_item, [:sales_item_line_detail, :item_ref])
+        send(test_pid, {:sales_receipt_item, item_ref.value})
+
+        {:ok,
+         %{
+           "Id" => "qb_sr_#{System.unique_integer()}",
+           "TotalAmt" => "0.00",
+           "SyncToken" => "0"
+         }}
+      end)
+
+      # Sync single membership payment
+      assert {:ok, _} = Sync.sync_payment(single_payment)
+      assert_received {:sales_receipt_item, "single_item_distinct"}
+
+      # Sync family membership payment
+      assert {:ok, _} = Sync.sync_payment(family_payment)
+      assert_received {:sales_receipt_item, "family_item_distinct"}
+    end
+
+    test "membership payment without subscription defaults to Membership Inc",
+         %{user: user} do
+      setup_default_mocks()
+
+      # Use a random entity_id that does not correspond to any subscription
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(4_500, :USD),
+          external_payment_id: "pi_no_sub_#{System.unique_integer()}",
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(160, :USD),
+          description: "Membership payment (no subscription)",
+          property: :single,
+          payment_method_id: nil
+        })
+
+      setup_default_mocks()
+      Process.sleep(100)
+      payment = Repo.reload!(payment)
+
+      if payment.quickbooks_sync_status == "synced" do
+        payment
+        |> Payment.changeset(%{
+          quickbooks_sync_status: "pending",
+          quickbooks_sales_receipt_id: nil,
+          quickbooks_response: nil
+        })
+        |> Repo.update!()
+      end
+
+      payment = Repo.reload!(payment)
+      user = Repo.reload!(user)
+
+      if user.quickbooks_customer_id do
+        user
+        |> Ecto.Changeset.change(quickbooks_customer_id: nil)
+        |> Repo.update!()
+      end
+
+      # Configure membership_item_id (generic fallback for unknown membership type)
+      current_config = Application.get_env(:ysc, :quickbooks, [])
+
+      Application.put_env(
+        :ysc,
+        :quickbooks,
+        Keyword.put(
+          current_config,
+          :membership_item_id,
+          "membership_inc_fallback_item"
+        )
+      )
+
+      expect(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_no_sub"}}
+      end)
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        line_item = List.first(params.line)
+        item_ref = get_in(line_item, [:sales_item_line_detail, :item_ref])
+
+        # When subscription is not found, falls back to generic Membership Inc item
+        assert item_ref.value == "membership_inc_fallback_item"
+
+        {:ok,
+         %{
+           "Id" => "qb_no_sub_sr",
+           "TotalAmt" => "45.00",
            "SyncToken" => "0"
          }}
       end)

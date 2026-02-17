@@ -6,6 +6,10 @@
 etc/docker/volume/*
 priv/static/exports/*.csv
 
+priv/static/assets/*.{gz,br,zst}
+
+.vscode/
+
 # PHOENIX
 
 # The directory Mix will write compiled artifacts to.
