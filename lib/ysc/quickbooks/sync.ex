@@ -46,6 +46,12 @@ defmodule Ysc.Quickbooks.Sync do
     clear_lake_booking: %{account: "Clear Lake Inc", class: "Clear Lake"},
     # Tahoe bookings
     tahoe_booking: %{account: "Tahoe Inc", class: "Tahoe"},
+    # Family membership
+    family_membership: %{account: "Family Membership", class: "Administration"},
+    # Single membership
+    single_membership: %{account: "Single Membership", class: "Administration"},
+    # Membership Inc
+    membership_inc: %{account: "Membership Inc", class: "Administration"},
     # Stripe fees
     stripe_fee: %{account: "Stripe Fees", class: "Administration"}
   }
@@ -1089,6 +1095,13 @@ defmodule Ysc.Quickbooks.Sync do
           item_id: configured_item_id
         )
 
+        Ysc.Logging.info(
+          "[QB Sync] get_quickbooks_item_id: Using pre-configured item ID. If you get error 2390, the item in QuickBooks may be missing an income account.",
+          item_name: item_name,
+          item_id: configured_item_id,
+          config_key: config_key
+        )
+
         {:ok, configured_item_id}
     end
   end
@@ -1101,7 +1114,7 @@ defmodule Ysc.Quickbooks.Sync do
       {:booking, :clear_lake} -> "Clear Lake Bookings"
       {:membership, :family} -> "Family Membership"
       {:membership, :single} -> "Single Membership"
-      {:membership, _} -> "Single Membership"
+      {:membership, _} -> "Membership Inc"
       _ -> "General Revenue"
     end
   end
@@ -1114,7 +1127,7 @@ defmodule Ysc.Quickbooks.Sync do
       {:booking, :clear_lake} -> :clear_lake_booking_item_id
       {:membership, :family} -> :family_membership_item_id
       {:membership, :single} -> :single_membership_item_id
-      {:membership, _} -> :single_membership_item_id
+      {:membership, _} -> :membership_item_id
       _ -> :default_item_id
     end
   end
@@ -1171,7 +1184,9 @@ defmodule Ysc.Quickbooks.Sync do
       {:donation, _} -> "Donations"
       {:booking, :tahoe} -> "Tahoe Inc"
       {:booking, :clear_lake} -> "Clear Lake Inc"
-      {:membership, _} -> "Membership Revenue"
+      {:membership, :family} -> "Family Membership"
+      {:membership, :single} -> "Single Membership"
+      {:membership, _} -> "Membership Inc"
       _ -> "General Revenue"
     end
   end
@@ -1239,8 +1254,14 @@ defmodule Ysc.Quickbooks.Sync do
         {:booking, :clear_lake} ->
           @account_class_mapping[:clear_lake_booking]
 
+        {:membership, :family} ->
+          @account_class_mapping[:family_membership]
+
+        {:membership, :single} ->
+          @account_class_mapping[:single_membership]
+
         {:membership, _} ->
-          %{account: "Membership Revenue", class: "Administration"}
+          @account_class_mapping[:membership_inc]
 
         _ ->
           %{account: nil, class: "Administration"}

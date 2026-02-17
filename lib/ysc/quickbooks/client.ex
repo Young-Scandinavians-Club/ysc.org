@@ -260,19 +260,43 @@ defmodule Ysc.Quickbooks.Client do
           error = parse_error_response(response_body)
           error_details = parse_error_details(response_body)
 
-          Ysc.Logging.error("QuickBooks API error",
-            status: status,
-            error: error,
-            endpoint: "salesreceipt",
-            error_details: error_details,
-            extra: %{
-              endpoint: "salesreceipt",
-              status_code: status,
-              error_summary: error,
-              quickbooks_errors: error_details[:errors] || [],
-              fault_type: error_details[:fault_type]
-            }
-          )
+          # Check for specific error codes and provide helpful guidance
+          error_code = get_primary_error_code(error_details)
+
+          case error_code do
+            "2390" ->
+              Ysc.Logging.error(
+                "QuickBooks API error - Item missing income account (2390)",
+                status: status,
+                error: error,
+                endpoint: "salesreceipt",
+                error_details: error_details,
+                extra: %{
+                  endpoint: "salesreceipt",
+                  status_code: status,
+                  error_summary: error,
+                  quickbooks_errors: error_details[:errors] || [],
+                  fault_type: error_details[:fault_type],
+                  resolution_hint:
+                    "ERROR 2390: The QuickBooks item used for this transaction does not have an income account associated. To fix: 1) In QuickBooks, go to Settings > Products and Services, 2) Find the item referenced in this transaction, 3) Edit the item and ensure 'Income account' is set to a valid revenue account (e.g., 'Membership Revenue', 'General Revenue', etc.), 4) Save the item, 5) Retry the sync."
+                }
+              )
+
+            _ ->
+              Ysc.Logging.error("QuickBooks API error",
+                status: status,
+                error: error,
+                endpoint: "salesreceipt",
+                error_details: error_details,
+                extra: %{
+                  endpoint: "salesreceipt",
+                  status_code: status,
+                  error_summary: error,
+                  quickbooks_errors: error_details[:errors] || [],
+                  fault_type: error_details[:fault_type]
+                }
+              )
+          end
 
           {:error, error}
 
@@ -2403,6 +2427,15 @@ defmodule Ysc.Quickbooks.Client do
         }
     end
   end
+
+  # Extract the primary error code from error details
+  defp get_primary_error_code(%{errors: [%{code: code} | _]})
+       when is_binary(code), do: code
+
+  defp get_primary_error_code(%{errors: [%{code: code} | _]})
+       when is_integer(code), do: to_string(code)
+
+  defp get_primary_error_code(_), do: nil
 
   # QuickBooks returns 429 when rate limited (e.g. 500 req/min per company).
   # Retry the request with exponential backoff, optionally honoring Retry-After.
