@@ -51,12 +51,7 @@ jobs:
       - name: Compile
         run: mix compile --warnings-as-errors
 
-      - name: Run tests with coverage
-        env:
-          MIX_ENV: test
-        run: mix test --cover
-
-      - name: Generate lcov report
+      - name: Run tests and generate lcov report
         env:
           MIX_ENV: test
         run: mix coveralls.lcov
