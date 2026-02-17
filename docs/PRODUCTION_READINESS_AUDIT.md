@@ -21,7 +21,7 @@ This document summarizes the audit and fixes made to ensure the application is p
 - `EMAIL_FROM_NAME` - Sender name (defaults to "YSC")
 - `EMAIL_CONTACT` - General contact (defaults to "info@ysc.org")
 - `EMAIL_ADMIN` - Admin email (defaults to "admin@ysc.org")
-- `EMAIL_MEMBERSHIP` - Membership email (defaults to "membership@ysc.org")
+- `EMAIL_MEMBERSHIP` - Membership email (defaults to "memberships@ysc.org")
 - `EMAIL_BOARD` - Board email (defaults to "board@ysc.org")
 - `EMAIL_VOLUNTEER` - Volunteer email (defaults to "volunteer@ysc.org")
 - `EMAIL_TAHOE` - Tahoe cabin email (defaults to "tahoe@ysc.org")
@@ -75,13 +75,11 @@ This document summarizes the audit and fixes made to ensure the application is p
 The following hardcoded values are acceptable and don't need to be configurable:
 
 1. **External Service URLs**:
-
    - `https://js.radar.com`, `https://js.stripe.com` - CDN URLs
    - `https://maps.google.com` - External service URLs
    - `https://ysc.org/...` - External website links
 
 2. **Business Email Addresses in Templates**:
-
    - Email addresses in HTML templates (contact pages, etc.) are acceptable as they're user-facing
    - Backend email sending now uses configurable addresses
 
@@ -110,7 +108,7 @@ The following hardcoded values are acceptable and don't need to be configurable:
 - `EMAIL_FROM_NAME` - From name (defaults to "YSC")
 - `EMAIL_CONTACT` - Contact email (defaults to "info@ysc.org")
 - `EMAIL_ADMIN` - Admin email (defaults to "admin@ysc.org")
-- `EMAIL_MEMBERSHIP` - Membership email (defaults to "membership@ysc.org")
+- `EMAIL_MEMBERSHIP` - Membership email (defaults to "memberships@ysc.org")
 - `EMAIL_BOARD` - Board email (defaults to "board@ysc.org")
 - `EMAIL_VOLUNTEER` - Volunteer email (defaults to "volunteer@ysc.org")
 - `EMAIL_TAHOE` - Tahoe email (defaults to "tahoe@ysc.org")

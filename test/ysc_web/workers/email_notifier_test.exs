@@ -1,6 +1,7 @@
 defmodule YscWeb.Workers.EmailNotifierTest do
   use Ysc.DataCase
 
+  alias YscWeb.Emails.Notifier
   alias YscWeb.Workers.EmailNotifier
   import Ysc.AccountsFixtures
   import Swoosh.TestAssertions
@@ -207,6 +208,54 @@ defmodule YscWeb.Workers.EmailNotifierTest do
                  "user_id" => user.id,
                  "category" => "bookings"
                })
+    end
+
+    test "schedule_email includes reply_to for membership templates", %{
+      user: user
+    } do
+      job =
+        Notifier.deliver_membership_payment_confirmation(
+          user,
+          :single,
+          Money.new(50, :USD),
+          ~D[2024-12-01]
+        )
+
+      assert job
+      assert job.args["reply_to"] == Ysc.EmailConfig.membership_email()
+    end
+
+    test "sets reply_to to memberships@ysc.org for membership emails", %{
+      user: user
+    } do
+      params = %{
+        first_name: "Jane",
+        membership_type: "Single",
+        amount: "$50.00",
+        payment_date: "December 01, 2024",
+        paid_elsewhere: false
+      }
+
+      membership_email = Ysc.EmailConfig.membership_email()
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => "membership_reply_to_test",
+                 "subject" => "Welcome to YSC – Your Membership is Active! 🎉",
+                 "template" => "membership_payment_confirmation",
+                 "params" => params,
+                 "text_body" => "",
+                 "user_id" => user.id,
+                 "category" => "account",
+                 "reply_to" => membership_email
+               })
+
+      assert_email_sent(
+        subject: "Welcome to YSC – Your Membership is Active! 🎉",
+        to: {nil, user.email},
+        reply_to: membership_email
+      )
     end
 
     test "idempotency: duplicate job returns success but sends only one email",

@@ -1453,7 +1453,7 @@ You can get these from your [Stripe Dashboard](https://dashboard.stripe.com/apik
 - `EMAIL_FROM_NAME` - Display name for outgoing emails (defaults to "YSC")
 - `EMAIL_CONTACT` - General contact email address (defaults to "info@ysc.org")
 - `EMAIL_ADMIN` - Admin email address (defaults to "admin@ysc.org")
-- `EMAIL_MEMBERSHIP` - Membership-related email address (defaults to "membership@ysc.org")
+- `EMAIL_MEMBERSHIP` - Membership-related email address (defaults to "memberships@ysc.org")
 - `EMAIL_BOARD` - Board email address (defaults to "board@ysc.org")
 - `EMAIL_VOLUNTEER` - Volunteer email address (defaults to "volunteer@ysc.org")
 - `EMAIL_TAHOE` - Tahoe cabin email address (defaults to "tahoe@ysc.org")

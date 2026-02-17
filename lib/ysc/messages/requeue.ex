@@ -187,7 +187,7 @@ defmodule Ysc.Messages.Requeue do
 
   defp requeue_job(job) do
     # Create a new job with the same args to re-queue it
-    job_attrs = %{
+    base_attrs = %{
       "recipient" => get_in(job.args, ["recipient"]),
       "idempotency_key" => get_in(job.args, ["idempotency_key"]),
       "subject" => get_in(job.args, ["subject"]),
@@ -197,6 +197,12 @@ defmodule Ysc.Messages.Requeue do
       "user_id" => get_in(job.args, ["user_id"]),
       "category" => get_in(job.args, ["category"])
     }
+
+    job_attrs =
+      case get_in(job.args, ["reply_to"]) do
+        nil -> base_attrs
+        reply_to -> Map.put(base_attrs, "reply_to", reply_to)
+      end
 
     # Create the Oban job struct
     new_job = YscWeb.Workers.EmailNotifier.new(job_attrs)

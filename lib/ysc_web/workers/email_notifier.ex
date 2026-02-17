@@ -33,7 +33,7 @@ defmodule YscWeb.Workers.EmailNotifier do
         "text_body" => text_body,
         "user_id" => user_id,
         "category" => category
-      } ->
+      } = args ->
         email_params = %{
           job: job,
           recipient: recipient,
@@ -43,7 +43,8 @@ defmodule YscWeb.Workers.EmailNotifier do
           params: params,
           text_body: text_body,
           user_id: user_id,
-          category: category
+          category: category,
+          reply_to: Map.get(args, "reply_to")
         }
 
         perform_with_args(email_params)
@@ -59,7 +60,7 @@ defmodule YscWeb.Workers.EmailNotifier do
             "params" => params,
             "text_body" => text_body,
             "user_id" => user_id
-          } ->
+          } = legacy_args ->
             # Legacy job - get category from template
             category = Ysc.Accounts.EmailCategories.get_category(template)
 
@@ -72,7 +73,8 @@ defmodule YscWeb.Workers.EmailNotifier do
               params: params,
               text_body: text_body,
               user_id: user_id,
-              category: category
+              category: category,
+              reply_to: Map.get(legacy_args, "reply_to")
             }
 
             perform_with_args(email_params)
@@ -150,7 +152,8 @@ defmodule YscWeb.Workers.EmailNotifier do
             template_module,
             atomized_params,
             params.text_body,
-            final_user_id
+            final_user_id,
+            params[:reply_to]
           )
 
         case result do

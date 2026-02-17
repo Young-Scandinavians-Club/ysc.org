@@ -5,6 +5,20 @@ defmodule Ysc.Accounts.EmailCategories do
 
   @type category :: :account | :event | :newsletter
 
+  # Templates that should have reply-to set to memberships@ysc.org
+  @membership_reply_to_templates MapSet.new([
+                                   "application_approved",
+                                   "application_rejected",
+                                   "application_submitted",
+                                   "family_invite",
+                                   "membership_payment_confirmation",
+                                   "membership_payment_failure",
+                                   "membership_payment_reminder_7day",
+                                   "membership_payment_reminder_30day",
+                                   "membership_renewal_payment_method_reminder",
+                                   "membership_renewal_success"
+                                 ])
+
   # Map of email template names to their notification categories
   @template_categories %{
     # Account notifications (cannot be disabled)
@@ -67,6 +81,22 @@ defmodule Ysc.Accounts.EmailCategories do
   end
 
   def get_category(_), do: :account
+
+  @doc """
+  Returns the reply-to email for membership-related templates, or nil for others.
+
+  Membership emails use memberships@ysc.org so replies go to the membership team.
+  """
+  @spec get_reply_to(String.t()) :: String.t() | nil
+  def get_reply_to(template_name) when is_binary(template_name) do
+    if MapSet.member?(@membership_reply_to_templates, template_name) do
+      Ysc.EmailConfig.membership_email()
+    else
+      nil
+    end
+  end
+
+  def get_reply_to(_), do: nil
 
   @doc """
   Checks if a user should receive an email based on their notification preferences.

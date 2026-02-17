@@ -20,6 +20,42 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
     end
   end
 
+  describe "get_reply_to/1" do
+    test "returns membership email for membership-related templates" do
+      membership_email = Ysc.EmailConfig.membership_email()
+
+      assert EmailCategories.get_reply_to("membership_payment_confirmation") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("membership_payment_failure") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("membership_renewal_success") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("application_approved") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("application_rejected") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("application_submitted") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("family_invite") == membership_email
+    end
+
+    test "returns nil for non-membership templates" do
+      assert EmailCategories.get_reply_to("booking_confirmation") == nil
+      assert EmailCategories.get_reply_to("confirm_email") == nil
+      assert EmailCategories.get_reply_to("event_notification") == nil
+    end
+
+    test "returns nil for unknown template" do
+      assert EmailCategories.get_reply_to("unknown_template") == nil
+    end
+  end
+
   describe "should_send_email?/2" do
     test "always sends account emails" do
       # Account emails ignore user preferences

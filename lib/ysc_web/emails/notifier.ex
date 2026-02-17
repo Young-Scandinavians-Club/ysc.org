@@ -48,6 +48,8 @@ defmodule YscWeb.Emails.Notifier do
       YscWeb.Emails.MembershipPaymentReminder7Day,
     "membership_payment_reminder_30day" =>
       YscWeb.Emails.MembershipPaymentReminder30Day,
+    "membership_renewal_payment_method_reminder" =>
+      YscWeb.Emails.MembershipRenewalPaymentMethodReminder,
     "family_invite" => YscWeb.Emails.FamilyInvite,
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,
@@ -77,19 +79,25 @@ defmodule YscWeb.Emails.Notifier do
     # Get category for this template
     category = Ysc.Accounts.EmailCategories.get_category(template)
 
-    # Oban jobs require string keys in args
-    job =
-      %{
-        "recipient" => recipient,
-        "idempotency_key" => idempotency_key,
-        "subject" => subject,
-        "template" => template,
-        "params" => variables,
-        "text_body" => text_body,
-        "user_id" => user_id,
-        "category" => category
-      }
-      |> YscWeb.Workers.EmailNotifier.new()
+    # Membership emails get reply-to set to memberships@ysc.org
+    base_job_args = %{
+      "recipient" => recipient,
+      "idempotency_key" => idempotency_key,
+      "subject" => subject,
+      "template" => template,
+      "params" => variables,
+      "text_body" => text_body,
+      "user_id" => user_id,
+      "category" => category
+    }
+
+    job_args =
+      case Ysc.Accounts.EmailCategories.get_reply_to(template) do
+        nil -> base_job_args
+        reply_to -> Map.put(base_job_args, "reply_to", reply_to)
+      end
+
+    job = YscWeb.Workers.EmailNotifier.new(job_args)
 
     case Oban.insert(job) do
       {:ok, %Oban.Job{} = inserted_job} ->
@@ -155,7 +163,8 @@ defmodule YscWeb.Emails.Notifier do
         template,
         variables,
         text_body,
-        user_id
+        user_id,
+        reply_to \\ nil
       ) do
     rendered = template.render(variables)
     template_name = template.get_template_name()
@@ -175,11 +184,17 @@ defmodule YscWeb.Emails.Notifier do
       |> to(recipient)
       |> from({from_name(), from_email()})
       |> subject(subject)
+      |> maybe_reply_to(reply_to)
       |> html_body(rendered)
       |> text_body(text_body)
 
     Ysc.Messages.run_send_message_idempotent(email, attrs)
   end
+
+  defp maybe_reply_to(email, nil), do: email
+
+  defp maybe_reply_to(email, reply_to) when is_binary(reply_to),
+    do: reply_to(email, reply_to)
 
   def send_email_idempotent(
         recipient,

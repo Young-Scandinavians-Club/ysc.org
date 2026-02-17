@@ -37,7 +37,7 @@ defmodule Ysc.EmailConfig do
   """
   def membership_email do
     Application.get_env(:ysc, :emails)[:membership_email] ||
-      "membership@ysc.org"
+      "memberships@ysc.org"
   end
 
   @doc """
