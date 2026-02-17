@@ -2141,20 +2141,44 @@ defmodule YscWeb.HomeLive do
 
   def handle_event("subscribe_newsletter", params, socket) do
     email = params["email"]
+    remote_ip = socket.assigns.remote_ip
 
-    # Verify Turnstile for spam protection
-    case Turnstile.verify(params, socket.assigns.remote_ip) do
-      {:ok, _} ->
-        subscribe_to_newsletter(email, socket)
+    # Check rate limits first (by IP and email)
+    case Ysc.NewsletterRateLimit.check(remote_ip, email) do
+      :ok ->
+        verify_and_subscribe(params, email, socket)
 
-      {:error, _reason} ->
+      {:error, :rate_limited, _retry_after} ->
         {:noreply,
          socket
          |> assign(
            newsletter_email: email,
-           newsletter_error: "Please complete the verification to continue."
-         )
-         |> Turnstile.refresh()}
+           newsletter_error:
+             "Too many subscription attempts. Please try again later."
+         )}
+    end
+  end
+
+  defp verify_and_subscribe(params, email, socket) do
+    # Verify Turnstile for spam protection
+    # Only verify if the token is present (interaction-only mode may not always generate one)
+    if Map.has_key?(params, "cf-turnstile-response") do
+      case Turnstile.verify(params, socket.assigns.remote_ip) do
+        {:ok, _} ->
+          subscribe_to_newsletter(email, socket)
+
+        {:error, _reason} ->
+          {:noreply,
+           socket
+           |> assign(
+             newsletter_email: email,
+             newsletter_error: "Please complete the verification to continue."
+           )
+           |> Turnstile.refresh()}
+      end
+    else
+      # No token present - Turnstile deemed request safe, proceed
+      subscribe_to_newsletter(email, socket)
     end
   end
 
