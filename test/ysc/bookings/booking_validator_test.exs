@@ -157,12 +157,15 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     rooms = create_test_rooms()
 
     # Configure membership plans for testing
+    original_plans = Application.get_env(:ysc, :membership_plans)
+
     Application.put_env(:ysc, :membership_plans, [
       %{
         id: :single,
         stripe_price_id: "price_single_annual",
         amount: 45,
         name: "Single",
+        description: "Membership just for yourself",
         interval: "year",
         currency: "usd"
       },
@@ -171,10 +174,15 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         stripe_price_id: "price_family_annual",
         amount: 65,
         name: "Family",
+        description: "For you, your Spouse and your children under 18",
         interval: "year",
         currency: "usd"
       }
     ])
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :membership_plans, original_plans)
+    end)
 
     user = user_fixture()
 

@@ -43,6 +43,32 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
             </div>
           </div>
 
+          <%= if length(@ticket_tiers) == 0 do %>
+            <div class="flex items-center gap-2 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <.icon
+                name="hero-information-circle"
+                class="w-5 h-5 text-amber-600 flex-shrink-0"
+              />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-amber-900">
+                  Tickets Coming Soon
+                </p>
+                <p class="text-xs text-amber-700">
+                  Enable this to show users that tickets will be available but details are not ready yet.
+                  The flag will automatically clear when you add your first ticket tier.
+                </p>
+              </div>
+              <.toggle
+                id="tickets-tbd-toggle"
+                checked={@event.tickets_tbd}
+                label={if @event.tickets_tbd, do: "TBD Enabled", else: "Set as TBD"}
+                phx-click="toggle-tickets-tbd"
+                phx-target={@myself}
+                class="flex-shrink-0"
+              />
+            </div>
+          <% end %>
+
           <div
             :if={length(@ticket_tiers) == 0}
             class="text-center py-8 text-zinc-500"
@@ -530,6 +556,55 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         {:error, _changeset} ->
           {:noreply, put_flash(socket, :error, "Failed to delete ticket tier")}
       end
+    end
+  end
+
+  @impl true
+  def handle_event("toggle-tickets-tbd", _params, socket) do
+    new_value = !socket.assigns.event.tickets_tbd
+
+    case Events.set_tickets_tbd(socket.assigns.event, new_value) do
+      {:ok, updated_event} ->
+        message =
+          if new_value,
+            do: "Event marked as 'Tickets TBD'",
+            else: "Tickets TBD flag cleared"
+
+        {:noreply,
+         socket
+         |> put_flash(:info, message)
+         |> assign(:event, updated_event)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update event")}
+    end
+  end
+
+  @impl true
+  def handle_event("set-tickets-tbd", _params, socket) do
+    case Events.set_tickets_tbd(socket.assigns.event, true) do
+      {:ok, updated_event} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Event marked as 'Tickets TBD'")
+         |> assign(:event, updated_event)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update event")}
+    end
+  end
+
+  @impl true
+  def handle_event("clear-tickets-tbd", _params, socket) do
+    case Events.set_tickets_tbd(socket.assigns.event, false) do
+      {:ok, updated_event} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Tickets TBD flag cleared")
+         |> assign(:event, updated_event)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update event")}
     end
   end
 

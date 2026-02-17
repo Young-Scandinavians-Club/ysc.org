@@ -336,6 +336,74 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Renders a toggle (switch) control with an optional label.
+
+  Uses a full-size overlay checkbox with Tailwind's `peer` and `peer-checked:` so the track
+  and knob (via `after:` pseudo-element) animate when toggled. The input receives the click
+  so it toggles immediately; pass phx-click/phx-target on the input to sync with the server.
+
+  ## Examples
+
+      <.toggle
+        id="tickets-tbd"
+        checked={@event.tickets_tbd}
+        label="Tickets Coming Soon"
+        phx-click="toggle-tickets-tbd"
+        phx-target={@myself}
+      />
+
+  """
+  attr :id, :string, default: nil
+  attr :checked, :boolean, required: true, doc: "Whether the toggle is on"
+
+  attr :label, :string,
+    default: nil,
+    doc: "Optional label text shown next to the toggle"
+
+  attr :class, :string,
+    default: nil,
+    doc: "Additional classes for the wrapper label"
+
+  attr :rest, :global, include: ~w(phx-click phx-target disabled tabindex)
+
+  def toggle(assigns) do
+    ~H"""
+    <label
+      id={@id}
+      class={[
+        "relative inline-flex items-center cursor-pointer select-none p-2 gap-3",
+        @class
+      ]}
+      {@rest}
+    >
+      <span
+        :if={@label}
+        class={[
+          "text-sm font-semibold",
+          if(@checked, do: "text-green-700", else: "text-zinc-400")
+        ]}
+        style="transition: color 0.3s ease-in-out;"
+      >
+        <%= @label %>
+      </span>
+      <span
+        class={[
+          "inline-flex items-center flex-shrink-0 w-14 h-8 p-1 rounded-full",
+          if(@checked, do: "bg-green-500", else: "bg-zinc-300")
+        ]}
+        style="transition: background-color 0.3s ease-in-out;"
+      >
+        <span
+          class="block w-6 h-6 bg-white rounded-full shadow-md"
+          style={"transform: translateX(#{if @checked, do: "1.5rem", else: "0"}); transition: transform 0.3s ease-in-out;"}
+        >
+        </span>
+      </span>
+    </label>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,

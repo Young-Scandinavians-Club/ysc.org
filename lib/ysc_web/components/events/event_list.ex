@@ -555,6 +555,20 @@ defmodule YscWeb.EventsListLive do
     badges = []
 
     badges =
+      if Map.get(event, :tickets_tbd, false) do
+        [
+          %{
+            text: "Save the Date",
+            icon: "hero-ticket",
+            class: "bg-blue-600"
+          }
+          | badges
+        ]
+      else
+        badges
+      end
+
+    badges =
       if event_sold_out?(event) do
         [%{text: "Sold Out", icon: "hero-ticket", class: "bg-red-600"} | badges]
       else
@@ -592,6 +606,7 @@ defmodule YscWeb.EventsListLive do
       "Sold Out" -> "bg-red-600"
       "Going Fast!" -> "bg-emerald-600"
       "Cancelled" -> "bg-zinc-600"
+      "Save the Date" -> "bg-blue-600"
       _ -> "bg-zinc-600"
     end
   end
@@ -606,6 +621,9 @@ defmodule YscWeb.EventsListLive do
 
       "Cancelled" ->
         "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"
+
+      "Save the Date" ->
+        "sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
 
       _ ->
         "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"

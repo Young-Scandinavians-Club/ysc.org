@@ -221,6 +221,24 @@ defmodule YscWeb.Components.Events.EventCard do
     if published_at != nil do
       badges = []
 
+      # Add "Save the Date" badge if applicable
+      tickets_tbd = Map.get(event, :tickets_tbd, false)
+
+      tbd_badge =
+        if tickets_tbd do
+          [
+            %{
+              text: "Save the Date",
+              class: "bg-blue-500 text-white",
+              icon: "hero-ticket"
+            }
+          ]
+        else
+          []
+        end
+
+      badges = badges ++ tbd_badge
+
       # Add "Just Added" badge if applicable (within 48 hours of publishing)
       just_added_badge =
         if DateTime.diff(DateTime.utc_now(), published_at, :hour) <= 48 do

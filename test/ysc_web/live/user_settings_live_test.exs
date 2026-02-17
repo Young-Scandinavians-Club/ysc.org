@@ -1,5 +1,7 @@
 defmodule YscWeb.UserSettingsLiveTest do
-  use YscWeb.ConnCase, async: true
+  # async: false because tests use Application.put_env for global callback overrides
+  # that would race with Ysc.SubscriptionsTest using the same keys
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures

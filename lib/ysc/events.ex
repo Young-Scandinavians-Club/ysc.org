@@ -184,6 +184,8 @@ defmodule Ysc.Events do
           latitude: e.latitude,
           longitude: e.longitude,
           place_id: e.place_id,
+          partiful_link: e.partiful_link,
+          tickets_tbd: e.tickets_tbd,
           lock_version: e.lock_version,
           inserted_at: e.inserted_at,
           updated_at: e.updated_at,
@@ -248,6 +250,8 @@ defmodule Ysc.Events do
           latitude: e.latitude,
           longitude: e.longitude,
           place_id: e.place_id,
+          partiful_link: e.partiful_link,
+          tickets_tbd: e.tickets_tbd,
           lock_version: e.lock_version,
           inserted_at: e.inserted_at,
           updated_at: e.updated_at,
@@ -344,7 +348,18 @@ defmodule Ysc.Events do
        ) do
     ticket_tiers = Map.get(ticket_tiers_by_event, event.id, [])
     ticket_count = Map.get(ticket_counts_by_event, event.id, 0)
-    pricing_info = calculate_event_pricing(ticket_tiers)
+
+    pricing_info =
+      if Map.get(event, :tickets_tbd) do
+        %{
+          display_text: "Tickets Coming Soon",
+          has_free_tiers: false,
+          lowest_price: nil
+        }
+      else
+        calculate_event_pricing(ticket_tiers)
+      end
+
     image = get_event_image(event, images_by_id)
 
     event
@@ -782,17 +797,42 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Set or clear the tickets_tbd flag on an event.
+  When true, the event shows "Tickets Coming Soon" until the first tier is added.
+  """
+  def set_tickets_tbd(%Event{} = event, tbd \\ true) do
+    event
+    |> Event.changeset(%{tickets_tbd: tbd})
+    |> Repo.update()
+    |> case do
+      {:ok, updated_event} ->
+        broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: updated_event})
+        {:ok, updated_event}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
+  end
+
+  @doc """
   Create a new ticket tier.
+  Automatically clears tickets_tbd on the event when the first tier is added.
   """
   def create_ticket_tier(attrs \\ %{}) do
-    %TicketTier{}
-    |> TicketTier.changeset(attrs)
-    |> Repo.insert()
-    |> case do
+    result =
+      %TicketTier{}
+      |> TicketTier.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
       {:ok, ticket_tier} ->
         broadcast(%Ysc.MessagePassingEvents.TicketTierAdded{
           ticket_tier: ticket_tier
         })
+
+        # Auto-clear tickets_tbd when first tier is added
+        if event = get_event(ticket_tier.event_id),
+          do: clear_tickets_tbd_if_set(event)
 
         {:ok, ticket_tier}
 
@@ -800,6 +840,12 @@ defmodule Ysc.Events do
         {:error, changeset}
     end
   end
+
+  defp clear_tickets_tbd_if_set(%Event{tickets_tbd: true} = event) do
+    set_tickets_tbd(event, false)
+  end
+
+  defp clear_tickets_tbd_if_set(_event), do: :ok
 
   @doc """
   Update an existing ticket tier.

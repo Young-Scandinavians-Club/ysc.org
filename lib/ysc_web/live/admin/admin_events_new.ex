@@ -35,11 +35,19 @@ defmodule YscWeb.AdminEventsNewLive do
                 <%= @event_title %>
               </h1>
 
-              <div>
-                <.badge type={event_state_to_badge_style(@state)}>
-                  <%= String.capitalize("#{@state}") %>
-                </.badge>
-              </div>
+              <.badge type={event_state_to_badge_style(@state)}>
+                <%= String.capitalize("#{@state}") %>
+              </.badge>
+
+              <.link
+                :if={@event.state == :published}
+                href={~p"/events/#{@event.id}"}
+                target="_blank"
+                class="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-blue-700 transition"
+              >
+                <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                <span class="sr-only">View Event</span>
+              </.link>
             </div>
 
             <div
@@ -61,6 +69,7 @@ defmodule YscWeb.AdminEventsNewLive do
           <div class="pl-4 space-x-1 flex flex-row">
             <div :if={@event.state in [:draft, :scheduled]}>
               <.button
+                class="whitespace-nowrap"
                 color="blue"
                 phx-click="publish-event"
                 phx-disable-with="Publishing..."
@@ -71,6 +80,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
             <div :if={@event.state in [:published]}>
               <.button
+                class="whitespace-nowrap"
                 color="red"
                 phx-click="unpublish-event"
                 phx-disable-with="Unpublishing..."
