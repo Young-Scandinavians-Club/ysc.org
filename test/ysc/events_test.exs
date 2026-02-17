@@ -227,6 +227,37 @@ defmodule Ysc.EventsTest do
     end
   end
 
+  describe "event changeset with tickets_tbd" do
+    test "accepts tickets_tbd as true", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert event.tickets_tbd == true
+    end
+
+    test "defaults tickets_tbd to false when not set", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert event.tickets_tbd == false
+    end
+  end
+
   describe "event CRUD operations" do
     test "create_event/1 creates an event", %{user: user} do
       attrs = %{
@@ -380,6 +411,116 @@ defmodule Ysc.EventsTest do
                Events.create_ticket_tier(attrs)
 
       assert tier.description == nil
+    end
+  end
+
+  describe "tickets_tbd functionality" do
+    test "set_tickets_tbd/2 sets flag to true", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event TBD",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert event.tickets_tbd == false
+
+      assert {:ok, updated} = Events.set_tickets_tbd(event, true)
+      assert updated.tickets_tbd == true
+    end
+
+    test "set_tickets_tbd/2 sets flag to false", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event TBD",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert {:ok, updated} = Events.set_tickets_tbd(event, false)
+      assert updated.tickets_tbd == false
+    end
+
+    test "create_ticket_tier/1 auto-clears tickets_tbd flag when first tier is added",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event TBD",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _} = Events.set_tickets_tbd(event, true)
+      event = Events.get_event!(event.id)
+      assert event.tickets_tbd == true
+
+      {:ok, _tier} =
+        Events.create_ticket_tier(%{
+          name: "First Tier",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      event = Events.get_event!(event.id)
+      assert event.tickets_tbd == false
+    end
+
+    test "create_ticket_tier/1 does not affect tickets_tbd if already false", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert event.tickets_tbd == false
+
+      {:ok, _tier} =
+        Events.create_ticket_tier(%{
+          name: "Tier",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      event = Events.get_event!(event.id)
+      assert event.tickets_tbd == false
+    end
+
+    test "list_upcoming_events returns pricing_info display_text 'Tickets Coming Soon' when tickets_tbd is true",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event TBD Soon",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      [loaded | _] = Events.list_upcoming_events(10)
+      assert loaded.id == event.id
+      assert loaded.pricing_info.display_text == "Tickets Coming Soon"
     end
   end
 

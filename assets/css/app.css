@@ -24,9 +24,12 @@ body {
 }
 
 /* Archival Artifact Styling for History Page */
+
 .archival-photo {
   background-color: #f9f7f2;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 0 40px rgba(0, 0, 0, 0.02);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 0 40px rgba(0, 0, 0, 0.02);
 }
 
 .archival-photo img {
@@ -38,8 +41,9 @@ body {
 }
 
 /* Ledger-style financial callouts */
+
 .ledger-callout {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   background: linear-gradient(to right, #f9f7f2 0%, #ffffff 100%);
   border-left: 3px solid #d97706;
   padding: 0.75rem 1rem;
@@ -49,12 +53,15 @@ body {
 }
 
 /* Era-based photo treatments - sepia transitions by decade */
-.era-1950s img, .era-1960s img {
+
+.era-1950s img,
+.era-1960s img {
   filter: sepia(0.25) contrast(1.08);
   transition: filter 0.3s ease;
 }
 
-.era-1970s img, .era-1980s img {
+.era-1970s img,
+.era-1980s img {
   filter: sepia(0.15) contrast(1.05);
   transition: filter 0.3s ease;
 }
@@ -64,22 +71,28 @@ body {
   transition: filter 0.3s ease;
 }
 
-.era-2000s img, .era-2010s img, .era-2020s img {
+.era-2000s img,
+.era-2010s img,
+.era-2020s img {
   filter: sepia(0) contrast(1);
   transition: filter 0.3s ease;
 }
 
 /* Hover removes sepia for all eras */
-.era-1950s:hover img, .era-1960s:hover img,
-.era-1970s:hover img, .era-1980s:hover img,
+
+.era-1950s:hover img,
+.era-1960s:hover img,
+.era-1970s:hover img,
+.era-1980s:hover img,
 .era-1990s:hover img {
   filter: sepia(0) contrast(1);
 }
 
 /* Stacked paper effect for oldest archival documents */
+
 .stacked-paper {
   position: relative;
-  box-shadow: 
+  box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.12),
     0 4px 6px rgba(0, 0, 0, 0.08),
     0 8px 12px rgba(0, 0, 0, 0.05),
@@ -87,7 +100,7 @@ body {
 }
 
 .stacked-paper::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -4px;
   left: 8px;
@@ -100,7 +113,7 @@ body {
 }
 
 .stacked-paper::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -8px;
   left: 16px;
@@ -113,6 +126,7 @@ body {
 }
 
 /* Aspect ratio boxes to prevent layout shifts */
+
 .aspect-box {
   position: relative;
   width: 100%;
@@ -129,6 +143,7 @@ body {
 }
 
 /* Decade watermark styling */
+
 .decade-watermark {
   font-size: 15rem;
   font-weight: 900;

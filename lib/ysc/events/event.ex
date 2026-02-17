@@ -113,6 +113,9 @@ defmodule Ysc.Events.Event do
     # Optional: Partiful event URL for external RSVP (when set, ticket tiers cannot be used)
     field :partiful_link, :string
 
+    # When true, show "Tickets Coming Soon" until first ticket tier is added
+    field :tickets_tbd, :boolean, default: false
+
     has_many :faq_questions, Ysc.Events.FaqQuestion, on_replace: :delete
     has_many :agendas, Ysc.Events.Agenda, on_replace: :delete
     has_many :ticket_tiers, Ysc.Events.TicketTier, on_replace: :delete
@@ -147,6 +150,7 @@ defmodule Ysc.Events.Event do
       :longitude,
       :place_id,
       :partiful_link,
+      :tickets_tbd,
       :start_date,
       :start_time,
       :end_date,
