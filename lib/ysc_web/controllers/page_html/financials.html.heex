@@ -13,26 +13,29 @@
   <div class="mb-10 bg-gradient-to-br from-blue-50 to-zinc-50 border border-blue-200 rounded-xl p-6 shadow-sm">
     <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
       <.icon name="hero-chart-bar" class="w-6 h-6 text-blue-600" />
-      2024 At a Glance
+      FY 2025 At a Glance
     </h2>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
         <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">
           Active Members
         </div>
-        <div class="text-2xl font-bold text-zinc-900">~500</div>
+        <div class="text-2xl font-bold text-zinc-900">550</div>
+        <div class="text-xs text-zinc-500 mt-1">188 single, 181 families</div>
       </div>
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
         <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">
-          Annual Revenue
+          Net Revenue
         </div>
-        <div class="text-2xl font-bold text-zinc-900">Available in Report</div>
+        <div class="text-2xl font-bold text-zinc-900">$126,999.52</div>
+        <div class="text-xs text-zinc-500 mt-1">Incl. $100K donation</div>
       </div>
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
         <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">
-          Fiscal Year
+          Memberships
         </div>
-        <div class="text-2xl font-bold text-zinc-900">2024</div>
+        <div class="text-2xl font-bold text-zinc-900">369</div>
+        <div class="text-xs text-zinc-500 mt-1">Up from 330 (146 new)</div>
       </div>
     </div>
   </div>
@@ -43,6 +46,13 @@
       <span class="text-sm font-semibold text-zinc-700 mr-2">
         Jump to Year:
       </span>
+      <.link
+        href="#year-2026"
+        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+      >
+        2026
+      </.link>
+      <span class="text-zinc-400">|</span>
       <.link
         href="#year-2025"
         class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
@@ -57,12 +67,12 @@
         2024
       </.link>
       <span class="text-zinc-400">|</span>
-      <a
+      <.link
         href="#year-2023"
         class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
       >
         2023
-      </a>
+      </.link>
       <span class="text-zinc-400">|</span>
       <.link
         href="#year-2022"
@@ -78,12 +88,12 @@
         2021
       </.link>
       <span class="text-zinc-400">|</span>
-      <a
+      <.link
         href="#year-2020"
         class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
       >
         2020
-      </a>
+      </.link>
       <span class="text-zinc-400">|</span>
       <.link
         href="#year-2019"
@@ -103,7 +113,72 @@
 
   <%!-- Financial Reports by Year --%>
   <div class="space-y-6">
-    <%!-- 2025 General Meeting (Most Recent - Expanded) --%>
+    <%!-- 2026 General Meeting (Most Recent - Expanded) --%>
+    <section
+      id="year-2026"
+      class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden"
+    >
+      <div class="bg-zinc-900 px-6 py-4">
+        <h2 class="text-white font-bold text-xl m-0">2026 General Meeting</h2>
+      </div>
+      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <.link
+          href={~p"/annual_meetings/2026/YSC_ANNUAL_MEETING_REPORT_FY_2025.pdf"}
+          target="_blank"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Financials Summary 2025
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 70K
+            </div>
+          </div>
+        </.link>
+
+        <.link
+          href={~p"/annual_meetings/2026/YSC_ANNUAL_REPORT_FY_2025.pdf"}
+          target="_blank"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Full Annual Report
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 107K
+            </div>
+          </div>
+        </.link>
+
+        <.link
+          href={~p"/annual_meetings/2026/YSC_AGM_2026_meeting_minutes.pdf"}
+          target="_blank"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-text" class="w-6 h-6" />
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Meeting Minutes
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 104K
+            </div>
+          </div>
+        </.link>
+      </div>
+    </section>
+
+    <%!-- 2025 General Meeting --%>
     <section
       id="year-2025"
       class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden"
@@ -111,37 +186,41 @@
       <div class="bg-zinc-900 px-6 py-4">
         <h2 class="text-white font-bold text-xl m-0">2025 General Meeting</h2>
       </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2">
+      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <.link
-          href="#"
+          href={
+            ~p"/annual_meetings/2025/annual_meeting_financials_2024_handout.pdf"
+          }
+          target="_blank"
           class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
         >
           <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0">
             <div class="font-bold text-zinc-900 group-hover:text-blue-700">
               Financials Summary 2024
             </div>
             <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-              PDF • 1.2 MB
+              PDF • 70K
             </div>
           </div>
         </.link>
 
         <.link
-          href="#"
+          href={~p"/annual_meetings/2025/YSC_Annual_Report_2024.pdf"}
+          target="_blank"
           class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
         >
           <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
             <.icon name="hero-document-chart-bar" class="w-6 h-6" />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0">
             <div class="font-bold text-zinc-900 group-hover:text-blue-700">
               Full Annual Report
             </div>
             <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-              PDF • 4.5 MB
+              PDF • 106K
             </div>
           </div>
         </.link>
@@ -156,37 +235,41 @@
       <div class="bg-zinc-900 px-6 py-4">
         <h2 class="text-white font-bold text-xl m-0">2024 General Meeting</h2>
       </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2">
+      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <.link
-          href="#"
+          href={
+            ~p"/annual_meetings/2024/YSC-Financials-2023-General-Meeting-Handout.pdf"
+          }
+          target="_blank"
           class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
         >
           <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0">
             <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Financials Summary 2024
+              Financials Summary 2023
             </div>
             <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-              PDF • 1.2 MB
+              PDF • 57K
             </div>
           </div>
         </.link>
 
         <.link
-          href="#"
+          href={~p"/annual_meetings/2024/YSC-AGM-2025_final.pdf"}
+          target="_blank"
           class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
         >
           <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
             <.icon name="hero-document-chart-bar" class="w-6 h-6" />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0">
             <div class="font-bold text-zinc-900 group-hover:text-blue-700">
               Full Annual Report
             </div>
             <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-              PDF • 4.5 MB
+              PDF • 158K
             </div>
           </div>
         </.link>
@@ -201,37 +284,59 @@
       <div class="bg-zinc-900 px-6 py-4">
         <h2 class="text-white font-bold text-xl m-0">2023 General Meeting</h2>
       </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2">
-        <a
-          href="#"
+      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <.link
+          href={
+            ~p"/annual_meetings/2023/YSC-General-Meeting-Financials-Summary-2022.pdf"
+          }
+          target="_blank"
           class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
         >
           <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
+            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0">
             <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Financials Summary 2023
+              Financials Summary 2022
             </div>
             <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-              PDF • 1.1 MB
+              PDF • 49K
             </div>
           </div>
-        </a>
+        </.link>
 
         <.link
-          href="#"
+          href={~p"/annual_meetings/2023/YSC-Financials-2022.v2.pdf"}
+          target="_blank"
           class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
         >
           <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
             <.icon name="hero-document-chart-bar" class="w-6 h-6" />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0">
             <div class="font-bold text-zinc-900 group-hover:text-blue-700">
               Full Annual Report
             </div>
             <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-              PDF • 4.2 MB
+              PDF • 717K
+            </div>
+          </div>
+        </.link>
+
+        <.link
+          href={~p"/annual_meetings/2023/YSC-AGM-Minutes-02.27.22.pdf"}
+          target="_blank"
+          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+        >
+          <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 flex-shrink-0">
+            <.icon name="hero-document-text" class="w-6 h-6" />
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+              Meeting Minutes
+            </div>
+            <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+              PDF • 90K
             </div>
           </div>
         </.link>
@@ -253,37 +358,41 @@
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">
             2022 General Meeting
           </h3>
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <.link
-              href="#"
+              href={
+                ~p"/annual_meetings/2022/YSC-Financials-2021-General-Meeting-Overview.pdf"
+              }
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-                <.icon name="hero-document-text" class="w-6 h-6" />
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2022
+                  Financials Summary 2021
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 1.0 MB
+                  PDF • 49K
                 </div>
               </div>
             </.link>
 
             <.link
-              href="#"
+              href={~p"/annual_meetings/2022/YSC-Financials-2021-2.18.22.pdf"}
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
                 <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
                   Full Annual Report
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 4.0 MB
+                  PDF • 763K
                 </div>
               </div>
             </.link>
@@ -295,37 +404,59 @@
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">
             2021 General Meeting
           </h3>
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <.link
-              href="#"
+              href={~p"/annual_meetings/2021/YSC-Annual-Meeting-2021.pdf"}
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-                <.icon name="hero-document-text" class="w-6 h-6" />
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2021
+                  Financials Summary 2020
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 0.9 MB
+                  PDF • 7.9M
                 </div>
               </div>
             </.link>
 
             <.link
-              href="#"
+              href={~p"/annual_meetings/2021/YSC-Financials-2020-1.10.21.pdf"}
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
                 <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
                   Full Annual Report
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 3.8 MB
+                  PDF • 430K
+                </div>
+              </div>
+            </.link>
+
+            <.link
+              href={
+                ~p"/annual_meetings/2021/YSC-Annual-Meeting-Minutes-022121.pdf"
+              }
+              target="_blank"
+              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 flex-shrink-0">
+                <.icon name="hero-document-text" class="w-6 h-6" />
+              </div>
+              <div class="min-w-0">
+                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+                  Meeting Minutes
+                </div>
+                <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
+                  PDF • 88K
                 </div>
               </div>
             </.link>
@@ -337,37 +468,41 @@
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">
             2020 General Meeting
           </h3>
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <.link
-              href="#"
+              href={
+                ~p"/annual_meetings/2020/YSC-General-Meeting-Financials-2019-Summary-2.4.2020.pdf"
+              }
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-                <.icon name="hero-document-text" class="w-6 h-6" />
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2020
+                  Financials Summary 2019
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 0.9 MB
+                  PDF • 79K
                 </div>
               </div>
             </.link>
 
             <.link
-              href="#"
+              href={~p"/annual_meetings/2020/YSC-Financials-2019-2.4.2020.pdf"}
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
                 <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
                   Full Annual Report
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 3.7 MB
+                  PDF • 484K
                 </div>
               </div>
             </.link>
@@ -379,37 +514,41 @@
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">
             2019 General Meeting
           </h3>
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <.link
-              href="#"
+              href={
+                ~p"/annual_meetings/2019/YSC-General-Meeting-Financials-Summary-2018-v02.07.19.pdf"
+              }
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-                <.icon name="hero-document-text" class="w-6 h-6" />
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2019
+                  Financials Summary 2018
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 0.8 MB
+                  PDF • 74K
                 </div>
               </div>
             </.link>
 
             <.link
-              href="#"
+              href={~p"/annual_meetings/2019/YSC-Financials-2018-v02.07.19.pdf"}
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
                 <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
                   Full Annual Report
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 3.5 MB
+                  PDF • 532K
                 </div>
               </div>
             </.link>
@@ -421,37 +560,41 @@
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">
             2018 General Meeting
           </h3>
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <.link
-              href="#"
+              href={
+                ~p"/annual_meetings/2018/YSC-2017-financials-2018-02-14-CPA-approved.pdf"
+              }
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
               <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 flex-shrink-0">
-                <.icon name="hero-document-text" class="w-6 h-6" />
+                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2018
+                  Financials Summary 2017
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 0.8 MB
+                  PDF • 63K
                 </div>
               </div>
             </.link>
 
             <.link
-              href="#"
+              href={~p"/annual_meetings/2018/YSC-2017-financials.pptx"}
+              target="_blank"
               class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
             >
-              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 flex-shrink-0">
+              <div class="bg-orange-100 text-orange-600 p-3 rounded-lg mr-4 flex-shrink-0">
                 <.icon name="hero-document-chart-bar" class="w-6 h-6" />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0">
                 <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Full Annual Report
+                  Financials Presentation
                 </div>
                 <div class="text-xs text-zinc-500 uppercase tracking-wider mt-1">
-                  PDF • 3.4 MB
+                  PPTX • 284K
                 </div>
               </div>
             </.link>
