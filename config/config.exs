@@ -267,6 +267,20 @@ config :ysc, :quickbooks,
   # Set this to avoid :user_not_found when exporting payouts that include such payments.
   system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")
 
+# Client retry and delay configurations
+# These control how long various operations wait/retry to improve resilience
+# Set to 0 in test.exs to speed up test suite
+config :ysc,
+  # QuickBooks API rate limit retry configuration
+  quickbooks_max_429_retries: 3,
+  quickbooks_default_429_backoff_seconds: 2,
+  # Payment success page retry configuration
+  payment_success_retry_delay_ms: 500,
+  payment_success_total_timeout_ms: 10_000,
+  # Stripe customer database sync delays
+  stripe_customer_db_sync_delay_ms: 50,
+  stripe_customer_db_sync_retry_delay_ms: 100
+
 config :phoenix_template, :format_encoders, swiftui: Phoenix.HTML.Engine
 
 config :mime, :types, %{

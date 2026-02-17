@@ -2,6 +2,21 @@ import Config
 
 config :ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock
 
+# Speed up QuickBooks tests by disabling rate limit backoff delays
+config :ysc,
+  quickbooks_max_429_retries: 0,
+  quickbooks_default_429_backoff_seconds: 0
+
+# Speed up payment success retry delays
+config :ysc,
+  payment_success_retry_delay_ms: 0,
+  payment_success_total_timeout_ms: 1_000
+
+# Speed up Stripe customer database sync delays
+config :ysc,
+  stripe_customer_db_sync_delay_ms: 0,
+  stripe_customer_db_sync_retry_delay_ms: 0
+
 # Configure Stripe mocks for testing
 config :ysc,
   stripe_payment_method_module: Stripe.PaymentMethodMock,

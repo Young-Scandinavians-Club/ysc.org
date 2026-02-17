@@ -6,6 +6,19 @@ defmodule YscWeb.PaymentSuccessLive do
   Handles both successful and failed payments:
   - Successful payments: Redirects to booking receipt or order confirmation page with confetti
   - Failed payments: Redirects to booking checkout or event page with error message
+
+  ## Retry Configuration
+
+  The LiveView retries fetching payment intent metadata with configurable delays:
+
+  - `:payment_success_retry_delay_ms` - Delay between retries in milliseconds (default: 500)
+  - `:payment_success_total_timeout_ms` - Total timeout for all retries in milliseconds (default: 10,000)
+
+  Example configuration for tests (disable delays for speed):
+
+      config :ysc,
+        payment_success_retry_delay_ms: 0,
+        payment_success_total_timeout_ms: 1_000
   """
   use YscWeb, :live_view
 
@@ -15,10 +28,16 @@ defmodule YscWeb.PaymentSuccessLive do
   import Ecto.Query
   require Ysc.Logging
 
-  # Retry configuration
+  # Retry configuration - configurable for test environments
   @max_retries 5
-  @retry_delay_ms 500
-  @total_timeout_ms 10_000
+
+  defp retry_delay_ms do
+    Application.get_env(:ysc, :payment_success_retry_delay_ms, 500)
+  end
+
+  defp total_timeout_ms do
+    Application.get_env(:ysc, :payment_success_total_timeout_ms, 10_000)
+  end
 
   @impl true
   def mount(params, _session, socket) do
@@ -164,7 +183,7 @@ defmodule YscWeb.PaymentSuccessLive do
     elapsed = System.monotonic_time(:millisecond) - start_time
 
     cond do
-      elapsed >= @total_timeout_ms ->
+      elapsed >= total_timeout_ms() ->
         Ysc.Logging.warning("Retry timeout exceeded",
           elapsed_ms: elapsed,
           attempt: attempt
@@ -194,12 +213,12 @@ defmodule YscWeb.PaymentSuccessLive do
 
           {:error, :payment_intent_not_found} ->
             # Retry if payment intent not found yet
-            Process.sleep(@retry_delay_ms)
+            Process.sleep(retry_delay_ms())
             retry_with_timeout(fun, start_time, attempt + 1)
 
           {:error, :no_metadata} ->
             # Retry if metadata not available yet
-            Process.sleep(@retry_delay_ms)
+            Process.sleep(retry_delay_ms())
             retry_with_timeout(fun, start_time, attempt + 1)
 
           {:error, _} = error ->

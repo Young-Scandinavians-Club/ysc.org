@@ -582,6 +582,48 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert Enum.any?(subscription_payments, fn p -> p.id == payment.id end)
     end
 
+    test "resolves subscription from customer for proration invoices (subscription_update)",
+         %{} do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{stripe_status: "active"})
+
+      # Proration invoice with null subscription but subscription_update billing reason
+      # This simulates what happens during subscription upgrades/downgrades
+      invoice_data = %{
+        "id" => "in_proration_#{System.unique_integer()}",
+        "customer" => user.stripe_id,
+        "subscription" => nil,
+        "billing_reason" => "subscription_update",
+        "amount_paid" => 1508,
+        "description" => "Proration for upgrade",
+        "number" => "INV-PRORATION",
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", invoice_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      # Verify payment was created
+      payment = Ledgers.get_payment_by_external_id(invoice_data["id"])
+      assert payment != nil
+      assert payment.user_id == user.id
+      assert Money.to_string!(payment.amount) == "$15.08"
+
+      # Verify payment is linked to subscription
+      subscription_payments =
+        Ledgers.get_payments_for_subscription(subscription.id)
+
+      assert Enum.any?(subscription_payments, fn p -> p.id == payment.id end)
+
+      # Verify email was sent for renewal (subscription_update is treated as renewal)
+      assert_email_sent(
+        subject: "Your YSC Membership Has Been Renewed! 🎉",
+        to: {nil, user.email}
+      )
+    end
+
     test "skips processing when subscription cannot be resolved", %{} do
       user = user_with_stripe_id()
 

@@ -13,10 +13,20 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
   end
 
   def get_subject(email_data \\ %{}) do
-    if email_data[:is_single_to_family_upgrade] do
-      "Your YSC Membership Has Been Upgraded to Family! 🎉"
-    else
-      "Your YSC Membership Has Been Renewed! 🎉"
+    cond do
+      # New proration-based detection
+      email_data[:is_upgrade] ->
+        "Your YSC Membership Has Been Upgraded! 🎉"
+
+      email_data[:is_downgrade] ->
+        "Your YSC Membership Has Been Updated"
+
+      # Legacy Single to Family upgrade detection (without proration details)
+      email_data[:is_single_to_family_upgrade] ->
+        "Your YSC Membership Has Been Upgraded to Family! 🎉"
+
+      true ->
+        "Your YSC Membership Has Been Renewed! 🎉"
     end
   end
 
@@ -25,7 +35,8 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
         membership_type,
         amount,
         renewal_date,
-        billing_reason \\ nil
+        billing_reason \\ nil,
+        proration_details \\ nil
       ) do
     # Validate input
     if is_nil(user) do
@@ -42,17 +53,39 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     # Format renewal date
     renewal_date_str = format_date(renewal_date)
 
-    # Single to Family upgrade: subscription_update + Family membership means they upgraded
+    # Extract proration details if available
+    {is_upgrade, is_downgrade, old_membership_type_name, has_proration} =
+      if proration_details do
+        old_type_name =
+          if proration_details.old_membership_type do
+            get_membership_type_name(proration_details.old_membership_type)
+          else
+            nil
+          end
+
+        is_up = proration_details.is_upgrade == true
+        is_down = proration_details.is_upgrade == false
+
+        {is_up, is_down, old_type_name, true}
+      else
+        {false, false, nil, false}
+      end
+
+    # Legacy: Single to Family upgrade detection (for backward compatibility)
     is_single_to_family_upgrade =
       billing_reason in ["subscription_update", :subscription_update] and
-        membership_type in [:family, "family"]
+        membership_type in [:family, "family"] and not has_proration
 
     %{
       first_name: first_name,
       membership_type: membership_type_name,
       amount: amount_str,
       renewal_date: renewal_date_str,
-      is_single_to_family_upgrade: is_single_to_family_upgrade
+      is_single_to_family_upgrade: is_single_to_family_upgrade,
+      is_upgrade: is_upgrade,
+      is_downgrade: is_downgrade,
+      old_membership_type: old_membership_type_name,
+      has_proration: has_proration
     }
   end
 

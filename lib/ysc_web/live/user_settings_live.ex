@@ -4108,12 +4108,22 @@ defmodule YscWeb.UserSettingsLive do
         {:ok, _stripe_customer} ->
           # Reload user to get updated stripe_id
           # Add a small delay to ensure the database update has committed
-          Process.sleep(50)
+          db_sync_delay =
+            Application.get_env(:ysc, :stripe_customer_db_sync_delay_ms, 50)
+
+          Process.sleep(db_sync_delay)
           reloaded_user = Ysc.Accounts.get_user!(user.id)
 
           # If still no stripe_id after reload, try again (database might need a moment)
           if reloaded_user.stripe_id == nil do
-            Process.sleep(100)
+            db_sync_retry_delay =
+              Application.get_env(
+                :ysc,
+                :stripe_customer_db_sync_retry_delay_ms,
+                100
+              )
+
+            Process.sleep(db_sync_retry_delay)
             Ysc.Accounts.get_user!(user.id)
           else
             reloaded_user
@@ -4141,12 +4151,22 @@ defmodule YscWeb.UserSettingsLive do
             {:ok, _stripe_customer} ->
               # Reload user to get updated stripe_id
               # Add a small delay to ensure the database update has committed
-              Process.sleep(50)
+              db_sync_delay =
+                Application.get_env(:ysc, :stripe_customer_db_sync_delay_ms, 50)
+
+              Process.sleep(db_sync_delay)
               reloaded_user = Ysc.Accounts.get_user!(user.id)
 
               # If still no stripe_id after reload, try again
               if reloaded_user.stripe_id == nil do
-                Process.sleep(100)
+                db_sync_retry_delay =
+                  Application.get_env(
+                    :ysc,
+                    :stripe_customer_db_sync_retry_delay_ms,
+                    100
+                  )
+
+                Process.sleep(db_sync_retry_delay)
                 Ysc.Accounts.get_user!(user.id)
               else
                 reloaded_user

@@ -6,6 +6,26 @@ defmodule Ysc.Quickbooks.Client do
   SalesReceipts (for purchases and refunds) and Deposits (for Stripe payouts).
 
   Implements `Ysc.Quickbooks.ClientBehaviour` for testability.
+
+  ## Rate Limiting Configuration
+
+  The client automatically retries requests when QuickBooks returns 429 (rate limit) responses.
+  The retry behavior can be configured via application config:
+
+  - `:quickbooks_max_429_retries` - Maximum number of retry attempts (default: 3)
+  - `:quickbooks_default_429_backoff_seconds` - Base backoff in seconds for exponential backoff (default: 2)
+
+  Example configuration for tests (disable retries for speed):
+
+      config :ysc,
+        quickbooks_max_429_retries: 0,
+        quickbooks_default_429_backoff_seconds: 0
+
+  Example configuration for production (more aggressive retries):
+
+      config :ysc,
+        quickbooks_max_429_retries: 5,
+        quickbooks_default_429_backoff_seconds: 3
   """
   @behaviour Ysc.Quickbooks.ClientBehaviour
 
@@ -16,8 +36,6 @@ defmodule Ysc.Quickbooks.Client do
   @token_url "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
   # Latest minor version as of 2024
   @minor_version "65"
-  @max_429_retries 3
-  @default_429_backoff_seconds 2
   @request_id_max_length 255
 
   @doc """
@@ -194,7 +212,7 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.warning(
             "QuickBooks rate limit exceeded after retries",
             endpoint: "salesreceipt",
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -373,7 +391,7 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.warning(
             "QuickBooks rate limit exceeded after retries",
             endpoint: "refundreceipt",
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -573,7 +591,7 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.warning(
             "QuickBooks rate limit exceeded after retries",
             endpoint: "deposit",
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -748,7 +766,7 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.warning(
             "QuickBooks rate limit exceeded after retries",
             endpoint: "customer",
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -1101,7 +1119,7 @@ defmodule Ysc.Quickbooks.Client do
             "QuickBooks rate limit exceeded after retries",
             endpoint: "item",
             name: name,
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -1906,7 +1924,7 @@ defmodule Ysc.Quickbooks.Client do
             "QuickBooks rate limit exceeded after retries",
             endpoint: "class_query",
             name: name,
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -2285,7 +2303,7 @@ defmodule Ysc.Quickbooks.Client do
             "QuickBooks rate limit exceeded after retries",
             endpoint: "account_query",
             name: name,
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -2437,20 +2455,33 @@ defmodule Ysc.Quickbooks.Client do
 
   defp get_primary_error_code(_), do: nil
 
+  # Get the max number of 429 retries from config, defaults to 3
+  defp max_429_retries do
+    Application.get_env(:ysc, :quickbooks_max_429_retries, 3)
+  end
+
+  # Get the default 429 backoff seconds from config, defaults to 2
+  defp default_429_backoff_seconds do
+    Application.get_env(:ysc, :quickbooks_default_429_backoff_seconds, 2)
+  end
+
   # QuickBooks returns 429 when rate limited (e.g. 500 req/min per company).
   # Retry the request with exponential backoff, optionally honoring Retry-After.
   defp request_with_429_retry(callback, attempt \\ 0) do
+    max_retries = max_429_retries()
+    backoff_base = default_429_backoff_seconds()
+
     case callback.() do
       {:ok, %Finch.Response{status: 429} = resp}
-      when attempt < @max_429_retries ->
+      when attempt < max_retries ->
         backoff_sec =
           retry_after_seconds_from_response(resp) ||
-            :math.pow(@default_429_backoff_seconds, attempt) |> round()
+            :math.pow(backoff_base, attempt) |> round()
 
         Ysc.Logging.warning(
           "[QB Client] Rate limited (429), retrying after backoff",
           attempt: attempt + 1,
-          max_retries: @max_429_retries,
+          max_retries: max_retries,
           backoff_seconds: backoff_sec
         )
 
@@ -2461,7 +2492,7 @@ defmodule Ysc.Quickbooks.Client do
         # All retries exhausted - log as warning (not error) since this is expected behavior
         Ysc.Logging.warning(
           "[QB Client] Rate limit retries exhausted, returning 429 response",
-          max_retries: @max_429_retries
+          max_retries: max_retries
         )
 
         {:error, {:rate_limited, resp}}
@@ -3571,7 +3602,7 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.warning(
             "QuickBooks rate limit exceeded after retries",
             endpoint: "vendor",
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -3969,7 +4000,7 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.warning(
             "QuickBooks rate limit exceeded after retries",
             endpoint: "bill",
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}
@@ -4725,7 +4756,7 @@ defmodule Ysc.Quickbooks.Client do
             "QuickBooks rate limit exceeded after retries",
             endpoint: "billpayment",
             bill_payment_id: bill_payment_id,
-            max_retries: @max_429_retries
+            max_retries: max_429_retries()
           )
 
           {:error, :rate_limited}

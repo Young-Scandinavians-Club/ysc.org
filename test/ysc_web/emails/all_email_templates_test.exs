@@ -685,7 +685,11 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         membership_type: "Single",
         renewal_date: "Dec 1, 2024",
         amount: "$50.00",
-        is_single_to_family_upgrade: false
+        is_single_to_family_upgrade: false,
+        is_upgrade: false,
+        is_downgrade: false,
+        old_membership_type: nil,
+        has_proration: false
       }
 
       html = MembershipRenewalSuccess.render(assigns)
@@ -702,7 +706,11 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         membership_type: "Family",
         renewal_date: "Dec 1, 2024",
         amount: "$65.00",
-        is_single_to_family_upgrade: true
+        is_single_to_family_upgrade: true,
+        is_upgrade: false,
+        is_downgrade: false,
+        old_membership_type: nil,
+        has_proration: false
       }
 
       html = MembershipRenewalSuccess.render(assigns)
@@ -711,6 +719,54 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert html =~ "Membership Upgrade Successful"
       assert html =~ "Single to Family membership upgrade"
       assert html =~ "$65.00"
+    end
+
+    test "MembershipRenewalSuccess renders proration upgrade variant", %{
+      user: user
+    } do
+      assigns = %{
+        first_name: user.first_name,
+        membership_type: "Family",
+        renewal_date: "Feb 17, 2026",
+        amount: "$15.08",
+        is_single_to_family_upgrade: false,
+        is_upgrade: true,
+        is_downgrade: false,
+        old_membership_type: "Single",
+        has_proration: true
+      }
+
+      html = MembershipRenewalSuccess.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      assert html =~ "Membership Upgrade Successful"
+      assert html =~ "upgraded from Single to Family"
+      assert html =~ "prorated payment"
+      assert html =~ "$15.08"
+    end
+
+    test "MembershipRenewalSuccess renders proration downgrade variant", %{
+      user: user
+    } do
+      assigns = %{
+        first_name: user.first_name,
+        membership_type: "Single",
+        renewal_date: "Feb 17, 2026",
+        amount: "$10.00",
+        is_single_to_family_upgrade: false,
+        is_upgrade: false,
+        is_downgrade: true,
+        old_membership_type: "Family",
+        has_proration: true
+      }
+
+      html = MembershipRenewalSuccess.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      assert html =~ "Membership Updated"
+      assert html =~ "changed from Family to Single"
+      assert html =~ "prorated payment"
+      assert html =~ "$10.00"
     end
 
     test "MembershipPaymentReminder7Day renders", %{user: user} do

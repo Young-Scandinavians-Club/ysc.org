@@ -10,7 +10,13 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong><%= if @is_single_to_family_upgrade, do: "Membership Upgrade Successful! 🎉", else: "Membership Renewal Successful! 🎉" %></strong>
+      <strong>
+        <%= cond do %>
+          <% @is_upgrade || @is_single_to_family_upgrade -> %>Membership Upgrade Successful! 🎉
+          <% @is_downgrade -> %>Membership Updated
+          <% true -> %>Membership Renewal Successful! 🎉
+        <% end %>
+      </strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -30,11 +36,34 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #DCFCE7; padding: 16px; border-radius: 6px; border-left: 4px solid #166534;">
-      <strong>Great news!</strong> <%= if @is_single_to_family_upgrade do %>Your Single to Family membership upgrade has been successfully processed on <%= @renewal_date %>.<% else %>Your <%= @membership_type %> membership has been successfully renewed on <%= @renewal_date %>.<% end %>
+      <strong>Great news!</strong>
+      <%= cond do %>
+        <% @is_upgrade and @old_membership_type -> %>
+          Your membership has been upgraded from <%= @old_membership_type %> to <%= @membership_type %> on <%= @renewal_date %>. Welcome to your new membership level!
+        <% @is_downgrade and @old_membership_type -> %>
+          Your membership has been changed from <%= @old_membership_type %> to <%= @membership_type %> on <%= @renewal_date %>.
+        <% @is_single_to_family_upgrade -> %>
+          Your Single to Family membership upgrade has been successfully processed on <%= @renewal_date %>.
+        <% true -> %>
+          Your <%= @membership_type %> membership has been successfully renewed on <%= @renewal_date %>.
+      <% end %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      Your payment of <strong><%= @amount %></strong> has been processed<%= if @is_single_to_family_upgrade, do: " for your Single to Family membership upgrade", else: "" %>. Your membership is now active for another year. Thank you for continuing to be part of the Young Scandinavians Club community!
+      <%= if @has_proration do %>
+        <%= if @is_upgrade do %>
+          Your prorated payment of <strong><%= @amount %></strong> has been processed for the upgrade to <%= @membership_type %>. This reflects the remaining time on your current membership period at the new rate.
+        <% else %>
+          Your prorated payment of <strong><%= @amount %></strong> has been processed for your membership change. This reflects the credit for unused time and the charge for the remaining period at the new rate.
+        <% end %>
+      <% else %>
+        <%= if @is_single_to_family_upgrade do %>
+          Your payment of <strong><%= @amount %></strong> has been processed for your Single to Family membership upgrade.
+        <% else %>
+          Your payment of <strong><%= @amount %></strong> has been processed.
+        <% end %>
+      <% end %>
+      Thank you for continuing to be part of the Young Scandinavians Club community!
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -68,4 +97,3 @@
     <mj-spacer height="12px"></mj-spacer>
   </mj-column>
 </mj-section>
-

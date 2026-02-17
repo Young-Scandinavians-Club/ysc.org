@@ -1222,6 +1222,14 @@ defmodule Ysc.Stripe.WebhookHandler do
                     _ -> Date.utc_today()
                   end
 
+                # For subscription updates (upgrades/downgrades), extract proration details
+                proration_details =
+                  if billing_reason == "subscription_update" do
+                    extract_proration_details(invoice, membership_type)
+                  else
+                    nil
+                  end
+
                 # Enqueue the appropriate email job
                 if is_renewal do
                   enqueue_membership_renewal_success_email(
@@ -1229,7 +1237,8 @@ defmodule Ysc.Stripe.WebhookHandler do
                     membership_type,
                     payment.amount,
                     payment_date,
-                    billing_reason
+                    billing_reason,
+                    proration_details
                   )
                 else
                   # First-time membership payment - always paid online via Stripe
@@ -1945,7 +1954,12 @@ defmodule Ysc.Stripe.WebhookHandler do
       billing_reason = invoice[:billing_reason] || invoice["billing_reason"]
       customer_id = invoice[:customer] || invoice["customer"]
 
-      if billing_reason == "subscription_create" && customer_id do
+      # CRITICAL: Proration invoices from subscription upgrades/downgrades have subscription: null
+      # but billing_reason: "subscription_update". We must resolve the subscription from the customer.
+      # Same for subscription_create which can have race conditions.
+      if (billing_reason == "subscription_create" ||
+            billing_reason == "subscription_update") &&
+           customer_id do
         require Ysc.Logging
 
         Ysc.Logging.info(
@@ -1967,17 +1981,26 @@ defmodule Ysc.Stripe.WebhookHandler do
               nil
 
             subscriptions ->
-              # Get the most recently created subscription
-              # We sort by inserted_at to find the one we just created
+              # For subscription_update, get the most recently updated subscription
+              # For subscription_create, get the most recently created subscription
+              # We sort by updated_at for updates and inserted_at for creates
               subscription =
-                subscriptions
-                |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
-                |> List.first()
+                if billing_reason == "subscription_update" do
+                  subscriptions
+                  |> Enum.filter(&(&1.stripe_status == "active"))
+                  |> Enum.sort_by(& &1.updated_at, {:desc, DateTime})
+                  |> List.first()
+                else
+                  subscriptions
+                  |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+                  |> List.first()
+                end
 
               if subscription do
                 Ysc.Logging.info(
                   "Resolved subscription ID from user subscriptions",
-                  resolved_subscription_id: subscription.stripe_id
+                  resolved_subscription_id: subscription.stripe_id,
+                  billing_reason: billing_reason
                 )
 
                 subscription.stripe_id
@@ -1996,6 +2019,103 @@ defmodule Ysc.Stripe.WebhookHandler do
       else
         nil
       end
+    end
+  end
+
+  # Helper function to extract proration details from a subscription_update invoice
+  # This analyzes the line items to determine if it's an upgrade or downgrade
+  # and extracts information about what changed
+  defp extract_proration_details(invoice, new_membership_type) do
+    require Ysc.Logging
+
+    # Get line items from invoice - handle both map and struct formats
+    lines =
+      case invoice do
+        %{lines: %{data: data}} when is_list(data) -> data
+        %{"lines" => %{"data" => data}} when is_list(data) -> data
+        _ -> []
+      end
+
+    # Look for proration line items (they have "Unused time" or "Remaining time" in description)
+    proration_lines =
+      Enum.filter(lines, fn line ->
+        description = line[:description] || line["description"] || ""
+        String.contains?(description, ["Unused time", "Remaining time"])
+      end)
+
+    if length(proration_lines) >= 2 do
+      # We have both credit (unused time) and charge (remaining time)
+      # Find which one is the credit (negative amount) and which is the charge (positive)
+      credit_line =
+        Enum.find(proration_lines, fn line ->
+          amount = line[:amount] || line["amount"] || 0
+          amount < 0
+        end)
+
+      charge_line =
+        Enum.find(proration_lines, fn line ->
+          amount = line[:amount] || line["amount"] || 0
+          amount > 0
+        end)
+
+      if credit_line && charge_line do
+        # Extract membership types from descriptions
+        # e.g., "Unused time on Single after 17 Feb 2026"
+        # e.g., "Remaining time on Family after 17 Feb 2026"
+        old_type = extract_membership_type_from_description(credit_line)
+
+        _new_type_from_charge =
+          extract_membership_type_from_description(charge_line)
+
+        # Determine if upgrade or downgrade
+        is_upgrade = membership_upgrade?(old_type, new_membership_type)
+
+        Ysc.Logging.info("Extracted proration details from invoice",
+          old_membership_type: old_type,
+          new_membership_type: new_membership_type,
+          is_upgrade: is_upgrade
+        )
+
+        %{
+          old_membership_type: old_type,
+          new_membership_type: new_membership_type,
+          is_upgrade: is_upgrade,
+          credit_amount:
+            abs(credit_line[:amount] || credit_line["amount"] || 0),
+          charge_amount: charge_line[:amount] || charge_line["amount"] || 0
+        }
+      else
+        nil
+      end
+    else
+      # No proration lines found or insufficient data
+      nil
+    end
+  end
+
+  # Extract membership type from line item description
+  defp extract_membership_type_from_description(line_item) do
+    description = line_item[:description] || line_item["description"] || ""
+
+    cond do
+      String.contains?(description, "Single") -> :single
+      String.contains?(description, "Family") -> :family
+      true -> nil
+    end
+  end
+
+  # Determine if going from old_type to new_type is an upgrade
+  defp membership_upgrade?(old_type, new_type) do
+    case {old_type, new_type} do
+      {:single, :family} -> true
+      {"single", :family} -> true
+      {:single, "family"} -> true
+      {"single", "family"} -> true
+      {:family, :single} -> false
+      {"family", :single} -> false
+      {:family, "single"} -> false
+      {"family", "single"} -> false
+      _ -> nil
     end
   end
 
@@ -3431,7 +3551,8 @@ defmodule Ysc.Stripe.WebhookHandler do
          membership_type,
          amount,
          renewal_date,
-         billing_reason
+         billing_reason,
+         proration_details
        ) do
     try do
       email_module = YscWeb.Emails.MembershipRenewalSuccess
@@ -3442,7 +3563,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           membership_type,
           amount,
           renewal_date,
-          billing_reason
+          billing_reason,
+          proration_details
         )
 
       subject = email_module.get_subject(email_data)
@@ -3457,7 +3579,8 @@ defmodule Ysc.Stripe.WebhookHandler do
         email: user.email,
         membership_type: membership_type,
         amount: Money.to_string!(amount),
-        renewal_date: Date.to_iso8601(renewal_date)
+        renewal_date: Date.to_iso8601(renewal_date),
+        has_proration_details: !is_nil(proration_details)
       )
 
       # Enqueue email job asynchronously - failures won't affect webhook processing
