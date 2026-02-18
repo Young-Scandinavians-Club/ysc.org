@@ -596,7 +596,7 @@ defmodule YscWeb.UserSettingsLive do
                   <p class="text-sm text-zinc-600">
                     Your profile picture is synced via Gravatar. Update it on your <a
                       class="text-blue-600 hover:underline"
-                      href="https://gravatar.com/profile"
+                      href={"https://gravatar.com/#{:crypto.hash(:sha256, String.downcase(String.trim(@user.email))) |> Base.encode16(case: :lower)}"}
                       target="_blank"
                       noreferrer
                     >Gravatar Profile</a>.

@@ -2566,7 +2566,7 @@ defmodule YscWeb.CoreComponents do
     if Application.get_env(:ysc, :dev_routes, false) == true do
       image_path
     else
-      "https://gravatar.com/avatar/#{email_hash}?d=#{YscWeb.Endpoint.url()}#{image_path}"
+      "https://gravatar.com/avatar/#{email_hash}?d=#{YscWeb.Endpoint.url()}#{image_path}&s=512"
     end
   end
 
