@@ -40,6 +40,16 @@ defmodule Ysc.Quickbooks.SyncTest do
       stripe_account_id: "stripe_account_123"
     )
 
+    # When using configured item IDs, ensure_item_has_income_account fetches the item.
+    stub(ClientMock, :get_item_by_id, fn _item_id ->
+      {:ok,
+       %{
+         "Id" => "item_123",
+         "Name" => "Test Item",
+         "IncomeAccountRef" => %{"value" => "income_account_123"}
+       }}
+    end)
+
     %{user: user}
   end
 
@@ -81,6 +91,17 @@ defmodule Ysc.Quickbooks.SyncTest do
 
     stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
       {:ok, "qb_item_default"}
+    end)
+
+    # When using configured item IDs, ensure_item_has_income_account fetches the item.
+    # Return item with IncomeAccountRef so no update is needed.
+    stub(ClientMock, :get_item_by_id, fn _item_id ->
+      {:ok,
+       %{
+         "Id" => "item_123",
+         "Name" => "Test Item",
+         "IncomeAccountRef" => %{"value" => "income_account_123"}
+       }}
     end)
   end
 

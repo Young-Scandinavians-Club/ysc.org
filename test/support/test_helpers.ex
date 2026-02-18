@@ -134,6 +134,15 @@ defmodule Ysc.TestHelpers do
       _ -> {:error, :not_found}
     end)
 
+    stub(Ysc.Quickbooks.ClientMock, :get_item_by_id, fn _item_id ->
+      {:ok,
+       %{
+         "Id" => "item_123",
+         "Name" => "Test Item",
+         "IncomeAccountRef" => %{"value" => "income_account_123"}
+       }}
+    end)
+
     :ok
   end
 end

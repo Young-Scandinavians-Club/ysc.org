@@ -144,6 +144,16 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
       _item_name, _opts -> {:ok, "qb_item_default"}
     end)
 
+    # When using configured item IDs, ensure_item_has_income_account fetches the item
+    stub(ClientMock, :get_item_by_id, fn _item_id ->
+      {:ok,
+       %{
+         "Id" => "item_123",
+         "Name" => "Test Item",
+         "IncomeAccountRef" => %{"value" => "income_account_123"}
+       }}
+    end)
+
     %{
       user: user,
       event: event,

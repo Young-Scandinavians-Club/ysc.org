@@ -926,6 +926,171 @@ defmodule Ysc.Quickbooks.Client do
     end
   end
 
+  @doc """
+  Fetches an Item by ID from QuickBooks.
+
+  Returns the full item entity including IncomeAccountRef if set.
+  Used to verify configured items have required income account (avoids error 2390).
+  """
+  @spec get_item_by_id(String.t()) :: {:ok, map()} | {:error, atom()}
+  def get_item_by_id(item_id) do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      url = build_url(company_id, "item/#{item_id}", [])
+      headers = build_headers(access_token)
+      request = Finch.build(:get, url, headers)
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, data} ->
+              item = get_response_entity(data, "Item")
+              {:ok, item}
+
+            {:error, error} ->
+              Ysc.Logging.error("Failed to parse get_item_by_id response",
+                error: inspect(error),
+                response: response_body
+              )
+
+              {:error, :invalid_response}
+          end
+
+        {:ok, %Finch.Response{status: 401, body: _}} ->
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:get, url, headers)
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok, %Finch.Response{status: s, body: body}}
+                when s in 200..299 ->
+                  case Jason.decode(body) do
+                    {:ok, data} -> {:ok, get_response_entity(data, "Item")}
+                    _ -> {:error, :invalid_response}
+                  end
+
+                _ ->
+                  {:error, :request_failed}
+              end
+
+            error ->
+              error
+          end
+
+        {:ok, %Finch.Response{status: status, body: response_body}} ->
+          Ysc.Logging.error("get_item_by_id failed",
+            item_id: item_id,
+            status: status,
+            response: response_body
+          )
+
+          {:error, :request_failed}
+
+        {:error, error} ->
+          {:error, error}
+      end
+    end
+  end
+
+  @doc """
+  Updates an existing Item's income account in QuickBooks.
+
+  Used to fix items that were created without an income account (error 2390).
+  Requires the item to be fetched first to get its SyncToken.
+  """
+  @spec update_item_income_account(String.t(), map()) ::
+          {:ok, map()} | {:error, atom()}
+  def update_item_income_account(item_id, income_account_ref) do
+    with {:ok, item} <- get_item_by_id(item_id),
+         {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      # Convert atom keys to string keys for QuickBooks API
+      income_ref =
+        case income_account_ref do
+          %{value: value} -> %{"value" => to_string(value)}
+          %{"value" => _} = ref -> ref
+          _ -> nil
+        end
+
+      if is_nil(income_ref) do
+        Ysc.Logging.error(
+          "update_item_income_account: invalid income_account_ref",
+          item_id: item_id
+        )
+
+        {:error, :invalid_income_account_ref}
+      else
+        body =
+          item
+          |> Map.put("IncomeAccountRef", income_ref)
+          |> Map.take([
+            "Id",
+            "SyncToken",
+            "Name",
+            "Type",
+            "Active",
+            "IncomeAccountRef",
+            "ExpenseAccountRef"
+          ])
+
+        url = build_url(company_id, "item", [])
+        headers = build_headers(access_token)
+        request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+        result =
+          request_with_429_retry(fn ->
+            Finch.request(request, Ysc.Finch)
+          end)
+
+        case result do
+          {:ok, %Finch.Response{status: status, body: response_body}}
+          when status in 200..299 ->
+            case Jason.decode(response_body) do
+              {:ok, data} ->
+                updated = get_response_entity(data, "Item")
+
+                Ysc.Logging.info(
+                  "Successfully updated item income account (fixes error 2390)",
+                  item_id: item_id,
+                  item_name: Map.get(item, "Name")
+                )
+
+                {:ok, updated}
+
+              {:error, error} ->
+                Ysc.Logging.error("Failed to parse update_item response",
+                  error: inspect(error)
+                )
+
+                {:error, :invalid_response}
+            end
+
+          {:ok, %Finch.Response{status: status, body: response_body}} ->
+            error = parse_error_response(response_body)
+
+            Ysc.Logging.error("update_item_income_account failed",
+              item_id: item_id,
+              status: status,
+              error: error,
+              response: response_body
+            )
+
+            {:error, :update_failed}
+
+          {:error, error} ->
+            {:error, error}
+        end
+      end
+    end
+  end
+
   defp query_item_by_name(name) do
     with {:ok, access_token} <- get_access_token(),
          {:ok, company_id} <- get_company_id() do

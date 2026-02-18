@@ -49,6 +49,17 @@ defmodule Ysc.Quickbooks.ClientBehaviour do
               {:ok, String.t()} | {:error, atom() | String.t()}
 
   @doc """
+  Fetches an Item by ID from QuickBooks.
+  """
+  @callback get_item_by_id(String.t()) :: {:ok, map()} | {:error, atom()}
+
+  @doc """
+  Updates an existing Item's income account in QuickBooks.
+  """
+  @callback update_item_income_account(String.t(), map()) ::
+              {:ok, map()} | {:error, atom()}
+
+  @doc """
   Queries for an account by name in QuickBooks.
   """
   @callback query_account_by_name(String.t()) ::

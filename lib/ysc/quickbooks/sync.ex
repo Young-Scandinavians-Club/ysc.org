@@ -1097,14 +1097,74 @@ defmodule Ysc.Quickbooks.Sync do
           item_id: configured_item_id
         )
 
-        Ysc.Logging.info(
-          "[QB Sync] get_quickbooks_item_id: Using pre-configured item ID. If you get error 2390, the item in QuickBooks may be missing an income account.",
-          item_name: item_name,
-          item_id: configured_item_id,
-          config_key: config_key
+        ensure_item_has_income_account(
+          configured_item_id,
+          entity_type,
+          property
+        )
+    end
+  end
+
+  defp ensure_item_has_income_account(item_id, entity_type, property) do
+    case client_module().get_item_by_id(item_id) do
+      {:ok, item} ->
+        income_account_ref = item["IncomeAccountRef"]
+        has_income_account = income_account_ref && income_account_ref["value"]
+
+        if has_income_account do
+          Ysc.Logging.debug(
+            "[QB Sync] ensure_item_has_income_account: Item already has income account",
+            item_id: item_id
+          )
+
+          {:ok, item_id}
+        else
+          income_account_name =
+            determine_income_account_name(entity_type, property)
+
+          income_account_ref = query_income_account(income_account_name)
+
+          if is_nil(income_account_ref) do
+            Ysc.Logging.error(
+              "[QB Sync] ensure_item_has_income_account: Configured item missing income account and no revenue account found. Create a revenue-type account (e.g. General Revenue) in QuickBooks, or fix the item manually (Settings > Products and Services)."
+            )
+
+            {:error, :no_income_account_for_item}
+          else
+            Ysc.Logging.info(
+              "[QB Sync] ensure_item_has_income_account: Updating item with income account (fixes error 2390)",
+              item_id: item_id,
+              item_name: Map.get(item, "Name")
+            )
+
+            case client_module().update_item_income_account(
+                   item_id,
+                   income_account_ref
+                 ) do
+              {:ok, _updated} ->
+                {:ok, item_id}
+
+              error ->
+                Ysc.Logging.warning(
+                  "[QB Sync] ensure_item_has_income_account: Failed to update item, sync may fail with error 2390",
+                  item_id: item_id,
+                  error: inspect(error)
+                )
+
+                # Still return the item_id - the sync will be retried and user can fix manually
+                {:ok, item_id}
+            end
+          end
+        end
+
+      error ->
+        Ysc.Logging.warning(
+          "[QB Sync] ensure_item_has_income_account: Could not fetch item, using configured ID anyway",
+          item_id: item_id,
+          error: inspect(error)
         )
 
-        {:ok, configured_item_id}
+        {:ok, item_id}
     end
   end
 
