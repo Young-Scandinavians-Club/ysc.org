@@ -176,8 +176,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     # Form action - allow self and Stripe
     form_action = "'self' https://js.stripe.com"
 
-    # Frame ancestors - allow localhost in dev for dev inbox, deny otherwise
-    frame_ancestors = if is_dev, do: "'self' http://localhost:*", else: "'none'"
+    # Frame ancestors - allow self for admin post preview, plus localhost in dev for dev inbox
+    frame_ancestors = if is_dev, do: "'self' http://localhost:*", else: "'self'"
 
     # Upgrade insecure requests - only in production
     # In development, we need to allow HTTP for LocalStack
