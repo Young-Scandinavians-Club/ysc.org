@@ -298,7 +298,7 @@ defmodule Ysc.Accounts.AuthService do
       where: ae.user_id == ^user.id,
       where: ae.event_type == "login_success",
       where: ae.success == true,
-      order_by: [desc: ae.inserted_at],
+      order_by: [desc: ae.inserted_at, desc: ae.id],
       limit: 1,
       select: ae.inserted_at
     )
@@ -314,7 +314,7 @@ defmodule Ysc.Accounts.AuthService do
       where: ae.user_id == ^user.id,
       where: ae.event_type == "login_success",
       where: ae.success == true,
-      order_by: [desc: ae.inserted_at],
+      order_by: [desc: ae.inserted_at, desc: ae.id],
       limit: 1
     )
     |> Repo.one()
@@ -330,7 +330,7 @@ defmodule Ysc.Accounts.AuthService do
       where: ae.user_id == ^user.id,
       where: ae.event_type in ["login_success", "logout"],
       where: ae.success == true,
-      order_by: [desc: ae.inserted_at],
+      order_by: [desc: ae.inserted_at, desc: ae.id],
       limit: 1,
       select: ae.inserted_at
     )
@@ -347,7 +347,7 @@ defmodule Ysc.Accounts.AuthService do
       where: ae.user_id == ^user.id,
       where: ae.event_type in ["login_success", "logout"],
       where: ae.success == true,
-      order_by: [desc: ae.inserted_at],
+      order_by: [desc: ae.inserted_at, desc: ae.id],
       limit: 1
     )
     |> Repo.one()

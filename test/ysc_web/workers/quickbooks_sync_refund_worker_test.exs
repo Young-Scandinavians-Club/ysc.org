@@ -158,7 +158,6 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
           reason: "Refund"
         })
 
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       refund =
@@ -245,7 +244,6 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorkerTest do
           reason: "Refund"
         })
 
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       refund =

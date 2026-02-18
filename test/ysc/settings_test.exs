@@ -14,28 +14,25 @@ defmodule Ysc.SettingsTest do
 
   describe "settings/0" do
     test "returns all settings ordered by id desc" do
-      # Clear cache before test to ensure fresh state
       Settings.clear_cache()
 
       setting1 =
         %SiteSetting{name: "setting1", value: "value1"} |> Repo.insert!()
 
-      # Add a small delay to ensure setting2 gets a later ULID
-      Process.sleep(1)
-
       setting2 =
         %SiteSetting{name: "setting2", value: "value2"} |> Repo.insert!()
 
-      # Clear cache again to force fresh query from DB
       Settings.clear_cache()
 
       settings = Settings.settings()
       assert length(settings) == 2
 
-      # Since setting2 was created after setting1, its ID should be "greater" (newer ULID)
-      # and thus come first when ordered by desc
-      # Check that both settings are present and setting2 comes first
-      assert Enum.map(settings, & &1.id) == [setting2.id, setting1.id]
+      setting_ids = Enum.map(settings, & &1.id)
+      assert setting1.id in setting_ids
+      assert setting2.id in setting_ids
+
+      [first, second] = settings
+      assert first.id > second.id
     end
 
     test "uses cache when available" do

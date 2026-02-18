@@ -43,10 +43,17 @@ defmodule YscWeb.NewsListLiveTest do
     test "only shows 3 most recent posts" do
       author = user_fixture()
 
-      # Create 5 published posts
+      base_time =
+        DateTime.utc_now()
+        |> DateTime.add(-600, :second)
+        |> DateTime.truncate(:second)
+
       for i <- 1..5 do
-        create_post(author, %{title: "Post #{i}", state: :published})
-        Process.sleep(10)
+        create_post(author, %{
+          title: "Post #{i}",
+          state: :published,
+          published_on: DateTime.add(base_time, i, :second)
+        })
       end
 
       html = render_component(YscWeb.NewsListLive, %{id: "news-list"})

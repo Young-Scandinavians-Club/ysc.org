@@ -2,13 +2,33 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
   @moduledoc """
   Oban worker for syncing Payout records to QuickBooks.
 
-  This worker processes Stripe payouts asynchronously and creates Deposits in QuickBooks.
+  The entire sync operation runs inside a database transaction holding a
+  `FOR UPDATE NOWAIT` row lock on the payout. The lock is held until the
+  QuickBooks API call and status update complete, preventing concurrent
+  processing of the same payout. If the lock is already held, the job
+  returns `:ok` and lets the nightly retry worker pick it up later.
   """
 
   require Ysc.Logging
-  use Oban.Worker, queue: :default, max_attempts: 3
 
+  use Oban.Worker,
+    queue: :default,
+    max_attempts: 5,
+    unique: [
+      period: 300,
+      fields: [:args, :queue],
+      states: [:available, :scheduled, :executing, :retryable]
+    ]
+
+  alias Ysc.Repo
+  alias Ysc.Ledgers.Payout
   alias Ysc.Quickbooks.Sync
+  import Ecto.Query
+
+  @non_retriable_errors [
+    :quickbooks_accounts_not_configured,
+    :payout_not_found
+  ]
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"payout_id" => payout_id}}) do
@@ -16,89 +36,122 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
       payout_id: payout_id
     )
 
-    alias Ysc.Repo
-    alias Ysc.Ledgers.Payout
-    import Ecto.Query
-
-    # Convert payout_id string to ULID if needed
     payout_id_ulid =
       case Ecto.ULID.cast(payout_id) do
         {:ok, ulid} -> ulid
         _ -> payout_id
       end
 
-    # Lock the payout record to prevent concurrent processing
-    case Repo.transaction(fn ->
-           from(p in Payout,
+    Repo.transaction(fn ->
+      case from(p in Payout,
              where: p.id == ^payout_id_ulid,
              lock: "FOR UPDATE NOWAIT"
            )
-           |> Repo.one()
-         end) do
-      {:ok, nil} ->
+           |> Repo.one() do
+        nil ->
+          Repo.rollback(:payout_not_found)
+
+        %Payout{quickbooks_sync_status: "synced", quickbooks_deposit_id: dep_id}
+        when not is_nil(dep_id) ->
+          {:already_synced, dep_id}
+
+        payout ->
+          payout = Repo.preload(payout, [:payments, :refunds])
+          Sync.sync_payout(payout)
+      end
+    end)
+    |> handle_result(payout_id)
+  rescue
+    e in Postgrex.Error ->
+      if match?(%{postgres: %{code: :lock_not_available}}, e) do
+        Ysc.Logging.info("Payout is locked by another process, skipping",
+          payout_id: payout_id
+        )
+
+        :ok
+      else
+        reraise e, __STACKTRACE__
+      end
+  end
+
+  defp handle_result(result, payout_id) do
+    case result do
+      {:ok, {:already_synced, deposit_id}} ->
+        Ysc.Logging.info("Payout already synced (checked under lock)",
+          payout_id: payout_id,
+          deposit_id: deposit_id
+        )
+
+        :ok
+
+      {:ok, {:ok, deposit}} ->
+        Ysc.Logging.info("Successfully synced payout to QuickBooks",
+          payout_id: payout_id,
+          deposit_id: Map.get(deposit, "Id")
+        )
+
+        :ok
+
+      {:ok, {:error, reason}} ->
+        classify_error(reason, payout_id)
+
+      {:error, :payout_not_found} ->
         Ysc.Logging.warning("Payout not found for QuickBooks sync",
           payout_id: payout_id
         )
 
         {:discard, :payout_not_found}
 
-      {:ok, payout} ->
-        # Check if already synced (double-check after acquiring lock)
-        if payout.quickbooks_sync_status == "synced" &&
-             payout.quickbooks_deposit_id do
-          Ysc.Logging.info(
-            "Payout already synced to QuickBooks (checked after lock)",
-            payout_id: payout_id,
-            deposit_id: payout.quickbooks_deposit_id
-          )
-
-          :ok
-        else
-          # Preload payments and refunds for the sync
-          payout = Repo.preload(payout, [:payments, :refunds])
-
-          case Sync.sync_payout(payout) do
-            {:ok, deposit} ->
-              Ysc.Logging.info("Successfully synced payout to QuickBooks",
-                payout_id: payout_id,
-                deposit_id: Map.get(deposit, "Id")
-              )
-
-              :ok
-
-            {:error, reason} ->
-              Ysc.Logging.warning("Failed to sync payout to QuickBooks",
-                payout_id: payout_id,
-                error: inspect(reason)
-              )
-
-              # Oban will retry based on max_attempts
-              {:error, reason}
-          end
-        end
-
-      {:error, %Postgrex.Error{postgres: %{code: :lock_not_available}}} ->
-        # Another worker is processing this payout
-        Ysc.Logging.info("Payout is locked by another worker, skipping",
-          payout_id: payout_id
-        )
-
-        :ok
-
       {:error, reason} ->
-        Ysc.Logging.warning("Failed to lock payout for QuickBooks sync",
+        Ysc.Logging.warning("Payout sync transaction failed",
           payout_id: payout_id,
           error: inspect(reason)
         )
 
-        # Report to Sentry (only for non-lock errors)
-        unless match?(
-                 %Postgrex.Error{postgres: %{code: :lock_not_available}},
-                 reason
-               ) do
-        end
-
         {:error, reason}
     end
+  end
+
+  defp classify_error(reason, payout_id) when reason in @non_retriable_errors do
+    Ysc.Logging.warning("Discarding payout sync — non-retriable error",
+      payout_id: payout_id,
+      error: inspect(reason)
+    )
+
+    {:discard, reason}
+  end
+
+  defp classify_error(reason, payout_id) when is_binary(reason) do
+    if validation_fault?(reason) do
+      Ysc.Logging.warning(
+        "Discarding payout sync — QuickBooks validation error",
+        payout_id: payout_id,
+        error: reason
+      )
+
+      {:discard, reason}
+    else
+      Ysc.Logging.warning("Failed to sync payout to QuickBooks",
+        payout_id: payout_id,
+        error: reason
+      )
+
+      {:error, reason}
+    end
+  end
+
+  defp classify_error(reason, payout_id) do
+    Ysc.Logging.warning("Failed to sync payout to QuickBooks",
+      payout_id: payout_id,
+      error: inspect(reason)
+    )
+
+    {:error, reason}
+  end
+
+  defp validation_fault?(reason) when is_binary(reason) do
+    String.contains?(reason, "2010:") or
+      String.contains?(reason, "Request has invalid or unsupported property") or
+      String.contains?(reason, "ValidationFault")
   end
 end

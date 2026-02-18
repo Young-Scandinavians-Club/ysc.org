@@ -500,8 +500,7 @@ defmodule Ysc.Quickbooks.Client do
       - `line` (required) - List of deposit line items
       - `total_amt` (required) - Total deposit amount
       - `txn_date` (optional) - Transaction date (ISO 8601 format)
-      - `private_note` (optional) - Private note
-      - `memo` (optional) - Public memo
+      - `private_note` (optional) - Private note (QuickBooks Deposit does not support `Memo`)
 
   ## Examples
 
@@ -519,7 +518,7 @@ defmodule Ysc.Quickbooks.Client do
         ],
         total_amt: 500.00,
         txn_date: "2024-01-15",
-        memo: "Stripe payout for period ending 2024-01-15"
+        private_note: "Stripe payout for period ending 2024-01-15"
       })
 
   """
@@ -1634,7 +1633,6 @@ defmodule Ysc.Quickbooks.Client do
     }
     |> maybe_put("TxnDate", params[:txn_date])
     |> maybe_put("PrivateNote", params[:private_note])
-    |> maybe_put("Memo", params[:memo])
   end
 
   defp build_customer_body(params) do
@@ -2656,7 +2654,7 @@ defmodule Ysc.Quickbooks.Client do
       when attempt < max_retries ->
         backoff_sec =
           retry_after_seconds_from_response(resp) ||
-            :math.pow(backoff_base, attempt) |> round()
+            round(backoff_base * :math.pow(2, attempt))
 
         Ysc.Logging.warning(
           "[QB Client] Rate limited (429), retrying after backoff",

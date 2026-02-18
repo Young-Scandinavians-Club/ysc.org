@@ -63,13 +63,6 @@ defmodule Ysc.TestHelpers do
   end
 
   @doc """
-  Waits for async operations to complete.
-  """
-  def wait_for_async(timeout_ms \\ 1000) do
-    Process.sleep(timeout_ms)
-  end
-
-  @doc """
   Reloads a struct from the database.
   """
   def reload!(struct) do
