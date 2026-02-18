@@ -8,9 +8,9 @@
       cursor: pointer;
       transition: background-color 0.3s ease, color 0.3s ease;
       text-align: center;
-      width: 92%;
-      margin-left: 4%;
-      margin-right: 4%;
+      width: 100%;
+      padding-left: 4%;
+      padding-right: 4%;
       display: block !important;
       box-sizing: border-box;
       }
