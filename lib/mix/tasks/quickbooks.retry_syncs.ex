@@ -105,12 +105,21 @@ defmodule Mix.Tasks.Quickbooks.RetrySyncs do
   defp retry_unsynced_payments(limit, dry_run) do
     Ysc.Logging.info("=== Checking Payments ===")
 
-    # Find payments that are not synced (status is nil, "pending", or "failed")
+    # Find payments that are not synced (status is nil, "pending", or "failed").
+    # Exclude "skipped" and payout payments (Payout.payment_id) - those must not be synced as Sales Receipts.
+    payout_payment_ids =
+      from(po in Payout,
+        where: not is_nil(po.payment_id),
+        select: po.payment_id
+      )
+
     unsynced_payments =
       from(p in Payment,
         where:
-          is_nil(p.quickbooks_sync_status) or
-            p.quickbooks_sync_status != "synced",
+          (is_nil(p.quickbooks_sync_status) or
+             p.quickbooks_sync_status != "synced") and
+            p.quickbooks_sync_status != "skipped" and
+            p.id not in subquery(payout_payment_ids),
         select: %{
           id: p.id,
           reference_id: p.reference_id,

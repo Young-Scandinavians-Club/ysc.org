@@ -90,13 +90,26 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:ok, %{"Id" => payment.quickbooks_sales_receipt_id}}
     else
-      Ysc.Logging.debug(
-        "[QB Sync] Payment not yet synced, proceeding with sync",
-        payment_id: payment.id,
-        current_status: payment.quickbooks_sync_status
-      )
+      # Payout payments (virtual payment representing the Stripe payout) must NOT be synced
+      # as Sales Receipts. The Payout is synced as a Deposit that links to customer payments.
+      if payout_payment?(payment) do
+        Ysc.Logging.info(
+          "[QB Sync] Skipping payout payment - synced via Payout Deposit",
+          payment_id: payment.id,
+          reference_id: payment.reference_id
+        )
 
-      do_sync_payment(payment)
+        mark_payment_skipped_for_quickbooks(payment)
+        {:ok, %{}}
+      else
+        Ysc.Logging.debug(
+          "[QB Sync] Payment not yet synced, proceeding with sync",
+          payment_id: payment.id,
+          current_status: payment.quickbooks_sync_status
+        )
+
+        do_sync_payment(payment)
+      end
     end
   end
 
@@ -2075,9 +2088,13 @@ defmodule Ysc.Quickbooks.Sync do
     result
   end
 
+  # Creates a QuickBooks Deposit that LINKS to existing Sales Receipts and Refund Receipts.
+  # Does NOT create new Sales Receipts - payments/refunds are already recorded when they happen.
+  # The Deposit moves money from Undeposited Funds (where Sales Receipts deposited) to the Bank,
+  # and includes a line for Stripe fees (expense).
   defp create_payout_deposit(%Payout{} = payout) do
     Ysc.Logging.debug(
-      "[QB Sync] create_payout_deposit: Creating payout deposit",
+      "[QB Sync] create_payout_deposit: Creating payout deposit (linking to existing Sales Receipts)",
       payout_id: payout.id
     )
 
@@ -2337,16 +2354,18 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  # Builds Deposit line items that LINK to existing Sales Receipts/Refund Receipts.
+  # Each line references an already-synced payment/refund via LinkedTxn - we do NOT create new Sales Receipts.
   defp build_payout_line_items(%Payout{payments: payments, refunds: refunds}) do
-    Ysc.Logging.debug("[QB Sync] build_payout_line_items: Building line items",
+    Ysc.Logging.debug(
+      "[QB Sync] build_payout_line_items: Building line items (linking to existing QB transactions)",
       payments_count: length(payments),
       refunds_count: length(refunds)
     )
 
-    # Get Administration class for deposit line items (payouts are administrative transactions)
     administration_class_ref = get_administration_class_ref()
 
-    # Build line items for payments (positive amounts)
+    # Build line items for payments (positive amounts) - each links to existing Sales Receipt
     Ysc.Logging.debug("[QB Sync] build_payout_line_items: Processing payments",
       payments_count: length(payments)
     )
@@ -2360,7 +2379,7 @@ defmodule Ysc.Quickbooks.Sync do
           sales_receipt_id: payment.quickbooks_sales_receipt_id
         )
 
-        # Only include payments that have been synced to QuickBooks
+        # Only include payments that have been synced to QuickBooks (Sales Receipts already exist)
         if payment.quickbooks_sync_status == "synced" &&
              payment.quickbooks_sales_receipt_id do
           # Money.to_decimal returns dollars (database stores amounts in dollars)
@@ -2369,19 +2388,20 @@ defmodule Ysc.Quickbooks.Sync do
             |> Decimal.round(2)
 
           Ysc.Logging.debug(
-            "[QB Sync] build_payout_line_items: Payment line item created",
+            "[QB Sync] build_payout_line_items: Payment line item created (linking to existing SR)",
             payment_id: payment.id,
             amount: Decimal.to_string(amount),
             sales_receipt_id: payment.quickbooks_sales_receipt_id
           )
 
+          # DepositLineDetail with LinkedTxn: links to existing Sales Receipt, moves from Undeposited Funds to Bank.
+          # No AccountRef - source is the linked Sales Receipt.
           %{
             amount: amount,
             detail_type: "DepositLineDetail",
             deposit_line_detail: %{
               class_ref: administration_class_ref
             },
-            # LinkedTxn is required to link a Deposit to a SalesReceipt in QuickBooks
             linked_txn: [
               %{
                 txn_id: payment.quickbooks_sales_receipt_id,
@@ -2441,19 +2461,19 @@ defmodule Ysc.Quickbooks.Sync do
             |> Decimal.negate()
 
           Ysc.Logging.debug(
-            "[QB Sync] build_payout_line_items: Refund line item created",
+            "[QB Sync] build_payout_line_items: Refund line item created (linking to existing RR)",
             refund_id: refund.id,
             amount: Decimal.to_string(amount),
             sales_receipt_id: refund.quickbooks_sales_receipt_id
           )
 
+          # DepositLineDetail with LinkedTxn: links to existing Refund Receipt
           %{
             amount: amount,
             detail_type: "DepositLineDetail",
             deposit_line_detail: %{
               class_ref: administration_class_ref
             },
-            # LinkedTxn is required to link a Deposit to a RefundReceipt in QuickBooks
             linked_txn: [
               %{
                 txn_id: refund.quickbooks_sales_receipt_id,
@@ -2899,6 +2919,25 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:error, :transactions_not_fully_synced}
     end
+  end
+
+  # Returns true if payment is the virtual "payout payment" (Payout.payment_id).
+  # These must NOT be synced as Sales Receipts - the Payout is synced as a Deposit.
+  defp payout_payment?(%Payment{id: payment_id}) do
+    payout =
+      from(p in Payout, where: p.payment_id == ^payment_id, limit: 1)
+      |> Repo.one()
+
+    not is_nil(payout)
+  end
+
+  defp mark_payment_skipped_for_quickbooks(%Payment{} = payment) do
+    payment
+    |> Payment.changeset(%{
+      quickbooks_sync_status: "skipped",
+      quickbooks_last_sync_attempt_at: DateTime.utc_now()
+    })
+    |> Repo.update()
   end
 
   # Update functions for Payment

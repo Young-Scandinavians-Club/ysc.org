@@ -24,7 +24,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Ledgers
-  alias Ysc.Ledgers.{Payment, Refund, LedgerEntry, LedgerTransaction}
+  alias Ysc.Ledgers.{Payment, Payout, Refund, LedgerEntry, LedgerTransaction}
 
   @doc """
   Runs a full reconciliation check across all financial entities.
@@ -119,15 +119,26 @@ defmodule Ysc.Ledgers.Reconciliation do
         end
       end)
 
-    # Calculate totals
+    # Calculate totals - exclude payout payments (Payout.payment_id) since
+    # calculate_payment_total_from_ledger only sums t.type == :payment (customer payments).
+    # Payout payments have t.type == :payout and represent Stripe transfers, not receivables.
+    payout_payment_ids =
+      from(po in Payout,
+        where: not is_nil(po.payment_id),
+        select: po.payment_id
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
     total_payment_amount =
       payments
+      |> Enum.reject(fn p -> MapSet.member?(payout_payment_ids, p.id) end)
       |> Enum.reduce(Money.new(0, :USD), fn payment, acc ->
         {:ok, sum} = Money.add(acc, payment.amount)
         sum
       end)
 
-    # Get total from ledger entries for payments
+    # Get total from ledger entries for customer payments (t.type == :payment only)
     ledger_payment_total = calculate_payment_total_from_ledger()
 
     amount_match = Money.equal?(total_payment_amount, ledger_payment_total)

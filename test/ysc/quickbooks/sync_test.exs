@@ -445,6 +445,32 @@ defmodule Ysc.Quickbooks.SyncTest do
       # Should not call QuickBooks API - should return early with existing ID
       assert {:ok, %{"Id" => "qb_existing_123"}} = Sync.sync_payment(payment)
     end
+
+    test "skips payout payment - must not be synced as Sales Receipt (Payout creates Deposit)",
+         %{
+           user: _user
+         } do
+      # Create a payout (which creates a payout_payment - the virtual payment representing the payout)
+      {:ok, {payout_payment, _transaction, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(7389, :USD),
+          stripe_payout_id: "po_1T1cjaREiftrEncLkEE5cPkZ",
+          description: "Stripe payout",
+          fee_total: Money.new(100, :USD)
+        })
+
+      # payout_payment is the Payment where Payout.payment_id = payment.id
+      assert payout.payment_id == payout_payment.id
+
+      # sync_payment must NOT create a Sales Receipt for payout payments
+      # (they are synced via sync_payout as a Deposit)
+      assert {:ok, %{}} = Sync.sync_payment(payout_payment)
+
+      # Verify marked as skipped (not synced)
+      payout_payment = Repo.reload!(payout_payment)
+      assert payout_payment.quickbooks_sync_status == "skipped"
+      assert payout_payment.quickbooks_sales_receipt_id == nil
+    end
   end
 
   describe "sync_refund/1" do

@@ -311,6 +311,48 @@ defmodule Ysc.Ledgers.ReconciliationTest do
              )
     end
 
+    test "excludes payout payments from payment totals (ledger only sums t.type == :payment)",
+         %{
+           user: user
+         } do
+      # Create customer payment
+      {:ok, {_payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_totals_test",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "Test payment",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # Create payout (which creates payout_payment - must be excluded from totals)
+      {:ok, {payout_payment, _tx, _entries, _payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(5_000, :USD),
+          stripe_payout_id: "po_recon_totals_test",
+          description: "Stripe payout",
+          fee_total: Money.new(50, :USD)
+        })
+
+      result = Reconciliation.reconcile_payments()
+
+      # Totals must match: payments_table should exclude payout_payment ($50),
+      # so it should equal ledger_entries (customer payment $100 only)
+      assert result.totals.match == true,
+             "Payout payment (#{payout_payment.reference_id}) must be excluded from payment totals. " <>
+               "payments_table: #{Money.to_string!(result.totals.payments_table)}, " <>
+               "ledger_entries: #{Money.to_string!(result.totals.ledger_entries)}"
+
+      assert Money.equal?(result.totals.payments_table, Money.new(10_000, :USD))
+      assert Money.equal?(result.totals.ledger_entries, Money.new(10_000, :USD))
+    end
+
     test "detects payments without ledger transactions", %{user: user} do
       # Create a payment without going through process_payment
       payment =
