@@ -21,7 +21,7 @@ defmodule YscWeb.Emails.FooterBlock do
     </mj-section>
     <mj-section padding="48px">
       <mj-column padding="0">
-        <mj-text align="center" font-size="16px" font-weight="400" color="#71717b">The Young Scandinavians Club</mj-text>
+        <mj-text align="center" font-size="16px" font-weight="400" color="#71717b">Young Scandinavians Club</mj-text>
         <mj-text align="center" font-size="12px" color="#71717b">
           <a href="#{YscWeb.Endpoint.url()}" class="link-nostyle">YSC.org</a>
         </mj-text>

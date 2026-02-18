@@ -114,8 +114,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Please process this reimbursement promptly.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
     <mj-spacer height="12px"></mj-spacer>
   </mj-column>
 </mj-section>
-

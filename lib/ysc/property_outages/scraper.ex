@@ -1061,7 +1061,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
       If you have any questions or concerns, please don't hesitate to reach out to us.
 
-      The Young Scandinavians Club
+      Young Scandinavians Club
       """
 
       case Notifier.schedule_email(

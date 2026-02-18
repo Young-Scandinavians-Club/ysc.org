@@ -168,7 +168,7 @@ const StripeElements = {
                 this.paymentElement = this.elements.create('payment', {
                     layout: 'tabs',
                     business: {
-                        name: 'The Young Scandinavians Club'
+                        name: 'Young Scandinavians Club'
                     }
                 });
 
@@ -203,7 +203,7 @@ const StripeElements = {
                                 this.paymentElement = this.elements.create('payment', {
                                     layout: 'tabs',
                                     business: {
-                                        name: 'The Young Scandinavians Club'
+                                        name: 'Young Scandinavians Club'
                                     }
                                 });
                                 this.paymentElement.mount('#payment-element');
