@@ -15,7 +15,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">To complete the request please click the link below.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px"> Update Email → </mj-button>
+    <mj-button href="<%= @url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px"> Update Email → </mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you didn't request this change, please ignore this email. The link will expire in 24 hours.</mj-text>
     <mj-spacer height="12px"></mj-spacer>

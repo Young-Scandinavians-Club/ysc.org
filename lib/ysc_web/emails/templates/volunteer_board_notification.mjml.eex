@@ -77,7 +77,7 @@
       Please access the admin dashboard to view additional details and manage this volunteer signup:
     </mj-text>
     <mj-spacer height="16px"></mj-spacer>
-    <mj-button href="<%= admin_dashboard_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Admin Dashboard →</mj-button>
+    <mj-button href="<%= admin_dashboard_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Admin Dashboard →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="12px" line-height="1.5" padding="0px" color="#666" align="center">
       This is an automated notification. Please do not reply to this email.

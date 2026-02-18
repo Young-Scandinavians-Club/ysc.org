@@ -8,9 +8,11 @@
       cursor: pointer;
       transition: background-color 0.3s ease, color 0.3s ease;
       text-align: center;
-      }
-      .btn_block a {
       width: 92%;
+      margin-left: 4%;
+      margin-right: 4%;
+      display: block !important;
+      box-sizing: border-box;
       }
       .btn_block a:hover {
       background-color: #155dfc !important;

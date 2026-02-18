@@ -15,7 +15,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We noticed that you don't currently have a payment method on file. To ensure your membership continues without interruption, please add a payment method before your renewal date.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @payment_methods_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Add Payment Method →</mj-button>
+    <mj-button href="<%= @payment_methods_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Add Payment Method →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Why is this important?</strong></mj-text>
     <mj-spacer height="12px"></mj-spacer>

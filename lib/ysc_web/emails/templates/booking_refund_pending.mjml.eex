@@ -62,7 +62,7 @@
       <span style="color: #6B7280;"> (Total: <%= total_guests %> <%= if total_guests == 1, do: "guest", else: "guests" %>)</span>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Payment Details -->
     <%= if @payment.reference_id != "N/A" do %>

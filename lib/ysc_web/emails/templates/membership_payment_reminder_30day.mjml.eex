@@ -17,7 +17,7 @@
       <strong>Your membership approval is still valid!</strong> Complete your payment anytime to unlock all member benefits.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Complete Your Membership Payment → </mj-button>
+    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Complete Your Membership Payment → </mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">As a member, you'll have access to:</mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">

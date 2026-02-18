@@ -15,7 +15,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Before you dive into all the fun (think events, new friends, and a whole lot of Scandinavian awesomeness!), and while you wait for your application to be reviewed we just need you to confirm your email address.</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-button href="<%= @url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px"> Confirm your email → </mj-button>
+    <mj-button href="<%= @url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px"> Confirm your email → </mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">See you soon,</mj-text>
     <mj-spacer height="24px"></mj-spacer>

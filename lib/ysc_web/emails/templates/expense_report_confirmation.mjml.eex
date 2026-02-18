@@ -92,7 +92,7 @@
       <strong>Net Total:</strong> <%= @expense_report.net_total %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @expense_report_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Expense Report →</mj-button>
+    <mj-button href="<%= @expense_report_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Expense Report →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Next Steps -->
     <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">

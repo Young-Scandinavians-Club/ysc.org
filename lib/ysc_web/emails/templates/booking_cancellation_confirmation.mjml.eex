@@ -75,7 +75,7 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <% end %>
-    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you have any questions about your cancellation, please contact the Cabin Master or reach out to us at <a href="mailto:info@ysc.org">info@ysc.org</a>.</mj-text>
     <mj-spacer height="24px"></mj-spacer>

@@ -25,28 +25,28 @@
 >
   <mj-column padding="0">
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       Hej <%= @first_name %>,
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%= if @is_renewal do %>
-      <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" style="background-color: #FEF2F2; border-radius: 6px; border-left: 4px solid #DC2626;">
+      <mj-text align="center" font-size="18px" line-height="1.5" padding="16px" style="background-color: #FEF2F2; border-radius: 6px; border-left: 4px solid #DC2626;">
         <strong>⚠️ Urgent Action Required:</strong> Your <%= @membership_type %> membership renewal payment could not be processed. Your membership will expire if we cannot successfully process the payment.
       </mj-text>
       <mj-spacer height="24px"></mj-spacer>
-      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
         We attempted to renew your Young Scandinavians Club <%= @membership_type %> membership, but encountered an issue with your payment method. This could be due to:
       </mj-text>
     <% else %>
-      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
         We hope this message finds you well! We wanted to reach out regarding your Young Scandinavians Club <%= @membership_type %> membership payment.
       </mj-text>
       <mj-spacer height="12px"></mj-spacer>
-      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
         Unfortunately, we encountered an issue processing your recent membership payment. This could be due to:
       </mj-text>
     <% end %>
-    <mj-text font-size="18px" align="left" line-height="1.5">
+    <mj-text font-size="18px" align="center" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px">
           Insufficient funds in your account
@@ -64,12 +64,12 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <%= if @invoice_id do %>
-      <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#6b7280">
+      <mj-text align="center" font-size="16px" line-height="1.5" padding="0px" color="#6b7280">
         <strong>Invoice Reference:</strong> <%= @invoice_id %>
       </mj-text>
       <mj-spacer height="12px"></mj-spacer>
     <% end %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
         To keep your membership active and ensure uninterrupted access to all member benefits, please update your payment method and retry the payment as soon as possible.
       <% else %>
@@ -78,15 +78,15 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%= if @retry_payment_url do %>
-      <mj-button href="<%= @retry_payment_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">Retry Payment Now →</mj-button>
+      <mj-button href="<%= @retry_payment_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Retry Payment Now →</mj-button>
       <mj-spacer height="12px"></mj-spacer>
     <% end %>
-    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px"><%= if @is_renewal, do: "Update Payment Method →", else: "Update Payment Method →" %></mj-button>
+    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px"><%= if @is_renewal, do: "Update Payment Method →", else: "Update Payment Method →" %></mj-button>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       If you continue to experience issues, please try:
     </mj-text>
-    <mj-text font-size="18px" align="left" line-height="1.5">
+    <mj-text font-size="18px" align="center" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px">
           <strong>Contacting your bank:</strong> They may need to authorize the transaction
@@ -103,14 +103,14 @@
       </ul>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
         Once your payment method is updated and the renewal payment is successfully processed, your <%= @membership_type %> membership will continue uninterrupted with full access to all member benefits, including:
       <% else %>
         Once your payment is successfully processed, you'll immediately gain access to all member benefits, including:
       <% end %>
     </mj-text>
-    <mj-text font-size="18px" align="left" line-height="1.5">
+    <mj-text font-size="18px" align="center" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px">
           <strong>Exclusive Events:</strong> Join our vibrant community gatherings, cultural celebrations, and social activities
@@ -124,7 +124,7 @@
       </ul>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
         We value your continued membership and look forward to seeing you at our upcoming events!
       <% else %>
@@ -132,11 +132,11 @@
       <% end %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       Vi ses snart! (See you soon!) 👋
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       Young Scandinavians Club
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>

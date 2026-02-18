@@ -158,7 +158,7 @@
     <% end %>
 
     <!-- View Booking Button -->
-    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="left" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Cabin Master Contact -->
     <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
