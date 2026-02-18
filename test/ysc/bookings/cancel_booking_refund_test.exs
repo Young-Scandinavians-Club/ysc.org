@@ -261,10 +261,7 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
           {30, "100.0"}
         ])
 
-      # Ensure cache is refreshed after creating policy
       Ysc.Bookings.RefundPolicyCache.invalidate()
-      # Small delay to ensure cache refresh
-      Process.sleep(10)
 
       # Create booking with payment
       checkin_date = ~D[2025-12-15]

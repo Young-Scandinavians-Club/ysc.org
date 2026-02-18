@@ -33,11 +33,8 @@ defmodule Ysc.SmsRateLimitTest do
     test "allows SMS when under per-minute limit" do
       phone_number = "12065551234"
 
-      # Record 4 SMS (under the limit of 5)
       Enum.each(1..4, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        # Small delay to ensure different timestamps
-        Process.sleep(10)
       end)
 
       assert {:ok, :allowed} = SmsRateLimit.check_rate_limit(phone_number)
@@ -83,10 +80,8 @@ defmodule Ysc.SmsRateLimitTest do
     test "blocks SMS when per-minute limit is exceeded" do
       phone_number = "1206555#{System.unique_integer([:positive])}"
 
-      # Record 5 SMS (at the limit)
       Enum.each(1..5, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       # 6th SMS should be blocked
@@ -140,10 +135,8 @@ defmodule Ysc.SmsRateLimitTest do
     test "per-minute limit takes precedence over per-hour limit" do
       phone_number = "12065551234"
 
-      # Record 5 SMS quickly (within a minute)
       Enum.each(1..5, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       # Should be blocked by per-minute limit, not per-hour
@@ -158,10 +151,8 @@ defmodule Ysc.SmsRateLimitTest do
       phone1 = "1206555#{base}"
       phone2 = "1206555#{base + 1}"
 
-      # Exceed limit for phone1
       Enum.each(1..5, fn _ ->
         SmsRateLimit.record_sms_send(phone1)
-        Process.sleep(10)
       end)
 
       # Phone2 should still be allowed
@@ -208,11 +199,7 @@ defmodule Ysc.SmsRateLimitTest do
     test "appends new timestamp to existing list" do
       phone_number = "1206555#{System.unique_integer([:positive])}"
 
-      # Record first SMS
       SmsRateLimit.record_sms_send(phone_number)
-      Process.sleep(10)
-
-      # Record second SMS
       SmsRateLimit.record_sms_send(phone_number)
 
       # Verify both timestamps are present
@@ -252,8 +239,6 @@ defmodule Ysc.SmsRateLimitTest do
       phone2 = "12065551235"
 
       SmsRateLimit.record_sms_send(phone1)
-      # Small delay to ensure different timestamps
-      Process.sleep(10)
       SmsRateLimit.record_sms_send(phone2)
 
       # Both should be recorded separately
@@ -286,10 +271,8 @@ defmodule Ysc.SmsRateLimitTest do
       # Use a unique number per test so async tests don't share cache state
       phone_number = "1206555#{System.unique_integer([:positive])}"
 
-      # Record 3 SMS
       Enum.each(1..3, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)
@@ -304,10 +287,8 @@ defmodule Ysc.SmsRateLimitTest do
       # Use a unique number per test so async tests don't share cache state
       phone_number = "1206555#{System.unique_integer([:positive])}"
 
-      # Record 5 SMS (at the limit)
       Enum.each(1..5, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)
@@ -362,10 +343,8 @@ defmodule Ysc.SmsRateLimitTest do
     test "returns correct remaining counts" do
       phone_number = "12065551234"
 
-      # Record 2 SMS
       Enum.each(1..2, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)
@@ -397,11 +376,9 @@ defmodule Ysc.SmsRateLimitTest do
     test "allows sending SMS up to limits" do
       phone_number = "12065551234"
 
-      # Send 4 SMS (under limit)
       Enum.each(1..4, fn _ ->
         assert {:ok, :allowed} = SmsRateLimit.check_rate_limit(phone_number)
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       # 5th should still be allowed
@@ -411,11 +388,9 @@ defmodule Ysc.SmsRateLimitTest do
     test "blocks after reaching per-minute limit" do
       phone_number = "12065551234"
 
-      # Send 5 SMS
       Enum.each(1..5, fn _ ->
         assert {:ok, :allowed} = SmsRateLimit.check_rate_limit(phone_number)
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       # 6th should be blocked
@@ -427,10 +402,8 @@ defmodule Ysc.SmsRateLimitTest do
       # Use a unique number per test so async tests don't share cache state
       phone_number = "1206555#{System.unique_integer([:positive])}"
 
-      # Send 3 SMS
       Enum.each(1..3, fn _ ->
         SmsRateLimit.record_sms_send(phone_number)
-        Process.sleep(10)
       end)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)

@@ -167,7 +167,8 @@ defmodule Ysc.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       precommit: [
         "format",
-        "compile"
+        "compile",
+        "credo --strict"
       ],
       test: [
         "ecto.create --quiet",

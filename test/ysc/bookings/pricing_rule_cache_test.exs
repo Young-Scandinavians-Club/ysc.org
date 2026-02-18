@@ -394,7 +394,14 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
           price_unit: :per_person_per_night
         })
 
-      # Populate cache
+      # Set version to a past value so cached entries store an old version
+      Cachex.put(
+        :ysc_cache,
+        "pricing_rule:version",
+        System.system_time(:second) - 10
+      )
+
+      # Populate cache (entry stores the past version)
       cached1 =
         PricingRuleCache.get(
           :tahoe,
@@ -407,10 +414,7 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
 
       assert cached1.id == rule.id
 
-      # Wait to ensure version timestamp is different (versions use second resolution)
-      Process.sleep(1100)
-
-      # Invalidate cache
+      # Invalidate sets version to now(), making cached entries stale
       PricingRuleCache.invalidate()
 
       # Update the rule in database
@@ -435,16 +439,16 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
     end
 
     test "invalidation bumps cache version" do
-      # Get initial version
+      # Set version to a known past value
+      past_version = System.system_time(:second) - 10
+      Cachex.put(:ysc_cache, "pricing_rule:version", past_version)
+
       {:ok, version1} = Cachex.get(:ysc_cache, "pricing_rule:version")
+      assert version1 == past_version
 
-      # Wait one second to ensure time difference (version uses second resolution)
-      Process.sleep(1100)
-
-      # Invalidate
+      # Invalidate sets version to now()
       PricingRuleCache.invalidate()
 
-      # Get new version
       {:ok, version2} = Cachex.get(:ysc_cache, "pricing_rule:version")
 
       assert version2 > version1
@@ -475,7 +479,14 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
           price_unit: :per_person_per_night
         })
 
-      # Populate cache with version 1
+      # Set version to a past value so cached entries have an old version
+      Cachex.put(
+        :ysc_cache,
+        "pricing_rule:version",
+        System.system_time(:second) - 10
+      )
+
+      # Populate cache (entry stores the past version)
       PricingRuleCache.get(
         :tahoe,
         season.id,
@@ -485,10 +496,7 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
         :per_person_per_night
       )
 
-      # Wait to ensure version timestamp is different
-      Process.sleep(1100)
-
-      # Invalidate to bump version
+      # Invalidate sets version to now(), making cached entries stale
       PricingRuleCache.invalidate()
 
       # Update rule in DB

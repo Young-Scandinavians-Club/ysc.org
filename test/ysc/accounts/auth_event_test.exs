@@ -755,11 +755,7 @@ defmodule Ysc.Accounts.AuthEventTest do
       assert AuthService.get_last_login_session_event(user) == nil
       assert AuthService.get_last_session_timeframe(user) == nil
 
-      # Log a successful login
       {:ok, login_event} = AuthService.log_login_success(user, conn)
-
-      # Add a delay to ensure timestamps are different
-      Process.sleep(1000)
 
       # Should return login time as last session activity
       last_session_datetime = AuthService.get_last_login_session_datetime(user)

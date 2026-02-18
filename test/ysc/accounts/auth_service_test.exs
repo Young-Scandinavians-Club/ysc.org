@@ -439,8 +439,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
       conn = mock_conn()
 
       {:ok, _event1} = AuthService.log_login_success(user, conn)
-      # Small delay to ensure different timestamps
-      Process.sleep(10)
       {:ok, event2} = AuthService.log_login_success(user, conn)
 
       history = AuthService.get_user_auth_history(user, 10)
@@ -503,7 +501,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
       conn = mock_conn()
 
       AuthService.log_login_success(user, conn)
-      Process.sleep(10)
       {:ok, last_event} = AuthService.log_login_success(user, conn)
 
       last_login_time = AuthService.get_last_successful_login_datetime(user)
@@ -529,8 +526,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
       conn = mock_conn()
 
       AuthService.log_login_success(user, conn)
-      # Ensure distinct timestamps
-      Process.sleep(10)
       {:ok, _last_event} = AuthService.log_login_success(user, conn)
 
       retrieved_event = AuthService.get_last_successful_login_event(user)
@@ -580,8 +575,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
       conn = mock_conn()
 
       AuthService.log_login_success(user, conn)
-      # Ensure distinct timestamps
-      Process.sleep(10)
       {:ok, _logout_event} = AuthService.log_logout(user, conn)
 
       last_event = AuthService.get_last_login_session_event(user)
@@ -617,7 +610,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
       conn = mock_conn()
 
       {:ok, login_event} = AuthService.log_login_success(user, conn)
-      Process.sleep(10)
       {:ok, logout_event} = AuthService.log_logout(user, conn)
 
       timeframe = AuthService.get_last_session_timeframe(user)

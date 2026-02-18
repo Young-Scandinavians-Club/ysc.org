@@ -20,9 +20,6 @@ defmodule Ysc.SettingsTest do
       setting1 =
         %SiteSetting{name: "setting1", value: "value1"} |> Repo.insert!()
 
-      # Add a small delay to ensure setting2 gets a later ULID
-      Process.sleep(1)
-
       setting2 =
         %SiteSetting{name: "setting2", value: "value2"} |> Repo.insert!()
 
