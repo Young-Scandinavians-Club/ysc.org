@@ -28,16 +28,31 @@ defmodule YscWeb.AdminDashboardLive do
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
           <div>
             <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
-              Overview
+              Welcome back, <%= String.capitalize(@current_user.first_name) %> 👋
             </h1>
             <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
-              <span class={[
-                "w-2 h-2 rounded-full",
-                if(@loading_dashboard,
-                  do: "bg-amber-500 animate-pulse",
-                  else: "bg-emerald-500"
-                )
-              ]}>
+              <span class="relative inline-flex w-2 h-2">
+                <span class={[
+                  "w-2 h-2 rounded-full",
+                  if(@loading_dashboard, do: "bg-amber-500", else: "bg-emerald-500")
+                ]}>
+                </span>
+                <span class={[
+                  "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:4s]",
+                  if(@loading_dashboard,
+                    do: "bg-amber-500 animate-ping",
+                    else: "bg-emerald-500 animate-ping"
+                  )
+                ]}>
+                </span>
+                <span class={[
+                  "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:5s]",
+                  if(@loading_dashboard,
+                    do: "bg-amber-500 animate-pulse",
+                    else: "bg-emerald-500 animate-pulse"
+                  )
+                ]}>
+                </span>
               </span>
               <%= if @loading_dashboard do %>
                 Loading dashboard...
