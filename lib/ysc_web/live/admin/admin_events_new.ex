@@ -364,7 +364,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     locked={false}
                   />
                   <p class="text-zinc-700 text-sm">
-                    Click on the map to set marker to set or move the marker to set the location.
+                    Click on the map to set marker location.
                   </p>
                 </div>
               </div>
@@ -390,7 +390,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 <div id="richtext" phx-update="ignore">
                   <trix-editor
                     input="post[raw_body]"
-                    class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r focus:ring-0 text-wrap"
+                    class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
                     placeholder="Write something delightful and nice..."
                   >
                   </trix-editor>
