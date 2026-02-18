@@ -505,8 +505,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       # Reload refund to get updated sync status
-      # Wait a bit for any async jobs to complete
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       # Clear sync status if it was auto-synced with default stub
@@ -612,8 +610,6 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # If sync didn't update status (shouldn't happen, but handle it)
       if refund.quickbooks_sync_status != "synced" do
-        # Wait a bit for async processing
-        Process.sleep(100)
         _refund = Repo.reload!(refund)
       end
 
@@ -886,7 +882,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           reason: "Refund"
         })
 
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       refund =
@@ -1659,8 +1654,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           reason: "Partial refund"
         })
 
-      # Wait for async jobs
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       # Clear refund sync status to force explicit sync
@@ -1997,8 +1990,6 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert payment.quickbooks_sales_receipt_id != nil
 
       # Refund should NOT be synced (we explicitly cleared it)
-      # Wait a bit for any async jobs
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       # If refund was auto-synced, clear it again
@@ -3247,8 +3238,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           reason: "Booking cancelled"
         })
 
-      # Wait for any async jobs to complete
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       # Clear sync status if it was auto-synced with default stub
@@ -3375,8 +3364,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           reason: "Booking cancelled"
         })
 
-      # Wait for any async jobs to complete
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       # Clear sync status if it was auto-synced with default stub
@@ -3641,7 +3628,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -3757,7 +3743,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -3906,7 +3891,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
 
       # Reset both payments to pending
       for payment <- [single_payment, family_payment] do
@@ -4002,7 +3986,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4093,7 +4076,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4174,7 +4156,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4255,7 +4236,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4313,7 +4293,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4399,7 +4378,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           payment_method_id: nil
         })
 
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4474,7 +4452,6 @@ defmodule Ysc.Quickbooks.SyncTest do
         })
 
       setup_default_mocks()
-      Process.sleep(100)
       payment = Repo.reload!(payment)
 
       if payment.quickbooks_sync_status == "synced" do
@@ -4553,7 +4530,6 @@ defmodule Ysc.Quickbooks.SyncTest do
           reason: "Test refund failure"
         })
 
-      Process.sleep(100)
       refund = Repo.reload!(refund)
 
       if refund.quickbooks_sync_status == "synced" do

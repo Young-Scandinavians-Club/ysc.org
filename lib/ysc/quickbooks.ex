@@ -35,7 +35,7 @@ defmodule Ysc.Quickbooks do
         stripe_account_id: "101112",
         amount: 500.00,
         txn_date: ~D[2024-01-15],
-        memo: "Stripe payout for period ending 2024-01-15"
+        private_note: "Stripe payout for period ending 2024-01-15"
       })
   """
 
@@ -443,10 +443,8 @@ defmodule Ysc.Quickbooks do
       - `stripe_account_id` (required) - QuickBooks account ID representing Stripe
       - `amount` (required) - Deposit amount
       - `txn_date` (optional) - Transaction date (Date struct or ISO 8601 string)
-      - `memo` (optional) - Public memo
-      - `private_note` (optional) - Private note
+      - `private_note` (optional) - Private note (QuickBooks Deposit does not support `Memo`)
       - `class_ref` (optional) - Class reference for categorization
-      - `payment_method_ref` (optional) - Payment method reference
 
   """
   @spec create_stripe_payout_deposit(map(), keyword()) ::
@@ -482,11 +480,6 @@ defmodule Ysc.Quickbooks do
     deposit_params =
       if params[:txn_date],
         do: Map.put(deposit_params, :txn_date, format_date(params.txn_date)),
-        else: deposit_params
-
-    deposit_params =
-      if params[:memo],
-        do: Map.put(deposit_params, :memo, params.memo),
         else: deposit_params
 
     deposit_params =

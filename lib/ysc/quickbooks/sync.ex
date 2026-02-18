@@ -2256,8 +2256,8 @@ defmodule Ysc.Quickbooks.Sync do
           total_amt: amount,
           txn_date:
             format_payout_date(payout.arrival_date || payout.inserted_at),
-          memo: "Stripe Payout: #{payout.stripe_payout_id}",
-          private_note: "Payout with no linked transactions"
+          private_note:
+            "Stripe Payout: #{payout.stripe_payout_id} — no linked transactions"
         }
 
         Ysc.Logging.debug(
@@ -2310,7 +2310,7 @@ defmodule Ysc.Quickbooks.Sync do
             stripe_account_id: stripe_account_id,
             amount: amount,
             txn_date: payout.arrival_date || payout.inserted_at,
-            memo: "Stripe Payout: #{payout.stripe_payout_id}",
+            private_note: "Stripe Payout: #{payout.stripe_payout_id}",
             description: payout.description || "Stripe payout",
             class_ref: administration_class_ref
           }
@@ -2696,9 +2696,8 @@ defmodule Ysc.Quickbooks.Sync do
       line: line_items,
       total_amt: total_amount,
       txn_date: format_payout_date(payout.arrival_date || payout.inserted_at),
-      memo: "Stripe Payout: #{payout.stripe_payout_id}",
       private_note:
-        "Payout includes #{length(payout.payments)} payments and #{length(payout.refunds)} refunds"
+        "Stripe Payout: #{payout.stripe_payout_id} — #{length(payout.payments)} payments and #{length(payout.refunds)} refunds"
     }
 
     Ysc.Logging.debug(

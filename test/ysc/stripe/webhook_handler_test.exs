@@ -119,6 +119,30 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
     end)
 
+    stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn _name ->
+      {:ok, "revenue_account_default"}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn _name, _opts ->
+      {:ok, "qb_item_default"}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :get_item_by_id, fn _id ->
+      {:ok,
+       %{
+         "Id" => "qb_item_default",
+         "IncomeAccountRef" => %{"value" => "revenue_account_default"}
+       }}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _params, _opts ->
+      {:ok, %{"Id" => "qb_rr_default", "TotalAmt" => "0.00"}}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn _name ->
+      {:ok, "qb_class_default"}
+    end)
+
     :ok
   end
 

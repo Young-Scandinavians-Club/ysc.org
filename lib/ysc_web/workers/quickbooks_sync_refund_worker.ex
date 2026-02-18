@@ -2,15 +2,32 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
   @moduledoc """
   Oban worker for syncing Refund records to QuickBooks.
 
-  This worker processes refunds asynchronously and creates SalesReceipts (with negative amounts) in QuickBooks.
+  The entire sync operation runs inside a database transaction holding a
+  `FOR UPDATE NOWAIT` row lock on the refund. The lock is held until the
+  QuickBooks API call and status update complete, preventing concurrent
+  processing of the same refund. If the lock is already held, the job
+  returns `:ok` and lets the nightly retry worker pick it up later.
   """
 
   require Ysc.Logging
-  use Oban.Worker, queue: :default, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :default,
+    max_attempts: 5,
+    unique: [
+      period: 300,
+      fields: [:args, :queue],
+      states: [:available, :scheduled, :executing, :retryable]
+    ]
 
   alias Ysc.Repo
   alias Ysc.Ledgers.Refund
   alias Ysc.Quickbooks.Sync
+  import Ecto.Query
+
+  @non_retriable_errors [
+    :refund_not_found
+  ]
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"refund_id" => refund_id}}) do
@@ -18,84 +35,124 @@ defmodule YscWeb.Workers.QuickbooksSyncRefundWorker do
       refund_id: refund_id
     )
 
-    import Ecto.Query
-
-    # Convert refund_id string to ULID if needed
     refund_id_ulid =
       case Ecto.ULID.cast(refund_id) do
         {:ok, ulid} -> ulid
         _ -> refund_id
       end
 
-    # Lock the refund record to prevent concurrent processing
-    case Repo.transaction(fn ->
-           from(r in Refund,
+    Repo.transaction(fn ->
+      case from(r in Refund,
              where: r.id == ^refund_id_ulid,
              lock: "FOR UPDATE NOWAIT"
            )
-           |> Repo.one()
-         end) do
-      {:ok, nil} ->
+           |> Repo.one() do
+        nil ->
+          Repo.rollback(:refund_not_found)
+
+        %Refund{
+          quickbooks_sync_status: "synced",
+          quickbooks_sales_receipt_id: sr_id
+        }
+        when not is_nil(sr_id) ->
+          {:already_synced, sr_id}
+
+        refund ->
+          Sync.sync_refund(refund)
+      end
+    end)
+    |> handle_result(refund_id)
+  rescue
+    e in Postgrex.Error ->
+      if match?(%{postgres: %{code: :lock_not_available}}, e) do
+        Ysc.Logging.info("Refund is locked by another process, skipping",
+          refund_id: refund_id
+        )
+
+        :ok
+      else
+        reraise e, __STACKTRACE__
+      end
+  end
+
+  defp handle_result(result, refund_id) do
+    case result do
+      {:ok, {:already_synced, sales_receipt_id}} ->
+        Ysc.Logging.info("Refund already synced (checked under lock)",
+          refund_id: refund_id,
+          sales_receipt_id: sales_receipt_id
+        )
+
+        :ok
+
+      {:ok, {:ok, sales_receipt}} ->
+        Ysc.Logging.info("Successfully synced refund to QuickBooks",
+          refund_id: refund_id,
+          sales_receipt_id: Map.get(sales_receipt, "Id")
+        )
+
+        :ok
+
+      {:ok, {:error, reason}} ->
+        classify_error(reason, refund_id)
+
+      {:error, :refund_not_found} ->
         Ysc.Logging.warning("Refund not found for QuickBooks sync",
           refund_id: refund_id
         )
 
         {:discard, :refund_not_found}
 
-      {:ok, refund} ->
-        # Check if already synced (double-check after acquiring lock)
-        if refund.quickbooks_sync_status == "synced" &&
-             refund.quickbooks_sales_receipt_id do
-          Ysc.Logging.info(
-            "Refund already synced to QuickBooks (checked after lock)",
-            refund_id: refund_id,
-            sales_receipt_id: refund.quickbooks_sales_receipt_id
-          )
-
-          :ok
-        else
-          case Sync.sync_refund(refund) do
-            {:ok, sales_receipt} ->
-              Ysc.Logging.info("Successfully synced refund to QuickBooks",
-                refund_id: refund_id,
-                sales_receipt_id: Map.get(sales_receipt, "Id")
-              )
-
-              :ok
-
-            {:error, reason} ->
-              Ysc.Logging.warning("Failed to sync refund to QuickBooks",
-                refund_id: refund_id,
-                error: inspect(reason)
-              )
-
-              # Oban will retry based on max_attempts
-              {:error, reason}
-          end
-        end
-
-      {:error, %Postgrex.Error{postgres: %{code: :lock_not_available}}} ->
-        # Another worker is processing this refund
-        Ysc.Logging.info("Refund is locked by another worker, skipping",
-          refund_id: refund_id
-        )
-
-        :ok
-
       {:error, reason} ->
-        Ysc.Logging.warning("Failed to lock refund for QuickBooks sync",
+        Ysc.Logging.warning("Refund sync transaction failed",
           refund_id: refund_id,
           error: inspect(reason)
         )
 
-        # Report to Sentry (only for non-lock errors)
-        unless match?(
-                 %Postgrex.Error{postgres: %{code: :lock_not_available}},
-                 reason
-               ) do
-        end
-
         {:error, reason}
     end
+  end
+
+  defp classify_error(reason, refund_id) when reason in @non_retriable_errors do
+    Ysc.Logging.warning("Discarding refund sync — non-retriable error",
+      refund_id: refund_id,
+      error: inspect(reason)
+    )
+
+    {:discard, reason}
+  end
+
+  defp classify_error(reason, refund_id) when is_binary(reason) do
+    if validation_fault?(reason) do
+      Ysc.Logging.warning(
+        "Discarding refund sync — QuickBooks validation error",
+        refund_id: refund_id,
+        error: reason
+      )
+
+      {:discard, reason}
+    else
+      Ysc.Logging.warning("Failed to sync refund to QuickBooks",
+        refund_id: refund_id,
+        error: reason
+      )
+
+      {:error, reason}
+    end
+  end
+
+  defp classify_error(reason, refund_id) do
+    Ysc.Logging.warning("Failed to sync refund to QuickBooks",
+      refund_id: refund_id,
+      error: inspect(reason)
+    )
+
+    {:error, reason}
+  end
+
+  defp validation_fault?(reason) when is_binary(reason) do
+    String.contains?(reason, "2010:") or
+      String.contains?(reason, "Request has invalid or unsupported property") or
+      String.contains?(reason, "ValidationFault")
   end
 end

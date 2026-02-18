@@ -468,10 +468,10 @@ defmodule Ysc.QuickbooksTest do
                })
     end
 
-    test "creates deposit with optional txn_date, memo, class_ref" do
+    test "creates deposit with optional txn_date, private_note, class_ref" do
       expect(ClientMock, :create_deposit, fn params, _opts ->
         assert params.txn_date == "2024-12-01"
-        assert params.memo == "Payout for November"
+        assert params.private_note == "Payout for November"
         assert [line] = params.line
         assert line.deposit_line_detail.class_ref == %{value: "class_payout"}
 
@@ -484,7 +484,7 @@ defmodule Ysc.QuickbooksTest do
                  stripe_account_id: "stripe_2",
                  amount: 1000.00,
                  txn_date: ~D[2024-12-01],
-                 memo: "Payout for November",
+                 private_note: "Payout for November",
                  class_ref: "class_payout"
                })
     end
