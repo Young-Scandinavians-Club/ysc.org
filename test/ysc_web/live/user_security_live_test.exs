@@ -5,6 +5,7 @@ defmodule YscWeb.UserSecurityLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.AuthEvent
   alias Ysc.Repo
 
   describe "mount/3" do
@@ -274,6 +275,148 @@ defmodule YscWeb.UserSecurityLiveTest do
                view,
                ~s(a[href="/users/settings/security"][class*="bg-blue-600"])
              )
+    end
+  end
+
+  describe "recent logins" do
+    test "shows Recent Logins section", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/users/settings/security")
+
+      assert html =~ "Recent Logins"
+      assert html =~ "Review where and how you signed in"
+    end
+
+    test "shows loading state for login history on initial mount", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/users/settings/security")
+
+      assert html =~ "Loading login history"
+    end
+
+    test "shows empty state when user has no login history", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      :timer.sleep(200)
+
+      html = render(view)
+      assert html =~ "Recent Logins"
+      assert html =~ "No login history yet"
+    end
+
+    test "displays recent login events with device and masked IP", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      attrs = %{
+        ip_address: "192.168.1.100",
+        user_agent: "Mozilla/5.0",
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "macOS"
+      }
+
+      AuthEvent.login_success_changeset(user, attrs)
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      :timer.sleep(200)
+
+      html = render(view)
+      assert html =~ "Recent Logins"
+      assert html =~ "Successful"
+      assert html =~ "Chrome on macOS"
+      assert html =~ "192.168.xxx.xxx"
+    end
+
+    test "displays failed login when present", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      attrs = %{
+        user_id: user.id,
+        email_attempted: user.email,
+        failure_reason: "invalid_credentials",
+        ip_address: "10.0.0.1",
+        user_agent: "Mozilla/5.0",
+        device_type: "desktop"
+      }
+
+      AuthEvent.login_failure_changeset(attrs)
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      :timer.sleep(200)
+
+      html = render(view)
+      assert html =~ "Recent Logins"
+      assert html =~ "Failed"
+      assert html =~ "10.0.xxx.xxx"
+    end
+
+    test "shows flagged badge for suspicious login event", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      attrs = %{
+        ip_address: "172.16.0.1",
+        user_agent: "Mozilla/5.0",
+        device_type: "mobile",
+        browser: "Safari",
+        operating_system: "iOS",
+        is_suspicious: true
+      }
+
+      AuthEvent.login_success_changeset(user, attrs)
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      :timer.sleep(200)
+
+      html = render(view)
+      assert html =~ "Recent Logins"
+      assert html =~ "Successful"
+      assert html =~ "Flagged"
+    end
+
+    test "limits to 10 most recent login events", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      base_attrs = %{
+        ip_address: "192.168.1.1",
+        user_agent: "Mozilla/5.0",
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "macOS"
+      }
+
+      for i <- 1..12 do
+        attrs = Map.put(base_attrs, :ip_address, "192.168.1.#{i}")
+        AuthEvent.login_success_changeset(user, attrs) |> Repo.insert!()
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      :timer.sleep(200)
+
+      html = render(view)
+
+      # Each event shows masked IP "192.168.xxx.xxx"; we limit to 10 so count should be 10
+      masked_ip_count =
+        html |> String.split("192.168.xxx.xxx") |> length() |> Kernel.-(1)
+
+      assert masked_ip_count == 10
     end
   end
 end

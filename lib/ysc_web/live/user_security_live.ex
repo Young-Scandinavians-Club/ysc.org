@@ -10,6 +10,7 @@ defmodule YscWeb.UserSecurityLive do
     user = socket.assigns.current_user
     current_membership = socket.assigns.current_membership
     active_plan = YscWeb.UserAuth.get_membership_plan_type(current_membership)
+    timezone = get_timezone_from_connect_params(socket)
 
     # Initialize password form
     password_changeset = Accounts.change_user_password(user)
@@ -18,6 +19,7 @@ defmodule YscWeb.UserSecurityLive do
     socket =
       socket
       |> assign(:page_title, "Security Settings")
+      |> assign(:timezone, timezone)
       |> assign(:user, user)
       |> assign(:current_password, nil)
       |> assign(:current_email, user.email)
@@ -33,12 +35,18 @@ defmodule YscWeb.UserSecurityLive do
       |> assign(:reauth_challenge, nil)
       |> assign(:pending_password_change, nil)
       |> assign(:user_has_password, !is_nil(user.hashed_password))
+      |> assign(:login_history, [])
+      |> assign(:login_history_loading, true)
 
-    # Load passkeys asynchronously only if connected
+    # Load passkeys and login history asynchronously only if connected
     socket =
       if connected?(socket) do
-        start_async(socket, :load_passkeys, fn ->
+        socket
+        |> start_async(:load_passkeys, fn ->
           Accounts.get_user_passkeys(user)
+        end)
+        |> start_async(:load_login_history, fn ->
+          Accounts.get_user_auth_history(user, 10)
         end)
       else
         socket
@@ -64,6 +72,23 @@ defmodule YscWeb.UserSecurityLive do
      socket
      |> assign(:passkeys_loading, false)
      |> assign(:passkeys_loaded, true)}
+  end
+
+  @impl true
+  def handle_async(:load_login_history, {:ok, login_history}, socket) do
+    {:noreply,
+     socket
+     |> assign(:login_history, login_history)
+     |> assign(:login_history_loading, false)}
+  end
+
+  def handle_async(:load_login_history, {:exit, reason}, socket) do
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load login history async: #{inspect(reason)}")
+
+    {:noreply,
+     socket
+     |> assign(:login_history_loading, false)}
   end
 
   @impl true
@@ -602,6 +627,69 @@ defmodule YscWeb.UserSecurityLive do
                 </:actions>
               </.simple_form>
             </div>
+            <!-- Recent Logins Section -->
+            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+              <h2 class="text-zinc-900 font-bold text-xl">Recent Logins</h2>
+              <p class="text-zinc-600 text-sm">
+                Review where and how you signed in. If you see an unfamiliar login, change your password and sign out other sessions.
+              </p>
+
+              <div
+                :if={@login_history_loading}
+                class="flex items-center justify-center py-8"
+              >
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
+                </div>
+                <span class="ml-3 text-zinc-600 text-sm">
+                  Loading login history...
+                </span>
+              </div>
+
+              <div
+                :if={!@login_history_loading && @login_history == []}
+                class="text-center py-8"
+              >
+                <p class="text-zinc-600 text-sm">No login history yet.</p>
+              </div>
+
+              <div
+                :if={!@login_history_loading && @login_history != []}
+                class="space-y-3"
+              >
+                <div
+                  :for={event <- @login_history}
+                  class="flex items-start justify-between gap-4 p-4 border border-zinc-200 rounded-lg"
+                >
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                      <.icon
+                        name={device_type_icon(event.device_type)}
+                        class="w-5 h-5 text-zinc-600 shrink-0"
+                      />
+                      <span class={login_status_badge(event)}>
+                        <%= if event.success, do: "Successful", else: "Failed" %>
+                      </span>
+                      <%= if event.is_suspicious do %>
+                        <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                          <.icon
+                            name="hero-exclamation-triangle"
+                            class="w-3 h-3 me-1"
+                          /> Flagged
+                        </span>
+                      <% end %>
+                    </div>
+                    <p class="text-sm text-zinc-900 font-medium">
+                      <%= login_device_description(event) %>
+                    </p>
+                    <p class="text-xs text-zinc-500 mt-1">
+                      <%= format_login_time(event.inserted_at, @timezone) %> · <%= mask_ip(
+                        event.ip_address
+                      ) %>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -616,5 +704,62 @@ defmodule YscWeb.UserSecurityLive do
       # Fallback for passkeys created before nickname detection was implemented
       "Device (created #{Calendar.strftime(passkey.inserted_at, "%b %Y")})"
     end
+  end
+
+  defp device_type_icon(device_type) do
+    case device_type do
+      "mobile" -> "hero-device-phone-mobile"
+      "tablet" -> "hero-device-tablet"
+      "desktop" -> "hero-computer-desktop"
+      _ -> "hero-computer-desktop"
+    end
+  end
+
+  defp get_timezone_from_connect_params(socket) do
+    connect_params = get_connect_params(socket) || %{}
+    Map.get(connect_params, "timezone", "America/Los_Angeles")
+  end
+
+  defp format_login_time(datetime, timezone) do
+    datetime
+    |> DateTime.shift_zone!(timezone)
+    |> Calendar.strftime("%b %d, %Y at %H:%M")
+  end
+
+  defp mask_ip(nil), do: "—"
+  defp mask_ip(""), do: "—"
+
+  defp mask_ip(ip) when is_binary(ip) do
+    # IPv4: mask last two octets (e.g. 192.168.xxx.xxx)
+    parts = String.split(ip, ".")
+
+    if length(parts) == 4 do
+      [a, b | _] = parts
+      "#{a}.#{b}.xxx.xxx"
+    else
+      # IPv6: show first two groups and mask rest
+      parts = String.split(ip, ":")
+
+      if length(parts) > 2 do
+        [a, b | _] = parts
+        "#{a}:#{b}:xxxx:..."
+      else
+        "—"
+      end
+    end
+  end
+
+  defp login_status_badge(event) do
+    if event.success do
+      "inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800"
+    else
+      "inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-800"
+    end
+  end
+
+  defp login_device_description(event) do
+    browser = event.browser || "Unknown browser"
+    os = event.operating_system || "Unknown OS"
+    "#{browser} on #{os}"
   end
 end
