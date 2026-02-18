@@ -72,6 +72,7 @@ defmodule YscWeb.Emails.EventNotificationTest do
       assert email_data.first_name == user.first_name
       assert is_map(email_data.event)
       assert email_data.event_url =~ "/events/#{event.id}"
+      assert email_data.notification_settings_url =~ "/users/notifications"
 
       # Check event details
       assert email_data.event.id == event.id

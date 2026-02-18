@@ -27,6 +27,10 @@ defmodule YscWeb.Emails.EventNotification do
     YscWeb.Endpoint.url() <> "/events/#{event_id}"
   end
 
+  def notification_settings_url do
+    YscWeb.Endpoint.url() <> "/users/notifications"
+  end
+
   @doc """
   Prepares event notification email data.
 
@@ -97,7 +101,8 @@ defmodule YscWeb.Emails.EventNotification do
       event: event_map,
       event_date_time: event_date_time,
       event_url: event_url(event.id),
-      event_image_url: event_image_url
+      event_image_url: event_image_url,
+      notification_settings_url: notification_settings_url()
     }
   end
 
