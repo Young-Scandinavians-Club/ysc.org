@@ -31,19 +31,13 @@ defmodule Ysc.Ledgers do
   # Format: {name, account_type, normal_balance, description}
   # Assets and Expenses are debit-normal
   # Liabilities, Revenue, and Equity are credit-normal
+  # Only accounts that are actually used in the codebase
   @basic_accounts [
     # Asset accounts (debit-normal)
     {"cash", "asset", "debit", "Cash account for holding funds"},
     {"stripe_account", "asset", "debit", "Stripe account balance"},
     {"accounts_receivable", "asset", "debit",
      "Outstanding payments from customers"},
-
-    # Liability accounts (credit-normal)
-    {"accounts_payable", "liability", "credit",
-     "Outstanding payments to vendors"},
-    {"deferred_revenue", "liability", "credit",
-     "Prepaid subscriptions and bookings"},
-    {"refund_liability", "liability", "credit", "Pending refunds"},
 
     # Revenue accounts (credit-normal)
     {"membership_revenue", "revenue", "credit",
@@ -57,8 +51,6 @@ defmodule Ysc.Ledgers do
 
     # Expense accounts (debit-normal)
     {"stripe_fees", "expense", "debit", "Stripe processing fees"},
-    {"operating_expenses", "expense", "debit", "General operating expenses"},
-    {"refund_expense", "expense", "debit", "Refunds issued to customers"},
     {"discount_expense", "expense", "debit", "Reserved ticket discounts"}
   ]
 

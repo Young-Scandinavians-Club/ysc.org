@@ -35,7 +35,6 @@ defmodule Ysc.LedgersTest do
       assert Ledgers.get_account_by_name("clear_lake_booking_revenue")
       assert Ledgers.get_account_by_name("donation_revenue")
       assert Ledgers.get_account_by_name("stripe_fees")
-      assert Ledgers.get_account_by_name("refund_expense")
     end
 
     test "list_accounts/0 returns all accounts" do

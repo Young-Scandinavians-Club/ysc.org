@@ -1670,7 +1670,13 @@ defmodule Ysc.Quickbooks.Client do
       item: inspect(item, limit: :infinity)
     )
 
-    amount_value = normalize_amount_value(item.amount)
+    # DiscountLineDetail amounts must be negative to reduce the total
+    amount_value =
+      if item.detail_type == "DiscountLineDetail" do
+        normalize_discount_amount_value(item.amount)
+      else
+        normalize_amount_value(item.amount)
+      end
 
     base = %{
       "Amount" => amount_value,
@@ -1696,6 +1702,14 @@ defmodule Ysc.Quickbooks.Client do
     case amount do
       %Decimal{} = amt -> Decimal.to_float(Decimal.abs(amt))
       amt when is_number(amt) -> abs(amt)
+      _ -> 0
+    end
+  end
+
+  defp normalize_discount_amount_value(amount) do
+    case amount do
+      %Decimal{} = amt -> -Decimal.to_float(Decimal.abs(amt))
+      amt when is_number(amt) -> -abs(amt)
       _ -> 0
     end
   end
@@ -1814,6 +1828,8 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   defp normalize_discount_line_detail(base, detail) do
+    detail = detail || %{}
+
     discount_detail = %{}
 
     discount_detail =
@@ -1857,10 +1873,9 @@ defmodule Ysc.Quickbooks.Client do
          field_key,
          map_key
        ) do
-    if detail[field_key] do
-      Map.put(discount_detail, map_key, detail[field_key])
-    else
-      discount_detail
+    case detail[field_key] do
+      nil -> discount_detail
+      value -> Map.put(discount_detail, map_key, normalize_ref(value))
     end
   end
 

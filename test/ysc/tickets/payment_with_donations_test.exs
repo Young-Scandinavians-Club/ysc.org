@@ -568,6 +568,362 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       assert {:ok, _} = Sync.sync_payment(payment)
     end
+
+    test "syncs ticket + discount only with event line and discount line", %{
+      user: user,
+      event: event
+    } do
+      # Payment: $100 gross event, $15 discount, $0 donation → net $85
+      total_amount = Money.new(85, :USD)
+      gross_event_amount = Money.new(100, :USD)
+      donation_amount = Money.new(0, :USD)
+      discount_amount = Money.new(15, :USD)
+      stripe_fee = Money.new(0, :USD)
+
+      {:ok, {payment, _transaction, entries}} =
+        Ledgers.process_event_payment_with_donations_and_discounts(%{
+          user_id: user.id,
+          total_amount: total_amount,
+          gross_event_amount: gross_event_amount,
+          event_amount: gross_event_amount,
+          donation_amount: donation_amount,
+          discount_amount: discount_amount,
+          event_id: event.id,
+          external_payment_id: "pi_qb_ticket_discount_only_123",
+          stripe_fee: stripe_fee,
+          description: "Ticket with discount - Order ORD-DISC",
+          payment_method_id: nil,
+          ticket_order_id: nil
+        })
+
+      # Ledger should have discount_expense credit entry
+      discount_expense_entry =
+        Enum.find(entries, fn e ->
+          e.description =~ "Reserved ticket discount" &&
+            e.debit_credit == :credit
+        end)
+
+      assert discount_expense_entry != nil
+      assert Money.equal?(discount_expense_entry.amount, discount_amount)
+
+      payment = Repo.reload!(payment)
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sales_receipt_id: nil,
+        quickbooks_sync_status: "pending"
+      })
+      |> Repo.update!()
+
+      payment = Repo.reload!(payment)
+      user = Repo.get!(Ysc.Accounts.User, user.id)
+
+      if user.quickbooks_customer_id do
+        user
+        |> Ecto.Changeset.change(quickbooks_customer_id: nil)
+        |> Repo.update!()
+      end
+
+      Cachex.clear(:ysc_cache)
+
+      stub(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_123"}}
+      end)
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Events Inc" -> {:ok, "events_account_default"}
+        "Donations" -> {:ok, "donations_account_default"}
+        "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+        "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Events" -> {:ok, "events_class_default"}
+        "Administration" -> {:ok, "admin_class_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        # Event-only with discount uses single-entity path: one line with net amount ($85).
+        assert length(params.line) == 1,
+               "expected 1 line for event-only payment with discount (net amount), got #{length(params.line)}"
+
+        single_line = List.first(params.line)
+        assert single_line.amount == Decimal.new("85.00")
+        assert params.total_amt == Decimal.new("85.00")
+
+        {:ok, %{"Id" => "qb_sr_ticket_discount_only", "TotalAmt" => "85.00"}}
+      end)
+
+      assert {:ok, receipt} = Sync.sync_payment(payment)
+      assert receipt["Id"] == "qb_sr_ticket_discount_only"
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+    end
+
+    test "syncs order with discounted ticket and non-discounted ticket (one line net amount)",
+         %{
+           user: user,
+           event: event
+         } do
+      # Order: 1 discounted ticket ($60 - $12 = $48) + 1 full-price ticket ($50) → gross $110, discount $12, total $98
+      total_amount = Money.new(98, :USD)
+      gross_event_amount = Money.new(110, :USD)
+      donation_amount = Money.new(0, :USD)
+      discount_amount = Money.new(12, :USD)
+      stripe_fee = Money.new(0, :USD)
+
+      {:ok, {payment, _transaction, entries}} =
+        Ledgers.process_event_payment_with_donations_and_discounts(%{
+          user_id: user.id,
+          total_amount: total_amount,
+          gross_event_amount: gross_event_amount,
+          event_amount: gross_event_amount,
+          donation_amount: donation_amount,
+          discount_amount: discount_amount,
+          event_id: event.id,
+          external_payment_id: "pi_qb_mixed_disc_order_123",
+          stripe_fee: stripe_fee,
+          description: "Order: discounted + full-price ticket - ORD-MIX",
+          payment_method_id: nil,
+          ticket_order_id: nil
+        })
+
+      # Ledger: gross event revenue, revenue reduction (debit), discount_expense (credit), stripe receivable
+      event_revenue_credit =
+        Enum.find(entries, fn e ->
+          e.description =~ "Event revenue from tickets" &&
+            e.debit_credit == :credit
+        end)
+
+      assert event_revenue_credit != nil
+      assert Money.equal?(event_revenue_credit.amount, gross_event_amount)
+
+      revenue_reduction_debit =
+        Enum.find(entries, fn e ->
+          e.description =~ "Revenue reduction from discount" &&
+            e.debit_credit == :debit
+        end)
+
+      assert revenue_reduction_debit != nil
+      assert Money.equal?(revenue_reduction_debit.amount, discount_amount)
+
+      discount_expense_entry =
+        Enum.find(entries, fn e ->
+          e.description =~ "Reserved ticket discount" &&
+            e.debit_credit == :credit
+        end)
+
+      assert discount_expense_entry != nil
+      assert Money.equal?(discount_expense_entry.amount, discount_amount)
+
+      payment = Repo.reload!(payment)
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sales_receipt_id: nil,
+        quickbooks_sync_status: "pending"
+      })
+      |> Repo.update!()
+
+      payment = Repo.reload!(payment)
+      user = Repo.get!(Ysc.Accounts.User, user.id)
+
+      if user.quickbooks_customer_id do
+        user
+        |> Ecto.Changeset.change(quickbooks_customer_id: nil)
+        |> Repo.update!()
+      end
+
+      Cachex.clear(:ysc_cache)
+
+      stub(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_123"}}
+      end)
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Events Inc" -> {:ok, "events_account_default"}
+        "Donations" -> {:ok, "donations_account_default"}
+        "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+        "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Events" -> {:ok, "events_class_default"}
+        "Administration" -> {:ok, "admin_class_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        # Event-only (no donation) → single line with net amount ($98)
+        assert length(params.line) == 1,
+               "expected 1 line for order with discounted + non-discounted ticket, got #{length(params.line)}"
+
+        single_line = List.first(params.line)
+
+        assert single_line.amount == Decimal.new("98.00"),
+               "expected net amount 98.00 (110 - 12), got #{single_line.amount}"
+
+        assert params.total_amt == Decimal.new("98.00")
+
+        {:ok, %{"Id" => "qb_sr_mixed_disc_order", "TotalAmt" => "98.00"}}
+      end)
+
+      assert {:ok, receipt} = Sync.sync_payment(payment)
+      assert receipt["Id"] == "qb_sr_mixed_disc_order"
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+    end
+
+    test "syncs ticket + discount + donation with event, discount, and donation lines",
+         %{
+           user: user,
+           event: event
+         } do
+      # Payment: $100 gross event, $15 discount, $25 donation → net $110
+      total_amount = Money.new(110, :USD)
+      gross_event_amount = Money.new(100, :USD)
+      donation_amount = Money.new(25, :USD)
+      discount_amount = Money.new(15, :USD)
+      stripe_fee = Money.new(0, :USD)
+
+      {:ok, {payment, _transaction, entries}} =
+        Ledgers.process_event_payment_with_donations_and_discounts(%{
+          user_id: user.id,
+          total_amount: total_amount,
+          gross_event_amount: gross_event_amount,
+          event_amount: gross_event_amount,
+          donation_amount: donation_amount,
+          discount_amount: discount_amount,
+          event_id: event.id,
+          external_payment_id: "pi_qb_ticket_discount_donation_123",
+          stripe_fee: stripe_fee,
+          description: "Ticket with discount and donation - Order ORD-DISC-DON",
+          payment_method_id: nil,
+          ticket_order_id: nil
+        })
+
+      # Ledger should have event revenue, donation revenue, and discount_expense entries
+      event_revenue_entry =
+        Enum.find(entries, fn e ->
+          e.description =~ "Event revenue from tickets" &&
+            e.debit_credit == :credit
+        end)
+
+      assert event_revenue_entry != nil
+      assert Money.equal?(event_revenue_entry.amount, gross_event_amount)
+
+      discount_expense_entry =
+        Enum.find(entries, fn e ->
+          e.description =~ "Reserved ticket discount" &&
+            e.debit_credit == :credit
+        end)
+
+      assert discount_expense_entry != nil
+      assert Money.equal?(discount_expense_entry.amount, discount_amount)
+
+      donation_revenue_entry =
+        Enum.find(entries, fn e ->
+          e.description =~ "Donation revenue from tickets" &&
+            e.debit_credit == :credit
+        end)
+
+      assert donation_revenue_entry != nil
+      assert Money.equal?(donation_revenue_entry.amount, donation_amount)
+
+      payment = Repo.reload!(payment)
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sales_receipt_id: nil,
+        quickbooks_sync_status: "pending"
+      })
+      |> Repo.update!()
+
+      payment = Repo.reload!(payment)
+      user = Repo.get!(Ysc.Accounts.User, user.id)
+
+      if user.quickbooks_customer_id do
+        user
+        |> Ecto.Changeset.change(quickbooks_customer_id: nil)
+        |> Repo.update!()
+      end
+
+      Cachex.clear(:ysc_cache)
+
+      stub(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_123"}}
+      end)
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Events Inc" -> {:ok, "events_account_default"}
+        "Donations" -> {:ok, "donations_account_default"}
+        "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+        "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Events" -> {:ok, "events_class_default"}
+        "Administration" -> {:ok, "admin_class_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        # Mixed payment: event line + discount line + donation line
+        assert length(params.line) == 3,
+               "expected 3 lines (event, discount, donation), got #{length(params.line)}: #{inspect(Enum.map(params.line, fn l -> {l.detail_type, l.amount} end))}"
+
+        event_line =
+          Enum.find(params.line, fn line ->
+            get_in(line, [:sales_item_line_detail, :item_ref, :value]) ==
+              "event_item_123"
+          end)
+
+        assert event_line != nil, "missing event line"
+        assert event_line.amount == Decimal.new("100.00")
+        assert event_line.description =~ "Event tickets"
+
+        discount_line =
+          Enum.find(params.line, fn line ->
+            line.detail_type == "DiscountLineDetail"
+          end)
+
+        assert discount_line != nil, "missing discount line"
+        assert discount_line.amount == Decimal.new("15.00")
+        assert discount_line.description =~ "Reserved ticket discount"
+
+        assert get_in(discount_line, [
+                 :discount_line_detail,
+                 :discount_account_ref,
+                 :value
+               ]) == "ticket_discounts_account_123"
+
+        donation_line =
+          Enum.find(params.line, fn line ->
+            get_in(line, [:sales_item_line_detail, :item_ref, :value]) ==
+              "donation_item_123"
+          end)
+
+        assert donation_line != nil, "missing donation line"
+        assert donation_line.amount == Decimal.new("25.00")
+        assert donation_line.description =~ "Donation"
+
+        # Total = 100 (event) - 15 (discount) + 25 (donation) = 110
+        assert params.total_amt == Decimal.new("110.00"),
+               "expected total 110.00, got #{params.total_amt}"
+
+        {:ok,
+         %{"Id" => "qb_sr_ticket_discount_donation", "TotalAmt" => "110.00"}}
+      end)
+
+      assert {:ok, receipt} = Sync.sync_payment(payment)
+      assert receipt["Id"] == "qb_sr_ticket_discount_donation"
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+    end
   end
 
   describe "end-to-end ticket payment with donations flow" do
