@@ -57,7 +57,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     |> put_resp_header("cross-origin-resource-policy", "same-origin")
     |> put_resp_header("cross-origin-embedder-policy", "unsafe-none")
     |> put_resp_header("x-content-type-options", "nosniff")
-    |> put_resp_header("x-frame-options", "DENY")
+    |> put_resp_header("x-frame-options", "SAMEORIGIN")
     |> put_resp_header("x-xss-protection", "1; mode=block")
     |> put_hsts_header(is_dev)
   end
@@ -161,7 +161,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
       if is_dev do
         "'self' http://localhost:* https://localhost:* https://js.stripe.com https://challenges.cloudflare.com"
       else
-        "https://js.stripe.com https://challenges.cloudflare.com"
+        "'self' https://js.stripe.com https://challenges.cloudflare.com"
       end
 
     # Worker sources - allow blob: workers (Radar library creates workers from blob URLs)
