@@ -1507,7 +1507,7 @@ defmodule YscWeb.CoreComponents do
           <.link navigate="/" class="items-center group ps-2.5 mb-5 inline-block">
             <div class="flex items-center gap-2">
               <.ysc_logo class="h-20 me-3" />
-              <span class="text-xs font-black bg-zinc-800 text-white px-2 py-0.5 rounded">
+              <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded">
                 ADMIN
               </span>
             </div>
