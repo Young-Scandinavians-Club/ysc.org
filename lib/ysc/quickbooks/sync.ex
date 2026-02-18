@@ -1176,7 +1176,7 @@ defmodule Ysc.Quickbooks.Sync do
       {:booking, :clear_lake} -> "Clear Lake Bookings"
       {:membership, :family} -> "Family Membership"
       {:membership, :single} -> "Single Membership"
-      {:membership, _} -> "Membership Inc"
+      {:membership, _} -> "Memberships"
       _ -> "General Revenue"
     end
   end
