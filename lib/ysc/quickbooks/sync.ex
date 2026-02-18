@@ -53,7 +53,9 @@ defmodule Ysc.Quickbooks.Sync do
     # Membership Inc
     membership_inc: %{account: "Membership Inc", class: "Administration"},
     # Stripe fees
-    stripe_fee: %{account: "Stripe Fees", class: "Administration"}
+    stripe_fee: %{account: "Stripe Fees", class: "Administration"},
+    # Ticket discounts (expense account for reserved ticket discounts)
+    ticket_discount: %{account: "Ticket Discounts", class: "Administration"}
   }
 
   @doc """
@@ -1587,6 +1589,48 @@ defmodule Ysc.Quickbooks.Sync do
           line_items
         end
 
+      # Add discount line item if payment has discount (from discount_expense ledger entries)
+      line_items =
+        case get_payment_discount_amount(payment) do
+          discount_amount when not is_nil(discount_amount) ->
+            if Money.positive?(discount_amount) do
+              discount_amount_decimal =
+                Money.to_decimal(discount_amount)
+                |> Decimal.round(2)
+
+              case get_ticket_discounts_account_ref() do
+                {:ok, discount_account_ref} ->
+                  discount_line_item =
+                    build_discount_line_item(
+                      discount_amount_decimal,
+                      "Reserved ticket discount - Order #{payment.reference_id}",
+                      discount_account_ref
+                    )
+
+                  Ysc.Logging.debug(
+                    "[QB Sync] create_mixed_payment_sales_receipt: Added discount line item",
+                    payment_id: payment.id,
+                    discount_amount: Decimal.to_string(discount_amount_decimal)
+                  )
+
+                  [discount_line_item | line_items]
+
+                {:error, _} ->
+                  Ysc.Logging.warning(
+                    "[QB Sync] create_mixed_payment_sales_receipt: Ticket Discounts account not found in QuickBooks, skipping discount line",
+                    payment_id: payment.id
+                  )
+
+                  line_items
+              end
+            else
+              line_items
+            end
+
+          _ ->
+            line_items
+        end
+
       # Add donation line item if donation entry exists and has positive amount
       Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Checking donation entry",
@@ -1644,10 +1688,19 @@ defmodule Ysc.Quickbooks.Sync do
         line_items: inspect(line_items, limit: :infinity)
       )
 
-      # Calculate total from line items
+      # Calculate total from line items (discount reduces total)
       total_amount =
         Enum.reduce(line_items, Decimal.new(0), fn item, acc ->
-          Decimal.add(acc, item.amount)
+          amount =
+            case item do
+              %{detail_type: "DiscountLineDetail", amount: amt} ->
+                Decimal.negate(Decimal.new(amt))
+
+              %{amount: amt} ->
+                Decimal.new(amt)
+            end
+
+          Decimal.add(acc, amount)
         end)
 
       Ysc.Logging.debug(
@@ -1761,6 +1814,46 @@ defmodule Ysc.Quickbooks.Sync do
         # Last resort fallback - this may fail, but we must provide a class
         %{value: "Administration", name: "Administration"}
     end
+  end
+
+  defp get_payment_discount_amount(%Payment{id: payment_id}) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id == ^payment_id,
+      where: a.name == "discount_expense",
+      where: e.debit_credit == "credit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      %Decimal{} = amount -> Money.new(amount, :USD)
+      amount when is_integer(amount) -> Money.new(amount, :USD)
+      _ -> nil
+    end
+  end
+
+  defp get_ticket_discounts_account_ref do
+    account_name = @account_class_mapping[:ticket_discount].account
+
+    case client_module().query_account_by_name(account_name) do
+      {:ok, account_id} -> {:ok, %{value: account_id}}
+      error -> error
+    end
+  end
+
+  defp build_discount_line_item(amount, description, discount_account_ref) do
+    class_ref = get_administration_class_ref()
+
+    %{
+      amount: amount,
+      detail_type: "DiscountLineDetail",
+      discount_line_detail: %{
+        discount_account_ref: discount_account_ref,
+        class_ref: class_ref
+      },
+      description: description
+    }
   end
 
   defp build_sales_line_item(item_id, amount, description, class_ref) do
