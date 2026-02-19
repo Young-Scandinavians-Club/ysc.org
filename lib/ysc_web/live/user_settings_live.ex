@@ -284,29 +284,27 @@ defmodule YscWeb.UserSettingsLive do
           show
         >
           <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
-            Update Payment Method
+            Payment Method
           </h2>
-
-          <div class="space-y-6">
-            <!-- Loading state for payment methods -->
-            <div
-              :if={assigns[:loading_payment_methods]}
-              class="flex items-center justify-center py-8"
-            >
-              <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
-              </div>
-              <span class="ml-3 text-zinc-600 text-sm">
-                Loading payment methods...
-              </span>
+          <%!-- Loading state --%>
+          <div
+            :if={assigns[:loading_payment_methods]}
+            class="flex items-center justify-center py-12"
+          >
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
             </div>
-            <!-- Existing Payment Methods -->
-            <div :if={
-              !assigns[:loading_payment_methods] && length(@all_payment_methods) > 0
-            }>
-              <h3 class="text-lg font-medium text-zinc-900 mb-4">
-                Select Existing Payment Method
-              </h3>
-              <div class="space-y-3">
+            <span class="ml-3 text-zinc-600 text-sm">
+              Loading payment methods...
+            </span>
+          </div>
+          <%!-- Loaded content --%>
+          <div :if={!assigns[:loading_payment_methods]}>
+            <%!-- Section 1: Existing payment methods --%>
+            <div :if={length(@all_payment_methods) > 0}>
+              <p class="text-sm font-medium text-zinc-500 uppercase tracking-wide mb-3">
+                Saved methods
+              </p>
+              <div class="space-y-2">
                 <div
                   :for={payment_method <- @all_payment_methods}
                   class={[
@@ -359,7 +357,7 @@ defmodule YscWeb.UserSettingsLive do
                       </svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-zinc-600 text-sm font-semibold">
+                      <p class="text-zinc-800 text-sm font-semibold">
                         <%= payment_method_display_text(payment_method) %>
                       </p>
                       <p
@@ -367,7 +365,7 @@ defmodule YscWeb.UserSettingsLive do
                           payment_method.type == :card && payment_method.exp_month &&
                             payment_method.exp_year
                         }
-                        class="text-zinc-600 text-xs"
+                        class="text-zinc-500 text-xs mt-0.5"
                       >
                         Expires <%= String.pad_leading(
                           to_string(payment_method.exp_month),
@@ -380,7 +378,7 @@ defmodule YscWeb.UserSettingsLive do
                           payment_method.type == :bank_account &&
                             payment_method.account_type
                         }
-                        class="text-zinc-600 text-xs"
+                        class="text-zinc-500 text-xs mt-0.5"
                       >
                         <%= payment_method.account_type %>
                       </p>
@@ -391,13 +389,9 @@ defmodule YscWeb.UserSettingsLive do
                           @default_payment_method &&
                             payment_method.id == @default_payment_method.id
                         }
-                        class="flex items-center text-blue-600"
+                        class="flex items-center gap-1 text-blue-600"
                       >
-                        <svg
-                          class="w-5 h-5 mr-1"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path
                             fill-rule="evenodd"
                             d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -405,92 +399,89 @@ defmodule YscWeb.UserSettingsLive do
                           >
                           </path>
                         </svg>
-                        <span class="text-sm font-medium">Default</span>
+                        <span class="text-xs font-semibold">Default</span>
                       </div>
-                      <div
+                      <span
                         :if={
                           !@default_payment_method ||
                             payment_method.id != @default_payment_method.id
                         }
-                        class="text-sm text-zinc-400"
+                        class="text-xs text-zinc-400"
                       >
-                        <span :if={!@selecting_payment_method}>
-                          Click to set as default
-                        </span>
-                        <span :if={@selecting_payment_method}>Updating...</span>
-                      </div>
+                        <%= cond do %>
+                          <% @selecting_payment_method -> %>
+                            Updating...
+                          <% true -> %>
+                            Set as default
+                        <% end %>
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <!-- Add New Payment Method -->
-            <div class="border-t flex w-full justify-end">
-              <button
+            <%!-- Separator --%>
+            <div class="relative my-6">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-zinc-200"></div>
+              </div>
+              <div
                 :if={!@show_new_payment_form}
+                class="relative flex justify-center"
+              >
+                <span class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide">
+                  Add new
+                </span>
+              </div>
+            </div>
+            <%!-- Section 2: Add new payment method button OR Stripe form --%>
+            <div :if={!@show_new_payment_form} class="flex justify-center py-2">
+              <button
                 id="add-payment-method"
                 type="button"
                 phx-click="add-new-payment-method"
                 phx-disable-with="Loading..."
-                class="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 border-dashed border-zinc-300 text-sm font-medium text-zinc-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
               >
-                <svg
-                  class="-ml-1 mr-2 h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  >
-                  </path>
-                </svg>
-                Add New Payment Method
+                <.icon name="hero-plus-circle" class="w-5 h-5" /> Add Payment Method
               </button>
             </div>
+            <div :if={@show_new_payment_form && @payment_intent_secret}>
+              <form
+                id="payment-form"
+                class="flex flex-col space-y-4"
+                phx-hook="StripeInput"
+                data-clientSecret={@payment_intent_secret}
+                data-publicKey={@public_key}
+                data-submitURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/payment-method"}
+                data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+              >
+                <div id="error-message">
+                  <p id="card-errors" class="text-red-400 text-sm"></p>
+                </div>
+                <div id="payment-element"></div>
+              </form>
+            </div>
           </div>
-          <!-- New Payment Method Form (Hidden by default) -->
-          <div :if={@show_new_payment_form && @payment_intent_secret} class="pt-4">
-            <h3 class="text-lg font-medium text-zinc-900">
-              Add New Payment Method
-            </h3>
-            <form
-              id="payment-form"
-              class="flex space-y-6 flex-col"
-              phx-hook="StripeInput"
-              data-clientSecret={@payment_intent_secret}
-              data-publicKey={@public_key}
-              data-submitURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/payment-method"}
-              data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+          <%!-- Modal footer --%>
+          <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
+            <button
+              type="button"
+              phx-click={JS.navigate(~p"/users/membership")}
+              class="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 bg-white hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              <div id="error-message">
-                <p id="card-errors" class="text-red-400 text-sm"></p>
-              </div>
-              <div id="payment-element">
-                <!-- Elements will create form elements here -->
-              </div>
-
-              <div class="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  phx-click="cancel-new-payment-method"
-                  class="px-4 py-2 border border-zinc-300 rounded-md text-sm font-medium text-zinc-700 bg-white hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  id="submit"
-                  phx-disable-with="Saving..."
-                  class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Save Payment Method
-                </button>
-              </div>
-            </form>
+              Cancel
+            </button>
+            <button
+              :if={@show_new_payment_form && @payment_intent_secret}
+              type="submit"
+              form="payment-form"
+              id="submit"
+              phx-disable-with="Saving..."
+              class="px-4 py-2 rounded-lg border border-transparent text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Save Payment Method
+            </button>
           </div>
         </.modal>
 
@@ -773,262 +764,136 @@ defmodule YscWeb.UserSettingsLive do
             :if={@live_action == :membership || @live_action == :payment_method}
             class="flex flex-col space-y-6"
           >
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
-              <div class="flex flex-row justify-between items-center">
-                <h2 class="text-zinc-900 font-bold text-xl">Current Membership</h2>
-              </div>
-
-              <%= if @is_sub_account do %>
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                  <div class="flex">
-                    <div class="flex-shrink-0">
-                      <.icon name="hero-user-group" class="h-5 w-5 text-blue-400" />
-                    </div>
-                    <div class="ml-3">
-                      <h3 class="text-sm font-medium text-blue-800">
-                        Family Account
-                      </h3>
-                      <div class="mt-2 text-sm text-blue-700">
-                        <p>
-                          You are a family member account. You share the membership benefits from <strong><%= if @primary_user, do: "#{@primary_user.first_name} #{@primary_user.last_name}", else: "your primary account" %></strong>.
-                        </p>
-                        <p class="mt-1">
-                          As a family member, you cannot purchase or manage your own membership. All membership benefits are shared from the primary account holder.
-                        </p>
-                      </div>
-                    </div>
+            <%!-- Sub-account: read-only view --%>
+            <div
+              :if={@is_sub_account}
+              class="rounded border border-zinc-100 p-6 space-y-4"
+            >
+              <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex gap-3">
+                  <.icon
+                    name="hero-user-group"
+                    class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <h3 class="text-sm font-semibold text-blue-800">
+                      Family Account
+                    </h3>
+                    <p class="text-sm text-blue-700 mt-1">
+                      You are a family member. You share membership benefits from <strong><%= if @primary_user,
+                        do: "#{@primary_user.first_name} #{@primary_user.last_name}",
+                        else: "your primary account" %></strong>.
+                      Family members cannot purchase or manage their own membership.
+                    </p>
+                    <%= if @primary_user do %>
+                      <p class="text-sm text-blue-700 mt-1">
+                        Contact
+                        <strong>
+                          <%= @primary_user.first_name %> <%= @primary_user.last_name %>
+                        </strong>
+                        to make any changes.
+                      </p>
+                    <% end %>
                   </div>
                 </div>
-              <% end %>
-
-              <p
-                :if={@current_membership == nil && !@is_sub_account}
-                class="text-sm text-zinc-600"
-              >
-                <.icon
-                  name="hero-x-circle"
-                  class="me-1 w-5 h-5 text-red-600 -mt-0.5"
-                />You are currently <strong>not</strong>
-                an active and paying member of the YSC.
-              </p>
-
+              </div>
               <.membership_status
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
-
-              <%= if @scheduled_downgrade_info && !@is_sub_account do %>
-                <div
-                  data-testid="scheduled-downgrade-notice"
-                  class="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4"
-                >
-                  <div class="flex">
-                    <div class="flex-shrink-0">
-                      <.icon
-                        name="hero-arrow-trending-down"
-                        class="h-5 w-5 text-amber-500"
-                      />
-                    </div>
-                    <div class="ml-3">
-                      <h3 class="text-sm font-medium text-amber-800">
-                        Downgrade Scheduled
-                      </h3>
-                      <div class="mt-2 text-sm text-amber-700">
-                        <p>
-                          Your membership will change to
-                          <strong>
-                            <%= String.capitalize(
-                              to_string(@scheduled_downgrade_info.target_plan)
-                            ) %>
-                          </strong>
-                          after <strong><%= Calendar.strftime(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %></strong>.
-                        </p>
-                        <p class="mt-1">
-                          You will keep your current plan benefits until that date.
-                        </p>
-                        <div class="mt-3">
-                          <.button
-                            id="cancel-scheduled-downgrade-btn"
-                            phx-click="cancel-scheduled-downgrade"
-                            phx-disable-with="Cancelling..."
-                            variant="outline"
-                            color="amber"
-                            data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
-                          >
-                            Cancel downgrade
-                          </.button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
-
-              <div class="space-y-4">
-                <.button
-                  :if={
-                    !@is_sub_account &&
-                      @current_membership != nil &&
-                      !Subscriptions.scheduled_for_cancellation?(
-                        @current_membership
-                      ) &&
-                      @active_plan_type != :lifetime
-                  }
-                  phx-click="cancel-membership"
-                  phx-disable-with="Cancelling..."
-                  color="red"
-                  disabled={
-                    !@user_is_active ||
-                      Subscriptions.scheduled_for_cancellation?(@current_membership)
-                  }
-                  data-confirm="Are you sure you want to cancel your membership?"
-                >
-                  Cancel Membership
-                </.button>
-
-                <.button
-                  :if={
-                    !@is_sub_account &&
-                      Subscriptions.scheduled_for_cancellation?(@current_membership)
-                  }
-                  phx-click="reactivate-membership"
-                  phx-disable-with="Reactivating..."
-                  color="green"
-                  disabled={!@user_is_active}
-                >
-                  Reactivate Membership
-                </.button>
-              </div>
             </div>
 
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
-              <div class="flex flex-row justify-between items-center">
-                <h2 class="text-zinc-900 font-bold text-xl">Manage Membership</h2>
-              </div>
-
-              <%= if @is_sub_account do %>
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                  <div class="flex">
-                    <div class="flex-shrink-0">
-                      <.icon
-                        name="hero-information-circle"
-                        class="h-5 w-5 text-blue-400"
-                      />
-                    </div>
-                    <div class="ml-3">
-                      <h3 class="text-sm font-medium text-blue-800">
-                        Membership Management Unavailable
-                      </h3>
-                      <div class="mt-2 text-sm text-blue-700">
-                        <p>
-                          As a family member account, you cannot manage your own membership. The primary account holder manages the membership for all family members.
-                        </p>
-                        <%= if @primary_user do %>
-                          <p class="mt-1">
-                            Contact
-                            <strong>
-                              <%= @primary_user.first_name %> <%= @primary_user.last_name %>
-                            </strong>
-                            if you need to make changes to your membership.
-                          </p>
-                        <% end %>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
-
-              <div
-                :if={@active_plan_type == :lifetime && !@is_sub_account}
-                class="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4"
-              >
-                <div class="flex">
-                  <div class="flex-shrink-0">
-                    <.icon name="hero-star" class="h-5 w-5 text-blue-400" />
-                  </div>
-                  <div class="ml-3">
-                    <h3 class="text-sm font-medium text-blue-800">
+            <%!-- Lifetime membership: special case --%>
+            <div
+              :if={@active_plan_type == :lifetime && !@is_sub_account}
+              class="rounded border border-zinc-100 p-6 space-y-4"
+            >
+              <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex gap-3">
+                  <.icon
+                    name="hero-star"
+                    class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <h3 class="text-sm font-semibold text-blue-800">
                       Lifetime Membership
                     </h3>
-                    <div class="mt-2 text-sm text-blue-700">
-                      <p>
-                        You have a lifetime membership that never expires. Your membership cannot be cancelled or changed.
-                      </p>
-                    </div>
+                    <p class="text-sm text-blue-700 mt-1">
+                      You have a lifetime membership that never expires. Your membership cannot be cancelled or changed.
+                    </p>
                   </div>
                 </div>
+              </div>
+              <.membership_status
+                current_membership={@current_membership}
+                primary_user={@primary_user}
+                is_sub_account={@is_sub_account}
+              />
+            </div>
+
+            <%!-- No active membership: 3-step purchase flow --%>
+            <div :if={
+              @active_plan_type == nil && @current_membership == nil &&
+                !@is_sub_account
+            }>
+              <div class="mb-6">
+                <h2 class="text-2xl font-bold text-zinc-900">
+                  Get Your YSC Membership
+                </h2>
+                <p class="text-zinc-500 mt-1">
+                  Access exclusive events, cabin access, and all membership benefits.
+                </p>
               </div>
 
               <div
-                :if={!@user_is_active && !@is_sub_account}
-                class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4"
+                :if={!@user_is_active}
+                class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4"
               >
-                <div class="flex">
-                  <div class="flex-shrink-0">
-                    <.icon
-                      name="hero-exclamation-triangle"
-                      class="h-5 w-5 text-yellow-400"
-                    />
-                  </div>
-                  <div class="ml-3">
-                    <h3 class="text-sm font-medium text-yellow-800">
+                <div class="flex gap-3">
+                  <.icon
+                    name="hero-exclamation-triangle"
+                    class="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <h3 class="text-sm font-semibold text-yellow-800">
                       Account Pending Approval
                     </h3>
-                    <div class="mt-2 text-sm text-yellow-700">
-                      <p>
-                        You will be able to manage your membership plan once your account is approved.
-                        Please wait for the board to review and approve your application.
-                      </p>
-                    </div>
+                    <p class="text-sm text-yellow-700 mt-1">
+                      Your account must be approved by the board before you can purchase a membership. Please check back shortly.
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div :if={@active_plan_type != :lifetime && !@is_sub_account}>
-                <.form
-                  for={@membership_form}
-                  id="membership_form"
-                  phx-submit="select_membership"
-                  phx-change="validate_membership"
-                  class={[
-                    "space-y-6 pt-4",
-                    !@user_is_active && "opacity-50 pointer-events-none"
-                  ]}
-                >
-                  <div class="space-y-2">
-                    <div class="flex flex-row items-center">
-                      <h3 class="text-lg font-semibold text-zinc-900">
-                        Membership Type
-                      </h3>
-                      <.dropdown
-                        :if={@live_action != :payment_method}
-                        id="membership-help"
-                        wide={true}
-                      >
-                        <:button_block>
-                          <.icon
-                            class="w-5 h-5 text-blue-700 hover:text-blue-800 transition ease-in-out cursor-help"
-                            name="hero-question-mark-circle"
-                          />
-                        </:button_block>
-
-                        <div class="space-y-2 prose prose-zinc py-3 px-4">
-                          <p class="text-sm">
-                            The YSC offers two types of memberships: a
-                            <strong>Single</strong>
-                            membership for individuals and a <strong>Family</strong>
-                            membership that covers you, your spouse, and your children under 18. Both memberships are billed annually.
-                          </p>
-
-                          <p class="text-sm">
-                            With the Family membership you can for example book "member" event tickets for everyone in your household. While the Single membership only allows you to book "member" event tickets for yourself.
-                          </p>
-                        </div>
-                      </.dropdown>
+              <.form
+                for={@membership_form}
+                id="membership_form"
+                phx-submit="select_membership"
+                phx-change="validate_membership"
+              >
+                <div class={[
+                  "bg-white border border-zinc-100 rounded overflow-hidden",
+                  !@user_is_active && "opacity-50 pointer-events-none"
+                ]}>
+                  <%!-- Step 1: Choose Plan --%>
+                  <div class="p-6 border-b border-zinc-100">
+                    <div class="flex items-start gap-3 mb-5">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <div>
+                        <h3 class="text-lg font-semibold text-zinc-900">
+                          Choose Your Plan
+                        </h3>
+                        <p class="text-sm text-zinc-500 mt-0.5">
+                          Single covers you. Family covers your spouse and children under 18. Both are billed annually.
+                        </p>
+                      </div>
                     </div>
-
-                    <fieldset class="flex flex-wrap mb-8">
+                    <fieldset class="flex flex-wrap gap-3">
                       <.radio_fieldset
                         field={@membership_form[:membership_type]}
                         options={
@@ -1048,266 +913,614 @@ defmodule YscWeb.UserSettingsLive do
                         checked_value={@membership_form.params["membership_type"]}
                       />
                     </fieldset>
+                  </div>
 
-                    <div
-                      :if={@membership_change_info != nil}
-                      class={[
-                        "rounded-lg p-4 border mb-4",
-                        if(@membership_change_info.direction == :upgrade,
-                          do: "bg-blue-50 border-blue-200",
-                          else: "bg-amber-50 border-amber-200"
-                        )
-                      ]}
-                    >
-                      <div class="flex">
-                        <div class="flex-shrink-0">
-                          <.icon
-                            name={
-                              if(@membership_change_info.direction == :upgrade,
-                                do: "hero-arrow-trending-up",
-                                else: "hero-arrow-trending-down"
-                              )
-                            }
-                            class={[
-                              "h-5 w-5",
-                              if(@membership_change_info.direction == :upgrade,
-                                do: "text-blue-400",
-                                else: "text-amber-400"
-                              )
-                            ]}
-                          />
-                        </div>
-                        <div class="ml-3 flex-1">
-                          <h4 class={[
-                            "text-sm font-semibold mb-2",
-                            if(@membership_change_info.direction == :upgrade,
-                              do: "text-blue-900",
-                              else: "text-amber-900"
-                            )
-                          ]}>
-                            <%= if @membership_change_info.direction == :upgrade do %>
-                              Upgrade to <%= String.capitalize(
-                                "#{@membership_change_info.new_plan.id}"
-                              ) %> Membership
-                            <% else %>
-                              Downgrade to <%= String.capitalize(
-                                "#{@membership_change_info.new_plan.id}"
-                              ) %> Membership
-                            <% end %>
-                          </h4>
-                          <div class={[
-                            "text-sm space-y-1",
-                            if(@membership_change_info.direction == :upgrade,
-                              do: "text-blue-800",
-                              else: "text-amber-800"
-                            )
-                          ]}>
-                            <%= if @membership_change_info.direction == :upgrade do %>
-                              <p>
-                                You will be charged a prorated amount immediately to upgrade from <%= String.capitalize(
-                                  "#{@membership_change_info.current_plan.id}"
-                                ) %> to <%= String.capitalize(
-                                  "#{@membership_change_info.new_plan.id}"
-                                ) %> membership.
-                              </p>
-                              <p class="text-xs mt-2 opacity-90">
-                                The prorated charge will be calculated based on the remaining time in your current billing period. The maximum charge will be
-                                <strong>
-                                  <%= Ysc.MoneyHelper.format_money!(
-                                    Money.new(
-                                      :USD,
-                                      @membership_change_info.price_difference
-                                    )
-                                  ) %>
-                                </strong>
-                                (the full annual difference), but will be less based on how much time remains in your current period.
-                              </p>
-                            <% else %>
-                              <p>
-                                Your membership will change from <%= String.capitalize(
-                                  "#{@membership_change_info.current_plan.id}"
-                                ) %> to <%= String.capitalize(
-                                  "#{@membership_change_info.new_plan.id}"
-                                ) %> at your next renewal date.
-                              </p>
-                              <p class="text-sm mt-2 opacity-90">
-                                You will continue to have <%= String.capitalize(
-                                  "#{@membership_change_info.current_plan.id}"
-                                ) %> benefits until then. No immediate charges or credits will be applied.
-                              </p>
-                            <% end %>
-                          </div>
-                        </div>
+                  <%!-- Step 2: Payment Method --%>
+                  <div class="p-6 bg-zinc-50/50 border-b border-zinc-100">
+                    <div class="flex items-start gap-3 mb-5">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <div>
+                        <h3 class="text-lg font-semibold text-zinc-900">
+                          Payment Method
+                        </h3>
+                        <p class="text-sm text-zinc-500 mt-0.5">
+                          Used for this purchase and all future automatic renewals.
+                        </p>
                       </div>
                     </div>
 
                     <div
-                      :if={@change_membership_button}
-                      class="flex w-full flex-row justify-end pt-4"
+                      :if={@loading_payment_methods}
+                      class="flex items-center gap-3 py-3"
                     >
-                      <.button
-                        disabled={
-                          @default_payment_method == nil || !@user_is_active
-                        }
-                        phx-click="change-membership"
-                        phx-value-membership_type={
-                          @membership_form.params["membership_type"]
-                        }
-                        phx-disable-with="Changing..."
-                        type="button"
+                      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600">
+                      </div>
+                      <span class="text-sm text-zinc-500">
+                        Loading payment methods...
+                      </span>
+                    </div>
+
+                    <%!-- No payment method: dashed "add" prompt --%>
+                    <.link
+                      :if={
+                        !@loading_payment_methods && @default_payment_method == nil
+                      }
+                      navigate={~p"/users/membership/payment-method"}
+                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                    >
+                      <div class="flex items-center gap-3">
+                        <.icon
+                          name="hero-credit-card"
+                          class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                        />
+                        <span class="text-zinc-600 font-medium group-hover:text-blue-700">
+                          Add a payment method
+                        </span>
+                      </div>
+                      <.icon
+                        name="hero-plus-circle"
+                        class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                      />
+                    </.link>
+
+                    <%!-- Has payment method: display with Change link --%>
+                    <div
+                      :if={
+                        !@loading_payment_methods && @default_payment_method != nil
+                      }
+                      class="flex items-center justify-between p-4 bg-white border border-zinc-200 rounded-lg"
+                    >
+                      <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0">
+                          <svg
+                            :if={@default_payment_method.type == :card}
+                            stroke="currentColor"
+                            fill="currentColor"
+                            stroke-width="0"
+                            viewBox="0 0 576 512"
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="w-6 h-6 fill-zinc-700"
+                          >
+                            <path d={payment_method_icon(@default_payment_method)}>
+                            </path>
+                          </svg>
+                          <svg
+                            :if={@default_payment_method.type == :bank_account}
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke-width="1.5"
+                            stroke="currentColor"
+                            class="w-6 h-6 text-zinc-700"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d={payment_method_icon(@default_payment_method)}
+                            >
+                            </path>
+                          </svg>
+                        </div>
+                        <div>
+                          <p class="text-sm font-semibold text-zinc-700">
+                            <%= payment_method_display_text(@default_payment_method) %>
+                          </p>
+                          <p
+                            :if={
+                              @default_payment_method.type == :card &&
+                                @default_payment_method.exp_month &&
+                                @default_payment_method.exp_year
+                            }
+                            class="text-xs text-zinc-500"
+                          >
+                            Expires <%= String.pad_leading(
+                              to_string(@default_payment_method.exp_month),
+                              2,
+                              "0"
+                            ) %> / <%= @default_payment_method.exp_year %>
+                          </p>
+                          <p
+                            :if={
+                              @default_payment_method.type == :bank_account &&
+                                @default_payment_method.account_type
+                            }
+                            class="text-xs text-zinc-500"
+                          >
+                            <%= @default_payment_method.account_type %>
+                          </p>
+                        </div>
+                      </div>
+                      <.link
+                        navigate={~p"/users/membership/payment-method"}
+                        class="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
                       >
-                        <.icon name="hero-arrows-right-left" class="me-2 -mt-0.5" />Change Membership Plan
-                      </.button>
+                        Change
+                      </.link>
                     </div>
                   </div>
 
-                  <div class="space-y-2">
-                    <h3 class="text-lg font-semibold text-zinc-900">
-                      Payment Method
-                    </h3>
+                  <%!-- Step 3: Summary & Pay --%>
+                  <div class="p-6">
+                    <div class="flex items-center gap-3 mb-5">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0">
+                        3
+                      </span>
+                      <h3 class="text-lg font-semibold text-zinc-900">
+                        Confirm & Pay
+                      </h3>
+                    </div>
 
-                    <div class="w-full py-2 px-3 rounded border border-zinc-200">
-                      <div class="w-full flex flex-row justify-between items-center">
-                        <div class="items-center space-x-2 flex flex-row">
-                          <div
-                            :if={@default_payment_method != nil}
-                            class="flex-shrink-0"
-                          >
-                            <svg
-                              :if={@default_payment_method.type == :card}
-                              stroke="currentColor"
-                              fill="currentColor"
-                              stroke-width="0"
-                              viewBox="0 0 576 512"
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="w-6 h-6 fill-zinc-800 text-zinc-800"
-                            >
-                              <path d={payment_method_icon(@default_payment_method)}>
-                              </path>
-                            </svg>
-                            <svg
-                              :if={@default_payment_method.type == :bank_account}
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke-width="1.5"
-                              stroke="currentColor"
-                              class="w-6 h-6 text-zinc-800"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d={payment_method_icon(@default_payment_method)}
-                              >
-                              </path>
-                            </svg>
-                          </div>
+                    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                      <% selected_type = @membership_form.params["membership_type"]
 
-                          <div class="flex flex-col">
-                            <p
-                              :if={@default_payment_method != nil}
-                              class="text-zinc-600 text-sm font-semibold"
-                            >
-                              <%= payment_method_display_text(
-                                @default_payment_method
-                              ) %>
-                            </p>
-                            <p
-                              :if={
-                                @default_payment_method != nil &&
-                                  @default_payment_method.type == :card
-                              }
-                              class="text-zinc-600 text-xs"
-                            >
-                              Expires <%= String.pad_leading(
-                                to_string(@default_payment_method.exp_month),
-                                2,
-                                "0"
-                              ) %> / <%= @default_payment_method.exp_year %>
-                            </p>
-                            <p
-                              :if={
-                                @default_payment_method != nil &&
-                                  @default_payment_method.type == :bank_account
-                              }
-                              class="text-zinc-600 text-xs"
-                            >
-                              <%= @default_payment_method.account_type %>
-                            </p>
-                            <p
-                              :if={@default_payment_method == nil}
-                              class="text-zinc-600 text-sm font-semibold"
-                            >
-                              No payment method
-                            </p>
-                          </div>
-                        </div>
-
+                      selected_plan =
+                        if selected_type,
+                          do:
+                            Enum.find(
+                              @membership_plans,
+                              &(to_string(&1.id) == selected_type)
+                            ),
+                          else: nil %>
+                      <div>
+                        <%= if selected_plan do %>
+                          <p class="text-sm text-zinc-500">
+                            <%= String.capitalize(to_string(selected_plan.id)) %> Membership &middot; Billed annually
+                          </p>
+                          <p class="text-2xl font-bold text-zinc-900 mt-0.5">
+                            <%= Ysc.MoneyHelper.format_money!(
+                              Money.new(:USD, selected_plan.amount)
+                            ) %>
+                          </p>
+                        <% else %>
+                          <p class="text-sm text-zinc-400 italic">
+                            Select a plan above to see pricing.
+                          </p>
+                        <% end %>
+                      </div>
+                      <div class="flex flex-col items-start sm:items-end gap-2">
                         <.button
-                          disabled={!@user_is_active}
-                          phx-click={
-                            JS.navigate(~p"/users/membership/payment-method")
+                          disabled={
+                            @default_payment_method == nil || !@user_is_active
                           }
+                          phx-disable-with="Processing..."
                         >
-                          Update Payment Method
+                          <.icon name="hero-shield-check" class="w-5 h-5 me-1.5" />
+                          Complete Membership Purchase
+                        </.button>
+                        <p class="text-xs text-zinc-400 flex items-center gap-1">
+                          <.icon name="hero-lock-closed" class="w-3 h-3" />
+                          Secure payment via Stripe
+                        </p>
+                      </div>
+                    </div>
+
+                    <p
+                      :if={
+                        !@loading_payment_methods && @default_payment_method == nil
+                      }
+                      class="mt-3 text-sm text-zinc-500"
+                    >
+                      Add a payment method in step 2 to complete your purchase.
+                    </p>
+                  </div>
+                </div>
+              </.form>
+            </div>
+
+            <%!-- Active membership (non-lifetime): status + plan management --%>
+            <div
+              :if={
+                @current_membership != nil && @active_plan_type != :lifetime &&
+                  !@is_sub_account
+              }
+              class="space-y-6"
+            >
+              <%!-- Current status card --%>
+              <div class="rounded border border-zinc-100 p-6 space-y-4">
+                <h2 class="text-zinc-900 font-bold text-xl">Current Membership</h2>
+
+                <.membership_status
+                  current_membership={@current_membership}
+                  primary_user={@primary_user}
+                  is_sub_account={@is_sub_account}
+                />
+
+                <div
+                  :if={@scheduled_downgrade_info}
+                  data-testid="scheduled-downgrade-notice"
+                  class="bg-amber-50 border border-amber-200 rounded-lg p-4 mx-2"
+                >
+                  <div class="flex gap-3">
+                    <.icon
+                      name="hero-arrow-trending-down"
+                      class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5"
+                    />
+                    <div class="flex-1">
+                      <h3 class="text-sm font-semibold text-amber-800">
+                        Downgrade Scheduled
+                      </h3>
+                      <p class="text-sm text-amber-700 mt-1">
+                        Your membership will change to
+                        <strong>
+                          <%= String.capitalize(
+                            to_string(@scheduled_downgrade_info.target_plan)
+                          ) %>
+                        </strong>
+                        after <strong>
+                          <%= Calendar.strftime(
+                            @scheduled_downgrade_info.effective_date,
+                            "%B %d, %Y"
+                          ) %>
+                        </strong>. You will keep your current benefits until that date.
+                      </p>
+                      <div class="mt-3">
+                        <.button
+                          id="cancel-scheduled-downgrade-btn"
+                          phx-click="cancel-scheduled-downgrade"
+                          phx-disable-with="Cancelling..."
+                          variant="outline"
+                          color="amber"
+                          data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                        >
+                          Cancel downgrade
                         </.button>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  <div
-                    :if={@active_plan_type == nil}
-                    class="flex w-full flex-col items-end gap-1 pt-4"
+                <div class="flex flex-wrap gap-3 pt-2 border-t border-zinc-100">
+                  <.button
+                    phx-click={JS.navigate(~p"/users/membership/payment-method")}
+                    variant="outline"
                   >
-                    <.button disabled={
-                      @default_payment_method == nil || !@user_is_active
-                    }>
-                      <.icon name="hero-credit-card" class="me-2 -mt-0.5" />Pay Membership
-                    </.button>
-                    <p
-                      :if={@default_payment_method == nil || !@user_is_active}
-                      class="text-xs text-zinc-500 max-w-sm text-right"
+                    <.icon name="hero-credit-card" class="w-4 h-4 mr-1.5" />
+                    Change Payment Method
+                  </.button>
+
+                  <.button
+                    :if={
+                      @current_membership != nil &&
+                        !Subscriptions.scheduled_for_cancellation?(
+                          @current_membership
+                        ) &&
+                        @active_plan_type != :lifetime
+                    }
+                    phx-click="cancel-membership"
+                    phx-disable-with="Cancelling..."
+                    color="red"
+                    variant="outline"
+                    disabled={
+                      !@user_is_active ||
+                        Subscriptions.scheduled_for_cancellation?(
+                          @current_membership
+                        )
+                    }
+                    data-confirm="Are you sure you want to cancel your membership?"
+                  >
+                    Cancel Membership
+                  </.button>
+
+                  <.button
+                    :if={
+                      @current_membership != nil &&
+                        Subscriptions.scheduled_for_cancellation?(
+                          @current_membership
+                        )
+                    }
+                    phx-click="reactivate-membership"
+                    phx-disable-with="Reactivating..."
+                    color="green"
+                    disabled={!@user_is_active}
+                  >
+                    Reactivate Membership
+                  </.button>
+                </div>
+              </div>
+
+              <%!-- Change plan card (only when we know the plan type) --%>
+              <div
+                :if={@active_plan_type != nil}
+                class="rounded border border-zinc-100 overflow-hidden"
+              >
+                <div class="p-6 border-b border-zinc-100">
+                  <h2 class="text-zinc-900 font-bold text-xl">Change Plan</h2>
+                  <p class="text-sm text-zinc-500 mt-1">
+                    Switch between Single and Family plans. Upgrades take effect immediately; downgrades apply at your next renewal.
+                  </p>
+                </div>
+
+                <div
+                  :if={!@user_is_active}
+                  class="m-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+                >
+                  <div class="flex gap-3">
+                    <.icon
+                      name="hero-exclamation-triangle"
+                      class="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5"
+                    />
+                    <div>
+                      <h3 class="text-sm font-semibold text-yellow-800">
+                        Account Pending Approval
+                      </h3>
+                      <p class="text-sm text-yellow-700 mt-1">
+                        You will be able to manage your membership once your account is approved.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <.form
+                  for={@membership_form}
+                  id="membership_form"
+                  phx-change="validate_membership"
+                  class={[!@user_is_active && "opacity-50 pointer-events-none"]}
+                >
+                  <%!-- Step 1: Plan selection --%>
+                  <div class="p-6 border-b border-zinc-100">
+                    <div class="flex items-center gap-3 mb-4">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0">
+                        1
+                      </span>
+                      <h3 class="text-lg font-semibold text-zinc-900">
+                        Select Plan
+                      </h3>
+                    </div>
+                    <fieldset class="flex flex-wrap gap-3">
+                      <.radio_fieldset
+                        field={@membership_form[:membership_type]}
+                        options={
+                          @membership_plans
+                          |> Enum.filter(&(&1.id != :lifetime))
+                          |> Enum.map(fn plan ->
+                            {plan.id,
+                             %{
+                               option: "#{plan.id}",
+                               subtitle: plan.description,
+                               icon: (plan.id == :single && "user") || "user-group",
+                               footer:
+                                 "#{Ysc.MoneyHelper.format_money!(Money.new(:USD, plan.amount))} per year"
+                             }}
+                          end)
+                        }
+                        checked_value={@membership_form.params["membership_type"]}
+                      />
+                    </fieldset>
+                  </div>
+
+                  <%!-- Plan change info banner --%>
+                  <div
+                    :if={@membership_change_info != nil}
+                    class={[
+                      "mx-6 mt-4 rounded-lg p-4 border",
+                      if(@membership_change_info.direction == :upgrade,
+                        do: "bg-blue-50 border-blue-200",
+                        else: "bg-amber-50 border-amber-200"
+                      )
+                    ]}
+                  >
+                    <div class="flex gap-3">
+                      <.icon
+                        name={
+                          if(@membership_change_info.direction == :upgrade,
+                            do: "hero-arrow-trending-up",
+                            else: "hero-arrow-trending-down"
+                          )
+                        }
+                        class={[
+                          "h-5 w-5 flex-shrink-0 mt-0.5",
+                          if(@membership_change_info.direction == :upgrade,
+                            do: "text-blue-500",
+                            else: "text-amber-500"
+                          )
+                        ]}
+                      />
+                      <div>
+                        <h4 class={[
+                          "text-sm font-semibold mb-1",
+                          if(@membership_change_info.direction == :upgrade,
+                            do: "text-blue-900",
+                            else: "text-amber-900"
+                          )
+                        ]}>
+                          <%= if @membership_change_info.direction == :upgrade do %>
+                            Upgrade to <%= String.capitalize(
+                              "#{@membership_change_info.new_plan.id}"
+                            ) %> Membership
+                          <% else %>
+                            Downgrade to <%= String.capitalize(
+                              "#{@membership_change_info.new_plan.id}"
+                            ) %> Membership
+                          <% end %>
+                        </h4>
+                        <div class={[
+                          "text-sm",
+                          if(@membership_change_info.direction == :upgrade,
+                            do: "text-blue-800",
+                            else: "text-amber-800"
+                          )
+                        ]}>
+                          <%= if @membership_change_info.direction == :upgrade do %>
+                            <p>
+                              You will be charged a prorated amount now to upgrade from <%= String.capitalize(
+                                "#{@membership_change_info.current_plan.id}"
+                              ) %> to <%= String.capitalize(
+                                "#{@membership_change_info.new_plan.id}"
+                              ) %> membership. The maximum charge will be
+                              <strong>
+                                <%= Ysc.MoneyHelper.format_money!(
+                                  Money.new(
+                                    :USD,
+                                    @membership_change_info.price_difference
+                                  )
+                                ) %>
+                              </strong>
+                              based on time remaining in your billing period.
+                            </p>
+                          <% else %>
+                            <p>
+                              Your membership will switch at your next renewal date. You will keep your <%= String.capitalize(
+                                "#{@membership_change_info.current_plan.id}"
+                              ) %> benefits until then. No immediate charges or credits will apply.
+                            </p>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <%!-- Step 2: Payment Method --%>
+                  <div class="p-6 bg-zinc-50/50 border-t border-zinc-100 mt-4">
+                    <div class="flex items-start gap-3 mb-4">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <div>
+                        <h3 class="text-lg font-semibold text-zinc-900">
+                          Payment Method
+                        </h3>
+                        <p class="text-sm text-zinc-500 mt-0.5">
+                          Used for this change and all future automatic renewals.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      :if={@loading_payment_methods}
+                      class="flex items-center gap-3 py-3"
                     >
-                      <%= if @default_payment_method == nil do %>
-                        Add a payment method above to pay for your membership.
+                      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600">
+                      </div>
+                      <span class="text-sm text-zinc-500">Loading...</span>
+                    </div>
+
+                    <.link
+                      :if={
+                        !@loading_payment_methods && @default_payment_method == nil
+                      }
+                      navigate={~p"/users/membership/payment-method"}
+                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                    >
+                      <div class="flex items-center gap-3">
+                        <.icon
+                          name="hero-credit-card"
+                          class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                        />
+                        <span class="text-zinc-600 font-medium group-hover:text-blue-700">
+                          Add a payment method
+                        </span>
+                      </div>
+                      <.icon
+                        name="hero-plus-circle"
+                        class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                      />
+                    </.link>
+
+                    <div
+                      :if={
+                        !@loading_payment_methods && @default_payment_method != nil
+                      }
+                      class="flex items-center justify-between p-4 bg-white border border-zinc-200 rounded-lg"
+                    >
+                      <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0">
+                          <svg
+                            :if={@default_payment_method.type == :card}
+                            stroke="currentColor"
+                            fill="currentColor"
+                            stroke-width="0"
+                            viewBox="0 0 576 512"
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="w-6 h-6 fill-zinc-700"
+                          >
+                            <path d={payment_method_icon(@default_payment_method)}>
+                            </path>
+                          </svg>
+                          <svg
+                            :if={@default_payment_method.type == :bank_account}
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke-width="1.5"
+                            stroke="currentColor"
+                            class="w-6 h-6 text-zinc-700"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d={payment_method_icon(@default_payment_method)}
+                            >
+                            </path>
+                          </svg>
+                        </div>
+                        <div>
+                          <p class="text-sm font-semibold text-zinc-700">
+                            <%= payment_method_display_text(@default_payment_method) %>
+                          </p>
+                          <p
+                            :if={
+                              @default_payment_method.type == :card &&
+                                @default_payment_method.exp_month &&
+                                @default_payment_method.exp_year
+                            }
+                            class="text-xs text-zinc-500"
+                          >
+                            Expires <%= String.pad_leading(
+                              to_string(@default_payment_method.exp_month),
+                              2,
+                              "0"
+                            ) %> / <%= @default_payment_method.exp_year %>
+                          </p>
+                          <p
+                            :if={
+                              @default_payment_method.type == :bank_account &&
+                                @default_payment_method.account_type
+                            }
+                            class="text-xs text-zinc-500"
+                          >
+                            <%= @default_payment_method.account_type %>
+                          </p>
+                        </div>
+                      </div>
+                      <.link
+                        navigate={~p"/users/membership/payment-method"}
+                        class="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        Change
+                      </.link>
+                    </div>
+                  </div>
+
+                  <%!-- Confirm change button --%>
+                  <div
+                    :if={@change_membership_button}
+                    class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-100"
+                  >
+                    <p class="text-sm text-zinc-500">
+                      <%= if @membership_change_info && @membership_change_info.direction == :upgrade do %>
+                        You will be charged a prorated amount today.
                       <% else %>
-                        Your account must be approved before you can pay for membership. Please wait for the board to review your application.
+                        The change will take effect at your next renewal date.
                       <% end %>
                     </p>
+                    <.button
+                      disabled={@default_payment_method == nil || !@user_is_active}
+                      phx-click="change-membership"
+                      phx-value-membership_type={
+                        @membership_form.params["membership_type"]
+                      }
+                      phx-disable-with="Changing..."
+                      type="button"
+                    >
+                      <.icon name="hero-arrows-right-left" class="me-2 -mt-0.5" />
+                      Change Membership Plan
+                    </.button>
                   </div>
                 </.form>
               </div>
             </div>
-
-            <%!-- <div class="rounded border border-zinc-100 px-4 py-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Membership Billing History</h2>
-
-              <div class="space-y-3">
-                <p :if={length(@invoices) == 0} class="text-zinc-600 text-sm">No previous payments</p>
-
-                <div
-                  :for={invoice <- @invoices}
-                  class="items-center flex w-full flex-row justify-between rounded bg-zinc-50 py-2 px-3"
-                >
-                  <div>
-                    <div class="flex flex-row space-x-2 items-center">
-                      <p class="text-sm font-bold text-zinc-800">
-                        <%= Timex.format!(invoice.created, "{Mshort} {D}, {YYYY}") %>
-                      </p>
-                      <.badge type={payment_to_badge_style(invoice.status)}>
-                        <%= String.upcase(invoice.status) %>
-                      </.badge>
-                    </div>
-
-                    <div class="text-sm text-zinc-600">
-                      <%= Ysc.MoneyHelper.format_money!(Money.new(:USD, "#{invoice.total / 100.0}")) %>
-                    </div>
-                  </div>
-
-                  <.button phx-click={JS.navigate(invoice.hosted_invoice_url)}>View</.button>
-                </div>
-              </div>
-            </div> --%>
           </div>
 
           <div :if={@live_action == :notifications} class="space-y-6">
@@ -1952,15 +2165,23 @@ defmodule YscWeb.UserSettingsLive do
         membership -> Subscriptions.get_scheduled_downgrade_info(membership)
       end
 
+    payment_intent_secret = payment_secret(live_action, user)
+
+    # Auto-show the new payment form when the modal opens with no existing methods
+    show_new_payment_form =
+      live_action == :payment_method && all_payment_methods == [] &&
+        not is_nil(payment_intent_secret)
+
     {:noreply,
      socket
      |> assign(:user, user)
      |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
      |> assign(:primary_user, primary_user)
-     |> assign(:payment_intent_secret, payment_secret(live_action, user))
+     |> assign(:payment_intent_secret, payment_intent_secret)
      |> assign(:default_payment_method, default_payment_method)
      |> assign(:all_payment_methods, all_payment_methods)
      |> assign(:loading_payment_methods, false)
+     |> assign(:show_new_payment_form, show_new_payment_form)
      |> assign(:address_form, to_form(address_changeset))
      |> assign(
        :membership_form,
