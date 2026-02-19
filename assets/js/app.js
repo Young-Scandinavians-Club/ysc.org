@@ -221,7 +221,9 @@ window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 
 // Handle custom events from LiveView
 window.addEventListener("phx:scroll-to-top", () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 100);
 });
 
 window.addEventListener("phx:scroll-to-price-details", () => {
