@@ -912,7 +912,12 @@ defmodule Ysc.Accounts do
   When changing phone number in settings, pass the new phone as `to_phone` so
   the code is sent to the new number instead of the current user.phone_number.
   """
-  def send_phone_verification_code(user, code, resend_key_suffix \\ nil, to_phone \\ nil) do
+  def send_phone_verification_code(
+        user,
+        code,
+        resend_key_suffix \\ nil,
+        to_phone \\ nil
+      ) do
     # Include resend suffix in idempotency key to allow multiple sends
     suffix = if resend_key_suffix, do: "_#{resend_key_suffix}", else: ""
     idempotency_key = "phone_verification_#{user.id}#{suffix}"

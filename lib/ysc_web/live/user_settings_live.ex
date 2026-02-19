@@ -2370,7 +2370,12 @@ defmodule YscWeb.UserSettingsLive do
               else: "resend_new_#{timestamp}"
 
           _job =
-            Accounts.send_phone_verification_code(user, code, suffix, pending_phone)
+            Accounts.send_phone_verification_code(
+              user,
+              code,
+              suffix,
+              pending_phone
+            )
 
           {:noreply,
            socket
