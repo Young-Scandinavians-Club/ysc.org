@@ -2191,7 +2191,13 @@ defmodule Ysc.Quickbooks.Sync do
       payout_id: payout.id
     )
 
-    bank_account_id = Application.get_env(:ysc, :quickbooks)[:bank_account_id]
+    # Bank account is required for QuickBooks Deposit (error 6000). Treat empty string as missing.
+    raw_bank_id = Application.get_env(:ysc, :quickbooks)[:bank_account_id]
+
+    bank_account_id =
+      if raw_bank_id && to_string(raw_bank_id) |> String.trim() != "",
+        do: to_string(raw_bank_id),
+        else: nil
 
     stripe_account_id =
       Application.get_env(:ysc, :quickbooks)[:stripe_account_id]

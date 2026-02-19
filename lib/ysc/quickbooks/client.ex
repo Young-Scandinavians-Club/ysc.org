@@ -524,7 +524,8 @@ defmodule Ysc.Quickbooks.Client do
   """
   @spec create_deposit(map()) :: {:ok, map()} | {:error, atom() | String.t()}
   def create_deposit(params, opts \\ []) do
-    with {:ok, access_token} <- get_access_token(),
+    with :ok <- validate_deposit_bank_account(params),
+         {:ok, access_token} <- get_access_token(),
          {:ok, company_id} <- get_company_id() do
       # Support idempotency via requestid parameter
       idempotency_key =
@@ -1616,8 +1617,25 @@ defmodule Ysc.Quickbooks.Client do
     body
   end
 
+  # QuickBooks requires a bank account for deposits (error 6000). Validate before sending.
+  defp validate_deposit_bank_account(params) do
+    ref = params[:deposit_to_account_ref] || params["deposit_to_account_ref"]
+    value = ref && (ref[:value] || ref["value"])
+
+    if value && to_string(value) |> String.trim() |> then(&(&1 != "")) do
+      :ok
+    else
+      Ysc.Logging.error(
+        "[QB Client] create_deposit: Bank account required. Set QUICKBOOKS_BANK_ACCOUNT_ID to your QuickBooks bank account Id."
+      )
+
+      {:error, :bank_account_required}
+    end
+  end
+
   # Builds request body per Deposit entity spec:
   # https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
+  # DepositToAccountRef (bank account) is required by QuickBooks - normalize and validate.
   defp build_deposit_body(params) do
     total_amt_value =
       case params.total_amt do
@@ -1626,8 +1644,13 @@ defmodule Ysc.Quickbooks.Client do
         _ -> 0
       end
 
+    # Normalize so QuickBooks receives {"value": "..."} (string keys, string value).
+    deposit_to_account_ref =
+      (params[:deposit_to_account_ref] || params.deposit_to_account_ref)
+      |> normalize_ref()
+
     %{
-      "DepositToAccountRef" => params.deposit_to_account_ref,
+      "DepositToAccountRef" => deposit_to_account_ref,
       "Line" => Enum.map(params.line, &normalize_deposit_line_item/1),
       "TotalAmt" => total_amt_value
     }
