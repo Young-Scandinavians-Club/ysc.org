@@ -133,6 +133,7 @@ defmodule Ysc.Accounts.SignupApplication do
       :citizenship,
       :most_connected_nordic_country
     ])
+    |> validate_birth_date()
     |> validate_agreed_to_bylaws()
     |> validate_membership_eligibility()
   end
@@ -149,6 +150,28 @@ defmodule Ysc.Accounts.SignupApplication do
       :review_outcome,
       :reviewed_by_user_id
     ])
+  end
+
+  defp validate_birth_date(changeset) do
+    case get_field(changeset, :birth_date) do
+      nil ->
+        changeset
+
+      date ->
+        today = Date.utc_today()
+        min_date = Date.new!(1900, 1, 1)
+
+        cond do
+          Date.before?(date, min_date) ->
+            add_error(changeset, :birth_date, "must be after 1900")
+
+          Date.after?(date, today) ->
+            add_error(changeset, :birth_date, "cannot be in the future")
+
+          true ->
+            changeset
+        end
+    end
   end
 
   defp validate_agreed_to_bylaws(changeset) do

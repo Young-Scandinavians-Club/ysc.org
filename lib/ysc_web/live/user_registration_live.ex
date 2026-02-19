@@ -118,6 +118,7 @@ defmodule YscWeb.UserRegistrationLive do
                   field={rf[:birth_date]}
                   label="Birth Date*"
                   type="date"
+                  max={Date.to_iso8601(Date.utc_today())}
                   required
                 />
                 <.input field={rf[:occupation]} label="Occupation" />
