@@ -516,12 +516,19 @@ defmodule YscWeb.UserRegistrationLive do
           int_step
       end
 
-    {:noreply, socket |> assign(:current_step, new_step)}
+    {:noreply,
+     socket
+     |> assign(:current_step, new_step)
+     |> push_event("scroll-to-top", %{})}
   end
 
   def handle_event("prev-step", _value, socket) do
     new_step = max(socket.assigns.current_step - 1, 0)
-    {:noreply, assign(socket, :current_step, new_step)}
+
+    {:noreply,
+     socket
+     |> assign(:current_step, new_step)
+     |> push_event("scroll-to-top", %{})}
   end
 
   def handle_event("next-step", _values, socket) do
@@ -530,7 +537,11 @@ defmodule YscWeb.UserRegistrationLive do
     step_invalid = false
 
     new_step = if step_invalid, do: current_step, else: current_step + 1
-    {:noreply, assign(socket, :current_step, new_step)}
+
+    {:noreply,
+     socket
+     |> assign(:current_step, new_step)
+     |> push_event("scroll-to-top", %{})}
   end
 
   # Determine the appropriate step based on which fields are filled
