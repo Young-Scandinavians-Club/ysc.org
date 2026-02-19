@@ -2183,7 +2183,8 @@ defmodule YscWeb.UserSettingsLive do
             Accounts.send_phone_verification_code(
               updated_user,
               phone_code,
-              "settings_change"
+              "settings_change",
+              new_phone
             )
 
           # Update form and store pending phone number
@@ -2368,7 +2369,13 @@ defmodule YscWeb.UserSettingsLive do
               do: "resend_existing_#{timestamp}",
               else: "resend_new_#{timestamp}"
 
-          _job = Accounts.send_phone_verification_code(user, code, suffix)
+          _job =
+            Accounts.send_phone_verification_code(
+              user,
+              code,
+              suffix,
+              pending_phone
+            )
 
           {:noreply,
            socket

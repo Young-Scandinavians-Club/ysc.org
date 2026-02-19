@@ -908,14 +908,24 @@ defmodule Ysc.Accounts do
 
   @doc """
   Sends a phone verification code via SMS.
+
+  When changing phone number in settings, pass the new phone as `to_phone` so
+  the code is sent to the new number instead of the current user.phone_number.
   """
-  def send_phone_verification_code(user, code, resend_key_suffix \\ nil) do
+  def send_phone_verification_code(
+        user,
+        code,
+        resend_key_suffix \\ nil,
+        to_phone \\ nil
+      ) do
     # Include resend suffix in idempotency key to allow multiple sends
     suffix = if resend_key_suffix, do: "_#{resend_key_suffix}", else: ""
     idempotency_key = "phone_verification_#{user.id}#{suffix}"
 
+    destination = to_phone || user.phone_number
+
     YscWeb.Sms.Notifier.schedule_sms(
-      user.phone_number,
+      destination,
       idempotency_key,
       "phone_verification",
       YscWeb.Sms.PhoneVerification.prepare_sms_data(user, code),
