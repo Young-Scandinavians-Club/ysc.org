@@ -6,8 +6,99 @@ defmodule YscWeb.UserSettingsLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts.MembershipCache
+  alias Ysc.MessagePassingEvents
   alias Ysc.Repo
   alias Ysc.Subscriptions
+
+  describe "membership PubSub real-time updates" do
+    setup %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+      %{conn: conn, user: user}
+    end
+
+    test "shows info flash when membership is updated for the current user", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+
+      refute has_element?(view, "#flash-info")
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "memberships:user:#{user.id}",
+        {Ysc.Subscriptions,
+         %MessagePassingEvents.MembershipUpdated{user_id: user.id}}
+      )
+
+      :timer.sleep(100)
+
+      assert has_element?(view, "#flash-info")
+    end
+
+    test "reloads membership data and updates the UI on receiving a PubSub event",
+         %{
+           conn: conn,
+           user: user
+         } do
+      try do
+        Application.put_env(
+          :ysc,
+          :get_scheduled_downgrade_info_callback,
+          fn _sub -> nil end
+        )
+
+        {:ok, view, _html} = live(conn, ~p"/users/membership")
+
+        refute has_element?(view, "button[phx-click=\"cancel-membership\"]")
+
+        {:ok, _subscription} =
+          Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_pubsub_test_#{System.unique_integer()}",
+            stripe_status: "active",
+            name: "Membership",
+            current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+          })
+
+        MembershipCache.invalidate_user(user.id)
+
+        Phoenix.PubSub.broadcast(
+          Ysc.PubSub,
+          "memberships:user:#{user.id}",
+          {Ysc.Subscriptions,
+           %MessagePassingEvents.MembershipUpdated{user_id: user.id}}
+        )
+
+        :timer.sleep(100)
+
+        assert has_element?(view, "button[phx-click=\"cancel-membership\"]")
+      after
+        Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
+      end
+    end
+
+    test "ignores membership updates intended for a different user", %{
+      conn: conn
+    } do
+      other_user = user_fixture(%{state: :active})
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "memberships:user:#{other_user.id}",
+        {Ysc.Subscriptions,
+         %MessagePassingEvents.MembershipUpdated{user_id: other_user.id}}
+      )
+
+      :timer.sleep(100)
+
+      refute has_element?(view, "#flash-info")
+    end
+  end
 
   describe "scheduled downgrade notice" do
     test "displays downgrade scheduled notice when user has scheduled downgrade",
