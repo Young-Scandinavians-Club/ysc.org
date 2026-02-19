@@ -889,7 +889,7 @@ defmodule YscWeb.UserSettingsLive do
                           Choose Your Plan
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
-                          Single covers you. Family covers your spouse and children under 18. Both are billed annually.
+                          Single covers you. Family covers you, your spouse and children under 18. Both are billed annually.
                         </p>
                       </div>
                     </div>
