@@ -906,8 +906,32 @@ defmodule YscWeb.AdminUsersLive do
          |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
          |> put_flash(:info, "User was approved and is now a member!")}
 
+      {:error, %Ecto.Changeset{} = changeset} ->
+        errors =
+          Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+            Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+              opts
+              |> Keyword.get(String.to_existing_atom(key), key)
+              |> to_string()
+            end)
+          end)
+
+        error_detail =
+          Enum.map_join(errors, "; ", fn {field, msgs} ->
+            "#{field}: #{Enum.join(msgs, ", ")}"
+          end)
+
+        {:noreply,
+         socket
+         |> put_flash(:error, "Could not approve application — #{error_detail}")}
+
       {:error, _} ->
-        {:noreply, socket |> put_flash(:error, "Something went wrong")}
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           "Could not approve application. Please try again."
+         )}
     end
   end
 
@@ -949,7 +973,9 @@ defmodule YscWeb.AdminUsersLive do
          |> put_flash(:info, "User application was rejected!")}
 
       {:error, _} ->
-        {:noreply, socket |> put_flash(:error, "Something went wrong")}
+        {:noreply,
+         socket
+         |> put_flash(:error, "Could not reject application. Please try again.")}
     end
   end
 

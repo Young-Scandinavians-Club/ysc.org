@@ -288,6 +288,19 @@ defmodule Ysc.Accounts.User do
   end
 
   @doc """
+  A minimal changeset used when approving a membership application.
+
+  Only casts `:state` and `:date_of_birth` so that missing or incomplete
+  profile fields (first_name, last_name, phone_number, etc.) never block
+  an admin from approving an application.
+  """
+  def approve_user_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:state, :date_of_birth])
+    |> validate_date_of_birth()
+  end
+
+  @doc """
   A user changeset for updating profile information.
   """
   def profile_changeset(user, attrs, opts \\ []) do
