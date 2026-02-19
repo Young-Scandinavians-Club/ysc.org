@@ -71,8 +71,7 @@ if config_env() == :prod do
     # Total DB connections = POOL_SIZE × app machines; unmanaged Postgres max_connections is 300
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     socket_options: maybe_ipv6,
-    # SSL for Fly Postgres (unmanaged or managed)
-    ssl: true,
+    # Unmanaged Fly Postgres on the private network (.internal) typically does not use TLS; ssl: true causes "ssl connect: closed"
     # Wait longer for a connection when pool is busy (reduces "connection not available" under burst load)
     queue_target: 15_000,
     queue_interval: 1_000,
