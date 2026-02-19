@@ -21,6 +21,10 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    # Get timezone from connect params (browser sends via LiveSocket)
+    connect_params = get_connect_params(socket) || %{}
+    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+
     # Set default date range to current calendar year
     current_year = DateTime.utc_now().year
     start_date = DateTime.new!(Date.new!(current_year, 1, 1), ~T[00:00:00])
@@ -29,6 +33,7 @@ defmodule YscWeb.AdminMoneyLive do
     # Initialize socket with placeholder values for fast initial render
     socket =
       socket
+      |> assign(:timezone, timezone)
       |> assign(:page_title, "Money")
       |> assign(:active_page, :money)
       |> assign(:loading_money_data, true)
@@ -310,10 +315,12 @@ defmodule YscWeb.AdminMoneyLive do
 
     query_params =
       if socket.assigns[:start_date] && socket.assigns[:end_date] do
+        tz = socket.assigns[:timezone] || "America/Los_Angeles"
+
         %{
           "start_date" =>
-            Calendar.strftime(socket.assigns.start_date, "%Y-%m-%d"),
-          "end_date" => Calendar.strftime(socket.assigns.end_date, "%Y-%m-%d")
+            format_datetime(socket.assigns.start_date, tz, "%Y-%m-%d"),
+          "end_date" => format_datetime(socket.assigns.end_date, tz, "%Y-%m-%d")
         }
       else
         %{}
@@ -1096,7 +1103,7 @@ defmodule YscWeb.AdminMoneyLive do
               type="date"
               id="start_date"
               name="start_date"
-              value={Calendar.strftime(@start_date, "%Y-%m-%d")}
+              value={format_datetime(@start_date, @timezone, "%Y-%m-%d")}
               class="block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
@@ -1111,7 +1118,7 @@ defmodule YscWeb.AdminMoneyLive do
               type="date"
               id="end_date"
               name="end_date"
-              value={Calendar.strftime(@end_date, "%Y-%m-%d")}
+              value={format_datetime(@end_date, @timezone, "%Y-%m-%d")}
               class="block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
@@ -1124,8 +1131,9 @@ defmodule YscWeb.AdminMoneyLive do
           </.button>
         </form>
         <p class="text-sm text-zinc-600 mt-2">
-          Showing data from <%= Calendar.strftime(@start_date, "%B %d, %Y") %> to <%= Calendar.strftime(
+          Showing data from <%= format_datetime(@start_date, @timezone, "%B %d, %Y") %> to <%= format_datetime(
             @end_date,
+            @timezone,
             "%B %d, %Y"
           ) %>
         </p>
@@ -1262,7 +1270,11 @@ defmodule YscWeb.AdminMoneyLive do
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= Calendar.strftime(payment.payment_date, "%Y-%m-%d %H:%M") %>
+                  <%= format_datetime(
+                    payment.payment_date,
+                    @timezone,
+                    "%Y-%m-%d %H:%M"
+                  ) %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div class="flex gap-2">
@@ -1377,7 +1389,11 @@ defmodule YscWeb.AdminMoneyLive do
             <tbody class="bg-white divide-y divide-zinc-200">
               <tr :for={entry <- @ledger_entries}>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= Calendar.strftime(entry.inserted_at, "%Y-%m-%d %H:%M") %>
+                  <%= format_datetime(
+                    entry.inserted_at,
+                    @timezone,
+                    "%Y-%m-%d %H:%M"
+                  ) %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                   <div class="flex flex-col">
@@ -1528,7 +1544,11 @@ defmodule YscWeb.AdminMoneyLive do
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= Calendar.strftime(webhook.inserted_at, "%Y-%m-%d %H:%M:%S") %>
+                  <%= format_datetime(
+                    webhook.inserted_at,
+                    @timezone,
+                    "%Y-%m-%d %H:%M:%S"
+                  ) %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <.button
@@ -1693,8 +1713,9 @@ defmodule YscWeb.AdminMoneyLive do
                   <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= Calendar.strftime(
+                  <%= format_datetime(
                     expense_report.inserted_at,
+                    @timezone,
                     "%Y-%m-%d %H:%M"
                   ) %>
                 </td>
@@ -2046,9 +2067,10 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Received At:</strong>
               <span class="text-zinc-600 ml-2">
-                <%= Calendar.strftime(
+                <%= format_datetime(
                   @selected_webhook.inserted_at,
-                  "%Y-%m-%d %H:%M:%S UTC"
+                  @timezone,
+                  "%Y-%m-%d %H:%M:%S"
                 ) %>
               </span>
             </p>
@@ -2057,9 +2079,10 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Last Updated:</strong>
               <span class="text-zinc-600 ml-2">
-                <%= Calendar.strftime(
+                <%= format_datetime(
                   @selected_webhook.updated_at,
-                  "%Y-%m-%d %H:%M:%S UTC"
+                  @timezone,
+                  "%Y-%m-%d %H:%M:%S"
                 ) %>
               </span>
             </p>
@@ -2114,7 +2137,7 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Total Fees</p>
-              <p class="text-sm text-zinc-900 font-semibold text-red-600">
+              <p class="text-sm  font-semibold text-red-600">
                 <%= Money.to_string!(
                   @selected_payout.fee_total || Money.new(0, :USD)
                 ) %>
@@ -2124,8 +2147,9 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="text-sm font-medium text-zinc-700">Arrival Date</p>
               <p class="text-sm text-zinc-900">
                 <%= if @selected_payout.arrival_date do %>
-                  <%= Calendar.strftime(
+                  <%= format_datetime(
                     @selected_payout.arrival_date,
+                    @timezone,
                     "%Y-%m-%d %H:%M"
                   ) %>
                 <% else %>
@@ -2136,8 +2160,9 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="text-sm font-medium text-zinc-700">Created</p>
               <p class="text-sm text-zinc-900">
-                <%= Calendar.strftime(
+                <%= format_datetime(
                   @selected_payout.inserted_at,
+                  @timezone,
                   "%Y-%m-%d %H:%M"
                 ) %>
               </p>
@@ -2176,8 +2201,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Synced At</p>
                 <p class="text-zinc-900 text-xs">
-                  <%= Calendar.strftime(
+                  <%= format_datetime(
                     @selected_payout.quickbooks_synced_at,
+                    @timezone,
                     "%Y-%m-%d %H:%M:%S"
                   ) %>
                 </p>
@@ -2187,8 +2213,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Last Sync Attempt</p>
                 <p class="text-zinc-900 text-xs">
-                  <%= Calendar.strftime(
+                  <%= format_datetime(
                     @selected_payout.quickbooks_last_sync_attempt_at,
+                    @timezone,
                     "%Y-%m-%d %H:%M:%S"
                   ) %>
                 </p>
@@ -2305,7 +2332,11 @@ defmodule YscWeb.AdminMoneyLive do
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
-                    <%= Calendar.strftime(payment.payment_date, "%Y-%m-%d %H:%M") %>
+                    <%= format_datetime(
+                      payment.payment_date,
+                      @timezone,
+                      "%Y-%m-%d %H:%M"
+                    ) %>
                   </td>
                 </tr>
               </tbody>
@@ -2431,7 +2462,11 @@ defmodule YscWeb.AdminMoneyLive do
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
-                    <%= Calendar.strftime(refund.inserted_at, "%Y-%m-%d %H:%M") %>
+                    <%= format_datetime(
+                      refund.inserted_at,
+                      @timezone,
+                      "%Y-%m-%d %H:%M"
+                    ) %>
                   </td>
                 </tr>
               </tbody>
@@ -2556,8 +2591,9 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="text-sm font-medium text-zinc-700">Payment Date</p>
               <p class="text-sm text-zinc-900">
-                <%= Calendar.strftime(
+                <%= format_datetime(
                   @selected_payment.payment_date,
+                  @timezone,
                   "%Y-%m-%d %H:%M"
                 ) %>
               </p>
@@ -2635,8 +2671,9 @@ defmodule YscWeb.AdminMoneyLive do
                 <div>
                   <p class="font-medium text-zinc-700">Synced At</p>
                   <p class="text-zinc-900 text-xs">
-                    <%= Calendar.strftime(
+                    <%= format_datetime(
                       @selected_payment.quickbooks_synced_at,
+                      @timezone,
                       "%Y-%m-%d %H:%M:%S"
                     ) %>
                   </p>
@@ -2646,8 +2683,9 @@ defmodule YscWeb.AdminMoneyLive do
                 <div>
                   <p class="font-medium text-zinc-700">Last Sync Attempt</p>
                   <p class="text-zinc-900 text-xs">
-                    <%= Calendar.strftime(
+                    <%= format_datetime(
                       @selected_payment.quickbooks_last_sync_attempt_at,
+                      @timezone,
                       "%Y-%m-%d %H:%M:%S"
                     ) %>
                   </p>
@@ -2797,7 +2835,11 @@ defmodule YscWeb.AdminMoneyLive do
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-xs">
-                      <%= Calendar.strftime(refund.inserted_at, "%Y-%m-%d %H:%M") %>
+                      <%= format_datetime(
+                        refund.inserted_at,
+                        @timezone,
+                        "%Y-%m-%d %H:%M"
+                      ) %>
                     </td>
                   </tr>
                 </tbody>
@@ -2867,7 +2909,11 @@ defmodule YscWeb.AdminMoneyLive do
                       <%= Money.to_string!(entry.amount) %>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-xs">
-                      <%= Calendar.strftime(entry.inserted_at, "%Y-%m-%d %H:%M") %>
+                      <%= format_datetime(
+                        entry.inserted_at,
+                        @timezone,
+                        "%Y-%m-%d %H:%M"
+                      ) %>
                     </td>
                   </tr>
                 </tbody>
@@ -2962,8 +3008,9 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="font-medium text-zinc-700">Created At</p>
               <p class="text-zinc-900">
-                <%= Calendar.strftime(
+                <%= format_datetime(
                   @selected_expense_report.inserted_at,
+                  @timezone,
                   "%Y-%m-%d %H:%M:%S"
                 ) %>
               </p>
@@ -2971,8 +3018,9 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="font-medium text-zinc-700">Updated At</p>
               <p class="text-zinc-900">
-                <%= Calendar.strftime(
+                <%= format_datetime(
                   @selected_expense_report.updated_at,
+                  @timezone,
                   "%Y-%m-%d %H:%M:%S"
                 ) %>
               </p>
@@ -3060,8 +3108,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Synced At</p>
                 <p class="text-zinc-900">
-                  <%= Calendar.strftime(
+                  <%= format_datetime(
                     @selected_expense_report.quickbooks_synced_at,
+                    @timezone,
                     "%Y-%m-%d %H:%M:%S"
                   ) %>
                 </p>
@@ -3071,8 +3120,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Last Sync Attempt</p>
                 <p class="text-zinc-900">
-                  <%= Calendar.strftime(
+                  <%= format_datetime(
                     @selected_expense_report.quickbooks_last_sync_attempt_at,
+                    @timezone,
                     "%Y-%m-%d %H:%M:%S"
                   ) %>
                 </p>
@@ -3284,6 +3334,16 @@ defmodule YscWeb.AdminMoneyLive do
       {:error, _} -> DateTime.utc_now()
     end
   end
+
+  # Format DateTime in user timezone for display
+  defp format_datetime(%DateTime{} = datetime, timezone, format) do
+    datetime
+    |> DateTime.shift_zone!(timezone)
+    |> Calendar.strftime(format)
+  end
+
+  defp format_datetime(nil, _timezone, _format), do: "—"
+  defp format_datetime(_, _timezone, _format), do: "—"
 
   # Format QuickBooks sync error for display (can be string, map, or nil)
   defp format_qb_error(nil), do: ""

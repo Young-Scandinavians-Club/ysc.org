@@ -44,8 +44,10 @@ defmodule YscWeb.AdminMoneyLiveTest do
       })
       |> render_submit()
 
+      # Dates are shown in user timezone (default America/Los_Angeles in tests).
+      # 2023-01-01 00:00 UTC = 2022-12-31 in PST; 2023-12-31 23:59 UTC = 2023-12-31 in PST
       assert render(view) =~
-               "Showing data from January 01, 2023 to December 31, 2023"
+               "Showing data from December 31, 2022 to December 31, 2023"
     end
   end
 end
