@@ -65,11 +65,19 @@ if config_env() == :prod do
   maybe_ipv6 =
     if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
+  # Unmanaged Fly Postgres: direct connection to Postgres (no PgBouncer). Each pool connection = one Postgres connection.
   config :ysc, Ysc.Repo,
-    # ssl: true,
     url: database_url,
+    # Total DB connections = POOL_SIZE × app machines; unmanaged Postgres max_connections is 300
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    socket_options: maybe_ipv6
+    socket_options: maybe_ipv6,
+    # SSL for Fly Postgres (unmanaged or managed)
+    ssl: true,
+    # Wait longer for a connection when pool is busy (reduces "connection not available" under burst load)
+    queue_target: 15_000,
+    queue_interval: 1_000,
+    # Allow time for DB to respond (e.g. cold start on Fly)
+    connect_timeout: 15_000
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
