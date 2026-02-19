@@ -1596,7 +1596,7 @@ defmodule Ysc.Accounts do
         Ecto.Multi.new()
         |> Ecto.Multi.update(
           :user,
-          User.update_user_changeset(user, %{
+          User.approve_user_changeset(user, %{
             state: :active,
             date_of_birth: application.birth_date
           })
