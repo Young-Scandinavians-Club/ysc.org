@@ -1905,6 +1905,7 @@ defmodule YscWeb.UserSettingsLive do
     # This keeps the initial static render fast
     if connected?(socket) do
       send(self(), :load_settings_data)
+      Ysc.Subscriptions.subscribe_membership_updates(user.id)
 
       if live_action == :payments do
         send(self(), :load_payments_data)
@@ -1990,6 +1991,18 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(:filtered_payments_list, all_payments)
      |> assign(:yearly_stats, yearly_stats)
      |> assign(:loading_payments, false)}
+  end
+
+  def handle_info(
+        {Ysc.Subscriptions,
+         %Ysc.MessagePassingEvents.MembershipUpdated{user_id: user_id}},
+        socket
+      ) do
+    if socket.assigns.user.id == user_id do
+      {:noreply, reload_membership_data(socket)}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_info({:retry_invoice_payment, invoice_id}, socket) do
@@ -3371,6 +3384,34 @@ defmodule YscWeb.UserSettingsLive do
            "Failed to change membership plan. Please try again."
          )}
     end
+  end
+
+  defp reload_membership_data(socket) do
+    user = Accounts.get_user!(socket.assigns.user.id, [:subscriptions])
+    current_membership = MembershipCache.get_active_membership(user)
+    active_plan = get_membership_plan(current_membership)
+
+    membership_type_str =
+      if active_plan, do: Atom.to_string(active_plan), else: nil
+
+    scheduled_downgrade_info =
+      case current_membership do
+        nil -> nil
+        membership -> Subscriptions.get_scheduled_downgrade_info(membership)
+      end
+
+    socket
+    |> assign(:user, user)
+    |> assign(:current_membership, current_membership)
+    |> assign(:active_plan_type, active_plan)
+    |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
+    |> assign(:change_membership_button, false)
+    |> assign(:membership_change_info, nil)
+    |> assign(
+      :membership_form,
+      to_form(%{"membership_type" => membership_type_str})
+    )
+    |> put_flash(:info, "Your membership has been updated.")
   end
 
   defp process_email_change_after_reauth(socket) do

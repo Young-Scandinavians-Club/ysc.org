@@ -104,6 +104,7 @@ defmodule Ysc.Subscriptions do
         # Invalidate cache for the user
         if updated_subscription.user_id do
           MembershipCache.invalidate_user(updated_subscription.user_id)
+          broadcast_membership_updated(updated_subscription.user_id)
         end
 
         result
@@ -134,6 +135,7 @@ defmodule Ysc.Subscriptions do
       {:ok, _} ->
         if user_id do
           MembershipCache.invalidate_user(user_id)
+          broadcast_membership_updated(user_id)
         end
 
         result
@@ -1361,6 +1363,7 @@ defmodule Ysc.Subscriptions do
 
           # Invalidate membership cache when subscription is created
           MembershipCache.invalidate_user(user.id)
+          broadcast_membership_updated(user.id)
 
           {:ok, subscription}
 
@@ -1496,4 +1499,26 @@ defmodule Ysc.Subscriptions do
 
   def retry_failed_invoice(_user, _invoice_id),
     do: {:error, :invalid_invoice_id}
+
+  ## PubSub Functions
+
+  @doc """
+  Subscribe to membership update events for a specific user.
+  """
+  def subscribe_membership_updates(user_id) do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, membership_topic(user_id))
+  end
+
+  defp membership_topic(user_id), do: "memberships:user:#{user_id}"
+
+  defp broadcast_membership_updated(user_id) when not is_nil(user_id) do
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      membership_topic(user_id),
+      {__MODULE__,
+       %Ysc.MessagePassingEvents.MembershipUpdated{user_id: user_id}}
+    )
+  end
+
+  defp broadcast_membership_updated(_), do: :ok
 end

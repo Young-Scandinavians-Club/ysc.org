@@ -109,4 +109,9 @@ defmodule Ysc.MessagePassingEvents do
     @moduledoc false
     defstruct ticket_reservation: nil
   end
+
+  defmodule MembershipUpdated do
+    @moduledoc false
+    defstruct user_id: nil
+  end
 end
