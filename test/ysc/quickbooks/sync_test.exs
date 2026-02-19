@@ -2088,6 +2088,146 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert {:ok, _} = Sync.sync_payout(payout)
     end
 
+    test "simple deposit with no linked transactions includes Stripe fees line item",
+         %{user: _user} do
+      # Create a payout with fee_total but no linked payments/refunds
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(9_680, :USD),
+          stripe_payout_id: "po_simple_with_fees",
+          currency: "USD",
+          status: "paid",
+          fee_total: Money.new(320, :USD)
+        })
+
+      payout = Repo.preload(payout, [:payments, :refunds])
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        # Should have 2 lines: gross Stripe line + negative fee line
+        assert length(params.line) == 2
+
+        # Gross line: net ($9680) + fees ($320) = $10000
+        gross_line =
+          Enum.find(params.line, fn line ->
+            line.deposit_line_detail[:entity_ref] != nil
+          end)
+
+        assert gross_line != nil
+        assert Decimal.equal?(gross_line.amount, Decimal.new("10000.00"))
+
+        assert gross_line.deposit_line_detail.entity_ref.value ==
+                 "stripe_account_123"
+
+        # Fee line: -$320 with Stripe Fees account
+        fee_line =
+          Enum.find(params.line, fn line ->
+            line.deposit_line_detail[:account_ref] != nil &&
+              line.deposit_line_detail[:account_ref][:value] ==
+                "stripe_fees_account_123"
+          end)
+
+        assert fee_line != nil
+        assert Decimal.equal?(fee_line.amount, Decimal.new("-320.00"))
+        assert fee_line.description =~ "Stripe processing fees"
+
+        # Total should be the net amount (what actually hits the bank)
+        assert Decimal.equal?(params.total_amt, Decimal.new("9680.00"))
+
+        {:ok, %{"Id" => "qb_deposit_simple_fees", "TotalAmt" => "9680.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+      assert payout.quickbooks_deposit_id == "qb_deposit_simple_fees"
+    end
+
+    test "simple deposit without fees creates single line item at net amount",
+         %{user: _user} do
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(5_000, :USD),
+          stripe_payout_id: "po_simple_no_fees",
+          currency: "USD",
+          status: "paid",
+          fee_total: nil
+        })
+
+      payout = Repo.preload(payout, [:payments, :refunds])
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        # Should have only 1 line (no fee line)
+        assert length(params.line) == 1
+
+        line = List.first(params.line)
+        assert Decimal.equal?(line.amount, Decimal.new("5000.00"))
+
+        assert line.deposit_line_detail[:entity_ref].value ==
+                 "stripe_account_123"
+
+        assert Decimal.equal?(params.total_amt, Decimal.new("5000.00"))
+
+        {:ok, %{"Id" => "qb_deposit_simple_no_fees", "TotalAmt" => "5000.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payout(payout)
+    end
+
     test "passes idempotency key with length at most 255 to create_deposit", %{
       user: _user
     } do
@@ -5223,6 +5363,131 @@ defmodule Ysc.Quickbooks.SyncTest do
         assert Decimal.equal?(fee_line.amount, Decimal.new("-465.00"))
 
         {:ok, %{"Id" => "qb_deposit_mixed", "TotalAmt" => "11535.00"}}
+      end)
+
+      assert {:ok, _deposit} = Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+    end
+
+    test "deposit lines with LinkedTxn include AccountRef for Undeposited Funds",
+         %{
+           user: user
+         } do
+      user
+      |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_acctref")
+      |> Repo.update!()
+
+      setup_default_mocks()
+
+      # Create and sync a payment
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_acctref_test",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment for AccountRef test",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, _} = Sync.sync_payment(payment)
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+      assert payment.quickbooks_sales_receipt_id != nil
+
+      # Create and sync a refund
+      {:ok, {refund, _transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(2_000, :USD),
+          external_refund_id: "re_acctref_test",
+          reason: "Partial refund"
+        })
+
+      assert {:ok, _} = Sync.sync_refund(refund)
+      refund = Repo.reload!(refund)
+      assert refund.quickbooks_sync_status == "synced"
+      assert refund.quickbooks_sales_receipt_id != nil
+
+      # Create payout linked to both
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(7_680, :USD),
+          stripe_payout_id: "po_acctref_test",
+          currency: "USD",
+          status: "paid",
+          fee_total: Money.new(320, :USD)
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+      {:ok, payout} = Ledgers.link_refund_to_payout(payout, refund)
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        # 3 lines: payment + refund + fee
+        assert length(params.line) == 3
+
+        # Payment line must have account_ref pointing to Undeposited Funds
+        payment_line =
+          Enum.find(params.line, fn line ->
+            line[:linked_txn] != nil &&
+              Enum.any?(line.linked_txn, &(&1.txn_type == "SalesReceipt"))
+          end)
+
+        assert payment_line != nil
+
+        assert payment_line.deposit_line_detail[:account_ref] != nil,
+               "Payment line must include AccountRef for Undeposited Funds"
+
+        assert payment_line.deposit_line_detail.account_ref.value ==
+                 "undeposited_funds_123"
+
+        # Refund line must also have account_ref pointing to Undeposited Funds
+        refund_line =
+          Enum.find(params.line, fn line ->
+            line[:linked_txn] != nil &&
+              Enum.any?(line.linked_txn, &(&1.txn_type == "RefundReceipt"))
+          end)
+
+        assert refund_line != nil
+
+        assert refund_line.deposit_line_detail[:account_ref] != nil,
+               "Refund line must include AccountRef for Undeposited Funds"
+
+        assert refund_line.deposit_line_detail.account_ref.value ==
+                 "undeposited_funds_123"
+
+        {:ok, %{"Id" => "qb_deposit_acctref", "TotalAmt" => "7680.00"}}
       end)
 
       assert {:ok, _deposit} = Sync.sync_payout(payout)

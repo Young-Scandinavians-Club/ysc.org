@@ -2230,21 +2230,31 @@ defmodule Ysc.Quickbooks.Sync do
           payout_amount: Money.to_string!(payout.amount)
         )
 
-        # Create a simple deposit without line items for payouts with no linked transactions
-        # Money.to_decimal returns dollars (database stores amounts in dollars)
-        amount =
+        # Create a simple deposit without linked transactions.
+        # If the payout has Stripe fees, break the deposit into a gross line + negative fee line
+        # so QuickBooks reporting captures both the income and the processing cost.
+        administration_class_ref = get_administration_class_ref()
+
+        net_amount =
           Money.to_decimal(payout.amount)
           |> Decimal.round(2)
 
-        # Get Administration class for simple deposit
-        administration_class_ref = get_administration_class_ref()
+        stripe_fees =
+          if payout.fee_total && Money.positive?(payout.fee_total) do
+            payout.fee_total
+          else
+            nil
+          end
 
-        params = %{
-          bank_account_id: bank_account_id,
-          deposit_to_account_ref: %{value: bank_account_id},
-          line: [
-            %{
-              amount: amount,
+        {line_items, total_amt} =
+          if stripe_fees do
+            fee_decimal =
+              Money.to_decimal(stripe_fees) |> Decimal.round(2)
+
+            gross_amount = Decimal.add(net_amount, fee_decimal)
+
+            gross_line = %{
+              amount: gross_amount,
               detail_type: "DepositLineDetail",
               deposit_line_detail: %{
                 entity_ref: %{value: stripe_account_id, type: "Account"},
@@ -2252,8 +2262,49 @@ defmodule Ysc.Quickbooks.Sync do
               },
               description: "Stripe Payout: #{payout.stripe_payout_id}"
             }
-          ],
-          total_amt: amount,
+
+            case get_stripe_fees_account_ref() do
+              {:ok, stripe_fees_account_ref} ->
+                fee_line = %{
+                  amount: Decimal.negate(fee_decimal),
+                  detail_type: "DepositLineDetail",
+                  deposit_line_detail: %{
+                    account_ref: stripe_fees_account_ref,
+                    class_ref: administration_class_ref
+                  },
+                  description:
+                    "Stripe processing fees for payout #{payout.stripe_payout_id}"
+                }
+
+                {[gross_line, fee_line], net_amount}
+
+              _error ->
+                Ysc.Logging.warning(
+                  "[QB Sync] create_payout_deposit: Stripe Fees account not found, simple deposit without fee line",
+                  payout_id: payout.id
+                )
+
+                {[gross_line], gross_amount}
+            end
+          else
+            line = %{
+              amount: net_amount,
+              detail_type: "DepositLineDetail",
+              deposit_line_detail: %{
+                entity_ref: %{value: stripe_account_id, type: "Account"},
+                class_ref: administration_class_ref
+              },
+              description: "Stripe Payout: #{payout.stripe_payout_id}"
+            }
+
+            {[line], net_amount}
+          end
+
+        params = %{
+          bank_account_id: bank_account_id,
+          deposit_to_account_ref: %{value: bank_account_id},
+          line: line_items,
+          total_amt: total_amt,
           txn_date:
             format_payout_date(payout.arrival_date || payout.inserted_at),
           private_note:
@@ -2458,6 +2509,21 @@ defmodule Ysc.Quickbooks.Sync do
 
     administration_class_ref = get_administration_class_ref()
 
+    # QuickBooks requires AccountRef in DepositLineDetail even for lines with LinkedTxn.
+    # The correct source account is "Undeposited Funds" since that's where SalesReceipts/RefundReceipts settle.
+    undeposited_funds_ref =
+      case get_undeposited_funds_account_ref() do
+        {:ok, ref} ->
+          ref
+
+        _error ->
+          Ysc.Logging.warning(
+            "[QB Sync] build_payout_line_items: Undeposited Funds account not found, deposit may fail"
+          )
+
+          nil
+      end
+
     # Build line items for payments (positive amounts) - each links to existing Sales Receipt
     Ysc.Logging.debug("[QB Sync] build_payout_line_items: Processing payments",
       payments_count: length(payments)
@@ -2487,14 +2553,18 @@ defmodule Ysc.Quickbooks.Sync do
             sales_receipt_id: payment.quickbooks_sales_receipt_id
           )
 
-          # DepositLineDetail with LinkedTxn: links to existing Sales Receipt, moves from Undeposited Funds to Bank.
-          # No AccountRef - source is the linked Sales Receipt.
+          detail =
+            %{class_ref: administration_class_ref}
+            |> then(fn d ->
+              if undeposited_funds_ref,
+                do: Map.put(d, :account_ref, undeposited_funds_ref),
+                else: d
+            end)
+
           %{
             amount: amount,
             detail_type: "DepositLineDetail",
-            deposit_line_detail: %{
-              class_ref: administration_class_ref
-            },
+            deposit_line_detail: detail,
             linked_txn: [
               %{
                 txn_id: payment.quickbooks_sales_receipt_id,
@@ -2560,13 +2630,18 @@ defmodule Ysc.Quickbooks.Sync do
             sales_receipt_id: refund.quickbooks_sales_receipt_id
           )
 
-          # DepositLineDetail with LinkedTxn: links to existing Refund Receipt
+          detail =
+            %{class_ref: administration_class_ref}
+            |> then(fn d ->
+              if undeposited_funds_ref,
+                do: Map.put(d, :account_ref, undeposited_funds_ref),
+                else: d
+            end)
+
           %{
             amount: amount,
             detail_type: "DepositLineDetail",
-            deposit_line_detail: %{
-              class_ref: administration_class_ref
-            },
+            deposit_line_detail: detail,
             linked_txn: [
               %{
                 txn_id: refund.quickbooks_sales_receipt_id,
@@ -2673,6 +2748,16 @@ defmodule Ysc.Quickbooks.Sync do
 
       _ ->
         {:error, :stripe_fees_account_not_found}
+    end
+  end
+
+  defp get_undeposited_funds_account_ref do
+    case client_module().query_account_by_name("Undeposited Funds") do
+      {:ok, account_id} ->
+        {:ok, %{value: account_id, name: "Undeposited Funds"}}
+
+      _ ->
+        {:error, :undeposited_funds_account_not_found}
     end
   end
 
