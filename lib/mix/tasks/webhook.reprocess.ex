@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Webhook.Reprocess do
   @moduledoc """
-  Mix task for re-processing failed webhook events.
+  Mix task for re-processing failed webhook events and for reprocessing pending/processing (stuck) webhooks.
 
   ## Examples:
 
@@ -10,8 +10,14 @@ defmodule Mix.Tasks.Webhook.Reprocess do
       # List failed webhooks for a specific provider
       mix webhook.reprocess list --provider stripe
 
-      # List failed webhooks for a specific event type
-      mix webhook.reprocess list --event-type invoice.payment_succeeded
+      # List webhooks that are pending or stuck in processing (e.g. Stripe)
+      mix webhook.reprocess list-pending --provider stripe
+
+      # Re-process all Stripe webhooks that are :pending or :processing
+      mix webhook.reprocess pending --provider stripe
+
+      # Re-process with a limit and dry run
+      mix webhook.reprocess pending --provider stripe --limit 10 --dry-run
 
       # Show statistics about failed webhooks
       mix webhook.reprocess stats
@@ -21,15 +27,6 @@ defmodule Mix.Tasks.Webhook.Reprocess do
 
       # Re-process all failed webhooks
       mix webhook.reprocess all
-
-      # Re-process all failed webhooks with a limit
-      mix webhook.reprocess all --limit 10
-
-      # Re-process all failed Stripe invoice payment webhooks
-      mix webhook.reprocess all --provider stripe --event-type invoice.payment_succeeded
-
-      # Dry run - show what would be processed without actually processing
-      mix webhook.reprocess all --dry-run
 
       # Reset a failed webhook to pending state
       mix webhook.reprocess reset WEBHOOK_ID
@@ -48,6 +45,9 @@ defmodule Mix.Tasks.Webhook.Reprocess do
       ["list" | opts] ->
         list_failed_webhooks(opts)
 
+      ["list-pending" | opts] ->
+        list_pending_or_processing_webhooks(opts)
+
       ["stats"] ->
         show_stats()
 
@@ -56,6 +56,9 @@ defmodule Mix.Tasks.Webhook.Reprocess do
 
       ["all" | opts] ->
         reprocess_all_webhooks(opts)
+
+      ["pending" | opts] ->
+        reprocess_pending_or_processing_webhooks(opts)
 
       ["reset", webhook_id] ->
         reset_webhook(webhook_id)
@@ -178,6 +181,70 @@ defmodule Mix.Tasks.Webhook.Reprocess do
     end
   end
 
+  defp list_pending_or_processing_webhooks(opts) do
+    opts = parse_opts(opts)
+
+    Ysc.Logging.info("Listing pending/processing webhook events...")
+
+    webhooks =
+      Ysc.Webhooks.Reprocessor.list_pending_or_processing_webhooks(opts)
+
+    if Enum.empty?(webhooks) do
+      Ysc.Logging.info("No pending or processing webhook events found.")
+    else
+      Ysc.Logging.info(
+        "Found #{length(webhooks)} pending/processing webhook events:"
+      )
+
+      Ysc.Logging.info("")
+
+      Enum.each(webhooks, fn webhook ->
+        Ysc.Logging.info("ID: #{webhook.id}")
+        Ysc.Logging.info("  Provider: #{webhook.provider}")
+        Ysc.Logging.info("  Event Type: #{webhook.event_type}")
+        Ysc.Logging.info("  Event ID: #{webhook.event_id}")
+        Ysc.Logging.info("  State: #{webhook.state}")
+        Ysc.Logging.info("  Updated At: #{webhook.updated_at}")
+        Ysc.Logging.info("  Created At: #{webhook.inserted_at}")
+        Ysc.Logging.info("")
+      end)
+    end
+  end
+
+  defp reprocess_pending_or_processing_webhooks(opts) do
+    opts = parse_opts(opts)
+
+    if opts[:dry_run] do
+      Ysc.Logging.info("🔍 Dry run - showing what would be processed...")
+    else
+      Ysc.Logging.info("Re-processing all pending/processing webhook events...")
+    end
+
+    result =
+      Ysc.Webhooks.Reprocessor.reprocess_all_pending_or_processing_webhooks(
+        opts
+      )
+
+    Ysc.Logging.info("")
+    Ysc.Logging.info("Summary: #{result.summary}")
+    Ysc.Logging.info("Total Found: #{result.total_found}")
+
+    if not opts[:dry_run] and Map.has_key?(result, :successful) do
+      Ysc.Logging.info("Successful: #{result.successful}")
+      Ysc.Logging.info("Failed: #{result.failed}")
+
+      if result.failed > 0 do
+        Ysc.Logging.info("")
+        Ysc.Logging.info("Failed webhook details:")
+
+        Enum.each(result.results, fn
+          {:ok, _} -> :ok
+          {:error, reason} -> Ysc.Logging.error("  #{inspect(reason)}")
+        end)
+      end
+    end
+  end
+
   defp reset_webhook(webhook_id) do
     Ysc.Logging.info("Resetting webhook #{webhook_id} to pending state...")
 
@@ -232,25 +299,27 @@ defmodule Mix.Tasks.Webhook.Reprocess do
 
     Commands:
       list                    List all failed webhook events
+      list-pending             List webhooks in :pending or :processing state
       stats                   Show statistics about failed webhooks
-      single <webhook_id>     Re-process a specific webhook
+      single <webhook_id>     Re-process a specific failed webhook
       all                     Re-process all failed webhooks
+      pending                 Re-process all :pending or :processing webhooks (e.g. stripe)
       reset <webhook_id>      Reset a failed webhook to pending state
 
     Options:
       --provider <provider>   Filter by provider (e.g., stripe)
       --event-type <type>     Filter by event type (e.g., invoice.payment_succeeded)
-      --limit <number>        Limit number of webhooks to process (default: 50 for all, 100 for list)
+      --limit <number>        Limit number of webhooks (default: 50 for all/pending, 100 for list)
       --dry-run               Show what would be processed without actually processing
 
     Examples:
       mix webhook.reprocess list
-      mix webhook.reprocess list --provider stripe
+      mix webhook.reprocess list-pending --provider stripe
+      mix webhook.reprocess pending --provider stripe
+      mix webhook.reprocess pending --provider stripe --limit 10 --dry-run
       mix webhook.reprocess stats
       mix webhook.reprocess single WEBHOOK_ID
       mix webhook.reprocess all --limit 10
-      mix webhook.reprocess all --provider stripe --event-type invoice.payment_succeeded
-      mix webhook.reprocess all --dry-run
       mix webhook.reprocess reset WEBHOOK_ID
     """)
   end

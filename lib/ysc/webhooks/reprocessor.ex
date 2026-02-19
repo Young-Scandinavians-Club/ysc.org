@@ -226,6 +226,133 @@ defmodule Ysc.Webhooks.Reprocessor do
     end
   end
 
+  @doc """
+  Lists webhook events in `:pending` or `:processing` state (e.g. stuck or not yet processed).
+
+  ## Options:
+  - `:limit` - Maximum number of events to return (default: 100)
+  - `:provider` - Filter by provider (e.g., "stripe")
+  """
+  def list_pending_or_processing_webhooks(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 100)
+    provider = Keyword.get(opts, :provider)
+
+    query =
+      from(w in WebhookEvent,
+        where: w.state in [:pending, :processing],
+        order_by: [asc: w.inserted_at],
+        limit: ^limit
+      )
+
+    query =
+      if provider do
+        where(query, [w], w.provider == ^provider)
+      else
+        query
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Resets a webhook from `:processing` to `:pending` so it can be picked up for processing again.
+  Use when a process died while holding the lock (stuck processing).
+  """
+  def reset_processing_to_pending(webhook_id) do
+    case Repo.get(WebhookEvent, webhook_id) do
+      nil ->
+        {:error, :not_found}
+
+      %WebhookEvent{state: :processing} = webhook_event ->
+        webhook_event
+        |> Ecto.Changeset.change(%{state: :pending})
+        |> Repo.update()
+
+      %WebhookEvent{state: state} ->
+        {:error, {:not_processing, state}}
+    end
+  end
+
+  @doc """
+  Re-processes a single webhook that is in `:pending` or `:processing` state.
+
+  For `:processing` webhooks (stuck), resets to `:pending` first then processes from stored payload.
+  Returns the same result types as `reprocess_webhook/1` for failed webhooks.
+  """
+  def reprocess_pending_or_processing_webhook(webhook_id) do
+    case Repo.get(WebhookEvent, webhook_id) do
+      nil ->
+        {:error, :not_found}
+
+      %WebhookEvent{state: state} = webhook_event
+      when state in [:pending, :processing] ->
+        webhook_event =
+          if state == :processing do
+            {:ok, updated} = reset_processing_to_pending(webhook_id)
+            updated
+          else
+            webhook_event
+          end
+
+        reprocess_webhook_event(webhook_event)
+
+      %WebhookEvent{state: state} ->
+        {:error, {:not_pending_or_processing, state}}
+    end
+  end
+
+  @doc """
+  Re-processes all webhooks in `:pending` or `:processing` state.
+
+  ## Options:
+  - `:limit` - Maximum number of events to process (default: 50)
+  - `:provider` - Filter by provider (e.g., "stripe")
+  - `:dry_run` - If true, only list what would be processed
+
+  Returns a summary map like `reprocess_all_failed_webhooks/1`.
+  """
+  def reprocess_all_pending_or_processing_webhooks(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    provider = Keyword.get(opts, :provider)
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    webhooks =
+      list_pending_or_processing_webhooks(
+        limit: limit,
+        provider: provider
+      )
+
+    if dry_run do
+      %{
+        total_found: length(webhooks),
+        would_process: webhooks,
+        summary: "Dry run - no webhooks were actually processed"
+      }
+    else
+      results =
+        Enum.map(webhooks, fn w ->
+          reprocess_pending_or_processing_webhook(w.id)
+        end)
+
+      successful =
+        Enum.count(results, fn
+          {:ok, _} -> true
+          _ -> false
+        end)
+
+      failed = length(results) - successful
+
+      %{
+        total_found: length(webhooks),
+        successful: successful,
+        failed: failed,
+        results: results,
+        summary:
+          "Processed #{successful} webhooks successfully, #{failed} failed"
+      }
+    end
+  end
+
   # Private function to actually re-process a webhook event
   defp reprocess_webhook_event(%WebhookEvent{} = webhook_event) do
     require Ysc.Logging
