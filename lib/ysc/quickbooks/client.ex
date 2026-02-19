@@ -2386,6 +2386,127 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   @doc """
+  Queries for all QuickBooks Accounts (Chart of Accounts).
+
+  Returns {:ok, list} of account maps with Id, Name, AccountType, AccountSubType, Active,
+  or {:error, reason}.
+  """
+  @spec query_all_accounts() :: {:ok, [map()]} | {:error, atom() | String.t()}
+  def query_all_accounts do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      query =
+        "SELECT Id, Name, AccountType, AccountSubType, Active FROM Account"
+
+      url = build_query_url(company_id, query)
+      headers = build_headers(access_token)
+      request = Finch.build(:get, url, headers)
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, %{"QueryResponse" => %{"Account" => accounts}}}
+            when is_list(accounts) ->
+              {:ok, accounts}
+
+            {:ok, %{"QueryResponse" => %{"Account" => account}}}
+            when is_map(account) ->
+              {:ok, [account]}
+
+            {:ok, %{"QueryResponse" => _}} ->
+              {:ok, []}
+
+            {:ok, data} ->
+              Ysc.Logging.error(
+                "[QB Client] query_all_accounts: Unexpected response",
+                data: inspect(data, limit: 500)
+              )
+
+              {:error, :invalid_response}
+
+            {:error, _} ->
+              {:error, :invalid_response}
+          end
+
+        {:ok, %Finch.Response{body: body}} ->
+          {:error, parse_error_response(body)}
+
+        {:error, error} ->
+          {:error, error}
+      end
+    end
+  end
+
+  @doc """
+  Fetches a single QuickBooks Account by Id.
+
+  Returns {:ok, account_map} with full account entity (Id, Name, AccountType, etc.)
+  or {:error, reason}.
+  """
+  @spec get_account_by_id(String.t()) ::
+          {:ok, map()} | {:error, atom() | String.t()}
+  def get_account_by_id(account_id) do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      url = build_url(company_id, "account/#{account_id}", [])
+      headers = build_headers(access_token)
+      request = Finch.build(:get, url, headers)
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, data} ->
+              account = get_response_entity(data, "Account")
+              {:ok, account}
+
+            {:error, _} ->
+              {:error, :invalid_response}
+          end
+
+        {:ok, %Finch.Response{status: 401, body: _}} ->
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:get, url, headers)
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok, %Finch.Response{status: s, body: body}}
+                when s in 200..299 ->
+                  case Jason.decode(body) do
+                    {:ok, data} -> {:ok, get_response_entity(data, "Account")}
+                    _ -> {:error, :invalid_response}
+                  end
+
+                _ ->
+                  {:error, :request_failed}
+              end
+
+            error ->
+              error
+          end
+
+        {:ok, %Finch.Response{status: _, body: body}} ->
+          {:error, parse_error_response(body)}
+
+        {:error, error} ->
+          {:error, error}
+      end
+    end
+  end
+
+  @doc """
   Queries for a QuickBooks Account by name.
 
   Returns {:ok, account_id} if found, {:error, :not_found} otherwise.
@@ -2819,9 +2940,13 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   defp get_company_id do
-    case Application.get_env(:ysc, :quickbooks)[:company_id] do
-      nil -> {:error, :quickbooks_company_id_not_configured}
-      company_id -> {:ok, company_id}
+    qb = Application.get_env(:ysc, :quickbooks) || %{}
+    company_id = qb[:company_id] || qb[:realm_id]
+
+    if company_id && to_string(company_id) |> String.trim() != "" do
+      {:ok, to_string(company_id)}
+    else
+      {:error, :quickbooks_company_id_not_configured}
     end
   end
 
