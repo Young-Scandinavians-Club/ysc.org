@@ -1159,9 +1159,8 @@ defmodule YscWeb.AdminMoneyLive do
           </.button>
         </form>
         <p class="text-sm text-zinc-600 mt-2">
-          Showing data from <%= format_datetime(@start_date, @timezone, "%B %d, %Y") %> to <%= format_datetime(
+          Showing data from <%= Calendar.strftime(@start_date, "%B %d, %Y") %> to <%= Calendar.strftime(
             @end_date,
-            @timezone,
             "%B %d, %Y"
           ) %>
         </p>
@@ -1307,6 +1306,7 @@ defmodule YscWeb.AdminMoneyLive do
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div class="flex gap-2">
                     <.button
+                      :if={payment.payment_type_info.type != "Payout"}
                       phx-click="show_payment_modal"
                       phx-value-payment_id={payment.id}
                       class="bg-blue-600 hover:bg-blue-700"
