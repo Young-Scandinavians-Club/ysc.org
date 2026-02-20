@@ -174,7 +174,8 @@
           # Prevent Mix.env() calls that won't work in production releases
           {Credo.Check.Warning.MixEnv, []},
           # Custom checks
-          {Ysc.Credo.NoSleepInTests, []}
+          {Ysc.Credo.NoSleepInTests, []},
+          {Ysc.Credo.NoExternalUrlsInTestConfig, []}
         ],
         disabled: [
           #

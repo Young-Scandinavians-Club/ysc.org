@@ -143,12 +143,9 @@ defmodule YscWeb.EventsLiveTest do
   describe "masthead title" do
     test "displays 'The Calendar' when no upcoming events", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data to load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # With 0 upcoming events, should show "The Calendar"
       assert html =~ "The Calendar" or html =~ "What"
     end
 
@@ -156,13 +153,9 @@ defmodule YscWeb.EventsLiveTest do
       _event = create_event(%{title: "Future Event", past: false})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data to load
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
-      # With upcoming events, should show "What's Next" or "The Calendar"
-      # Check for either title in the masthead
       assert html =~ "What" or html =~ "Calendar"
     end
   end
@@ -170,11 +163,8 @@ defmodule YscWeb.EventsLiveTest do
   describe "async data loading" do
     test "loads events data after connection", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
 
-      # Wait for async load
-      :timer.sleep(300)
-
-      # After loading, async_data_loaded should be true
       rendered_view = :sys.get_state(view.pid)
       assert rendered_view.socket.assigns.async_data_loaded == true
     end
@@ -192,12 +182,9 @@ defmodule YscWeb.EventsLiveTest do
       conn: conn
     } do
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # No past events, section shouldn't be visible
       refute html =~ "What Was"
     end
 
@@ -205,12 +192,10 @@ defmodule YscWeb.EventsLiveTest do
       _past_event = create_event(%{title: "Old Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should show past events section with random title
+
       assert html =~ "Hvad var" or html =~ "Det Som Varit" or html =~ "Hva var" or
                html =~ "Mikä oli" or html =~ "Hvað var" or html =~ "Old Event"
     end
@@ -219,12 +204,9 @@ defmodule YscWeb.EventsLiveTest do
       past_event = create_event(%{title: "Past Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should have image for past event
       assert html =~ "Past Event" or html =~ past_event.id
     end
 
@@ -232,9 +214,7 @@ defmodule YscWeb.EventsLiveTest do
       _past_event = create_event(%{title: "Old Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "grayscale"
@@ -244,9 +224,7 @@ defmodule YscWeb.EventsLiveTest do
       past_event = create_event(%{title: "Old Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "/events/#{past_event.id}"
@@ -255,79 +233,59 @@ defmodule YscWeb.EventsLiveTest do
 
   describe "show more past events" do
     test "does not show 'Show More' button when few past events", %{conn: conn} do
-      # Create just a few past events (less than 10)
       for i <- 1..5 do
         create_event(%{title: "Past Event #{i}", past: true})
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should not show "Show More" button
       refute html =~ "Show More Past Events"
     end
 
     test "shows 'Show More' button when many past events exist", %{conn: conn} do
-      # Create more than 10 past events
       for i <- 1..15 do
         create_event(%{title: "Past Event #{i}", past: true})
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should show "Show More" button
       assert html =~ "Show More Past Events" or html =~ "Past Event"
     end
 
     test "clicking 'Show More' loads more past events", %{conn: conn} do
-      # Create many past events
       for i <- 1..20 do
         create_event(%{title: "Past Event #{i}", past: true})
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
 
-      # Wait for initial load
-      :timer.sleep(200)
-
-      # Click show more
       result = render_click(view, "show_more_past_events")
-
-      # Should still render successfully
       assert is_binary(result) or is_map(result)
     end
 
     test "increases past events limit when clicking Show More", %{conn: conn} do
-      # Create many past events
       for i <- 1..20 do
         create_event(%{title: "Past Event #{i}", past: true})
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for initial load
-      :timer.sleep(200)
+      render_async(view)
 
       rendered_view = :sys.get_state(view.pid)
       initial_limit = rendered_view.socket.assigns.past_events_limit
 
-      # Click show more
       render_click(view, "show_more_past_events")
 
-      # Limit should have increased
       rendered_view = :sys.get_state(view.pid)
       assert rendered_view.socket.assigns.past_events_limit > initial_limit
     end
 
     test "limits maximum past events to 50", %{conn: conn} do
-      # Create many past events (unique reference_id to avoid collisions)
       for i <- 1..60 do
         create_event(%{
           title: "Past Event #{i}",
@@ -337,17 +295,12 @@ defmodule YscWeb.EventsLiveTest do
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
 
-      # Wait for initial load
-      :timer.sleep(200)
-
-      # Click show more multiple times
       for _i <- 1..10 do
         render_click(view, "show_more_past_events")
-        :timer.sleep(50)
       end
 
-      # Limit should not exceed 50
       rendered_view = :sys.get_state(view.pid)
       assert rendered_view.socket.assigns.past_events_limit <= 50
     end
@@ -384,12 +337,10 @@ defmodule YscWeb.EventsLiveTest do
         create_event(%{title: "No Image Event", past: true, with_image: false})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should have blur hash canvas even without image
+
       assert html =~ "BlurHashCanvas" or html =~ "No Image Event" or
                not (html =~ "No Image Event")
     end
@@ -399,22 +350,18 @@ defmodule YscWeb.EventsLiveTest do
         create_event(%{title: "Event With Image", past: true, with_image: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should have optimized image path
+
       assert html =~ "test_event_optimized.jpg" or html =~ "Event With Image" or
                not (html =~ "Event With Image")
     end
 
     test "falls back to raw image when optimized not available", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
 
-      :timer.sleep(200)
-
-      # Just verify the page renders (fallback logic is internal)
       html = render(view)
       assert is_binary(html)
     end
@@ -425,12 +372,10 @@ defmodule YscWeb.EventsLiveTest do
       _past_event = create_event(%{title: "Accessible Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should have alt attributes
+
       assert html =~ "alt=" or html =~ "Accessible Event" or
                not (html =~ "Accessible Event")
     end
@@ -446,12 +391,9 @@ defmodule YscWeb.EventsLiveTest do
   describe "empty states" do
     test "handles no events gracefully", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
-
-      # Wait for async data
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
-      # Should still render page structure
       assert html =~ "Events"
       assert html =~ "Upcoming Events"
     end

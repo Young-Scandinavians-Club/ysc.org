@@ -202,8 +202,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      # Wait for async data to load
-      :timer.sleep(100)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Payment Summary" or html =~ "$100.00"
@@ -399,8 +398,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      # Wait for async load
-      :timer.sleep(100)
+      render_async(view)
 
       assert has_element?(view, ~s(button), "Cancel Reservation")
     end
@@ -485,8 +483,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      # Wait for async load
-      :timer.sleep(100)
+      render_async(view)
 
       html = render(view)
       refute html =~ "Your Door Code"
@@ -516,8 +513,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      # Wait for async load
-      :timer.sleep(100)
+      render_async(view)
 
       html = render(view)
       refute html =~ "Your Door Code"

@@ -66,12 +66,10 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         {:ok, payment_intent}
       end)
 
-      # Navigate to event page with order restoration parameters
       url = ~p"/events/#{event.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(500)
+      render_async(view)
 
-      # Verify page loaded
       html = render(view)
       assert is_binary(html)
     end
@@ -81,7 +79,6 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      # Create an expired order
       {:ok, order} =
         %TicketOrder{}
         |> TicketOrder.create_changeset(%{
@@ -94,24 +91,21 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         })
         |> Repo.insert()
 
-      # Try to restore - should not crash
       url = ~p"/events/#{event.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
     end
 
     test "rejects order for different user", %{conn: conn} do
-      # Create a different user
       other_user = user_with_membership(:lifetime)
 
       event = event_with_tickets(tier_count: 1, state: :upcoming)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      # Create order for other user
       {:ok, order} =
         %TicketOrder{}
         |> TicketOrder.create_changeset(%{
@@ -124,12 +118,10 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         })
         |> Repo.insert()
 
-      # Current user tries to access other user's order
       url = ~p"/events/#{event.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(300)
+      render_async(view)
 
-      # Should load page without restoring order
       html = render(view)
       assert is_binary(html)
     end
@@ -140,7 +132,6 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       event1 = Repo.preload(event1, :ticket_tiers, force: true)
       tier = hd(event1.ticket_tiers)
 
-      # Create order for event1
       {:ok, order} =
         %TicketOrder{}
         |> TicketOrder.create_changeset(%{
@@ -153,12 +144,10 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         })
         |> Repo.insert()
 
-      # Try to restore order on event2 page
       url = ~p"/events/#{event2.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(300)
+      render_async(view)
 
-      # Should load page without restoring order
       html = render(view)
       assert is_binary(html)
     end
@@ -170,9 +159,8 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       non_existent_order_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
       url = ~p"/events/#{event.id}?order_id=#{non_existent_order_id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(300)
+      render_async(view)
 
-      # Should not crash
       html = render(view)
       assert is_binary(html)
     end
@@ -211,7 +199,7 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
 
       url = ~p"/events/#{event.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(500)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -246,9 +234,8 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
 
       url = ~p"/events/#{event.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(300)
+      render_async(view)
 
-      # Should handle error gracefully
       html = render(view)
       assert is_binary(html)
     end
@@ -286,12 +273,11 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         {:ok, payment_intent}
       end)
 
-      # Simulate return from Stripe with payment_intent parameter
       url =
         ~p"/events/#{event.id}?payment_intent=#{payment_intent.id}&order_id=#{order.id}"
 
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(500)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -328,12 +314,11 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         {:ok, payment_intent}
       end)
 
-      # Simulate return with client secret
       url =
         ~p"/events/#{event.id}?payment_intent_client_secret=#{payment_intent.client_secret}&order_id=#{order.id}"
 
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(500)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -370,12 +355,11 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         {:ok, payment_intent}
       end)
 
-      # Simulate return with redirect status
       url =
         ~p"/events/#{event.id}?payment_intent=#{payment_intent.id}&redirect_status=succeeded&order_id=#{order.id}"
 
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(500)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -413,12 +397,11 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
         {:ok, payment_intent}
       end)
 
-      # Simulate return with failed status
       url =
         ~p"/events/#{event.id}?payment_intent=#{payment_intent.id}&redirect_status=failed&order_id=#{order.id}"
 
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(500)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -431,31 +414,22 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      # Create order that expires very soon
+      # Create order already expired - no need to wait for real time to pass
       {:ok, order} =
         %TicketOrder{}
         |> TicketOrder.create_changeset(%{
           user_id: user.id,
           event_id: event.id,
           total_amount: tier.price,
-          status: :pending,
-          expires_at: DateTime.add(DateTime.utc_now(), 1, :second),
+          status: :expired,
+          expires_at: DateTime.add(DateTime.utc_now(), -5, :second),
           reference_id: "ORD-#{System.unique_integer([:positive])}"
         })
         |> Repo.insert()
 
-      # Wait for expiration
-      :timer.sleep(2000)
-
-      # Mark as expired
-      {:ok, _expired_order} =
-        order
-        |> Ecto.Changeset.change(%{status: :expired})
-        |> Repo.update()
-
       url = ~p"/events/#{event.id}?order_id=#{order.id}"
       {:ok, view, _html} = live(conn, url)
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)

@@ -228,12 +228,16 @@ defmodule EventDetailsLiveHelpers do
   @doc """
   Waits for LiveView async operation to complete.
 
+  Uses render_async/2 to properly wait for start_async/assign_async tasks
+  rather than arbitrary time delays.
+
   ## Examples
 
+      wait_for_async(view)
       wait_for_async(view, 500)
   """
-  def wait_for_async(view, timeout \\ 500) do
-    :timer.sleep(timeout)
+  def wait_for_async(view, timeout \\ 200) do
+    render_async(view, timeout)
     view
   end
 
@@ -258,6 +262,7 @@ defmodule EventDetailsLiveHelpers do
       if System.monotonic_time(:millisecond) > deadline do
         view
       else
+        # credo:disable-for-next-line Ysc.Credo.NoSleepInTests
         :timer.sleep(20)
         wait_for_element_loop(view, selector, deadline)
       end

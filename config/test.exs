@@ -87,9 +87,11 @@ config :ysc, :stripe_client, Ysc.TestStripeClient
 config :ysc, :stripe_subscription_retriever, Ysc.StripeSubscriptionRetrieverMock
 config :ysc, :accounts_module, Ysc.AccountsMock
 
-# Discord alerts configuration for testing
+# Discord alerts configuration for testing.
+# Use a localhost URL that immediately refuses connections so tests that
+# exercise the HTTP path fail fast without any network I/O.
 config :ysc, Ysc.Alerts.Discord,
-  webhook_url: "https://discord.com/api/webhooks/test/token",
+  webhook_url: "http://localhost:1",
   enabled: true
 
 config :ysc,

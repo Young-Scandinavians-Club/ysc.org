@@ -36,8 +36,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       # Page loads
       assert html =~ "Tahoe"
 
-      # Wait for async data to load
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Shows membership requirement or disabled state
@@ -70,8 +69,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Check calendar is displayed
@@ -120,7 +118,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Check for room selection elements
@@ -145,7 +143,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       # Try to switch modes (if button exists)
       html = render(view)
@@ -200,7 +198,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Check tab structure exists
@@ -239,7 +237,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Lifetime members should see booking functionality
@@ -252,7 +250,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       assert html =~ "Tahoe"
@@ -267,7 +265,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
       # Tooltips load in background
-      :timer.sleep(300)
+      render_async(view, 2_000)
 
       html = render(view)
       assert html =~ "Tahoe"
@@ -279,7 +277,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Check for calendar or date picker elements
@@ -294,7 +292,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Season info should be displayed
@@ -367,7 +365,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
 
       # Should have labels or aria-labels
@@ -392,7 +390,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(100)
+      render_async(view, 2_000)
 
       # Check socket assigns
       state = :sys.get_state(view.pid)
@@ -416,7 +414,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       # Refund policies should be loaded
       html = render(view)
@@ -524,8 +522,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      # Wait for async operations
-      :timer.sleep(300)
+      render_async(view, 2_000)
 
       html = render(view)
       assert html =~ "Tahoe"
@@ -538,7 +535,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       # Simulate increasing guest count
       render_click(view, "increase-guests", %{})
@@ -552,7 +549,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?guests=4")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       # Simulate decreasing guest count
       render_click(view, "decrease-guests", %{})
@@ -566,7 +563,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "increase-children", %{})
 
@@ -579,7 +576,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?children=2")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "decrease-children", %{})
 
@@ -592,7 +589,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "toggle-guests-dropdown", %{})
 
@@ -605,7 +602,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "close-guests-dropdown", %{})
 
@@ -620,7 +617,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
 
@@ -634,7 +631,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       # Start with room mode (default)
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       # Already in room mode, just verify it works
       render_click(view, "booking-mode-changed", %{"booking_mode" => "room"})
@@ -658,7 +655,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
           ~p"/bookings/tahoe?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
         )
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "reset-dates", %{})
 
@@ -671,7 +668,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       date_str = Date.to_string(Date.utc_today())
       render_click(view, "cursor-move", %{"date" => date_str})
@@ -685,7 +682,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "cursor-leave", %{})
 
@@ -700,7 +697,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "ignore", %{})
 
@@ -713,7 +710,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})
 
@@ -728,7 +725,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       checkin = Date.add(Date.utc_today(), 30)
 
@@ -745,7 +742,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       checkout = Date.add(Date.utc_today(), 33)
 
@@ -764,7 +761,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_change(view, "guests-changed", %{"guests_count" => "4"})
 
@@ -777,7 +774,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_change(view, "children-changed", %{"children_count" => "2"})
 
@@ -792,7 +789,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?booking_mode=room")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       # Try to change room selection
       render_change(view, "room-changed", %{"room" => "1"})
@@ -806,7 +803,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?booking_mode=room")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "remove-room", %{"room-id" => "1"})
 
@@ -888,7 +885,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
 
-      :timer.sleep(300)
+      render_async(view, 2_000)
       html = render(view)
 
       assert html =~ "Tahoe"
@@ -899,7 +896,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       html = render(view)
       assert html =~ "Tahoe"
@@ -923,7 +920,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
       assert html =~ "Tahoe"
     end
@@ -944,7 +941,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
 
-      :timer.sleep(200)
+      render_async(view, 2_000)
       html = render(view)
       assert html =~ "Tahoe"
     end
@@ -956,7 +953,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       for i <- 1..5 do
         date = Date.add(Date.utc_today(), 30 + i)
@@ -975,7 +972,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      :timer.sleep(200)
+      render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})
       render_click(view, "switch-tab", %{"tab" => "booking"})

@@ -220,7 +220,7 @@ defmodule YscWeb.PostLiveTest do
       {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
 
       # Wait for comments to load
-      :timer.sleep(100)
+      render_async(view)
 
       result =
         view
@@ -241,7 +241,7 @@ defmodule YscWeb.PostLiveTest do
       {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
 
       # Wait for comments to load
-      :timer.sleep(100)
+      render_async(view)
 
       # Try to submit comment with script tag
       result =
@@ -267,8 +267,7 @@ defmodule YscWeb.PostLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       # Comments should be loaded or loading skeleton should be gone

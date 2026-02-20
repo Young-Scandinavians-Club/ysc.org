@@ -146,7 +146,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       refute has_element?(view, "#reauth-modal")
 
       # Password should be updated (verify by trying to authenticate with new password)
-      :timer.sleep(100)
       updated_user = Repo.reload!(user)
 
       assert Accounts.get_user_by_email_and_password(
@@ -231,7 +230,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       })
 
       # Give database time to update
-      :timer.sleep(50)
 
       # All tokens should be deleted
       tokens_after =
@@ -314,7 +312,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       refute has_element?(view, "#reauth-modal")
 
       # Password should be updated
-      :timer.sleep(100)
       updated_user = Repo.reload!(user)
 
       assert Accounts.get_user_by_email_and_password(
@@ -414,7 +411,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       # Should trigger submit
 
       # Password should be set
-      :timer.sleep(100)
       updated_user = Repo.reload!(user)
       assert updated_user.hashed_password != nil
       assert updated_user.password_set_at != nil
@@ -454,7 +450,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       })
 
       # Give database time to update
-      :timer.sleep(100)
 
       # password_set_at should be set
       updated_user = Repo.reload!(user)

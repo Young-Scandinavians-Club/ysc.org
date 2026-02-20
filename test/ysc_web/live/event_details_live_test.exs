@@ -171,7 +171,7 @@ defmodule YscWeb.EventDetailsLiveTest do
         )
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "toggle-map")
       assert is_binary(result)
@@ -185,7 +185,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_state(:upcoming, with_image: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-ticket-modal")
       assert is_binary(result)
@@ -224,7 +224,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "open-ticket-modal")
       # May redirect to tickets page or return HTML
@@ -233,7 +233,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "can close ticket modal", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-ticket-modal")
       assert is_binary(result)
@@ -244,7 +244,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -257,7 +257,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select first
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -274,7 +274,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -287,7 +287,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Increment first to have something to decrement
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -304,7 +304,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       [tier1, tier2 | _] = event.ticket_tiers
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select multiple tickets
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier1.id})
@@ -316,7 +316,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "handles show-attendees-modal event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "show-attendees-modal")
       assert is_binary(result)
@@ -324,7 +324,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "handles hide-attendees-modal event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-attendees-modal")
       assert is_binary(result)
@@ -348,7 +348,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "set-donation-amount", %{
@@ -366,7 +366,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "set-donation-amount", %{
@@ -384,7 +384,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "set-donation-amount", %{
@@ -397,7 +397,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "handles update-donation-amount event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_change(view, "update-donation-amount", %{
@@ -437,7 +437,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier: tier
     } do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_change(view, "update-registration-field", %{
@@ -455,7 +455,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier: tier
     } do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_change(view, "update-registration-field", %{
@@ -473,7 +473,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier: tier
     } do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_change(view, "update-registration-field", %{
@@ -500,7 +500,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select a ticket first
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -512,7 +512,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "handles close-order-completion event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-order-completion")
       assert is_binary(result)
@@ -520,7 +520,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "handles payment-redirect-started event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "payment-redirect-started")
       assert is_binary(result)
@@ -528,7 +528,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     test "handles checkout-expired event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "checkout-expired")
       assert is_binary(result)
@@ -569,7 +569,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       free_tier: free_tier
     } do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "increase-ticket-quantity", %{
@@ -585,7 +585,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       free_tier: free_tier
     } do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result =
         render_click(view, "increase-ticket-quantity", %{
@@ -624,8 +624,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      # Wait for async operations
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
       assert html =~ event.title
@@ -636,8 +635,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      # Wait for async operations
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
       assert html =~ event.title
@@ -766,7 +764,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select ticket
       html =
@@ -791,7 +789,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select ticket
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -816,7 +814,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       [tier1, tier2 | _] = event.ticket_tiers
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select from first tier
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier1.id})
@@ -844,7 +842,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select ticket
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -863,7 +861,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Set initial donation
       render_click(view, "set-donation-amount", %{
@@ -919,7 +917,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier: tier
     } do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select ticket that requires registration
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -957,7 +955,7 @@ defmodule YscWeb.EventDetailsLiveTest do
         )
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Open map
       html = render_click(view, "toggle-map")
@@ -974,7 +972,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_state(:upcoming, with_image: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Show modal
       html = render_click(view, "show-attendees-modal")
@@ -999,7 +997,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       # Load event page
       {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
       assert html =~ event.title
-      :timer.sleep(200)
+      render_async(view)
 
       # Select first tier
       html =
@@ -1041,7 +1039,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Add multiple tickets
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -1066,7 +1064,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       [tier1, tier2] = event.ticket_tiers
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select tickets
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier1.id})
@@ -1101,7 +1099,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select free tickets
       html =
@@ -1262,7 +1260,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Select ticket
       html =
@@ -1344,7 +1342,7 @@ defmodule YscWeb.EventDetailsLiveTest do
         })
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       # Should be able to add many tickets
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -1375,7 +1373,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_tickets(tier_count: 1)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-payment-modal")
       assert is_binary(result)
@@ -1387,7 +1385,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_tickets(tier_count: 1)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-registration-modal")
       assert is_binary(result)
@@ -1399,7 +1397,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_tickets(tier_count: 1)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "retry-checkout")
       assert is_binary(result) or match?({:error, _}, result)
@@ -1411,7 +1409,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_tickets(tier_count: 1)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(200)
+      render_async(view)
 
       result = render_click(view, "close-free-ticket-confirmation")
       assert is_binary(result)

@@ -41,11 +41,9 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Select tickets asynchronously
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -57,13 +55,11 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Rapidly change quantities
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "decrease-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -75,25 +71,19 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(100)
 
-      # Change donation amounts
       render_click(view, "set-donation-amount", %{
         "tier-id" => tier.id,
         "amount" => "25"
       })
 
-      :timer.sleep(100)
-
       render_click(view, "set-donation-amount", %{
         "tier-id" => tier.id,
         "amount" => "50"
       })
-
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -108,11 +98,9 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       _tier = hd(event.ticket_tiers)
 
-      # Start LiveView session
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Simulate ticket availability update from another session
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "events:#{event.id}",
@@ -120,8 +108,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
           event_id: event.id
         }
       )
-
-      :timer.sleep(300)
 
       html = render(view)
       assert is_binary(html)
@@ -133,18 +119,7 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       [_tier1, _tier2] = event.ticket_tiers
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
-
-      # Broadcast multiple updates
-      Phoenix.PubSub.broadcast(
-        Ysc.PubSub,
-        "events:#{event.id}",
-        %TicketAvailabilityUpdated{
-          event_id: event.id
-        }
-      )
-
-      :timer.sleep(100)
+      render_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -154,7 +129,13 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         }
       )
 
-      :timer.sleep(300)
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events:#{event.id}",
+        %TicketAvailabilityUpdated{
+          event_id: event.id
+        }
+      )
 
       html = render(view)
       assert is_binary(html)
@@ -166,9 +147,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       _tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Simulate tickets selling out
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "events:#{event.id}",
@@ -176,8 +156,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
           event_id: event.id
         }
       )
-
-      :timer.sleep(300)
 
       html = render(view)
       assert is_binary(html)
@@ -205,9 +183,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       {:ok, view, _html} =
         live(conn, ~p"/events/#{event.id}?order_id=#{order.id}")
 
-      :timer.sleep(300)
+      render_async(view)
 
-      # Broadcast cancellation event
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "ticket_orders:#{order.id}",
@@ -217,8 +194,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
           user_id: user.id
         }
       )
-
-      :timer.sleep(300)
 
       html = render(view)
       assert is_binary(html)
@@ -244,9 +219,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       {:ok, view, _html} =
         live(conn, ~p"/events/#{event.id}?order_id=#{order.id}")
 
-      :timer.sleep(300)
+      render_async(view)
 
-      # Broadcast expiration event
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "ticket_orders:#{order.id}",
@@ -256,8 +230,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         }
       )
 
-      :timer.sleep(300)
-
       html = render(view)
       assert is_binary(html)
     end
@@ -265,7 +237,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
 
   describe "concurrent ticket purchasing" do
     test "handles concurrent attempts to purchase same tickets", %{conn: conn} do
-      # Create second user
       user2 = user_with_membership(:lifetime)
       conn2 = build_conn() |> log_in_user(user2)
 
@@ -273,17 +244,14 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      # Start two sessions
       {:ok, view1, _html} = live(conn, ~p"/events/#{event.id}")
       {:ok, view2, _html} = live(conn2, ~p"/events/#{event.id}")
-      :timer.sleep(500)
+      render_async(view1)
+      render_async(view2)
 
-      # Both users try to select tickets
       render_click(view1, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view2, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(300)
 
-      # Both views should remain responsive
       html1 = render(view1)
       html2 = render(view2)
       assert is_binary(html1)
@@ -300,15 +268,12 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
 
       {:ok, view1, _html} = live(conn, ~p"/events/#{event.id}")
       {:ok, view2, _html} = live(conn2, ~p"/events/#{event.id}")
-      :timer.sleep(500)
+      render_async(view1)
+      render_async(view2)
 
-      # First user starts checkout
       render_click(view1, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(100)
       render_click(view1, "proceed-to-checkout")
-      :timer.sleep(500)
 
-      # Broadcast availability update that would affect second session
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "events:#{event.id}",
@@ -317,9 +282,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         }
       )
 
-      :timer.sleep(300)
-
-      # Both sessions should handle the update
       html1 = render(view1)
       html2 = render(view2)
       assert is_binary(html1)
@@ -332,7 +294,6 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
       event = Repo.preload(event, :ticket_tiers, force: true)
 
-      # Create tier requiring registration
       registration_tier =
         Ysc.EventsFixtures.ticket_tier_fixture(%{
           event_id: event.id,
@@ -346,13 +307,11 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
       render_click(view, "increase-ticket-quantity", %{
         "tier-id" => registration_tier.id
       })
-
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -364,16 +323,12 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(100)
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(500)
 
-      # Try to close modal
       render_click(view, "close-payment-modal")
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -385,16 +340,12 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(100)
       render_click(view, "proceed-to-checkout")
-      :timer.sleep(500)
 
-      # Simulate redirect started
       render_click(view, "payment-redirect-started")
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -407,13 +358,10 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Stop the view (simulates navigation away)
       GenServer.stop(view.pid)
-      :timer.sleep(200)
 
-      # View should be stopped cleanly
       refute Process.alive?(view.pid)
     end
 
@@ -424,14 +372,12 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event1.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event1.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Start operation
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
 
-      # Navigate away immediately
       render_patch(view, ~p"/events/#{event2.id}")
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -440,17 +386,14 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
     test "handles rapid mount/unmount cycles", %{conn: conn} do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
 
-      # Rapidly mount and unmount
       {:ok, view1, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(100)
       GenServer.stop(view1.pid)
 
       {:ok, view2, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(100)
       GenServer.stop(view2.pid)
 
       {:ok, view3, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view3)
 
       html = render(view3)
       assert is_binary(html)
@@ -464,15 +407,12 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Trigger operations that might spawn async processes
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(500)
 
-      # View should still be responsive
       html = render(view)
       assert is_binary(html)
     end
@@ -483,20 +423,15 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Send malformed PubSub message
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "events:#{event.id}",
         {:unexpected_message, "data"}
       )
 
-      :timer.sleep(300)
-
-      # View should still work
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -510,9 +445,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       _tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
-      # Simulate real-time inventory changes
       for _quantity <- 99..95//-1 do
         Phoenix.PubSub.broadcast(
           Ysc.PubSub,
@@ -521,11 +455,7 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
             event_id: event.id
           }
         )
-
-        :timer.sleep(100)
       end
-
-      :timer.sleep(200)
 
       html = render(view)
       assert is_binary(html)
@@ -537,15 +467,9 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       tier = hd(event.ticket_tiers)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      :timer.sleep(300)
+      render_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      # Don't wait - check immediately
-      html = render(view)
-      assert is_binary(html)
-
-      # Wait for completion
-      :timer.sleep(300)
       html = render(view)
       assert is_binary(html)
     end

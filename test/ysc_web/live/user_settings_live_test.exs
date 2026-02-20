@@ -33,8 +33,6 @@ defmodule YscWeb.UserSettingsLiveTest do
          %MessagePassingEvents.MembershipUpdated{user_id: user.id}}
       )
 
-      :timer.sleep(100)
-
       assert has_element?(view, "#flash-info")
     end
 
@@ -72,8 +70,6 @@ defmodule YscWeb.UserSettingsLiveTest do
            %MessagePassingEvents.MembershipUpdated{user_id: user.id}}
         )
 
-        :timer.sleep(100)
-
         assert has_element?(view, "button[phx-click=\"cancel-membership\"]")
       after
         Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
@@ -93,8 +89,6 @@ defmodule YscWeb.UserSettingsLiveTest do
         {Ysc.Subscriptions,
          %MessagePassingEvents.MembershipUpdated{user_id: other_user.id}}
       )
-
-      :timer.sleep(100)
 
       refute has_element?(view, "#flash-info")
     end

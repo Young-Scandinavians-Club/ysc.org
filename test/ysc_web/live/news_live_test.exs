@@ -60,8 +60,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async data to load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
 
@@ -89,8 +88,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Featured News" or html =~ "Club News"
@@ -101,8 +99,7 @@ defmodule YscWeb.NewsLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       refute html =~ "Pinned News" or html =~ "animate-pulse"
@@ -126,8 +123,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       # May show author name if featured post loaded
@@ -143,8 +139,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       # At least some posts should be visible
@@ -157,8 +152,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Club News"
@@ -172,8 +166,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       # Should show "min read" somewhere
@@ -190,8 +183,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for initial load
-      :timer.sleep(200)
+      render_async(view)
 
       # Trigger next page
       result = render_click(view, "next-page")
@@ -208,8 +200,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for initial load
-      :timer.sleep(200)
+      render_async(view)
 
       # Go to next page first
       render_click(view, "next-page")
@@ -224,8 +215,7 @@ defmodule YscWeb.NewsLiveTest do
     test "prev-page with overran flag resets to page 1", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for initial load
-      :timer.sleep(200)
+      render_async(view)
 
       # Trigger prev-page with overran flag
       result = render_click(view, "prev-page", %{"_overran" => true})
@@ -237,8 +227,7 @@ defmodule YscWeb.NewsLiveTest do
     test "does not go below page 1 when on first page", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for initial load
-      :timer.sleep(200)
+      render_async(view)
 
       # Try to go to previous page when already on page 1
       result = render_click(view, "prev-page")
@@ -252,8 +241,7 @@ defmodule YscWeb.NewsLiveTest do
     test "handles no posts gracefully", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       # Should show the page header even with no posts
@@ -268,8 +256,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      # Wait for async load
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       # May show "President" if post is visible
@@ -282,7 +269,7 @@ defmodule YscWeb.NewsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/news")
 
       # Even if async load fails, page should still render
-      :timer.sleep(300)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Club News"

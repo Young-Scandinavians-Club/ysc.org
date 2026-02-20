@@ -176,9 +176,6 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         )
         |> Repo.insert!()
 
-      # Wait a moment to ensure the expired check works
-      :timer.sleep(100)
-
       # Should be able to create a new invite since the old one is expired
       assert {:ok, new_invite} =
                FamilyInvites.create_invite(primary_user, email)
@@ -323,9 +320,6 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         )
         |> Repo.update!()
 
-      # Wait a moment to ensure time has passed
-      :timer.sleep(100)
-
       assert {:error, :invite_expired_or_used} =
                FamilyInvites.accept_invite(expired_invite.token, %{
                  email: email,
@@ -459,17 +453,29 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     test "returns all invites for primary user ordered by inserted_at desc" do
       primary_user = create_user_with_lifetime_membership()
 
-      # Create multiple invites
+      # Create invites and explicitly backdate the older ones so ordering is
+      # deterministic without relying on real wall-clock time passing.
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
       {:ok, invite1} =
         FamilyInvites.create_invite(primary_user, unique_user_email())
 
-      # Ensure different timestamps - need at least 1 second for database timestamp precision
-      :timer.sleep(1000)
+      {:ok, invite1} =
+        invite1
+        |> Ecto.Changeset.change(%{
+          inserted_at: DateTime.add(now, -120, :second)
+        })
+        |> Ysc.Repo.update()
 
       {:ok, invite2} =
         FamilyInvites.create_invite(primary_user, unique_user_email())
 
-      :timer.sleep(1000)
+      {:ok, invite2} =
+        invite2
+        |> Ecto.Changeset.change(%{
+          inserted_at: DateTime.add(now, -60, :second)
+        })
+        |> Ysc.Repo.update()
 
       {:ok, invite3} =
         FamilyInvites.create_invite(primary_user, unique_user_email())

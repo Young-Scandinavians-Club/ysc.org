@@ -47,7 +47,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
       # Wait for async task to complete
-      :timer.sleep(100)
+      render_async(view)
 
       # After loading, should show empty state or passkeys
       html = render(view)
@@ -61,7 +61,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
       # Wait for async task to complete and re-render
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
 
@@ -172,7 +172,6 @@ defmodule YscWeb.UserSecurityLiveTest do
       refute has_element?(view, "#reauth-modal")
 
       # Verify password was actually changed
-      :timer.sleep(100)
       updated_user = Repo.reload!(user)
 
       assert Accounts.get_user_by_email_and_password(
@@ -200,7 +199,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
       # Wait for passkeys to load
-      :timer.sleep(100)
+      render_async(view)
 
       # Delete the passkey
       result =
@@ -304,7 +303,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Recent Logins"
@@ -328,7 +327,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Recent Logins"
@@ -355,7 +354,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Recent Logins"
@@ -381,7 +380,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
       assert html =~ "Recent Logins"
@@ -408,7 +407,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      :timer.sleep(200)
+      render_async(view)
 
       html = render(view)
 
