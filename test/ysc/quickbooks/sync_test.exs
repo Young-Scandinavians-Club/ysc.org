@@ -2068,18 +2068,20 @@ defmodule Ysc.Quickbooks.SyncTest do
         stripe_account_id: "stripe_account_123"
       )
 
-      # Stub query functions needed for payout sync
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        _ -> {:error, :not_found}
+      end)
+
       stub(ClientMock, :query_class_by_name, fn
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
       end)
 
-      # Stub get_or_create_item in case config is not set when running in parallel
       stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
         {:ok, "event_item_123"}
       end)
 
-      # Mock Deposit creation (simple deposit without line items)
       expect(ClientMock, :create_deposit, fn params, _opts ->
         assert params.total_amt == Decimal.new("10000.00")
         {:ok, %{"Id" => "qb_deposit_123", "TotalAmt" => "10000.00"}}
@@ -2133,20 +2135,19 @@ defmodule Ysc.Quickbooks.SyncTest do
       end)
 
       expect(ClientMock, :create_deposit, fn params, _opts ->
-        # Should have 2 lines: gross Stripe line + negative fee line
+        # Should have 2 lines: gross Undeposited Funds line + negative fee line
         assert length(params.line) == 2
 
-        # Gross line: net ($9680) + fees ($320) = $10000
+        # Gross line: net ($9680) + fees ($320) = $10000 (from Undeposited Funds)
         gross_line =
           Enum.find(params.line, fn line ->
-            line.deposit_line_detail[:entity_ref] != nil
+            line.deposit_line_detail[:account_ref] != nil &&
+              line.deposit_line_detail[:account_ref][:value] ==
+                "undeposited_funds_123"
           end)
 
         assert gross_line != nil
         assert Decimal.equal?(gross_line.amount, Decimal.new("10000.00"))
-
-        assert gross_line.deposit_line_detail.entity_ref.value ==
-                 "stripe_account_123"
 
         # Fee line: -$320 with Stripe Fees account
         fee_line =
@@ -2201,6 +2202,11 @@ defmodule Ysc.Quickbooks.SyncTest do
         stripe_account_id: "stripe_account_123"
       )
 
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        _ -> {:error, :not_found}
+      end)
+
       stub(ClientMock, :query_class_by_name, fn
         "Administration" -> {:ok, "admin_class_123"}
         _ -> {:error, :not_found}
@@ -2217,8 +2223,8 @@ defmodule Ysc.Quickbooks.SyncTest do
         line = List.first(params.line)
         assert Decimal.equal?(line.amount, Decimal.new("5000.00"))
 
-        assert line.deposit_line_detail[:entity_ref].value ==
-                 "stripe_account_123"
+        assert line.deposit_line_detail[:account_ref][:value] ==
+                 "undeposited_funds_123"
 
         assert Decimal.equal?(params.total_amt, Decimal.new("5000.00"))
 
@@ -2262,12 +2268,16 @@ defmodule Ysc.Quickbooks.SyncTest do
         stripe_account_id: "stripe_account_123"
       )
 
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        _ -> {:error, :not_found}
+      end)
+
       stub(ClientMock, :query_class_by_name, fn
         "Administration" -> {:ok, "admin_class_default"}
         _ -> {:error, :not_found}
       end)
 
-      # Stub get_or_create_item in case config is not set when running in parallel
       stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
         {:ok, "event_item_123"}
       end)

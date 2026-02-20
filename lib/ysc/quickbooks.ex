@@ -440,7 +440,7 @@ defmodule Ysc.Quickbooks do
 
     - `params` - Map containing:
       - `bank_account_id` (required) - QuickBooks bank account ID to deposit to
-      - `stripe_account_id` (required) - QuickBooks account ID representing Stripe
+      - `undeposited_funds_account_id` (optional) - QuickBooks Undeposited Funds account ID (source of funds)
       - `amount` (required) - Deposit amount
       - `txn_date` (optional) - Transaction date (Date struct or ISO 8601 string)
       - `private_note` (optional) - Private note (QuickBooks Deposit does not support `Memo`)
@@ -451,7 +451,7 @@ defmodule Ysc.Quickbooks do
           {:ok, map()} | {:error, atom() | String.t()}
   def create_stripe_payout_deposit(params, opts \\ []) do
     deposit_line_detail = %{
-      account_ref: %{value: params.stripe_account_id}
+      account_ref: %{value: params[:undeposited_funds_account_id]}
     }
 
     deposit_line_detail =

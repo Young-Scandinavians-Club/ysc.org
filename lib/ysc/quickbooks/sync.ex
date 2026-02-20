@@ -2204,16 +2204,19 @@ defmodule Ysc.Quickbooks.Sync do
         do: to_string(raw_bank_id),
         else: nil
 
-    stripe_account_id =
-      Application.get_env(:ysc, :quickbooks)[:stripe_account_id]
+    undeposited_funds_ref =
+      case get_undeposited_funds_account_ref() do
+        {:ok, ref} -> ref
+        _error -> nil
+      end
 
     Ysc.Logging.debug("[QB Sync] create_payout_deposit: Account IDs",
       payout_id: payout.id,
       bank_account_id: bank_account_id,
-      stripe_account_id: stripe_account_id
+      undeposited_funds_ref: inspect(undeposited_funds_ref)
     )
 
-    if bank_account_id && stripe_account_id do
+    if bank_account_id do
       # Check if payout has any linked payments or refunds
       payments_count = length(payout.payments || [])
       refunds_count = length(payout.refunds || [])
@@ -2268,7 +2271,7 @@ defmodule Ysc.Quickbooks.Sync do
               amount: gross_amount,
               detail_type: "DepositLineDetail",
               deposit_line_detail: %{
-                entity_ref: %{value: stripe_account_id, type: "Account"},
+                account_ref: undeposited_funds_ref,
                 class_ref: administration_class_ref
               },
               description: "Stripe Payout: #{payout.stripe_payout_id}"
@@ -2302,7 +2305,7 @@ defmodule Ysc.Quickbooks.Sync do
               amount: net_amount,
               detail_type: "DepositLineDetail",
               deposit_line_detail: %{
-                entity_ref: %{value: stripe_account_id, type: "Account"},
+                account_ref: undeposited_funds_ref,
                 class_ref: administration_class_ref
               },
               description: "Stripe Payout: #{payout.stripe_payout_id}"
@@ -2369,7 +2372,8 @@ defmodule Ysc.Quickbooks.Sync do
 
           params = %{
             bank_account_id: bank_account_id,
-            stripe_account_id: stripe_account_id,
+            undeposited_funds_account_id:
+              undeposited_funds_ref && undeposited_funds_ref[:value],
             amount: amount,
             txn_date: payout.arrival_date || payout.inserted_at,
             private_note: "Stripe Payout: #{payout.stripe_payout_id}",
@@ -2499,10 +2503,9 @@ defmodule Ysc.Quickbooks.Sync do
       end
     else
       Ysc.Logging.warning(
-        "[QB Sync] create_payout_deposit: QuickBooks accounts not configured",
+        "[QB Sync] create_payout_deposit: QuickBooks bank account not configured",
         payout_id: payout.id,
-        bank_account_id: bank_account_id,
-        stripe_account_id: stripe_account_id
+        bank_account_id: bank_account_id
       )
 
       {:error, :quickbooks_accounts_not_configured}

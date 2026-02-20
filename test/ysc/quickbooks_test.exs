@@ -454,7 +454,7 @@ defmodule Ysc.QuickbooksTest do
         assert params.total_amt == 500.00
         assert [line] = params.line
         assert line.detail_type == "DepositLineDetail"
-        assert line.deposit_line_detail.account_ref == %{value: "stripe_acc_1"}
+        assert line.deposit_line_detail.account_ref == %{value: "undeposited_4"}
         assert line.description == "Stripe payout"
 
         {:ok, %{"Id" => "dep_1", "TotalAmt" => "500.00"}}
@@ -463,7 +463,7 @@ defmodule Ysc.QuickbooksTest do
       assert {:ok, %{"Id" => "dep_1"}} =
                Quickbooks.create_stripe_payout_deposit(%{
                  bank_account_id: "bank_1",
-                 stripe_account_id: "stripe_acc_1",
+                 undeposited_funds_account_id: "undeposited_4",
                  amount: 500.00
                })
     end
@@ -485,7 +485,7 @@ defmodule Ysc.QuickbooksTest do
       assert {:ok, %{"Id" => "dep_2"}} =
                Quickbooks.create_stripe_payout_deposit(%{
                  bank_account_id: "bank_2",
-                 stripe_account_id: "stripe_2",
+                 undeposited_funds_account_id: "undeposited_4",
                  amount: 1000.00,
                  txn_date: ~D[2024-12-01],
                  private_note: "Payout for November",
