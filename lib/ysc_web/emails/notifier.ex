@@ -50,6 +50,7 @@ defmodule YscWeb.Emails.Notifier do
       YscWeb.Emails.MembershipPaymentReminder30Day,
     "membership_renewal_payment_method_reminder" =>
       YscWeb.Emails.MembershipRenewalPaymentMethodReminder,
+    "membership_renewal_reminder" => YscWeb.Emails.MembershipRenewalReminder,
     "family_invite" => YscWeb.Emails.FamilyInvite,
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,

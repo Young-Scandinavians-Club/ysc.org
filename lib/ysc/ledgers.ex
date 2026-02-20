@@ -1889,6 +1889,22 @@ defmodule Ysc.Ledgers do
   end
 
   @doc """
+  Checks whether a payment has revenue debit entries, which are exclusively
+  created by `create_refund_entries`. Used as a backward-compatible fallback
+  for refunds processed before Feb 3, 2026, when the `refund_id` column did
+  not yet exist on `ledger_entries`.
+  """
+  def payment_has_revenue_debit_entries?(payment_id) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id == ^payment_id,
+      where: a.account_type == "revenue",
+      where: e.debit_credit == "debit"
+    )
+    |> Repo.exists?()
+  end
+
+  @doc """
   Gets the related entity (booking or ticket order) for a payment.
 
   Returns:

@@ -103,7 +103,10 @@ config :ysc, Oban,
        {"0 3 * * *", YscWeb.Workers.QuickbooksSyncRetryWorker},
        {"0 3 * * *", YscWeb.Workers.WebhookRetryWorker},
        {"0 */6 * * *", YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker},
-       {"0 9 * * *", YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker}
+       {"0 9 * * *",
+        YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
+       # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
+       {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker}
      ]}
   ]
 

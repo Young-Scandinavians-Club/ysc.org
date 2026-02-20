@@ -368,15 +368,22 @@ defmodule Ysc.Ledgers.Reconciliation do
         issues
       end
 
-    # Check if refund has ledger entries
-    # Query entries directly by refund_id for accurate relationship tracking
+    # Check if refund has ledger entries.
+    # For refunds processed before Feb 3, 2026 (when the refund_id column was
+    # added to ledger_entries), entries exist but have refund_id = NULL. Fall back
+    # to checking for revenue debit entries on the payment, which are exclusively
+    # created by create_refund_entries and prove the refund was fully processed.
     refund_entries = Ledgers.get_entries_by_refund(refund.id)
 
+    has_entries =
+      not Enum.empty?(refund_entries) or
+        Ledgers.payment_has_revenue_debit_entries?(refund.payment_id)
+
     issues =
-      if Enum.empty?(refund_entries) do
-        ["No refund ledger entries found" | issues]
-      else
+      if has_entries do
         issues
+      else
+        ["No refund ledger entries found" | issues]
       end
 
     if Enum.empty?(issues) do
@@ -466,13 +473,13 @@ defmodule Ysc.Ledgers.Reconciliation do
   end
 
   defp calculate_refund_total_from_ledger do
-    # Sum all revenue reversal entries for refunds using the refund_id column
-    # With the refund_id foreign key, we can directly identify refund entries
-    # and sum only the debit side (revenue reversals) to match the refund amounts
+    # Sum all revenue reversal entries. Revenue debit entries are exclusively
+    # created by create_refund_entries, so no refund_id filter is needed.
+    # Omitting it ensures backward-compatibility with entries from before Feb 2026
+    # when the refund_id column did not exist on ledger_entries.
     query =
       from(e in LedgerEntry,
         join: a in assoc(e, :account),
-        where: not is_nil(e.refund_id),
         where: a.account_type == "revenue",
         where: e.debit_credit == "debit",
         select: sum(fragment("(?.amount).amount", e))
@@ -593,13 +600,16 @@ defmodule Ysc.Ledgers.Reconciliation do
         amount -> Money.new(amount, :USD)
       end
 
-    # Sum credit entries (refunds)
+    # Sum credit entries (refunds).
+    # Note: stripe_account credits with related_entity_type :membership are exclusively
+    # created by create_refund_entries, so the refund_id filter is not required here.
+    # Omitting it ensures backward-compatibility with entries created before Feb 2026
+    # when the refund_id column did not exist on ledger_entries.
     membership_credits =
       from(e in LedgerEntry,
         where: e.account_id == ^stripe_account.id,
         where: e.related_entity_type == :membership,
         where: e.debit_credit == "credit",
-        where: not is_nil(e.refund_id),
         select: sum(fragment("(?.amount).amount", e))
       )
       |> Repo.one()
@@ -651,13 +661,16 @@ defmodule Ysc.Ledgers.Reconciliation do
         amount -> Money.new(amount, :USD)
       end
 
-    # Sum credit entries (refunds)
+    # Sum credit entries (refunds).
+    # Note: stripe_account credits with related_entity_type :booking are exclusively
+    # created by create_refund_entries, so the refund_id filter is not required here.
+    # Omitting it ensures backward-compatibility with entries created before Feb 2026
+    # when the refund_id column did not exist on ledger_entries.
     booking_credits =
       from(e in LedgerEntry,
         where: e.account_id == ^stripe_account.id,
         where: e.related_entity_type == :booking,
         where: e.debit_credit == "credit",
-        where: not is_nil(e.refund_id),
         select: sum(fragment("(?.amount).amount", e))
       )
       |> Repo.one()
@@ -704,13 +717,16 @@ defmodule Ysc.Ledgers.Reconciliation do
         amount -> Money.new(amount, :USD)
       end
 
-    # Sum credit entries (refunds)
+    # Sum credit entries (refunds).
+    # Note: stripe_account credits with related_entity_type :event are exclusively
+    # created by create_refund_entries, so the refund_id filter is not required here.
+    # Omitting it ensures backward-compatibility with entries created before Feb 2026
+    # when the refund_id column did not exist on ledger_entries.
     event_credits =
       from(e in LedgerEntry,
         where: e.account_id == ^stripe_account.id,
         where: e.related_entity_type == :event,
         where: e.debit_credit == "credit",
-        where: not is_nil(e.refund_id),
         select: sum(fragment("(?.amount).amount", e))
       )
       |> Repo.one()
@@ -760,13 +776,16 @@ defmodule Ysc.Ledgers.Reconciliation do
         amount -> Money.new(amount, :USD)
       end
 
-    # Subtract refunds from donations
+    # Subtract refunds from donations.
+    # Note: donation_revenue debit entries are exclusively created by
+    # create_refund_entries (payment entries only create credits), so the
+    # refund_id filter is not required. Omitting it ensures backward-compatibility
+    # with entries created before Feb 2026 when the refund_id column did not exist.
     refunds_total =
       from(e in LedgerEntry,
         join: a in assoc(e, :account),
         where: a.name == "donation_revenue",
         where: e.debit_credit == "debit",
-        where: not is_nil(e.refund_id),
         select: sum(fragment("(?.amount).amount", e))
       )
       |> Repo.one()
