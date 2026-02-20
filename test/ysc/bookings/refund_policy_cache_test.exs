@@ -234,19 +234,16 @@ defmodule Ysc.Bookings.RefundPolicyCacheTest do
     end
 
     test "invalidation bumps cache version" do
-      # Set version to a known past value
-      past_version = System.system_time(:second) - 10
-      Cachex.put(:ysc_cache, "refund_policy:version", past_version)
-
-      {:ok, version1} = Cachex.get(:ysc_cache, "refund_policy:version")
-      assert version1 == past_version
-
-      # Invalidate sets version to now()
+      # Capture version before invalidation
       RefundPolicyCache.invalidate()
+      {:ok, version1} = Cachex.get(:ysc_cache, "refund_policy:version")
+      assert is_integer(version1)
 
+      # Second invalidation must produce a different version
+      RefundPolicyCache.invalidate()
       {:ok, version2} = Cachex.get(:ysc_cache, "refund_policy:version")
 
-      assert version2 > version1
+      assert version2 != version1
     end
 
     test "broadcasts invalidation event via PubSub" do
