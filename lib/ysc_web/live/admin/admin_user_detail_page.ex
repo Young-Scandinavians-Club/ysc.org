@@ -18,6 +18,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Tickets
+  alias YscWeb.Workers.MembershipRenewalReminderWorker
 
   def render(assigns) do
     ~H"""
@@ -2388,6 +2389,16 @@ defmodule YscWeb.AdminUserDetailsLive do
               membership_changeset =
                 %{period_end_date: updated_subscription.current_period_end}
                 |> membership_changeset()
+
+              # If the new renewal date falls within the 7-day reminder window,
+              # send the reminder immediately — the daily cron only looks at
+              # exactly 7 days out and would miss a date moved closer than that.
+              selected_user = socket.assigns[:selected_user]
+
+              MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
+                selected_user,
+                updated_subscription
+              )
 
               {:noreply,
                socket

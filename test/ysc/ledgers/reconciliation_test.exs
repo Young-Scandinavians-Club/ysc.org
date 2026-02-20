@@ -2440,4 +2440,341 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert Enum.all?(durations, &(&1 < 1000))
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Backward compatibility: refunds created before Feb 3, 2026
+  #
+  # Between Nov 20, 2025 (refund_id added to ledger_transactions) and Feb 3,
+  # 2026 (refund_id added to ledger_entries), create_refund_entries wrote
+  # LedgerEntry rows without a refund_id. These helpers simulate that state.
+  # ---------------------------------------------------------------------------
+
+  defp create_legacy_payment(user, attrs \\ %{}) do
+    defaults = %{
+      user_id: user.id,
+      amount: Money.new(10_000, :USD),
+      external_provider: :stripe,
+      external_payment_id: "pi_legacy_#{System.unique_integer([:positive])}",
+      payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+      entity_type: :membership,
+      entity_id: Ecto.ULID.generate(),
+      stripe_fee: Money.new(300, :USD),
+      description: "Legacy test payment",
+      property: :general,
+      payment_method_id: nil
+    }
+
+    {:ok, {payment, _tx, _entries}} =
+      Ledgers.process_payment(Map.merge(defaults, attrs))
+
+    payment
+  end
+
+  # Inserts a refund record + ledger transaction (with refund_id) + ledger
+  # entries WITHOUT refund_id, exactly as create_refund_entries produced them
+  # before the refund_id column was added to ledger_entries on Feb 3, 2026.
+  defp create_legacy_refund(
+         payment,
+         refund_amount,
+         entity_type,
+         revenue_account_name
+       ) do
+    refund =
+      Repo.insert!(%Refund{
+        payment_id: payment.id,
+        amount: refund_amount,
+        external_provider: :stripe,
+        external_refund_id: "re_legacy_#{System.unique_integer([:positive])}",
+        status: :completed,
+        reason: "legacy_test"
+      })
+
+    Repo.insert!(%LedgerTransaction{
+      type: :refund,
+      refund_id: refund.id,
+      payment_id: payment.id,
+      total_amount: refund_amount,
+      status: :completed
+    })
+
+    revenue_account = Ledgers.get_account_by_name(revenue_account_name)
+    stripe_account = Ledgers.get_account_by_name("stripe_account")
+
+    # Revenue reversal debit — refund_id intentionally omitted (NULL)
+    Repo.insert!(%LedgerEntry{
+      account_id: revenue_account.id,
+      payment_id: payment.id,
+      amount: refund_amount,
+      debit_credit: :debit,
+      related_entity_type: entity_type,
+      description: "Legacy revenue reversal (pre-Feb-2026, no refund_id)"
+    })
+
+    # Stripe account credit — refund_id intentionally omitted (NULL)
+    Repo.insert!(%LedgerEntry{
+      account_id: stripe_account.id,
+      payment_id: payment.id,
+      amount: refund_amount,
+      debit_credit: :credit,
+      related_entity_type: entity_type,
+      description: "Legacy stripe reduction (pre-Feb-2026, no refund_id)"
+    })
+
+    refund
+  end
+
+  describe "backward compatibility (pre-Feb-2026 refunds)" do
+    test "reconcile_refunds/0 passes for a membership refund without refund_id on ledger entries",
+         %{user: user} do
+      payment = create_legacy_payment(user)
+
+      _refund =
+        create_legacy_refund(
+          payment,
+          Money.new(4000, :USD),
+          :membership,
+          "membership_revenue"
+        )
+
+      result = Reconciliation.reconcile_refunds()
+
+      assert result.status == :ok
+      assert result.total_refunds == 1
+      assert result.discrepancies_count == 0
+
+      # The ledger total is now also derived from all revenue debits (not filtered
+      # by refund_id), so it should match the refund table total.
+      assert result.totals.match == true
+    end
+
+    test "reconcile_refunds/0 still reports error when no ledger entries exist at all",
+         %{user: user} do
+      payment =
+        Repo.insert!(%Payment{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_provider: :stripe,
+          external_payment_id:
+            "pi_no_entries_#{System.unique_integer([:positive])}",
+          status: :completed,
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      refund =
+        Repo.insert!(%Refund{
+          payment_id: payment.id,
+          amount: Money.new(4000, :USD),
+          external_provider: :stripe,
+          external_refund_id:
+            "re_truly_missing_#{System.unique_integer([:positive])}",
+          status: :completed,
+          reason: "test"
+        })
+
+      # Transaction exists but NO ledger entries at all (neither new nor legacy)
+      Repo.insert!(%LedgerTransaction{
+        type: :refund,
+        refund_id: refund.id,
+        payment_id: payment.id,
+        total_amount: refund.amount,
+        status: :completed
+      })
+
+      result = Reconciliation.reconcile_refunds()
+
+      assert result.status == :error
+      discrepancy = List.first(result.discrepancies)
+      assert discrepancy.refund_id == refund.id
+      assert "No refund ledger entries found" in discrepancy.issues
+    end
+
+    test "reconcile_refunds/0 passes for multiple legacy membership refunds", %{
+      user: user
+    } do
+      payment = create_legacy_payment(user, %{amount: Money.new(50_000, :USD)})
+
+      refund_amounts = [5_000, 8_000, 12_000]
+
+      for amount <- refund_amounts do
+        create_legacy_refund(
+          payment,
+          Money.new(amount, :USD),
+          :membership,
+          "membership_revenue"
+        )
+      end
+
+      result = Reconciliation.reconcile_refunds()
+
+      assert result.status == :ok
+      assert result.total_refunds == 3
+      assert result.discrepancies_count == 0
+      assert result.totals.match == true
+
+      expected_total = Money.new(Enum.sum(refund_amounts), :USD)
+      assert Money.equal?(result.totals.refunds_table, expected_total)
+    end
+
+    test "reconcile_entity_totals/0 includes legacy booking refund entries in booking totals",
+         %{user: user} do
+      payment =
+        create_legacy_payment(user, %{
+          entity_type: :booking,
+          property: :tahoe,
+          amount: Money.new(15_000, :USD),
+          stripe_fee: Money.new(450, :USD),
+          description: "Booking payment"
+        })
+
+      create_legacy_refund(
+        payment,
+        Money.new(5_000, :USD),
+        :booking,
+        "tahoe_booking_revenue"
+      )
+
+      result = Reconciliation.reconcile_entity_totals()
+
+      assert result.bookings.status == :ok
+      assert result.bookings.match == true
+      # Net booking revenue: $150 credit - $50 debit = $100
+      assert Money.equal?(
+               result.bookings.ledger_revenue,
+               Money.new(10_000, :USD)
+             )
+
+      assert Money.equal?(
+               result.bookings.payment_total,
+               Money.new(10_000, :USD)
+             )
+    end
+
+    test "reconcile_entity_totals/0 includes legacy event refund entries in event totals",
+         %{user: user} do
+      payment =
+        create_legacy_payment(user, %{
+          entity_type: :event,
+          amount: Money.new(10_000, :USD),
+          stripe_fee: Money.new(300, :USD),
+          description: "Event payment"
+        })
+
+      create_legacy_refund(
+        payment,
+        Money.new(3_000, :USD),
+        :event,
+        "event_revenue"
+      )
+
+      result = Reconciliation.reconcile_entity_totals()
+
+      assert result.events.status == :ok
+      assert result.events.match == true
+      # Net event revenue: $100 credit - $30 debit = $70
+      assert Money.equal?(result.events.ledger_revenue, Money.new(7_000, :USD))
+      assert Money.equal?(result.events.payment_total, Money.new(7_000, :USD))
+    end
+
+    test "reconcile_entity_totals/0 includes legacy donation refund entries in donation totals",
+         %{user: user} do
+      payment =
+        create_legacy_payment(user, %{
+          entity_type: :donation,
+          amount: Money.new(8_000, :USD),
+          stripe_fee: Money.new(240, :USD),
+          description: "Donation payment"
+        })
+
+      create_legacy_refund(
+        payment,
+        Money.new(2_000, :USD),
+        :donation,
+        "donation_revenue"
+      )
+
+      result = Reconciliation.reconcile_entity_totals()
+
+      assert result.donations.status == :ok
+      assert result.donations.match == true
+      # Net donation revenue: $80 credit - $20 debit = $60
+      assert Money.equal?(
+               result.donations.ledger_revenue,
+               Money.new(6_000, :USD)
+             )
+
+      assert Money.equal?(
+               result.donations.payment_total,
+               Money.new(6_000, :USD)
+             )
+    end
+
+    test "run_full_reconciliation/0 passes with multiple legacy refunds across entity types",
+         %{user: user} do
+      membership_payment =
+        create_legacy_payment(user, %{amount: Money.new(20_000, :USD)})
+
+      booking_payment =
+        create_legacy_payment(user, %{
+          entity_type: :booking,
+          property: :tahoe,
+          amount: Money.new(15_000, :USD),
+          stripe_fee: Money.new(450, :USD)
+        })
+
+      event_payment =
+        create_legacy_payment(user, %{
+          entity_type: :event,
+          amount: Money.new(10_000, :USD),
+          stripe_fee: Money.new(300, :USD)
+        })
+
+      donation_payment =
+        create_legacy_payment(user, %{
+          entity_type: :donation,
+          amount: Money.new(5_000, :USD),
+          stripe_fee: Money.new(150, :USD)
+        })
+
+      create_legacy_refund(
+        membership_payment,
+        Money.new(5_000, :USD),
+        :membership,
+        "membership_revenue"
+      )
+
+      create_legacy_refund(
+        booking_payment,
+        Money.new(3_000, :USD),
+        :booking,
+        "tahoe_booking_revenue"
+      )
+
+      create_legacy_refund(
+        event_payment,
+        Money.new(2_000, :USD),
+        :event,
+        "event_revenue"
+      )
+
+      create_legacy_refund(
+        donation_payment,
+        Money.new(1_000, :USD),
+        :donation,
+        "donation_revenue"
+      )
+
+      {:ok, report} = Reconciliation.run_full_reconciliation()
+
+      assert report.overall_status == :ok
+      assert report.checks.ledger_balance.balanced == true
+      assert report.checks.refunds.status == :ok
+      assert report.checks.refunds.discrepancies_count == 0
+      assert report.checks.refunds.totals.match == true
+      assert report.checks.entity_totals.status == :ok
+      assert report.checks.entity_totals.memberships.match == true
+      assert report.checks.entity_totals.bookings.match == true
+      assert report.checks.entity_totals.events.match == true
+      assert report.checks.entity_totals.donations.match == true
+    end
+  end
 end

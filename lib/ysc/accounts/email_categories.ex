@@ -16,6 +16,7 @@ defmodule Ysc.Accounts.EmailCategories do
                                    "membership_payment_reminder_7day",
                                    "membership_payment_reminder_30day",
                                    "membership_renewal_payment_method_reminder",
+                                   "membership_renewal_reminder",
                                    "membership_renewal_success"
                                  ])
 
@@ -36,6 +37,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "membership_payment_failure" => :account,
     "membership_payment_confirmation" => :account,
     "membership_renewal_success" => :account,
+    "membership_renewal_reminder" => :account,
     "membership_payment_reminder_7day" => :account,
     "membership_payment_reminder_30day" => :account,
     "booking_checkin_reminder" => :account,
