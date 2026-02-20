@@ -504,6 +504,9 @@ defmodule Ysc.Quickbooks.Sync do
         error
 
       {:error, reason} = error ->
+        qb_bank_account_id =
+          Application.get_env(:ysc, :quickbooks)[:bank_account_id]
+
         Ysc.Logging.error(
           "[QB Sync] do_sync_payout: Sync failed in pipeline - Error: #{inspect(reason)}, Payout ID: #{payout.id}, Stripe Payout ID: #{inspect(payout.stripe_payout_id)}, Payments: #{length(payout.payments)}, Refunds: #{length(payout.refunds)}",
           payout_id: payout.id,
@@ -513,13 +516,15 @@ defmodule Ysc.Quickbooks.Sync do
           full_error: inspect(error),
           payments_count: length(payout.payments),
           refunds_count: length(payout.refunds),
+          quickbooks_bank_account_id: qb_bank_account_id,
           extra: %{
             payout_id: payout.id,
             stripe_payout_id: payout.stripe_payout_id,
             amount: Money.to_string!(payout.amount),
             payments_count: length(payout.payments),
             refunds_count: length(payout.refunds),
-            error: inspect(reason)
+            error: inspect(reason),
+            quickbooks_bank_account_id: qb_bank_account_id
           },
           tags: %{
             quickbooks_operation: "sync_payout",

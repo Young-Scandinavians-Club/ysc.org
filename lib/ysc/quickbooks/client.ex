@@ -656,22 +656,54 @@ defmodule Ysc.Quickbooks.Client do
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
           error_details = parse_error_details(response_body)
+          error_code = get_primary_error_code(error_details)
 
-          Ysc.Logging.error("QuickBooks API error",
-            status: status,
-            error: error,
-            endpoint: "deposit",
-            error_details: error_details,
-            extra: %{
-              endpoint: "deposit",
-              status_code: status,
-              error_summary: error,
-              quickbooks_errors: error_details[:errors] || [],
-              fault_type: error_details[:fault_type]
-            }
-          )
+          bank_account_id_used =
+            get_in(params, [:deposit_to_account_ref, :value]) ||
+              get_in(params, ["deposit_to_account_ref", "value"])
 
-          {:error, error}
+          case error_code do
+            "6000" ->
+              Ysc.Logging.error(
+                "QuickBooks API error - Invalid bank account for deposit (6000)",
+                status: status,
+                error: error,
+                endpoint: "deposit",
+                error_details: error_details,
+                bank_account_id: bank_account_id_used,
+                quickbooks_bank_account_id_env:
+                  Application.get_env(:ysc, :quickbooks)[:bank_account_id],
+                extra: %{
+                  endpoint: "deposit",
+                  status_code: status,
+                  error_summary: error,
+                  quickbooks_errors: error_details[:errors] || [],
+                  fault_type: error_details[:fault_type],
+                  bank_account_id_used: bank_account_id_used,
+                  resolution_hint:
+                    "ERROR 6000: QUICKBOOKS_BANK_ACCOUNT_ID (currently #{inspect(bank_account_id_used)}) points to an account QuickBooks does not recognise as a Bank type account. Run `mix quickbooks.verify_sandbox` to check the AccountType for this ID. Update QUICKBOOKS_BANK_ACCOUNT_ID to a Bank/Checking account ID, then use the 'Retry QB Sync' button on the payout."
+                }
+              )
+
+              {:error, :invalid_bank_account}
+
+            _ ->
+              Ysc.Logging.error("QuickBooks API error",
+                status: status,
+                error: error,
+                endpoint: "deposit",
+                error_details: error_details,
+                extra: %{
+                  endpoint: "deposit",
+                  status_code: status,
+                  error_summary: error,
+                  quickbooks_errors: error_details[:errors] || [],
+                  fault_type: error_details[:fault_type]
+                }
+              )
+
+              {:error, error}
+          end
 
         {:error, error} ->
           Ysc.Logging.error("Failed to create QuickBooks Deposit",

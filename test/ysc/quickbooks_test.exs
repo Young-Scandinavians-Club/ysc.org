@@ -473,7 +473,11 @@ defmodule Ysc.QuickbooksTest do
         assert params.txn_date == "2024-12-01"
         assert params.private_note == "Payout for November"
         assert [line] = params.line
-        assert line.deposit_line_detail.class_ref == %{value: "class_payout"}
+
+        assert line.deposit_line_detail.class_ref == %{
+                 value: "class_payout",
+                 name: "Administration"
+               }
 
         {:ok, %{"Id" => "dep_2", "TotalAmt" => "1000.00"}}
       end)
@@ -485,7 +489,7 @@ defmodule Ysc.QuickbooksTest do
                  amount: 1000.00,
                  txn_date: ~D[2024-12-01],
                  private_note: "Payout for November",
-                 class_ref: "class_payout"
+                 class_ref: %{value: "class_payout", name: "Administration"}
                })
     end
   end

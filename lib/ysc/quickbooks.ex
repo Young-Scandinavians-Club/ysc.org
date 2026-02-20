@@ -456,8 +456,7 @@ defmodule Ysc.Quickbooks do
 
     deposit_line_detail =
       if params[:class_ref],
-        do:
-          Map.put(deposit_line_detail, :class_ref, %{value: params.class_ref}),
+        do: Map.put(deposit_line_detail, :class_ref, params.class_ref),
         else: deposit_line_detail
 
     # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail

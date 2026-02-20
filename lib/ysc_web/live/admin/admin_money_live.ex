@@ -408,6 +408,34 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   @impl true
+  def handle_event("retry_payout_qb_sync", %{"payout_id" => payout_id}, socket) do
+    payout = Repo.get!(Ysc.Ledgers.Payout, payout_id)
+
+    {:ok, payout} =
+      payout
+      |> Ysc.Ledgers.Payout.changeset(%{
+        quickbooks_sync_status: nil,
+        quickbooks_sync_error: nil,
+        quickbooks_last_sync_attempt_at: nil
+      })
+      |> Repo.update()
+
+    %{payout_id: to_string(payout.id)}
+    |> YscWeb.Workers.QuickbooksSyncPayoutWorker.new()
+    |> Oban.insert()
+
+    payout = Repo.preload(payout, [:payments, :refunds])
+
+    {:noreply,
+     socket
+     |> assign(:selected_payout, payout)
+     |> put_flash(
+       :info,
+       "QuickBooks sync job enqueued for payout #{payout.stripe_payout_id}"
+     )}
+  end
+
+  @impl true
   def handle_event("show_payment_modal", %{"payment_id" => payment_id}, socket) do
     path = build_money_path(socket, "/payments/#{payment_id}")
     {:noreply, push_navigate(socket, to: path)}
@@ -2548,6 +2576,17 @@ defmodule YscWeb.AdminMoneyLive do
         </div>
 
         <div class="flex justify-end gap-2">
+          <%= if @selected_payout.quickbooks_sync_status != "synced" do %>
+            <.button
+              id="retry-payout-qb-sync-btn"
+              type="button"
+              phx-click="retry_payout_qb_sync"
+              phx-value-payout_id={@selected_payout.id}
+              class="bg-amber-600 hover:bg-amber-700"
+            >
+              Retry QB Sync
+            </.button>
+          <% end %>
           <.button
             type="button"
             phx-click="close_payout_modal"

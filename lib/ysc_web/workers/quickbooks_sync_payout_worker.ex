@@ -27,7 +27,8 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
 
   @non_retriable_errors [
     :quickbooks_accounts_not_configured,
-    :payout_not_found
+    :payout_not_found,
+    :invalid_bank_account
   ]
 
   @impl Oban.Worker
