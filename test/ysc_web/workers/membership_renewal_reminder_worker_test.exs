@@ -5,11 +5,13 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
   Two scenarios are covered:
 
   1. Daily cron job (`perform/1`) — sends reminders to all active members whose
-     `current_period_end` falls exactly 7 days from today.
+     `current_period_end` falls exactly 7 days from today and who have a payment
+     method on file (so the renewal will actually succeed).
 
   2. Admin billing anchor move (`schedule_reminder_if_within_window/2`) — sends
      a reminder immediately when an admin shifts a renewal date into the ≤7-day
-     window that the daily cron would otherwise miss.
+     window that the daily cron would otherwise miss, again only for members
+     with a payment method on file.
 
   Oban is configured in `:inline` mode for tests, meaning jobs execute
   synchronously on insert. Email delivery is asserted via Swoosh.TestAssertions.
@@ -19,6 +21,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
   import Swoosh.TestAssertions
 
   alias YscWeb.Workers.MembershipRenewalReminderWorker
+  alias Ysc.Payments.PaymentMethod
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Repo
 
@@ -41,13 +44,23 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       refute_email_sent(subject: @subject)
     end
 
-    test "sends reminder to member renewing in exactly 7 days" do
+    test "sends reminder to member renewing in exactly 7 days who has a payment method" do
+      user = user_fixture()
+      insert_subscription(user, days_from_now(7))
+      insert_payment_method(user)
+
+      assert :ok = MembershipRenewalReminderWorker.perform(build_job())
+
+      assert_email_sent(subject: @subject, to: {nil, user.email})
+    end
+
+    test "does not send reminder to member renewing in 7 days without a payment method" do
       user = user_fixture()
       insert_subscription(user, days_from_now(7))
 
       assert :ok = MembershipRenewalReminderWorker.perform(build_job())
 
-      assert_email_sent(subject: @subject, to: {nil, user.email})
+      refute_email_sent(subject: @subject)
     end
 
     test "does not send reminder for a subscription renewing in 6 days" do
@@ -91,11 +104,37 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       user2 = user_fixture()
       insert_subscription(user1, days_from_now(7))
       insert_subscription(user2, days_from_now(7))
+      insert_payment_method(user1)
+      insert_payment_method(user2)
 
       assert :ok = MembershipRenewalReminderWorker.perform(build_job())
 
       assert_email_sent(subject: @subject, to: {nil, user1.email})
       assert_email_sent(subject: @subject, to: {nil, user2.email})
+    end
+
+    test "only sends to members with a payment method when some do not have one" do
+      user_with_pm = user_fixture()
+      user_without_pm = user_fixture()
+      insert_subscription(user_with_pm, days_from_now(7))
+      insert_subscription(user_without_pm, days_from_now(7))
+      insert_payment_method(user_with_pm)
+
+      assert :ok = MembershipRenewalReminderWorker.perform(build_job())
+
+      assert_email_sent(subject: @subject, to: {nil, user_with_pm.email})
+
+      # refute_email_sent/1 does not accept function arguments or dynamic `to:`
+      # values at compile time, so we inspect Swoosh's process-level email store
+      # directly to verify no renewal reminder was sent to the user without a PM.
+      no_pm_email = user_without_pm.email
+
+      assert [] ==
+               Process.get(Swoosh.Adapters.Test, [])
+               |> Enum.filter(fn email ->
+                 email.subject == @subject and
+                   Enum.any?(email.to, fn {_, addr} -> addr == no_pm_email end)
+               end)
     end
 
     test "handles a subscription with nil current_period_end without raising" do
@@ -120,9 +159,10 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
   # ---------------------------------------------------------------------------
 
   describe "schedule_reminder_if_within_window/2" do
-    test "sends reminder immediately when new date is 1 day away" do
+    test "sends reminder immediately when new date is 1 day away and user has a payment method" do
       user = user_fixture()
       subscription = insert_subscription(user, days_from_now(1))
+      insert_payment_method(user)
 
       assert :ok =
                MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
@@ -133,30 +173,45 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       assert_email_sent(subject: @subject, to: {nil, user.email})
     end
 
-    test "sends reminder immediately when new date is 3 days away" do
+    test "sends reminder immediately when new date is 3 days away and user has a payment method" do
+      user = user_fixture()
+      subscription = insert_subscription(user, days_from_now(3))
+      insert_payment_method(user)
+
+      assert :ok =
+               MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
+                 user,
+                 subscription
+               )
+
+      assert_email_sent(subject: @subject, to: {nil, user.email})
+    end
+
+    test "sends reminder when new date is 5 days away and user has a payment method" do
+      user = user_fixture()
+      subscription = insert_subscription(user, days_from_now(5))
+      insert_payment_method(user)
+
+      assert :ok =
+               MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
+                 user,
+                 subscription
+               )
+
+      assert_email_sent(subject: @subject, to: {nil, user.email})
+    end
+
+    test "skips and sends no email when user has no payment method on file" do
       user = user_fixture()
       subscription = insert_subscription(user, days_from_now(3))
 
-      assert :ok =
+      assert :skipped =
                MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
                  user,
                  subscription
                )
 
-      assert_email_sent(subject: @subject, to: {nil, user.email})
-    end
-
-    test "sends reminder when new date is 5 days away" do
-      user = user_fixture()
-      subscription = insert_subscription(user, days_from_now(5))
-
-      assert :ok =
-               MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
-                 user,
-                 subscription
-               )
-
-      assert_email_sent(subject: @subject, to: {nil, user.email})
+      refute_email_sent(subject: @subject)
     end
 
     test "skips and sends no email when new date is 14 days away" do
@@ -219,6 +274,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       user = user_fixture()
       renewal = days_from_now(3)
       subscription = insert_subscription(user, renewal)
+      insert_payment_method(user)
 
       assert :ok =
                MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
@@ -259,6 +315,23 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
     DateTime.utc_now()
     |> DateTime.add(n, :day)
     |> DateTime.truncate(:second)
+  end
+
+  defp insert_payment_method(user) do
+    %PaymentMethod{
+      user_id: user.id,
+      provider: :stripe,
+      provider_id: "pm_test_#{System.unique_integer([:positive])}",
+      provider_customer_id: "cus_test_#{System.unique_integer([:positive])}",
+      provider_type: "card",
+      type: :card,
+      last_four: "4242",
+      exp_month: 12,
+      exp_year: 2030,
+      display_brand: "visa",
+      is_default: true
+    }
+    |> Repo.insert!()
   end
 
   defp insert_subscription(user, renewal_date, opts \\ []) do

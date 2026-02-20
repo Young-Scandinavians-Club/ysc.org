@@ -10,6 +10,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
   use Oban.Worker, queue: :default, max_attempts: 3
 
   import Ecto.Query
+  alias Ysc.Payments
   alias Ysc.Repo
   alias Ysc.Subscriptions.Subscription
   alias YscWeb.Emails.{Notifier, MembershipRenewalReminder}
@@ -47,7 +48,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
     )
 
     results =
-      Enum.map(subscriptions, fn s -> send_reminder_email(s.user, s) end)
+      Enum.map(subscriptions, fn s -> maybe_send_reminder_email(s.user, s) end)
 
     success_count = Enum.count(results, fn r -> r == :ok end)
 
@@ -96,9 +97,25 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
         renewal_date: subscription.current_period_end
       )
 
-      send_reminder_email(user, subscription)
+      maybe_send_reminder_email(user, subscription)
     else
       :skipped
+    end
+  end
+
+  defp maybe_send_reminder_email(user, subscription) do
+    case Payments.get_default_payment_method(user) do
+      nil ->
+        Ysc.Logging.debug(
+          "Skipping renewal reminder — user has no payment method on file",
+          user_id: user.id,
+          subscription_id: subscription.id
+        )
+
+        :skipped
+
+      _payment_method ->
+        send_reminder_email(user, subscription)
     end
   end
 
