@@ -24,7 +24,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmationTest do
 
   describe "prepare_email_data/5" do
     test "returns map with first_name, membership_type, amount, payment_date, paid_elsewhere" do
-      user = user_fixture(%{first_name: "Jane", last_name: "Doe"})
+      user = oauth_user_fixture(%{first_name: "Jane", last_name: "Doe"})
       amount = Money.new(50, :USD)
       payment_date = ~D[2024-12-01]
 
@@ -44,7 +44,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmationTest do
     end
 
     test "includes paid_elsewhere when opts passed" do
-      user = user_fixture()
+      user = oauth_user_fixture()
       amount = Money.new(50, :USD)
       payment_date = ~D[2024-12-01]
 
@@ -61,7 +61,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmationTest do
     end
 
     test "formats family membership type" do
-      user = user_fixture()
+      user = oauth_user_fixture()
       amount = Money.new(75, :USD)
       payment_date = ~D[2024-12-01]
 
@@ -77,7 +77,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmationTest do
     end
 
     test "uses Valued Member when user has no first_name" do
-      base_user = user_fixture()
+      base_user = oauth_user_fixture()
       user = %{base_user | first_name: nil}
       amount = Money.new(50, :USD)
       payment_date = ~D[2024-12-01]

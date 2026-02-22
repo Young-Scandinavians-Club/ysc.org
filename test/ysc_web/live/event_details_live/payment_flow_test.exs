@@ -40,7 +40,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       conn: conn,
       user: user
     } do
-      event = event_with_tickets(tier_count: 2, state: :upcoming)
+      event = event_with_tickets(tier_count: 2, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -76,8 +76,11 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(html)
     end
 
-    test "calculates correct total with multiple tickets", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "calculates correct total with multiple tickets", %{
+      conn: conn,
+      user: user
+    } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -106,8 +109,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(html)
     end
 
-    test "includes donation in total amount", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "includes donation in total amount", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -141,7 +144,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end
 
     test "includes metadata in payment intent", %{conn: conn, user: user} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -169,8 +172,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "payment intent creation failures" do
-    test "handles Stripe API error gracefully", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "handles Stripe API error gracefully", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -197,8 +200,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(html)
     end
 
-    test "handles network timeout error", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "handles network timeout error", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -219,8 +222,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(result)
     end
 
-    test "handles invalid payment parameters", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "handles invalid payment parameters", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -243,8 +246,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "payment redirect handling" do
-    test "tracks payment redirect state", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "tracks payment redirect state", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -269,8 +272,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "payment modal UI state" do
-    test "handles payment modal close event", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "handles payment modal close event", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -294,8 +297,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "idempotency key usage" do
-    test "uses order reference as idempotency key", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "uses order reference as idempotency key", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -319,8 +322,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "amount calculation edge cases" do
-    test "handles zero-amount free tickets", %{conn: conn} do
-      event = event_with_state(:upcoming, with_image: true)
+    test "handles zero-amount free tickets", %{conn: conn, user: user} do
+      event = event_with_state(:upcoming, with_image: true, user: user)
 
       free_tier =
         ticket_tier_fixture(%{
@@ -349,8 +352,11 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(result) or match?({:error, _}, result)
     end
 
-    test "converts Money to cents correctly for Stripe", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "converts Money to cents correctly for Stripe", %{
+      conn: conn,
+      user: user
+    } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -379,8 +385,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(html)
     end
 
-    test "handles large ticket quantities correctly", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "handles large ticket quantities correctly", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -412,8 +418,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "checkout retry mechanism" do
-    test "allows retry after failure", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "allows retry after failure", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -438,8 +444,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "payment modal interactions" do
-    test "close-payment-modal event works", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "close-payment-modal event works", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
@@ -450,8 +456,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(result)
     end
 
-    test "close-order-completion event works", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "close-order-completion event works", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
@@ -462,8 +468,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(result)
     end
 
-    test "checkout-expired event works", %{conn: conn} do
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+    test "checkout-expired event works", %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 

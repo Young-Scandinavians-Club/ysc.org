@@ -26,10 +26,15 @@ config :ysc,
   customers_module: Ysc.CustomersMock,
   payments_module: Ysc.PaymentsMock
 
-# In tests run with low complexity for speed
+# Minimum Argon2 parameters for tests — fast but still exercises the real hash path.
+# t_cost: 1  — single iteration (minimum)
+# m_cost: 8  — 256 KiB memory (minimum recommended)
+# parallelism: 1 — single thread; avoids spawning 4 OS threads per hash when
+#                  ExUnit runs many concurrent cases, reducing thread contention.
 config :argon2_elixir,
   t_cost: 1,
-  m_cost: 8
+  m_cost: 8,
+  parallelism: 1
 
 # Configure your database
 #

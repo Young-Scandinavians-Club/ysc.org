@@ -147,21 +147,25 @@ defmodule Ysc.TestDataFactory do
 
   - `with_image: true` - Include a test image
   - `attrs` - Additional event attributes
+  - `user` - Existing user to use as organizer and image uploader (avoids extra Argon2 hashes)
 
   ## Examples
 
       event = event_with_state(:upcoming)
       event = event_with_state(:past, with_image: true)
       event = event_with_state(:cancelled, attrs: %{title: "Cancelled Party"})
+      event = event_with_state(:upcoming, with_image: true, user: existing_user)
   """
   def event_with_state(state \\ :upcoming, opts \\ []) do
     attrs = Keyword.get(opts, :attrs, %{})
     with_image = Keyword.get(opts, :with_image, false)
+    user = Keyword.get(opts, :user, nil)
 
-    # Create image if requested
+    # Create image if requested, reusing the provided user to avoid an extra Argon2 hash
     image =
       if with_image do
-        create_test_image()
+        image_attrs = if user, do: %{user_id: user.id}, else: %{}
+        create_test_image(image_attrs)
       else
         nil
       end
@@ -206,8 +210,11 @@ defmodule Ysc.TestDataFactory do
           }
       end
 
+    organizer_attrs = if user, do: %{organizer_id: user.id}, else: %{}
+
     event_attrs =
       attrs
+      |> Map.merge(organizer_attrs)
       |> Map.merge(%{
         start_date: start_date,
         end_date: end_date,
@@ -227,19 +234,23 @@ defmodule Ysc.TestDataFactory do
   - `state` - Event state (default: :upcoming)
   - `event_attrs` - Additional event attributes
   - `tier_attrs` - Base attributes for tiers
+  - `user` - Existing user to use as organizer and image uploader (avoids extra Argon2 hashes)
 
   ## Examples
 
       event = event_with_tickets()
       event = event_with_tickets(tier_count: 3, state: :upcoming)
+      event = event_with_tickets(tier_count: 2, user: existing_user)
   """
   def event_with_tickets(opts \\ []) do
     tier_count = Keyword.get(opts, :tier_count, 2)
     state = Keyword.get(opts, :state, :upcoming)
     event_attrs = Keyword.get(opts, :event_attrs, %{})
     tier_attrs = Keyword.get(opts, :tier_attrs, %{})
+    user = Keyword.get(opts, :user, nil)
 
-    event = event_with_state(state, with_image: true, attrs: event_attrs)
+    event =
+      event_with_state(state, with_image: true, attrs: event_attrs, user: user)
 
     # Create ticket tiers
     tiers =
@@ -364,7 +375,7 @@ defmodule Ysc.TestDataFactory do
   Returns a Media.Image struct.
   """
   def create_test_image(attrs \\ %{}) do
-    uploader = user_fixture()
+    user_id = attrs[:user_id] || user_fixture().id
 
     default_attrs = %{
       title: "Test Image #{System.unique_integer()}",
@@ -372,10 +383,10 @@ defmodule Ysc.TestDataFactory do
       optimized_image_path: "/uploads/test_image_optimized.jpg",
       thumbnail_path: "/uploads/test_image_thumb.jpg",
       blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
-      user_id: uploader.id
+      user_id: user_id
     }
 
-    attrs = Map.merge(default_attrs, attrs)
+    attrs = Map.merge(default_attrs, Map.delete(attrs, :user_id))
 
     {:ok, image} =
       %Media.Image{}

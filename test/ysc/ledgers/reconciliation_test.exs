@@ -1990,10 +1990,10 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
 
     test "handles timeout scenarios gracefully during high load", %{user: user} do
-      # Create many payments quickly - use Task.async to truly parallelize
-      # Note: We might get reference_id collisions in extreme load, so we handle those
+      # 25 concurrent payments is sufficient to validate concurrency safety and
+      # reconciliation performance — 100 was overkill and made the test ~1s.
       tasks =
-        for i <- 1..100 do
+        for i <- 1..25 do
           Task.async(fn ->
             try do
               Ledgers.process_payment(%{
@@ -2024,7 +2024,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       successful_payments = Enum.count(results, &(&1 == :ok))
 
       # Most payments should succeed (reference_id collisions are rare)
-      assert successful_payments >= 95
+      assert successful_payments >= 23
 
       # Reconciliation should complete without timing out
       start_time = System.monotonic_time(:millisecond)
@@ -2035,7 +2035,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
 
       # Should complete in reasonable time
       assert duration < 10_000
-      assert report.checks.payments.total_payments >= 95
+      assert report.checks.payments.total_payments >= 23
       assert report.overall_status == :ok
     end
 
