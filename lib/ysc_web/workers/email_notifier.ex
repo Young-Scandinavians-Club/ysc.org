@@ -174,7 +174,7 @@ defmodule YscWeb.Workers.EmailNotifier do
               error: reason
             )
 
-            # Report to Sentry with context            {:error, reason}
+            {:error, reason}
         end
       rescue
         error ->

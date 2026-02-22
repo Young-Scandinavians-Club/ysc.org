@@ -39,15 +39,32 @@ defmodule Ysc.Messages do
       message_template: attrs[:message_template]
     )
 
-    try do
-      result = build_and_run_email_transaction(email, attrs)
-      handle_email_transaction_result(result, email, attrs)
-    rescue
-      error in [Ecto.ConstraintError] ->
-        handle_email_constraint_error(error, email, attrs)
+    if idempotency_record_exists?(attrs) do
+      Ysc.Logging.info(
+        "Duplicate message detected (pre-check), treating as success",
+        recipient: email.to,
+        idempotency_key: attrs[:idempotency_key],
+        message_template: attrs[:message_template]
+      )
 
-      error ->
-        handle_email_transaction_exception(error, email, attrs, __STACKTRACE__)
+      emit_email_sent_telemetry(email, attrs, %{duplicate: true})
+      {:ok, email}
+    else
+      try do
+        result = build_and_run_email_transaction(email, attrs)
+        handle_email_transaction_result(result, email, attrs)
+      rescue
+        error in [Ecto.ConstraintError] ->
+          handle_email_constraint_error(error, email, attrs)
+
+        error ->
+          handle_email_transaction_exception(
+            error,
+            email,
+            attrs,
+            __STACKTRACE__
+          )
+      end
     end
   end
 
@@ -57,13 +74,13 @@ defmodule Ysc.Messages do
       :message_idempotency,
       MessageIdempotency.changeset(%MessageIdempotency{}, attrs)
     )
-    |> Ecto.Multi.run(:send_email, fn repo, _result ->
-      send_email_via_mailer(email, attrs, repo)
+    |> Ecto.Multi.run(:send_email, fn _repo, _result ->
+      send_email_via_mailer(email, attrs)
     end)
     |> Repo.transaction()
   end
 
-  defp send_email_via_mailer(email, attrs, repo) do
+  defp send_email_via_mailer(email, attrs) do
     Ysc.Logging.debug("Sending email via Mailer.deliver",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key]
@@ -79,11 +96,11 @@ defmodule Ysc.Messages do
         {:ok, email}
 
       error ->
-        handle_mailer_deliver_error(error, email, attrs, repo)
+        handle_mailer_deliver_error(error, email, attrs)
     end
   end
 
-  defp handle_mailer_deliver_error(error, email, attrs, repo) do
+  defp handle_mailer_deliver_error(error, email, attrs) do
     Ysc.Logging.error("Mailer.deliver failed",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
@@ -95,7 +112,6 @@ defmodule Ysc.Messages do
       tags: build_email_sentry_tags(attrs, "mailer_deliver_failed")
     )
 
-    repo.rollback({:error, "failed to send email"})
     {:error, "failed to send email"}
   end
 
@@ -399,9 +415,36 @@ defmodule Ysc.Messages do
       message_template: attrs[:message_template]
     )
 
-    with {:ok, :allowed} <- check_rate_limit(phone_number, attrs) do
-      execute_sms_transaction(phone_number, body, attrs)
+    if idempotency_record_exists?(attrs) do
+      Ysc.Logging.info(
+        "Duplicate SMS detected (pre-check), treating as success",
+        recipient: phone_number,
+        idempotency_key: attrs[:idempotency_key],
+        message_template: attrs[:message_template]
+      )
+
+      :telemetry.execute(
+        [:ysc, :sms, :sent],
+        %{count: 1},
+        build_telemetry_metadata(phone_number, attrs, %{duplicate: true})
+      )
+
+      {:ok, %{id: "mdr2-idempotent"}}
+    else
+      with {:ok, :allowed} <- check_rate_limit(phone_number, attrs) do
+        execute_sms_transaction(phone_number, body, attrs)
+      end
     end
+  end
+
+  defp idempotency_record_exists?(attrs) do
+    Repo.exists?(
+      from m in MessageIdempotency,
+        where:
+          m.message_type == ^attrs[:message_type] and
+            m.idempotency_key == ^attrs[:idempotency_key] and
+            m.message_template == ^attrs[:message_template]
+    )
   end
 
   defp check_rate_limit(phone_number, attrs) do

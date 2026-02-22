@@ -258,7 +258,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       )
     end
 
-    test "idempotency: duplicate job returns success but sends only one email",
+    test "idempotency: duplicate job returns :ok but sends only one email",
          %{user: user} do
       params = %{
         first_name: "John",
@@ -282,7 +282,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
 
       args = %{
         "recipient" => user.email,
-        "idempotency_key" => "idemp_dup_123",
+        "idempotency_key" => "idemp_dup_worker_#{System.unique_integer()}",
         "subject" => "Duplicate Subject",
         "template" => "booking_confirmation",
         "params" => params,
@@ -291,17 +291,81 @@ defmodule YscWeb.Workers.EmailNotifierTest do
         "category" => "bookings"
       }
 
-      # First run
+      key = args["idempotency_key"]
+
+      # First run – email delivered, idempotency record committed.
       assert :ok = perform_job(EmailNotifier, args)
       assert_email_sent(subject: "Duplicate Subject")
 
-      # Second run
-      assert :ok = perform_job(EmailNotifier, args)
+      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: key
+             )
 
-      # Should not send another email.
-      # We can't easily check count with assert_email_sent.
-      # But duplicate should return :ok (which we checked) and verify logs if possible, but assertions are better.
-      # For now, just ensuring it doesn't crash is good.
+      # Second run with identical args – pre-check fires, Mailer is never called.
+      assert :ok = perform_job(EmailNotifier, args)
+      assert_no_email_sent()
+
+      # Exactly one idempotency record was ever written.
+      import Ecto.Query
+
+      assert Ysc.Repo.one(
+               from m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^key,
+                 select: count()
+             ) == 1
+    end
+
+    test "idempotency: three identical jobs produce exactly one email and one record",
+         %{user: user} do
+      params = %{
+        first_name: "Jane",
+        booking: %{
+          reference_id: "REF999",
+          property: "Alpine",
+          checkin_date: "Feb 1, 2025",
+          checkout_date: "Feb 3, 2025",
+          guests_count: 1,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 2",
+          nights: 2,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$200.00",
+        booking_date: "Jan 25, 2025",
+        booking_url: "http://example.com/bookings/999"
+      }
+
+      key = "idemp_triple_#{System.unique_integer()}"
+
+      args = %{
+        "recipient" => user.email,
+        "idempotency_key" => key,
+        "subject" => "Triple Idempotency",
+        "template" => "booking_confirmation",
+        "params" => params,
+        "text_body" => "",
+        "user_id" => user.id,
+        "category" => "bookings"
+      }
+
+      assert :ok = perform_job(EmailNotifier, args)
+      assert_email_sent(subject: "Triple Idempotency")
+
+      assert :ok = perform_job(EmailNotifier, args)
+      assert_no_email_sent()
+
+      assert :ok = perform_job(EmailNotifier, args)
+      assert_no_email_sent()
+
+      import Ecto.Query
+
+      assert Ysc.Repo.one(
+               from m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^key,
+                 select: count()
+             ) == 1
     end
   end
 end
