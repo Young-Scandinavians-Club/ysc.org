@@ -13,6 +13,7 @@ defmodule Ysc.Accounts do
 
   alias Ysc.Accounts.{
     Address,
+    BoardPosition,
     User,
     UserToken,
     UserNotifier,
@@ -1019,6 +1020,76 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Assigns a board position to a user and records it in history.
+
+  Closes any current open board position record (sets `ended_on` to today),
+  inserts a new `BoardPosition` with `started_on` today and `ended_on: nil`,
+  and updates `user.board_position`.
+  """
+  def assign_board_position(%User{} = user, position)
+      when not is_nil(position) do
+    today = Date.utc_today()
+
+    Repo.transaction(fn ->
+      # Close any open board position for this user
+      from(bp in BoardPosition,
+        where: bp.user_id == ^user.id,
+        where: is_nil(bp.ended_on)
+      )
+      |> Repo.update_all(set: [ended_on: today])
+
+      # Insert new board position record
+      %BoardPosition{}
+      |> BoardPosition.changeset(%{
+        user_id: user.id,
+        position: position,
+        started_on: today,
+        ended_on: nil
+      })
+      |> Repo.insert!()
+
+      # Update user's current board position
+      user
+      |> Ecto.Changeset.change(%{board_position: position})
+      |> Repo.update!()
+    end)
+  end
+
+  @doc """
+  Removes the user's board position and closes the current record in history.
+
+  Sets `ended_on` to today on the open `BoardPosition` (if any) and clears
+  `user.board_position`.
+  """
+  def remove_board_position(%User{} = user) do
+    today = Date.utc_today()
+
+    Repo.transaction(fn ->
+      from(bp in BoardPosition,
+        where: bp.user_id == ^user.id,
+        where: is_nil(bp.ended_on)
+      )
+      |> Repo.update_all(set: [ended_on: today])
+
+      user
+      |> Ecto.Changeset.change(%{board_position: nil})
+      |> Repo.update!()
+    end)
+  end
+
+  @doc """
+  Returns all board position records for a user, most recent first.
+  Uses started_on then inserted_at so same-day entries have deterministic order.
+  """
+  def list_board_position_history(%User{} = user) do
+    from(bp in BoardPosition,
+      where: bp.user_id == ^user.id,
+      order_by: [desc: bp.started_on, desc: bp.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Gets all users that have signed up and need their application reviewed.
   These are users with pending_approval state.
   """
@@ -1107,15 +1178,20 @@ defmodule Ysc.Accounts do
   end
 
   def update_user(user, params, %User{} = current_user) do
-    with :ok <- Policy.authorize(:user_update, current_user, user),
-         {:ok, updated_user} <-
-           user |> User.update_user_changeset(params) |> Repo.update() do
-      # Update Stripe customer with new information
-      Task.start(fn ->
-        Ysc.Customers.update_stripe_customer(updated_user)
-      end)
+    with :ok <- Policy.authorize(:user_update, current_user, user) do
+      user = maybe_update_board_position_history(user, params)
 
-      {:ok, updated_user}
+      case user |> User.update_user_changeset(params) |> Repo.update() do
+        {:ok, updated_user} ->
+          Task.start(fn ->
+            Ysc.Customers.update_stripe_customer(updated_user)
+          end)
+
+          {:ok, updated_user}
+
+        error ->
+          error
+      end
     end
   end
 
@@ -1123,19 +1199,57 @@ defmodule Ysc.Accounts do
   Updates user and their billing address information.
   """
   def update_user_with_address(user, params, %User{} = current_user) do
-    with :ok <- Policy.authorize(:user_update, current_user, user),
-         {:ok, updated_user} <-
-           user
+    with :ok <- Policy.authorize(:user_update, current_user, user) do
+      user = maybe_update_board_position_history(user, params)
+
+      case user
            |> User.update_user_with_address_changeset(params)
            |> Repo.update() do
-      # Update Stripe customer with new information
-      Task.start(fn ->
-        Ysc.Customers.update_stripe_customer(updated_user)
-      end)
+        {:ok, updated_user} ->
+          Task.start(fn ->
+            Ysc.Customers.update_stripe_customer(updated_user)
+          end)
 
-      {:ok, updated_user}
+          {:ok, updated_user}
+
+        error ->
+          error
+      end
     end
   end
+
+  defp maybe_update_board_position_history(user, params) do
+    new_val =
+      Map.get(params, "board_position") || Map.get(params, :board_position)
+
+    current = user.board_position
+    new_normalized = normalize_board_position_param(new_val)
+    current_normalized = if current, do: to_string(current), else: nil
+
+    if new_normalized != current_normalized do
+      if new_normalized in [nil, ""] do
+        {:ok, updated} = remove_board_position(user)
+        updated
+      else
+        position_atom =
+          if is_binary(new_normalized) do
+            String.to_existing_atom(new_normalized)
+          else
+            new_normalized
+          end
+
+        {:ok, updated} = assign_board_position(user, position_atom)
+        updated
+      end
+    else
+      user
+    end
+  end
+
+  defp normalize_board_position_param(nil), do: nil
+  defp normalize_board_position_param(""), do: nil
+  defp normalize_board_position_param(v) when is_binary(v), do: v
+  defp normalize_board_position_param(v) when is_atom(v), do: to_string(v)
 
   @doc """
   Returns an `%Ecto.Changeset{}` for changing the user profile.

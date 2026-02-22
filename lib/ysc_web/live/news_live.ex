@@ -141,11 +141,11 @@ defmodule YscWeb.NewsLive do
                         <%= String.capitalize(@featured.author.last_name || "") %>
                       </p>
                       <p
-                        :if={@featured.author.board_position}
+                        :if={@featured.board_position_at_publish}
                         class="text-xs sm:text-xs text-zinc-500 sm:text-white/80 font-medium mt-0.5"
                       >
                         YSC <%= format_board_position(
-                          @featured.author.board_position
+                          @featured.board_position_at_publish
                         ) %>
                       </p>
                     </div>
@@ -264,10 +264,10 @@ defmodule YscWeb.NewsLive do
                       <%= String.capitalize(post.author.last_name || "") %>
                     </p>
                     <p
-                      :if={post.author.board_position}
+                      :if={post.board_position_at_publish}
                       class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
                     >
-                      YSC <%= format_board_position(post.author.board_position) %>
+                      YSC <%= format_board_position(post.board_position_at_publish) %>
                     </p>
                   </div>
                 </div>

@@ -101,10 +101,10 @@ defmodule YscWeb.Components.News.NewsCard do
                 <%= String.capitalize(@post.author.last_name || "") %>
               </p>
               <p
-                :if={@post.author.board_position}
+                :if={@post.board_position_at_publish}
                 class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
               >
-                YSC <%= format_board_position(@post.author.board_position) %>
+                YSC <%= format_board_position(@post.board_position_at_publish) %>
               </p>
             </div>
           </div>

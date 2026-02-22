@@ -7,7 +7,8 @@ defmodule YscWeb.PostLiveTest do
   alias Ysc.Posts
   alias Ysc.Repo
 
-  # Helper to create a post
+  # Helper to create a post. When author has board_position and post is published,
+  # sets board_position_at_publish so the UI shows the historic role.
   defp create_post(attrs) do
     author = attrs[:author] || user_fixture()
 
@@ -21,7 +22,10 @@ defmodule YscWeb.PostLiveTest do
       comment_count: 0
     }
 
-    attrs = Map.merge(default_attrs, Map.delete(attrs, :author))
+    attrs =
+      default_attrs
+      |> Map.merge(Map.delete(attrs, :author))
+      |> maybe_set_board_position_at_publish(author)
 
     {:ok, post} =
       %Posts.Post{}
@@ -29,6 +33,18 @@ defmodule YscWeb.PostLiveTest do
       |> Repo.insert()
 
     Repo.preload(post, [:author, :featured_image])
+  end
+
+  defp maybe_set_board_position_at_publish(attrs, author) do
+    if attrs[:state] == :published && author.board_position do
+      Map.put(
+        attrs,
+        :board_position_at_publish,
+        to_string(author.board_position)
+      )
+    else
+      attrs
+    end
   end
 
   describe "mount/3 - post access" do
@@ -119,6 +135,20 @@ defmodule YscWeb.PostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
 
       assert html =~ "President"
+    end
+
+    test "does not display board position when author has no board position", %{
+      conn: conn
+    } do
+      author = user_fixture(%{first_name: "Member", last_name: "Author"})
+      post = create_post(%{title: "Member Post", author: author})
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ "Member"
+      assert html =~ "Author"
+      refute html =~ "YSC President"
+      refute html =~ "YSC Vice President"
     end
 
     test "displays published date", %{conn: conn} do

@@ -144,6 +144,35 @@ defmodule Ysc.PostsTest do
       assert {:error, :unauthorized} =
                Posts.update_post(post, %{"title" => "Updated"}, user)
     end
+
+    test "publishing post when author has no board position sets board_position_at_publish to nil",
+         %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Member post",
+            "body" => "Body",
+            "url_name" => "member-post-nil-board",
+            "state" => "draft"
+          },
+          author
+        )
+
+      assert post.board_position_at_publish == nil
+
+      assert {:ok, published} =
+               Posts.update_post(
+                 post,
+                 %{
+                   "state" => "published",
+                   "published_on" => DateTime.utc_now()
+                 },
+                 author
+               )
+
+      assert published.state == :published
+      assert published.board_position_at_publish == nil
+    end
   end
 
   describe "list_posts/1 and list_posts/2" do

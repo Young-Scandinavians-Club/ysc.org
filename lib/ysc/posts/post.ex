@@ -65,6 +65,9 @@ defmodule Ysc.Posts.Post do
     field :published_on, :utc_datetime
     field :deleted_on, :utc_datetime
 
+    # Snapshot of author's board position when the post was first published
+    field :board_position_at_publish, :string
+
     # Easier to render with normalized value and no join required
     field :comment_count, :integer
 
@@ -84,7 +87,8 @@ defmodule Ysc.Posts.Post do
       :image_id,
       :featured_post,
       :published_on,
-      :deleted_on
+      :deleted_on,
+      :board_position_at_publish
     ])
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
@@ -104,7 +108,8 @@ defmodule Ysc.Posts.Post do
       :featured_post,
       :published_on,
       :deleted_on,
-      :comment_count
+      :comment_count,
+      :board_position_at_publish
     ])
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)

@@ -7,7 +7,8 @@ defmodule YscWeb.NewsLiveTest do
   alias Ysc.Posts
   alias Ysc.Repo
 
-  # Helper to create a post
+  # Helper to create a post. When author has board_position and post is published,
+  # sets board_position_at_publish so the UI shows the historic role.
   defp create_post(attrs) do
     author = attrs[:author] || user_fixture()
 
@@ -21,7 +22,10 @@ defmodule YscWeb.NewsLiveTest do
       user_id: author.id
     }
 
-    attrs = Map.merge(default_attrs, Map.delete(attrs, :author))
+    attrs =
+      default_attrs
+      |> Map.merge(Map.delete(attrs, :author))
+      |> maybe_set_board_position_at_publish(author)
 
     {:ok, post} =
       %Posts.Post{}
@@ -30,6 +34,18 @@ defmodule YscWeb.NewsLiveTest do
 
     # Preload author
     Repo.preload(post, [:author, :featured_image])
+  end
+
+  defp maybe_set_board_position_at_publish(attrs, author) do
+    if attrs[:state] == :published && author.board_position do
+      Map.put(
+        attrs,
+        :board_position_at_publish,
+        to_string(author.board_position)
+      )
+    else
+      attrs
+    end
   end
 
   describe "mount/3" do

@@ -1188,4 +1188,145 @@ defmodule Ysc.AccountsTest do
       assert changeset.valid?
     end
   end
+
+  describe "board position history" do
+    test "assign_board_position sets user board_position and creates an open history record" do
+      user = user_fixture()
+      assert user.board_position == nil
+
+      assert {:ok, updated_user} =
+               Accounts.assign_board_position(user, :president)
+
+      assert updated_user.board_position == :president
+
+      history = Accounts.list_board_position_history(updated_user)
+      assert length(history) == 1
+      [record] = history
+      assert record.user_id == user.id
+      assert record.position == :president
+      assert record.ended_on == nil
+      assert record.started_on == Date.utc_today()
+    end
+
+    test "assign_board_position when user already has a position closes old record and opens new one" do
+      user = user_fixture()
+      {:ok, user} = Accounts.assign_board_position(user, :president)
+      today = Date.utc_today()
+
+      assert {:ok, updated_user} =
+               Accounts.assign_board_position(user, :treasurer)
+
+      assert updated_user.board_position == :treasurer
+
+      history = Accounts.list_board_position_history(updated_user)
+      assert length(history) == 2
+
+      open = Enum.find(history, &is_nil(&1.ended_on))
+      closed = Enum.find(history, &(&1.ended_on == today))
+      assert open.position == :treasurer
+      assert open.started_on == today
+      assert closed.position == :president
+      assert closed.ended_on == today
+    end
+
+    test "remove_board_position clears user board_position and closes open history record" do
+      user = user_fixture()
+      {:ok, user} = Accounts.assign_board_position(user, :secretary)
+      today = Date.utc_today()
+
+      assert {:ok, updated_user} = Accounts.remove_board_position(user)
+      assert updated_user.board_position == nil
+
+      history = Accounts.list_board_position_history(updated_user)
+      assert length(history) == 1
+      [record] = history
+      assert record.position == :secretary
+      assert record.ended_on == today
+    end
+
+    test "remove_board_position when user has no position is a no-op for history and clears user" do
+      user = user_fixture()
+      assert user.board_position == nil
+
+      assert {:ok, updated_user} = Accounts.remove_board_position(user)
+      assert updated_user.board_position == nil
+
+      assert Accounts.list_board_position_history(updated_user) == []
+    end
+
+    test "list_board_position_history returns all records for user" do
+      user = user_fixture()
+      {:ok, user} = Accounts.assign_board_position(user, :president)
+      {:ok, user} = Accounts.assign_board_position(user, :vice_president)
+      {:ok, _user} = Accounts.assign_board_position(user, :treasurer)
+
+      history = Accounts.list_board_position_history(user)
+      assert length(history) == 3
+      positions = Enum.map(history, & &1.position)
+      assert :treasurer in positions
+      assert :vice_president in positions
+      assert :president in positions
+      open = Enum.filter(history, &is_nil(&1.ended_on))
+      assert length(open) == 1
+      assert hd(open).position == :treasurer
+    end
+
+    test "update_user with board_position param records history" do
+      admin = user_fixture(%{role: :admin})
+      user = user_fixture()
+
+      assert {:ok, updated_user} =
+               Accounts.update_user(
+                 user,
+                 %{"board_position" => "president"},
+                 admin
+               )
+
+      assert updated_user.board_position == :president
+      history = Accounts.list_board_position_history(updated_user)
+      assert length(history) == 1
+      assert hd(history).position == :president
+      assert hd(history).ended_on == nil
+    end
+
+    test "update_user with board_position changed from one to another records two history entries" do
+      admin = user_fixture(%{role: :admin})
+      user = user_fixture()
+
+      {:ok, user} =
+        Accounts.update_user(user, %{"board_position" => "president"}, admin)
+
+      assert {:ok, updated_user} =
+               Accounts.update_user(
+                 user,
+                 %{"board_position" => "treasurer"},
+                 admin
+               )
+
+      assert updated_user.board_position == :treasurer
+      history = Accounts.list_board_position_history(updated_user)
+      assert length(history) == 2
+      open = Enum.find(history, &is_nil(&1.ended_on))
+      closed = Enum.find(history, &(&1.ended_on == Date.utc_today()))
+      assert open.position == :treasurer
+      assert closed.position == :president
+    end
+
+    test "update_user with board_position cleared records history with ended_on" do
+      admin = user_fixture(%{role: :admin})
+      user = user_fixture()
+
+      {:ok, user} =
+        Accounts.update_user(user, %{"board_position" => "secretary"}, admin)
+
+      assert {:ok, updated_user} =
+               Accounts.update_user(user, %{"board_position" => ""}, admin)
+
+      assert updated_user.board_position == nil
+      history = Accounts.list_board_position_history(updated_user)
+      assert length(history) == 1
+      assert hd(history).position == :secretary
+      assert hd(history).ended_on == Date.utc_today()
+    end
+  end
 end
