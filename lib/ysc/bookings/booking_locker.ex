@@ -1151,24 +1151,21 @@ defmodule Ysc.Bookings.BookingLocker do
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
 
-      # Make this function idempotent - if booking is already confirmed, return success
-      # This handles the race condition where multiple processes (redirect + webhook/polling)
-      # might try to confirm the same booking after payment succeeds
+      # Make this function idempotent - if booking is already confirmed, short-circuit
+      # the entire transaction (including inventory updates) and signal to the caller
+      # that no side-effects should be triggered again.
       if booking.status == :complete do
         Ysc.Logging.info(
-          "Booking already confirmed, returning existing booking (idempotent)",
+          "Booking already confirmed, skipping re-confirmation (idempotent)",
           booking_id: booking.id
         )
 
-        # Return the already-confirmed booking
-        booking
-      else
-        # Booking must be in :hold status to proceed with confirmation
-        if booking.status != :hold do
-          Repo.rollback({:error, :invalid_status})
-        end
+        Repo.rollback({:already_confirmed, booking})
+      end
 
-        # Continue with normal confirmation flow below
+      # Booking must be in :hold status to proceed with confirmation
+      if booking.status != :hold do
+        Repo.rollback({:error, :invalid_status})
       end
 
       case booking.booking_mode do
@@ -1289,6 +1286,16 @@ defmodule Ysc.Bookings.BookingLocker do
         schedule_checkout_reminder(confirmed_booking)
 
         {:ok, confirmed_booking}
+
+      # Booking was already confirmed by a prior call - return success without
+      # re-triggering emails, SMS, or re-scheduling reminders.
+      {:error, {:already_confirmed, booking}} ->
+        Ysc.Logging.info(
+          "confirm_booking: booking was already confirmed, no side-effects triggered",
+          booking_id: booking.id
+        )
+
+        {:ok, booking}
 
       error ->
         error

@@ -294,6 +294,48 @@ defmodule YscWeb.Workers.SmsNotifierTest do
              ) == 1
     end
 
+    test "handles pre-existing idempotency record (simulates concurrent duplicate that committed first)",
+         %{user: user} do
+      key = "sms_pre_exists_#{System.unique_integer()}"
+      template = "booking_checkin_reminder"
+
+      # Pre-insert the record exactly as the first concurrent job would have committed it.
+      %Ysc.Messages.MessageIdempotency{}
+      |> Ysc.Messages.MessageIdempotency.changeset(%{
+        message_type: :sms,
+        idempotency_key: key,
+        message_template: template,
+        phone_number: "12065551234"
+      })
+      |> Ysc.Repo.insert!()
+
+      params = %{
+        first_name: "John",
+        property_name: "Tahoe",
+        checkin_date: "Jan 1, 2025",
+        door_code: "1234",
+        checkin_time: "3:00 PM"
+      }
+
+      # The worker must return :ok without error even though it cannot insert.
+      assert :ok =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "idempotency_key" => key,
+                 "template" => template,
+                 "params" => params,
+                 "user_id" => user.id,
+                 "category" => "bookings"
+               })
+
+      # Still exactly one record — no duplicate was inserted.
+      assert Ysc.Repo.one(
+               from m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^key,
+                 select: count()
+             ) == 1
+    end
+
     test "idempotency is scoped: same key with different template sends twice",
          %{
            user: user

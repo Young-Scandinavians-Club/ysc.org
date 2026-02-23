@@ -5,7 +5,16 @@ defmodule YscWeb.Workers.SmsNotifier do
   Processes SMS templates and sends them to recipients asynchronously.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :mailers, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :mailers,
+    max_attempts: 3,
+    unique: [
+      fields: [:args],
+      keys: [:idempotency_key, :template],
+      states: [:available, :scheduled, :executing, :retryable],
+      period: :infinity
+    ]
 
   @impl Oban.Worker
   def perform(%Oban.Job{} = job) do
