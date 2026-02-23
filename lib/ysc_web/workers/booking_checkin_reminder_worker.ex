@@ -6,7 +6,16 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
   with door code, location, and check-in information.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :mailers, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :mailers,
+    max_attempts: 3,
+    unique: [
+      fields: [:args],
+      keys: [:booking_id],
+      states: [:available, :scheduled, :executing, :retryable],
+      period: :infinity
+    ]
 
   alias Ysc.Repo
   alias Ysc.Bookings.Booking

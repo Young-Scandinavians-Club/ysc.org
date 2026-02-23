@@ -502,6 +502,109 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "confirm_booking/1 SMS idempotency" do
+    # Verifies that calling confirm_booking more than once never re-triggers
+    # the check-in reminder SMS — the root cause of the duplicate-SMS bug.
+    setup do
+      Cachex.clear(:ysc_cache)
+      :ok
+    end
+
+    test "second call returns {:ok, booking} without scheduling a new SMS", %{
+      user: user
+    } do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          phone_number: "+14155551234",
+          account_notifications_sms: true
+        )
+        |> Ysc.Repo.update!()
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          2
+        )
+
+      # First confirmation — reminder is scheduled and (via inline Oban) the SMS
+      # idempotency record is committed.
+      assert {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+      assert confirmed.status == :complete
+
+      sms_key = "booking_checkin_reminder_sms_#{confirmed.id}"
+
+      count_after_first =
+        Ysc.Repo.aggregate(
+          from(m in Ysc.Messages.MessageIdempotency,
+            where: m.idempotency_key == ^sms_key and m.message_type == :sms
+          ),
+          :count
+        )
+
+      # Second confirmation (simulating a late webhook or double page-load) must
+      # NOT insert a new Oban reminder job and must NOT create a second SMS record.
+      assert {:ok, second} = BookingLocker.confirm_booking(booking.id)
+      assert second.status == :complete
+      assert second.id == confirmed.id
+
+      count_after_second =
+        Ysc.Repo.aggregate(
+          from(m in Ysc.Messages.MessageIdempotency,
+            where: m.idempotency_key == ^sms_key and m.message_type == :sms
+          ),
+          :count
+        )
+
+      assert count_after_second == count_after_first,
+             "Expected no new SMS idempotency record on second confirm_booking call " <>
+               "(count before: #{count_after_first}, after: #{count_after_second})"
+    end
+
+    test "triple confirm_booking calls keep the SMS idempotency record count at 1",
+         %{user: user} do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          phone_number: "+14155551235",
+          account_notifications_sms: true
+        )
+        |> Ysc.Repo.update!()
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          2
+        )
+
+      for _ <- 1..3 do
+        assert {:ok, b} = BookingLocker.confirm_booking(booking.id)
+        assert b.status == :complete
+      end
+
+      sms_key = "booking_checkin_reminder_sms_#{booking.id}"
+
+      assert Ysc.Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key and m.message_type == :sms
+               ),
+               :count
+             ) == 1
+    end
+  end
+
   # Helper functions
   defp create_room_category do
     {:ok, category} =

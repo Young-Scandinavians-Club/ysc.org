@@ -262,6 +262,139 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
     end
   end
 
+  describe "SMS idempotency" do
+    # Each test gives the user a real phone number and enables SMS so that
+    # send_checkin_reminder_sms → SmsNotifier → run_send_sms_idempotent actually runs.
+    setup do
+      Cachex.clear(:ysc_cache)
+      :ok
+    end
+
+    defp sms_enabled_user do
+      user_fixture(%{email: "sms_idemp_#{System.unique_integer()}@example.com"})
+      |> Ecto.Changeset.change(
+        phone_number: "+14155551234",
+        account_notifications_sms: true
+      )
+      |> Repo.update!()
+    end
+
+    test "perform/1 called twice for the same booking creates exactly one SMS idempotency record" do
+      user = sms_enabled_user()
+      booking = create_complete_booking(user)
+      sms_key = "booking_checkin_reminder_sms_#{booking.id}"
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+
+      assert Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key and m.message_type == :sms
+               ),
+               :count
+             ) == 1
+
+      # Second run — pre-check (or DB constraint) must block a duplicate send.
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+
+      assert Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key and m.message_type == :sms
+               ),
+               :count
+             ) == 1
+    end
+
+    test "perform/1 called three times still yields exactly one SMS idempotency record" do
+      user = sms_enabled_user()
+      booking = create_complete_booking(user)
+      sms_key = "booking_checkin_reminder_sms_#{booking.id}"
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      for _ <- 1..3 do
+        assert :ok = BookingCheckinReminderWorker.perform(job)
+      end
+
+      assert Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key and m.message_type == :sms
+               ),
+               :count
+             ) == 1
+    end
+
+    test "schedule_reminder immediate path (< 3 days) called twice creates one SMS idempotency record" do
+      user = sms_enabled_user()
+      booking = create_complete_booking(user)
+      sms_key = "booking_checkin_reminder_sms_#{booking.id}"
+
+      # Use tomorrow so schedule_reminder takes the immediate (non-Oban-job) path.
+      tomorrow = Date.add(Date.utc_today(), 1)
+
+      BookingCheckinReminderWorker.schedule_reminder(booking.id, tomorrow)
+      BookingCheckinReminderWorker.schedule_reminder(booking.id, tomorrow)
+
+      assert Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key and m.message_type == :sms
+               ),
+               :count
+             ) == 1
+    end
+
+    test "different bookings get independent SMS idempotency records" do
+      user = sms_enabled_user()
+      booking_a = create_complete_booking(user)
+      booking_b = create_complete_booking(user)
+
+      for booking <- [booking_a, booking_b] do
+        job = %Oban.Job{
+          id: 1,
+          args: %{"booking_id" => booking.id},
+          worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+          queue: "mailers",
+          state: "available",
+          attempt: 1
+        }
+
+        assert :ok = BookingCheckinReminderWorker.perform(job)
+      end
+
+      sms_key_a = "booking_checkin_reminder_sms_#{booking_a.id}"
+      sms_key_b = "booking_checkin_reminder_sms_#{booking_b.id}"
+
+      assert Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key_a
+               ),
+               :count
+             ) == 1
+
+      assert Repo.aggregate(
+               from(m in Ysc.Messages.MessageIdempotency,
+                 where: m.idempotency_key == ^sms_key_b
+               ),
+               :count
+             ) == 1
+    end
+  end
+
   describe "email notification content" do
     test "send_checkin_reminder_email executes without error" do
       user =
