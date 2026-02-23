@@ -75,8 +75,8 @@ defmodule YscWeb.PostLive do
               <p class="text-sm font-medium text-zinc-500">
                 <%= String.capitalize(@post.author.first_name || "") %>
                 <%= String.capitalize(@post.author.last_name || "") %>
-                <%= if @post.author.board_position do %>
-                  , YSC <%= format_board_position(@post.author.board_position) %>
+                <%= if @post.board_position_at_publish do %>
+                  , YSC <%= format_board_position(@post.board_position_at_publish) %>
                 <% end %>
               </p>
             </div>

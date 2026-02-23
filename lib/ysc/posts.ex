@@ -82,7 +82,28 @@ defmodule Ysc.Posts do
 
   def update_post(post, params, %User{} = current_user, opts \\ []) do
     with :ok <- Policy.authorize(:post_update, current_user, post) do
+      params = maybe_set_board_position_at_publish(post, params)
       post |> Post.update_post_changeset(params, opts) |> Repo.update()
+    end
+  end
+
+  defp maybe_set_board_position_at_publish(post, params) do
+    new_state = Map.get(params, "state") || Map.get(params, :state)
+
+    going_published =
+      new_state in ["published", :published] && post.state != :published
+
+    already_set =
+      Map.has_key?(params, "board_position_at_publish") ||
+        Map.has_key?(params, :board_position_at_publish)
+
+    if going_published && !already_set do
+      post = Repo.preload(post, :author)
+      position = post.author && post.author.board_position
+      position_str = if position, do: to_string(position), else: nil
+      Map.put(params, "board_position_at_publish", position_str)
+    else
+      params
     end
   end
 
