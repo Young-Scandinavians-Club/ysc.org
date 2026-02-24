@@ -743,7 +743,7 @@ defmodule YscWeb.TahoeBookingLive do
               <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-lg">
                 Lake Tahoe Cabin
               </h1>
-              <span class="px-2 py-1 bg-blue-700/90 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-blue-500/50 backdrop-blur-sm">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-700/90 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-blue-500/50 backdrop-blur-sm">
                 Member Access
               </span>
             </div>

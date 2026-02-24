@@ -445,13 +445,10 @@ defmodule YscWeb.ClearLakeBookingLive do
             <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-lg">
               Clear Lake Portal
             </h1>
-            <span class="px-2 py-1 bg-teal-600 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-teal-500 backdrop-blur-sm">
+            <span class="whitespace-nowrap px-2 py-1 bg-teal-600 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-teal-500 backdrop-blur-sm">
               Member Access
             </span>
           </div>
-          <p class="text-sm sm:text-base text-zinc-100 px-4 max-w-2xl drop-shadow-md">
-            Velkommen back! Manage your stay or reserve new dates below.
-          </p>
         </div>
       </div>
     </section>
