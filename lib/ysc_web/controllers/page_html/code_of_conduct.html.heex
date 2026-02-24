@@ -1,5 +1,5 @@
 <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
-  <div class="max-w-xl mx-auto lg:mx-0 prose prose-zinc prose-a:text-blue-600 pb-10">
+  <div class="max-w-3xl mx-auto prose prose-zinc prose-lg prose-a:text-blue-600 prose-headings:scroll-mt-20 pb-10">
     <h1 class="uppercase">Non-Discrimination Code of Conduct</h1>
 
     <p>
@@ -16,7 +16,7 @@
       When attending Club events and while on Club premises, members and their guests are expected to:
     </p>
 
-    <ul>
+    <ul class="ps-5">
       <li>
         Conduct themselves in a manner that will promote a comfortable and welcoming Club environment for everyone regardless of factors such as gender, race, ethnicity, national origin, sexual orientation, gender identity or expression, religion, age, disability, and the like. This includes other members, guests, and any other person present during a Club event or on Club premises.
       </li>
@@ -24,7 +24,7 @@
         <p>
           Conduct themselves in a manner that avoids behavior that could reasonably be construed as discrimination or harassment, sexual or otherwise.
         </p>
-        <ul>
+        <ul class="ps-5">
           <li>
             Sexual harassment includes sexual attention, sexually oriented comments or statements, and the display or distribution of sexually oriented materials, toward, to or in the presence of a person who does not welcome such conduct, or creating an intimidating, hostile or offensive environment. Sexual harassment also includes harassment that is based on gender; that is, conduct that would not occur except for the gender of the person harassed.
           </li>
@@ -49,13 +49,17 @@
     </p>
 
     <p class="font-bold">
-      Click the link below to report a violation of the Code of Conduct:
+      Click the button below to report a violation of the Code of Conduct:
     </p>
     <.link
-      class="hover:text-blue-700 transition ease-in-out"
+      id="report-violation-button"
+      class="inline-flex items-center gap-2 rounded py-2 px-3 text-sm font-semibold leading-6 transition duration-200 ease-in-out bg-blue-700 hover:bg-blue-800 !text-zinc-100 hover:!text-zinc-100 active:!text-zinc-100/80 no-underline"
       navigate={~p"/report-conduct-violation"}
     >
-      Report a Violation
+      <.icon
+        name="hero-exclamation-triangle"
+        class="h-5 w-5 mt-0.5 me-0.5 text-current"
+      /> Report a Violation
     </.link>
   </div>
 </div>
