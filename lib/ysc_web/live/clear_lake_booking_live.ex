@@ -2025,13 +2025,6 @@ defmodule YscWeb.ClearLakeBookingLive do
             <p class="text-zinc-600 mb-6 leading-relaxed">
               This isn't a hotel—it's a collective treasure. Since 1963, we've maintained this lakeside sanctuary through our <strong>cooperative community</strong>. Members share a commitment to preserving this special place, ensuring the cabin stays beautiful and accessible for generations to come.
             </p>
-            <.link
-              navigate={~p"/code-of-conduct"}
-              class="text-teal-700 font-bold hover:underline flex items-center gap-2"
-            >
-              Read the Cabin Code of Conduct
-              <.icon name="hero-arrow-right" class="w-4 h-4" />
-            </.link>
           </section>
           <!-- Legacy Timeline Section -->
           <section id="legacy-timeline" class="py-16 border-t border-zinc-100">
@@ -2095,7 +2088,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <div>
                     <span class="block">Linens & Bedding</span>
                     <span class="text-xs text-teal-300">
-                      Sheets, pillowcases, comforter/sleeping bag
+                      Requirements differ by season. Summer: camping setup on the lawn (under the stars or in a tent)—sheets, pillowcases, comforter/sleeping bag. Winter: see card below for indoor bed setup.
                     </span>
                   </div>
                 </li>
@@ -2187,10 +2180,6 @@ defmodule YscWeb.ClearLakeBookingLive do
               <p class="text-sm text-zinc-600 leading-relaxed mb-3">
                 Reach out to the club through our contact page to learn more about donation options and legacy tiers.
               </p>
-              <div class="text-sm text-amber-800 italic flex items-center">
-                <.icon name="hero-heart" class="w-5 h-5 mr-2" />
-                The club matches all member donations!
-              </div>
             </div>
           </div>
 
