@@ -67,6 +67,7 @@ import ConfirmCloseModal from "./confirm_close_modal";
 import ClipboardCopy from "./clipboard_copy";
 import DecadeIndicator from "./decade_indicator";
 import FooterRotator from "./footer_rotator";
+import ScrollMoreIndicator from "./scroll_more_indicator";
 
 let Hooks = {
     StickyNavbar,
@@ -109,6 +110,7 @@ let Hooks = {
     ClipboardCopy,
     DecadeIndicator,
     FooterRotator,
+    ScrollMoreIndicator,
 };
 Hooks.LivePhone = LivePhone;
 
