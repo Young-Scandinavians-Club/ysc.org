@@ -65,7 +65,7 @@ This document summarizes all the new documentation created for onboarding develo
 - Added "Quick Start" section for returning developers
 - Completely rewrote "Getting Started" section with:
   - Visual setup overview flowchart
-  - Detailed prerequisites installation (Docker, Elixir via asdf, Stripe CLI)
+  - Detailed prerequisites installation (Docker, Elixir via asdf, Stripe CLI, ShellCheck, shfmt)
   - Step-by-step Stripe configuration
   - Clear environment setup with reference to `.env.example`
   - Initial setup instructions

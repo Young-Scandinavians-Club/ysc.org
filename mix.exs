@@ -13,14 +13,15 @@ defmodule Ysc.MixProject do
       test_coverage: [
         tool: ExCoveralls,
         ignore_modules: [
-          YscNative,
-          YscWeb.PropertyCheckInLive.SwiftUI,
-          YscWeb.TahoeCabinRulesLive.SwiftUI,
-          YscWeb.TahoeStayingWithLive.SwiftUI,
-          YscWeb.CoreComponents.SwiftUI,
-          YscWeb.HomeLive.SwiftUI,
-          YscWeb.Layouts.SwiftUI,
-          YscWeb.Styles.App.SwiftUI,
+          Mix.Tasks.CheckQuickbooksSync,
+          Mix.Tasks.DebugEmails,
+          Mix.Tasks.ExpireCheckoutSessions,
+          Mix.Tasks.GenerateVideoPosters,
+          Mix.Tasks.Message.Requeue,
+          Mix.Tasks.ShellLint,
+          Mix.Tasks.TestOutageEmail,
+          Mix.Tasks.TestSubscriptionExpiration,
+          Mix.Tasks.Webhook.Reprocess,
           Ysc.Application,
           Ysc.Cldr,
           Ysc.Cldr.Currency,
@@ -28,17 +29,8 @@ defmodule Ysc.MixProject do
           Ysc.Cldr.DateTime.Formatter,
           Ysc.Cldr.List,
           Ysc.Cldr.Unit,
-          YscWeb.TahoeCabinRulesLive,
-          YscWeb.TahoeStayingWithLive,
-          YscWeb.PropertyCheckInLive,
-          Mix.Tasks.CheckQuickbooksSync,
-          Mix.Tasks.DebugEmails,
-          Mix.Tasks.ExpireCheckoutSessions,
-          Mix.Tasks.GenerateVideoPosters,
-          Mix.Tasks.Message.Requeue,
-          Mix.Tasks.TestOutageEmail,
-          Mix.Tasks.TestSubscriptionExpiration,
-          Mix.Tasks.Webhook.Reprocess,
+          Ysc.Credo.NoExternalUrlsInTestConfig,
+          Ysc.Credo.NoSleepInTests,
           Ysc.Customers.Behaviour,
           Ysc.Payments.Behaviour,
           Ysc.Quickbooks.Client,
@@ -46,7 +38,18 @@ defmodule Ysc.MixProject do
           Ysc.Stripe.PaymentIntentBehaviour,
           Ysc.Stripe.PaymentMethodBehaviour,
           Ysc.Stripe.SetupIntentBehaviour,
-          Ysc.StripeBehaviour
+          Ysc.StripeBehaviour,
+          YscNative,
+          YscWeb.CoreComponents.SwiftUI,
+          YscWeb.HomeLive.SwiftUI,
+          YscWeb.Layouts.SwiftUI,
+          YscWeb.PropertyCheckInLive,
+          YscWeb.PropertyCheckInLive.SwiftUI,
+          YscWeb.Styles.App.SwiftUI,
+          YscWeb.TahoeCabinRulesLive,
+          YscWeb.TahoeCabinRulesLive.SwiftUI,
+          YscWeb.TahoeStayingWithLive,
+          YscWeb.TahoeStayingWithLive.SwiftUI
         ]
       ]
     ]
@@ -169,7 +172,8 @@ defmodule Ysc.MixProject do
       precommit: [
         "format",
         "compile",
-        "credo --strict"
+        "credo --strict",
+        "shell_lint"
       ],
       test: [
         "ecto.create --quiet",

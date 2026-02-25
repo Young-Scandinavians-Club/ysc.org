@@ -222,6 +222,31 @@ stripe listen --forward-to localhost:4000/webhooks/stripe
 
 Keep this terminal window open while developing. The Stripe CLI will forward webhook events to your local server.
 
+#### 4. Install Shell Script Tools (ShellCheck and shfmt)
+
+ShellCheck and shfmt are used to lint and format shell scripts. They are required for `mix precommit` and `make preflight`.
+
+**macOS:**
+
+```bash
+brew install shellcheck shfmt
+
+# Verify installation:
+shellcheck --version
+shfmt --version
+```
+
+**Linux (Ubuntu/Debian):**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y shellcheck shfmt
+
+# Verify installation:
+shellcheck --version
+shfmt --version
+```
+
 ### Environment Configuration
 
 #### Create Your `.env` File
@@ -1309,6 +1334,7 @@ This single command will:
 
 - Compile your code with warnings as errors
 - Check code formatting
+- Lint shell scripts (ShellCheck + shfmt)
 - Run Credo (strict mode)
 - Run Sobelow security audit
 - Audit dependencies for vulnerabilities
@@ -1369,6 +1395,7 @@ The project includes several useful make targets for development:
 - **`make preflight`** - **Run this before every commit!** Executes all CI checks locally:
   - Compiles code with warnings as errors
   - Checks code formatting
+  - Lints shell scripts (ShellCheck + shfmt)
   - Runs Credo in strict mode
   - Runs Sobelow security audit
   - Audits dependencies for vulnerabilities
@@ -1377,10 +1404,11 @@ The project includes several useful make targets for development:
 
 #### Code Quality
 
-- **`make format`** - Format all Elixir code using the project's formatter
+- **`make format`** - Format Elixir code and shell scripts
 - **`make lint`** - Run the full lint suite:
   - Runs Credo for code analysis
   - Checks that all files are properly formatted
+  - Lints shell scripts (ShellCheck + shfmt)
   - Use this before committing code
 
 #### Testing

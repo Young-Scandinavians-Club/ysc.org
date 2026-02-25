@@ -64,6 +64,24 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  shell:
+    name: Shell Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shfmt
+        run: sudo apt-get update && sudo apt-get install -y shfmt
+
+      - name: ShellCheck
+        run: find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' -exec shellcheck {} +
+
+      - name: shfmt (format check)
+        run: |
+          scripts=$(find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*')
+          if [ -n "$scripts" ]; then shfmt -d -i 2 -ci $scripts; fi
+
   formatting:
     name: Code Formatting
     runs-on: ubuntu-latest

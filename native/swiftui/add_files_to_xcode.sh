@@ -5,8 +5,6 @@
 # Generate unique IDs (following Xcode's pattern)
 API_KEY_MANAGER_REF=$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | cut -c1-24 | sed 's/\(.\{12\}\)\(.\{12\}\)/\1\2/')
 API_KEY_INPUT_REF=$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | cut -c1-24 | sed 's/\(.\{12\}\)\(.\{12\}\)/\1\2/')
-API_KEY_MANAGER_BUILD=$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | cut -c1-24 | sed 's/\(.\{12\}\)\(.\{12\}\)/\1\2/')
-API_KEY_INPUT_BUILD=$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | cut -c1-24 | sed 's/\(.\{12\}\)\(.\{12\}\)/\1\2/')
 
 echo "Generated IDs:"
 echo "APIKeyManager fileRef: $API_KEY_MANAGER_REF"

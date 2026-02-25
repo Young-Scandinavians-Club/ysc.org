@@ -6,7 +6,7 @@ Welcome! This document provides an overview of all the documentation available t
 
 ### 🚀 Getting Started (Start Here!)
 - **[README.md](../README.md)** - Complete setup guide for new developers
-  - Prerequisites installation (Docker, Elixir, Stripe CLI)
+  - Prerequisites installation (Docker, Elixir, Stripe CLI, ShellCheck/shfmt)
   - Environment configuration
   - Initial setup and verification
   - Troubleshooting quick fixes
@@ -64,7 +64,7 @@ ysc-redesign-ex/
 
 1. **Start with [README.md](../README.md)**
    - Follow the setup guide step by step
-   - Install prerequisites
+   - Install prerequisites (Docker, Elixir, Stripe CLI, ShellCheck, shfmt)
    - Configure environment
    - Run initial setup
    - Verify everything works
@@ -91,6 +91,25 @@ If you're already familiar with Elixir/Phoenix development:
 2. **Environment Setup** - Copy `.env.example` to `.env` and fill in Stripe keys
 3. **Run Setup** - `make dev-setup && make dev`
 4. **Architecture** - Skim [DEVELOPMENT_ARCHITECTURE.md](DEVELOPMENT_ARCHITECTURE.md) to understand specifics
+
+## Prerequisites
+
+Before running setup, ensure you have installed:
+
+- **Docker** - For PostgreSQL and LocalStack
+- **Elixir/Erlang** (via asdf) - See `.tool-versions` for versions
+- **Stripe CLI** - For webhook forwarding during development
+- **ShellCheck and shfmt** - For shell script linting (required for `mix precommit` and `make preflight`)
+
+```bash
+# macOS
+brew install shellcheck shfmt
+
+# Ubuntu/Debian
+sudo apt-get install -y shellcheck shfmt
+```
+
+See [README.md](../README.md) for complete installation instructions.
 
 ## Essential Commands
 

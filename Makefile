@@ -102,14 +102,31 @@ tests-failed: test-failed
 test-failed:  ## Run the test suite for failed tests from previous run
 	@MIX_ENV=test mix test --trace --failed
 
+# Shell scripts to lint/format (exclude vendor and build dirs)
+SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' 2>/dev/null)
+
 .PHONY: format
-format:  ## Format the code
+format:  ## Format the code (Elixir and shell scripts)
 	@mix format
+	@if command -v shfmt >/dev/null 2>&1 && [ -n "$(SHELL_SCRIPTS)" ]; then \
+		shfmt -w -i 2 -ci $(SHELL_SCRIPTS); \
+	fi
+
+.PHONY: shell-lint
+shell-lint:  ## Lint shell scripts with ShellCheck
+	@command -v shellcheck >/dev/null 2>&1 || { echo "Install ShellCheck: brew install shellcheck"; exit 1; }
+	@if [ -n "$(SHELL_SCRIPTS)" ]; then shellcheck $(SHELL_SCRIPTS); fi
+
+.PHONY: shell-format-check
+shell-format-check:  ## Check shell script formatting with shfmt
+	@command -v shfmt >/dev/null 2>&1 || { echo "Install shfmt: brew install shfmt"; exit 1; }
+	@if [ -n "$(SHELL_SCRIPTS)" ]; then shfmt -d -i 2 -ci $(SHELL_SCRIPTS); fi
 
 .PHONY: lint
 lint:  ## Run the lint suite
 	@mix credo --all
 	@mix format --check-formatted
+	@$(MAKE) shell-lint shell-format-check
 
 .PHONY: preflight
 preflight:  ## Run all CI checks locally (compile, format, credo, sobelow, audit, tests)
@@ -194,6 +211,10 @@ run-ios-ipad-simulator:  ## Build and launch the iOS app in iPad simulator
 .PHONY: version
 version:  ## Print the current version
 	@echo $(VERSION_LONG)
+
+.PHONY: release-tag
+release-tag:  ## Create a new release (update version in mix.exs, create git tag, commit and push). Use TAG=v1.0.0 to pass version
+	@./etc/scripts/release.sh $(TAG)
 
 .PHONY: release
 release:  ## Build and tag a docker image for release
