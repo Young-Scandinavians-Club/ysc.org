@@ -3022,7 +3022,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp country_to_flag_class(code) when is_binary(code) do
     normalized = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
 
-    if normalized in ["SE", "NO", "FI", "DK", "IS"] do
+    if normalized in ["SE", "NO", "FI", "DK", "IS", "US"] do
       "fi-#{String.downcase(normalized)}"
     else
       nil
@@ -3040,7 +3040,8 @@ defmodule YscWeb.AdminUserDetailsLive do
         "NO" => "Norway",
         "FI" => "Finland",
         "DK" => "Denmark",
-        "IS" => "Iceland"
+        "IS" => "Iceland",
+        "US" => "United States"
       },
       key,
       code
