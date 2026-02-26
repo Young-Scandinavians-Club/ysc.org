@@ -103,7 +103,7 @@ defmodule YscWeb.Components.Autocomplete do
         :if={@label != ""}
         class="block text-sm font-semibold leading-6 text-zinc-800"
       >
-        <%= @label %>
+        {@label}
       </label>
 
       <%!-- Hidden input for form submission --%>
@@ -118,10 +118,10 @@ defmodule YscWeb.Components.Autocomplete do
         <div class="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium text-zinc-900 truncate">
-              <%= @display_fn.(@selected) %>
+              {@display_fn.(@selected)}
             </div>
             <div :if={@subtitle_fn} class="text-xs text-zinc-500 truncate">
-              <%= @subtitle_fn.(@selected) %>
+              {@subtitle_fn.(@selected)}
             </div>
           </div>
           <button
@@ -152,7 +152,6 @@ defmodule YscWeb.Components.Autocomplete do
             "block w-full pl-10 py-2 text-sm rounded-md shadow-sm",
             if(@search_value != "", do: "pr-9", else: "pr-3"),
             "border focus:ring-0 focus:outline-none",
-            "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
             @errors == [] && "border-zinc-300 focus:border-zinc-400",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
@@ -189,10 +188,10 @@ defmodule YscWeb.Components.Autocomplete do
                 class="w-full px-3 py-2 text-left hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-none transition-colors duration-75 cursor-pointer"
               >
                 <div class="text-sm font-medium text-zinc-900">
-                  <%= @display_fn.(result) %>
+                  {@display_fn.(result)}
                 </div>
                 <div :if={@subtitle_fn} class="text-xs text-zinc-500">
-                  <%= @subtitle_fn.(result) %>
+                  {@subtitle_fn.(result)}
                 </div>
               </button>
             </li>
@@ -211,7 +210,7 @@ defmodule YscWeb.Components.Autocomplete do
           )
         ]}>
           <div class="px-3 py-4 text-sm text-zinc-500 text-center">
-            No results found for "<%= @search_value %>"
+            No results found for "{@search_value}"
           </div>
         </div>
 
@@ -225,14 +224,14 @@ defmodule YscWeb.Components.Autocomplete do
           )
         ]}>
           <div class="px-3 py-3 text-sm text-zinc-400 text-center">
-            Type at least <%= @min_chars %> characters to search
+            Type at least {@min_chars} characters to search
           </div>
         </div>
       </div>
 
       <%!-- Error messages --%>
       <p :for={msg <- @errors} class="mt-1 text-sm text-rose-600">
-        <%= msg %>
+        {msg}
       </p>
     </div>
     """

@@ -127,15 +127,15 @@ defmodule YscWeb.AdminPostsLive do
               <div class="flex items-start justify-between mb-3">
                 <div class="flex-1 min-w-0">
                   <h3 class="text-base font-semibold text-zinc-900 mb-1 truncate">
-                    <%= post.title %>
+                    {post.title}
                   </h3>
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-sm text-zinc-600">
-                      <%= "#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}" %>
+                      {"#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}"}
                     </span>
                     <span class="text-zinc-400">•</span>
                     <span class="text-sm text-zinc-600">
-                      <%= Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}") %>
+                      {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
                     </span>
                   </div>
                 </div>
@@ -166,7 +166,7 @@ defmodule YscWeb.AdminPostsLive do
                     }
                   >
                     <.badge type={post_state_to_badge_style(post.state)}>
-                      <%= String.capitalize("#{post.state}") %>
+                      {String.capitalize("#{post.state}")}
                     </.badge>
                   </.tooltip>
 
@@ -174,7 +174,7 @@ defmodule YscWeb.AdminPostsLive do
                     :if={post.published_on == nil}
                     type={post_state_to_badge_style(post.state)}
                   >
-                    <%= String.capitalize("#{post.state}") %>
+                    {String.capitalize("#{post.state}")}
                   </.badge>
 
                   <span
@@ -182,7 +182,7 @@ defmodule YscWeb.AdminPostsLive do
                     class="flex items-center gap-1 text-zinc-600 text-sm"
                   >
                     <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4" />
-                    <%= post.comment_count %>
+                    {post.comment_count}
                   </span>
                 </div>
 
@@ -200,22 +200,23 @@ defmodule YscWeb.AdminPostsLive do
             <Flop.Phoenix.pagination
               meta={@meta}
               path={~p"/admin/posts"}
-              opts={[
-                wrapper_attrs: [class: "flex items-center justify-center py-4"],
-                pagination_list_attrs: [
-                  class: ["flex gap-0 order-2 justify-center items-center"]
-                ],
-                previous_link_attrs: [
-                  class:
-                    "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                next_link_attrs: [
-                  class:
-                    "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                page_links: {:ellipsis, 3}
+              class="flex items-center justify-center py-4"
+              page_list_attrs={[
+                class: "flex gap-0 order-2 justify-center items-center"
               ]}
-            />
+              page_links={3}
+            >
+              <:previous attrs={[
+                class:
+                  "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:previous>
+              <:next attrs={[
+                class:
+                  "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:next>
+            </Flop.Phoenix.pagination>
           </div>
         </div>
         <!-- Desktop Table View -->
@@ -228,19 +229,19 @@ defmodule YscWeb.AdminPostsLive do
           >
             <:col :let={{_, post}} label="Title" field={:title}>
               <p class="text-sm font-semibold">
-                <%= post.title %>
+                {post.title}
                 <span
                   :if={post.comment_count > 0}
                   class="relative text-zinc-600 ml-2 rounded px-2 py-1 text-sm"
                 >
                   <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4 -mt-0.5" />
-                  <%= post.comment_count %>
+                  {post.comment_count}
                 </span>
               </p>
             </:col>
 
             <:col :let={{_, post}} label="Author" field={:author_name}>
-              <%= "#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}" %>
+              {"#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}"}
             </:col>
 
             <:col :let={{_, post}} label="State" field={:state}>
@@ -251,7 +252,7 @@ defmodule YscWeb.AdminPostsLive do
                 }
               >
                 <.badge type={post_state_to_badge_style(post.state)}>
-                  <%= String.capitalize("#{post.state}") %>
+                  {String.capitalize("#{post.state}")}
                 </.badge>
               </.tooltip>
 
@@ -259,12 +260,12 @@ defmodule YscWeb.AdminPostsLive do
                 :if={post.published_on == nil}
                 type={post_state_to_badge_style(post.state)}
               >
-                <%= String.capitalize("#{post.state}") %>
+                {String.capitalize("#{post.state}")}
               </.badge>
             </:col>
 
             <:col :let={{_, post}} label="Created" field={:inserted_at}>
-              <%= Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}") %>
+              {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
             </:col>
 
             <:action :let={{_, post}} label="Pinned">
@@ -356,7 +357,8 @@ defmodule YscWeb.AdminPostsLive do
 
       _ ->
         {:noreply,
-         socket |> put_flash(:error, "Something went wrong try again.")}
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Something went wrong try again.")}
     end
   end
 
@@ -413,7 +415,12 @@ defmodule YscWeb.AdminPostsLive do
         {:noreply, socket}
 
       _ ->
-        {:noreply, put_flash(socket, :error, "Could not update featured post")}
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not update featured post"
+         )}
     end
   end
 
@@ -432,7 +439,8 @@ defmodule YscWeb.AdminPostsLive do
 
       _ ->
         {:noreply,
-         socket |> put_flash(:error, "Something went wrong try again.")}
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Something went wrong try again.")}
     end
   end
 

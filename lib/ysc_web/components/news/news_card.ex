@@ -68,11 +68,11 @@ defmodule YscWeb.Components.News.NewsCard do
       <div class="px-4 pb-4 flex flex-col flex-1">
         <div class="flex items-center gap-3 mb-4">
           <span class="text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
-            <%= Timex.format!(@post.published_on, "{Mshort} {D}") %>
+            {Timex.format!(@post.published_on, "{Mshort} {D}")}
           </span>
           <span class="h-3 w-px bg-zinc-200"></span>
           <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
-            <%= @reading_time %> min read
+            {@reading_time} min read
           </span>
         </div>
 
@@ -80,11 +80,11 @@ defmodule YscWeb.Components.News.NewsCard do
           navigate={~p"/posts/#{@post.url_name}"}
           class="text-2xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-4 group-hover:text-blue-600 transition-colors"
         >
-          <%= @post.title %>
+          {@post.title}
         </.link>
 
         <article class="text-zinc-500 text-sm leading-relaxed line-clamp-3 mb-8">
-          <%= raw(@preview_text) %>
+          {raw(@preview_text)}
         </article>
 
         <div class="mt-auto pt-6 border-t border-zinc-50 flex items-center justify-between">
@@ -97,14 +97,14 @@ defmodule YscWeb.Components.News.NewsCard do
             />
             <div>
               <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
-                <%= String.capitalize(@post.author.first_name || "") %>
-                <%= String.capitalize(@post.author.last_name || "") %>
+                {String.capitalize(@post.author.first_name || "")}
+                {String.capitalize(@post.author.last_name || "")}
               </p>
               <p
                 :if={@post.board_position_at_publish}
                 class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
               >
-                YSC <%= format_board_position(@post.board_position_at_publish) %>
+                YSC {format_board_position(@post.board_position_at_publish)}
               </p>
             </div>
           </div>

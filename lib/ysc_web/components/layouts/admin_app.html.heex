@@ -1,7 +1,11 @@
 <div id="app-container" class="w-full flex flex-col min-h-screen">
-  <.flash_group flash={@flash} />
+  <.toast_group
+    flash={@flash}
+    connected={assigns[:socket] != nil}
+    toasts_sync={assigns[:toasts_sync] || []}
+  />
 
   <main class="flex-1 w-full">
-    <%= @inner_content %>
+    {@inner_content}
   </main>
 </div>

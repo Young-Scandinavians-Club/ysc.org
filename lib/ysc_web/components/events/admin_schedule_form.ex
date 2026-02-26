@@ -110,7 +110,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
         # The EventUpdated broadcast will trigger a refresh in the parent
         {:noreply,
          socket
-         |> put_flash(:info, "Event scheduled successfully")}
+         |> YscWeb.Flash.put_toast(:info, "Event scheduled successfully")}
 
       {:error, changeset} ->
         error_details =
@@ -134,7 +134,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
         {:noreply,
          socket
          |> assign_form(changeset)
-         |> put_flash(:error, error_message)}
+         |> YscWeb.Flash.put_toast(:error, error_message)}
     end
   end
 

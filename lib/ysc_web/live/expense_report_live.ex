@@ -67,7 +67,10 @@ defmodule YscWeb.ExpenseReportLive do
     else
       {:ok,
        socket
-       |> put_flash(:error, "You must be an active user to access this page.")
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "You must be an active user to access this page."
+       )
        |> redirect(to: ~p"/")}
     end
   end
@@ -383,7 +386,10 @@ defmodule YscWeb.ExpenseReportLive do
   def handle_event("copy-report-id", %{"id" => _id}, socket) do
     {:noreply,
      socket
-     |> put_flash(:info, "Report ID copied to clipboard")}
+     |> YscWeb.Flash.success_with_title(
+       "Copied",
+       "Report ID copied to clipboard"
+     )}
   end
 
   def handle_event("download-pdf", _params, socket) do
@@ -459,16 +465,25 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
-           |> put_flash(:info, "Receipt uploaded successfully")}
+           |> YscWeb.Flash.success_with_title(
+             "Uploaded",
+             "Receipt uploaded successfully"
+           )}
 
         {:postpone, _} ->
-          {:noreply, socket |> put_flash(:error, "Upload is still in progress")}
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "Upload is still in progress")}
 
         {:error, reason} ->
           Ysc.Logging.error("Failed to upload receipt", reason: inspect(reason))
 
           {:noreply,
-           socket |> put_flash(:error, "Failed to upload receipt: #{reason}")}
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to upload receipt: #{reason}"
+           )}
 
         # consume_uploaded_entry can return the value directly if callback returns {:ok, value}
         s3_path when is_binary(s3_path) ->
@@ -491,7 +506,10 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
-           |> put_flash(:info, "Receipt uploaded successfully")}
+           |> YscWeb.Flash.success_with_title(
+             "Uploaded",
+             "Receipt uploaded successfully"
+           )}
 
         other ->
           Ysc.Logging.error("Unexpected result from consume_uploaded_entry",
@@ -500,10 +518,14 @@ defmodule YscWeb.ExpenseReportLive do
 
           {:noreply,
            socket
-           |> put_flash(:error, "Failed to upload receipt: Unexpected result")}
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to upload receipt: Unexpected result"
+           )}
       end
     else
-      {:noreply, socket |> put_flash(:error, "Upload entry not found")}
+      {:noreply,
+       socket |> YscWeb.Flash.put_toast(:error, "Upload entry not found")}
     end
   end
 
@@ -580,16 +602,25 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
-           |> put_flash(:info, "Proof document uploaded successfully")}
+           |> YscWeb.Flash.success_with_title(
+             "Uploaded",
+             "Proof document uploaded successfully"
+           )}
 
         {:postpone, _} ->
-          {:noreply, socket |> put_flash(:error, "Upload is still in progress")}
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "Upload is still in progress")}
 
         {:error, reason} ->
           Ysc.Logging.error("Failed to upload proof", reason: inspect(reason))
 
           {:noreply,
-           socket |> put_flash(:error, "Failed to upload proof: #{reason}")}
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to upload proof: #{reason}"
+           )}
 
         # consume_uploaded_entry can return the value directly if callback returns {:ok, value}
         s3_path when is_binary(s3_path) ->
@@ -612,7 +643,10 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
-           |> put_flash(:info, "Proof document uploaded successfully")}
+           |> YscWeb.Flash.success_with_title(
+             "Uploaded",
+             "Proof document uploaded successfully"
+           )}
 
         other ->
           Ysc.Logging.error("Unexpected result from consume_uploaded_entry",
@@ -621,10 +655,14 @@ defmodule YscWeb.ExpenseReportLive do
 
           {:noreply,
            socket
-           |> put_flash(:error, "Failed to upload proof: Unexpected result")}
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to upload proof: Unexpected result"
+           )}
       end
     else
-      {:noreply, socket |> put_flash(:error, "Upload entry not found")}
+      {:noreply,
+       socket |> YscWeb.Flash.put_toast(:error, "Upload entry not found")}
     end
   end
 
@@ -752,7 +790,10 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> assign(:form, to_form(changeset))
            |> assign(:totals, totals)
-           |> put_flash(:error, "Please fix the errors below before submitting")}
+           |> YscWeb.Flash.error_with_title(
+             "Please fix",
+             "Please fix the errors below before submitting"
+           )}
       end
     else
       # Not a submit action, just validate
@@ -827,7 +868,7 @@ defmodule YscWeb.ExpenseReportLive do
          |> assign(:bank_account_form, nil)
          |> assign(:form, to_form(updated_changeset))
          |> push_patch(to: ~p"/expensereport")
-         |> put_flash(:info, "Bank account added successfully")}
+         |> YscWeb.Flash.put_toast(:info, "Bank account added successfully")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
@@ -1255,17 +1296,17 @@ defmodule YscWeb.ExpenseReportLive do
             <div>
               <dt class="text-sm font-medium text-zinc-500">Purpose</dt>
               <dd class="mt-1 text-sm text-zinc-900">
-                <%= @expense_report.purpose %>
+                {@expense_report.purpose}
               </dd>
             </div>
             <%= if @expense_report.event do %>
               <div>
                 <dt class="text-sm font-medium text-zinc-500">Related Event</dt>
                 <dd class="mt-1 text-sm text-zinc-900">
-                  <%= @expense_report.event.title %> - <%= Calendar.strftime(
+                  {@expense_report.event.title} - {Calendar.strftime(
                     @expense_report.event.start_date,
                     "%B %d, %Y"
-                  ) %>
+                  )}
                 </dd>
               </div>
             <% end %>
@@ -1273,7 +1314,7 @@ defmodule YscWeb.ExpenseReportLive do
               <dt class="text-sm font-medium text-zinc-500">Report ID</dt>
               <dd class="mt-1 flex items-center gap-2">
                 <span class="text-xs sm:text-sm text-zinc-900 font-mono break-all">
-                  <%= @expense_report.id %>
+                  {@expense_report.id}
                 </span>
                 <button
                   type="button"
@@ -1289,10 +1330,10 @@ defmodule YscWeb.ExpenseReportLive do
             <div>
               <dt class="text-sm font-medium text-zinc-500">Submitted</dt>
               <dd class="mt-1 text-sm text-zinc-900">
-                <%= Calendar.strftime(
+                {Calendar.strftime(
                   @expense_report.inserted_at,
                   "%B %d, %Y at %I:%M %p"
-                ) %>
+                )}
               </dd>
             </div>
             <div>
@@ -1300,11 +1341,11 @@ defmodule YscWeb.ExpenseReportLive do
                 Reimbursement Method
               </dt>
               <dd class="mt-1 text-sm text-zinc-900">
-                <%= case @expense_report.reimbursement_method do
+                {case @expense_report.reimbursement_method do
                   "bank_transfer" -> "Bank Transfer"
                   "check" -> "Check"
                   _ -> "Not specified"
-                end %>
+                end}
               </dd>
             </div>
           </div>
@@ -1323,14 +1364,14 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="flex justify-between items-start p-4 bg-zinc-50 rounded-lg">
                     <div class="flex-1">
                       <p class="font-medium text-zinc-900">
-                        <%= item.description %>
+                        {item.description}
                       </p>
                       <p class="text-sm text-zinc-500 mt-1">
                         <%= if item.vendor do %>
-                          Vendor: <%= item.vendor %> •
+                          Vendor: {item.vendor} •
                         <% end %>
                         <%= if item.date do %>
-                          Date: <%= Calendar.strftime(item.date, "%B %d, %Y") %>
+                          Date: {Calendar.strftime(item.date, "%B %d, %Y")}
                         <% end %>
                       </p>
                       <%= if item.receipt_s3_path do %>
@@ -1365,11 +1406,11 @@ defmodule YscWeb.ExpenseReportLive do
                     </div>
                     <div class="text-right ml-4">
                       <p class="font-semibold text-zinc-900">
-                        <%= case Ysc.MoneyHelper.format_money(item.amount) do
+                        {case Ysc.MoneyHelper.format_money(item.amount) do
                           {:ok, amount} -> amount
                           amount when is_binary(amount) -> amount
                           _ -> "N/A"
-                        end %>
+                        end}
                       </p>
                     </div>
                   </div>
@@ -1390,11 +1431,11 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="flex justify-between items-start p-4 bg-zinc-50 rounded-lg">
                     <div class="flex-1">
                       <p class="font-medium text-zinc-900">
-                        <%= item.description %>
+                        {item.description}
                       </p>
                       <p class="text-sm text-zinc-500 mt-1">
                         <%= if item.date do %>
-                          Date: <%= Calendar.strftime(item.date, "%B %d, %Y") %>
+                          Date: {Calendar.strftime(item.date, "%B %d, %Y")}
                         <% end %>
                       </p>
                       <%= if item.proof_s3_path do %>
@@ -1427,11 +1468,11 @@ defmodule YscWeb.ExpenseReportLive do
                     </div>
                     <div class="text-right ml-4">
                       <p class="font-semibold text-zinc-900">
-                        <%= case Ysc.MoneyHelper.format_money(item.amount) do
+                        {case Ysc.MoneyHelper.format_money(item.amount) do
                           {:ok, amount} -> amount
                           amount when is_binary(amount) -> amount
                           _ -> "N/A"
-                        end %>
+                        end}
                       </p>
                     </div>
                   </div>
@@ -1450,33 +1491,33 @@ defmodule YscWeb.ExpenseReportLive do
               <div class="flex justify-between">
                 <span class="text-zinc-600">Total Expenses</span>
                 <span class="font-medium">
-                  <%= case Ysc.MoneyHelper.format_money(@totals.expense_total) do
+                  {case Ysc.MoneyHelper.format_money(@totals.expense_total) do
                     {:ok, amount} -> amount
                     amount when is_binary(amount) -> amount
                     _ -> "N/A"
-                  end %>
+                  end}
                 </span>
               </div>
               <%= if not Money.zero?(@totals.income_total) do %>
                 <div class="flex justify-between">
                   <span class="text-zinc-600">Total Income</span>
                   <span class="font-medium">
-                    <%= case Ysc.MoneyHelper.format_money(@totals.income_total) do
+                    {case Ysc.MoneyHelper.format_money(@totals.income_total) do
                       {:ok, amount} -> amount
                       amount when is_binary(amount) -> amount
                       _ -> "N/A"
-                    end %>
+                    end}
                   </span>
                 </div>
               <% end %>
               <div class="flex justify-between pt-3 border-t border-zinc-200">
                 <span class="text-lg font-semibold text-zinc-900">Net Total</span>
                 <span class="text-lg font-semibold text-zinc-900">
-                  <%= case Ysc.MoneyHelper.format_money(@totals.net_total) do
+                  {case Ysc.MoneyHelper.format_money(@totals.net_total) do
                     {:ok, amount} -> amount
                     amount when is_binary(amount) -> amount
                     _ -> "N/A"
-                  end %>
+                  end}
                 </span>
               </div>
             </div>
@@ -1493,7 +1534,7 @@ defmodule YscWeb.ExpenseReportLive do
               <div class="mt-2 text-sm text-blue-700">
                 <p>
                   You will receive a confirmation email at
-                  <strong><%= @current_user.email %></strong>
+                  <strong>{@current_user.email}</strong>
                   with the details of your submitted expense report.
                 </p>
               </div>
@@ -1599,15 +1640,15 @@ defmodule YscWeb.ExpenseReportLive do
                       <div class="flex items-start justify-between mb-2">
                         <div>
                           <h3 class="text-lg font-semibold text-zinc-900 mb-1">
-                            <%= report.purpose %>
+                            {report.purpose}
                           </h3>
                           <div class="flex items-center gap-4 text-sm text-zinc-600">
-                            <span class="font-mono text-xs"><%= report.id %></span>
+                            <span class="font-mono text-xs">{report.id}</span>
                             <span>
-                              Submitted <%= Calendar.strftime(
+                              Submitted {Calendar.strftime(
                                 report.inserted_at,
                                 "%B %d, %Y"
-                              ) %>
+                              )}
                             </span>
                           </div>
                         </div>
@@ -1617,37 +1658,35 @@ defmodule YscWeb.ExpenseReportLive do
                         <div>
                           <span class="text-zinc-500">Total Expenses</span>
                           <p class="font-semibold text-zinc-900 mt-1">
-                            <%= case Ysc.MoneyHelper.format_money(
-                                       totals.expense_total
-                                     ) do
+                            {case Ysc.MoneyHelper.format_money(totals.expense_total) do
                               {:ok, amount} -> amount
                               amount when is_binary(amount) -> amount
                               _ -> "N/A"
-                            end %>
+                            end}
                           </p>
                         </div>
                         <%= if not Money.zero?(totals.income_total) do %>
                           <div>
                             <span class="text-zinc-500">Total Income</span>
                             <p class="font-semibold text-zinc-900 mt-1">
-                              <%= case Ysc.MoneyHelper.format_money(
-                                         totals.income_total
-                                       ) do
+                              {case Ysc.MoneyHelper.format_money(
+                                      totals.income_total
+                                    ) do
                                 {:ok, amount} -> amount
                                 amount when is_binary(amount) -> amount
                                 _ -> "N/A"
-                              end %>
+                              end}
                             </p>
                           </div>
                         <% end %>
                         <div>
                           <span class="text-zinc-500">Net Total</span>
                           <p class="font-semibold text-lg text-zinc-900 mt-1">
-                            <%= case Ysc.MoneyHelper.format_money(totals.net_total) do
+                            {case Ysc.MoneyHelper.format_money(totals.net_total) do
                               {:ok, amount} -> amount
                               amount when is_binary(amount) -> amount
                               _ -> "N/A"
-                            end %>
+                            end}
                           </p>
                         </div>
                       </div>
@@ -1656,30 +1695,28 @@ defmodule YscWeb.ExpenseReportLive do
                         <%= if report.event do %>
                           <span>
                             <.icon name="hero-calendar" class="w-4 h-4 inline mr-1" />
-                            <%= report.event.title %>
+                            {report.event.title}
                           </span>
                         <% end %>
                         <span>
                           <.icon name="hero-banknotes" class="w-4 h-4 inline mr-1" />
-                          <%= case report.reimbursement_method do
+                          {case report.reimbursement_method do
                             "bank_transfer" -> "Bank Transfer"
                             "check" -> "Check"
                             _ -> "Not specified"
-                          end %>
+                          end}
                         </span>
                         <span>
                           <.icon
                             name="hero-document-text"
                             class="w-4 h-4 inline mr-1"
                           />
-                          <%= length(report.expense_items) %> expense item<%= if length(
-                                                                                   report.expense_items
-                                                                                 ) !=
-                                                                                   1,
-                                                                                 do:
-                                                                                   "s",
-                                                                                 else:
-                                                                                   "" %>
+                          {length(report.expense_items)} expense item{if length(
+                                                                           report.expense_items
+                                                                         ) !=
+                                                                           1,
+                                                                         do: "s",
+                                                                         else: ""}
                         </span>
                       </div>
                     </div>
@@ -1723,7 +1760,7 @@ defmodule YscWeb.ExpenseReportLive do
               <p :if={@treasurer}>
                 If you have questions, please contact:
                 <strong>
-                  <%= @treasurer.first_name %> <%= @treasurer.last_name %>
+                  {@treasurer.first_name} {@treasurer.last_name}
                 </strong>
                 (<a
                   href={"mailto:#{@treasurer.email}"}
@@ -1770,7 +1807,7 @@ defmodule YscWeb.ExpenseReportLive do
                   :for={error <- @form[:purpose].errors}
                   class="mt-1 text-sm text-red-600"
                 >
-                  <%= error_to_string(error) %>
+                  {error_to_string(error)}
                 </p>
 
                 <div class="mt-4">
@@ -1819,7 +1856,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="border border-zinc-200 rounded-lg p-4 mb-4 space-y-4">
                     <div class="flex justify-between items-start">
                       <h4 class="text-md font-medium text-zinc-800">
-                        Expense Item <%= expense_f.index + 1 %>
+                        Expense Item {expense_f.index + 1}
                       </h4>
                       <button
                         type="button"
@@ -1870,11 +1907,11 @@ defmodule YscWeb.ExpenseReportLive do
                           :for={error <- expense_f[:date].errors}
                           class="mt-1 text-sm text-red-600"
                         >
-                          <%= error_to_string(error) %>
+                          {error_to_string(error)}
                         </p>
                       </div>
                       <div>
-                        <div phx-feedback-for={expense_f[:vendor].name}>
+                        <div>
                           <.input
                             field={expense_f[:vendor]}
                             type="text"
@@ -1915,7 +1952,7 @@ defmodule YscWeb.ExpenseReportLive do
                           :for={error <- expense_f[:vendor].errors}
                           class="mt-1 text-sm text-red-600"
                         >
-                          <%= error_to_string(error) %>
+                          {error_to_string(error)}
                         </p>
                       </div>
                       <div>
@@ -1934,7 +1971,7 @@ defmodule YscWeb.ExpenseReportLive do
                           :for={error <- expense_f[:amount].errors}
                           class="mt-1 text-sm text-red-600"
                         >
-                          <%= error_to_string(error) %>
+                          {error_to_string(error)}
                         </p>
                       </div>
                     </div>
@@ -1951,7 +1988,7 @@ defmodule YscWeb.ExpenseReportLive do
                         :for={error <- expense_f[:description].errors}
                         class="mt-1 text-sm text-red-600"
                       >
-                        <%= error_to_string(error) %>
+                        {error_to_string(error)}
                       </p>
                     </div>
 
@@ -2111,7 +2148,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       class="w-5 h-5 text-blue-600 flex-shrink-0"
                                     />
                                     <span class="text-sm font-medium text-blue-800">
-                                      File selected: <%= entry.client_name %>
+                                      File selected: {entry.client_name}
                                     </span>
                                   </div>
                                   <progress
@@ -2124,7 +2161,7 @@ defmodule YscWeb.ExpenseReportLive do
                                     data-upload-type="receipt"
                                     phx-hook="AutoConsumeUpload"
                                   >
-                                    <%= entry.progress %>%
+                                    {entry.progress}%
                                   </progress>
                                   <div class="flex gap-2">
                                     <button
@@ -2148,7 +2185,7 @@ defmodule YscWeb.ExpenseReportLive do
                                         <% entry.done? -> %>
                                           Processing...
                                         <% true -> %>
-                                          Uploading... (<%= entry.progress %>%)
+                                          Uploading... ({entry.progress}%)
                                       <% end %>
                                     </button>
                                     <button
@@ -2228,7 +2265,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="border border-zinc-200 rounded-lg p-4 mb-4 space-y-4">
                     <div class="flex justify-between items-start">
                       <h4 class="text-md font-medium text-zinc-800">
-                        Income Item <%= income_f.index + 1 %>
+                        Income Item {income_f.index + 1}
                       </h4>
                       <button
                         type="button"
@@ -2254,7 +2291,7 @@ defmodule YscWeb.ExpenseReportLive do
                           :for={error <- income_f[:date].errors}
                           class="mt-1 text-sm text-red-600"
                         >
-                          <%= error_to_string(error) %>
+                          {error_to_string(error)}
                         </p>
                       </div>
                       <div>
@@ -2273,7 +2310,7 @@ defmodule YscWeb.ExpenseReportLive do
                           :for={error <- income_f[:amount].errors}
                           class="mt-1 text-sm text-red-600"
                         >
-                          <%= error_to_string(error) %>
+                          {error_to_string(error)}
                         </p>
                       </div>
                     </div>
@@ -2289,7 +2326,7 @@ defmodule YscWeb.ExpenseReportLive do
                         :for={error <- income_f[:description].errors}
                         class="mt-1 text-sm text-red-600"
                       >
-                        <%= error_to_string(error) %>
+                        {error_to_string(error)}
                       </p>
                     </div>
 
@@ -2449,7 +2486,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       class="w-5 h-5 text-blue-600 flex-shrink-0"
                                     />
                                     <span class="text-sm font-medium text-blue-800">
-                                      File selected: <%= entry.client_name %>
+                                      File selected: {entry.client_name}
                                     </span>
                                   </div>
                                   <progress
@@ -2462,7 +2499,7 @@ defmodule YscWeb.ExpenseReportLive do
                                     data-upload-type="proof"
                                     phx-hook="AutoConsumeUpload"
                                   >
-                                    <%= entry.progress %>%
+                                    {entry.progress}%
                                   </progress>
                                   <div class="flex gap-2">
                                     <button
@@ -2486,7 +2523,7 @@ defmodule YscWeb.ExpenseReportLive do
                                         <% entry.done? -> %>
                                           Processing...
                                         <% true -> %>
-                                          Uploading... (<%= entry.progress %>%)
+                                          Uploading... ({entry.progress}%)
                                       <% end %>
                                     </button>
                                     <button
@@ -2564,7 +2601,7 @@ defmodule YscWeb.ExpenseReportLive do
                     :if={@billing_address}
                     class="text-sm font-medium text-zinc-900 mb-4"
                   >
-                    <%= format_address(@billing_address) %>
+                    {format_address(@billing_address)}
                   </p>
                   <p :if={@billing_address} class="text-xs text-zinc-600">
                     To update this address, please visit your
@@ -2595,10 +2632,10 @@ defmodule YscWeb.ExpenseReportLive do
                     </p>
                   </div>
                   <.error :for={error <- @form[:reimbursement_method].errors}>
-                    <%= error_to_string(error) %>
+                    {error_to_string(error)}
                   </.error>
                   <.error :for={error <- @form[:address_id].errors}>
-                    <%= error_to_string(error) %>
+                    {error_to_string(error)}
                   </.error>
                 </div>
 
@@ -2624,7 +2661,7 @@ defmodule YscWeb.ExpenseReportLive do
                       :for={error <- @form[:bank_account_id].errors}
                       class="mt-1 text-sm text-red-600"
                     >
-                      <%= error_to_string(error) %>
+                      {error_to_string(error)}
                     </p>
                     <div class="flex items-center gap-2">
                       <span class="text-sm text-zinc-600">Or</span>
@@ -2658,7 +2695,7 @@ defmodule YscWeb.ExpenseReportLive do
                     :for={error <- @form[:reimbursement_method].errors}
                     class="mt-1 text-sm text-red-600"
                   >
-                    <%= error_to_string(error) %>
+                    {error_to_string(error)}
                   </p>
                 </div>
               </div>
@@ -2692,7 +2729,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="min-h-[60px] space-y-1">
                     <%= if !can_submit?(@form, @bank_accounts, @billing_address, @current_user) do %>
                       <%= for error <- get_submission_errors(@form, @bank_accounts, @billing_address, @current_user) do %>
-                        <p class="text-sm text-red-600"><%= error %></p>
+                        <p class="text-sm text-red-600">{error}</p>
                       <% end %>
                     <% end %>
                   </div>
@@ -2720,7 +2757,7 @@ defmodule YscWeb.ExpenseReportLive do
                   >
                     <%= if can_submit?(@form, @bank_accounts, @billing_address, @current_user) do %>
                       <.icon name="hero-paper-airplane" class="w-4 h-4 inline mr-2" />
-                      Submit <%= Money.to_string!(@totals.net_total) %> Report
+                      Submit {Money.to_string!(@totals.net_total)} Report
                     <% else %>
                       Complete checklist to submit
                     <% end %>
@@ -2740,7 +2777,7 @@ defmodule YscWeb.ExpenseReportLive do
                       Net Total
                     </span>
                     <span class="text-lg font-bold text-zinc-900">
-                      <%= Money.to_string!(@totals.net_total) %>
+                      {Money.to_string!(@totals.net_total)}
                     </span>
                   </div>
                   <.button
@@ -2767,7 +2804,7 @@ defmodule YscWeb.ExpenseReportLive do
                   >
                     <%= if can_submit?(@form, @bank_accounts, @billing_address, @current_user) do %>
                       <.icon name="hero-paper-airplane" class="w-4 h-4 inline mr-2" />
-                      Submit <%= Money.to_string!(@totals.net_total) %> Report
+                      Submit {Money.to_string!(@totals.net_total)} Report
                     <% else %>
                       Complete checklist to submit
                     <% end %>
@@ -2781,14 +2818,14 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="flex justify-between items-center">
                     <span class="text-sm text-zinc-600">Total Expenses</span>
                     <span class="text-sm font-semibold text-zinc-900">
-                      <%= Money.to_string!(@totals.expense_total) %>
+                      {Money.to_string!(@totals.expense_total)}
                     </span>
                   </div>
                   <%= if not Money.zero?(@totals.income_total) do %>
                     <div class="flex justify-between items-center">
                       <span class="text-sm text-zinc-600">Total Income</span>
                       <span class="text-sm font-semibold text-zinc-900">
-                        <%= Money.to_string!(@totals.income_total) %>
+                        {Money.to_string!(@totals.income_total)}
                       </span>
                     </div>
                   <% end %>
@@ -2798,7 +2835,7 @@ defmodule YscWeb.ExpenseReportLive do
                         Net Total
                       </span>
                       <span class="text-lg font-bold text-zinc-900">
-                        <%= Money.to_string!(@totals.net_total) %>
+                        {Money.to_string!(@totals.net_total)}
                       </span>
                     </div>
                   </div>
@@ -2818,20 +2855,20 @@ defmodule YscWeb.ExpenseReportLive do
                               class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
                             />
                             <span class="text-sm text-green-700 line-through">
-                              <%= label %>
+                              {label}
                             </span>
                           <% :error -> %>
                             <.icon
                               name="hero-exclamation-circle"
                               class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
                             />
-                            <span class="text-sm text-red-600"><%= label %></span>
+                            <span class="text-sm text-red-600">{label}</span>
                           <% :pending -> %>
                             <.icon
                               name="hero-minus-circle"
                               class="w-5 h-5 text-zinc-400 flex-shrink-0 mt-0.5"
                             />
-                            <span class="text-sm text-zinc-600"><%= label %></span>
+                            <span class="text-sm text-zinc-600">{label}</span>
                         <% end %>
                       </div>
                     <% end %>
@@ -3505,9 +3542,9 @@ defmodule YscWeb.ExpenseReportLive do
             else: "text-zinc-500"
           )
         ]}>
-          <%= @title %>
+          {@title}
         </p>
-        <p class="text-xs text-zinc-500 mt-1"><%= @description %></p>
+        <p class="text-xs text-zinc-500 mt-1">{@description}</p>
       </div>
     </div>
     """

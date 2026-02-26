@@ -843,7 +843,7 @@ defmodule YscWeb.TahoeBookingLive do
                 <div class="bg-white border-2 border-blue-100 rounded-xl p-5 shadow-sm">
                   <div class="flex justify-between items-start mb-3">
                     <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                      <%= booking.reference_id %>
+                      {booking.reference_id}
                     </span>
                     <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>
                       <span class="text-xs font-bold text-amber-600 italic">
@@ -856,15 +856,15 @@ defmodule YscWeb.TahoeBookingLive do
                     <% end %>
                   </div>
                   <p class="font-bold text-zinc-900 text-lg leading-none">
-                    <%= Calendar.strftime(booking.checkin_date, "%b %d") %> — <%= Calendar.strftime(
+                    {Calendar.strftime(booking.checkin_date, "%b %d")} — {Calendar.strftime(
                       booking.checkout_date,
                       "%b %d"
-                    ) %>
+                    )}
                   </p>
                   <p class="text-sm text-zinc-500 mt-1">
-                    <%= booking.guests_count %> <%= if booking.guests_count == 1,
+                    {booking.guests_count} {if booking.guests_count == 1,
                       do: "Guest",
-                      else: "Guests" %> • <%= if booking.booking_mode == :buyout do
+                      else: "Guests"} • {if booking.booking_mode == :buyout do
                       "Full Buyout"
                     else
                       if Ecto.assoc_loaded?(booking.rooms) &&
@@ -873,7 +873,7 @@ defmodule YscWeb.TahoeBookingLive do
                       else
                         "Rooms"
                       end
-                    end %>
+                    end}
                   </p>
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -912,10 +912,10 @@ defmodule YscWeb.TahoeBookingLive do
                       :if={@booking_error_title}
                       class="text-sm font-semibold text-amber-900"
                     >
-                      <%= @booking_error_title %>
+                      {@booking_error_title}
                     </h3>
                     <div class="mt-2 text-sm text-amber-800">
-                      <p><%= raw(@booking_disabled_reason) %></p>
+                      <p>{raw(@booking_disabled_reason)}</p>
                     </div>
                   </div>
                 </div>
@@ -1091,7 +1091,7 @@ defmodule YscWeb.TahoeBookingLive do
                 >
                   <p class="text-xs text-blue-900">
                     <strong>Winter Policy:</strong>
-                    <%= if @checkin_date do
+                    {if @checkin_date do
                       month = @checkin_date.month
 
                       if month >= 12 or month <= 4 do
@@ -1099,7 +1099,7 @@ defmodule YscWeb.TahoeBookingLive do
                       else
                         "May–November: Full buyouts available. Individual rooms also available."
                       end
-                    end %>
+                    end}
                   </p>
                 </div>
                 <!-- Pricing & Membership Info -->
@@ -1125,14 +1125,14 @@ defmodule YscWeb.TahoeBookingLive do
                       <p>
                         Adults:
                         <strong>
-                          <%= MoneyHelper.format_money!(default_adult_price) %>
+                          {MoneyHelper.format_money!(default_adult_price)}
                         </strong>
                         per night
                       </p>
                       <p>
                         Children (5-17):
                         <strong>
-                          <%= MoneyHelper.format_money!(default_children_price) %>
+                          {MoneyHelper.format_money!(default_children_price)}
                         </strong>
                         per night
                       </p>
@@ -1198,10 +1198,10 @@ defmodule YscWeb.TahoeBookingLive do
                           class="w-full px-3 py-2 border border-zinc-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span class="text-zinc-900">
-                            <%= format_guests_display(
+                            {format_guests_display(
                               @guests_count,
                               @children_count
-                            ) %>
+                            )}
                           </span>
                           <.icon
                             name="hero-chevron-down"
@@ -1255,7 +1255,7 @@ defmodule YscWeb.TahoeBookingLive do
                                   class="w-12 text-center font-medium text-lg text-zinc-900"
                                   aria-live="polite"
                                 >
-                                  <%= @guests_count %>
+                                  {@guests_count}
                                 </span>
                                 <button
                                   type="button"
@@ -1306,7 +1306,7 @@ defmodule YscWeb.TahoeBookingLive do
                                   class="w-12 text-center font-medium text-lg text-zinc-900"
                                   aria-live="polite"
                                 >
-                                  <%= @children_count %>
+                                  {@children_count}
                                 </span>
                                 <button
                                   type="button"
@@ -1334,9 +1334,9 @@ defmodule YscWeb.TahoeBookingLive do
                                   nil
                                 end %>
                               <% default_children_price =
-                                get_default_children_price(@property, season_id) %> Children 5-17 years: <%= MoneyHelper.format_money!(
+                                get_default_children_price(@property, season_id) %> Children 5-17 years: {MoneyHelper.format_money!(
                                 default_children_price
-                              ) %>/night. Children under 5 stay for free.
+                              )}/night. Children under 5 stay for free.
                             </p>
                             <!-- Done Button -->
                             <div class="pt-2">
@@ -1359,55 +1359,55 @@ defmodule YscWeb.TahoeBookingLive do
                       :if={@form_errors[:checkin_date]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @form_errors[:checkin_date] %>
+                      {@form_errors[:checkin_date]}
                     </p>
                     <p
                       :if={@form_errors[:checkout_date]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @form_errors[:checkout_date] %>
+                      {@form_errors[:checkout_date]}
                     </p>
                     <p
                       :if={@date_validation_errors[:weekend]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:weekend] %>
+                      {@date_validation_errors[:weekend]}
                     </p>
                     <p
                       :if={@date_validation_errors[:max_nights]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:max_nights] %>
+                      {@date_validation_errors[:max_nights]}
                     </p>
                     <p
                       :if={@date_validation_errors[:active_booking]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:active_booking] %>
+                      {@date_validation_errors[:active_booking]}
                     </p>
                     <p
                       :if={@date_validation_errors[:advance_booking_limit]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:advance_booking_limit] %>
+                      {@date_validation_errors[:advance_booking_limit]}
                     </p>
                     <p
                       :if={@date_validation_errors[:season_booking_mode]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:season_booking_mode] %>
+                      {@date_validation_errors[:season_booking_mode]}
                     </p>
                     <p
                       :if={@date_validation_errors[:season_date_range]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:season_date_range] %>
+                      {@date_validation_errors[:season_date_range]}
                     </p>
                     <p
                       :if={@date_validation_errors[:availability]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:availability] %>
+                      {@date_validation_errors[:availability]}
                     </p>
                   </div>
                 </section>
@@ -1459,19 +1459,19 @@ defmodule YscWeb.TahoeBookingLive do
                       :if={@date_validation_errors[:weekend]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:weekend] %>
+                      {@date_validation_errors[:weekend]}
                     </p>
                     <p
                       :if={@date_validation_errors[:max_nights]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:max_nights] %>
+                      {@date_validation_errors[:max_nights]}
                     </p>
                     <p
                       :if={@date_validation_errors[:availability]}
                       class="text-red-600 text-sm"
                     >
-                      <%= @date_validation_errors[:availability] %>
+                      {@date_validation_errors[:availability]}
                     </p>
                   </div>
                 </section>
@@ -1507,9 +1507,7 @@ defmodule YscWeb.TahoeBookingLive do
                   Choose Your Rooms
                   <%= if can_select_multiple_rooms?(assigns) && length(@selected_room_ids) > 0 do %>
                     <span class="text-sm font-normal text-zinc-500">
-                      (<%= length(@selected_room_ids) %>/<%= max_rooms_for_user(
-                        assigns
-                      ) %>)
+                      ({length(@selected_room_ids)}/{max_rooms_for_user(assigns)})
                     </span>
                   <% end %>
                 </h2>
@@ -1529,7 +1527,7 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <p class="text-sm text-blue-900 font-medium">
                       <strong>Family Membership Benefit:</strong>
-                      You can book up to <%= max_rooms_for_user(assigns) %> rooms in the same reservation.
+                      You can book up to {max_rooms_for_user(assigns)} rooms in the same reservation.
                     </p>
                   </div>
                 </div>
@@ -1636,7 +1634,7 @@ defmodule YscWeb.TahoeBookingLive do
                                     Not Available
                                   </p>
                                   <p class="text-xs text-amber-800">
-                                    <%= reason %>
+                                    {reason}
                                   </p>
                                 </div>
                               </div>
@@ -1678,10 +1676,10 @@ defmodule YscWeb.TahoeBookingLive do
                             <div class="flex items-start justify-between mb-2">
                               <div class="flex-1">
                                 <div class="font-bold text-zinc-900 text-base mb-1">
-                                  <%= room.name %>
+                                  {room.name}
                                 </div>
                                 <div class="text-xs text-zinc-600 line-clamp-2">
-                                  <%= room.description %>
+                                  {room.description}
                                 </div>
                               </div>
                               <div class="ml-3 flex-shrink-0">
@@ -1717,13 +1715,13 @@ defmodule YscWeb.TahoeBookingLive do
                             </div>
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
                               <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded border border-blue-200">
-                                Max <%= room.capacity_max %> Guests
+                                Max {room.capacity_max} Guests
                               </span>
                               <span
                                 :if={room.min_billable_occupancy > 1}
                                 class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded border border-amber-200"
                               >
-                                Min <%= room.min_billable_occupancy %> Guests
+                                Min {room.min_billable_occupancy} Guests
                               </span>
                             </div>
                             <!-- Room Features: Compact Badges -->
@@ -1739,30 +1737,24 @@ defmodule YscWeb.TahoeBookingLive do
                                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded border border-zinc-200"
                                 title="Twin beds"
                               >
-                                <%= raw(
-                                  bed_icon_svg(:single, "w-3 h-3 text-zinc-600")
-                                ) %>
-                                <span><%= room.single_beds %></span>
+                                {raw(bed_icon_svg(:single, "w-3 h-3 text-zinc-600"))}
+                                <span>{room.single_beds}</span>
                               </span>
                               <span
                                 :if={room.queen_beds > 0}
                                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded border border-zinc-200"
                                 title="Queen beds"
                               >
-                                <%= raw(
-                                  bed_icon_svg(:queen, "w-3 h-3 text-zinc-600")
-                                ) %>
-                                <span><%= room.queen_beds %></span>
+                                {raw(bed_icon_svg(:queen, "w-3 h-3 text-zinc-600"))}
+                                <span>{room.queen_beds}</span>
                               </span>
                               <span
                                 :if={room.king_beds > 0}
                                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded border border-zinc-200"
                                 title="King beds"
                               >
-                                <%= raw(
-                                  bed_icon_svg(:king, "w-3 h-3 text-zinc-600")
-                                ) %>
-                                <span><%= room.king_beds %></span>
+                                {raw(bed_icon_svg(:king, "w-3 h-3 text-zinc-600"))}
+                                <span>{room.king_beds}</span>
                               </span>
                             </div>
                             <div class="border-t border-zinc-200 pt-2 mt-auto">
@@ -1780,27 +1772,27 @@ defmodule YscWeb.TahoeBookingLive do
                                 end %>
                               <div class="text-sm text-zinc-900 font-bold">
                                 <div :if={room.minimum_price}>
-                                  <%= MoneyHelper.format_money!(room.minimum_price) %> min
+                                  {MoneyHelper.format_money!(room.minimum_price)} min
                                   <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    (<%= room.min_billable_occupancy %> guest)
+                                    ({room.min_billable_occupancy} guest)
                                   </span>
                                 </div>
                                 <div :if={!room.minimum_price}>
                                   <% fallback_adult_price =
                                     get_default_adult_price(@property, season_id) %>
-                                  <%= MoneyHelper.format_money!(
+                                  {MoneyHelper.format_money!(
                                     room.adult_price_per_night ||
                                       fallback_adult_price
-                                  ) %>/adult
+                                  )}/adult
                                 </div>
                               </div>
                               <div class="text-xs text-zinc-500">
                                 <% fallback_children_price =
                                   get_default_children_price(@property, season_id) %>
-                                <%= MoneyHelper.format_money!(
+                                {MoneyHelper.format_money!(
                                   room.children_price_per_night ||
                                     fallback_children_price
-                                ) %>/child
+                                )}/child
                               </div>
                             </div>
                           </div>
@@ -1850,7 +1842,7 @@ defmodule YscWeb.TahoeBookingLive do
                                     Not Available
                                   </p>
                                   <p class="text-xs text-amber-800">
-                                    <%= reason %>
+                                    {reason}
                                   </p>
                                 </div>
                               </div>
@@ -1892,10 +1884,10 @@ defmodule YscWeb.TahoeBookingLive do
                             <div class="flex items-start justify-between mb-2">
                               <div class="flex-1">
                                 <div class="font-bold text-zinc-900 text-base mb-1">
-                                  <%= room.name %>
+                                  {room.name}
                                 </div>
                                 <div class="text-xs text-zinc-600 line-clamp-2">
-                                  <%= room.description %>
+                                  {room.description}
                                 </div>
                               </div>
                               <div class="ml-3 flex-shrink-0">
@@ -1905,13 +1897,13 @@ defmodule YscWeb.TahoeBookingLive do
                             </div>
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
                               <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded border border-blue-200">
-                                Max <%= room.capacity_max %> Guests
+                                Max {room.capacity_max} Guests
                               </span>
                               <span
                                 :if={room.min_billable_occupancy > 1}
                                 class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded border border-amber-200"
                               >
-                                Min <%= room.min_billable_occupancy %> Guests
+                                Min {room.min_billable_occupancy} Guests
                               </span>
                             </div>
                             <!-- Room Features: Compact Badges -->
@@ -1927,30 +1919,24 @@ defmodule YscWeb.TahoeBookingLive do
                                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded border border-zinc-200"
                                 title="Twin beds"
                               >
-                                <%= raw(
-                                  bed_icon_svg(:single, "w-3 h-3 text-zinc-600")
-                                ) %>
-                                <span><%= room.single_beds %></span>
+                                {raw(bed_icon_svg(:single, "w-3 h-3 text-zinc-600"))}
+                                <span>{room.single_beds}</span>
                               </span>
                               <span
                                 :if={room.queen_beds > 0}
                                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded border border-zinc-200"
                                 title="Queen beds"
                               >
-                                <%= raw(
-                                  bed_icon_svg(:queen, "w-3 h-3 text-zinc-600")
-                                ) %>
-                                <span><%= room.queen_beds %></span>
+                                {raw(bed_icon_svg(:queen, "w-3 h-3 text-zinc-600"))}
+                                <span>{room.queen_beds}</span>
                               </span>
                               <span
                                 :if={room.king_beds > 0}
                                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded border border-zinc-200"
                                 title="King beds"
                               >
-                                <%= raw(
-                                  bed_icon_svg(:king, "w-3 h-3 text-zinc-600")
-                                ) %>
-                                <span><%= room.king_beds %></span>
+                                {raw(bed_icon_svg(:king, "w-3 h-3 text-zinc-600"))}
+                                <span>{room.king_beds}</span>
                               </span>
                             </div>
                             <div class="border-t border-zinc-200 pt-2 mt-auto">
@@ -1968,27 +1954,27 @@ defmodule YscWeb.TahoeBookingLive do
                                 end %>
                               <div class="text-sm text-zinc-900 font-bold">
                                 <div :if={room.minimum_price}>
-                                  <%= MoneyHelper.format_money!(room.minimum_price) %> min
+                                  {MoneyHelper.format_money!(room.minimum_price)} min
                                   <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    (<%= room.min_billable_occupancy %> guest)
+                                    ({room.min_billable_occupancy} guest)
                                   </span>
                                 </div>
                                 <div :if={!room.minimum_price}>
                                   <% fallback_adult_price =
                                     get_default_adult_price(@property, season_id) %>
-                                  <%= MoneyHelper.format_money!(
+                                  {MoneyHelper.format_money!(
                                     room.adult_price_per_night ||
                                       fallback_adult_price
-                                  ) %>/adult
+                                  )}/adult
                                 </div>
                               </div>
                               <div class="text-xs text-zinc-500">
                                 <% fallback_children_price =
                                   get_default_children_price(@property, season_id) %>
-                                <%= MoneyHelper.format_money!(
+                                {MoneyHelper.format_money!(
                                   room.children_price_per_night ||
                                     fallback_children_price
-                                ) %>/child
+                                )}/child
                               </div>
                             </div>
                           </div>
@@ -1998,7 +1984,7 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                 </fieldset>
                 <p :if={@form_errors[:room_id]} class="text-red-600 text-sm mt-1">
-                  <%= @form_errors[:room_id] %>
+                  {@form_errors[:room_id]}
                 </p>
                 <p
                   :if={
@@ -2030,27 +2016,26 @@ defmodule YscWeb.TahoeBookingLive do
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Check-in</span>
                       <span class="font-semibold text-zinc-900 text-right">
-                        <%= Calendar.strftime(@checkin_date, "%b %d, %Y") %>
+                        {Calendar.strftime(@checkin_date, "%b %d, %Y")}
                       </span>
                     </div>
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Check-out</span>
                       <span class="font-semibold text-zinc-900 text-right">
-                        <%= Calendar.strftime(@checkout_date, "%b %d, %Y") %>
+                        {Calendar.strftime(@checkout_date, "%b %d, %Y")}
                       </span>
                     </div>
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Nights</span>
                       <span class="font-semibold text-zinc-900">
-                        <%= Date.diff(@checkout_date, @checkin_date) %> <%= if Date.diff(
-                                                                                 @checkout_date,
-                                                                                 @checkin_date
-                                                                               ) ==
-                                                                                 1,
-                                                                               do:
-                                                                                 "night",
-                                                                               else:
-                                                                                 "nights" %>
+                        {Date.diff(@checkout_date, @checkin_date)} {if Date.diff(
+                                                                         @checkout_date,
+                                                                         @checkin_date
+                                                                       ) ==
+                                                                         1,
+                                                                       do: "night",
+                                                                       else:
+                                                                         "nights"}
                       </span>
                     </div>
                   </div>
@@ -2061,7 +2046,7 @@ defmodule YscWeb.TahoeBookingLive do
                   >
                     <span class="text-zinc-500 font-medium">Guests</span>
                     <span class="font-semibold text-zinc-900">
-                      <%= format_guests_display(@guests_count, @children_count) %>
+                      {format_guests_display(@guests_count, @children_count)}
                     </span>
                   </div>
                   <!-- Family Membership Notice in Summary Card -->
@@ -2081,7 +2066,7 @@ defmodule YscWeb.TahoeBookingLive do
                       />
                       <p class="text-xs text-blue-900 leading-tight">
                         <strong>Family Membership:</strong>
-                        You can book up to <%= max_rooms_for_user(assigns) %> rooms.
+                        You can book up to {max_rooms_for_user(assigns)} rooms.
                       </p>
                     </div>
                   </div>
@@ -2118,7 +2103,7 @@ defmodule YscWeb.TahoeBookingLive do
                               />
                               <div class="flex-1">
                                 <p class="text-xs font-semibold text-red-900">
-                                  <%= room.name %> requires minimum of <%= min_required %> guests
+                                  {room.name} requires minimum of {min_required} guests
                                 </p>
                                 <p class="text-xs text-red-800 mt-0.5">
                                   <% season_id =
@@ -2137,12 +2122,12 @@ defmodule YscWeb.TahoeBookingLive do
                                     get_default_adult_price(@property, season_id) %>
                                   <% room_adult_price =
                                     room.adult_price_per_night ||
-                                      fallback_adult_price %> (<%= MoneyHelper.format_money!(
+                                      fallback_adult_price %> ({MoneyHelper.format_money!(
                                     case Money.mult(room_adult_price, min_required) do
                                       {:ok, total} -> total
                                       _ -> room_adult_price
                                     end
-                                  ) %>/night minimum)
+                                  )}/night minimum)
                                 </p>
                               </div>
                             </div>
@@ -2156,7 +2141,7 @@ defmodule YscWeb.TahoeBookingLive do
                               class="w-4 h-4 text-green-600 flex-shrink-0"
                             />
                             <p class="text-xs text-green-900">
-                              <%= room.name %>: Guest count OK
+                              {room.name}: Guest count OK
                             </p>
                           </div>
                         <% end %>
@@ -2182,7 +2167,7 @@ defmodule YscWeb.TahoeBookingLive do
                         :if={room}
                         class="flex justify-between items-center text-sm"
                       >
-                        <span class="text-zinc-700"><%= room.name %></span>
+                        <span class="text-zinc-700">{room.name}</span>
                         <button
                           phx-click="remove-room"
                           phx-value-room-id={room_id}
@@ -2223,13 +2208,13 @@ defmodule YscWeb.TahoeBookingLive do
                         <span class="text-zinc-600">
                           Full Buyout
                           <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
-                            (<%= MoneyHelper.format_money!(
+                            ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
-                            ) %> × <%= @price_breakdown.nights %>)
+                            )} × {@price_breakdown.nights})
                           <% end %>
                         </span>
                         <span class="font-semibold text-zinc-900">
-                          <%= MoneyHelper.format_money!(@calculated_price) %>
+                          {MoneyHelper.format_money!(@calculated_price)}
                         </span>
                       </div>
                       <!-- Room Price Breakdown -->
@@ -2255,14 +2240,14 @@ defmodule YscWeb.TahoeBookingLive do
                               <% adult_count =
                                 @price_breakdown[:billable_people] ||
                                   @price_breakdown[:guests_count] ||
-                                  0 %> (<%= adult_count %> <%= if adult_count == 1,
+                                  0 %> ({adult_count} {if adult_count == 1,
                                 do: "adult",
-                                else: "adults" %> × <%= @price_breakdown.nights %>)
+                                else: "adults"} × {@price_breakdown.nights})
                             <% end %>
                           </span>
                           <span class="font-semibold text-zinc-900">
-                            <%= if @price_breakdown[:base],
-                              do: MoneyHelper.format_money!(@price_breakdown.base) %>
+                            {if @price_breakdown[:base],
+                              do: MoneyHelper.format_money!(@price_breakdown.base)}
                           </span>
                         </div>
                         <div
@@ -2275,11 +2260,11 @@ defmodule YscWeb.TahoeBookingLive do
                           <span class="text-zinc-600">
                             Children
                             <%= if @price_breakdown.nights do %>
-                              (<%= @price_breakdown[:children_count] || 0 %> × <%= @price_breakdown.nights %>)
+                              ({@price_breakdown[:children_count] || 0} × {@price_breakdown.nights})
                             <% end %>
                           </span>
                           <span class="font-semibold text-zinc-900">
-                            <%= MoneyHelper.format_money!(@price_breakdown.children) %>
+                            {MoneyHelper.format_money!(@price_breakdown.children)}
                           </span>
                         </div>
                       </div>
@@ -2291,7 +2276,7 @@ defmodule YscWeb.TahoeBookingLive do
                       <span class="text-lg font-bold text-zinc-900">Total</span>
                       <div class="text-right">
                         <span class="text-2xl font-black text-blue-600">
-                          <%= MoneyHelper.format_money!(@calculated_price) %>
+                          {MoneyHelper.format_money!(@calculated_price)}
                         </span>
                       </div>
                     </div>
@@ -2299,10 +2284,10 @@ defmodule YscWeb.TahoeBookingLive do
                   <!-- Error Messages -->
                   <div :if={@price_error || @capacity_error} class="space-y-1">
                     <p :if={@price_error} class="text-red-600 text-xs">
-                      <%= @price_error %>
+                      {@price_error}
                     </p>
                     <p :if={@capacity_error} class="text-red-600 text-xs">
-                      <%= @capacity_error %>
+                      {@capacity_error}
                     </p>
                   </div>
                   <!-- Missing Info List (Smart Sidebar) -->
@@ -2536,7 +2521,7 @@ defmodule YscWeb.TahoeBookingLive do
                                   total = guests_count + children_count
 
                                   "#{total} #{if total == 1, do: "guest", else: "guests"}"
-                                end %> I confirm that the number of people in my booking (<%= party_size_text %>) matches my actual party size.
+                                end %> I confirm that the number of people in my booking ({party_size_text}) matches my actual party size.
                             </span>
                           </div>
                         </label>
@@ -2858,10 +2843,10 @@ defmodule YscWeb.TahoeBookingLive do
                   :if={@booking_error_title}
                   class="text-sm font-semibold text-amber-900"
                 >
-                  <%= @booking_error_title %>
+                  {@booking_error_title}
                 </h3>
                 <div class="mt-2 text-sm text-amber-800">
-                  <p><%= raw(@booking_disabled_reason) %></p>
+                  <p>{raw(@booking_disabled_reason)}</p>
                 </div>
               </div>
             </div>
@@ -3618,9 +3603,9 @@ defmodule YscWeb.TahoeBookingLive do
                                   nil
                                 end %>
                               <% default_children_price =
-                                get_default_children_price(@property, season_id) %> 5–17 years: <%= MoneyHelper.format_money!(
+                                get_default_children_price(@property, season_id) %> 5–17 years: {MoneyHelper.format_money!(
                                 default_children_price
-                              ) %>/night<br />Under 5: Free
+                              )}/night<br />Under 5: Free
                             </td>
                           </tr>
                         </tbody>
@@ -3774,16 +3759,16 @@ defmodule YscWeb.TahoeBookingLive do
                                 Days Before Check-In
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                <%= if @buyout_refund_policy &&
-                                         @buyout_refund_policy.name,
-                                       do: @buyout_refund_policy.name,
-                                       else: "Full Cabin" %>
+                                {if @buyout_refund_policy &&
+                                      @buyout_refund_policy.name,
+                                    do: @buyout_refund_policy.name,
+                                    else: "Full Cabin"}
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                <%= if @room_refund_policy &&
-                                         @room_refund_policy.name,
-                                       do: @room_refund_policy.name,
-                                       else: "Room Booking" %>
+                                {if @room_refund_policy &&
+                                      @room_refund_policy.name,
+                                    do: @room_refund_policy.name,
+                                    else: "Room Booking"}
                               </th>
                             </tr>
                           </thead>
@@ -3834,7 +3819,7 @@ defmodule YscWeb.TahoeBookingLive do
                                      else: nil %>
                                 <tr class="border-b border-zinc-100 hover:bg-white">
                                   <td class="px-4 py-3 font-semibold text-zinc-900">
-                                    <%= days %>+ days
+                                    {days}+ days
                                   </td>
                                   <td class={[
                                     "px-4 py-3 text-center border-l border-zinc-100",
@@ -3858,11 +3843,11 @@ defmodule YscWeb.TahoeBookingLive do
                                     )
                                   ]}>
                                     <%= if buyout_rule && buyout_rule.refund_percentage do %>
-                                      <%= trunc(
+                                      {trunc(
                                         Decimal.to_float(
                                           buyout_rule.refund_percentage
                                         )
-                                      ) %>%
+                                      )}%
                                     <% else %>
                                       —
                                     <% end %>
@@ -3889,11 +3874,11 @@ defmodule YscWeb.TahoeBookingLive do
                                     )
                                   ]}>
                                     <%= if room_rule && room_rule.refund_percentage do %>
-                                      <%= trunc(
+                                      {trunc(
                                         Decimal.to_float(
                                           room_rule.refund_percentage
                                         )
-                                      ) %>%
+                                      )}%
                                     <% else %>
                                       —
                                     <% end %>
@@ -3923,16 +3908,16 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @buyout_refund_policy && @buyout_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              <%= if @buyout_refund_policy.name,
+                              {if @buyout_refund_policy.name,
                                 do: @buyout_refund_policy.name,
-                                else: "Full Cabin Buyout" %>:
+                                else: "Full Cabin Buyout"}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- Enum.sort_by(@buyout_refund_policy.rules, & &1.days_before_checkin, :desc) do %>
                                 <% refund_pct =
                                   trunc(Decimal.to_float(rule.refund_percentage)) %>
                                 <li>
-                                  If you cancel <%= rule.days_before_checkin %> or more days before check-in, you'll receive a <%= refund_pct %>% refund.
+                                  If you cancel {rule.days_before_checkin} or more days before check-in, you'll receive a {refund_pct}% refund.
                                 </li>
                               <% end %>
                             </ul>
@@ -3941,16 +3926,16 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @room_refund_policy && @room_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              <%= if @room_refund_policy.name,
+                              {if @room_refund_policy.name,
                                 do: @room_refund_policy.name,
-                                else: "Room Booking" %>:
+                                else: "Room Booking"}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- Enum.sort_by(@room_refund_policy.rules, & &1.days_before_checkin, :desc) do %>
                                 <% refund_pct =
                                   trunc(Decimal.to_float(rule.refund_percentage)) %>
                                 <li>
-                                  If you cancel <%= rule.days_before_checkin %> or more days before check-in, you'll receive a <%= refund_pct %>% refund.
+                                  If you cancel {rule.days_before_checkin} or more days before check-in, you'll receive a {refund_pct}% refund.
                                 </li>
                               <% end %>
                             </ul>
@@ -4164,13 +4149,13 @@ defmodule YscWeb.TahoeBookingLive do
                         <li>
                           Adults:
                           <strong>
-                            <%= MoneyHelper.format_money!(default_adult_price) %>
+                            {MoneyHelper.format_money!(default_adult_price)}
                           </strong>
                         </li>
                         <li>
                           Children (5–17):
                           <strong>
-                            <%= MoneyHelper.format_money!(default_children_price) %>
+                            {MoneyHelper.format_money!(default_children_price)}
                           </strong>
                         </li>
                         <li>Children under 5: <strong>Free</strong></li>
@@ -4263,7 +4248,7 @@ defmodule YscWeb.TahoeBookingLive do
                 <div :if={@calculated_price} class="text-right">
                   <p class="text-xs text-zinc-500 uppercase">Total</p>
                   <p class="text-xl font-black text-blue-600">
-                    <%= MoneyHelper.format_money!(@calculated_price) %>
+                    {MoneyHelper.format_money!(@calculated_price)}
                   </p>
                 </div>
                 <div :if={!@calculated_price} class="text-sm text-zinc-500">
@@ -4404,7 +4389,7 @@ defmodule YscWeb.TahoeBookingLive do
                     Ready to Experience Tahoe?
                   </h4>
                   <p class="text-blue-100">
-                    <%= raw(@booking_disabled_reason) %>
+                    {raw(@booking_disabled_reason)}
                   </p>
                 </div>
                 <.link
@@ -4857,7 +4842,7 @@ defmodule YscWeb.TahoeBookingLive do
              chores_confirmed: false,
              party_size_confirmed: false
            )
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :info,
              "Booking created! Please complete payment to confirm."
            )
@@ -4866,7 +4851,7 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, :insufficient_capacity} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Sorry, there is not enough capacity for your requested dates."
            )
@@ -4882,7 +4867,7 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, :property_unavailable} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Sorry, the property is not available for your requested dates."
            )
@@ -4898,7 +4883,7 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, :rooms_already_booked} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Sorry, some rooms are already booked for your requested dates."
            )
@@ -4915,7 +4900,7 @@ defmodule YscWeb.TahoeBookingLive do
           # Map room_unavailable to rooms_already_booked for consistent error handling
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Sorry, some rooms are already booked for your requested dates."
            )
@@ -4931,7 +4916,7 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, :stale_inventory} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "The availability changed while you were booking. Please refresh the calendar and try again."
            )
@@ -4947,7 +4932,10 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, :invalid_parameters} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Please fill in all required fields.")
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Please fill in all required fields."
+           )
            |> assign(
              form_errors: %{general: "Please fill in all required fields."},
              calculated_price: nil,
@@ -4958,7 +4946,7 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, %Ecto.Changeset{} = changeset} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Please fix the errors below.")
+           |> YscWeb.Flash.put_toast(:error, "Please fix the errors below.")
            |> assign(
              form_errors: format_errors(changeset),
              calculated_price: nil,
@@ -4970,7 +4958,7 @@ defmodule YscWeb.TahoeBookingLive do
           # Handle any other error atoms that weren't explicitly handled above
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "An error occurred while creating your booking. Please try again."
            )

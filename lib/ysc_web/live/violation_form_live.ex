@@ -31,7 +31,7 @@ defmodule YscWeb.ConductViolationReportLive do
               Your Submitted Report
             </p>
             <p class="text-sm text-zinc-700 whitespace-pre-wrap">
-              <%= @submitted_summary %>
+              {@submitted_summary}
             </p>
           </div>
           <div class="flex flex-col sm:flex-row gap-4 justify-center">
@@ -109,7 +109,7 @@ defmodule YscWeb.ConductViolationReportLive do
                         Name
                       </p>
                       <p class="text-zinc-900 font-medium">
-                        <%= @current_user.first_name %> <%= @current_user.last_name %>
+                        {@current_user.first_name} {@current_user.last_name}
                       </p>
                     </div>
                     <div>
@@ -117,7 +117,7 @@ defmodule YscWeb.ConductViolationReportLive do
                         Email
                       </p>
                       <p class="text-zinc-900 font-medium">
-                        <%= @current_user.email %>
+                        {@current_user.email}
                       </p>
                     </div>
                     <div>
@@ -125,7 +125,7 @@ defmodule YscWeb.ConductViolationReportLive do
                         Phone
                       </p>
                       <p class="text-zinc-900 font-medium">
-                        <%= @current_user.phone_number || "Not provided" %>
+                        {@current_user.phone_number || "Not provided"}
                       </p>
                     </div>
                   </div>
@@ -175,22 +175,22 @@ defmodule YscWeb.ConductViolationReportLive do
                 <%!-- Non-logged in user form fields --%>
                 <div :if={!@logged_in?}>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div phx-feedback-for={@form[:first_name].id}>
+                    <div>
                       <.input field={@form[:first_name]} label="First Name*" />
                     </div>
-                    <div phx-feedback-for={@form[:last_name].id}>
+                    <div>
                       <.input field={@form[:last_name]} label="Last Name*" />
                     </div>
                   </div>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                    <div phx-feedback-for={@form[:email].id}>
+                    <div>
                       <.input
                         field={@form[:email]}
                         type="email"
                         label="Email Address*"
                       />
                     </div>
-                    <div phx-feedback-for={@form[:phone].id}>
+                    <div>
                       <.input field={@form[:phone]} label="Phone Number*" />
                     </div>
                   </div>
@@ -216,7 +216,7 @@ defmodule YscWeb.ConductViolationReportLive do
                     <li>What happened, in your own words</li>
                   </ul>
                 </div>
-                <div phx-feedback-for={@form[:summary].id}>
+                <div>
                   <.input
                     type="textarea"
                     field={@form[:summary]}
@@ -359,7 +359,7 @@ defmodule YscWeb.ConductViolationReportLive do
            socket
            |> assign(:submitted, true)
            |> assign(:submitted_summary, summary_text)
-           |> put_flash(:info, "Your report has been submitted")}
+           |> YscWeb.Flash.put_toast(:info, "Your report has been submitted")}
 
         {:error, changeset} ->
           {:noreply, assign_form(socket, changeset)}
@@ -373,7 +373,10 @@ defmodule YscWeb.ConductViolationReportLive do
                socket
                |> assign(:submitted, true)
                |> assign(:submitted_summary, summary_text)
-               |> put_flash(:info, "Your report has been submitted")}
+               |> YscWeb.Flash.put_toast(
+                 :info,
+                 "Your report has been submitted"
+               )}
 
             {:error, changeset} ->
               {:noreply, assign_form(socket, changeset)}
@@ -382,7 +385,7 @@ defmodule YscWeb.ConductViolationReportLive do
         {:error, _} ->
           socket =
             socket
-            |> put_flash(:error, "Please try submitting again")
+            |> YscWeb.Flash.put_toast(:error, "Please try submitting again")
             |> Turnstile.refresh()
 
           {:noreply, assign_form(socket, changeset)}

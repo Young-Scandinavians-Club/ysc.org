@@ -76,7 +76,7 @@ defmodule YscWeb.AccountSetupLive do
                   data-countdown={email_countdown}
                   data-timer-type="email"
                 >
-                  resend in <%= email_countdown %>s
+                  resend in {email_countdown}s
                 </span>
               <% end %>.
             </p>
@@ -233,7 +233,7 @@ defmodule YscWeb.AccountSetupLive do
                   data-countdown={sms_countdown}
                   data-timer-type="sms"
                 >
-                  resend in <%= sms_countdown %>s
+                  resend in {sms_countdown}s
                 </span>
               <% end %>.
             </p>
@@ -710,7 +710,7 @@ defmodule YscWeb.AccountSetupLive do
       {:error, :not_found} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "No verification code found. Please request a new one."
          )}
@@ -718,7 +718,7 @@ defmodule YscWeb.AccountSetupLive do
       {:error, :expired} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Verification code has expired. Please request a new one."
          )}
@@ -726,7 +726,10 @@ defmodule YscWeb.AccountSetupLive do
       {:error, :invalid_code} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Invalid verification code. Please try again.")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Invalid verification code. Please try again."
+         )}
     end
   end
 
@@ -772,7 +775,7 @@ defmodule YscWeb.AccountSetupLive do
            :email_resend_disabled_until,
            Ysc.ResendRateLimiter.disabled_until(60)
          )
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :info,
            "A new verification code has been sent to your email."
          )}
@@ -781,7 +784,7 @@ defmodule YscWeb.AccountSetupLive do
         # Rate limited
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Please wait before requesting another verification code."
          )}
@@ -804,7 +807,10 @@ defmodule YscWeb.AccountSetupLive do
     else
       {:noreply,
        socket
-       |> put_flash(:error, "Please complete email verification first.")}
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Please complete email verification first."
+       )}
     end
   end
 
@@ -827,7 +833,10 @@ defmodule YscWeb.AccountSetupLive do
     else
       {:noreply,
        socket
-       |> put_flash(:error, "Please complete password setup first.")}
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Please complete password setup first."
+       )}
     end
   end
 
@@ -854,7 +863,10 @@ defmodule YscWeb.AccountSetupLive do
     if is_nil(current_user) or not user_needs.password_setup do
       {:noreply,
        socket
-       |> put_flash(:error, "Please verify your email address first.")}
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Please verify your email address first."
+       )}
     else
       case Accounts.set_user_initial_password(socket.assigns.user, user_params) do
         {:ok, updated_user} ->
@@ -895,7 +907,7 @@ defmodule YscWeb.AccountSetupLive do
            |> assign(:user, updated_user)
            |> assign(:user_needs, updated_user_needs)
            |> assign(:password, password)
-           |> put_flash(:info, "Password set successfully!")}
+           |> YscWeb.Flash.put_toast(:info, "Password set successfully!")}
 
         {:error, changeset} ->
           {:noreply, assign(socket, password_form: to_form(changeset))}
@@ -911,7 +923,10 @@ defmodule YscWeb.AccountSetupLive do
     if is_nil(current_user) or socket.assigns.current_step != 2 do
       {:noreply,
        socket
-       |> put_flash(:error, "Phone setup is not available at this step.")}
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Phone setup is not available at this step."
+       )}
     else
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
@@ -948,7 +963,7 @@ defmodule YscWeb.AccountSetupLive do
            |> push_patch(
              to: ~p"/account/setup/#{socket.assigns.user.id}?step=3"
            )
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :info,
              "Phone number saved! Please verify it with the code we sent."
            )}
@@ -966,7 +981,7 @@ defmodule YscWeb.AccountSetupLive do
     if is_nil(current_user) do
       {:noreply,
        socket
-       |> put_flash(:error, "Please complete account setup first.")}
+       |> YscWeb.Flash.put_toast(:error, "Please complete account setup first.")}
     else
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
@@ -1021,7 +1036,10 @@ defmodule YscWeb.AccountSetupLive do
     else
       {:noreply,
        socket
-       |> put_flash(:error, "Please complete the required steps in order.")
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Please complete the required steps in order."
+       )
        |> redirect(to: ~p"/account/setup/#{socket.assigns.user.id}")}
     end
   end
@@ -1061,7 +1079,7 @@ defmodule YscWeb.AccountSetupLive do
     if is_nil(current_user) or not user_needs.phone_verification do
       {:noreply,
        socket
-       |> put_flash(:error, "Please complete phone setup first.")}
+       |> YscWeb.Flash.put_toast(:error, "Please complete phone setup first.")}
     else
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
@@ -1086,7 +1104,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, :not_found} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "No verification code found. Please request a new one."
            )}
@@ -1094,7 +1112,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, :expired} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Verification code has expired. Please request a new one."
            )}
@@ -1102,7 +1120,10 @@ defmodule YscWeb.AccountSetupLive do
         {:error, :invalid_code} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Invalid verification code. Please try again.")}
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Invalid verification code. Please try again."
+           )}
       end
     end
   end
@@ -1115,7 +1136,7 @@ defmodule YscWeb.AccountSetupLive do
     if is_nil(current_user) or not user_needs.phone_verification do
       {:noreply,
        socket
-       |> put_flash(:error, "Please complete phone setup first.")}
+       |> YscWeb.Flash.put_toast(:error, "Please complete phone setup first.")}
     else
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
@@ -1153,13 +1174,16 @@ defmodule YscWeb.AccountSetupLive do
              :sms_resend_disabled_until,
              Ysc.ResendRateLimiter.disabled_until(60)
            )
-           |> put_flash(:info, "Verification code sent to your phone.")}
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Verification code sent to your phone."
+           )}
 
         {:error, :rate_limited, _remaining} ->
           # Rate limited
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Please wait before requesting another verification code."
            )}

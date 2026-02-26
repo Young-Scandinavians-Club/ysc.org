@@ -32,11 +32,11 @@ defmodule YscWeb.AdminEventsNewLive do
           <div class="flex flex-col space-y-1">
             <div class="flex flex-row items-center space-x-3">
               <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-                <%= @event_title %>
+                {@event_title}
               </h1>
 
               <.badge type={event_state_to_badge_style(@state)}>
-                <%= String.capitalize("#{@state}") %>
+                {String.capitalize("#{@state}")}
               </.badge>
 
               <.link
@@ -56,12 +56,12 @@ defmodule YscWeb.AdminEventsNewLive do
             >
               <.icon name="hero-calendar-days" class="text-zinc-600" />
               <p class="text-sm text-zinc-600">
-                <%= Ysc.Events.DateTimeFormatter.format_datetime(%{
+                {Ysc.Events.DateTimeFormatter.format_datetime(%{
                   start_date: format_date(@start_date),
                   start_time: format_time(@start_time),
                   end_date: format_date(@end_date),
                   end_time: format_time(@end_time)
-                }) %>
+                })}
               </p>
             </div>
           </div>
@@ -105,9 +105,9 @@ defmodule YscWeb.AdminEventsNewLive do
               }
             >
               <:button_block>
-                <.icon name="hero-clock" class="w-5 h-5 me-1" /><%= schedule_button_text(
+                <.icon name="hero-clock" class="w-5 h-5 me-1" />{schedule_button_text(
                   @event.state
-                ) %>
+                )}
                 <.icon name="hero-chevron-down" class="ms-2" />
               </:button_block>
 
@@ -193,8 +193,8 @@ defmodule YscWeb.AdminEventsNewLive do
                       "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
                   ]}
                 >
-                  Tickets <%= if @partiful_link_present,
-                    do: "(Disabled - Using Partiful)" %>
+                  Tickets {if @partiful_link_present,
+                    do: "(Disabled - Using Partiful)"}
                 </.link>
               </li>
             </ul>
@@ -594,7 +594,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Event deleted.")
+     |> YscWeb.Flash.put_toast(:info, "Event deleted.")
      |> push_navigate(to: "/admin/events")}
   end
 
@@ -604,7 +604,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Event published.")
+     |> YscWeb.Flash.put_toast(:info, "Event published.")
      |> push_navigate(to: "/admin/events")}
   end
 
@@ -649,7 +649,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Event moved back to draft.")
+     |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.")
      |> push_navigate(to: "/admin/events/#{socket.assigns.event.id}/edit")}
   end
 
@@ -659,7 +659,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Event cancelled.")
+     |> YscWeb.Flash.put_toast(:info, "Event cancelled.")
      |> push_navigate(to: "/admin/events")}
   end
 
@@ -900,7 +900,10 @@ defmodule YscWeb.AdminEventsNewLive do
          socket
          |> assign(:event, event)
          |> assign(:capacity_form, to_form(Event.changeset(event, %{})))
-         |> put_flash(:info, "Event capacity updated successfully.")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Event capacity updated successfully."
+         )}
 
       {:error, changeset} ->
         {:noreply, assign(socket, :capacity_form, to_form(changeset))}
@@ -1114,7 +1117,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info({:redirect_to_tickets, event_id}, socket) do
     {:noreply,
      socket
-     |> put_flash(:info, "Ticket reservation created successfully")
+     |> YscWeb.Flash.put_toast(:info, "Ticket reservation created successfully")
      |> push_navigate(to: ~p"/admin/events/#{event_id}/tickets")}
   end
 

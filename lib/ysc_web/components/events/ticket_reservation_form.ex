@@ -45,9 +45,9 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
           >
             <div>
               <p class="font-medium text-zinc-900">
-                <%= @selected_user.first_name %> <%= @selected_user.last_name %>
+                {@selected_user.first_name} {@selected_user.last_name}
               </p>
-              <p class="text-sm text-zinc-600"><%= @selected_user.email %></p>
+              <p class="text-sm text-zinc-600">{@selected_user.email}</p>
             </div>
             <button
               type="button"
@@ -82,14 +82,14 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
                 class="p-3 hover:bg-zinc-50 cursor-pointer border-b border-zinc-100 last:border-b-0"
               >
                 <p class="font-medium text-zinc-900">
-                  <%= user.first_name %> <%= user.last_name %>
+                  {user.first_name} {user.last_name}
                 </p>
-                <p class="text-sm text-zinc-600"><%= user.email %></p>
+                <p class="text-sm text-zinc-600">{user.email}</p>
               </div>
             </div>
           </div>
           <.error :for={error <- @form[:user_id].errors}>
-            <%= translate_error(error) %>
+            {translate_error(error)}
           </.error>
         </div>
 

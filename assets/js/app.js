@@ -68,6 +68,7 @@ import ClipboardCopy from "./clipboard_copy";
 import DecadeIndicator from "./decade_indicator";
 import FooterRotator from "./footer_rotator";
 import ScrollMoreIndicator from "./scroll_more_indicator";
+import { createLiveToastHook } from "../../deps/live_toast";
 
 let Hooks = {
     StickyNavbar,
@@ -111,6 +112,7 @@ let Hooks = {
     DecadeIndicator,
     FooterRotator,
     ScrollMoreIndicator,
+    LiveToast: createLiveToastHook(6000, 3),
 };
 Hooks.LivePhone = LivePhone;
 

@@ -52,9 +52,9 @@ defmodule YscWeb.AdminBookingsLive do
         show
       >
         <.header>
-          <%= if @live_action == :new_blackout,
+          {if @live_action == :new_blackout,
             do: "New Blackout",
-            else: "Edit Blackout" %>
+            else: "Edit Blackout"}
         </.header>
 
         <.simple_form
@@ -122,7 +122,7 @@ defmodule YscWeb.AdminBookingsLive do
                       else: "Updating..."
                   }
                 >
-                  <%= if @live_action == :new_blackout, do: "Create", else: "Update" %>
+                  {if @live_action == :new_blackout, do: "Create", else: "Update"}
                 </.button>
               </div>
             </div>
@@ -149,9 +149,9 @@ defmodule YscWeb.AdminBookingsLive do
         show
       >
         <.header>
-          <%= if @live_action == :new_pricing_rule,
+          {if @live_action == :new_pricing_rule,
             do: "New Pricing Rule",
-            else: "Edit Pricing Rule" %>
+            else: "Edit Pricing Rule"}
         </.header>
 
         <.simple_form
@@ -258,7 +258,7 @@ defmodule YscWeb.AdminBookingsLive do
                   else: "Updating..."
               }
             >
-              <%= if @live_action == :new_pricing_rule, do: "Create", else: "Update" %>
+              {if @live_action == :new_pricing_rule, do: "Create", else: "Update"}
             </.button>
           </:actions>
         </.simple_form>
@@ -394,13 +394,13 @@ defmodule YscWeb.AdminBookingsLive do
           <div class="mb-4 p-4 bg-zinc-50 rounded border border-zinc-200">
             <p class="text-sm text-zinc-600 mb-2">
               <span class="font-medium">Total Amount Paid:</span>
-              <%= MoneyHelper.format_money!(@selected_pending_refund.payment.amount) %>
+              {MoneyHelper.format_money!(@selected_pending_refund.payment.amount)}
             </p>
             <p class="text-sm text-zinc-600 mb-2">
               <span class="font-medium">Policy Refund Amount:</span>
-              <%= MoneyHelper.format_money!(
+              {MoneyHelper.format_money!(
                 @selected_pending_refund.policy_refund_amount
-              ) %>
+              )}
             </p>
             <p class="text-xs text-zinc-500">
               You can approve a different amount than the policy amount if needed.
@@ -465,9 +465,9 @@ defmodule YscWeb.AdminBookingsLive do
           <div class="mb-4 p-4 bg-red-50 rounded border border-red-200">
             <p class="text-sm text-red-800 mb-2">
               <span class="font-medium">Policy Refund Amount:</span>
-              <%= MoneyHelper.format_money!(
+              {MoneyHelper.format_money!(
                 @selected_pending_refund.policy_refund_amount
-              ) %>
+              )}
             </p>
             <p class="text-xs text-red-600">
               This refund will be rejected and no payment will be processed.
@@ -518,11 +518,11 @@ defmodule YscWeb.AdminBookingsLive do
                     _ -> "dark"
                   end %>
                 <.badge type={badge_type}>
-                  <%= String.upcase(to_string(@booking.status)) %>
+                  {String.upcase(to_string(@booking.status))}
                 </.badge>
               </div>
               <div :if={@booking.inserted_at} class="mt-1 text-xs text-zinc-500">
-                Booked <%= format_datetime(@booking.inserted_at, @timezone) %>
+                Booked {format_datetime(@booking.inserted_at, @timezone)}
               </div>
             </div>
           </div>
@@ -543,11 +543,11 @@ defmodule YscWeb.AdminBookingsLive do
                     "?"
                   end %>
                 <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm">
-                  <%= user_initials %>
+                  {user_initials}
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-zinc-900 truncate">
-                    <%= if @booking.user do
+                    {if @booking.user do
                       if @booking.user.first_name && @booking.user.last_name do
                         "#{@booking.user.first_name} #{@booking.user.last_name}"
                       else
@@ -555,33 +555,33 @@ defmodule YscWeb.AdminBookingsLive do
                       end
                     else
                       "Unknown User"
-                    end %>
+                    end}
                   </p>
                   <p
                     :if={@booking.user && @booking.user.email}
                     class="text-xs text-zinc-500 truncate"
                   >
-                    <%= @booking.user.email %>
+                    {@booking.user.email}
                   </p>
                 </div>
               </div>
               <div class="mt-3 flex items-center gap-4 text-xs">
                 <div class="flex items-center gap-1.5">
                   <span class="font-semibold text-zinc-700">
-                    <%= @booking.guests_count %>
+                    {@booking.guests_count}
                   </span>
                   <span class="text-zinc-600">
-                    <%= if @booking.guests_count == 1, do: "Adult", else: "Adults" %>
+                    {if @booking.guests_count == 1, do: "Adult", else: "Adults"}
                   </span>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <span class="font-semibold text-zinc-700">
-                    <%= @booking.children_count || 0 %>
+                    {@booking.children_count || 0}
                   </span>
                   <span class="text-zinc-600">
-                    <%= if (@booking.children_count || 0) == 1,
+                    {if (@booking.children_count || 0) == 1,
                       do: "Child",
-                      else: "Children" %>
+                      else: "Children"}
                   </span>
                 </div>
               </div>
@@ -593,16 +593,16 @@ defmodule YscWeb.AdminBookingsLive do
                 class="my-3 pt-3 border-t border-zinc-200"
               >
                 <p class="text-xs font-semibold text-zinc-600 mb-2">
-                  All Guests (<%= length(@booking.booking_guests) %>)
+                  All Guests ({length(@booking.booking_guests)})
                 </p>
                 <div class="space-y-1.5">
                   <%= for guest <- Enum.sort_by(@booking.booking_guests, & &1.order_index) do %>
                     <div class="flex items-center gap-2 text-xs">
                       <div class="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-xs">
-                        <%= "#{String.first(guest.first_name)}#{String.first(guest.last_name)}" %>
+                        {"#{String.first(guest.first_name)}#{String.first(guest.last_name)}"}
                       </div>
                       <span class="text-zinc-900">
-                        <%= "#{guest.first_name} #{guest.last_name}" %>
+                        {"#{guest.first_name} #{guest.last_name}"}
                       </span>
                       <span :if={guest.is_child} class="text-zinc-500">
                         (Child)
@@ -625,7 +625,7 @@ defmodule YscWeb.AdminBookingsLive do
                   Property
                 </label>
                 <p class="text-base font-bold text-zinc-900">
-                  <%= atom_to_readable(@booking.property) %>
+                  {atom_to_readable(@booking.property)}
                 </p>
               </div>
               <div>
@@ -633,7 +633,7 @@ defmodule YscWeb.AdminBookingsLive do
                   Booking Mode
                 </label>
                 <.badge type="default">
-                  <%= atom_to_readable(@booking.booking_mode) %>
+                  {atom_to_readable(@booking.booking_mode)}
                 </.badge>
               </div>
             </div>
@@ -645,7 +645,7 @@ defmodule YscWeb.AdminBookingsLive do
                     Check-in
                   </label>
                   <p class="text-sm text-zinc-900">
-                    <%= Calendar.strftime(@booking.checkin_date, "%B %d, %Y") %>
+                    {Calendar.strftime(@booking.checkin_date, "%B %d, %Y")}
                   </p>
                 </div>
 
@@ -654,7 +654,7 @@ defmodule YscWeb.AdminBookingsLive do
                     Check-out
                   </label>
                   <p class="text-sm text-zinc-900">
-                    <%= Calendar.strftime(@booking.checkout_date, "%B %d, %Y") %>
+                    {Calendar.strftime(@booking.checkout_date, "%B %d, %Y")}
                   </p>
                 </div>
 
@@ -663,7 +663,7 @@ defmodule YscWeb.AdminBookingsLive do
                     Nights
                   </label>
                   <p class="text-sm text-zinc-900">
-                    <%= Date.diff(@booking.checkout_date, @booking.checkin_date) %>
+                    {Date.diff(@booking.checkout_date, @booking.checkin_date)}
                   </p>
                 </div>
               </div>
@@ -676,16 +676,16 @@ defmodule YscWeb.AdminBookingsLive do
               class="col-span-2 mt-3"
             >
               <label class="block text-sm font-semibold text-zinc-700 mb-2">
-                <%= if length(@booking.rooms) == 1, do: "Room", else: "Rooms" %>
+                {if length(@booking.rooms) == 1, do: "Room", else: "Rooms"}
               </label>
               <div class="flex flex-wrap gap-2">
                 <%= for room <- @booking.rooms do %>
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-200">
                     <span class="text-sm font-semibold text-zinc-900">
-                      <%= room.name %>
+                      {room.name}
                     </span>
                     <span :if={room.room_category} class="text-xs text-zinc-600">
-                      <%= atom_to_readable(room.room_category.name) %>
+                      {atom_to_readable(room.room_category.name)}
                     </span>
                   </div>
                 <% end %>
@@ -709,7 +709,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <div class="flex-1 space-y-2">
                       <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-zinc-900 font-mono">
-                          <%= payment.reference_id %>
+                          {payment.reference_id}
                         </span>
                         <button
                           type="button"
@@ -722,14 +722,14 @@ defmodule YscWeb.AdminBookingsLive do
                           <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
                         </button>
                         <.badge type={payment_status_type}>
-                          <%= String.capitalize(to_string(payment.status)) %>
+                          {String.capitalize(to_string(payment.status))}
                         </.badge>
                       </div>
                       <p class="text-sm font-semibold text-zinc-900">
-                        <%= MoneyHelper.format_money!(payment.amount) %>
+                        {MoneyHelper.format_money!(payment.amount)}
                       </p>
                       <p :if={payment.payment_date} class="text-xs text-zinc-500">
-                        <%= format_datetime(payment.payment_date, @timezone) %>
+                        {format_datetime(payment.payment_date, @timezone)}
                       </p>
                       <div
                         :if={payment.external_payment_id}
@@ -742,7 +742,7 @@ defmodule YscWeb.AdminBookingsLive do
                           class="text-xs text-zinc-400 hover:text-blue-600 font-mono transition-colors underline decoration-dotted"
                           title="View in Stripe Dashboard"
                         >
-                          <%= payment.external_payment_id %>
+                          {payment.external_payment_id}
                         </a>
                         <button
                           type="button"
@@ -759,7 +759,7 @@ defmodule YscWeb.AdminBookingsLive do
                         :if={payment.quickbooks_sales_receipt_id}
                         class="text-xs text-green-600"
                       >
-                        QuickBooks: <%= payment.quickbooks_sales_receipt_id %>
+                        QuickBooks: {payment.quickbooks_sales_receipt_id}
                       </p>
                     </div>
                   </div>
@@ -792,7 +792,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <div class="flex-1 space-y-2">
                       <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-zinc-900 font-mono">
-                          <%= refund.reference_id %>
+                          {refund.reference_id}
                         </span>
                         <button
                           type="button"
@@ -805,17 +805,17 @@ defmodule YscWeb.AdminBookingsLive do
                           <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
                         </button>
                         <.badge type={refund_status_type}>
-                          <%= String.capitalize(to_string(refund.status)) %>
+                          {String.capitalize(to_string(refund.status))}
                         </.badge>
                       </div>
                       <p class="text-sm font-semibold text-zinc-900">
-                        <%= MoneyHelper.format_money!(refund.amount) %>
+                        {MoneyHelper.format_money!(refund.amount)}
                       </p>
                       <p :if={refund.reason} class="text-xs text-zinc-600">
-                        Reason: <%= refund.reason %>
+                        Reason: {refund.reason}
                       </p>
                       <p :if={refund.inserted_at} class="text-xs text-zinc-500">
-                        <%= format_datetime(refund.inserted_at, @timezone) %>
+                        {format_datetime(refund.inserted_at, @timezone)}
                       </p>
                       <div
                         :if={refund.external_refund_id}
@@ -828,7 +828,7 @@ defmodule YscWeb.AdminBookingsLive do
                           class="text-xs text-zinc-400 hover:text-blue-600 font-mono transition-colors underline decoration-dotted"
                           title="View in Stripe Dashboard"
                         >
-                          <%= refund.external_refund_id %>
+                          {refund.external_refund_id}
                         </a>
                         <button
                           type="button"
@@ -845,7 +845,7 @@ defmodule YscWeb.AdminBookingsLive do
                         :if={refund.quickbooks_sales_receipt_id}
                         class="text-xs text-green-600"
                       >
-                        QuickBooks: <%= refund.quickbooks_sales_receipt_id %>
+                        QuickBooks: {refund.quickbooks_sales_receipt_id}
                       </p>
                     </div>
                   </div>
@@ -884,15 +884,15 @@ defmodule YscWeb.AdminBookingsLive do
                   <div class="space-y-1 text-sm text-zinc-700">
                     <p>
                       <span class="font-medium">Time:</span>
-                      <%= if check_in.checked_in_at do
+                      {if check_in.checked_in_at do
                         format_datetime(check_in.checked_in_at, @timezone)
                       else
                         "—"
-                      end %>
+                      end}
                     </p>
                     <p>
                       <span class="font-medium">Rules Agreed:</span>
-                      <%= if check_in.rules_agreed, do: "Yes", else: "No" %>
+                      {if check_in.rules_agreed, do: "Yes", else: "No"}
                     </p>
                     <%= if Ecto.assoc_loaded?(check_in.check_in_vehicles) && length(check_in.check_in_vehicles) > 0 do %>
                       <div class="mt-2">
@@ -900,7 +900,7 @@ defmodule YscWeb.AdminBookingsLive do
                         <div class="space-y-1 ml-4">
                           <%= for vehicle <- check_in.check_in_vehicles do %>
                             <p class="text-xs">
-                              <%= vehicle.type %> • <%= vehicle.color %> • <%= vehicle.make %>
+                              {vehicle.type} • {vehicle.color} • {vehicle.make}
                             </p>
                           <% end %>
                         </div>
@@ -996,18 +996,18 @@ defmodule YscWeb.AdminBookingsLive do
 
         <div class="mb-4">
           <p class="text-sm text-zinc-600 mb-2">
-            <strong>Payment:</strong> <%= @primary_payment.reference_id %>
+            <strong>Payment:</strong> {@primary_payment.reference_id}
           </p>
           <p class="text-sm text-zinc-600 mb-2">
-            <strong>Amount:</strong> <%= MoneyHelper.format_money!(
+            <strong>Amount:</strong> {MoneyHelper.format_money!(
               @primary_payment.amount
-            ) %>
+            )}
           </p>
           <p class="text-sm text-zinc-600 mb-2">
-            <strong>Booking:</strong> <%= @booking.reference_id || @booking.id %>
+            <strong>Booking:</strong> {@booking.reference_id || @booking.id}
           </p>
           <p :if={@booking.user} class="text-sm text-zinc-600">
-            <strong>User:</strong> <%= @booking.user.email %>
+            <strong>User:</strong> {@booking.user.email}
           </p>
         </div>
 
@@ -1075,9 +1075,9 @@ defmodule YscWeb.AdminBookingsLive do
         show
       >
         <.header>
-          <%= if @live_action == :new_refund_policy,
+          {if @live_action == :new_refund_policy,
             do: "New Refund Policy",
-            else: "Edit Refund Policy" %>
+            else: "Edit Refund Policy"}
         </.header>
 
         <.simple_form
@@ -1145,9 +1145,9 @@ defmodule YscWeb.AdminBookingsLive do
                   else: "Updating..."
               }
             >
-              <%= if @live_action == :new_refund_policy,
+              {if @live_action == :new_refund_policy,
                 do: "Create",
-                else: "Update" %>
+                else: "Update"}
             </.button>
           </:actions>
         </.simple_form>
@@ -1178,12 +1178,12 @@ defmodule YscWeb.AdminBookingsLive do
         <div :if={@refund_policy} class="space-y-4">
           <div class="bg-blue-50 rounded border border-blue-200 p-4 mb-4">
             <p class="text-sm font-semibold text-zinc-700 mb-1">
-              <%= @refund_policy.name %>
+              {@refund_policy.name}
             </p>
             <p class="text-xs text-zinc-600">
-              <%= atom_to_readable(@refund_policy.property) %> • <%= atom_to_readable(
+              {atom_to_readable(@refund_policy.property)} • {atom_to_readable(
                 @refund_policy.booking_mode
-              ) %>
+              )}
             </p>
           </div>
           <!-- Existing Rules -->
@@ -1202,13 +1202,13 @@ defmodule YscWeb.AdminBookingsLive do
               >
                 <div class="flex-1">
                   <p class="text-sm font-semibold text-zinc-800">
-                    <%= rule.days_before_checkin %> days before check-in
+                    {rule.days_before_checkin} days before check-in
                   </p>
                   <p class="text-xs text-zinc-600">
-                    <%= Decimal.to_float(rule.refund_percentage) %>% refund
+                    {Decimal.to_float(rule.refund_percentage)}% refund
                   </p>
                   <p :if={rule.description} class="text-xs text-zinc-500 mt-1">
-                    <%= rule.description %>
+                    {rule.description}
                   </p>
                 </div>
                 <button
@@ -1326,9 +1326,9 @@ defmodule YscWeb.AdminBookingsLive do
         show
       >
         <.header>
-          <%= if @live_action == :new_booking,
+          {if @live_action == :new_booking,
             do: "New Booking",
-            else: "Edit Booking" %>
+            else: "Edit Booking"}
         </.header>
 
         <div
@@ -1336,7 +1336,7 @@ defmodule YscWeb.AdminBookingsLive do
           class="mb-4 p-3 bg-blue-50 rounded border border-blue-200"
         >
           <p class="text-sm text-blue-800">
-            <span class="font-semibold">Reference:</span> <%= @booking.reference_id %>
+            <span class="font-semibold">Reference:</span> {@booking.reference_id}
           </p>
           <p class="text-xs text-blue-600 mt-1">
             Admin mode: Validation rules are bypassed
@@ -1475,9 +1475,9 @@ defmodule YscWeb.AdminBookingsLive do
                       else: "Updating..."
                   }
                 >
-                  <%= if @live_action == :new_booking,
+                  {if @live_action == :new_booking,
                     do: "Create Booking",
-                    else: "Update Booking" %>
+                    else: "Update Booking"}
                 </.button>
               </div>
             </div>
@@ -1505,7 +1505,7 @@ defmodule YscWeb.AdminBookingsLive do
         max_width="max-w-4xl"
       >
         <.header>
-          <%= if @live_action == :new_room, do: "New Room", else: "Edit Room" %>
+          {if @live_action == :new_room, do: "New Room", else: "Edit Room"}
         </.header>
 
         <.simple_form
@@ -1704,7 +1704,7 @@ defmodule YscWeb.AdminBookingsLive do
                             class="text-xs font-medium text-white truncate"
                             title={image.title}
                           >
-                            <%= image.title %>
+                            {image.title}
                           </p>
                         </div>
                       </button>
@@ -1774,7 +1774,7 @@ defmodule YscWeb.AdminBookingsLive do
                       else: "Updating..."
                   }
                 >
-                  <%= if @live_action == :new_room, do: "Create", else: "Update" %>
+                  {if @live_action == :new_room, do: "Create", else: "Update"}
                 </.button>
               </div>
             </div>
@@ -1784,7 +1784,7 @@ defmodule YscWeb.AdminBookingsLive do
 
       <div class="flex justify-between py-6">
         <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-          <%= atom_to_readable(@selected_property) %> Bookings
+          {atom_to_readable(@selected_property)} Bookings
         </h1>
       </div>
       <!-- Property Tabs -->
@@ -1900,10 +1900,10 @@ defmodule YscWeb.AdminBookingsLive do
                 Calendar Overview
               </h2>
               <p class="text-xs sm:text-sm text-zinc-500 mt-1">
-                Showing <%= Timex.format!(@calendar_start_date, "{Mshort} {D}") %> - <%= Timex.format!(
+                Showing {Timex.format!(@calendar_start_date, "{Mshort} {D}")} - {Timex.format!(
                   @calendar_end_date,
                   "{Mshort} {D}"
-                ) %>
+                )}
               </p>
             </div>
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-4">
@@ -2002,12 +2002,12 @@ defmodule YscWeb.AdminBookingsLive do
                 <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
                   <div class="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
-                    <%= room.name %>
+                    {room.name}
                     <span
                       :if={room.room_category}
                       class="text-xs text-zinc-500 hidden sm:inline"
                     >
-                      (<%= atom_to_readable(room.room_category.name) %>)
+                      ({atom_to_readable(room.room_category.name)})
                     </span>
                   </div>
                 </div>
@@ -2025,10 +2025,10 @@ defmodule YscWeb.AdminBookingsLive do
                     <div class="col-span-2 flex items-center justify-center border-r border-zinc-200 border-b">
                       <div class={"flex flex-col items-center justify-center h-10 w-full relative #{if Date.compare(date, @today) == :eq, do: "bg-blue-100/20", else: ""}"}>
                         <span class="font-medium text-center">
-                          <%= Calendar.strftime(date, "%a") %>
+                          {Calendar.strftime(date, "%a")}
                         </span>
                         <span class="text-zinc-500 text-center">
-                          <%= Calendar.strftime(date, "%m/%d") %>
+                          {Calendar.strftime(date, "%m/%d")}
                         </span>
                       </div>
                     </div>
@@ -2067,7 +2067,7 @@ defmodule YscWeb.AdminBookingsLive do
                         style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
                       >
                         <span class={"text-sm font-semibold #{if availability_info.spots_available > 0, do: "text-green-600", else: "text-red-600"}"}>
-                          <%= availability_info.spots_available %>/<%= 12 %> slots
+                          {availability_info.spots_available}/{12} slots
                         </span>
                       </div>
                     <% end %>
@@ -2125,11 +2125,11 @@ defmodule YscWeb.AdminBookingsLive do
                     <% end %>
                   </div>
                 <% end %>
-                <%= for blackout <- @filtered_blackouts do
+                {for blackout <- @filtered_blackouts do
                   raw(
                     render_blackout_div(blackout, @calendar_start_date, total_days)
                   )
-                end %>
+                end}
               </div>
               <!-- Full Buyout Row -->
               <div
@@ -2180,9 +2180,9 @@ defmodule YscWeb.AdminBookingsLive do
                     <% end %>
                   </div>
                 <% end %>
-                <%= for booking <- @buyout_bookings do
+                {for booking <- @buyout_bookings do
                   raw(render_booking_div(booking, @calendar_start_date, total_days))
-                end %>
+                end}
               </div>
               <!-- Room Rows -->
               <%= for room <- @filtered_rooms do %>
@@ -2243,16 +2243,16 @@ defmodule YscWeb.AdminBookingsLive do
                       <% end %>
                     </div>
                   <% end %>
-                  <%= for booking <-
-                            @room_bookings
-                            |> Enum.filter(fn b ->
-                              Ecto.assoc_loaded?(b.rooms) &&
-                                Enum.any?(b.rooms, &(&1.id == room.id))
-                            end) do
+                  {for booking <-
+                         @room_bookings
+                         |> Enum.filter(fn b ->
+                           Ecto.assoc_loaded?(b.rooms) &&
+                             Enum.any?(b.rooms, &(&1.id == room.id))
+                         end) do
                     raw(
                       render_booking_div(booking, @calendar_start_date, total_days)
                     )
-                  end %>
+                  end}
                 </div>
               <% end %>
             </div>
@@ -2268,9 +2268,9 @@ defmodule YscWeb.AdminBookingsLive do
                 All Reservations
               </h2>
               <p class="text-xs sm:text-sm text-zinc-500 mt-1">
-                Search and filter reservations for <%= atom_to_readable(
+                Search and filter reservations for {atom_to_readable(
                   @selected_property
-                ) %>
+                )}
               </p>
             </div>
           </div>
@@ -2322,7 +2322,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                   <.badge type="default" class="whitespace-nowrap">
                     <span class="font-mono text-xs flex-shrink-0 whitespace-nowrap">
-                      <%= booking.reference_id %>
+                      {booking.reference_id}
                     </span>
                   </.badge>
                 </:col>
@@ -2330,15 +2330,15 @@ defmodule YscWeb.AdminBookingsLive do
                   <%= if booking.user do %>
                     <div>
                       <div class="text-sm font-semibold text-zinc-800">
-                        <%= if booking.user.first_name && booking.user.last_name do
+                        {if booking.user.first_name && booking.user.last_name do
                           "#{booking.user.first_name} #{booking.user.last_name}"
                         else
                           booking.user.email || "Unknown User"
-                        end %>
+                        end}
                       </div>
                       <%= if booking.user.email && (booking.user.first_name || booking.user.last_name) do %>
                         <div class="text-xs text-zinc-500 mt-0.5">
-                          <%= booking.user.email %>
+                          {booking.user.email}
                         </div>
                       <% end %>
                     </div>
@@ -2348,17 +2348,17 @@ defmodule YscWeb.AdminBookingsLive do
                 </:col>
                 <:col :let={{_, booking}} label="Check-in" field={:checkin_date}>
                   <span class="text-sm text-zinc-800">
-                    <%= Calendar.strftime(booking.checkin_date, "%b %d, %Y") %>
+                    {Calendar.strftime(booking.checkin_date, "%b %d, %Y")}
                   </span>
                 </:col>
                 <:col :let={{_, booking}} label="Check-out" field={:checkout_date}>
                   <span class="text-sm text-zinc-800">
-                    <%= Calendar.strftime(booking.checkout_date, "%b %d, %Y") %>
+                    {Calendar.strftime(booking.checkout_date, "%b %d, %Y")}
                   </span>
                 </:col>
                 <:col :let={{_, booking}} label="Nights">
                   <span class="text-sm text-zinc-600">
-                    <%= Date.diff(booking.checkout_date, booking.checkin_date) %>
+                    {Date.diff(booking.checkout_date, booking.checkin_date)}
                   </span>
                 </:col>
                 <:col :let={{_, booking}} label="Guests" field={:guests_count}>
@@ -2368,22 +2368,22 @@ defmodule YscWeb.AdminBookingsLive do
                     booking.guests_count + (booking.children_count || 0) %>
                   <div class="text-sm text-zinc-600">
                     <%= if adults_count > 0 do %>
-                      <%= adults_count %> <%= if adults_count == 1,
+                      {adults_count} {if adults_count == 1,
                         do: "adult",
-                        else: "adults" %>
+                        else: "adults"}
                     <% end %>
                     <%= if (booking.children_count || 0) > 0 do %>
-                      <%= if adults_count > 0, do: ", ", else: "" %><%= booking.children_count %> <%= if booking.children_count ==
-                                                                                                           1,
-                                                                                                         do:
-                                                                                                           "child",
-                                                                                                         else:
-                                                                                                           "children" %>
+                      {if adults_count > 0, do: ", ", else: ""}{booking.children_count} {if booking.children_count ==
+                                                                                              1,
+                                                                                            do:
+                                                                                              "child",
+                                                                                            else:
+                                                                                              "children"}
                     <% end %>
                     <span class="text-zinc-500 ml-1">
-                      (Total: <%= total_guests %> <%= if total_guests == 1,
+                      (Total: {total_guests} {if total_guests == 1,
                         do: "guest",
-                        else: "guests" %>)
+                        else: "guests"})
                     </span>
                   </div>
                 </:col>
@@ -2393,11 +2393,11 @@ defmodule YscWeb.AdminBookingsLive do
                       <%= for room <- booking.rooms do %>
                         <div>
                           <div class="text-sm font-medium text-zinc-800">
-                            <%= room.name %>
+                            {room.name}
                           </div>
                           <%= if room.room_category do %>
                             <div class="text-xs text-zinc-500 mt-0.5">
-                              <%= atom_to_readable(room.room_category.name) %>
+                              {atom_to_readable(room.room_category.name)}
                             </div>
                           <% end %>
                         </div>
@@ -2452,13 +2452,13 @@ defmodule YscWeb.AdminBookingsLive do
                 </:col>
                 <:col :let={{_, booking}} label="Booked" field={:inserted_at}>
                   <span class="text-sm text-zinc-600">
-                    <%= if booking.inserted_at do
+                    {if booking.inserted_at do
                       booking.inserted_at
                       |> DateTime.shift_zone!(@timezone)
                       |> Calendar.strftime("%b %d, %Y")
                     else
                       "—"
-                    end %>
+                    end}
                   </span>
                 </:col>
                 <:action :let={{_, booking}} label="Actions">
@@ -2521,26 +2521,23 @@ defmodule YscWeb.AdminBookingsLive do
               <Flop.Phoenix.pagination
                 meta={@reservation_meta}
                 path={~p"/admin/bookings"}
-                opts={[
-                  wrapper_attrs: [
-                    class: "flex items-center justify-center py-10 h-10 text-base"
-                  ],
-                  pagination_list_attrs: [
-                    class: [
-                      "flex gap-0 order-2 justify-center items-center"
-                    ]
-                  ],
-                  previous_link_attrs: [
-                    class:
-                      "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                  ],
-                  next_link_attrs: [
-                    class:
-                      "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                  ],
-                  page_links: {:ellipsis, 5}
+                class="flex items-center justify-center py-10 h-10 text-base"
+                page_list_attrs={[
+                  class: "flex gap-0 order-2 justify-center items-center"
                 ]}
-              />
+                page_links={5}
+              >
+                <:previous attrs={[
+                  class:
+                    "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                ]}>
+                </:previous>
+                <:next attrs={[
+                  class:
+                    "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                ]}>
+                </:next>
+              </Flop.Phoenix.pagination>
             </div>
           </div>
         </div>
@@ -2571,31 +2568,31 @@ defmodule YscWeb.AdminBookingsLive do
                           }
                           class="font-semibold text-zinc-900 hover:text-blue-600"
                         >
-                          Booking: <%= pending_refund.booking.reference_id %>
+                          Booking: {pending_refund.booking.reference_id}
                         </.link>
                         <span class="text-sm text-zinc-600">
-                          <%= format_property_name(pending_refund.booking.property) %>
+                          {format_property_name(pending_refund.booking.property)}
                         </span>
                       </div>
                       <div class="text-sm text-zinc-600 space-y-1">
                         <div>
                           <span class="font-medium">Check-in:</span>
-                          <%= Calendar.strftime(
+                          {Calendar.strftime(
                             pending_refund.booking.checkin_date,
                             "%B %d, %Y"
-                          ) %>
+                          )}
                         </div>
                         <div>
                           <span class="font-medium">Check-out:</span>
-                          <%= Calendar.strftime(
+                          {Calendar.strftime(
                             pending_refund.booking.checkout_date,
                             "%B %d, %Y"
-                          ) %>
+                          )}
                         </div>
                         <div>
                           <span class="font-medium">User:</span>
                           <%= if Ecto.assoc_loaded?(pending_refund.booking.user) do %>
-                            <%= pending_refund.booking.user.email %>
+                            {pending_refund.booking.user.email}
                           <% else %>
                             N/A
                           <% end %>
@@ -2603,22 +2600,22 @@ defmodule YscWeb.AdminBookingsLive do
                         <%= if pending_refund.cancellation_reason do %>
                           <div>
                             <span class="font-medium">Cancellation Reason:</span>
-                            <%= pending_refund.cancellation_reason %>
+                            {pending_refund.cancellation_reason}
                           </div>
                         <% end %>
                       </div>
                     </div>
                     <div class="text-right ml-4">
                       <div class="text-lg font-semibold text-zinc-900 mb-1">
-                        Policy Refund: <%= MoneyHelper.format_money!(
+                        Policy Refund: {MoneyHelper.format_money!(
                           pending_refund.policy_refund_amount
-                        ) %>
+                        )}
                       </div>
                       <%= if pending_refund.applied_rule_days_before_checkin do %>
                         <div class="text-xs text-zinc-500">
-                          <%= pending_refund.applied_rule_days_before_checkin %>+ days before check-in: <%= Decimal.to_float(
+                          {pending_refund.applied_rule_days_before_checkin}+ days before check-in: {Decimal.to_float(
                             pending_refund.applied_rule_refund_percentage
-                          ) %>% refund
+                          )}% refund
                         </div>
                       <% end %>
                     </div>
@@ -2662,7 +2659,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Door Codes</h2>
               <p class="text-sm text-zinc-500">
-                Manage door codes for <%= atom_to_readable(@selected_property) %>
+                Manage door codes for {atom_to_readable(@selected_property)}
               </p>
             </div>
           </div>
@@ -2677,16 +2674,16 @@ defmodule YscWeb.AdminBookingsLive do
                   :if={@active_door_code}
                   class="text-2xl font-mono font-bold text-blue-700"
                 >
-                  <%= @active_door_code.code %>
+                  {@active_door_code.code}
                 </p>
                 <p :if={!@active_door_code} class="text-sm text-zinc-500 italic">
                   No active code set
                 </p>
                 <p :if={@active_door_code} class="text-xs text-zinc-500 mt-1">
-                  Active since <%= format_datetime(
+                  Active since {format_datetime(
                     @active_door_code.active_from,
                     @timezone
-                  ) %>
+                  )}
                 </p>
               </div>
             </div>
@@ -2739,7 +2736,7 @@ defmodule YscWeb.AdminBookingsLive do
                 />
                 <div>
                   <p class="font-semibold mb-1">Warning: Code Reuse Detected</p>
-                  <p><%= @door_code_warning %></p>
+                  <p>{@door_code_warning}</p>
                 </div>
               </div>
             </div>
@@ -2767,17 +2764,17 @@ defmodule YscWeb.AdminBookingsLive do
                 <tbody class="divide-y divide-zinc-100">
                   <tr :for={door_code <- @door_codes} class="hover:bg-zinc-50">
                     <td class="py-3 pr-6 font-mono font-semibold text-zinc-800">
-                      <%= door_code.code %>
+                      {door_code.code}
                     </td>
                     <td class="py-3 pr-6 text-zinc-600">
-                      <%= format_datetime(door_code.active_from, @timezone) %>
+                      {format_datetime(door_code.active_from, @timezone)}
                     </td>
                     <td class="py-3 pr-6 text-zinc-600">
-                      <%= if door_code.active_to do
+                      {if door_code.active_to do
                         format_datetime(door_code.active_to, @timezone)
                       else
                         "—"
-                      end %>
+                      end}
                     </td>
                     <td class="py-3">
                       <span
@@ -2829,31 +2826,31 @@ defmodule YscWeb.AdminBookingsLive do
                 <tr :for={season <- @filtered_seasons} class="hover:bg-zinc-50">
                   <td class="py-3 pr-6">
                     <.badge type="sky">
-                      <%= if season.property,
+                      {if season.property,
                         do: atom_to_readable(season.property),
-                        else: "—" %>
+                        else: "—"}
                     </.badge>
                   </td>
                   <td class="py-3 pr-6 font-medium text-zinc-800">
-                    <%= season.name %>
+                    {season.name}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600">
-                    <%= if season.start_date && season.end_date do
+                    {if season.start_date && season.end_date do
                       format_season_dates(season.start_date, season.end_date)
                     else
                       "—"
-                    end %>
+                    end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600">
-                    <%= if season.advance_booking_days &&
-                             season.advance_booking_days > 0 do
+                    {if season.advance_booking_days &&
+                          season.advance_booking_days > 0 do
                       "#{season.advance_booking_days} days"
                     else
                       "No limit"
-                    end %>
+                    end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600">
-                    <%= if season.max_nights do
+                    {if season.max_nights do
                       "#{season.max_nights} nights"
                     else
                       case season.property do
@@ -2861,7 +2858,7 @@ defmodule YscWeb.AdminBookingsLive do
                         :clear_lake -> "30 (default)"
                         _ -> "—"
                       end
-                    end %>
+                    end}
                   </td>
                   <td class="py-3 pr-6">
                     <span
@@ -2931,46 +2928,46 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3 pr-6">
                     <span :if={rule.property}>
                       <.badge type="sky">
-                        <%= atom_to_readable(rule.property) %>
+                        {atom_to_readable(rule.property)}
                       </.badge>
                     </span>
                     <span :if={!rule.property} class="text-zinc-400">—</span>
                   </td>
                   <td class="py-3 pr-6">
                     <.badge type="gray">
-                      <%= if rule.booking_mode do
+                      {if rule.booking_mode do
                         atom_to_readable(rule.booking_mode)
                       else
                         "—"
-                      end %>
+                      end}
                     </.badge>
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
-                    <%= if rule.price_unit do
+                    {if rule.price_unit do
                       format_price_unit(rule.price_unit)
                     else
                       "—"
-                    end %>
+                    end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
-                    <%= format_specificity(rule) %>
+                    {format_specificity(rule)}
                   </td>
                   <td class="py-3 pr-6 font-semibold text-zinc-800">
-                    <%= if rule.amount do
+                    {if rule.amount do
                       format_price(rule.amount)
                     else
                       "$0.00"
-                    end %>
+                    end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
-                    <%= if rule.children_amount do
+                    {if rule.children_amount do
                       format_price(rule.children_amount)
                     else
                       "-"
-                    end %>
+                    end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
-                    <%= if rule.season, do: rule.season.name, else: "All seasons" %>
+                    {if rule.season, do: rule.season.name, else: "All seasons"}
                   </td>
                   <td class="py-3">
                     <button
@@ -3031,19 +3028,19 @@ defmodule YscWeb.AdminBookingsLive do
                 >
                   <td class="py-3 pr-6">
                     <.badge type="sky">
-                      <%= atom_to_readable(policy.property) %>
+                      {atom_to_readable(policy.property)}
                     </.badge>
                   </td>
                   <td class="py-3 pr-6">
                     <.badge type="gray">
-                      <%= atom_to_readable(policy.booking_mode) %>
+                      {atom_to_readable(policy.booking_mode)}
                     </.badge>
                   </td>
                   <td class="py-3 pr-6 font-medium text-zinc-800">
-                    <%= policy.name %>
+                    {policy.name}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
-                    <%= length(policy.rules || []) %> rule(s)
+                    {length(policy.rules || [])} rule(s)
                   </td>
                   <td class="py-3 pr-6">
                     <span
@@ -3100,7 +3097,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Rooms</h2>
               <p class="text-sm text-zinc-500">
-                Configure rooms for <%= atom_to_readable(@selected_property) %>
+                Configure rooms for {atom_to_readable(@selected_property)}
               </p>
             </div>
             <.button phx-click={
@@ -3154,23 +3151,23 @@ defmodule YscWeb.AdminBookingsLive do
                   </td>
                   <td class="py-3 pr-6">
                     <div class="font-medium text-zinc-800">
-                      <%= room.name %>
+                      {room.name}
                     </div>
                     <div
                       :if={room.description}
                       class="text-xs text-zinc-500 mt-0.5 line-clamp-2"
                     >
-                      <%= room.description %>
+                      {room.description}
                     </div>
                   </td>
                   <td class="py-3 pr-6">
                     <span :if={room.room_category} class="text-zinc-600">
-                      <%= atom_to_readable(room.room_category.name) %>
+                      {atom_to_readable(room.room_category.name)}
                     </span>
                     <span :if={!room.room_category} class="text-zinc-400">—</span>
                   </td>
                   <td class="py-3 pr-6 text-zinc-600">
-                    Max: <%= room.capacity_max %>
+                    Max: {room.capacity_max}
                     <span
                       :if={
                         room.min_billable_occupancy &&
@@ -3178,29 +3175,29 @@ defmodule YscWeb.AdminBookingsLive do
                       }
                       class="text-xs text-zinc-500"
                     >
-                      <br />Min billable: <%= room.min_billable_occupancy %>
+                      <br />Min billable: {room.min_billable_occupancy}
                     </span>
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
                     <%= if room.single_beds > 0 || room.queen_beds > 0 || room.king_beds > 0 do %>
-                      <%= if room.single_beds > 0,
+                      {if room.single_beds > 0,
                         do:
-                          "#{room.single_beds} Single#{if room.single_beds > 1, do: "s", else: ""}" %>
+                          "#{room.single_beds} Single#{if room.single_beds > 1, do: "s", else: ""}"}
                       <%= if room.queen_beds > 0 do %>
-                        <%= if room.single_beds > 0, do: ", " %><%= room.queen_beds %> Queen<%= if room.queen_beds >
-                                                                                                     1,
-                                                                                                   do:
-                                                                                                     "s",
-                                                                                                   else:
-                                                                                                     "" %>
+                        {if room.single_beds > 0, do: ", "}{room.queen_beds} Queen{if room.queen_beds >
+                                                                                        1,
+                                                                                      do:
+                                                                                        "s",
+                                                                                      else:
+                                                                                        ""}
                       <% end %>
                       <%= if room.king_beds > 0 do %>
-                        <%= if room.single_beds > 0 || room.queen_beds > 0, do: ", " %><%= room.king_beds %> King<%= if room.king_beds >
-                                                                                                                          1,
-                                                                                                                        do:
-                                                                                                                          "s",
-                                                                                                                        else:
-                                                                                                                          "" %>
+                        {if room.single_beds > 0 || room.queen_beds > 0, do: ", "}{room.king_beds} King{if room.king_beds >
+                                                                                                             1,
+                                                                                                           do:
+                                                                                                             "s",
+                                                                                                           else:
+                                                                                                             ""}
                       <% end %>
                     <% else %>
                       —
@@ -4270,7 +4267,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Blackout saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Blackout saved successfully")
          |> push_navigate(
            to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
          )
@@ -4302,7 +4299,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Blackout deleted successfully")
+     |> YscWeb.Flash.put_toast(:info, "Blackout deleted successfully")
      |> push_navigate(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
      |> update_calendar_view(socket.assigns.selected_property)}
   end
@@ -4338,7 +4335,8 @@ defmodule YscWeb.AdminBookingsLive do
         |> update_calendar_view(socket.assigns.selected_property)
       end
 
-    {:noreply, socket |> put_flash(:info, "Booking deleted successfully")}
+    {:noreply,
+     socket |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully")}
   end
 
   def handle_event("view-booking", %{"booking-id" => booking_id}, socket) do
@@ -4774,7 +4772,10 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, _updated_refund, _stripe_refund_id} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Refund approved and processed successfully")
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Refund approved and processed successfully"
+         )
          |> load_pending_refunds()}
 
       {:error, reason} ->
@@ -4784,7 +4785,7 @@ defmodule YscWeb.AdminBookingsLive do
             _ -> "Failed to approve refund. Please try again."
           end
 
-        {:noreply, put_flash(socket, :error, error_message)}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, error_message)}
     end
   end
 
@@ -4837,7 +4838,10 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, _updated_refund, _stripe_refund_id} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Refund approved and processed successfully")
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Refund approved and processed successfully"
+         )
          |> assign(:selected_pending_refund, nil)
          |> assign(:approve_refund_form, nil)
          |> load_pending_refunds()}
@@ -4849,7 +4853,7 @@ defmodule YscWeb.AdminBookingsLive do
             _ -> "Failed to approve refund. Please try again."
           end
 
-        {:noreply, put_flash(socket, :error, error_message)}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, error_message)}
     end
   end
 
@@ -4865,7 +4869,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, _updated_refund} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Refund rejected")
+         |> YscWeb.Flash.put_toast(:info, "Refund rejected")
          |> assign(:selected_pending_refund, nil)
          |> assign(:reject_refund_form, nil)
          |> load_pending_refunds()}
@@ -4873,7 +4877,10 @@ defmodule YscWeb.AdminBookingsLive do
       {:error, changeset} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Failed to reject refund. Please try again.")
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to reject refund. Please try again."
+         )
          |> assign(:reject_refund_form, to_form(changeset, as: "reject_refund"))}
     end
   end
@@ -4934,7 +4941,8 @@ defmodule YscWeb.AdminBookingsLive do
     release_availability = refund_params["release_availability"] == "true"
 
     if is_nil(refund_amount) do
-      {:noreply, put_flash(socket, :error, "Invalid refund amount")}
+      {:noreply,
+       YscWeb.Flash.put_toast(socket, :error, "Invalid refund amount")}
     else
       # Convert Money to cents for Stripe
       refund_amount_cents = MoneyHelper.money_to_cents(refund_amount)
@@ -4988,7 +4996,7 @@ defmodule YscWeb.AdminBookingsLive do
 
           {:noreply,
            socket
-           |> put_flash(:info, "Refund processed successfully")
+           |> YscWeb.Flash.put_toast(:info, "Refund processed successfully")
            |> assign(:show_refund_modal, false)
            |> push_navigate(
              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
@@ -4997,14 +5005,23 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:error, {:already_processed, _, _}} ->
           {:noreply,
-           put_flash(socket, :error, "Refund has already been processed.")}
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Refund has already been processed."
+           )}
 
         {:error, {:stripe_error, msg}} ->
-          {:noreply, put_flash(socket, :error, "Stripe error: #{inspect(msg)}")}
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Stripe error: #{inspect(msg)}"
+           )}
 
         {:error, :no_stripe_payment} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Cannot process refund: No Stripe payment found."
@@ -5012,7 +5029,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:error, reason} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Failed to process refund: #{inspect(reason)}"
@@ -5350,7 +5367,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :info,
            "Booking #{action_word} successfully. Confirmation email sent to user."
          )
@@ -5369,7 +5386,7 @@ defmodule YscWeb.AdminBookingsLive do
 
       {:error, reason} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Failed to create booking: #{inspect(reason)}"
@@ -5582,7 +5599,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, _pricing_rule} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Pricing rule saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Pricing rule saved successfully")
          |> push_navigate(
            to:
              ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
@@ -5699,7 +5716,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Season updated successfully")
+         |> YscWeb.Flash.put_toast(:info, "Season updated successfully")
          |> assign(:seasons, seasons)
          |> assign_filtered_data(
            socket.assigns.selected_property,
@@ -5772,7 +5789,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Refund policy saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Refund policy saved successfully")
          |> assign(:refund_policies, refund_policies)
          |> assign_filtered_data(
            socket.assigns.selected_property,
@@ -5863,7 +5880,10 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Refund policy rule added successfully")
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Refund policy rule added successfully"
+         )
          |> assign(:refund_policy_rules, refund_policy_rules)
          |> assign(:refund_policy_rule_form, rule_form)}
 
@@ -5875,7 +5895,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Failed to save refund policy rule. Please check the form for errors."
          )
@@ -5896,7 +5916,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Refund policy rule deleted successfully")
+     |> YscWeb.Flash.put_toast(:info, "Refund policy rule deleted successfully")
      |> assign(:refund_policy_rules, refund_policy_rules)}
   end
 
@@ -5924,7 +5944,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Door code set successfully")
+         |> YscWeb.Flash.put_toast(:info, "Door code set successfully")
          |> assign(:door_codes, door_codes)
          |> assign(:active_door_code, active_door_code)
          |> assign(:door_code_form, door_code_form)
@@ -5933,7 +5953,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:error, :invalid_attributes} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Invalid door code. Please enter a 4-5 character alphanumeric code."
          )}
@@ -5943,7 +5963,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, "Failed to set door code: #{errors}")}
+         |> YscWeb.Flash.put_toast(:error, "Failed to set door code: #{errors}")}
     end
   end
 
@@ -6014,7 +6034,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Room saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Room saved successfully")
          |> assign(:rooms, rooms)
          |> assign_filtered_data(
            socket.assigns.selected_property,
@@ -6041,7 +6061,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Room deleted successfully")
+     |> YscWeb.Flash.put_toast(:info, "Room deleted successfully")
      |> assign(:rooms, rooms)
      |> assign_filtered_data(
        socket.assigns.selected_property,

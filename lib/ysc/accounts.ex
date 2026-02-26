@@ -186,6 +186,23 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @doc """
+  Returns whether the user has a password set in the database.
+
+  Used to avoid overwriting an existing password when the in-memory user
+  struct might be stale (e.g. hashed_password not loaded or from cache).
+  Pass a user struct or user id.
+  """
+  def user_has_password_in_db?(%User{id: id}), do: user_has_password_in_db?(id)
+
+  def user_has_password_in_db?(user_id) when not is_nil(user_id) do
+    from(u in User,
+      where: u.id == ^user_id,
+      select: not is_nil(u.hashed_password)
+    )
+    |> Repo.one()
+  end
+
   def get_user_from_stripe_id(stripe_id) do
     Repo.get_by(User, stripe_id: stripe_id)
   end

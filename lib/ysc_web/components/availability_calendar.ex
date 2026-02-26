@@ -32,7 +32,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
 
           <div class="font-semibold text-lg">
-            <%= @current.month %>
+            {@current.month}
           </div>
 
           <div>
@@ -59,7 +59,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
         <div class="text-center grid grid-cols-7 text-xs leading-6 text-zinc-800 font-semibold mb-2">
           <div :for={week_day <- List.first(@current.week_rows)}>
-            <%= Calendar.strftime(week_day, "%a") %>
+            {Calendar.strftime(week_day, "%a")}
           </div>
         </div>
 
@@ -93,7 +93,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                   class="text-sm font-medium"
                   datetime={Calendar.strftime(day, "%Y-%m-%d")}
                 >
-                  <%= Calendar.strftime(day, "%d") %>
+                  {Calendar.strftime(day, "%d")}
                 </time>
               </button>
               <span
@@ -104,7 +104,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                   "text-left"
                 ]}
               >
-                <%= unavailability_reason(day, assigns) %>
+                {unavailability_reason(day, assigns)}
               </span>
             </div>
             <button
@@ -125,7 +125,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                 class="text-sm font-medium"
                 datetime={Calendar.strftime(day, "%Y-%m-%d")}
               >
-                <%= Calendar.strftime(day, "%d") %>
+                {Calendar.strftime(day, "%d")}
               </time>
               <div
                 :if={
@@ -135,12 +135,12 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                 }
                 class="text-xs mt-1"
               >
-                <%= availability_display(
+                {availability_display(
                   day,
                   @selected_booking_mode,
                   @availability,
                   assigns
-                ) %>
+                )}
               </div>
             </button>
           </div>

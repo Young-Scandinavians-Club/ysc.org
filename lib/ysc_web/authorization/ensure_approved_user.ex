@@ -27,7 +27,7 @@ defmodule YscWeb.Authorization.EnsureApprovedUserPlug do
 
   defp maybe_halt(_any, conn) do
     conn
-    |> Controller.put_flash(:error, "Your account is pending approval")
+    |> YscWeb.Flash.put_toast(:error, "Your account is pending approval")
     |> Controller.redirect(to: not_approved_path(conn))
     |> halt()
   end

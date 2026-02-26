@@ -38,10 +38,10 @@
               />
               <div class="flex-1">
                 <h3 class="text-xl font-bold text-zinc-900">
-                  <%= member.first_name %> <%= member.last_name %>
+                  {member.first_name} {member.last_name}
                 </h3>
                 <p class="text-blue-600 font-medium mt-1">
-                  <%= atom_to_readable(member.board_position) %>
+                  {atom_to_readable(member.board_position)}
                 </p>
               </div>
             </div>
@@ -68,7 +68,7 @@
               <div class="flex justify-between items-start gap-4">
                 <div class="flex-1">
                   <h3 class="font-semibold text-zinc-900 mb-1">
-                    <%= atom_to_readable(position) %>
+                    {atom_to_readable(position)}
                   </h3>
                   <p class="text-sm text-zinc-600">
                     <%= case position do %>
@@ -131,10 +131,10 @@
               />
               <div class="flex-1">
                 <h3 class="text-xl font-bold text-zinc-900">
-                  <%= member.first_name %> <%= member.last_name %>
+                  {member.first_name} {member.last_name}
                 </h3>
                 <p class="text-blue-600 font-medium mt-1">
-                  <%= atom_to_readable(member.board_position) %>
+                  {atom_to_readable(member.board_position)}
                 </p>
               </div>
             </div>

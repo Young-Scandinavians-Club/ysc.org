@@ -55,7 +55,7 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, info)
+     |> YscWeb.Flash.put_toast(:info, info)
      |> redirect(to: ~p"/")}
   end
 end

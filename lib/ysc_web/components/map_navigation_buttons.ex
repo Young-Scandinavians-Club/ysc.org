@@ -98,7 +98,7 @@ defmodule YscWeb.Components.MapNavigationButtons do
       class="group hover:blue-600 hover:fill-blue-600 transition ease-in-out duration-200"
       aria-label={@label}
     >
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </a>
     """
   end

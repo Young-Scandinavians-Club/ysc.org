@@ -49,14 +49,14 @@ defmodule YscWeb.Components.GalleryComponent do
                 class="text-xs font-medium text-white truncate"
                 title={image.title}
               >
-                <%= image.title %>
+                {image.title}
               </p>
               <p
                 :if={image.title == nil and image.alt_text != nil}
                 class="text-xs font-medium text-white/90 truncate"
                 title={image.alt_text}
               >
-                <%= image.alt_text %>
+                {image.alt_text}
               </p>
             </div>
           </button>

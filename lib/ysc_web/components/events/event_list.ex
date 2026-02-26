@@ -104,18 +104,18 @@ defmodule YscWeb.EventsListLive do
                           name={badge.icon}
                           class="w-3.5 h-3.5 inline me-0.5 relative z-10"
                         />
-                        <span class="relative z-10"><%= badge.text %></span>
+                        <span class="relative z-10">{badge.text}</span>
                       </span>
                     <% end %>
                   </div>
 
                   <h2 class="text-3xl font-black leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow">
-                    <%= @hero_event.title %>
+                    {@hero_event.title}
                   </h2>
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
                     <span class="text-xs sm:text-sm font-black uppercase tracking-[0.1em]">
-                      <%= format_event_date_time(@hero_event) %>
+                      {format_event_date_time(@hero_event)}
                     </span>
                     <span
                       :if={@hero_event.location_name}
@@ -127,7 +127,7 @@ defmodule YscWeb.EventsListLive do
                       class="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-1"
                     >
                       <.icon name="hero-map-pin" class="w-4 h-4" />
-                      <%= @hero_event.location_name %>
+                      {@hero_event.location_name}
                     </span>
                   </div>
 
@@ -135,12 +135,12 @@ defmodule YscWeb.EventsListLive do
                     :if={@hero_event.description}
                     class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-prose hero-description-shadow"
                   >
-                    <%= @hero_event.description %>
+                    {@hero_event.description}
                   </p>
 
                   <div class="flex items-center gap-4 pt-4 border-t border-zinc-100 sm:border-white/20">
                     <span class="text-xs sm:text-sm font-black text-zinc-900 sm:text-white rounded-xl border border-zinc-200 px-4 py-2">
-                      <%= @hero_event.pricing_info.display_text %>
+                      {@hero_event.pricing_info.display_text}
                     </span>
                     <span class="hidden sm:inline-flex items-center gap-1 text-sm font-bold text-white/90 hover:text-white transition-colors">
                       View Details <.icon name="hero-arrow-right" class="w-4 h-4" />

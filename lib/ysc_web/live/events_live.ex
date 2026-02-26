@@ -17,9 +17,9 @@ defmodule YscWeb.EventsLive do
             Events
           </p>
           <h1 class="text-4xl md:text-7xl font-black text-zinc-900">
-            <%= if @total_upcoming_count == 0,
+            {if @total_upcoming_count == 0,
               do: "The Calendar",
-              else: "What's Next" %>
+              else: "What's Next"}
           </h1>
         </div>
       </div>
@@ -133,7 +133,7 @@ defmodule YscWeb.EventsLive do
           <div class="max-w-screen-xl mx-auto px-4">
             <h2 class="text-3xl font-black text-zinc-800 tracking-tighter italic mb-12 group relative inline-block">
               <span class="inline-block transition-all duration-500 ease-in-out group-hover:-translate-y-full group-hover:opacity-0">
-                <%= random_past_events_title() %>
+                {random_past_events_title()}
               </span>
               <span class="absolute left-0 top-0 inline-block transition-all duration-500 ease-in-out translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 whitespace-nowrap">
                 What Was
@@ -176,13 +176,13 @@ defmodule YscWeb.EventsLive do
                     </div>
                     <div class="absolute bottom-0 left-0 right-0 z-[3] p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <h4 class="text-white text-sm font-black leading-tight line-clamp-2">
-                        <%= event.title %>
+                        {event.title}
                       </h4>
                       <p
                         :if={event.start_date}
                         class="text-white/80 text-xs font-medium mt-1"
                       >
-                        <%= Timex.format!(event.start_date, "{Mshort} {D}, {YYYY}") %>
+                        {Timex.format!(event.start_date, "{Mshort} {D}, {YYYY}")}
                       </p>
                     </div>
                   </div>

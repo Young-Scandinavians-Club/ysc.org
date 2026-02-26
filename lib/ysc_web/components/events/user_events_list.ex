@@ -26,10 +26,10 @@ defmodule YscWeb.UserEventsListLive do
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center text-sm text-zinc-500">
                 <time>
-                  <%= Timex.format!(
+                  {Timex.format!(
                     ticket.event.start_date,
                     "{WDshort}, {Mshort} {D}"
-                  ) %>
+                  )}
                 </time>
                 <span
                   :if={
@@ -37,7 +37,7 @@ defmodule YscWeb.UserEventsListLive do
                   }
                   class="ml-2"
                 >
-                  • <%= format_start_time(ticket.event.start_time) %>
+                  • {format_start_time(ticket.event.start_time)}
                 </span>
               </div>
               <div class="flex items-center space-x-2">
@@ -55,7 +55,7 @@ defmodule YscWeb.UserEventsListLive do
 
             <.link navigate={~p"/events/#{ticket.event.id}"} class="block">
               <h3 class="text-lg font-semibold text-zinc-900 hover:text-blue-600 transition-colors mb-2">
-                <%= ticket.event.title %>
+                {ticket.event.title}
               </h3>
             </.link>
 
@@ -63,19 +63,19 @@ defmodule YscWeb.UserEventsListLive do
               <div class="text-sm text-zinc-600">
                 <p :if={ticket.event.location_name} class="mb-1">
                   <.icon name="hero-map-pin" class="w-4 h-4 inline mr-1" />
-                  <%= ticket.event.location_name %>
+                  {ticket.event.location_name}
                 </p>
                 <p class="font-medium">
-                  Ticket: <%= ticket.ticket_tier.name %>
+                  Ticket: {ticket.ticket_tier.name}
                   <span :if={
                     ticket.ticket_tier.price && ticket.ticket_tier.price.amount > 0
                   }>
-                    • <%= Ysc.MoneyHelper.format_money!(ticket.ticket_tier.price) %>
+                    • {Ysc.MoneyHelper.format_money!(ticket.ticket_tier.price)}
                   </span>
                 </p>
               </div>
               <div class="text-xs text-zinc-500">
-                <p>Ref: <%= ticket.reference_id %></p>
+                <p>Ref: {ticket.reference_id}</p>
               </div>
             </div>
           </div>

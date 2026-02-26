@@ -109,23 +109,23 @@ defmodule YscWeb.NewsLive do
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
                     <span class="text-xs sm:text-sm font-black uppercase tracking-[0.1em]">
-                      <%= Timex.format!(
+                      {Timex.format!(
                         @featured.published_on,
                         "{Mshort} {D}, {YYYY}"
-                      ) %>
+                      )}
                     </span>
                     <span class="h-3 w-px bg-zinc-300 sm:bg-white/40"></span>
                     <span class="text-xs sm:text-sm font-bold uppercase tracking-widest">
-                      <%= reading_time(@featured) %> min read
+                      {reading_time(@featured)} min read
                     </span>
                   </div>
 
                   <h2 class="text-3xl font-black leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300">
-                    <%= @featured.title %>
+                    {@featured.title}
                   </h2>
 
                   <article class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-2xl">
-                    <%= raw(preview_text(@featured)) %>
+                    {raw(preview_text(@featured))}
                   </article>
 
                   <div class="flex items-center gap-3 pt-4 border-t border-zinc-100 sm:border-white/20">
@@ -137,16 +137,16 @@ defmodule YscWeb.NewsLive do
                     />
                     <div>
                       <p class="text-xs sm:text-sm font-black text-zinc-900 sm:text-white leading-tight">
-                        <%= String.capitalize(@featured.author.first_name || "") %>
-                        <%= String.capitalize(@featured.author.last_name || "") %>
+                        {String.capitalize(@featured.author.first_name || "")}
+                        {String.capitalize(@featured.author.last_name || "")}
                       </p>
                       <p
                         :if={@featured.board_position_at_publish}
                         class="text-xs sm:text-xs text-zinc-500 sm:text-white/80 font-medium mt-0.5"
                       >
-                        YSC <%= format_board_position(
+                        YSC {format_board_position(
                           @featured.board_position_at_publish
-                        ) %>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -194,7 +194,6 @@ defmodule YscWeb.NewsLive do
           class="grid grid-cols-1 md:grid-cols-2 py-4 gap-8"
           phx-viewport-top={@page > 1 && "prev-page"}
           phx-viewport-bottom={!@end_of_timeline? && "next-page"}
-          phx-page-loading
         >
           <div
             :for={post <- @posts}
@@ -231,11 +230,11 @@ defmodule YscWeb.NewsLive do
             <div class="px-4 pb-4 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
-                  <%= Timex.format!(post.published_on, "{Mshort} {D}") %>
+                  {Timex.format!(post.published_on, "{Mshort} {D}")}
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
                 <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
-                  <%= reading_time(post) %> min read
+                  {reading_time(post)} min read
                 </span>
               </div>
 
@@ -243,11 +242,11 @@ defmodule YscWeb.NewsLive do
                 navigate={~p"/posts/#{post.url_name}"}
                 class="text-2xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-4 group-hover:text-blue-600 transition-colors"
               >
-                <%= post.title %>
+                {post.title}
               </.link>
 
               <article class="text-zinc-500 text-sm leading-relaxed line-clamp-3 mb-8">
-                <%= raw(preview_text(post)) %>
+                {raw(preview_text(post))}
               </article>
 
               <div class="mt-auto pt-6 border-t border-zinc-50 flex items-center justify-between">
@@ -260,14 +259,14 @@ defmodule YscWeb.NewsLive do
                   />
                   <div>
                     <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
-                      <%= String.capitalize(post.author.first_name || "") %>
-                      <%= String.capitalize(post.author.last_name || "") %>
+                      {String.capitalize(post.author.first_name || "")}
+                      {String.capitalize(post.author.last_name || "")}
                     </p>
                     <p
                       :if={post.board_position_at_publish}
                       class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
                     >
-                      YSC <%= format_board_position(post.board_position_at_publish) %>
+                      YSC {format_board_position(post.board_position_at_publish)}
                     </p>
                   </div>
                 </div>

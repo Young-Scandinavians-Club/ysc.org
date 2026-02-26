@@ -84,7 +84,7 @@ defmodule YscWeb.PropertyCheckInLive do
 
       if is_nil(booking) do
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Reservation not found. Please search again."
@@ -113,7 +113,7 @@ defmodule YscWeb.PropertyCheckInLive do
     rescue
       Ecto.NoResultsError ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Reservation not found. Please search again."
@@ -184,7 +184,7 @@ defmodule YscWeb.PropertyCheckInLive do
        |> assign(:vehicle_make_form, to_form(%{"make" => ""}, as: :vehicle))}
     else
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "Please confirm that you have read and understand the booking and cabin rules."
@@ -248,7 +248,11 @@ defmodule YscWeb.PropertyCheckInLive do
 
     if is_nil(booking) do
       {:noreply,
-       put_flash(socket, :error, "No booking selected. Please search again.")}
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "No booking selected. Please search again."
+       )}
     else
       attrs = %{
         rules_agreed: rules_agreed,
@@ -262,11 +266,11 @@ defmodule YscWeb.PropertyCheckInLive do
            socket
            |> assign(:step, :done)
            |> clear_flash()
-           |> put_flash(:info, "Check-in completed successfully!")}
+           |> YscWeb.Flash.put_toast(:info, "Check-in completed successfully!")}
 
         {:error, _changeset} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Failed to complete check-in. Please try again."
@@ -282,7 +286,11 @@ defmodule YscWeb.PropertyCheckInLive do
 
     if is_nil(booking) do
       {:noreply,
-       put_flash(socket, :error, "No booking selected. Please search again.")}
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "No booking selected. Please search again."
+       )}
     else
       vehicle_attrs =
         Enum.map(vehicles, fn vehicle ->
@@ -305,11 +313,11 @@ defmodule YscWeb.PropertyCheckInLive do
            socket
            |> assign(:step, :done)
            |> clear_flash()
-           |> put_flash(:info, "Check-in completed successfully!")}
+           |> YscWeb.Flash.put_toast(:info, "Check-in completed successfully!")}
 
         {:error, _changeset} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Failed to complete check-in. Please try again."
@@ -427,14 +435,20 @@ defmodule YscWeb.PropertyCheckInLive do
 
     cond do
       is_nil(type) or type == "" ->
-        {:noreply, put_flash(socket, :error, "Please select a car type.")}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Please select a car type.")}
 
       is_nil(color) or color == "" ->
-        {:noreply, put_flash(socket, :error, "Please select a car color.")}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Please select a car color.")}
 
       make == "" ->
         {:noreply,
-         put_flash(socket, :error, "Please enter the maker (e.g. Subaru).")}
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Please enter the maker (e.g. Subaru)."
+         )}
 
       true ->
         vehicle = %{
@@ -474,7 +488,7 @@ defmodule YscWeb.PropertyCheckInLive do
        |> assign(:step, :search)
        |> assign(:reservation, nil)
        |> assign(:matching_guests, [])
-       |> put_flash(:error, "Please enter a last name.")}
+       |> YscWeb.Flash.put_toast(:error, "Please enter a last name.")}
     else
       bookings = Bookings.search_bookings_by_last_name(last_name, :tahoe)
 
@@ -485,7 +499,10 @@ defmodule YscWeb.PropertyCheckInLive do
          |> assign(:step, :search)
          |> assign(:reservation, nil)
          |> assign(:matching_guests, [])
-         |> put_flash(:error, "No reservation found for that last name.")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "No reservation found for that last name."
+         )}
       else
         search_results = Enum.map(bookings, &transform_booking_to_reservation/1)
 

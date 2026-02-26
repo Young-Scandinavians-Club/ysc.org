@@ -45,7 +45,7 @@ defmodule YscWeb.ContactLive do
                 <div>
                   <p class="text-sm font-semibold text-blue-900">Submitting as</p>
                   <p class="text-sm text-blue-700">
-                    <%= @current_user.first_name %> <%= @current_user.last_name %> (<%= @current_user.email %>)
+                    {@current_user.first_name} {@current_user.last_name} ({@current_user.email})
                   </p>
                 </div>
               </div>
@@ -304,7 +304,7 @@ defmodule YscWeb.ContactLive do
           {:noreply,
            socket
            |> assign(:submitted, true)
-           |> put_flash(:info, "Your message has been sent")}
+           |> YscWeb.Flash.put_toast(:info, "Your message has been sent")}
 
         {:error, changeset} ->
           {:noreply, assign_form(socket, changeset)}
@@ -317,7 +317,7 @@ defmodule YscWeb.ContactLive do
               {:noreply,
                socket
                |> assign(:submitted, true)
-               |> put_flash(:info, "Your message has been sent")}
+               |> YscWeb.Flash.put_toast(:info, "Your message has been sent")}
 
             {:error, changeset} ->
               {:noreply, assign_form(socket, changeset)}
@@ -326,7 +326,7 @@ defmodule YscWeb.ContactLive do
         {:error, _} ->
           socket =
             socket
-            |> put_flash(:error, "Please try submitting again")
+            |> YscWeb.Flash.put_toast(:error, "Please try submitting again")
             |> Turnstile.refresh()
 
           {:noreply, assign_form(socket, changeset)}

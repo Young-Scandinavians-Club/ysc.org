@@ -28,7 +28,8 @@ defmodule YscWeb.BookingCheckoutLive do
         reply
 
       {:error, {:redirect, path, message}} ->
-        {:ok, socket |> put_flash(:error, message) |> redirect(to: path)}
+        {:ok,
+         socket |> YscWeb.Flash.put_toast(:error, message) |> redirect(to: path)}
     end
   end
 
@@ -103,7 +104,10 @@ defmodule YscWeb.BookingCheckoutLive do
       {:error, reason} ->
         {:ok,
          socket
-         |> put_flash(:error, "Failed to calculate price: #{inspect(reason)}")
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to calculate price: #{inspect(reason)}"
+         )
          |> redirect(to: get_property_redirect_path(booking.property))}
     end
   end
@@ -234,39 +238,39 @@ defmodule YscWeb.BookingCheckoutLive do
             </div>
             <div class="flex-1">
               <h2 class="text-2xl font-bold text-zinc-900">
-                <%= atom_to_readable(@booking.property) %> Cabin
+                {atom_to_readable(@booking.property)} Cabin
               </h2>
               <p class="text-zinc-500 mt-1">
-                <%= format_date_short(@booking.checkin_date, @timezone) %> — <%= format_date_short(
+                {format_date_short(@booking.checkin_date, @timezone)} — {format_date_short(
                   @booking.checkout_date,
                   @timezone
-                ) %>, <%= Calendar.strftime(@booking.checkout_date, "%Y") %> (<%= Date.diff(
+                )}, {Calendar.strftime(@booking.checkout_date, "%Y")} ({Date.diff(
                   @booking.checkout_date,
                   @booking.checkin_date
-                ) %> <%= if Date.diff(
-                              @booking.checkout_date,
-                              @booking.checkin_date
-                            ) == 1,
-                            do: "night",
-                            else: "nights" %>)
+                )} {if Date.diff(
+                         @booking.checkout_date,
+                         @booking.checkin_date
+                       ) == 1,
+                       do: "night",
+                       else: "nights"})
               </p>
               <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
                 <span class="text-zinc-600">
-                  <%= @booking.guests_count %> <%= if @booking.guests_count == 1,
+                  {@booking.guests_count} {if @booking.guests_count == 1,
                     do: "adult",
-                    else: "adults" %>
+                    else: "adults"}
                   <%= if @booking.children_count && @booking.children_count > 0 do %>
-                    , <%= @booking.children_count %> <%= if @booking.children_count ==
-                                                              1,
-                                                            do: "child",
-                                                            else: "children" %>
+                    , {@booking.children_count} {if @booking.children_count ==
+                                                      1,
+                                                    do: "child",
+                                                    else: "children"}
                   <% end %>
                 </span>
                 <%= if @booking.booking_mode == :room && Ecto.assoc_loaded?(@booking.rooms) &&
                       length(@booking.rooms) > 0 do %>
                   <span class="text-zinc-400">•</span>
                   <span class="text-zinc-600">
-                    <%= Enum.map(@booking.rooms, & &1.name) |> Enum.join(", ") %>
+                    {Enum.map(@booking.rooms, & &1.name) |> Enum.join(", ")}
                   </span>
                 <% end %>
               </div>
@@ -284,18 +288,18 @@ defmodule YscWeb.BookingCheckoutLive do
                 do: Enum.map(@booking.rooms, & &1.name) |> Enum.join(", "),
                 else: "your selected room" %>
             <p class="text-sm text-zinc-600 mb-4">
-              You are booking <%= room_names %> for <%= @booking.guests_count || 1 %> <%= if (@booking.guests_count ||
-                                                                                                1) ==
-                                                                                               1,
-                                                                                             do:
-                                                                                               "adult",
-                                                                                             else:
-                                                                                               "adults" %>
+              You are booking {room_names} for {@booking.guests_count || 1} {if (@booking.guests_count ||
+                                                                                   1) ==
+                                                                                  1,
+                                                                                do:
+                                                                                  "adult",
+                                                                                else:
+                                                                                  "adults"}
               <%= if @booking.children_count && @booking.children_count > 0 do %>
-                and <%= @booking.children_count %> <%= if @booking.children_count ==
-                                                            1,
-                                                          do: "child",
-                                                          else: "children" %>
+                and {@booking.children_count} {if @booking.children_count ==
+                                                    1,
+                                                  do: "child",
+                                                  else: "children"}
               <% end %>.
             </p>
             <%!-- Booking Representative Header --%>
@@ -336,11 +340,11 @@ defmodule YscWeb.BookingCheckoutLive do
                       </span>
                     </div>
                     <p class="text-sm text-blue-700 font-medium mb-2">
-                      <%= Map.get(booking_user_data, "first_name", "") %> <%= Map.get(
+                      {Map.get(booking_user_data, "first_name", "")} {Map.get(
                         booking_user_data,
                         "last_name",
                         ""
-                      ) %>
+                      )}
                     </p>
                     <p class="text-xs text-blue-600">
                       You as the booking member must be present. You are already included in the total count above.
@@ -364,9 +368,9 @@ defmodule YscWeb.BookingCheckoutLive do
                   class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
                 >
                   <p class="text-sm font-semibold text-red-800">
-                    <%= error_count %> <%= if error_count == 1,
+                    {error_count} {if error_count == 1,
                       do: "guest is",
-                      else: "guests are" %> missing required information.
+                      else: "guests are"} missing required information.
                   </p>
                 </div>
               <% end %>
@@ -378,7 +382,7 @@ defmodule YscWeb.BookingCheckoutLive do
               role="alert"
             >
               <p class="text-sm text-red-800">
-                <%= @guest_info_errors[:general] %>
+                {@guest_info_errors[:general]}
               </p>
             </div>
             <!-- Guest Information Form -->
@@ -490,7 +494,7 @@ defmodule YscWeb.BookingCheckoutLive do
                           else: "bg-blue-100 text-blue-600"
                         )
                       ]}>
-                        <%= index %>
+                        {index}
                       </div>
                       <div class="flex-1 space-y-3">
                         <div class="flex justify-between items-center">
@@ -531,7 +535,7 @@ defmodule YscWeb.BookingCheckoutLive do
                                             family_member.id
                                       }
                                     >
-                                      <%= family_member.first_name %> <%= family_member.last_name %>
+                                      {family_member.first_name} {family_member.last_name}
                                     </option>
                                   <% end %>
                                 </optgroup>
@@ -553,7 +557,7 @@ defmodule YscWeb.BookingCheckoutLive do
                               class="w-5 h-5 text-green-600"
                             />
                             <span class="text-xs font-semibold text-green-800">
-                              Applied: <%= selected_family_member.first_name %> <%= selected_family_member.last_name %>
+                              Applied: {selected_family_member.first_name} {selected_family_member.last_name}
                             </span>
                           </div>
                         <% else %>
@@ -633,18 +637,18 @@ defmodule YscWeb.BookingCheckoutLive do
                             <div class="text-xs text-red-600 space-y-0.5">
                               <%= if @guest_info_errors[index_str][:first_name] do %>
                                 <p>
-                                  First name: <%= Enum.join(
+                                  First name: {Enum.join(
                                     @guest_info_errors[index_str][:first_name],
                                     ", "
-                                  ) %>
+                                  )}
                                 </p>
                               <% end %>
                               <%= if @guest_info_errors[index_str][:last_name] do %>
                                 <p>
-                                  Last name: <%= Enum.join(
+                                  Last name: {Enum.join(
                                     @guest_info_errors[index_str][:last_name],
                                     ", "
-                                  ) %>
+                                  )}
                                 </p>
                               <% end %>
                             </div>
@@ -707,7 +711,7 @@ defmodule YscWeb.BookingCheckoutLive do
               :if={@payment_error}
               class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
             >
-              <p class="text-sm text-red-800"><%= @payment_error %></p>
+              <p class="text-sm text-red-800">{@payment_error}</p>
             </div>
             <!-- Payment Form -->
             <div :if={@show_payment_form && @payment_intent && !@is_expired}>
@@ -733,7 +737,7 @@ defmodule YscWeb.BookingCheckoutLive do
                   >
                     <.icon name="hero-lock-closed" class="w-5 h-5 -mt-1 me-1" />
                     <span class="text-lg font-semibold">
-                      Pay <%= MoneyHelper.format_money!(@total_price) %> Securely
+                      Pay {MoneyHelper.format_money!(@total_price)} Securely
                     </span>
                   </.button>
                   <button
@@ -811,7 +815,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 data-expires-at={DateTime.to_iso8601(@booking.hold_expires_at)}
                 data-timezone={@timezone}
               >
-                <%= calculate_remaining_time(@booking.hold_expires_at) %>
+                {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
               to secure your booking.
             </p>
@@ -848,12 +852,12 @@ defmodule YscWeb.BookingCheckoutLive do
               if(assigns[:show_price_details] == false, do: "hidden lg:block")
             ]}>
               <%= if @price_breakdown do %>
-                <%= render_price_breakdown_sidebar(assigns) %>
+                {render_price_breakdown_sidebar(assigns)}
               <% end %>
               <div class="pt-4 border-t border-zinc-700 flex justify-between items-baseline">
                 <span class="text-lg font-bold">Total</span>
                 <span class="text-3xl font-black text-blue-400">
-                  <%= MoneyHelper.format_money!(@total_price) %>
+                  {MoneyHelper.format_money!(@total_price)}
                 </span>
               </div>
             </div>
@@ -903,7 +907,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <div>
             <p class="text-xs text-zinc-500 uppercase tracking-wide">Total</p>
             <p class="text-2xl font-black text-blue-600">
-              <%= MoneyHelper.format_money!(@total_price) %>
+              {MoneyHelper.format_money!(@total_price)}
             </p>
           </div>
           <.button
@@ -1569,7 +1573,7 @@ defmodule YscWeb.BookingCheckoutLive do
                    guest_info_form: nil,
                    guest_info_errors: %{}
                  )
-                 |> put_flash(
+                 |> YscWeb.Flash.put_toast(
                    :info,
                    "Guest information saved. Please complete payment."
                  )}
@@ -1609,7 +1613,7 @@ defmodule YscWeb.BookingCheckoutLive do
          assign(socket,
            guest_info_errors: %{general: error_message}
          )
-         |> put_flash(:error, error_message)}
+         |> YscWeb.Flash.put_toast(:error, error_message)}
 
       {:error, invalid_changesets} when is_list(invalid_changesets) ->
         errors =
@@ -1635,7 +1639,10 @@ defmodule YscWeb.BookingCheckoutLive do
 
         {:noreply,
          assign(socket, guest_info_errors: errors)
-         |> put_flash(:error, "Please fix the errors below.")}
+         |> YscWeb.Flash.error_with_title(
+           "Please fix",
+           "Please fix the errors below."
+         )}
     end
   end
 
@@ -1644,7 +1651,7 @@ defmodule YscWeb.BookingCheckoutLive do
      assign(socket,
        guest_info_errors: %{general: "No guest information provided"}
      )
-     |> put_flash(:error, "Please provide guest information.")}
+     |> YscWeb.Flash.put_toast(:error, "Please provide guest information.")}
   end
 
   @impl true
@@ -1656,7 +1663,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :info,
            "Your booking has been canceled and the availability has been released."
          )
@@ -1665,7 +1672,7 @@ defmodule YscWeb.BookingCheckoutLive do
       {:error, reason} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Failed to cancel booking: #{inspect(reason)}. Please try again or contact support."
          )}
@@ -1693,7 +1700,7 @@ defmodule YscWeb.BookingCheckoutLive do
            "This booking has expired and is no longer available for payment.",
          show_payment_form: false
        )
-       |> put_flash(
+       |> YscWeb.Flash.put_toast(
          :error,
          "This booking has expired. Please create a new booking."
        )}
@@ -1702,7 +1709,10 @@ defmodule YscWeb.BookingCheckoutLive do
         {:ok, booking} ->
           {:noreply,
            socket
-           |> put_flash(:info, "Payment successful! Your booking is confirmed.")
+           |> YscWeb.Flash.success_with_title(
+             "Success",
+             "Payment successful! Your booking is confirmed."
+           )
            |> push_navigate(
              to: ~p"/bookings/#{booking.id}/receipt?confetti=true"
            )}
@@ -1734,7 +1744,7 @@ defmodule YscWeb.BookingCheckoutLive do
          payment_error:
            "This booking has expired and is no longer available for payment."
        )
-       |> put_flash(
+       |> YscWeb.Flash.put_toast(
          :error,
          "This booking has expired. Please create a new booking."
        )}
@@ -2424,21 +2434,21 @@ defmodule YscWeb.BookingCheckoutLive do
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <div class="text-zinc-400">
-              <%= billable_people %> <%= if billable_people == 1,
+              {billable_people} {if billable_people == 1,
                 do: "adult",
-                else: "adults" %>
+                else: "adults"}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
               <%= if adult_price_per_night do %>
-                <%= MoneyHelper.format_money!(adult_price_per_night) %>/night
+                {MoneyHelper.format_money!(adult_price_per_night)}/night
               <% end %>
             </div>
             <div class="text-zinc-400 text-xs">
-              × <%= nights %> <%= if nights == 1, do: "night", else: "nights" %>
+              × {nights} {if nights == 1, do: "night", else: "nights"}
             </div>
             <div class="text-right font-medium tabular-nums">
               <%= if final_base_total do %>
-                <%= MoneyHelper.format_money!(final_base_total) %>
+                {MoneyHelper.format_money!(final_base_total)}
               <% end %>
             </div>
           </div>
@@ -2475,21 +2485,21 @@ defmodule YscWeb.BookingCheckoutLive do
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm mt-3">
             <div class="text-zinc-400">
-              <%= children_count %> <%= if children_count == 1,
+              {children_count} {if children_count == 1,
                 do: "child",
-                else: "children" %>
+                else: "children"}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
               <%= if calculated_children_price_per_night do %>
-                <%= MoneyHelper.format_money!(calculated_children_price_per_night) %>/night
+                {MoneyHelper.format_money!(calculated_children_price_per_night)}/night
               <% end %>
             </div>
             <div class="text-zinc-400 text-xs">
-              × <%= nights %> <%= if nights == 1, do: "night", else: "nights" %>
+              × {nights} {if nights == 1, do: "night", else: "nights"}
             </div>
             <div class="text-right font-medium tabular-nums">
               <%= if final_children_total do %>
-                <%= MoneyHelper.format_money!(final_children_total) %>
+                {MoneyHelper.format_money!(final_children_total)}
               <% end %>
             </div>
           </div>
@@ -2504,31 +2514,31 @@ defmodule YscWeb.BookingCheckoutLive do
         <%= if guests_count > 0 && price_per_guest_per_night do %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <div class="text-zinc-400">
-              <%= guests_count %> <%= if guests_count == 1,
+              {guests_count} {if guests_count == 1,
                 do: "guest",
-                else: "guests" %>
+                else: "guests"}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
-              <%= MoneyHelper.format_money!(price_per_guest_per_night) %>/night
+              {MoneyHelper.format_money!(price_per_guest_per_night)}/night
             </div>
             <div class="text-zinc-400 text-xs">
-              × <%= nights %> <%= if nights == 1, do: "night", else: "nights" %>
+              × {nights} {if nights == 1, do: "night", else: "nights"}
             </div>
             <div class="text-right font-medium tabular-nums">
-              <%= case Money.mult(price_per_guest_per_night, guests_count * nights) do
+              {case Money.mult(price_per_guest_per_night, guests_count * nights) do
                 {:ok, total} -> MoneyHelper.format_money!(total)
                 _ -> MoneyHelper.format_money!(@total_price)
-              end %>
+              end}
             </div>
           </div>
         <% else %>
           <!-- Fallback if price_per_guest_per_night not available -->
           <div class="flex justify-between text-sm">
             <span class="text-zinc-400">
-              <%= nights %> <%= if nights == 1, do: "night", else: "nights" %>
+              {nights} {if nights == 1, do: "night", else: "nights"}
             </span>
             <span class="font-medium">
-              <%= MoneyHelper.format_money!(@total_price) %>
+              {MoneyHelper.format_money!(@total_price)}
             </span>
           </div>
         <% end %>
@@ -2537,12 +2547,12 @@ defmodule YscWeb.BookingCheckoutLive do
         <%= if @price_breakdown[:nights] do %>
           <div class="flex justify-between text-sm">
             <span class="text-zinc-400">
-              <%= @price_breakdown.nights %> <%= if @price_breakdown.nights == 1,
+              {@price_breakdown.nights} {if @price_breakdown.nights == 1,
                 do: "night",
-                else: "nights" %>
+                else: "nights"}
             </span>
             <span class="font-medium">
-              <%= MoneyHelper.format_money!(@total_price) %>
+              {MoneyHelper.format_money!(@total_price)}
             </span>
           </div>
         <% end %>

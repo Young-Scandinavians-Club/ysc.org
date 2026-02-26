@@ -233,7 +233,7 @@ defmodule YscWeb.HomeLive do
 
         <h1 class="text-6xl md:text-8xl font-black text-white drop-shadow-2xl">
           <span class="block font-serif italic text-2xl md:text-4xl mb-4 text-white/80 font-light tracking-tight">
-            Celebrating <%= div(Date.utc_today().year - 1950, 5) * 5 %> Years of
+            Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years of
           </span>
           Young Scandinavians Club
         </h1>
@@ -274,7 +274,7 @@ defmodule YscWeb.HomeLive do
           <div class="w-px h-12 bg-white/30"></div>
           <div class="text-center">
             <div class="text-3xl font-bold text-white">
-              <%= div(Date.utc_today().year - 1950, 5) * 5 %>+
+              {div(Date.utc_today().year - 1950, 5) * 5}+
             </div>
             <div class="text-sm uppercase tracking-wide">Years</div>
           </div>
@@ -311,12 +311,12 @@ defmodule YscWeb.HomeLive do
               <strong class="text-zinc-900">Swedish</strong>
               heritage may qualify for membership, with rates starting at just
               <strong class="text-blue-600">
-                <%= Ysc.MoneyHelper.format_money!(
+                {Ysc.MoneyHelper.format_money!(
                   Money.new(
                     :USD,
                     Enum.at(Application.get_env(:ysc, :membership_plans), 0).amount
                   )
-                ) %>
+                )}
               </strong>
               per year.
             </p>
@@ -430,7 +430,7 @@ defmodule YscWeb.HomeLive do
             </div>
             <div class="mt-4 pt-4 border-t border-blue-400/30 w-full">
               <div class="text-2xl font-black text-white mb-1">
-                <%= div(Date.utc_today().year - 1950, 5) * 5 %>+
+                {div(Date.utc_today().year - 1950, 5) * 5}+
               </div>
               <div class="text-xs text-blue-100 uppercase tracking-widest">
                 Years of Community
@@ -587,7 +587,7 @@ defmodule YscWeb.HomeLive do
                 navigate={~p"/events/#{List.first(@upcoming_events).id}"}
                 class="text-sm font-bold hover:text-blue-100 transition-colors line-clamp-1"
               >
-                <%= List.first(@upcoming_events).title %> →
+                {List.first(@upcoming_events).title} →
               </.link>
             <% else %>
               <%= if length(@latest_news) > 0 do %>
@@ -596,7 +596,7 @@ defmodule YscWeb.HomeLive do
                   navigate={~p"/posts/#{List.first(@latest_news).url_name}"}
                   class="text-sm font-bold hover:text-blue-100 transition-colors line-clamp-1"
                 >
-                  <%= List.first(@latest_news).title %> →
+                  {List.first(@latest_news).title} →
                 </.link>
               <% end %>
             <% end %>
@@ -719,7 +719,7 @@ defmodule YscWeb.HomeLive do
                 </div>
                 <div class="absolute bottom-4 right-4 z-[2]">
                   <span class="bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-xl text-white text-xs font-black ring-1 ring-white/10 tracking-widest">
-                    <%= event.pricing_info.display_text %>
+                    {event.pricing_info.display_text}
                   </span>
                 </div>
                 <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60">
@@ -729,23 +729,23 @@ defmodule YscWeb.HomeLive do
               <div class="p-8 flex flex-col flex-1">
                 <div class="flex items-center gap-3 mb-4">
                   <span class="text-blue-400 font-black text-xs tracking-widest uppercase">
-                    <%= format_event_date(event.start_date) %>
+                    {format_event_date(event.start_date)}
                   </span>
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
                   <%= if event.start_time && event.start_time != "" do %>
                     <span class="text-zinc-400 text-xs font-bold uppercase tracking-widest text-xs">
-                      <%= format_event_time(event.start_date, event.start_time) %>
+                      {format_event_time(event.start_date, event.start_time)}
                     </span>
                   <% end %>
                 </div>
                 <.link navigate={~p"/events/#{event.id}"} class="block">
                   <h3 class="text-2xl font-black text-white tracking-tight group-hover:text-blue-400 transition-colors leading-tight">
-                    <%= event.title %>
+                    {event.title}
                   </h3>
                 </.link>
                 <%= if event.description do %>
                   <p class="text-zinc-400 mt-4 line-clamp-2 text-sm leading-relaxed">
-                    <%= event.description %>
+                    {event.description}
                   </p>
                 <% end %>
 
@@ -753,7 +753,7 @@ defmodule YscWeb.HomeLive do
                   <%= if event.location_name do %>
                     <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-2">
                       <.icon name="hero-map-pin" class="w-4 h-4 text-blue-500" />
-                      <%= event.location_name %>
+                      {event.location_name}
                     </span>
                   <% else %>
                     <span></span>
@@ -848,16 +848,14 @@ defmodule YscWeb.HomeLive do
                 />
               </div>
               <time class="text-xs font-black text-blue-600 uppercase tracking-widest">
-                <%= format_post_date(post.published_on) %> · <%= reading_time_for_news(
-                  post
-                ) %> min read
+                {format_post_date(post.published_on)} · {reading_time_for_news(post)} min read
               </time>
               <h3 class="text-2xl font-black text-zinc-900 tracking-tighter mt-3 group-hover:text-blue-600 transition-colors leading-none">
-                <%= post.title %>
+                {post.title}
               </h3>
               <%= if post.preview_text || post.rendered_body do %>
                 <p class="text-zinc-500 mt-4 text-sm leading-relaxed line-clamp-2 italic">
-                  <%= preview_text_for_news(post) %>
+                  {preview_text_for_news(post)}
                 </p>
               <% end %>
             </.link>
@@ -887,12 +885,12 @@ defmodule YscWeb.HomeLive do
             <h3 class="text-xl font-bold text-zinc-900">Single Membership</h3>
             <div class="mt-4">
               <span class="text-4xl font-bold text-zinc-900">
-                <%= Ysc.MoneyHelper.format_money!(
+                {Ysc.MoneyHelper.format_money!(
                   Money.new(
                     :USD,
                     Enum.at(Application.get_env(:ysc, :membership_plans), 0).amount
                   )
-                ) %>
+                )}
               </span>
               <span class="text-zinc-500">/year</span>
             </div>
@@ -920,12 +918,12 @@ defmodule YscWeb.HomeLive do
             <h3 class="text-xl font-bold text-zinc-900">Family Membership</h3>
             <div class="mt-4">
               <span class="text-4xl font-bold text-zinc-900">
-                <%= Ysc.MoneyHelper.format_money!(
+                {Ysc.MoneyHelper.format_money!(
                   Money.new(
                     :USD,
                     Enum.at(Application.get_env(:ysc, :membership_plans), 1).amount
                   )
-                ) %>
+                )}
               </span>
               <span class="text-zinc-500">/year</span>
             </div>
@@ -1010,7 +1008,7 @@ defmodule YscWeb.HomeLive do
               <Turnstile.widget appearance="interaction-only" />
             </div>
             <p :if={@newsletter_error} class="mt-3 text-sm text-red-600">
-              <%= @newsletter_error %>
+              {@newsletter_error}
             </p>
             <div
               :if={@newsletter_submitted}
@@ -1110,20 +1108,20 @@ defmodule YscWeb.HomeLive do
                 Member Dashboard
               </p>
               <h1 class="text-4xl lg:text-5xl font-black text-zinc-900 tracking-tight">
-                <%= greeting_for_country(@current_user.most_connected_country) %>, <%= String.capitalize(
+                {greeting_for_country(@current_user.most_connected_country)}, {String.capitalize(
                   @current_user.first_name
-                ) %>
+                )}
               </h1>
             </div>
             <div class="hidden md:flex items-center gap-4">
               <div class="text-right hidden md:block">
                 <p class="text-sm font-bold text-zinc-900">
-                  <%= YscWeb.UserAuth.get_membership_plan_display_name(
+                  {YscWeb.UserAuth.get_membership_plan_display_name(
                     @current_membership
-                  ) %>
+                  )}
                 </p>
                 <p class="text-xs text-zinc-500">
-                  <%= membership_status_text(@current_user, @current_membership) %>
+                  {membership_status_text(@current_user, @current_membership)}
                 </p>
               </div>
               <div class="w-16 h-16 rounded-full ring-4 ring-zinc-50 shadow-inner overflow-hidden">
@@ -1297,10 +1295,10 @@ defmodule YscWeb.HomeLive do
                           Destination
                         </p>
                         <p class="font-black text-2xl text-zinc-900 tracking-tighter">
-                          <%= format_property_name(booking.property) %>
+                          {format_property_name(booking.property)}
                         </p>
                         <p class="text-xs font-mono text-zinc-400">
-                          <%= booking.reference_id %>
+                          {booking.reference_id}
                         </p>
                       </div>
                       <div class="space-y-2">
@@ -1308,9 +1306,9 @@ defmodule YscWeb.HomeLive do
                           Dates
                         </p>
                         <p class="font-bold text-zinc-800">
-                          <%= format_booking_date(booking.checkin_date) %> — <%= format_booking_date(
+                          {format_booking_date(booking.checkin_date)} — {format_booking_date(
                             booking.checkout_date
-                          ) %>
+                          )}
                         </p>
                         <span class={[
                           "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded uppercase tracking-tighter",
@@ -1331,12 +1329,12 @@ defmodule YscWeb.HomeLive do
                               "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
                           end
                         ]}>
-                          <%= case days_until_booking(booking) do
+                          {case days_until_booking(booking) do
                             :started -> "Currently Staying"
                             0 -> "Checking in today"
                             1 -> "Tomorrow"
                             days -> "In #{days} days"
-                          end %>
+                          end}
                         </span>
                         <%= if booking.booking_mode == :buyout do %>
                           <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
@@ -1432,29 +1430,29 @@ defmodule YscWeb.HomeLive do
                           _ -> "bg-purple-50 text-purple-700"
                         end
                       ]}>
-                        <%= case days_until_event(event) do
+                        {case days_until_event(event) do
                           0 -> "Today"
                           1 -> "Tomorrow"
                           days -> "In #{days} days"
-                        end %>
+                        end}
                       </span>
                       <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                     </div>
                     <.link navigate={~p"/events/#{event.id}"} class="block group">
                       <h4 class="font-black text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
-                        <%= event.title %>
+                        {event.title}
                       </h4>
                     </.link>
                     <p class="text-xs text-zinc-500 flex items-center gap-1 mb-4">
                       <.icon name="hero-calendar" class="w-3 h-3" />
-                      <%= format_event_date_long(event.start_date) %>
+                      {format_event_date_long(event.start_date)}
                     </p>
                     <div
                       :if={event.location_name}
                       class="text-xs text-zinc-500 flex items-center gap-1 mb-4"
                     >
                       <.icon name="hero-map-pin" class="w-3 h-3" />
-                      <span class="truncate"><%= event.location_name %></span>
+                      <span class="truncate">{event.location_name}</span>
                     </div>
                     <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 flex items-center justify-between">
                       <.link
@@ -1470,7 +1468,7 @@ defmodule YscWeb.HomeLive do
                       <div class="flex flex-wrap gap-1">
                         <%= for {tier_name, tickets} <- grouped_tiers do %>
                           <span class="text-xs font-bold text-zinc-400">
-                            <%= length(tickets) %>× <%= tier_name %>
+                            {length(tickets)}× {tier_name}
                           </span>
                         <% end %>
                       </div>
@@ -1533,9 +1531,9 @@ defmodule YscWeb.HomeLive do
                 </div>
 
                 <h3 class="text-2xl font-black tracking-tight mb-2">
-                  <%= YscWeb.UserAuth.get_membership_plan_display_name(
+                  {YscWeb.UserAuth.get_membership_plan_display_name(
                     @current_membership
-                  ) %>
+                  )}
                 </h3>
                 <p class={[
                   "text-sm leading-relaxed mb-8",
@@ -1546,11 +1544,11 @@ defmodule YscWeb.HomeLive do
                   end
                 ]}>
                   <%= if @active_membership? do %>
-                    <%= get_membership_description(
+                    {get_membership_description(
                       @current_membership,
                       @is_sub_account || false,
                       @primary_user
-                    ) %>
+                    )}
                   <% else %>
                     <span class="block mb-2 font-bold text-white">
                       Membership Required
@@ -1631,13 +1629,13 @@ defmodule YscWeb.HomeLive do
                     </div>
                     <div>
                       <p class="text-xs font-bold text-blue-600 mb-1">
-                        <%= format_post_date(post.published_on) %>
+                        {format_post_date(post.published_on)}
                       </p>
                       <h4 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
-                        <%= post.title %>
+                        {post.title}
                       </h4>
                       <p class="text-xs text-zinc-500 line-clamp-1">
-                        <%= preview_text_plain(post) %>
+                        {preview_text_plain(post)}
                       </p>
                     </div>
                   </.link>
@@ -2128,7 +2126,10 @@ defmodule YscWeb.HomeLive do
         {:noreply,
          socket
          |> assign(show_passkey_prompt: false)
-         |> put_flash(:info, "We'll remind you about passkeys in 30 days.")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "We'll remind you about passkeys in 30 days."
+         )}
 
       {:error, _changeset} ->
         {:noreply, socket}
@@ -2198,7 +2199,10 @@ defmodule YscWeb.HomeLive do
            newsletter_submitted: true,
            newsletter_error: nil
          )
-         |> put_flash(:info, "Thank you for subscribing to our newsletter!")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Thank you for subscribing to our newsletter!"
+         )}
 
       {:error, :invalid_email} ->
         {:noreply,

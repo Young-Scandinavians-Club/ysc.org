@@ -85,10 +85,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           required={false}
         />
 
-        <div
-          :if={!donation_type?(@form[:type].value)}
-          phx-feedback-for={@form[:requires_registration].name}
-        >
+        <div :if={!donation_type?(@form[:type].value)}>
           <label class="flex items-center gap-4 text-sm leading-6 text-zinc-600">
             <input
               type="hidden"
@@ -125,7 +122,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             msg <-
               Enum.map(@form[:requires_registration].errors, &translate_error(&1))
           }>
-            <%= msg %>
+            {msg}
           </.error>
         </div>
 
@@ -271,7 +268,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Ticket tier #{action} successfully")
+         |> YscWeb.Flash.put_toast(:info, "Ticket tier #{action} successfully")
          |> assign_form(changeset)
          |> push_navigate(
            to: ~p"/admin/events/#{socket.assigns.event_id}/tickets"

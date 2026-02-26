@@ -36,7 +36,7 @@ defmodule YscWeb.Authorization.EnsureRolePlug do
 
   defp maybe_halt(_any, conn) do
     conn
-    |> Controller.put_flash(:error, "Unauthorized")
+    |> YscWeb.Flash.put_toast(:error, "Unauthorized")
     |> Controller.redirect(to: signed_in_path(conn))
     |> halt()
   end

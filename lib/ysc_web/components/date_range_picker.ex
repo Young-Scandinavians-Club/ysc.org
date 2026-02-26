@@ -69,7 +69,7 @@ defmodule YscWeb.Components.DateRangePicker do
             </div>
 
             <div id="current_month_year" class="self-center font-semibold">
-              <%= @current.month %>
+              {@current.month}
             </div>
 
             <div id="button_right">
@@ -99,7 +99,7 @@ defmodule YscWeb.Components.DateRangePicker do
             class="text-center mt-6 grid grid-cols-7 text-xs leading-6 text-zinc-800"
           >
             <div :for={week_day <- List.first(@current.week_rows)}>
-              <%= Calendar.strftime(week_day, "%a") %>
+              {Calendar.strftime(week_day, "%a")}
             </div>
           </div>
 
@@ -183,7 +183,7 @@ defmodule YscWeb.Components.DateRangePicker do
                   class="mx-auto flex h-6 w-6 items-center justify-center rounded-full"
                   datetime={Calendar.strftime(day, "%Y-%m-%d")}
                 >
-                  <%= Calendar.strftime(day, "%d") %>
+                  {Calendar.strftime(day, "%d")}
                 </time>
               </button>
               <span
@@ -207,7 +207,7 @@ defmodule YscWeb.Components.DateRangePicker do
                   "text-left"
                 ]}
               >
-                <%= get_date_tooltip(day, @date_tooltips) %>
+                {get_date_tooltip(day, @date_tooltips)}
               </span>
             </div>
           </div>
@@ -224,7 +224,7 @@ defmodule YscWeb.Components.DateRangePicker do
             </button>
             <div :if={!@range_start && !@range_end}></div>
             <.button type="button" phx-click="close-calendar" phx-target={@myself}>
-              <%= select_button_text(@range_start, @range_end) %>
+              {select_button_text(@range_start, @range_end)}
             </.button>
           </div>
         </div>

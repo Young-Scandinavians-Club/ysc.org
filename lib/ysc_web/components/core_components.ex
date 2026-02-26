@@ -95,7 +95,7 @@ defmodule YscWeb.CoreComponents do
                 </button>
               </div>
               <div id={"#{@id}-content"}>
-                <%= render_slot(@inner_block) %>
+                {render_slot(@inner_block)}
               </div>
             </.focus_wrap>
           </div>
@@ -160,9 +160,9 @@ defmodule YscWeb.CoreComponents do
           name="hero-exclamation-circle-mini"
           class="w-4 h-4"
         />
-        <%= @title %>
+        {@title}
       </p>
-      <p class="mt-2 text-sm leading-5"><%= msg %></p>
+      <p class="mt-2 text-sm leading-5">{msg}</p>
       <button
         type="button"
         class="absolute p-2 group top-1 right-1"
@@ -248,12 +248,12 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <.form :let={f} for={@for} as={@as} {@rest}>
       <div class="space-y-8 bg-white">
-        <%= render_slot(@inner_block, f) %>
+        {render_slot(@inner_block, f)}
         <div
           :for={action <- @actions}
           class="flex items-center justify-between gap-6 mt-2"
         >
-          <%= render_slot(action, f) %>
+          {render_slot(action, f)}
         </div>
       </div>
     </.form>
@@ -307,7 +307,7 @@ defmodule YscWeb.CoreComponents do
       ]}
       {@rest}
     >
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -330,7 +330,7 @@ defmodule YscWeb.CoreComponents do
       ]}
       {@rest}
     >
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </button>
     """
   end
@@ -384,7 +384,7 @@ defmodule YscWeb.CoreComponents do
         ]}
         style="transition: color 0.3s ease-in-out;"
       >
-        <%= @label %>
+        {@label}
       </span>
       <span
         class={[
@@ -468,9 +468,11 @@ defmodule YscWeb.CoreComponents do
   slot :inner_block
 
   def input(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+
     assigns
     |> assign(field: nil, id: assigns.id || field.id)
-    |> assign(:errors, Enum.map(field.errors, &translate_error(&1)))
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
     |> assign_new(:name, fn ->
       if assigns.multiple, do: field.name <> "[]", else: field.name
     end)
@@ -485,7 +487,7 @@ defmodule YscWeb.CoreComponents do
       end)
 
     ~H"""
-    <div phx-feedback-for={@name}>
+    <div>
       <label class="flex items-start gap-3 text-sm leading-6 text-zinc-600 cursor-pointer py-1">
         <input type="hidden" name={@name} value="false" />
         <input
@@ -497,17 +499,17 @@ defmodule YscWeb.CoreComponents do
           class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5 flex-shrink-0"
           {@rest}
         />
-        <span class="flex-1"><%= @label %></span>
+        <span class="flex-1">{@label}</span>
       </label>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "radio"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label for={@id}><%= @label %></.label>
+    <div>
+      <.label for={@id}>{@label}</.label>
       <input
         type="radio"
         id={@id}
@@ -517,7 +519,7 @@ defmodule YscWeb.CoreComponents do
         class="rounded border-zinc-300 text-zinc-900 focus:ring-0"
         {@rest}
       />
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -544,11 +546,11 @@ defmodule YscWeb.CoreComponents do
         </div>
         <div class="block">
           <div class="w-full font-semibold text-md text-zinc-800">
-            <%= @label %>
+            {@label}
           </div>
-          <div class="w-full text-sm text-zinc-600"><%= @subtitle %></div>
+          <div class="w-full text-sm text-zinc-600">{@subtitle}</div>
           <div :if={@footer != nil} class="w-full text-sm font-semibold pt-2">
-            <%= @footer %>
+            {@footer}
           </div>
         </div>
       </div>
@@ -558,8 +560,8 @@ defmodule YscWeb.CoreComponents do
 
   def input(%{type: "select"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label :if={@label != ""} for={@id}><%= @label %></.label>
+    <div>
+      <.label :if={@label != ""} for={@id}>{@label}</.label>
       <select
         id={@id}
         name={@name}
@@ -570,18 +572,18 @@ defmodule YscWeb.CoreComponents do
         multiple={@multiple}
         {@rest}
       >
-        <option :if={@prompt} value=""><%= @prompt %></option>
-        <%= Phoenix.HTML.Form.options_for_select(@options, @value) %>
+        <option :if={@prompt} value="">{@prompt}</option>
+        {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "country-select"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label for={@id}><%= @label %></.label>
+    <div>
+      <.label for={@id}>{@label}</.label>
       <select
         id={@id}
         name={@name}
@@ -589,8 +591,8 @@ defmodule YscWeb.CoreComponents do
         multiple={@multiple}
         {@rest}
       >
-        <option :if={@prompt} value=""><%= @prompt %></option>
-        <%= Phoenix.HTML.Form.options_for_select(
+        <option :if={@prompt} value="">{@prompt}</option>
+        {Phoenix.HTML.Form.options_for_select(
           Enum.map(
             LivePhone.Country.list(["US", "SE", "FI", "DK", "NO", "IS"]),
             fn x ->
@@ -598,37 +600,36 @@ defmodule YscWeb.CoreComponents do
             end
           ),
           @value
-        ) %>
+        )}
       </select>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "textarea"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label for={@id}><%= @label %></.label>
+    <div>
+      <.label for={@id}>{@label}</.label>
       <textarea
         id={@id}
         name={@name}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-800 focus:ring-0 sm:text-sm sm:leading-6",
-          "min-h-[6rem] phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
+          "mt-2 block w-full rounded-lg text-zinc-800 focus:ring-0 sm:text-sm sm:leading-6 min-h-[6rem]",
           @errors == [] && "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         {@rest}
       ><%= Phoenix.HTML.Form.normalize_value("textarea", @value) %></textarea>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "checkgroup"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name} class="text-sm">
-      <.label for={@id}><%= @label %></.label>
+    <div class="text-sm">
+      <.label for={@id}>{@label}</.label>
       <div class="w-full bg-white rounded text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         <div class="grid grid-cols-1 gap-1 text-sm items-baseline">
           <div :for={{label, value} <- @options} class="flex items-center">
@@ -645,20 +646,20 @@ defmodule YscWeb.CoreComponents do
                 class="mr-2 h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-400 transition duration-150 ease-in-out"
                 {@rest}
               />
-              <%= label %>
+              {label}
             </label>
           </div>
         </div>
       </div>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "phone-input"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name} class="phx-no-feedback">
-      <.label for={"live_phone-" <> @id}><%= @label %></.label>
+    <div>
+      <.label for={"live_phone-" <> @id}>{@label}</.label>
       <.live_component
         module={LivePhone}
         id={@id}
@@ -674,15 +675,15 @@ defmodule YscWeb.CoreComponents do
         ]}
         {@rest}
       />
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "date-text"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label for={@id}><%= @label %></.label>
+    <div>
+      <.label for={@id}>{@label}</.label>
       <div class="relative">
         <input
           type="date"
@@ -691,7 +692,6 @@ defmodule YscWeb.CoreComponents do
           value={Phoenix.HTML.Form.normalize_value("date", @value)}
           class={[
             "mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
-            "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
             @errors == [] && "border-zinc-300 focus:border-zinc-400",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
@@ -701,15 +701,15 @@ defmodule YscWeb.CoreComponents do
           {@rest}
         />
       </div>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "text-growing"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label for={@id}><%= @label %></.label>
+    <div>
+      <.label for={@id}>{@label}</.label>
       <input
         type={@type}
         name={@name}
@@ -719,19 +719,19 @@ defmodule YscWeb.CoreComponents do
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         {@rest}
       />
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "text-icon"} = assigns) do
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label for={@id}><%= @label %></.label>
+    <div>
+      <.label for={@id}>{@label}</.label>
 
       <div class="relative">
         <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-          <%= render_slot(@inner_block) %>
+          {render_slot(@inner_block)}
         </div>
         <input
           type="text"
@@ -740,14 +740,13 @@ defmodule YscWeb.CoreComponents do
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
             "mt-2 block w-full ps-7 rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
-            "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
             @errors == [] && "border-zinc-300 focus:border-zinc-400",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
           {@rest}
         />
       </div>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -761,8 +760,8 @@ defmodule YscWeb.CoreComponents do
     assigns = assign(assigns, :id, id)
 
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label :if={@label} for={@id}><%= @label %></.label>
+    <div>
+      <.label :if={@label} for={@id}>{@label}</.label>
 
       <div class="flex gap-x-3 mt-1" data-otp-input="">
         <%= for i <- 0..5 do %>
@@ -777,7 +776,7 @@ defmodule YscWeb.CoreComponents do
           />
         <% end %>
       </div>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -823,8 +822,8 @@ defmodule YscWeb.CoreComponents do
       |> assign(:is_password_toggle, is_password_toggle)
 
     ~H"""
-    <div phx-feedback-for={@name}>
-      <.label :if={@label} for={@id}><%= @label %></.label>
+    <div>
+      <.label :if={@label} for={@id}>{@label}</.label>
 
       <div class={["relative", @is_password_toggle && ""]}>
         <input
@@ -835,7 +834,6 @@ defmodule YscWeb.CoreComponents do
           class={[
             "mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
             @is_password_toggle && "pr-10",
-            "phx-no-feedback:border-zinc-300 phx-no-feedback:focus:border-zinc-400",
             @errors == [] && "border-zinc-300 focus:border-zinc-400",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
@@ -855,7 +853,7 @@ defmodule YscWeb.CoreComponents do
           />
         </button>
       </div>
-      <.error :for={msg <- @errors}><%= msg %></.error>
+      <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
   end
@@ -869,7 +867,7 @@ defmodule YscWeb.CoreComponents do
 
   def radio_fieldset(%{field: %Phoenix.HTML.FormField{}} = assigns) do
     ~H"""
-    <div phx-feedback-for={@field.name}>
+    <div>
       <ul class="grid w-full gap-6 md:grid-cols-2">
         <li :for={{_, values} <- @options} class="flex flex-col">
           <.input
@@ -929,7 +927,7 @@ defmodule YscWeb.CoreComponents do
   def label(assigns) do
     ~H"""
     <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-800">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </label>
     """
   end
@@ -941,9 +939,9 @@ defmodule YscWeb.CoreComponents do
 
   def error(assigns) do
     ~H"""
-    <p class="flex gap-3 mt-3 text-sm leading-6 text-rose-600 phx-no-feedback:hidden">
+    <p class="flex gap-3 mt-3 text-sm leading-6 text-rose-600">
       <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </p>
     """
   end
@@ -999,14 +997,14 @@ defmodule YscWeb.CoreComponents do
       today={@today}
       allow_saturdays={@allow_saturdays}
     />
-    <div phx-feedback-for={@start_date_field.name}>
+    <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
-        <%= format_form_error(msg) %>
+        {format_form_error(msg)}
       </.error>
     </div>
-    <div phx-feedback-for={@end_date_field.name}>
+    <div :if={Phoenix.Component.used_input?(@end_date_field)}>
       <.error :for={msg <- @end_date_field.errors}>
-        <%= format_form_error(msg) %>
+        {format_form_error(msg)}
       </.error>
     </div>
     """
@@ -1039,9 +1037,9 @@ defmodule YscWeb.CoreComponents do
       is_range?={false}
       min={@min}
     />
-    <div phx-feedback-for={@start_date_field.name}>
-      <.error :for={msg <- @start_date_field.form.errors}>
-        <%= format_form_error(msg) %>
+    <div :if={Phoenix.Component.used_input?(@start_date_field)}>
+      <.error :for={msg <- @start_date_field.errors}>
+        {format_form_error(msg)}
       </.error>
     </div>
     """
@@ -1067,13 +1065,13 @@ defmodule YscWeb.CoreComponents do
     ]}>
       <div>
         <h1 class="text-lg font-semibold leading-8 text-zinc-800">
-          <%= render_slot(@inner_block) %>
+          {render_slot(@inner_block)}
         </h1>
         <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
-          <%= render_slot(@subtitle) %>
+          {render_slot(@subtitle)}
         </p>
       </div>
-      <div class="flex-none"><%= render_slot(@actions) %></div>
+      <div class="flex-none">{render_slot(@actions)}</div>
     </header>
     """
   end
@@ -1159,8 +1157,8 @@ defmodule YscWeb.CoreComponents do
         </div>
         <div class="px-4 flex-1">
           <p class="text-sm">
-            <strong :if={@title}><%= @title %>:</strong>
-            <%= render_slot(@inner_block) %>
+            <strong :if={@title}>{@title}:</strong>
+            {render_slot(@inner_block)}
           </p>
           <div :if={@action_label} class="flex flex-col sm:flex-row gap-2 mt-3">
             <.link
@@ -1172,7 +1170,7 @@ defmodule YscWeb.CoreComponents do
               ]}
             >
               <.icon name="hero-credit-card" class="w-5 h-5 me-2" />
-              <%= @action_label %>
+              {@action_label}
             </.link>
           </div>
         </div>
@@ -1226,10 +1224,10 @@ defmodule YscWeb.CoreComponents do
         <thead class="text-sm leading-6 text-left text-zinc-500">
           <tr>
             <th :for={col <- @col} class="p-0 pb-4 pr-6 font-normal">
-              <%= col[:label] %>
+              {col[:label]}
             </th>
             <th class="relative p-0 pb-4">
-              <span class="sr-only"><%= gettext("Actions") %></span>
+              <span class="sr-only">{gettext("Actions")}</span>
             </th>
           </tr>
         </thead>
@@ -1251,7 +1249,7 @@ defmodule YscWeb.CoreComponents do
               <div class="block py-4 pr-6">
                 <span class="absolute right-0 -inset-y-px -left-4 group-hover:bg-zinc-50 sm:rounded-l-xl" />
                 <span class={["relative", i == 0 && "font-semibold text-zinc-900"]}>
-                  <%= render_slot(col, @row_item.(row)) %>
+                  {render_slot(col, @row_item.(row))}
                 </span>
               </div>
             </td>
@@ -1262,7 +1260,7 @@ defmodule YscWeb.CoreComponents do
                   :for={action <- @action}
                   class="relative ml-4 font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
                 >
-                  <%= render_slot(action, @row_item.(row)) %>
+                  {render_slot(action, @row_item.(row))}
                 </span>
               </div>
             </td>
@@ -1292,8 +1290,8 @@ defmodule YscWeb.CoreComponents do
     <div class="mt-14">
       <dl class="-my-4 divide-y divide-zinc-100">
         <div :for={item <- @item} class="flex gap-4 py-4 text-sm leading-6 sm:gap-8">
-          <dt class="flex-none w-1/4 text-zinc-500"><%= item.title %></dt>
-          <dd class="text-zinc-700"><%= render_slot(item) %></dd>
+          <dt class="flex-none w-1/4 text-zinc-500">{item.title}</dt>
+          <dd class="text-zinc-700">{render_slot(item)}</dd>
         </div>
       </dl>
     </div>
@@ -1318,7 +1316,7 @@ defmodule YscWeb.CoreComponents do
         class="text-sm font-semibold leading-6 text-zinc-600 hover:text-zinc-800 rounded hover:bg-zinc-100 p-2"
       >
         <.icon name="hero-arrow-left-solid" class="w-3 h-3 -mt-0.5" />
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </.link>
     </div>
     """
@@ -1373,7 +1371,7 @@ defmodule YscWeb.CoreComponents do
           <div>
             <p class="font-bold text-sm">IMPERSONATING USER</p>
             <p class="text-xs">
-              Viewing as: <%= @impersonated_user_name %> (<%= @impersonated_user_email %>)
+              Viewing as: {@impersonated_user_name} ({@impersonated_user_email})
             </p>
           </div>
         </div>
@@ -1415,7 +1413,7 @@ defmodule YscWeb.CoreComponents do
         class={"group flex items-center justify-between w-full px-3 py-2 font-bold transition duration-200 ease-in-out rounded lg:w-auto #{@class}"}
         phx-click={toggle_dropdown("##{@id}")}
       >
-        <%= render_slot(@button_block) %>
+        {render_slot(@button_block)}
       </button>
       <!-- Dropdown menu -->
       <div
@@ -1430,7 +1428,7 @@ defmodule YscWeb.CoreComponents do
         ]}
         phx-click-away={toggle_dropdown("##{@id}")}
       >
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </div>
     </div>
     """
@@ -1468,7 +1466,7 @@ defmodule YscWeb.CoreComponents do
         class="absolute z-[110] hidden w-60 mt-0 font-normal bg-white divide-y rounded shadow divide-zinc-100 right-4 mt-1"
         phx-click-away={hide_dropdown("#avatar-menu")}
       >
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </div>
     </div>
     """
@@ -1822,7 +1820,7 @@ defmodule YscWeb.CoreComponents do
     </aside>
 
     <main class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </main>
 
     <div
@@ -1911,10 +1909,10 @@ defmodule YscWeb.CoreComponents do
         !@right && "ps-3"
       ]}>
         <div class="text-sm font-semibold text-zinc-800 text-left">
-          <%= @display_name %>
+          {@display_name}
         </div>
         <div :if={@show_subtitle} class="font-normal text-sm text-zinc-500">
-          <%= @subtitle %>
+          {@subtitle}
         </div>
       </div>
     </div>
@@ -1951,12 +1949,12 @@ defmodule YscWeb.CoreComponents do
 
       <%!-- Desktop: Navigation links inline --%>
       <div class="hidden lg:flex lg:items-center lg:space-x-8">
-        <%= render_slot(@desktop_content) %>
+        {render_slot(@desktop_content)}
       </div>
 
       <%!-- CTA section (visible on both mobile and desktop) --%>
       <div id="cta-section" class="flex items-center">
-        <%= render_slot(@cta_section) %>
+        {render_slot(@cta_section)}
       </div>
     </div>
 
@@ -1995,7 +1993,7 @@ defmodule YscWeb.CoreComponents do
 
       <%!-- Menu content --%>
       <div class="mobile-menu-content p-4">
-        <%= render_slot(@mobile_content) %>
+        {render_slot(@mobile_content)}
       </div>
     </div>
     """
@@ -2032,7 +2030,7 @@ defmodule YscWeb.CoreComponents do
       @type == "dark" && "bg-zinc-100 text-zinc-800",
       @type == "default" && "bg-blue-100 text-blue-800"
     ]}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </span>
     """
   end
@@ -2084,7 +2082,7 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <div class={["relative inline-block", @class]}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
       <div
         :if={@show_badge}
         class={[
@@ -2093,7 +2091,7 @@ defmodule YscWeb.CoreComponents do
           @badge_class
         ]}
       >
-        <%= if @count > 99, do: "99+", else: @count %>
+        {if @count > 99, do: "99+", else: @count}
       </div>
     </div>
     """
@@ -2119,7 +2117,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div>
       <div class="group relative">
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
         <span
           role="tooltip"
           class={[
@@ -2128,7 +2126,7 @@ defmodule YscWeb.CoreComponents do
             @text_align
           ]}
         >
-          <%= @tooltip_text %>
+          {@tooltip_text}
         </span>
       </div>
     </div>
@@ -2142,12 +2140,12 @@ defmodule YscWeb.CoreComponents do
   def tooltip_special(assigns) do
     ~H"""
     <div class="group relative">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
       <span
         role="tooltip"
         class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-3 py-2 inline-block text-left rounded tooltip group-hover:opacity-100"
       >
-        <%= render_slot(@tooltip_body) %>
+        {render_slot(@tooltip_body)}
       </span>
     </div>
     """
@@ -2174,7 +2172,7 @@ defmodule YscWeb.CoreComponents do
           name="hero-bolt-solid"
           class="w-3 h-3 inline-block me-0.5 -mt-0.5"
         />
-        <%= text %>
+        {text}
       </.badge>
     </div>
     """
@@ -2380,9 +2378,9 @@ defmodule YscWeb.CoreComponents do
             class="flex items-center leading-6 text-sm"
           >
             <span class="flex items-center text-zinc-400 justify-center w-6 h-6 text-xs font-bold border rounded me-2 shrink-0 border-zinc-400">
-              <%= idx + 1 %>
+              {idx + 1}
             </span>
-            <%= val %>
+            {val}
             <.icon
               :if={idx + 1 < assigns[:stepper_max_length]}
               name="hero-chevron-right"
@@ -2395,9 +2393,9 @@ defmodule YscWeb.CoreComponents do
           class="flex items-center leading-6 text-blue-800 text-sm"
         >
           <span class="flex items-center text-zinc-100 justify-center w-6 h-6 text-xs font-bold bg-blue-600 border border-blue-600 rounded me-2 shrink-0">
-            <%= idx + 1 %>
+            {idx + 1}
           </span>
-          <%= val %>
+          {val}
           <.icon
             :if={idx + 1 < assigns[:stepper_max_length]}
             name="hero-chevron-right"
@@ -2445,8 +2443,8 @@ defmodule YscWeb.CoreComponents do
         alt="Looks like this page is empty"
       />
       <.header class="pt-8">
-        <%= @title %>
-        <:subtitle><%= @suggestion %></:subtitle>
+        {@title}
+        <:subtitle>{@suggestion}</:subtitle>
       </.header>
     </div>
     """
@@ -2600,7 +2598,7 @@ defmodule YscWeb.CoreComponents do
       class={"flex p-4 mb-4 text-sm text-#{@color}-800 rounded bg-#{@color}-50 border border-#{@color}-100"}
       role="alert"
     >
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -2622,7 +2620,7 @@ defmodule YscWeb.CoreComponents do
       <div class="h-[64px] w-[3px] bg-zinc-800 absolute -end-[17px] top-[142px] rounded-e-lg">
       </div>
       <div class="rounded-xl overflow-y-auto w-[272px] h-[572px] bg-white">
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </div>
     </div>
     """
@@ -2643,7 +2641,7 @@ defmodule YscWeb.CoreComponents do
       <div class="h-[64px] w-[3px] bg-zinc-800 absolute -end-[17px] top-[142px] rounded-e-lg">
       </div>
       <div class="rounded-[2rem] overflow-y-auto h-[426px] md:h-[654px] bg-white">
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </div>
     </div>
     """
@@ -2698,7 +2696,7 @@ defmodule YscWeb.CoreComponents do
           />
           <div>
             <p class="text-sm font-black text-zinc-900 leading-none">
-              <%= @author %>
+              {@author}
             </p>
             <p class="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
               <time
@@ -2706,14 +2704,14 @@ defmodule YscWeb.CoreComponents do
                 datetime={Timex.format!(@date, "%Y-%m-%d", :strftime)}
                 title={Timex.format!(@date, "%B %e, %Y", :strftime)}
               >
-                <%= Timex.format!(@date, "%b %e, %Y", :strftime) %>
+                {Timex.format!(@date, "%b %e, %Y", :strftime)}
               </time>
             </p>
           </div>
         </div>
       </footer>
       <p class="text-zinc-600 leading-relaxed ps-11 text-sm md:text-base">
-        <%= @text %>
+        {@text}
       </p>
       <div :if={!@reply} class="flex items-center mt-4 space-x-4">
         <button
@@ -3002,7 +3000,7 @@ defmodule YscWeb.CoreComponents do
               <%= if @primary_user do %>
                 The membership from
                 <strong>
-                  <%= @primary_user.first_name %> <%= @primary_user.last_name %>
+                  {@primary_user.first_name} {@primary_user.last_name}
                 </strong>
                 has been canceled.
               <% else %>
@@ -3042,17 +3040,17 @@ defmodule YscWeb.CoreComponents do
             />
             <%= if @is_sub_account do %>
               You have access to an active
-              <strong><%= get_membership_type(@current_membership) %></strong>
+              <strong>{get_membership_type(@current_membership)}</strong>
               membership
               <%= if @primary_user do %>
                 from
                 <strong>
-                  <%= @primary_user.first_name %> <%= @primary_user.last_name %>
+                  {@primary_user.first_name} {@primary_user.last_name}
                 </strong>
               <% end %>.
             <% else %>
               You have an active
-              <strong><%= get_membership_type(@current_membership) %></strong>
+              <strong>{get_membership_type(@current_membership)}</strong>
               membership.
             <% end %>
           </p>
@@ -3102,14 +3100,14 @@ defmodule YscWeb.CoreComponents do
               <%= if @primary_user do %>
                 The membership from
                 <strong>
-                  <%= @primary_user.first_name %> <%= @primary_user.last_name %>
+                  {@primary_user.first_name} {@primary_user.last_name}
                 </strong>
                 is scheduled for cancellation.
               <% else %>
                 The primary account membership is scheduled for cancellation.
               <% end %>
             <% else %>
-              Your <strong><%= get_membership_type(@current_membership) %></strong>
+              Your <strong>{get_membership_type(@current_membership)}</strong>
               membership is scheduled for cancellation.
             <% end %>
           </p>
@@ -3331,21 +3329,21 @@ defmodule YscWeb.CoreComponents do
           :if={@title != []}
           class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-lg"
         >
-          <%= render_slot(@title) %>
+          {render_slot(@title)}
         </h1>
 
         <p
           :if={@subtitle != []}
           class="mt-6 text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto drop-shadow-md"
         >
-          <%= render_slot(@subtitle) %>
+          {render_slot(@subtitle)}
         </p>
 
         <div :if={@cta != []} class="mt-8 flex flex-wrap gap-4 justify-center">
-          <%= render_slot(@cta) %>
+          {render_slot(@cta)}
         </div>
 
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </div>
     </section>
     """

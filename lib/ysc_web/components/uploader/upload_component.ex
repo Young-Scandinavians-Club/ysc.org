@@ -61,7 +61,7 @@ defmodule YscWeb.UploadComponent do
                     class="group-hover:blur h-80 w-full"
                   />
                   <figcaption class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1">
-                    <%= entry.client_name %>
+                    {entry.client_name}
                   </figcaption>
                 </button>
               </figure>
@@ -69,9 +69,9 @@ defmodule YscWeb.UploadComponent do
               <%!-- Phoenix.Component.upload_errors/2 returns a list of error atoms --%>
               <%= for err <- upload_errors(@uploads.upload_component_file, entry) do %>
                 <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> <%= error_to_string(
+                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
                     err
-                  ) %>
+                  )}
                 </p>
               <% end %>
             </article>
@@ -80,9 +80,9 @@ defmodule YscWeb.UploadComponent do
 
         <%= for err <- upload_errors(@uploads.upload_component_file) do %>
           <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-            <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> <%= error_to_string(
+            <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
               err
-            ) %>
+            )}
           </p>
         <% end %>
 

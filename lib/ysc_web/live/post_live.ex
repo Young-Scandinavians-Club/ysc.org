@@ -55,11 +55,11 @@ defmodule YscWeb.PostLive do
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
             <span class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
-              <%= Timex.format!(post_date(@post), "{Mshort} {D}, {YYYY}") %>
+              {Timex.format!(post_date(@post), "{Mshort} {D}, {YYYY}")}
             </span>
           </div>
           <h1 class="text-4xl md:text-6xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-8">
-            <%= @post.title %>
+            {@post.title}
           </h1>
           <div class="flex items-center justify-center gap-4 py-6 border-y border-zinc-100">
             <.user_avatar_image
@@ -73,10 +73,10 @@ defmodule YscWeb.PostLive do
                 Post By
               </p>
               <p class="text-sm font-medium text-zinc-500">
-                <%= String.capitalize(@post.author.first_name || "") %>
-                <%= String.capitalize(@post.author.last_name || "") %>
+                {String.capitalize(@post.author.first_name || "")}
+                {String.capitalize(@post.author.last_name || "")}
                 <%= if @post.board_position_at_publish do %>
-                  , YSC <%= format_board_position(@post.board_position_at_publish) %>
+                  , YSC {format_board_position(@post.board_position_at_publish)}
                 <% end %>
               </p>
             </div>
@@ -123,7 +123,7 @@ defmodule YscWeb.PostLive do
             class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-light border-l border-zinc-100 ml-[-2rem] pl-8"
             phx-hook="GLightboxHook"
           >
-            <%= raw(@post.raw_body) %>
+            {raw(@post.raw_body)}
           </div>
         </article>
       </div>
@@ -138,7 +138,7 @@ defmodule YscWeb.PostLive do
             <div class="flex items-center gap-3 mb-8">
               <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
               <h2 class="text-2xl font-black text-zinc-900 tracking-tight">
-                Community Discussion (<%= @n_comments %>)
+                Community Discussion ({@n_comments})
               </h2>
             </div>
 
@@ -227,7 +227,7 @@ defmodule YscWeb.PostLive do
       nil ->
         {:ok,
          socket
-         |> put_flash(:error, "Article not found")
+         |> YscWeb.Flash.put_toast(:error, "Article not found")
          |> redirect(to: ~p"/news")}
 
       post ->
@@ -331,7 +331,7 @@ defmodule YscWeb.PostLive do
     if new_comment.user_id == socket.assigns[:current_user].id do
       {:noreply,
        new_socket
-       |> put_flash(:info, "Your comment has been posted!")
+       |> YscWeb.Flash.put_toast(:info, "Your comment has been posted!")
        |> assign(:loading, false)
        |> assign_form(new_comment_changeset)}
     else

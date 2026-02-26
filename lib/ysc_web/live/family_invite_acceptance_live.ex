@@ -11,13 +11,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
       is_nil(invite) ->
         {:ok,
          socket
-         |> put_flash(:error, "Invalid invitation link.")
+         |> YscWeb.Flash.put_toast(:error, "Invalid invitation link.")
          |> redirect(to: ~p"/")}
 
       not FamilyInvite.valid?(invite) ->
         {:ok,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "This invitation has expired or has already been used."
          )
@@ -83,7 +83,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
       {:ok, _user} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :info,
            "Account created successfully! You can now log in with your email and password."
          )
@@ -92,13 +92,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
       {:error, :invite_not_found} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Invitation not found.")
+         |> YscWeb.Flash.put_toast(:error, "Invitation not found.")
          |> redirect(to: ~p"/")}
 
       {:error, :invite_expired_or_used} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "This invitation has expired or has already been used."
          )
@@ -117,8 +117,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         <h1>Accept Family Invitation</h1>
 
         <p>
-          You've been invited by
-          <strong><%= @invite.primary_user.first_name %></strong>
+          You've been invited by <strong>{@invite.primary_user.first_name}</strong>
           to join
           their YSC family membership!
         </p>

@@ -223,7 +223,7 @@ defmodule YscWeb.UserSecurityLive do
     # Get passkey and verify it belongs to current user
     case Repo.get(Ysc.Accounts.UserPasskey, id) do
       nil ->
-        {:noreply, put_flash(socket, :error, "Passkey not found.")}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, "Passkey not found.")}
 
       passkey ->
         if passkey.user_id == user.id do
@@ -236,11 +236,11 @@ defmodule YscWeb.UserSecurityLive do
               {:noreply,
                socket
                |> assign(:passkeys, updated_passkeys)
-               |> put_flash(:info, "Passkey deleted successfully.")}
+               |> YscWeb.Flash.put_toast(:info, "Passkey deleted successfully.")}
 
             {:error, _changeset} ->
               {:noreply,
-               put_flash(
+               YscWeb.Flash.put_toast(
                  socket,
                  :error,
                  "Failed to delete passkey. Please try again."
@@ -248,7 +248,7 @@ defmodule YscWeb.UserSecurityLive do
           end
         else
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "You are not authorized to delete this passkey."
@@ -262,9 +262,14 @@ defmodule YscWeb.UserSecurityLive do
     user_params = socket.assigns.pending_password_change
     user_has_password = socket.assigns.user_has_password
 
+    # When UI says "no password", confirm in DB to avoid overwriting an existing
+    # password (e.g. stale session/cache showing hashed_password as nil).
+    actually_has_password =
+      user_has_password || Accounts.user_has_password_in_db?(user)
+
     # Use appropriate update function based on whether user has a password
     result =
-      if user_has_password do
+      if actually_has_password do
         # User is changing their existing password - no need to validate current password
         # since we just re-authenticated them
         changeset = Accounts.User.password_changeset(user, user_params)
@@ -351,7 +356,7 @@ defmodule YscWeb.UserSecurityLive do
               />
               <%= if @reauth_error do %>
                 <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                  <p class="text-sm text-red-800"><%= @reauth_error %></p>
+                  <p class="text-sm text-red-800">{@reauth_error}</p>
                 </div>
               <% end %>
               <:actions>
@@ -373,9 +378,9 @@ defmodule YscWeb.UserSecurityLive do
             </div>
 
             <h3 class="font-semibold text-zinc-900">
-              <%= if @user_has_password,
+              {if @user_has_password,
                 do: "Verify with a passkey",
-                else: "Verify with your passkey" %>
+                else: "Verify with your passkey"}
             </h3>
             <p class="text-sm text-zinc-600">
               Use your device's fingerprint, face recognition, or security key
@@ -537,20 +542,20 @@ defmodule YscWeb.UserSecurityLive do
                       <div class="flex items-center gap-2 mb-1">
                         <.icon name="hero-key" class="w-5 h-5 text-zinc-600" />
                         <p class="text-zinc-900 font-medium">
-                          <%= format_passkey_name(passkey) %>
+                          {format_passkey_name(passkey)}
                         </p>
                       </div>
                       <div class="text-sm text-zinc-600 space-y-1">
                         <p>
-                          Created: <%= Calendar.strftime(
+                          Created: {Calendar.strftime(
                             passkey.inserted_at,
                             "%B %d, %Y"
-                          ) %>
+                          )}
                         </p>
                         <p>
                           Last used:
                           <%= if passkey.last_used_at do %>
-                            <%= Calendar.strftime(passkey.last_used_at, "%B %d, %Y") %>
+                            {Calendar.strftime(passkey.last_used_at, "%B %d, %Y")}
                           <% else %>
                             Never
                           <% end %>
@@ -576,9 +581,9 @@ defmodule YscWeb.UserSecurityLive do
             <!-- Password Change Section -->
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">
-                <%= if @user_has_password,
+                {if @user_has_password,
                   do: "Change Password",
-                  else: "Set Password" %>
+                  else: "Set Password"}
               </h2>
 
               <p :if={!@user_has_password} class="text-sm text-zinc-600">
@@ -620,9 +625,9 @@ defmodule YscWeb.UserSecurityLive do
                 </p>
                 <:actions>
                   <.button phx-disable-with="Continuing...">
-                    <%= if @user_has_password,
+                    {if @user_has_password,
                       do: "Change Password",
-                      else: "Set Password" %>
+                      else: "Set Password"}
                   </.button>
                 </:actions>
               </.simple_form>
@@ -667,7 +672,7 @@ defmodule YscWeb.UserSecurityLive do
                         class="w-5 h-5 text-zinc-600 shrink-0"
                       />
                       <span class={login_status_badge(event)}>
-                        <%= if event.success, do: "Successful", else: "Failed" %>
+                        {if event.success, do: "Successful", else: "Failed"}
                       </span>
                       <%= if event.is_suspicious do %>
                         <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
@@ -679,12 +684,12 @@ defmodule YscWeb.UserSecurityLive do
                       <% end %>
                     </div>
                     <p class="text-sm text-zinc-900 font-medium">
-                      <%= login_device_description(event) %>
+                      {login_device_description(event)}
                     </p>
                     <p class="text-xs text-zinc-500 mt-1">
-                      <%= format_login_time(event.inserted_at, @timezone) %> · <%= mask_ip(
+                      {format_login_time(event.inserted_at, @timezone)} · {mask_ip(
                         event.ip_address
-                      ) %>
+                      )}
                     </p>
                   </div>
                 </div>

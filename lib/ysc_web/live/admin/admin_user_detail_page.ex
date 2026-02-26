@@ -36,7 +36,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div class="flex flex-row items-center justify-between pt-4">
           <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-            <%= "#{String.capitalize(@first_name)} #{String.capitalize(@last_name)}" %>
+            {"#{String.capitalize(@first_name)} #{String.capitalize(@last_name)}"}
           </h1>
           <.link
             href={~p"/admin/impersonate/#{@user_id}"}
@@ -354,18 +354,18 @@ defmodule YscWeb.AdminUserDetailsLive do
               <:col :let={{_, order}} label="Order ID" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
                   <span class="font-mono text-xs">
-                    <%= order.reference_id %>
+                    {order.reference_id}
                   </span>
                 </.badge>
               </:col>
               <:col :let={{_, order}} label="Event" field={:inserted_at}>
                 <%= if order.event do %>
                   <div class="text-sm font-semibold text-zinc-800">
-                    <%= order.event.title %>
+                    {order.event.title}
                   </div>
                   <%= if order.event.start_date do %>
                     <div class="text-xs text-zinc-500 mt-0.5">
-                      <%= Calendar.strftime(order.event.start_date, "%b %d, %Y") %>
+                      {Calendar.strftime(order.event.start_date, "%b %d, %Y")}
                     </div>
                   <% end %>
                 <% else %>
@@ -374,12 +374,12 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, order}} label="Tickets">
                 <span class="text-sm text-zinc-600">
-                  <%= length(order.tickets || []) %> ticket(s)
+                  {length(order.tickets || [])} ticket(s)
                 </span>
               </:col>
               <:col :let={{_, order}} label="Amount" field={:total_amount}>
                 <span class="text-sm font-medium text-zinc-900">
-                  <%= Ysc.MoneyHelper.format_money!(order.total_amount) %>
+                  {Ysc.MoneyHelper.format_money!(order.total_amount)}
                 </span>
               </:col>
               <:col :let={{_, order}} label="Status" field={:status}>
@@ -408,7 +408,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, order}} label="Order Date" field={:inserted_at}>
                 <span class="text-sm text-zinc-600">
-                  <%= Calendar.strftime(order.inserted_at, "%b %d, %Y") %>
+                  {Calendar.strftime(order.inserted_at, "%b %d, %Y")}
                 </span>
               </:col>
             </Flop.Phoenix.table>
@@ -417,26 +417,23 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@ticket_orders_meta}
               meta={@ticket_orders_meta}
               path={~p"/admin/users/#{@user_id}/details/orders"}
-              opts={[
-                wrapper_attrs: [
-                  class: "flex items-center justify-center py-10 h-10 text-base"
-                ],
-                pagination_list_attrs: [
-                  class: [
-                    "flex gap-0 order-2 justify-center items-center"
-                  ]
-                ],
-                previous_link_attrs: [
-                  class:
-                    "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                next_link_attrs: [
-                  class:
-                    "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                page_links: {:ellipsis, 5}
+              class="flex items-center justify-center py-10 h-10 text-base"
+              page_list_attrs={[
+                class: "flex gap-0 order-2 justify-center items-center"
               ]}
-            />
+              page_links={5}
+            >
+              <:previous attrs={[
+                class:
+                  "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:previous>
+              <:next attrs={[
+                class:
+                  "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:next>
+            </Flop.Phoenix.pagination>
           </div>
         </div>
 
@@ -452,7 +449,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
                   <span class="font-mono text-xs flex-shrink-0 whitespace-nowrap">
-                    <%= booking.reference_id %>
+                    {booking.reference_id}
                   </span>
                 </.badge>
               </:col>
@@ -470,22 +467,22 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, booking}} label="Check-in" field={:checkin_date}>
                 <span class="text-sm text-zinc-800">
-                  <%= Calendar.strftime(booking.checkin_date, "%b %d, %Y") %>
+                  {Calendar.strftime(booking.checkin_date, "%b %d, %Y")}
                 </span>
               </:col>
               <:col :let={{_, booking}} label="Check-out" field={:checkout_date}>
                 <span class="text-sm text-zinc-800">
-                  <%= Calendar.strftime(booking.checkout_date, "%b %d, %Y") %>
+                  {Calendar.strftime(booking.checkout_date, "%b %d, %Y")}
                 </span>
               </:col>
               <:col :let={{_, booking}} label="Nights">
                 <span class="text-sm text-zinc-600">
-                  <%= Date.diff(booking.checkout_date, booking.checkin_date) %>
+                  {Date.diff(booking.checkout_date, booking.checkin_date)}
                 </span>
               </:col>
               <:col :let={{_, booking}} label="Guests" field={:guests_count}>
                 <span class="text-sm text-zinc-600">
-                  <%= booking.guests_count %>
+                  {booking.guests_count}
                 </span>
               </:col>
               <:col :let={{_, booking}} label="Room" field={:booking_mode}>
@@ -494,13 +491,11 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <%= for room <- booking.rooms do %>
                       <div>
                         <div class="text-sm font-medium text-zinc-800">
-                          <%= room.name %>
+                          {room.name}
                         </div>
                         <%= if room.room_category do %>
                           <div class="text-xs text-zinc-500 mt-0.5">
-                            <%= String.capitalize(
-                              to_string(room.room_category.name)
-                            ) %>
+                            {String.capitalize(to_string(room.room_category.name))}
                           </div>
                         <% end %>
                       </div>
@@ -542,7 +537,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, booking}} label="Booked" field={:inserted_at}>
                 <span class="text-sm text-zinc-600">
-                  <%= Calendar.strftime(booking.inserted_at, "%b %d, %Y") %>
+                  {Calendar.strftime(booking.inserted_at, "%b %d, %Y")}
                 </span>
               </:col>
               <:action :let={{_, booking}} label="Action">
@@ -559,26 +554,23 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@bookings_meta}
               meta={@bookings_meta}
               path={~p"/admin/users/#{@user_id}/details/bookings"}
-              opts={[
-                wrapper_attrs: [
-                  class: "flex items-center justify-center py-10 h-10 text-base"
-                ],
-                pagination_list_attrs: [
-                  class: [
-                    "flex gap-0 order-2 justify-center items-center"
-                  ]
-                ],
-                previous_link_attrs: [
-                  class:
-                    "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                next_link_attrs: [
-                  class:
-                    "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                page_links: {:ellipsis, 5}
+              class="flex items-center justify-center py-10 h-10 text-base"
+              page_list_attrs={[
+                class: "flex gap-0 order-2 justify-center items-center"
               ]}
-            />
+              page_links={5}
+            >
+              <:previous attrs={[
+                class:
+                  "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:previous>
+              <:next attrs={[
+                class:
+                  "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:next>
+            </Flop.Phoenix.pagination>
           </div>
         </div>
 
@@ -591,7 +583,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             <p class="leading-6 text-sm text-zinc-800 mb-4 font-semibold">
               Submitted:
               <.badge>
-                <%= if @selected_user_application.completed do
+                {if @selected_user_application.completed do
                   date_str =
                     @selected_user_application.completed
                     |> DateTime.shift_zone!("America/Los_Angeles")
@@ -600,7 +592,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   "#{date_str} (#{Timex.from_now(@selected_user_application.completed)})"
                 else
                   "N/A"
-                end %>
+                end}
               </.badge>
             </p>
 
@@ -610,7 +602,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             >
               Review outcome:
               <.badge>
-                <%= @selected_user_application.review_outcome %>
+                {@selected_user_application.review_outcome}
               </.badge>
             </p>
 
@@ -618,7 +610,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@selected_user_application.reviewed_by != nil}
               class="leading-6 text-sm text-zinc-800 mb-4"
             >
-              <span class="font-semibold">Reviewed by:</span> <%= @selected_user_application.reviewed_by.first_name %> <%= @selected_user_application.reviewed_by.last_name %> (<%= @selected_user_application.reviewed_by.email %>)
+              <span class="font-semibold">Reviewed by:</span> {@selected_user_application.reviewed_by.first_name} {@selected_user_application.reviewed_by.last_name} ({@selected_user_application.reviewed_by.email})
             </p>
 
             <p
@@ -627,13 +619,13 @@ defmodule YscWeb.AdminUserDetailsLive do
             >
               <span class="font-semibold">Reviewed at:</span>
               <.badge>
-                <%= if @selected_user_application.reviewed_at do
+                {if @selected_user_application.reviewed_at do
                   format_datetime_for_display(
                     @selected_user_application.reviewed_at
                   )
                 else
                   "N/A"
-                end %>
+                end}
               </.badge>
             </p>
 
@@ -642,13 +634,13 @@ defmodule YscWeb.AdminUserDetailsLive do
             </h3>
             <ul class="leading-6 text-zinc-800 text-sm pb-6">
               <li>
-                <span class="font-semibold">Email:</span> <%= @selected_user.email %>
+                <span class="font-semibold">Email:</span> {@selected_user.email}
               </li>
               <li>
-                <span class="font-semibold">Name:</span> <%= "#{@selected_user.first_name} #{@selected_user.last_name}" %>
+                <span class="font-semibold">Name:</span> {"#{@selected_user.first_name} #{@selected_user.last_name}"}
               </li>
               <li>
-                <span class="font-semibold">Birth date:</span> <%= @selected_user_application.birth_date %>
+                <span class="font-semibold">Birth date:</span> {@selected_user_application.birth_date}
               </li>
 
               <li :if={length(@selected_user.family_members) > 0}>
@@ -656,9 +648,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <ul class="space-y-1 text-zinc-800 list-disc list-inside">
                   <li :for={family_member <- @selected_user.family_members}>
                     <span class="text-xs font-medium me-2 px-2.5 py-1 rounded text-left bg-blue-100 text-blue-800">
-                      <%= String.capitalize("#{family_member.type}") %>
+                      {String.capitalize("#{family_member.type}")}
                     </span>
-                    <%= "#{family_member.first_name} #{family_member.last_name} (#{family_member.birth_date})" %>
+                    {"#{family_member.first_name} #{family_member.last_name} (#{family_member.birth_date})"}
                   </li>
                 </ul>
               </li>
@@ -669,7 +661,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </h3>
             <ul class="leading-6 text-sm text-zinc-800 pb-6">
               <li>
-                <span class="font-semibold">Membership type:</span> <%= @selected_user_application.membership_type %>
+                <span class="font-semibold">Membership type:</span> {@selected_user_application.membership_type}
               </li>
 
               <li class="pt-2">
@@ -678,24 +670,24 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <li :for={
                     reason <- @selected_user_application.membership_eligibility
                   }>
-                    <%= Map.get(
+                    {Map.get(
                       Ysc.Accounts.SignupApplication.eligibility_lookup(),
                       reason
-                    ) %>
+                    )}
                   </li>
                 </ul>
               </li>
               <li class="pt-2">
-                <span class="font-semibold">Occupation:</span> <%= @selected_user_application.occupation %>
+                <span class="font-semibold">Occupation:</span> {@selected_user_application.occupation}
               </li>
               <li class="pt-2">
-                <span class="font-semibold">Place of birth:</span> <%= @selected_user_application.place_of_birth %>
+                <span class="font-semibold">Place of birth:</span> {@selected_user_application.place_of_birth}
               </li>
               <li class="pt-2">
-                <span class="font-semibold">Citizenship:</span> <%= @selected_user_application.citizenship %>
+                <span class="font-semibold">Citizenship:</span> {@selected_user_application.citizenship}
               </li>
               <li class="pt-2">
-                <span class="font-semibold">Most connected Nordic country:</span> <%= @selected_user_application.most_connected_nordic_country %>
+                <span class="font-semibold">Most connected Nordic country:</span> {@selected_user_application.most_connected_nordic_country}
               </li>
 
               <li class="pt-2">
@@ -747,13 +739,13 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </p>
                 <p>
                   <span class="font-semibold">Awarded on:</span>
-                  <%= if @selected_user.lifetime_membership_awarded_at do
+                  {if @selected_user.lifetime_membership_awarded_at do
                     format_datetime_for_display(
                       @selected_user.lifetime_membership_awarded_at
                     )
                   else
                     "N/A"
-                  end %>
+                  end}
                 </p>
                 <p class="text-xs text-blue-700 pt-2">
                   Lifetime membership provides all Family membership perks and never expires.
@@ -820,9 +812,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                       <p class="mt-1 text-sm text-amber-700">
                         This user's membership will change to
                         <strong>
-                          <%= String.capitalize(
+                          {String.capitalize(
                             to_string(@scheduled_downgrade_info.target_plan)
-                          ) %>
+                          )}
                         </strong>
                         on <strong><%= Calendar.strftime(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %></strong>.
                       </p>
@@ -838,51 +830,51 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <div class="space-y-2 text-sm text-zinc-800">
                   <p>
                     <span class="font-semibold">Plan:</span>
-                    <%= get_membership_plan_name(@active_subscription) %>
+                    {get_membership_plan_name(@active_subscription)}
                   </p>
                   <p>
                     <span class="font-semibold">Status:</span>
                     <.badge>
-                      <%= String.capitalize(@active_subscription.stripe_status) %>
+                      {String.capitalize(@active_subscription.stripe_status)}
                     </.badge>
                   </p>
                   <p>
                     <span class="font-semibold">Current Period Start:</span>
-                    <%= if @active_subscription.current_period_start do
+                    {if @active_subscription.current_period_start do
                       format_datetime_for_display(
                         @active_subscription.current_period_start
                       )
                     else
                       "N/A"
-                    end %>
+                    end}
                   </p>
                   <p>
                     <span class="font-semibold">Current Period End:</span>
-                    <%= if @active_subscription.current_period_end do
+                    {if @active_subscription.current_period_end do
                       format_datetime_for_display(
                         @active_subscription.current_period_end
                       )
                     else
                       "N/A"
-                    end %>
+                    end}
                   </p>
                   <p :if={@active_subscription.ends_at}>
                     <span class="font-semibold">Scheduled Cancellation:</span>
-                    <%= format_datetime_for_display(@active_subscription.ends_at) %>
+                    {format_datetime_for_display(@active_subscription.ends_at)}
                   </p>
                   <p :if={@scheduled_downgrade_info}>
                     <span class="font-semibold">Scheduled Downgrade:</span>
-                    Will change to <%= String.capitalize(
+                    Will change to {String.capitalize(
                       to_string(@scheduled_downgrade_info.target_plan)
-                    ) %> on <%= Calendar.strftime(
+                    )} on {Calendar.strftime(
                       @scheduled_downgrade_info.effective_date,
                       "%B %d, %Y"
-                    ) %>
+                    )}
                   </p>
                   <p>
                     <span class="font-semibold">Stripe Subscription ID:</span>
                     <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
-                      <%= @active_subscription.stripe_id %>
+                      {@active_subscription.stripe_id}
                     </code>
                   </p>
                 </div>
@@ -996,23 +988,23 @@ defmodule YscWeb.AdminUserDetailsLive do
                         class="hover:bg-zinc-50"
                       >
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-800">
-                          <%= if payment.payment_date do
+                          {if payment.payment_date do
                             format_datetime_for_display(payment.payment_date)
                           else
                             "N/A"
-                          end %>
+                          end}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-zinc-900">
-                          <%= Ysc.MoneyHelper.format_money!(payment.amount) %>
+                          {Ysc.MoneyHelper.format_money!(payment.amount)}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap">
                           <.badge>
-                            <%= String.capitalize("#{payment.status}") %>
+                            {String.capitalize("#{payment.status}")}
                           </.badge>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
                           <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
-                            <%= if payment.external_payment_id do
+                            {if payment.external_payment_id do
                               String.slice(payment.external_payment_id, 0..20) <>
                                 if(String.length(payment.external_payment_id) > 20,
                                   do: "...",
@@ -1020,11 +1012,11 @@ defmodule YscWeb.AdminUserDetailsLive do
                                 )
                             else
                               "N/A"
-                            end %>
+                            end}
                           </code>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
-                          <%= if payment.payment_method do
+                          {if payment.payment_method do
                             case payment.payment_method.type do
                               "card" ->
                                 if payment.payment_method.last4 do
@@ -1045,7 +1037,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                             end
                           else
                             "N/A"
-                          end %>
+                          end}
                         </td>
                       </tr>
                     </tbody>
@@ -1114,13 +1106,13 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <div class="flex justify-between items-start mb-4">
                     <div>
                       <h3 class="text-lg font-semibold text-zinc-900">
-                        Account ending in ••••<%= bank_account.account_number_last_4 %>
+                        Account ending in ••••{bank_account.account_number_last_4}
                       </h3>
                       <p class="text-sm text-zinc-600 mt-1">
-                        Added <%= Calendar.strftime(
+                        Added {Calendar.strftime(
                           bank_account.inserted_at,
                           "%B %d, %Y"
-                        ) %>
+                        )}
                       </p>
                     </div>
                     <button
@@ -1152,7 +1144,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           Routing Number
                         </p>
                         <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded">
-                          <%= @unsealed_account.routing_number %>
+                          {@unsealed_account.routing_number}
                         </p>
                       </div>
                       <div>
@@ -1160,7 +1152,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           Account Number
                         </p>
                         <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded">
-                          <%= @unsealed_account.account_number %>
+                          {@unsealed_account.account_number}
                         </p>
                       </div>
                     </div>
@@ -1243,7 +1235,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         ]}
                       >
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-800">
-                          <%= format_datetime_for_display(notification.inserted_at) %>
+                          {format_datetime_for_display(notification.inserted_at)}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap">
                           <.badge type={
@@ -1251,22 +1243,22 @@ defmodule YscWeb.AdminUserDetailsLive do
                               do: "default",
                               else: "green"
                           }>
-                            <%= notification.message_type
+                            {notification.message_type
                             |> to_string()
-                            |> String.upcase() %>
+                            |> String.upcase()}
                           </.badge>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
                           <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
-                            <%= notification.message_template %>
+                            {notification.message_template}
                           </code>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
                           <%= if notification.email do %>
-                            <%= notification.email %>
+                            {notification.email}
                           <% else %>
                             <%= if notification.phone_number do %>
-                              <%= notification.phone_number %>
+                              {notification.phone_number}
                             <% else %>
                               <span class="text-zinc-400">—</span>
                             <% end %>
@@ -1326,9 +1318,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                       Sent
                     </p>
                     <p class="text-sm text-zinc-800">
-                      <%= format_datetime_for_display(
+                      {format_datetime_for_display(
                         @selected_notification.inserted_at
-                      ) %>
+                      )}
                     </p>
                   </div>
 
@@ -1338,9 +1330,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </p>
                     <p class="text-sm text-zinc-800">
                       <.badge>
-                        <%= @selected_notification.message_type
+                        {@selected_notification.message_type
                         |> to_string()
-                        |> String.capitalize() %>
+                        |> String.capitalize()}
                       </.badge>
                     </p>
                   </div>
@@ -1351,7 +1343,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </p>
                     <p class="text-sm text-zinc-800">
                       <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
-                        <%= @selected_notification.message_template %>
+                        {@selected_notification.message_template}
                       </code>
                     </p>
                   </div>
@@ -1362,10 +1354,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </p>
                     <p class="text-sm text-zinc-800">
                       <%= if @selected_notification.email do %>
-                        <%= @selected_notification.email %>
+                        {@selected_notification.email}
                       <% else %>
                         <%= if @selected_notification.phone_number do %>
-                          <%= @selected_notification.phone_number %>
+                          {@selected_notification.phone_number}
                         <% else %>
                           <span class="text-zinc-400">—</span>
                         <% end %>
@@ -1437,19 +1429,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                     />
                     <div class="flex-1">
                       <div class="font-semibold text-zinc-900">
-                        <%= "#{@primary_user.first_name} #{@primary_user.last_name}" %>
+                        {"#{@primary_user.first_name} #{@primary_user.last_name}"}
                       </div>
                       <div class="text-sm text-zinc-600">
-                        <%= @primary_user.email %>
+                        {@primary_user.email}
                       </div>
                       <%= if @primary_user.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          <%= format_phone_number(@primary_user.phone_number) %>
+                          {format_phone_number(@primary_user.phone_number)}
                         </div>
                       <% end %>
                     </div>
                     <.badge type={user_state_to_badge_type(@primary_user.state)}>
-                      <%= user_state_to_readable(@primary_user.state) %>
+                      {user_state_to_readable(@primary_user.state)}
                     </.badge>
                   </div>
                 </.link>
@@ -1461,7 +1453,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               class="border border-zinc-200 rounded-lg p-6"
             >
               <h3 class="text-lg font-semibold text-zinc-800 mb-4">
-                Sub Accounts (<%= length(@sub_accounts) %>)
+                Sub Accounts ({length(@sub_accounts)})
               </h3>
               <div class="space-y-3">
                 <.link
@@ -1478,19 +1470,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                     />
                     <div class="flex-1">
                       <div class="font-semibold text-zinc-900">
-                        <%= "#{sub_account.first_name} #{sub_account.last_name}" %>
+                        {"#{sub_account.first_name} #{sub_account.last_name}"}
                       </div>
                       <div class="text-sm text-zinc-600">
-                        <%= sub_account.email %>
+                        {sub_account.email}
                       </div>
                       <%= if sub_account.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          <%= format_phone_number(sub_account.phone_number) %>
+                          {format_phone_number(sub_account.phone_number)}
                         </div>
                       <% end %>
                     </div>
                     <.badge type={user_state_to_badge_type(sub_account.state)}>
-                      <%= user_state_to_readable(sub_account.state) %>
+                      {user_state_to_readable(sub_account.state)}
                     </.badge>
                   </div>
                 </.link>
@@ -1502,7 +1494,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               class="border border-zinc-200 rounded-lg p-6"
             >
               <h3 class="text-lg font-semibold text-zinc-800 mb-4">
-                Family Members (<%= length(@family_members) %>)
+                Family Members ({length(@family_members)})
               </h3>
               <div class="space-y-3">
                 <div
@@ -1512,24 +1504,24 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <div class="flex items-center gap-4">
                     <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                       <span class="text-blue-600 font-semibold text-lg">
-                        <%= String.first(family_member.first_name) %>
+                        {String.first(family_member.first_name)}
                       </span>
                     </div>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <div class="font-semibold text-zinc-900">
-                          <%= "#{family_member.first_name} #{family_member.last_name}" %>
+                          {"#{family_member.first_name} #{family_member.last_name}"}
                         </div>
                         <.badge type="sky" class="text-xs">
-                          <%= String.capitalize("#{family_member.type}") %>
+                          {String.capitalize("#{family_member.type}")}
                         </.badge>
                       </div>
                       <%= if family_member.birth_date do %>
                         <div class="text-sm text-zinc-600">
-                          Birth date: <%= Calendar.strftime(
+                          Birth date: {Calendar.strftime(
                             family_member.birth_date,
                             "%B %d, %Y"
-                          ) %>
+                          )}
                         </div>
                       <% end %>
                     </div>
@@ -1610,7 +1602,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                               <div class="flex items-center gap-2 mb-1">
                                 <p class="text-sm font-semibold text-zinc-900">
                                   <%= if note.created_by do %>
-                                    <%= "#{note.created_by.first_name} #{note.created_by.last_name}" %>
+                                    {"#{note.created_by.first_name} #{note.created_by.last_name}"}
                                   <% else %>
                                     Unknown Admin
                                   <% end %>
@@ -1620,22 +1612,22 @@ defmodule YscWeb.AdminUserDetailsLive do
                                     do: "red",
                                     else: "default"
                                 }>
-                                  <%= String.capitalize("#{note.category}") %>
+                                  {String.capitalize("#{note.category}")}
                                 </.badge>
                               </div>
                               <p class="text-xs text-zinc-500 mt-0.5">
                                 <%= if note.created_by do %>
-                                  <%= note.created_by.email %>
+                                  {note.created_by.email}
                                 <% end %>
                               </p>
                             </div>
                             <div class="text-xs text-zinc-500">
-                              <%= format_datetime_for_display(note.inserted_at) %>
+                              {format_datetime_for_display(note.inserted_at)}
                             </div>
                           </div>
                           <div class="mt-3">
                             <p class="text-sm text-zinc-800 whitespace-pre-wrap">
-                              <%= note.note %>
+                              {note.note}
                             </p>
                           </div>
                         </div>
@@ -1855,7 +1847,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       {:ok, updated_user} ->
         {:noreply,
          socket
-         |> put_flash(:info, "User updated")
+         |> YscWeb.Flash.put_toast(:info, "User updated")
          |> redirect(to: ~p"/admin/users/#{updated_user.id}/details")}
 
       {:error, changeset} ->
@@ -1868,7 +1860,10 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, "Failed to save: #{inspect(changeset.errors)}")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to save: #{inspect(changeset.errors)}"
+         )}
     end
   end
 
@@ -2009,12 +2004,12 @@ defmodule YscWeb.AdminUserDetailsLive do
            Accounts.has_lifetime_membership?(updated_user)
          )
          |> assign(:lifetime_form, to_form(lifetime_changeset, as: "lifetime"))
-         |> put_flash(:info, flash_message)}
+         |> YscWeb.Flash.put_toast(:info, flash_message)}
 
       {:error, changeset} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Failed to update lifetime membership: #{inspect(changeset.errors)}"
          )}
@@ -2068,7 +2063,9 @@ defmodule YscWeb.AdminUserDetailsLive do
     plan_id_str = params["plan_id"]
 
     if is_nil(plan_id_str) or plan_id_str == "" do
-      {:noreply, socket |> put_flash(:error, "Please select a membership plan")}
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:error, "Please select a membership plan")}
     else
       plan_id = String.to_existing_atom(plan_id_str)
 
@@ -2115,7 +2112,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                as: "create_paid_membership"
              )
            )
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :info,
              "Membership subscription created (paid elsewhere)."
            )}
@@ -2123,7 +2120,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:error, :sub_accounts_cannot_create_subscriptions} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Sub-accounts cannot have their own subscriptions."
            )}
@@ -2131,16 +2128,23 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:error, :user_already_has_active_subscription} ->
           {:noreply,
            socket
-           |> put_flash(:error, "User already has an active subscription.")}
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "User already has an active subscription."
+           )}
 
         {:error, :invalid_plan} ->
           {:noreply,
-           socket |> put_flash(:error, "Invalid membership plan selected.")}
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Invalid membership plan selected."
+           )}
 
         {:error, :could_not_create_stripe_customer} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Could not create or link Stripe customer for user."
            )}
@@ -2151,7 +2155,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               do: err,
               else: "Failed to create subscription: #{inspect(err)}"
 
-          {:noreply, socket |> put_flash(:error, message)}
+          {:noreply, socket |> YscWeb.Flash.put_toast(:error, message)}
       end
     end
   end
@@ -2166,7 +2170,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     if is_nil(active_subscription) do
       {:noreply,
        socket
-       |> put_flash(
+       |> YscWeb.Flash.put_toast(
          :error,
          "User does not have an active subscription to change"
        )}
@@ -2175,7 +2179,8 @@ defmodule YscWeb.AdminUserDetailsLive do
 
       if is_nil(new_membership_type_str) or new_membership_type_str == "" do
         {:noreply,
-         socket |> put_flash(:error, "Please select a membership type")}
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Please select a membership type")}
       else
         new_membership_type = String.to_existing_atom(new_membership_type_str)
 
@@ -2192,12 +2197,19 @@ defmodule YscWeb.AdminUserDetailsLive do
         cond do
           is_nil(new_plan) ->
             {:noreply,
-             socket |> put_flash(:error, "Invalid membership type selected")}
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Invalid membership type selected"
+             )}
 
           is_nil(current_plan) ->
             {:noreply,
              socket
-             |> put_flash(:error, "Could not determine current membership plan")}
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Could not determine current membership plan"
+             )}
 
           current_type == new_membership_type ->
             # Same plan selected - call change_membership_plan to cancel any
@@ -2240,7 +2252,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                  socket
                  |> assign(:active_subscription, updated_subscription)
                  |> assign(:scheduled_downgrade_info, nil)
-                 |> put_flash(:info, message)}
+                 |> YscWeb.Flash.put_toast(:info, message)}
 
               {:error, error} ->
                 error_message =
@@ -2252,7 +2264,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
                 {:noreply,
                  socket
-                 |> put_flash(
+                 |> YscWeb.Flash.put_toast(
                    :error,
                    "Failed to update membership: #{error_message}"
                  )}
@@ -2290,7 +2302,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                    :membership_type_form,
                    to_form(membership_type_changeset, as: "membership_type")
                  )
-                 |> put_flash(
+                 |> YscWeb.Flash.put_toast(
                    :info,
                    "Membership type changed from #{String.capitalize("#{current_type}")} to #{String.capitalize("#{new_membership_type}")}"
                  )}
@@ -2303,7 +2315,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 {:noreply,
                  socket
                  |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
-                 |> put_flash(
+                 |> YscWeb.Flash.put_toast(
                    :info,
                    "Downgrade scheduled. Membership will change to #{String.capitalize("#{new_membership_type}")} at next renewal."
                  )}
@@ -2318,7 +2330,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
                 {:noreply,
                  socket
-                 |> put_flash(
+                 |> YscWeb.Flash.put_toast(
                    :error,
                    "Failed to change membership type: #{error_message}"
                  )}
@@ -2339,7 +2351,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         nil ->
           {:noreply,
            socket
-           |> put_flash(:error, "Bank account not found")
+           |> YscWeb.Flash.put_toast(:error, "Bank account not found")
            |> assign(:unsealed_account_id, nil)
            |> assign(:unsealed_account, nil)}
 
@@ -2350,7 +2362,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            |> assign(:unsealed_account, decrypted_account)}
       end
     else
-      {:noreply, put_flash(socket, :error, "Unauthorized")}
+      {:noreply, YscWeb.Flash.put_toast(socket, :error, "Unauthorized")}
     end
   end
 
@@ -2369,7 +2381,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     active_subscription = socket.assigns[:active_subscription]
 
     if active_subscription == nil do
-      {:noreply, socket |> put_flash(:error, "No active subscription found")}
+      {:noreply,
+       socket |> YscWeb.Flash.put_toast(:error, "No active subscription found")}
     else
       case parse_datetime(membership_params["period_end_date"]) do
         {:ok, new_end_date} ->
@@ -2408,19 +2421,23 @@ defmodule YscWeb.AdminUserDetailsLive do
                  :membership_form,
                  to_form(membership_changeset, as: "membership")
                )
-               |> put_flash(:info, "Membership period updated successfully")}
+               |> YscWeb.Flash.put_toast(
+                 :info,
+                 "Membership period updated successfully"
+               )}
 
             {:error, error} ->
               {:noreply,
                socket
-               |> put_flash(
+               |> YscWeb.Flash.put_toast(
                  :error,
                  "Failed to update membership period: #{inspect(error)}"
                )}
           end
 
         {:error, _reason} ->
-          {:noreply, socket |> put_flash(:error, "Invalid date format")}
+          {:noreply,
+           socket |> YscWeb.Flash.put_toast(:error, "Invalid date format")}
       end
     end
   end
@@ -2444,13 +2461,13 @@ defmodule YscWeb.AdminUserDetailsLive do
            to_form(note_changeset(%{category: "general"}), as: "note")
          )
          |> assign(:user_notes, Accounts.list_user_notes(selected_user.id))
-         |> put_flash(:info, "Note added successfully")}
+         |> YscWeb.Flash.put_toast(:info, "Note added successfully")}
 
       {:error, changeset} ->
         {:noreply,
          socket
          |> assign(:note_form, to_form(changeset, as: "note"))
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Failed to add note: #{format_changeset_errors(changeset)}"
          )}

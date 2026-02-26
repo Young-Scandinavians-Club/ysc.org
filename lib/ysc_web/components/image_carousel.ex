@@ -268,7 +268,7 @@ defmodule YscWeb.Components.ImageCarousel do
         <%= if @has_overlay do %>
           <div class="carousel-overlay"></div>
           <div class="carousel-overlay-content">
-            <%= render_slot(@overlay) %>
+            {render_slot(@overlay)}
           </div>
         <% end %>
         <!-- Navigation buttons - one set for each possible slide state -->

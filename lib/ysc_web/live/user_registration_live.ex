@@ -260,19 +260,47 @@ defmodule YscWeb.UserRegistrationLive do
                   type="textarea"
                 />
 
-                <div class="flex items-center pt-4">
-                  <.input
-                    type="checkbox"
-                    field={rf[:agreed_to_bylaws]}
-                    label="I have read and agreed to the"
-                  />
-                  <.link
-                    navigate={~p"/bylaws"}
-                    target="_blank"
-                    class="text-sm text-blue-600 ms-2 hover:underline"
-                  >
-                    Young Scandinavians Club Bylaws
-                  </.link>
+                <% field = rf[:agreed_to_bylaws] %>
+                <% checked =
+                  Phoenix.HTML.Form.normalize_value("checkbox", field.value) %>
+                <div class="pt-4">
+                  <div class="flex flex-nowrap items-center gap-2">
+                    <input type="hidden" name={field.name} value="false" />
+                    <input
+                      type="checkbox"
+                      id={field.id}
+                      name={field.name}
+                      value="true"
+                      checked={checked}
+                      class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5 flex-shrink-0"
+                    />
+                    <label
+                      for={field.id}
+                      class="flex flex-nowrap items-center gap-1.5 text-sm leading-6 text-zinc-600 cursor-pointer py-1"
+                    >
+                      <span>I have read and agreed to the</span>
+                      <.link
+                        navigate={~p"/bylaws"}
+                        target="_blank"
+                        class="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                      >
+                        Young Scandinavians Club Bylaws
+                        <.icon
+                          name="hero-arrow-top-right-on-square"
+                          class="w-4 h-4 flex-shrink-0"
+                        />
+                      </.link>
+                    </label>
+                  </div>
+                  <.error :for={
+                    msg <-
+                      if(Phoenix.Component.used_input?(field),
+                        do: Enum.map(field.errors, &translate_error(&1)),
+                        else: []
+                      )
+                  }>
+                    {msg}
+                  </.error>
                 </div>
               </.inputs_for>
             </div>
@@ -447,7 +475,7 @@ defmodule YscWeb.UserRegistrationLive do
         # After successful registration, redirect to account setup flow
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :info,
            "Application submitted successfully! Please complete your account setup."
          )

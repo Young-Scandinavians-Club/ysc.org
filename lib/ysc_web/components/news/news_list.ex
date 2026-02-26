@@ -25,26 +25,26 @@ defmodule YscWeb.NewsListLive do
           <div class="flex-1 min-w-0">
             <div class="flex items-center text-sm text-zinc-500 mb-2">
               <time>
-                <%= Timex.format!(
+                {Timex.format!(
                   post.published_on,
                   "{WDshort}, {Mshort} {D}, {YYYY}"
-                ) %>
+                )}
               </time>
               <span class="mx-2">•</span>
               <span>
-                by <%= post.author.first_name %> <%= post.author.last_name %>
+                by {post.author.first_name} {post.author.last_name}
               </span>
             </div>
 
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
               <h3 class="text-lg font-semibold text-zinc-900 hover:text-blue-600 transition-colors mb-2">
-                <%= post.title %>
+                {post.title}
               </h3>
             </.link>
 
             <p class="text-zinc-600 text-sm line-clamp-2">
-              <%= post.preview_text ||
-                String.slice(post.rendered_body || "", 0, 150) <> "..." %>
+              {post.preview_text ||
+                String.slice(post.rendered_body || "", 0, 150) <> "..."}
             </p>
           </div>
         </div>

@@ -231,7 +231,7 @@ defmodule YscWeb.AdminPostEditorLive do
                                 height="120"
                               />
                               <figcaption class="text-xs truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1">
-                                <%= entry.client_name %>
+                                {entry.client_name}
                               </figcaption>
                             </button>
                           </figure>
@@ -241,7 +241,7 @@ defmodule YscWeb.AdminPostEditorLive do
                               <.icon
                                 name="hero-exclamation-circle"
                                 class="-mt-0.5 h-4 w-4"
-                              /> <%= error_to_string(err) %>
+                              /> {error_to_string(err)}
                             </p>
                           <% end %>
                         </article>
@@ -253,7 +253,7 @@ defmodule YscWeb.AdminPostEditorLive do
                         <.icon
                           name="hero-exclamation-circle"
                           class="-mt-0.5 h-4 w-4"
-                        /> <%= error_to_string(err) %>
+                        /> {error_to_string(err)}
                       </p>
                     <% end %>
 
@@ -312,7 +312,7 @@ defmodule YscWeb.AdminPostEditorLive do
             />
 
             <.badge type={post_state_to_badge_style(@post.state)} class="mt-3 ml-3">
-              <%= String.capitalize("#{@post.state}") %>
+              {String.capitalize("#{@post.state}")}
             </.badge>
 
             <p class={"text-sm text-zinc-600 transition duration-200 ease-in-out align-middle inline-block items-center px-1 mt-4 #{if @saving? == true, do: "opacity-100", else: "opacity-0"}"}>
@@ -436,7 +436,7 @@ defmodule YscWeb.AdminPostEditorLive do
             </.link>
           </span>
           <span class="pt-2 mr-1 hidden lg:block">
-            <%= "#{YscWeb.Endpoint.url()}/posts/" %>
+            {"#{YscWeb.Endpoint.url()}/posts/"}
           </span>
           <span>
             <.input
@@ -580,7 +580,10 @@ defmodule YscWeb.AdminPostEditorLive do
     if is_nil(post.image_id) do
       {:noreply,
        socket
-       |> put_flash(:info, "Please set a featured image before publishing.")
+       |> YscWeb.Flash.put_toast(
+         :info,
+         "Please set a featured image before publishing."
+       )
        |> push_navigate(to: ~p"/admin/posts/#{post.id}/settings")}
     else
       res =
@@ -595,13 +598,13 @@ defmodule YscWeb.AdminPostEditorLive do
           {:noreply,
            socket
            |> assign(:post, new_post)
-           |> put_flash(:info, "The post was published!")
+           |> YscWeb.Flash.put_toast(:info, "The post was published!")
            |> redirect(to: ~p"/admin/posts/#{post.id}")}
 
         {:error, _changeset} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Something went wrong")
+           |> YscWeb.Flash.put_toast(:error, "Something went wrong")
            |> redirect(to: ~p"/admin/posts")}
       end
     end
@@ -627,13 +630,13 @@ defmodule YscWeb.AdminPostEditorLive do
         {:noreply,
          socket
          |> assign(:post, new_post)
-         |> put_flash(:info, "The post recovered.")
+         |> YscWeb.Flash.put_toast(:info, "The post recovered.")
          |> redirect(to: ~p"/admin/posts/#{post.id}")}
 
       {:error, _changeset} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Something went wrong")
+         |> YscWeb.Flash.put_toast(:error, "Something went wrong")
          |> redirect(to: ~p"/admin/posts")}
     end
   end
@@ -658,13 +661,13 @@ defmodule YscWeb.AdminPostEditorLive do
         {:noreply,
          socket
          |> assign(:post, new_post)
-         |> put_flash(:info, "The post was deleted.")
+         |> YscWeb.Flash.put_toast(:info, "The post was deleted.")
          |> redirect(to: ~p"/admin/posts")}
 
       {:error, _changeset} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Something went wrong")
+         |> YscWeb.Flash.put_toast(:error, "Something went wrong")
          |> redirect(to: ~p"/admin/posts")}
     end
   end
@@ -699,7 +702,8 @@ defmodule YscWeb.AdminPostEditorLive do
          )}
 
       {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Could not set featured image")}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Could not set featured image")}
     end
   end
 
@@ -721,7 +725,12 @@ defmodule YscWeb.AdminPostEditorLive do
          )}
 
       {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Could not remove featured image")}
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not remove featured image"
+         )}
     end
   end
 
@@ -788,7 +797,11 @@ defmodule YscWeb.AdminPostEditorLive do
               )
 
             {:error, _} ->
-              put_flash(socket, :error, "Could not set featured image")
+              YscWeb.Flash.put_toast(
+                socket,
+                :error,
+                "Could not set featured image"
+              )
           end
 
         _ ->

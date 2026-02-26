@@ -110,30 +110,30 @@ defmodule YscWeb.AdminMediaLive do
             />
             <div class="mt-2 text-xs text-zinc-500 space-y-1">
               <p>
-                <strong>Version:</strong> <%= String.capitalize(
+                <strong>Version:</strong> {String.capitalize(
                   Atom.to_string(@selected_image_version)
-                ) %>
+                )}
               </p>
               <%= if @selected_image_version == :optimized && @active_image.width && @active_image.height do %>
                 <p>
-                  <strong>Dimensions:</strong> <%= @active_image.width %> × <%= @active_image.height %> px
+                  <strong>Dimensions:</strong> {@active_image.width} × {@active_image.height} px
                 </p>
               <% end %>
               <%= if @active_image.processing_state do %>
                 <p>
-                  <strong>Processing State:</strong> <%= String.capitalize(
+                  <strong>Processing State:</strong> {String.capitalize(
                     Atom.to_string(@active_image.processing_state)
-                  ) %>
+                  )}
                 </p>
               <% end %>
               <div class="flex items-center gap-2">
                 <strong class="flex-shrink-0">Path:</strong>
                 <div class="flex-1 min-w-0 flex items-center gap-2">
                   <span class="font-mono text-xs truncate overflow-hidden flex-1">
-                    <%= get_image_version_path(
+                    {get_image_version_path(
                       @active_image,
                       @selected_image_version
-                    ) %>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -203,7 +203,7 @@ defmodule YscWeb.AdminMediaLive do
                   class="w-12 h-12 text-zinc-400 mx-auto mb-2"
                 />
                 <p class="text-sm text-zinc-500">
-                  <%= String.capitalize(Atom.to_string(@selected_image_version)) %> version not available
+                  {String.capitalize(Atom.to_string(@selected_image_version))} version not available
                 </p>
               </div>
             </div>
@@ -211,7 +211,7 @@ defmodule YscWeb.AdminMediaLive do
         </div>
 
         <p class="leading-6 text-sm text-zinc-600 mt-2">
-          Uploaded by <%= "#{String.capitalize(@image_uploader.first_name)} #{String.capitalize(@image_uploader.last_name)} (#{@image_uploader.email}) on #{Timex.format!(@image_uploader.inserted_at, "%Y-%m-%d", :strftime)}" %>
+          Uploaded by {"#{String.capitalize(@image_uploader.first_name)} #{String.capitalize(@image_uploader.last_name)} (#{@image_uploader.email}) on #{Timex.format!(@image_uploader.inserted_at, "%Y-%m-%d", :strftime)}"}
         </p>
 
         <.simple_form
@@ -274,7 +274,7 @@ defmodule YscWeb.AdminMediaLive do
                           height="120"
                         />
                         <figcaption class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1">
-                          <%= entry.client_name %>
+                          {entry.client_name}
                         </figcaption>
                       </button>
                     </figure>
@@ -285,7 +285,7 @@ defmodule YscWeb.AdminMediaLive do
                         <.icon
                           name="hero-exclamation-circle"
                           class="-mt-0.5 h-5 w-5"
-                        /> <%= error_to_string(err) %>
+                        /> {error_to_string(err)}
                       </p>
                     <% end %>
                   </article>
@@ -295,9 +295,9 @@ defmodule YscWeb.AdminMediaLive do
               <%!-- Phoenix.Component.upload_errors/1 returns a list of error atoms --%>
               <%= for err <- upload_errors(@uploads.media_uploads) do %>
                 <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> <%= error_to_string(
+                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
                     err
-                  ) %>
+                  )}
                 </p>
               <% end %>
 
@@ -339,9 +339,9 @@ defmodule YscWeb.AdminMediaLive do
             Media Library
           </h1>
           <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
-            <%= @media_count %> <%= if @media_count == 1,
+            {@media_count} {if @media_count == 1,
               do: "image",
-              else: "images" %>
+              else: "images"}
           </p>
         </div>
 
@@ -361,11 +361,10 @@ defmodule YscWeb.AdminMediaLive do
           id="media-gallery"
           phx-update="stream"
           phx-viewport-bottom={!@end_of_timeline? && "load-more"}
-          phx-page-loading
           phx-hook="ScrollPreserver"
           class="space-y-8 pr-12"
         >
-          <%= render_images_by_year(assigns) %>
+          {render_images_by_year(assigns)}
         </div>
         <!-- Year Scrubber -->
         <div
@@ -383,13 +382,13 @@ defmodule YscWeb.AdminMediaLive do
               title={"#{item.year} (#{item.count} images)"}
             >
               <span class="group-hover:hidden flex items-center justify-center w-full h-full">
-                <%= String.slice(to_string(item.year), -2, 2) %>
+                {String.slice(to_string(item.year), -2, 2)}
               </span>
               <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
-                <%= item.year %>
+                {item.year}
               </span>
               <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-                <%= item.count %> photos
+                {item.count} photos
               </span>
             </button>
           <% end %>
@@ -1189,7 +1188,7 @@ defmodule YscWeb.AdminMediaLive do
             data-year-section={item.date.year}
             class="col-span-full sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200"
           >
-            <%= item.formatted_date %>
+            {item.formatted_date}
           </div>
         <% end %>
 
@@ -1228,14 +1227,14 @@ defmodule YscWeb.AdminMediaLive do
                 class="text-xs font-medium text-white truncate"
                 title={item.title}
               >
-                <%= item.title %>
+                {item.title}
               </p>
               <p
                 :if={item.title == nil and item.alt_text != nil}
                 class="text-xs font-medium text-white/90 truncate"
                 title={item.alt_text}
               >
-                <%= item.alt_text %>
+                {item.alt_text}
               </p>
             </div>
           </button>

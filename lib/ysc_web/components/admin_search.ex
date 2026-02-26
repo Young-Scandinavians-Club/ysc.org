@@ -58,14 +58,14 @@ defmodule YscWeb.AdminSearchComponent do
                 navigate={~p"/admin/events/#{event.id}/edit"}
                 class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
               >
-                <div class="font-medium"><%= event.title %></div>
+                <div class="font-medium">{event.title}</div>
                 <div class="text-xs text-zinc-500">
-                  <%= if event.organizer,
+                  {if event.organizer,
                     do:
                       "#{event.organizer.first_name} #{event.organizer.last_name}",
-                    else: "No organizer" %>
+                    else: "No organizer"}
                   <span :if={event.reference_id} class="ml-2">
-                    • <%= event.reference_id %>
+                    • {event.reference_id}
                   </span>
                 </div>
               </.link>
@@ -83,11 +83,11 @@ defmodule YscWeb.AdminSearchComponent do
                 navigate={~p"/admin/posts/#{post.id}"}
                 class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
               >
-                <div class="font-medium"><%= post.title %></div>
+                <div class="font-medium">{post.title}</div>
                 <div class="text-xs text-zinc-500">
-                  <%= if post.author,
+                  {if post.author,
                     do: "#{post.author.first_name} #{post.author.last_name}",
-                    else: "No author" %>
+                    else: "No author"}
                 </div>
               </.link>
             </div>
@@ -105,12 +105,12 @@ defmodule YscWeb.AdminSearchComponent do
                 class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
               >
                 <div class="font-medium">
-                  <%= ticket.reference_id %>
+                  {ticket.reference_id}
                 </div>
                 <div class="text-xs text-zinc-500">
-                  <%= ticket.event.title %>
+                  {ticket.event.title}
                   <span :if={ticket.user} class="ml-2">
-                    • <%= ticket.user.first_name %> <%= ticket.user.last_name %>
+                    • {ticket.user.first_name} {ticket.user.last_name}
                   </span>
                 </div>
               </.link>
@@ -129,9 +129,9 @@ defmodule YscWeb.AdminSearchComponent do
                 class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
               >
                 <div class="font-medium">
-                  <%= user.first_name %> <%= user.last_name %>
+                  {user.first_name} {user.last_name}
                 </div>
-                <div class="text-xs text-zinc-500"><%= user.email %></div>
+                <div class="text-xs text-zinc-500">{user.email}</div>
               </.link>
             </div>
           </div>
@@ -148,19 +148,19 @@ defmodule YscWeb.AdminSearchComponent do
                 class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
               >
                 <div class="font-medium">
-                  <%= booking.reference_id %>
+                  {booking.reference_id}
                 </div>
                 <div class="text-xs text-zinc-500">
-                  <%= if booking.user do
+                  {if booking.user do
                     "#{booking.user.first_name} #{booking.user.last_name} • #{booking.property}"
                   else
                     "#{booking.property}"
-                  end %>
+                  end}
                   <span class="ml-2">
-                    <%= Timex.format!(booking.checkin_date, "{YYYY}-{0M}-{0D}") %> - <%= Timex.format!(
+                    {Timex.format!(booking.checkin_date, "{YYYY}-{0M}-{0D}")} - {Timex.format!(
                       booking.checkout_date,
                       "{YYYY}-{0M}-{0D}"
-                    ) %>
+                    )}
                   </span>
                 </div>
               </.link>

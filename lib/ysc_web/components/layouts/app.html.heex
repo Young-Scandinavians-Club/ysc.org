@@ -9,7 +9,11 @@
 <% is_hero_mode = hero_mode?(current_path, @current_user) %>
 
 <div id="app-container" class="w-full flex flex-col min-h-screen">
-  <.flash_group flash={@flash} />
+  <.toast_group
+    flash={@flash}
+    connected={assigns[:socket] != nil}
+    toasts_sync={assigns[:toasts_sync] || []}
+  />
 
   <header
     :if={!is_fullscreen}
@@ -338,11 +342,11 @@
                   <div class="z-10 w-64 bg-white divide-y divide-zinc-100 rounded shadow">
                     <div class="px-4 py-3 text-sm text-zinc-900">
                       <p>
-                        <%= String.capitalize(@current_user.first_name) <>
-                          " " <> String.capitalize(@current_user.last_name) %>
+                        {String.capitalize(@current_user.first_name) <>
+                          " " <> String.capitalize(@current_user.last_name)}
                       </p>
                       <div class="font-medium truncate">
-                        <%= @current_user.email %>
+                        {@current_user.email}
                       </div>
                     </div>
                     <ul
@@ -557,7 +561,7 @@
   </div>
 
   <main class={["flex-1 w-full", is_hero_mode && "relative z-[1]"]}>
-    <%= @inner_content %>
+    {@inner_content}
   </main>
 
   <footer
@@ -689,7 +693,7 @@
       <div class="border-t border-zinc-100 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between mt-4 pt-4">
         <div class="text-sm text-zinc-600 text-center sm:text-left flex flex-wrap items-baseline justify-center sm:justify-start gap-x-1">
           <span class="whitespace-nowrap">
-            © <%= DateTime.utc_now().year %> <.link
+            © {DateTime.utc_now().year} <.link
               navigate={~p"/"}
               class="hover:text-zinc-900 transition-colors font-medium"
             >Young Scandinavians Club</.link>.

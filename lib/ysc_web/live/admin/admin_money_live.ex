@@ -222,7 +222,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:payment_related_entity, related_entity)
     else
       socket
-      |> put_flash(:error, "Payment not found")
+      |> YscWeb.Flash.put_toast(:error, "Payment not found")
       |> push_navigate(to: build_money_path(socket))
     end
   end
@@ -276,7 +276,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:refund_form, refund_form)
     else
       socket
-      |> put_flash(:error, "Payment not found")
+      |> YscWeb.Flash.put_toast(:error, "Payment not found")
       |> push_navigate(to: build_money_path(socket))
     end
   end
@@ -297,7 +297,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:selected_payout, payout)
     else
       socket
-      |> put_flash(:error, "Payout not found")
+      |> YscWeb.Flash.put_toast(:error, "Payout not found")
       |> push_navigate(to: build_money_path(socket))
     end
   end
@@ -398,7 +398,7 @@ defmodule YscWeb.AdminMoneyLive do
     else
       {:noreply,
        socket
-       |> put_flash(:error, "Payout not found for this payment")}
+       |> YscWeb.Flash.put_toast(:error, "Payout not found for this payment")}
     end
   end
 
@@ -429,7 +429,7 @@ defmodule YscWeb.AdminMoneyLive do
     {:noreply,
      socket
      |> assign(:selected_payout, payout)
-     |> put_flash(
+     |> YscWeb.Flash.put_toast(
        :info,
        "QuickBooks sync job enqueued for payout #{payout.stripe_payout_id}"
      )}
@@ -483,7 +483,7 @@ defmodule YscWeb.AdminMoneyLive do
 
               {:noreply,
                socket
-               |> put_flash(
+               |> YscWeb.Flash.put_toast(
                  :info,
                  "Refunded #{length(ticket_ids)} ticket(s) successfully. Amount: #{Money.to_string!(calculated_refund_amount)}"
                )
@@ -499,13 +499,19 @@ defmodule YscWeb.AdminMoneyLive do
             {:error, _changeset} ->
               {:noreply,
                socket
-               |> put_flash(:error, "Failed to process refund in ledger")}
+               |> YscWeb.Flash.put_toast(
+                 :error,
+                 "Failed to process refund in ledger"
+               )}
           end
 
         {:error, reason} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Failed to refund tickets: #{inspect(reason)}")}
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to refund tickets: #{inspect(reason)}"
+           )}
       end
     else
       # Full refund (existing logic)
@@ -568,7 +574,7 @@ defmodule YscWeb.AdminMoneyLive do
 
               {:noreply,
                socket
-               |> put_flash(:info, flash_message)
+               |> YscWeb.Flash.put_toast(:info, flash_message)
                |> assign(:accounts_with_balances, accounts_with_balances)
                |> assign(:payments_page, 1)
                |> assign(:ledger_entries_page, 1)
@@ -581,13 +587,13 @@ defmodule YscWeb.AdminMoneyLive do
             {:error, _changeset} ->
               {:noreply,
                socket
-               |> put_flash(:error, "Failed to process refund")}
+               |> YscWeb.Flash.put_toast(:error, "Failed to process refund")}
           end
 
         {:error, _} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Invalid amount format")}
+           |> YscWeb.Flash.put_toast(:error, "Invalid amount format")}
       end
     end
   end
@@ -619,7 +625,7 @@ defmodule YscWeb.AdminMoneyLive do
 
             {:noreply,
              socket
-             |> put_flash(:info, "Credit added successfully")
+             |> YscWeb.Flash.put_toast(:info, "Credit added successfully")
              |> assign(:show_credit_modal, false)
              |> assign(:selected_user, nil)
              |> assign(:accounts_with_balances, accounts_with_balances)
@@ -633,13 +639,13 @@ defmodule YscWeb.AdminMoneyLive do
           {:error, _changeset} ->
             {:noreply,
              socket
-             |> put_flash(:error, "Failed to add credit")}
+             |> YscWeb.Flash.put_toast(:error, "Failed to add credit")}
         end
 
       {:error, _} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Invalid amount format")}
+         |> YscWeb.Flash.put_toast(:error, "Invalid amount format")}
     end
   end
 
@@ -878,7 +884,7 @@ defmodule YscWeb.AdminMoneyLive do
     else
       {:noreply,
        socket
-       |> put_flash(:error, "Expense report not found")}
+       |> YscWeb.Flash.put_toast(:error, "Expense report not found")}
     end
   end
 
@@ -922,7 +928,10 @@ defmodule YscWeb.AdminMoneyLive do
         {:ok, _updated_report} ->
           {:noreply,
            socket
-           |> put_flash(:info, "Expense report status updated successfully")
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Expense report status updated successfully"
+           )
            |> assign(:show_expense_report_modal, false)
            |> assign(:selected_expense_report, nil)
            |> assign(:expense_reports_page, 1)
@@ -941,7 +950,7 @@ defmodule YscWeb.AdminMoneyLive do
 
           {:noreply,
            socket
-           |> put_flash(:error, error_message)
+           |> YscWeb.Flash.put_toast(:error, error_message)
            |> assign(
              :expense_report_status_form,
              to_form(changeset, as: :expense_report_status)
@@ -950,7 +959,7 @@ defmodule YscWeb.AdminMoneyLive do
     else
       {:noreply,
        socket
-       |> put_flash(:error, "Expense report not found")
+       |> YscWeb.Flash.put_toast(:error, "Expense report not found")
        |> assign(:show_expense_report_modal, false)
        |> assign(:selected_expense_report, nil)}
     end
@@ -1159,10 +1168,10 @@ defmodule YscWeb.AdminMoneyLive do
           </.button>
         </form>
         <p class="text-sm text-zinc-600 mt-2">
-          Showing data from <%= Calendar.strftime(@start_date, "%B %d, %Y") %> to <%= Calendar.strftime(
+          Showing data from {Calendar.strftime(@start_date, "%B %d, %Y")} to {Calendar.strftime(
             @end_date,
             "%B %d, %Y"
-          ) %>
+          )}
         </p>
       </div>
       <!-- Account Balances -->
@@ -1190,22 +1199,22 @@ defmodule YscWeb.AdminMoneyLive do
             >
               <div class="flex justify-between items-start mb-2">
                 <h3 class="font-medium text-zinc-900">
-                  <%= account_data.account.name %>
+                  {account_data.account.name}
                 </h3>
                 <span class={"px-2 py-1 text-xs font-semibold rounded #{get_normal_balance_badge_color(account_data.account.normal_balance)}"}>
-                  <%= String.capitalize(
+                  {String.capitalize(
                     to_string(account_data.account.normal_balance || "debit")
-                  ) %>-normal
+                  )}-normal
                 </span>
               </div>
               <p class="text-sm text-zinc-600 mb-2">
-                <%= account_data.account.description %>
+                {account_data.account.description}
               </p>
               <p class={"text-lg font-semibold mt-2 #{get_balance_color(account_data.balance, account_data.account.normal_balance)}"}>
-                <%= Money.to_string!(account_data.balance || Money.new(0, :USD)) %>
+                {Money.to_string!(account_data.balance || Money.new(0, :USD))}
               </p>
               <p class="text-xs text-zinc-500 capitalize mt-1">
-                <%= account_data.account.account_type %>
+                {account_data.account.account_type}
               </p>
             </div>
           </div>
@@ -1258,50 +1267,50 @@ defmodule YscWeb.AdminMoneyLive do
             <tbody class="bg-white divide-y divide-zinc-200">
               <tr :for={payment <- @recent_payments}>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
-                  <%= payment.reference_id %>
+                  {payment.reference_id}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                   <div class="flex flex-col">
                     <span class="font-medium text-zinc-900">
-                      <%= if Ecto.assoc_loaded?(payment.user) && payment.user do
+                      {if Ecto.assoc_loaded?(payment.user) && payment.user do
                         get_user_display_name(payment.user)
                       else
                         "System Transaction"
-                      end %>
+                      end}
                     </span>
                     <span class="text-xs text-zinc-500">
-                      <%= if Ecto.assoc_loaded?(payment.user) && payment.user do
+                      {if Ecto.assoc_loaded?(payment.user) && payment.user do
                         payment.user.email
                       else
                         "System Transaction"
-                      end %>
+                      end}
                     </span>
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                   <div class="flex flex-col">
                     <span class={"font-medium #{get_payment_type_color(payment.payment_type_info.type)}"}>
-                      <%= payment.payment_type_info.type %>
+                      {payment.payment_type_info.type}
                     </span>
                     <span class="text-xs text-zinc-500">
-                      <%= payment.payment_type_info.details %>
+                      {payment.payment_type_info.details}
                     </span>
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= Money.to_string!(payment.amount) %>
+                  {Money.to_string!(payment.amount)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                    <%= payment.status %>
+                    {payment.status}
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= format_datetime(
+                  {format_datetime(
                     payment.payment_date,
                     @timezone,
                     "%Y-%m-%d %H:%M"
-                  ) %>
+                  )}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div class="flex gap-2">
@@ -1338,7 +1347,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Pagination Controls for Payments -->
           <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
             <div class="text-sm text-zinc-600">
-              Page <%= @payments_page %> • Showing <%= length(@recent_payments) %> entries
+              Page {@payments_page} • Showing {length(@recent_payments)} entries
             </div>
             <div class="flex gap-2">
               <.button
@@ -1417,39 +1426,39 @@ defmodule YscWeb.AdminMoneyLive do
             <tbody class="bg-white divide-y divide-zinc-200">
               <tr :for={entry <- @ledger_entries}>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= format_datetime(
+                  {format_datetime(
                     entry.inserted_at,
                     @timezone,
                     "%Y-%m-%d %H:%M"
-                  ) %>
+                  )}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                   <div class="flex flex-col">
                     <span class="font-medium text-zinc-900">
-                      <%= entry.account.name %>
+                      {entry.account.name}
                     </span>
                     <span class="text-xs text-zinc-500">
-                      <%= String.capitalize(to_string(entry.account.account_type)) %>
+                      {String.capitalize(to_string(entry.account.account_type))}
                     </span>
                   </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
                   <div class="truncate" title={entry.description}>
-                    <%= entry.description %>
+                    {entry.description}
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_debit_credit_badge_color(entry.debit_credit)}"}>
-                    <%= String.capitalize(to_string(entry.debit_credit)) %>
+                    {String.capitalize(to_string(entry.debit_credit))}
                   </span>
                 </td>
                 <td class={"px-6 py-4 whitespace-nowrap text-sm font-medium #{get_debit_credit_amount_color(entry.debit_credit)}"}>
-                  <%= Money.to_string!(entry.amount) %>
+                  {Money.to_string!(entry.amount)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
                   <%= if entry.payment do %>
                     <span class="font-mono text-xs">
-                      <%= entry.payment.reference_id %>
+                      {entry.payment.reference_id}
                     </span>
                   <% else %>
                     <span class="text-zinc-400">—</span>
@@ -1458,7 +1467,7 @@ defmodule YscWeb.AdminMoneyLive do
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
                   <%= if entry.refund do %>
                     <span class="font-mono text-xs">
-                      <%= entry.refund.reference_id %>
+                      {entry.refund.reference_id}
                     </span>
                   <% else %>
                     <span class="text-zinc-400">—</span>
@@ -1468,11 +1477,11 @@ defmodule YscWeb.AdminMoneyLive do
                   <%= if entry.related_entity_type do %>
                     <div class="flex flex-col">
                       <span class="text-xs font-medium text-zinc-700">
-                        <%= String.capitalize(to_string(entry.related_entity_type)) %>
+                        {String.capitalize(to_string(entry.related_entity_type))}
                       </span>
                       <%= if entry.related_entity_id do %>
                         <span class="text-xs font-mono text-zinc-500">
-                          <%= String.slice(to_string(entry.related_entity_id), 0..8) %>...
+                          {String.slice(to_string(entry.related_entity_id), 0..8)}...
                         </span>
                       <% end %>
                     </div>
@@ -1491,7 +1500,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Pagination Controls for Ledger Entries -->
           <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
             <div class="text-sm text-zinc-600">
-              Page <%= @ledger_entries_page %> • Showing <%= length(@ledger_entries) %> entries
+              Page {@ledger_entries_page} • Showing {length(@ledger_entries)} entries
             </div>
             <div class="flex gap-2">
               <.button
@@ -1561,22 +1570,22 @@ defmodule YscWeb.AdminMoneyLive do
             <tbody class="bg-white divide-y divide-zinc-200">
               <tr :for={webhook <- @webhook_events}>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                  <%= String.slice(webhook.event_id, 0..20) %>...
+                  {String.slice(webhook.event_id, 0..20)}...
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <span class="font-medium"><%= webhook.event_type %></span>
+                  <span class="font-medium">{webhook.event_type}</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_webhook_state_color(webhook.state)}"}>
-                    <%= webhook.state %>
+                    {webhook.state}
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= format_datetime(
+                  {format_datetime(
                     webhook.inserted_at,
                     @timezone,
                     "%Y-%m-%d %H:%M:%S"
-                  ) %>
+                  )}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <.button
@@ -1598,7 +1607,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Pagination Controls for Webhooks -->
           <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
             <div class="text-sm text-zinc-600">
-              Page <%= @webhooks_page %> • Showing <%= length(@webhook_events) %> entries
+              Page {@webhooks_page} • Showing {length(@webhook_events)} entries
             </div>
             <div class="flex gap-2">
               <.button
@@ -1677,16 +1686,16 @@ defmodule YscWeb.AdminMoneyLive do
             <tbody class="bg-white divide-y divide-zinc-200">
               <tr :for={expense_report <- @expense_reports}>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                  <%= String.slice(to_string(expense_report.id), 0..12) %>...
+                  {String.slice(to_string(expense_report.id), 0..12)}...
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                   <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
                     <div class="flex flex-col">
                       <span class="font-medium text-zinc-900">
-                        <%= get_user_display_name(expense_report.user) %>
+                        {get_user_display_name(expense_report.user)}
                       </span>
                       <span class="text-xs text-zinc-500">
-                        <%= expense_report.user.email %>
+                        {expense_report.user.email}
                       </span>
                     </div>
                   <% else %>
@@ -1695,14 +1704,14 @@ defmodule YscWeb.AdminMoneyLive do
                 </td>
                 <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
                   <div class="truncate" title={expense_report.purpose}>
-                    <%= expense_report.purpose %>
+                    {expense_report.purpose}
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <.badge type={
                     get_expense_report_status_badge_type(expense_report.status)
                   }>
-                    <%= String.capitalize(expense_report.status || "unknown") %>
+                    {String.capitalize(expense_report.status || "unknown")}
                   </.badge>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -1712,9 +1721,9 @@ defmodule YscWeb.AdminMoneyLive do
                         expense_report.quickbooks_sync_status
                       )
                     }>
-                      <%= String.capitalize(
+                      {String.capitalize(
                         expense_report.quickbooks_sync_status || "unknown"
-                      ) %>
+                      )}
                     </.badge>
                     <%= if expense_report.quickbooks_sync_error do %>
                       <.tooltip
@@ -1725,7 +1734,7 @@ defmodule YscWeb.AdminMoneyLive do
                         text_align="text-left"
                       >
                         <span class="text-xs text-red-600 mt-1 truncate max-w-xs cursor-help">
-                          <%= format_qb_error(expense_report.quickbooks_sync_error) %>
+                          {format_qb_error(expense_report.quickbooks_sync_error)}
                         </span>
                       </.tooltip>
                     <% end %>
@@ -1734,18 +1743,18 @@ defmodule YscWeb.AdminMoneyLive do
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
                   <%= if expense_report.quickbooks_bill_id do %>
                     <span class="font-mono text-xs">
-                      <%= String.slice(expense_report.quickbooks_bill_id, 0..20) %>...
+                      {String.slice(expense_report.quickbooks_bill_id, 0..20)}...
                     </span>
                   <% else %>
                     <span class="text-zinc-400">—</span>
                   <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <%= format_datetime(
+                  {format_datetime(
                     expense_report.inserted_at,
                     @timezone,
                     "%Y-%m-%d %H:%M"
-                  ) %>
+                  )}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <.button
@@ -1767,9 +1776,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Pagination Controls for Expense Reports -->
           <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
             <div class="text-sm text-zinc-600">
-              Page <%= @expense_reports_page %> • Showing <%= length(
-                @expense_reports
-              ) %> entries
+              Page {@expense_reports_page} • Showing {length(@expense_reports)} entries
             </div>
             <div class="flex gap-2">
               <.button
@@ -1804,13 +1811,13 @@ defmodule YscWeb.AdminMoneyLive do
 
         <div class="mb-4">
           <p class="text-sm text-zinc-600">
-            <strong>Payment:</strong> <%= @selected_payment.reference_id %>
+            <strong>Payment:</strong> {@selected_payment.reference_id}
           </p>
           <p class="text-sm text-zinc-600">
-            <strong>Amount:</strong> <%= Money.to_string!(@selected_payment.amount) %>
+            <strong>Amount:</strong> {Money.to_string!(@selected_payment.amount)}
           </p>
           <p :if={@selected_payment.user} class="text-sm text-zinc-600">
-            <strong>User:</strong> <%= @selected_payment.user.email %>
+            <strong>User:</strong> {@selected_payment.user.email}
           </p>
         </div>
 
@@ -1883,13 +1890,13 @@ defmodule YscWeb.AdminMoneyLive do
                 />
                 <div class="flex-1">
                   <div class="text-sm font-medium text-zinc-900">
-                    <%= ticket.ticket_tier.name %>
+                    {ticket.ticket_tier.name}
                   </div>
                   <div class="text-xs text-zinc-600">
-                    Ticket ID: <%= ticket.reference_id || ticket.id %>
+                    Ticket ID: {ticket.reference_id || ticket.id}
                   </div>
                   <div class="text-xs font-medium text-zinc-700 mt-1">
-                    <%= cond do
+                    {cond do
                       ticket.ticket_tier.type == :free ->
                         "Free"
 
@@ -1900,7 +1907,7 @@ defmodule YscWeb.AdminMoneyLive do
                         Money.to_string!(
                           ticket.ticket_tier.price || Money.new(0, :USD)
                         )
-                    end %>
+                    end}
                   </div>
                 </div>
               </label>
@@ -2063,7 +2070,7 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Event ID:</strong>
               <span class="text-zinc-600 font-mono text-xs ml-2">
-                <%= @selected_webhook.event_id %>
+                {@selected_webhook.event_id}
               </span>
             </p>
           </div>
@@ -2071,7 +2078,7 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Event Type:</strong>
               <span class="text-zinc-600 ml-2">
-                <%= @selected_webhook.event_type %>
+                {@selected_webhook.event_type}
               </span>
             </p>
           </div>
@@ -2079,7 +2086,7 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Provider:</strong>
               <span class="text-zinc-600 ml-2 capitalize">
-                <%= @selected_webhook.provider %>
+                {@selected_webhook.provider}
               </span>
             </p>
           </div>
@@ -2087,7 +2094,7 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">State:</strong>
               <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full ml-2 #{get_webhook_state_color(@selected_webhook.state)}"}>
-                <%= @selected_webhook.state %>
+                {@selected_webhook.state}
               </span>
             </p>
           </div>
@@ -2095,11 +2102,11 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Received At:</strong>
               <span class="text-zinc-600 ml-2">
-                <%= format_datetime(
+                {format_datetime(
                   @selected_webhook.inserted_at,
                   @timezone,
                   "%Y-%m-%d %H:%M:%S"
-                ) %>
+                )}
               </span>
             </p>
           </div>
@@ -2107,11 +2114,11 @@ defmodule YscWeb.AdminMoneyLive do
             <p class="text-sm">
               <strong class="text-zinc-900">Last Updated:</strong>
               <span class="text-zinc-600 ml-2">
-                <%= format_datetime(
+                {format_datetime(
                   @selected_webhook.updated_at,
                   @timezone,
                   "%Y-%m-%d %H:%M:%S"
-                ) %>
+                )}
               </span>
             </p>
           </div>
@@ -2148,38 +2155,36 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="text-sm font-medium text-zinc-700">Stripe Payout ID</p>
               <p class="text-sm text-zinc-900 font-mono">
-                <%= @selected_payout.stripe_payout_id %>
+                {@selected_payout.stripe_payout_id}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
               <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_payout_status_color(@selected_payout.status)}"}>
-                <%= String.capitalize(@selected_payout.status || "unknown") %>
+                {String.capitalize(@selected_payout.status || "unknown")}
               </span>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Payout Amount</p>
               <p class="text-sm text-zinc-900 font-semibold">
-                <%= Money.to_string!(@selected_payout.amount) %>
+                {Money.to_string!(@selected_payout.amount)}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Total Fees</p>
               <p class="text-sm  font-semibold text-red-600">
-                <%= Money.to_string!(
-                  @selected_payout.fee_total || Money.new(0, :USD)
-                ) %>
+                {Money.to_string!(@selected_payout.fee_total || Money.new(0, :USD))}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Arrival Date</p>
               <p class="text-sm text-zinc-900">
                 <%= if @selected_payout.arrival_date do %>
-                  <%= format_datetime(
+                  {format_datetime(
                     @selected_payout.arrival_date,
                     @timezone,
                     "%Y-%m-%d %H:%M"
-                  ) %>
+                  )}
                 <% else %>
                   N/A
                 <% end %>
@@ -2188,11 +2193,11 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="text-sm font-medium text-zinc-700">Created</p>
               <p class="text-sm text-zinc-900">
-                <%= format_datetime(
+                {format_datetime(
                   @selected_payout.inserted_at,
                   @timezone,
                   "%Y-%m-%d %H:%M"
-                ) %>
+                )}
               </p>
             </div>
           </div>
@@ -2211,9 +2216,9 @@ defmodule YscWeb.AdminMoneyLive do
                     @selected_payout.quickbooks_sync_status
                   )
                 }>
-                  <%= String.capitalize(
+                  {String.capitalize(
                     @selected_payout.quickbooks_sync_status || "not_synced"
-                  ) %>
+                  )}
                 </.badge>
               </p>
             </div>
@@ -2221,7 +2226,7 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Deposit ID</p>
                 <p class="text-zinc-900 font-mono text-xs">
-                  <%= @selected_payout.quickbooks_deposit_id %>
+                  {@selected_payout.quickbooks_deposit_id}
                 </p>
               </div>
             <% end %>
@@ -2229,11 +2234,11 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Synced At</p>
                 <p class="text-zinc-900 text-xs">
-                  <%= format_datetime(
+                  {format_datetime(
                     @selected_payout.quickbooks_synced_at,
                     @timezone,
                     "%Y-%m-%d %H:%M:%S"
-                  ) %>
+                  )}
                 </p>
               </div>
             <% end %>
@@ -2241,11 +2246,11 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Last Sync Attempt</p>
                 <p class="text-zinc-900 text-xs">
-                  <%= format_datetime(
+                  {format_datetime(
                     @selected_payout.quickbooks_last_sync_attempt_at,
                     @timezone,
                     "%Y-%m-%d %H:%M:%S"
-                  ) %>
+                  )}
                 </p>
               </div>
             <% end %>
@@ -2260,7 +2265,7 @@ defmodule YscWeb.AdminMoneyLive do
                   text_align="text-left"
                 >
                   <p class="text-red-600 text-xs cursor-help">
-                    <%= format_qb_error(@selected_payout.quickbooks_sync_error) %>
+                    {format_qb_error(@selected_payout.quickbooks_sync_error)}
                   </p>
                 </.tooltip>
               </div>
@@ -2277,7 +2282,7 @@ defmodule YscWeb.AdminMoneyLive do
         <!-- Associated Payments -->
         <div class="mb-6">
           <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Associated Payments (<%= length(@selected_payout.payments || []) %>)
+            Associated Payments ({length(@selected_payout.payments || [])})
           </h4>
           <div
             :if={length(@selected_payout.payments || []) > 0}
@@ -2309,16 +2314,16 @@ defmodule YscWeb.AdminMoneyLive do
               <tbody class="bg-white divide-y divide-zinc-200">
                 <tr :for={payment <- @selected_payout.payments}>
                   <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
-                    <%= payment.reference_id %>
+                    {payment.reference_id}
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <%= if Ecto.assoc_loaded?(payment.user) && payment.user do %>
                       <div class="flex flex-col">
                         <span class="text-xs font-medium">
-                          <%= get_user_display_name(payment.user) %>
+                          {get_user_display_name(payment.user)}
                         </span>
                         <span class="text-xs text-zinc-500">
-                          <%= payment.user.email %>
+                          {payment.user.email}
                         </span>
                       </div>
                     <% else %>
@@ -2326,11 +2331,11 @@ defmodule YscWeb.AdminMoneyLive do
                     <% end %>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap font-medium">
-                    <%= Money.to_string!(payment.amount) %>
+                    {Money.to_string!(payment.amount)}
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                      <%= payment.status %>
+                      {payment.status}
                     </span>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
@@ -2340,9 +2345,9 @@ defmodule YscWeb.AdminMoneyLive do
                           payment.quickbooks_sync_status
                         )
                       }>
-                        <%= String.capitalize(
+                        {String.capitalize(
                           payment.quickbooks_sync_status || "not_synced"
-                        ) %>
+                        )}
                       </.badge>
                       <%= if payment.quickbooks_sync_error do %>
                         <.tooltip
@@ -2360,11 +2365,11 @@ defmodule YscWeb.AdminMoneyLive do
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
-                    <%= format_datetime(
+                    {format_datetime(
                       payment.payment_date,
                       @timezone,
                       "%Y-%m-%d %H:%M"
-                    ) %>
+                    )}
                   </td>
                 </tr>
               </tbody>
@@ -2376,7 +2381,7 @@ defmodule YscWeb.AdminMoneyLive do
                   Total Payments:
                 </span>
                 <span class="text-sm font-bold text-zinc-900">
-                  <%= Money.to_string!(
+                  {Money.to_string!(
                     (@selected_payout.payments || [])
                     |> Enum.reduce(Money.new(0, :USD), fn payment, acc ->
                       case Money.add(acc, payment.amount) do
@@ -2384,7 +2389,7 @@ defmodule YscWeb.AdminMoneyLive do
                         {:error, _} -> acc
                       end
                     end)
-                  ) %>
+                  )}
                 </span>
               </div>
             </div>
@@ -2399,7 +2404,7 @@ defmodule YscWeb.AdminMoneyLive do
         <!-- Associated Refunds -->
         <div class="mb-6">
           <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Associated Refunds (<%= length(@selected_payout.refunds || []) %>)
+            Associated Refunds ({length(@selected_payout.refunds || [])})
           </h4>
           <div
             :if={length(@selected_payout.refunds || []) > 0}
@@ -2434,16 +2439,16 @@ defmodule YscWeb.AdminMoneyLive do
               <tbody class="bg-white divide-y divide-zinc-200">
                 <tr :for={refund <- @selected_payout.refunds}>
                   <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
-                    <%= refund.reference_id %>
+                    {refund.reference_id}
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <%= if Ecto.assoc_loaded?(refund.user) && refund.user do %>
                       <div class="flex flex-col">
                         <span class="text-xs font-medium">
-                          <%= get_user_display_name(refund.user) %>
+                          {get_user_display_name(refund.user)}
                         </span>
                         <span class="text-xs text-zinc-500">
-                          <%= refund.user.email %>
+                          {refund.user.email}
                         </span>
                       </div>
                     <% else %>
@@ -2451,16 +2456,16 @@ defmodule YscWeb.AdminMoneyLive do
                     <% end %>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap font-medium text-red-600">
-                    <%= Money.to_string!(refund.amount) %>
+                    {Money.to_string!(refund.amount)}
                   </td>
                   <td class="px-4 py-2 text-xs text-zinc-600 max-w-xs">
                     <div class="truncate" title={refund.reason}>
-                      <%= refund.reason || "N/A" %>
+                      {refund.reason || "N/A"}
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                      <%= refund.status %>
+                      {refund.status}
                     </span>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
@@ -2470,9 +2475,9 @@ defmodule YscWeb.AdminMoneyLive do
                           refund.quickbooks_sync_status
                         )
                       }>
-                        <%= String.capitalize(
+                        {String.capitalize(
                           refund.quickbooks_sync_status || "not_synced"
-                        ) %>
+                        )}
                       </.badge>
                       <%= if refund.quickbooks_sync_error do %>
                         <.tooltip
@@ -2490,11 +2495,11 @@ defmodule YscWeb.AdminMoneyLive do
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
-                    <%= format_datetime(
+                    {format_datetime(
                       refund.inserted_at,
                       @timezone,
                       "%Y-%m-%d %H:%M"
-                    ) %>
+                    )}
                   </td>
                 </tr>
               </tbody>
@@ -2506,7 +2511,7 @@ defmodule YscWeb.AdminMoneyLive do
                   Total Refunds:
                 </span>
                 <span class="text-sm font-bold text-red-600">
-                  <%= Money.to_string!(
+                  {Money.to_string!(
                     (@selected_payout.refunds || [])
                     |> Enum.reduce(Money.new(0, :USD), fn refund, acc ->
                       case Money.add(acc, refund.amount) do
@@ -2514,7 +2519,7 @@ defmodule YscWeb.AdminMoneyLive do
                         {:error, _} -> acc
                       end
                     end)
-                  ) %>
+                  )}
                 </span>
               </div>
             </div>
@@ -2533,7 +2538,7 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="text-zinc-600">Total Payments:</p>
               <p class="font-semibold text-zinc-900">
-                <%= Money.to_string!(
+                {Money.to_string!(
                   (@selected_payout.payments || [])
                   |> Enum.reduce(Money.new(0, :USD), fn payment, acc ->
                     case Money.add(acc, payment.amount) do
@@ -2541,13 +2546,13 @@ defmodule YscWeb.AdminMoneyLive do
                       {:error, _} -> acc
                     end
                   end)
-                ) %>
+                )}
               </p>
             </div>
             <div>
               <p class="text-zinc-600">Total Refunds:</p>
               <p class="font-semibold text-red-600">
-                <%= Money.to_string!(
+                {Money.to_string!(
                   (@selected_payout.refunds || [])
                   |> Enum.reduce(Money.new(0, :USD), fn refund, acc ->
                     case Money.add(acc, refund.amount) do
@@ -2555,21 +2560,19 @@ defmodule YscWeb.AdminMoneyLive do
                       {:error, _} -> acc
                     end
                   end)
-                ) %>
+                )}
               </p>
             </div>
             <div>
               <p class="text-zinc-600">Net Amount:</p>
               <p class="font-semibold text-zinc-900">
-                <%= Money.to_string!(@selected_payout.amount) %>
+                {Money.to_string!(@selected_payout.amount)}
               </p>
             </div>
             <div>
               <p class="text-zinc-600">Stripe Fees:</p>
               <p class="font-semibold text-red-600">
-                <%= Money.to_string!(
-                  @selected_payout.fee_total || Money.new(0, :USD)
-                ) %>
+                {Money.to_string!(@selected_payout.fee_total || Money.new(0, :USD))}
               </p>
             </div>
           </div>
@@ -2610,31 +2613,29 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="text-sm font-medium text-zinc-700">Reference ID</p>
               <p class="text-sm text-zinc-900 font-mono">
-                <%= @selected_payment.reference_id %>
+                {@selected_payment.reference_id}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
               <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if @selected_payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                <%= String.capitalize(
-                  to_string(@selected_payment.status || "unknown")
-                ) %>
+                {String.capitalize(to_string(@selected_payment.status || "unknown"))}
               </span>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Amount</p>
               <p class="text-sm text-zinc-900 font-semibold">
-                <%= Money.to_string!(@selected_payment.amount) %>
+                {Money.to_string!(@selected_payment.amount)}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Payment Date</p>
               <p class="text-sm text-zinc-900">
-                <%= format_datetime(
+                {format_datetime(
                   @selected_payment.payment_date,
                   @timezone,
                   "%Y-%m-%d %H:%M"
-                ) %>
+                )}
               </p>
             </div>
             <div>
@@ -2643,10 +2644,10 @@ defmodule YscWeb.AdminMoneyLive do
                 <%= if Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user do %>
                   <div class="flex flex-col">
                     <span class="font-medium">
-                      <%= get_user_display_name(@selected_payment.user) %>
+                      {get_user_display_name(@selected_payment.user)}
                     </span>
                     <span class="text-xs text-zinc-500">
-                      <%= @selected_payment.user.email %>
+                      {@selected_payment.user.email}
                     </span>
                   </div>
                 <% else %>
@@ -2659,11 +2660,11 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="text-sm text-zinc-900">
                 <%= if @selected_payment.payment_type_info do %>
                   <span class={"font-medium #{get_payment_type_color(@selected_payment.payment_type_info.type)}"}>
-                    <%= @selected_payment.payment_type_info.type %>
+                    {@selected_payment.payment_type_info.type}
                   </span>
                   <%= if @selected_payment.payment_type_info.details do %>
                     <span class="text-xs text-zinc-500 block mt-1">
-                      <%= @selected_payment.payment_type_info.details %>
+                      {@selected_payment.payment_type_info.details}
                     </span>
                   <% end %>
                 <% else %>
@@ -2674,7 +2675,7 @@ defmodule YscWeb.AdminMoneyLive do
             <div :if={@selected_payment.external_payment_id}>
               <p class="text-sm font-medium text-zinc-700">Stripe Payment ID</p>
               <p class="text-sm text-zinc-900 font-mono text-xs">
-                <%= String.slice(@selected_payment.external_payment_id, 0..20) %>...
+                {String.slice(@selected_payment.external_payment_id, 0..20)}...
               </p>
             </div>
           </div>
@@ -2692,9 +2693,9 @@ defmodule YscWeb.AdminMoneyLive do
                       @selected_payment.quickbooks_sync_status
                     )
                   }>
-                    <%= String.capitalize(
+                    {String.capitalize(
                       @selected_payment.quickbooks_sync_status || "not_synced"
-                    ) %>
+                    )}
                   </.badge>
                 </p>
               </div>
@@ -2702,7 +2703,7 @@ defmodule YscWeb.AdminMoneyLive do
                 <div>
                   <p class="font-medium text-zinc-700">Sales Receipt ID</p>
                   <p class="text-zinc-900 font-mono text-xs">
-                    <%= @selected_payment.quickbooks_sales_receipt_id %>
+                    {@selected_payment.quickbooks_sales_receipt_id}
                   </p>
                 </div>
               <% end %>
@@ -2710,11 +2711,11 @@ defmodule YscWeb.AdminMoneyLive do
                 <div>
                   <p class="font-medium text-zinc-700">Synced At</p>
                   <p class="text-zinc-900 text-xs">
-                    <%= format_datetime(
+                    {format_datetime(
                       @selected_payment.quickbooks_synced_at,
                       @timezone,
                       "%Y-%m-%d %H:%M:%S"
-                    ) %>
+                    )}
                   </p>
                 </div>
               <% end %>
@@ -2722,11 +2723,11 @@ defmodule YscWeb.AdminMoneyLive do
                 <div>
                   <p class="font-medium text-zinc-700">Last Sync Attempt</p>
                   <p class="text-zinc-900 text-xs">
-                    <%= format_datetime(
+                    {format_datetime(
                       @selected_payment.quickbooks_last_sync_attempt_at,
                       @timezone,
                       "%Y-%m-%d %H:%M:%S"
-                    ) %>
+                    )}
                   </p>
                 </div>
               <% end %>
@@ -2734,7 +2735,7 @@ defmodule YscWeb.AdminMoneyLive do
                 <div class="col-span-2">
                   <p class="font-medium text-zinc-700">Sync Error</p>
                   <p class="text-red-600 text-xs">
-                    <%= format_qb_error(@selected_payment.quickbooks_sync_error) %>
+                    {format_qb_error(@selected_payment.quickbooks_sync_error)}
                   </p>
                 </div>
               <% end %>
@@ -2758,44 +2759,44 @@ defmodule YscWeb.AdminMoneyLive do
                 <div class="text-sm text-zinc-700">
                   <p><strong>Type:</strong> Booking</p>
                   <p>
-                    <strong>Reference:</strong> <%= booking.reference_id ||
-                      booking.id %>
+                    <strong>Reference:</strong> {booking.reference_id ||
+                      booking.id}
                   </p>
                   <p>
-                    <strong>Check-in:</strong> <%= Calendar.strftime(
+                    <strong>Check-in:</strong> {Calendar.strftime(
                       booking.checkin_date,
                       "%Y-%m-%d"
-                    ) %>
+                    )}
                   </p>
                   <p>
-                    <strong>Check-out:</strong> <%= Calendar.strftime(
+                    <strong>Check-out:</strong> {Calendar.strftime(
                       booking.checkout_date,
                       "%Y-%m-%d"
-                    ) %>
+                    )}
                   </p>
                   <p>
-                    <strong>Status:</strong> <%= String.capitalize(
+                    <strong>Status:</strong> {String.capitalize(
                       to_string(booking.status)
-                    ) %>
+                    )}
                   </p>
                 </div>
               <% {:ticket_order, ticket_order} -> %>
                 <div class="text-sm text-zinc-700">
                   <p><strong>Type:</strong> Ticket Order</p>
                   <p>
-                    <strong>Reference:</strong> <%= ticket_order.reference_id ||
-                      ticket_order.id %>
+                    <strong>Reference:</strong> {ticket_order.reference_id ||
+                      ticket_order.id}
                   </p>
                   <%= if ticket_order.event do %>
-                    <p><strong>Event:</strong> <%= ticket_order.event.title %></p>
+                    <p><strong>Event:</strong> {ticket_order.event.title}</p>
                   <% end %>
                   <p>
-                    <strong>Tickets:</strong> <%= length(ticket_order.tickets || []) %>
+                    <strong>Tickets:</strong> {length(ticket_order.tickets || [])}
                   </p>
                   <p>
-                    <strong>Status:</strong> <%= String.capitalize(
+                    <strong>Status:</strong> {String.capitalize(
                       to_string(ticket_order.status)
-                    ) %>
+                    )}
                   </p>
                 </div>
             <% end %>
@@ -2803,7 +2804,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Refunds Section -->
           <div class="mt-4">
             <h4 class="text-md font-semibold text-zinc-800 mb-3">
-              Refunds (<%= length(@payment_refunds || []) %>)
+              Refunds ({length(@payment_refunds || [])})
             </h4>
             <div :if={length(@payment_refunds || []) > 0} class="overflow-x-auto">
               <table class="min-w-full divide-y divide-zinc-200 text-sm">
@@ -2832,19 +2833,19 @@ defmodule YscWeb.AdminMoneyLive do
                 <tbody class="bg-white divide-y divide-zinc-200">
                   <tr :for={refund <- @payment_refunds}>
                     <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
-                      <%= refund.reference_id %>
+                      {refund.reference_id}
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap font-medium text-red-600">
-                      <%= Money.to_string!(refund.amount) %>
+                      {Money.to_string!(refund.amount)}
                     </td>
                     <td class="px-4 py-2 text-xs text-zinc-600 max-w-xs">
                       <div class="truncate" title={refund.reason}>
-                        <%= refund.reason || "N/A" %>
+                        {refund.reason || "N/A"}
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
                       <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                        <%= String.capitalize(to_string(refund.status || "unknown")) %>
+                        {String.capitalize(to_string(refund.status || "unknown"))}
                       </span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
@@ -2854,9 +2855,9 @@ defmodule YscWeb.AdminMoneyLive do
                             refund.quickbooks_sync_status
                           )
                         }>
-                          <%= String.capitalize(
+                          {String.capitalize(
                             refund.quickbooks_sync_status || "not_synced"
-                          ) %>
+                          )}
                         </.badge>
                         <%= if refund.quickbooks_sync_error do %>
                           <.tooltip
@@ -2874,11 +2875,11 @@ defmodule YscWeb.AdminMoneyLive do
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-xs">
-                      <%= format_datetime(
+                      {format_datetime(
                         refund.inserted_at,
                         @timezone,
                         "%Y-%m-%d %H:%M"
-                      ) %>
+                      )}
                     </td>
                   </tr>
                 </tbody>
@@ -2894,7 +2895,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Ledger Entries Section -->
           <div class="mt-4">
             <h4 class="text-md font-semibold text-zinc-800 mb-3">
-              Ledger Entries (<%= length(@payment_ledger_entries || []) %>)
+              Ledger Entries ({length(@payment_ledger_entries || [])})
             </h4>
             <div
               :if={length(@payment_ledger_entries || []) > 0}
@@ -2925,34 +2926,32 @@ defmodule YscWeb.AdminMoneyLive do
                     <td class="px-4 py-2 whitespace-nowrap">
                       <div class="flex flex-col">
                         <span class="text-xs font-medium text-zinc-900">
-                          <%= entry.account.name %>
+                          {entry.account.name}
                         </span>
                         <span class="text-xs text-zinc-500">
-                          <%= String.capitalize(
-                            to_string(entry.account.account_type)
-                          ) %>
+                          {String.capitalize(to_string(entry.account.account_type))}
                         </span>
                       </div>
                     </td>
                     <td class="px-4 py-2 text-xs text-zinc-600 max-w-xs">
                       <div class="truncate" title={entry.description}>
-                        <%= entry.description %>
+                        {entry.description}
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
                       <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_debit_credit_badge_color(entry.debit_credit)}"}>
-                        <%= String.capitalize(to_string(entry.debit_credit)) %>
+                        {String.capitalize(to_string(entry.debit_credit))}
                       </span>
                     </td>
                     <td class={"px-4 py-2 whitespace-nowrap text-xs font-medium #{get_debit_credit_amount_color(entry.debit_credit)}"}>
-                      <%= Money.to_string!(entry.amount) %>
+                      {Money.to_string!(entry.amount)}
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-xs">
-                      <%= format_datetime(
+                      {format_datetime(
                         entry.inserted_at,
                         @timezone,
                         "%Y-%m-%d %H:%M"
-                      ) %>
+                      )}
                     </td>
                   </tr>
                 </tbody>
@@ -2997,14 +2996,14 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="font-medium text-zinc-700">Expense Report ID</p>
               <p class="text-zinc-900 font-mono text-xs">
-                <%= String.slice(to_string(@selected_expense_report.id), 0..20) %>...
+                {String.slice(to_string(@selected_expense_report.id), 0..20)}...
               </p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">User</p>
               <p class="text-zinc-900">
                 <%= if Ecto.assoc_loaded?(@selected_expense_report.user) && @selected_expense_report.user do %>
-                  <%= get_user_display_name(@selected_expense_report.user) %> (<%= @selected_expense_report.user.email %>)
+                  {get_user_display_name(@selected_expense_report.user)} ({@selected_expense_report.user.email})
                 <% else %>
                   <span class="text-zinc-400">Unknown</span>
                 <% end %>
@@ -3012,14 +3011,14 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="font-medium text-zinc-700">Purpose</p>
-              <p class="text-zinc-900"><%= @selected_expense_report.purpose %></p>
+              <p class="text-zinc-900">{@selected_expense_report.purpose}</p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">Reimbursement Method</p>
               <p class="text-zinc-900">
-                <%= String.capitalize(
+                {String.capitalize(
                   @selected_expense_report.reimbursement_method || "unknown"
-                ) %>
+                )}
               </p>
             </div>
             <div>
@@ -3030,38 +3029,36 @@ defmodule YscWeb.AdminMoneyLive do
                     @selected_expense_report.status
                   )
                 }>
-                  <%= String.capitalize(
-                    @selected_expense_report.status || "unknown"
-                  ) %>
+                  {String.capitalize(@selected_expense_report.status || "unknown")}
                 </.badge>
               </p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">Certification Accepted</p>
               <p class="text-zinc-900">
-                <%= if @selected_expense_report.certification_accepted,
+                {if @selected_expense_report.certification_accepted,
                   do: "Yes",
-                  else: "No" %>
+                  else: "No"}
               </p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">Created At</p>
               <p class="text-zinc-900">
-                <%= format_datetime(
+                {format_datetime(
                   @selected_expense_report.inserted_at,
                   @timezone,
                   "%Y-%m-%d %H:%M:%S"
-                ) %>
+                )}
               </p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">Updated At</p>
               <p class="text-zinc-900">
-                <%= format_datetime(
+                {format_datetime(
                   @selected_expense_report.updated_at,
                   @timezone,
                   "%Y-%m-%d %H:%M:%S"
-                ) %>
+                )}
               </p>
             </div>
           </div>
@@ -3077,8 +3074,8 @@ defmodule YscWeb.AdminMoneyLive do
                 <p class="font-medium text-zinc-700">Address</p>
                 <p class="text-zinc-900">
                   <%= if Ecto.assoc_loaded?(@selected_expense_report.address) && @selected_expense_report.address do %>
-                    <%= @selected_expense_report.address.address %><br />
-                    <%= @selected_expense_report.address.city %>, <%= @selected_expense_report.address.region %> <%= @selected_expense_report.address.postal_code %>
+                    {@selected_expense_report.address.address}<br />
+                    {@selected_expense_report.address.city}, {@selected_expense_report.address.region} {@selected_expense_report.address.postal_code}
                   <% else %>
                     <span class="text-zinc-400">Not set</span>
                   <% end %>
@@ -3090,7 +3087,7 @@ defmodule YscWeb.AdminMoneyLive do
                 <p class="font-medium text-zinc-700">Bank Account</p>
                 <p class="text-zinc-900">
                   <%= if Ecto.assoc_loaded?(@selected_expense_report.bank_account) && @selected_expense_report.bank_account do %>
-                    Account ending in: <%= @selected_expense_report.bank_account.account_number_last_4 %>
+                    Account ending in: {@selected_expense_report.bank_account.account_number_last_4}
                   <% else %>
                     <span class="text-zinc-400">Not set</span>
                   <% end %>
@@ -3101,7 +3098,7 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Related Event</p>
                 <p class="text-zinc-900">
-                  <%= @selected_expense_report.event.title %>
+                  {@selected_expense_report.event.title}
                 </p>
               </div>
             <% end %>
@@ -3121,9 +3118,9 @@ defmodule YscWeb.AdminMoneyLive do
                     @selected_expense_report.quickbooks_sync_status
                   )
                 }>
-                  <%= String.capitalize(
+                  {String.capitalize(
                     @selected_expense_report.quickbooks_sync_status || "unknown"
-                  ) %>
+                  )}
                 </.badge>
               </p>
             </div>
@@ -3131,7 +3128,7 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Bill ID</p>
                 <p class="text-zinc-900 font-mono text-xs">
-                  <%= @selected_expense_report.quickbooks_bill_id %>
+                  {@selected_expense_report.quickbooks_bill_id}
                 </p>
               </div>
             <% end %>
@@ -3139,7 +3136,7 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Vendor ID</p>
                 <p class="text-zinc-900 font-mono text-xs">
-                  <%= @selected_expense_report.quickbooks_vendor_id %>
+                  {@selected_expense_report.quickbooks_vendor_id}
                 </p>
               </div>
             <% end %>
@@ -3147,11 +3144,11 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Synced At</p>
                 <p class="text-zinc-900">
-                  <%= format_datetime(
+                  {format_datetime(
                     @selected_expense_report.quickbooks_synced_at,
                     @timezone,
                     "%Y-%m-%d %H:%M:%S"
-                  ) %>
+                  )}
                 </p>
               </div>
             <% end %>
@@ -3159,11 +3156,11 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Last Sync Attempt</p>
                 <p class="text-zinc-900">
-                  <%= format_datetime(
+                  {format_datetime(
                     @selected_expense_report.quickbooks_last_sync_attempt_at,
                     @timezone,
                     "%Y-%m-%d %H:%M:%S"
-                  ) %>
+                  )}
                 </p>
               </div>
             <% end %>
@@ -3171,9 +3168,7 @@ defmodule YscWeb.AdminMoneyLive do
               <div class="col-span-2">
                 <p class="font-medium text-zinc-700">Sync Error</p>
                 <p class="text-red-600 text-xs">
-                  <%= format_qb_error(
-                    @selected_expense_report.quickbooks_sync_error
-                  ) %>
+                  {format_qb_error(@selected_expense_report.quickbooks_sync_error)}
                 </p>
               </div>
             <% end %>
@@ -3182,7 +3177,7 @@ defmodule YscWeb.AdminMoneyLive do
         <!-- Expense Items -->
         <div class="mb-6">
           <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Expense Items (<%= length(@selected_expense_report.expense_items || []) %>)
+            Expense Items ({length(@selected_expense_report.expense_items || [])})
           </h4>
           <%= if Ecto.assoc_loaded?(@selected_expense_report.expense_items) && length(@selected_expense_report.expense_items) > 0 do %>
             <div class="overflow-x-auto">
@@ -3209,16 +3204,16 @@ defmodule YscWeb.AdminMoneyLive do
                 <tbody class="bg-white divide-y divide-zinc-200">
                   <tr :for={item <- @selected_expense_report.expense_items}>
                     <td class="px-4 py-2 whitespace-nowrap">
-                      <%= Calendar.strftime(item.date, "%Y-%m-%d") %>
+                      {Calendar.strftime(item.date, "%Y-%m-%d")}
                     </td>
-                    <td class="px-4 py-2"><%= item.vendor %></td>
+                    <td class="px-4 py-2">{item.vendor}</td>
                     <td class="px-4 py-2 max-w-xs">
                       <div class="truncate" title={item.description}>
-                        <%= item.description %>
+                        {item.description}
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap font-medium">
-                      <%= Money.to_string!(item.amount) %>
+                      {Money.to_string!(item.amount)}
                     </td>
                     <td class="px-4 py-2">
                       <%= if item.receipt_s3_path do %>
@@ -3244,7 +3239,7 @@ defmodule YscWeb.AdminMoneyLive do
         <!-- Income Items -->
         <div class="mb-6">
           <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Income Items (<%= length(@selected_expense_report.income_items || []) %>)
+            Income Items ({length(@selected_expense_report.income_items || [])})
           </h4>
           <%= if Ecto.assoc_loaded?(@selected_expense_report.income_items) && length(@selected_expense_report.income_items) > 0 do %>
             <div class="overflow-x-auto">
@@ -3268,15 +3263,15 @@ defmodule YscWeb.AdminMoneyLive do
                 <tbody class="bg-white divide-y divide-zinc-200">
                   <tr :for={item <- @selected_expense_report.income_items}>
                     <td class="px-4 py-2 whitespace-nowrap">
-                      <%= Calendar.strftime(item.date, "%Y-%m-%d") %>
+                      {Calendar.strftime(item.date, "%Y-%m-%d")}
                     </td>
                     <td class="px-4 py-2 max-w-xs">
                       <div class="truncate" title={item.description}>
-                        <%= item.description %>
+                        {item.description}
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap font-medium">
-                      <%= Money.to_string!(item.amount) %>
+                      {Money.to_string!(item.amount)}
                     </td>
                     <td class="px-4 py-2">
                       <%= if item.proof_s3_path do %>
@@ -3306,19 +3301,19 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="font-medium text-zinc-700">Expense Total</p>
               <p class="text-lg font-semibold text-zinc-900">
-                <%= Money.to_string!(totals.expense_total) %>
+                {Money.to_string!(totals.expense_total)}
               </p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">Income Total</p>
               <p class="text-lg font-semibold text-zinc-900">
-                <%= Money.to_string!(totals.income_total) %>
+                {Money.to_string!(totals.income_total)}
               </p>
             </div>
             <div>
               <p class="font-medium text-zinc-700">Net Total</p>
               <p class="text-lg font-semibold text-zinc-900">
-                <%= Money.to_string!(totals.net_total) %>
+                {Money.to_string!(totals.net_total)}
               </p>
             </div>
           </div>

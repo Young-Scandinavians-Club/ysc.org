@@ -53,10 +53,12 @@ defmodule Ysc.ZeroCoverageModulesSmokeTest do
     test "UserNoteCategory exposes expected values and validation" do
       assert Keyword.keys(UserNoteCategory.__enum_map__()) == [
                :general,
-               :violation
+               :violation,
+               :rejection
              ]
 
       assert UserNoteCategory.valid_value?("general")
+      assert UserNoteCategory.valid_value?("rejection")
       refute UserNoteCategory.valid_value?("other")
     end
 

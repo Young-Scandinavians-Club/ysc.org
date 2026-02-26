@@ -88,17 +88,8 @@ class LivePhone {
     this.elements.textField().focus()
   }
 
-  // Remove phx-no-feedback class from parent wrapper to show validation errors
-  removeNoFeedback() {
-    const parent = this.elements.parent()
-    if (!parent) return
-
-    // Find the phx-feedback-for wrapper (parent of parent)
-    let wrapper = parent.closest('[phx-feedback-for]')
-    if (wrapper) {
-      wrapper.classList.remove('phx-no-feedback')
-    }
-  }
+  // No-op: validation feedback is now controlled server-side via used_input? (LiveView 1.0)
+  removeNoFeedback() {}
 
   // This has to happen because the `phx-change` event was not
   // always called correctly when updating the value from the

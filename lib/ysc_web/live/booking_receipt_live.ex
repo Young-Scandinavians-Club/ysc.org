@@ -17,7 +17,10 @@ defmodule YscWeb.BookingReceiptLive do
     if is_nil(user) do
       {:ok,
        socket
-       |> put_flash(:error, "You must be signed in to view this receipt.")
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "You must be signed in to view this receipt."
+       )
        |> redirect(to: ~p"/")}
     else
       # SECURITY: Filter by user_id in the database query to prevent unauthorized access
@@ -37,7 +40,7 @@ defmodule YscWeb.BookingReceiptLive do
         nil ->
           {:ok,
            socket
-           |> put_flash(:error, "Booking not found.")
+           |> YscWeb.Flash.put_toast(:error, "Booking not found.")
            |> redirect(to: ~p"/")}
 
         booking ->
@@ -183,7 +186,7 @@ defmodule YscWeb.BookingReceiptLive do
         {:noreply,
          socket
          |> assign(:show_cancel_modal, false)
-         |> put_flash(:info, refund_message)
+         |> YscWeb.Flash.put_toast(:info, refund_message)
          |> redirect(to: ~p"/bookings/#{booking.id}/receipt")}
 
       {:error, reason} ->
@@ -211,7 +214,7 @@ defmodule YscWeb.BookingReceiptLive do
         {:noreply,
          socket
          |> assign(:show_cancel_modal, false)
-         |> put_flash(:error, error_message)}
+         |> YscWeb.Flash.put_toast(:error, error_message)}
     end
   end
 
@@ -239,19 +242,19 @@ defmodule YscWeb.BookingReceiptLive do
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
               Your booking at
-              <strong><%= format_property_name(@booking.property) %></strong>
+              <strong>{format_property_name(@booking.property)}</strong>
               has been cancelled.
               <%= if @refund_data && @refund_data.total_refunded do %>
                 <%= if @refund_data.has_pending_refund do %>
                   A refund of
                   <strong>
-                    <%= MoneyHelper.format_money!(@refund_data.total_refunded) %>
+                    {MoneyHelper.format_money!(@refund_data.total_refunded)}
                   </strong>
                   is pending admin review.
                 <% else %>
                   A refund of
                   <strong>
-                    <%= MoneyHelper.format_money!(@refund_data.total_refunded) %>
+                    {MoneyHelper.format_money!(@refund_data.total_refunded)}
                   </strong>
                   has been processed.
                 <% end %>
@@ -267,11 +270,11 @@ defmodule YscWeb.BookingReceiptLive do
               </span>
             </div>
             <h1 class="text-4xl font-bold text-zinc-900">
-              See you at the Cabin, <%= @user_first_name %>!
+              See you at the Cabin, {@user_first_name}!
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
               Your stay at
-              <strong><%= format_property_name(@booking.property) %></strong>
+              <strong>{format_property_name(@booking.property)}</strong>
               is all set.
               We've sent a copy of these details to your email.
             </p>
@@ -282,7 +285,7 @@ defmodule YscWeb.BookingReceiptLive do
             Booking Reference
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
-            <%= @booking.reference_id %>
+            {@booking.reference_id}
           </p>
         </div>
       </div>
@@ -338,7 +341,7 @@ defmodule YscWeb.BookingReceiptLive do
                   Door Code
                 </p>
                 <p class="text-5xl font-mono font-black text-white text-center tracking-wider">
-                  <%= @door_code.code %>
+                  {@door_code.code}
                 </p>
               </div>
             </div>
@@ -417,15 +420,15 @@ defmodule YscWeb.BookingReceiptLive do
                       else: "bg-blue-100 text-blue-700"
                     )
                   ]}>
-                    <%= Date.diff(@booking.checkout_date, @booking.checkin_date) %> <%= if Date.diff(
-                                                                                             @booking.checkout_date,
-                                                                                             @booking.checkin_date
-                                                                                           ) ==
-                                                                                             1,
-                                                                                           do:
-                                                                                             "Night",
-                                                                                           else:
-                                                                                             "Nights" %>
+                    {Date.diff(@booking.checkout_date, @booking.checkin_date)} {if Date.diff(
+                                                                                     @booking.checkout_date,
+                                                                                     @booking.checkin_date
+                                                                                   ) ==
+                                                                                     1,
+                                                                                   do:
+                                                                                     "Night",
+                                                                                   else:
+                                                                                     "Nights"}
                   </span>
                 </div>
               </div>
@@ -448,7 +451,7 @@ defmodule YscWeb.BookingReceiptLive do
                     else: "text-zinc-900"
                   )
                 ]}>
-                  <%= format_date(@booking.checkin_date, @timezone) %>
+                  {format_date(@booking.checkin_date, @timezone)}
                 </p>
                 <p class={[
                   "text-sm",
@@ -477,7 +480,7 @@ defmodule YscWeb.BookingReceiptLive do
                     else: "text-zinc-900"
                   )
                 ]}>
-                  <%= format_date(@booking.checkout_date, @timezone) %>
+                  {format_date(@booking.checkout_date, @timezone)}
                 </p>
                 <p class={[
                   "text-sm",
@@ -507,7 +510,7 @@ defmodule YscWeb.BookingReceiptLive do
                   )
                 ]}>
                   <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
-                    <%= Enum.map_join(@booking.rooms, ", ", fn room -> room.name end) %>
+                    {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
                   <% else %>
                     <%= if @booking.booking_mode == :buyout do %>
                       Full Buyout
@@ -526,14 +529,14 @@ defmodule YscWeb.BookingReceiptLive do
                     )
                   ]}
                 >
-                  <%= @booking.guests_count %> <%= if @booking.guests_count == 1,
+                  {@booking.guests_count} {if @booking.guests_count == 1,
                     do: "Adult",
-                    else: "Adults" %>
+                    else: "Adults"}
                   <%= if @booking.children_count > 0 do %>
-                    , <%= @booking.children_count %> <%= if @booking.children_count ==
-                                                              1,
-                                                            do: "Child",
-                                                            else: "Children" %>
+                    , {@booking.children_count} {if @booking.children_count ==
+                                                      1,
+                                                    do: "Child",
+                                                    else: "Children"}
                   <% end %>
                 </p>
               </div>
@@ -586,7 +589,7 @@ defmodule YscWeb.BookingReceiptLive do
                             <.icon name="hero-user-circle" class="w-5 h-5" />
                           <% end %>
                         <% else %>
-                          <%= guest.order_index + 1 %>
+                          {guest.order_index + 1}
                         <% end %>
                       </div>
                       <div class="flex-1">
@@ -599,12 +602,12 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           ]}>
                             <%= if guest.is_booking_user do %>
-                              <%= guest.first_name %> <%= guest.last_name %>
+                              {guest.first_name} {guest.last_name}
                               <span class="text-xs font-normal text-zinc-500 ml-2">
                                 (Booking Member)
                               </span>
                             <% else %>
-                              <%= guest.first_name %> <%= guest.last_name %>
+                              {guest.first_name} {guest.last_name}
                             <% end %>
                           </h3>
                           <span class={[
@@ -614,7 +617,7 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "bg-blue-200 text-blue-800"
                             )
                           ]}>
-                            <%= if guest.is_child, do: "Child", else: "Adult" %>
+                            {if guest.is_child, do: "Child", else: "Adult"}
                           </span>
                         </div>
                       </div>
@@ -699,9 +702,9 @@ defmodule YscWeb.BookingReceiptLive do
                   else: "text-zinc-400"
                 )
               ]}>
-                <%= if @booking.status == :canceled,
+                {if @booking.status == :canceled,
                   do: "Payment & Refund Summary",
-                  else: "Payment Summary" %>
+                  else: "Payment Summary"}
               </h3>
               <div class={[
                 "space-y-4 text-sm",
@@ -720,9 +723,9 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           }>
                             Full Buyout
-                            (<%= MoneyHelper.format_money!(
+                            ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
-                            ) %> × <%= @price_breakdown.nights %>)
+                            )} × {@price_breakdown.nights})
                           </span>
                           <span class={
                             if(@booking.status == :canceled,
@@ -730,7 +733,7 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-300"
                             )
                           }>
-                            <%= MoneyHelper.format_money!(@payment.amount) %>
+                            {MoneyHelper.format_money!(@payment.amount)}
                           </span>
                         </div>
                       <% end %>
@@ -746,12 +749,12 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           }>
                             Spot Rental
-                            (<%= @price_breakdown.guests_count %> × <%= @price_breakdown.nights %> night<%= if @price_breakdown.nights !=
-                                                                                                                 1,
-                                                                                                               do:
-                                                                                                                 "s",
-                                                                                                               else:
-                                                                                                                 "" %>)
+                            ({@price_breakdown.guests_count} × {@price_breakdown.nights} night{if @price_breakdown.nights !=
+                                                                                                    1,
+                                                                                                  do:
+                                                                                                    "s",
+                                                                                                  else:
+                                                                                                    ""})
                           </span>
                           <span class={
                             if(@booking.status == :canceled,
@@ -759,13 +762,13 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-300"
                             )
                           }>
-                            <%= MoneyHelper.format_money!(
+                            {MoneyHelper.format_money!(
                               Money.mult(
                                 @price_breakdown.price_per_guest_per_night,
                                 total_guest_nights
                               )
                               |> elem(1)
-                            ) %>
+                            )}
                           </span>
                         </div>
                       <% end %>
@@ -783,12 +786,12 @@ defmodule YscWeb.BookingReceiptLive do
                               <%= if @price_breakdown[:adult_price_per_night] do %>
                                 <% adult_count =
                                   @price_breakdown[:billable_people] ||
-                                    @price_breakdown[:guests_count] || 0 %> (<%= adult_count %> <%= if adult_count ==
-                                                                                                         1,
-                                                                                                       do:
-                                                                                                         "adult",
-                                                                                                       else:
-                                                                                                         "adults" %> × <%= @price_breakdown.nights %>)
+                                    @price_breakdown[:guests_count] || 0 %> ({adult_count} {if adult_count ==
+                                                                                                 1,
+                                                                                               do:
+                                                                                                 "adult",
+                                                                                               else:
+                                                                                                 "adults"} × {@price_breakdown.nights})
                               <% end %>
                             </span>
                             <span class={
@@ -797,7 +800,7 @@ defmodule YscWeb.BookingReceiptLive do
                                 else: "text-zinc-300"
                               )
                             }>
-                              <%= MoneyHelper.format_money!(@price_breakdown.base) %>
+                              {MoneyHelper.format_money!(@price_breakdown.base)}
                             </span>
                           </div>
                         <% end %>
@@ -810,7 +813,7 @@ defmodule YscWeb.BookingReceiptLive do
                               )
                             }>
                               Children
-                              (<%= @price_breakdown[:children_count] %> × <%= @price_breakdown.nights %>)
+                              ({@price_breakdown[:children_count]} × {@price_breakdown.nights})
                             </span>
                             <span class={
                               if(@booking.status == :canceled,
@@ -818,9 +821,7 @@ defmodule YscWeb.BookingReceiptLive do
                                 else: "text-zinc-300"
                               )
                             }>
-                              <%= MoneyHelper.format_money!(
-                                @price_breakdown.children
-                              ) %>
+                              {MoneyHelper.format_money!(@price_breakdown.children)}
                             </span>
                           </div>
                         <% end %>
@@ -848,7 +849,7 @@ defmodule YscWeb.BookingReceiptLive do
                         else: "text-blue-400"
                       )
                     ]}>
-                      <%= MoneyHelper.format_money!(@payment.amount) %>
+                      {MoneyHelper.format_money!(@payment.amount)}
                     </span>
                   </div>
                 <% else %>
@@ -868,7 +869,7 @@ defmodule YscWeb.BookingReceiptLive do
                         else: "text-blue-400"
                       )
                     ]}>
-                      <%= MoneyHelper.format_money!(@payment.amount) %>
+                      {MoneyHelper.format_money!(@payment.amount)}
                     </span>
                   </div>
                 <% end %>
@@ -877,7 +878,7 @@ defmodule YscWeb.BookingReceiptLive do
                     <div class="flex justify-between border-t border-red-200 pt-4">
                       <span class="text-zinc-600">Refunded</span>
                       <span class="font-bold text-green-600 text-xl">
-                        <%= MoneyHelper.format_money!(@refund_data.total_refunded) %>
+                        {MoneyHelper.format_money!(@refund_data.total_refunded)}
                       </span>
                     </div>
                     <%= if @refund_data.has_pending_refund do %>
@@ -902,15 +903,15 @@ defmodule YscWeb.BookingReceiptLive do
                         <%= for refund <- @refund_data.processed_refunds do %>
                           <div class="flex justify-between text-xs">
                             <span class="text-zinc-500">
-                              <%= MoneyHelper.format_money!(refund.amount) %>
+                              {MoneyHelper.format_money!(refund.amount)}
                               <%= if refund.reason do %>
                                 <span class="text-zinc-400">
-                                  • <%= String.slice(refund.reason, 0, 30) %><%= if String.length(
-                                                                                      refund.reason
-                                                                                    ) >
-                                                                                      30,
-                                                                                    do:
-                                                                                      "..." %>
+                                  • {String.slice(refund.reason, 0, 30)}{if String.length(
+                                                                              refund.reason
+                                                                            ) >
+                                                                              30,
+                                                                            do:
+                                                                              "..."}
                                 </span>
                               <% end %>
                             </span>
@@ -921,10 +922,10 @@ defmodule YscWeb.BookingReceiptLive do
                                 else: "text-amber-600"
                               )
                             ]}>
-                              <%= if refund.status == :completed,
+                              {if refund.status == :completed,
                                 do: "Processed",
                                 else:
-                                  String.capitalize(Atom.to_string(refund.status)) %>
+                                  String.capitalize(Atom.to_string(refund.status))}
                             </span>
                           </div>
                         <% end %>
@@ -933,13 +934,13 @@ defmodule YscWeb.BookingReceiptLive do
                     <div class="flex justify-between border-t-2 border-red-300 pt-4 mt-4">
                       <span class="font-semibold text-zinc-900">Net Amount</span>
                       <span class="font-bold text-red-600 text-xl">
-                        <%= case Money.sub(
-                                   @payment.amount,
-                                   @refund_data.total_refunded
-                                 ) do
+                        {case Money.sub(
+                                @payment.amount,
+                                @refund_data.total_refunded
+                              ) do
                           {:ok, net} -> MoneyHelper.format_money!(net)
                           _ -> MoneyHelper.format_money!(@payment.amount)
-                        end %>
+                        end}
                       </span>
                     </div>
                   <% else %>
@@ -965,7 +966,7 @@ defmodule YscWeb.BookingReceiptLive do
                   }>
                     Method
                   </span>
-                  <span><%= get_payment_method_description(@payment) %></span>
+                  <span>{get_payment_method_description(@payment)}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class={
@@ -977,7 +978,7 @@ defmodule YscWeb.BookingReceiptLive do
                     Date
                   </span>
                   <span>
-                    <%= format_payment_date(@payment.payment_date, @timezone) %>
+                    {format_payment_date(@payment.payment_date, @timezone)}
                   </span>
                 </div>
               </div>
@@ -1031,7 +1032,7 @@ defmodule YscWeb.BookingReceiptLive do
                     <span class="text-sm text-blue-700">Original Payment:</span>
                     <span class="text-sm font-medium text-blue-900">
                       <%= if @payment do %>
-                        <%= MoneyHelper.format_money!(@payment.amount) %>
+                        {MoneyHelper.format_money!(@payment.amount)}
                       <% else %>
                         —
                       <% end %>
@@ -1040,7 +1041,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <div class="flex justify-between items-baseline">
                     <span class="text-sm text-blue-700">Estimated Refund:</span>
                     <span class="text-lg font-bold text-blue-900">
-                      <%= MoneyHelper.format_money!(@refund_info.estimated_refund) %>
+                      {MoneyHelper.format_money!(@refund_info.estimated_refund)}
                     </span>
                   </div>
                   <%= if @refund_info.applied_rule do %>
@@ -1049,7 +1050,7 @@ defmodule YscWeb.BookingReceiptLive do
                       |> Float.round(0)
                       |> trunc() %>
                     <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                      Based on cancellation policy: <%= refund_percent %>% refund if cancelled <%= @refund_info.applied_rule.days_before_checkin %> days or more before check-in.
+                      Based on cancellation policy: {refund_percent}% refund if cancelled {@refund_info.applied_rule.days_before_checkin} days or more before check-in.
                     </p>
                   <% else %>
                     <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
@@ -1104,14 +1105,14 @@ defmodule YscWeb.BookingReceiptLive do
       <!-- Footer Note -->
       <div class="mt-12 pt-8 border-t border-zinc-100">
         <p class="text-sm text-zinc-500 text-center">
-          The YSC is run by members like you. If you have questions about your stay, contact the <%= format_property_name(
+          The YSC is run by members like you. If you have questions about your stay, contact the {format_property_name(
             @booking.property
-          ) %> Cabin Master at
+          )} Cabin Master at
           <a
             href={"mailto:#{get_cabin_master_email(@booking.property)}"}
             class="text-blue-600 hover:text-blue-500 underline"
           >
-            <%= get_cabin_master_email(@booking.property) %>
+            {get_cabin_master_email(@booking.property)}
           </a>
           .
         </p>
@@ -1132,7 +1133,7 @@ defmodule YscWeb.BookingReceiptLive do
         case process_payment_from_redirect(booking, payment_intent_id) do
           {:ok, _confirmed_booking} ->
             {socket
-             |> put_flash(
+             |> YscWeb.Flash.put_toast(
                :info,
                "Payment successful! Your booking is confirmed."
              ), true}
@@ -1140,7 +1141,8 @@ defmodule YscWeb.BookingReceiptLive do
           {:error, :already_processed} ->
             # Payment was already processed (maybe via webhook or client-side)
             {socket
-             |> put_flash(:info, "Your booking is confirmed."), false}
+             |> YscWeb.Flash.put_toast(:info, "Your booking is confirmed."),
+             false}
 
           {:error, reason} ->
             Ysc.Logging.error("Failed to process payment from redirect",
@@ -1150,7 +1152,7 @@ defmodule YscWeb.BookingReceiptLive do
             )
 
             {socket
-             |> put_flash(
+             |> YscWeb.Flash.put_toast(
                :error,
                "Payment was successful, but there was an issue confirming your booking. Please contact support."
              ), false}
@@ -1158,7 +1160,7 @@ defmodule YscWeb.BookingReceiptLive do
 
       {"failed", _payment_intent_id} ->
         {socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Payment failed. Please try again or contact support if the problem persists."
          ), false}

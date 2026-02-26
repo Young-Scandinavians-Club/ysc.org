@@ -56,7 +56,7 @@ defmodule YscWeb.UserSettingsLive do
 
             <%= if @phone_verification_error do %>
               <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p class="text-sm text-red-800"><%= @phone_verification_error %></p>
+                <p class="text-sm text-red-800">{@phone_verification_error}</p>
               </div>
             <% end %>
 
@@ -93,7 +93,7 @@ defmodule YscWeb.UserSettingsLive do
                   data-countdown={sms_countdown}
                   data-timer-type="sms"
                 >
-                  resend in <%= sms_countdown %>s
+                  resend in {sms_countdown}s
                 </span>
               <% end %>.
             </p>
@@ -151,7 +151,7 @@ defmodule YscWeb.UserSettingsLive do
 
             <%= if @email_verification_error do %>
               <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p class="text-sm text-red-800"><%= @email_verification_error %></p>
+                <p class="text-sm text-red-800">{@email_verification_error}</p>
               </div>
             <% end %>
             <.input
@@ -179,7 +179,7 @@ defmodule YscWeb.UserSettingsLive do
                   data-countdown={email_countdown}
                   data-timer-type="email"
                 >
-                  resend in <%= email_countdown %>s
+                  resend in {email_countdown}s
                 </span>
               <% end %>.
             </p>
@@ -235,7 +235,7 @@ defmodule YscWeb.UserSettingsLive do
                 />
                 <%= if @reauth_error do %>
                   <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p class="text-sm text-red-800"><%= @reauth_error %></p>
+                    <p class="text-sm text-red-800">{@reauth_error}</p>
                   </div>
                 <% end %>
                 <:actions>
@@ -257,9 +257,9 @@ defmodule YscWeb.UserSettingsLive do
               </div>
 
               <h3 class="font-semibold text-zinc-900">
-                <%= if @user_has_password,
+                {if @user_has_password,
                   do: "Verify with a passkey",
-                  else: "Verify with your passkey" %>
+                  else: "Verify with your passkey"}
               </h3>
               <p class="text-sm text-zinc-600">
                 Use your device's fingerprint, face recognition, or security key
@@ -358,7 +358,7 @@ defmodule YscWeb.UserSettingsLive do
                     </div>
                     <div class="flex-1 min-w-0">
                       <p class="text-zinc-800 text-sm font-semibold">
-                        <%= payment_method_display_text(payment_method) %>
+                        {payment_method_display_text(payment_method)}
                       </p>
                       <p
                         :if={
@@ -367,11 +367,11 @@ defmodule YscWeb.UserSettingsLive do
                         }
                         class="text-zinc-500 text-xs mt-0.5"
                       >
-                        Expires <%= String.pad_leading(
+                        Expires {String.pad_leading(
                           to_string(payment_method.exp_month),
                           2,
                           "0"
-                        ) %> / <%= payment_method.exp_year %>
+                        )} / {payment_method.exp_year}
                       </p>
                       <p
                         :if={
@@ -380,7 +380,7 @@ defmodule YscWeb.UserSettingsLive do
                         }
                         class="text-zinc-500 text-xs mt-0.5"
                       >
-                        <%= payment_method.account_type %>
+                        {payment_method.account_type}
                       </p>
                     </div>
                     <div class="flex-shrink-0">
@@ -790,7 +790,7 @@ defmodule YscWeb.UserSettingsLive do
                       <p class="text-sm text-blue-700 mt-1">
                         Contact
                         <strong>
-                          <%= @primary_user.first_name %> <%= @primary_user.last_name %>
+                          {@primary_user.first_name} {@primary_user.last_name}
                         </strong>
                         to make any changes.
                       </p>
@@ -1005,7 +1005,7 @@ defmodule YscWeb.UserSettingsLive do
                         </div>
                         <div>
                           <p class="text-sm font-semibold text-zinc-700">
-                            <%= payment_method_display_text(@default_payment_method) %>
+                            {payment_method_display_text(@default_payment_method)}
                           </p>
                           <p
                             :if={
@@ -1015,11 +1015,11 @@ defmodule YscWeb.UserSettingsLive do
                             }
                             class="text-xs text-zinc-500"
                           >
-                            Expires <%= String.pad_leading(
+                            Expires {String.pad_leading(
                               to_string(@default_payment_method.exp_month),
                               2,
                               "0"
-                            ) %> / <%= @default_payment_method.exp_year %>
+                            )} / {@default_payment_method.exp_year}
                           </p>
                           <p
                             :if={
@@ -1028,7 +1028,7 @@ defmodule YscWeb.UserSettingsLive do
                             }
                             class="text-xs text-zinc-500"
                           >
-                            <%= @default_payment_method.account_type %>
+                            {@default_payment_method.account_type}
                           </p>
                         </div>
                       </div>
@@ -1066,12 +1066,12 @@ defmodule YscWeb.UserSettingsLive do
                       <div>
                         <%= if selected_plan do %>
                           <p class="text-sm text-zinc-500">
-                            <%= String.capitalize(to_string(selected_plan.id)) %> Membership &middot; Billed annually
+                            {String.capitalize(to_string(selected_plan.id))} Membership &middot; Billed annually
                           </p>
                           <p class="text-2xl font-bold text-zinc-900 mt-0.5">
-                            <%= Ysc.MoneyHelper.format_money!(
+                            {Ysc.MoneyHelper.format_money!(
                               Money.new(:USD, selected_plan.amount)
-                            ) %>
+                            )}
                           </p>
                         <% else %>
                           <p class="text-sm text-zinc-400 italic">
@@ -1144,9 +1144,9 @@ defmodule YscWeb.UserSettingsLive do
                       <p class="text-sm text-amber-700 mt-1">
                         Your membership will change to
                         <strong>
-                          <%= String.capitalize(
+                          {String.capitalize(
                             to_string(@scheduled_downgrade_info.target_plan)
-                          ) %>
+                          )}
                         </strong>
                         after <strong>
                           <%= Calendar.strftime(
@@ -1326,13 +1326,13 @@ defmodule YscWeb.UserSettingsLive do
                           )
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
-                            Upgrade to <%= String.capitalize(
+                            Upgrade to {String.capitalize(
                               "#{@membership_change_info.new_plan.id}"
-                            ) %> Membership
+                            )} Membership
                           <% else %>
-                            Downgrade to <%= String.capitalize(
+                            Downgrade to {String.capitalize(
                               "#{@membership_change_info.new_plan.id}"
-                            ) %> Membership
+                            )} Membership
                           <% end %>
                         </h4>
                         <div class={[
@@ -1344,26 +1344,26 @@ defmodule YscWeb.UserSettingsLive do
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
                             <p>
-                              You will be charged a prorated amount now to upgrade from <%= String.capitalize(
+                              You will be charged a prorated amount now to upgrade from {String.capitalize(
                                 "#{@membership_change_info.current_plan.id}"
-                              ) %> to <%= String.capitalize(
+                              )} to {String.capitalize(
                                 "#{@membership_change_info.new_plan.id}"
-                              ) %> membership. The maximum charge will be
+                              )} membership. The maximum charge will be
                               <strong>
-                                <%= Ysc.MoneyHelper.format_money!(
+                                {Ysc.MoneyHelper.format_money!(
                                   Money.new(
                                     :USD,
                                     @membership_change_info.price_difference
                                   )
-                                ) %>
+                                )}
                               </strong>
                               based on time remaining in your billing period.
                             </p>
                           <% else %>
                             <p>
-                              Your membership will switch at your next renewal date. You will keep your <%= String.capitalize(
+                              Your membership will switch at your next renewal date. You will keep your {String.capitalize(
                                 "#{@membership_change_info.current_plan.id}"
-                              ) %> benefits until then. No immediate charges or credits will apply.
+                              )} benefits until then. No immediate charges or credits will apply.
                             </p>
                           <% end %>
                         </div>
@@ -1457,7 +1457,7 @@ defmodule YscWeb.UserSettingsLive do
                         </div>
                         <div>
                           <p class="text-sm font-semibold text-zinc-700">
-                            <%= payment_method_display_text(@default_payment_method) %>
+                            {payment_method_display_text(@default_payment_method)}
                           </p>
                           <p
                             :if={
@@ -1467,11 +1467,11 @@ defmodule YscWeb.UserSettingsLive do
                             }
                             class="text-xs text-zinc-500"
                           >
-                            Expires <%= String.pad_leading(
+                            Expires {String.pad_leading(
                               to_string(@default_payment_method.exp_month),
                               2,
                               "0"
-                            ) %> / <%= @default_payment_method.exp_year %>
+                            )} / {@default_payment_method.exp_year}
                           </p>
                           <p
                             :if={
@@ -1480,7 +1480,7 @@ defmodule YscWeb.UserSettingsLive do
                             }
                             class="text-xs text-zinc-500"
                           >
-                            <%= @default_payment_method.account_type %>
+                            {@default_payment_method.account_type}
                           </p>
                         </div>
                       </div>
@@ -1704,21 +1704,21 @@ defmodule YscWeb.UserSettingsLive do
                 <%= if @yearly_stats && (@yearly_stats.nights > 0 || @yearly_stats.events > 0) do %>
                   <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
                     <p class="text-sm text-blue-900 font-semibold">
-                      In <%= Date.utc_today().year %>, you've enjoyed
+                      In {Date.utc_today().year}, you've enjoyed
                       <%= if @yearly_stats.nights > 0 do %>
-                        <strong><%= @yearly_stats.nights %></strong>
-                        <%= if @yearly_stats.nights == 1,
+                        <strong>{@yearly_stats.nights}</strong>
+                        {if @yearly_stats.nights == 1,
                           do: "night",
-                          else: "nights" %> at the cabins <%= if @yearly_stats.events >
-                                                                   0,
-                                                                 do: "and",
-                                                                 else: "" %>
+                          else: "nights"} at the cabins {if @yearly_stats.events >
+                                                              0,
+                                                            do: "and",
+                                                            else: ""}
                       <% end %>
                       <%= if @yearly_stats.events > 0 do %>
-                        attended <strong><%= @yearly_stats.events %></strong>
-                        <%= if @yearly_stats.events == 1,
+                        attended <strong>{@yearly_stats.events}</strong>
+                        {if @yearly_stats.events == 1,
                           do: "club event",
-                          else: "club events" %>!
+                          else: "club events"}!
                       <% else %>
                         !
                       <% end %>
@@ -1905,7 +1905,7 @@ defmodule YscWeb.UserSettingsLive do
                       class="bg-white divide-y divide-zinc-200"
                     >
                       <%= for {id, payment_info} <- @streams.payments do %>
-                        <%= render_payment_table_row(payment_info, id: id) %>
+                        {render_payment_table_row(payment_info, id: id)}
                       <% end %>
                     </tbody>
                   </table>
@@ -1919,7 +1919,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%= for payment_info <- @filtered_payments_list do %>
                     <% card_id = "mobile-card-#{payment_dom_id(payment_info)}" %>
                     <div id={card_id}>
-                      <%= render_payment_card(payment_info) %>
+                      {render_payment_card(payment_info)}
                     </div>
                   <% end %>
                 </div>
@@ -1949,7 +1949,7 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
 
                   <div class="text-sm text-zinc-600">
-                    Page <%= @payments_page %> of <%= @payments_total_pages %>
+                    Page {@payments_page} of {@payments_total_pages}
                   </div>
 
                   <div class="flex items-center space-x-2">
@@ -2009,10 +2009,10 @@ defmodule YscWeb.UserSettingsLive do
             new_email
           )
 
-          put_flash(socket, :info, "Email changed successfully.")
+          YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.")
 
         :error ->
-          put_flash(
+          YscWeb.Flash.put_toast(
             socket,
             :error,
             "Email change link is invalid or it has expired."
@@ -2288,7 +2288,8 @@ defmodule YscWeb.UserSettingsLive do
        |> assign(:reauth_error, nil)}
     else
       # Email hasn't changed
-      {:noreply, put_flash(socket, :info, "Email address is the same.")}
+      {:noreply,
+       YscWeb.Flash.put_toast(socket, :info, "Email address is the same.")}
     end
   end
 
@@ -2431,7 +2432,7 @@ defmodule YscWeb.UserSettingsLive do
            |> assign(:profile_form, profile_form)
            |> assign(:pending_phone_number, new_phone)
            |> push_patch(to: ~p"/users/settings/phone-verification")
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :info,
              "Phone number update initiated. Please verify the code sent to your new number."
            )}
@@ -2450,7 +2451,7 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> assign(:user, updated_user)
            |> assign(:profile_form, profile_form)
-           |> put_flash(:info, "Profile updated successfully.")}
+           |> YscWeb.Flash.put_toast(:info, "Profile updated successfully.")}
 
         {:error, changeset} ->
           {:noreply, assign(socket, profile_form: to_form(changeset))}
@@ -2514,7 +2515,7 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:user, updated_user)
                    |> assign(:pending_phone_number, nil)
                    |> push_patch(to: ~p"/users/settings")
-                   |> put_flash(
+                   |> YscWeb.Flash.put_toast(
                      :info,
                      "Phone number updated and verified successfully."
                    )}
@@ -2617,13 +2618,16 @@ defmodule YscWeb.UserSettingsLive do
              :sms_resend_disabled_until,
              Ysc.ResendRateLimiter.disabled_until(60)
            )
-           |> put_flash(:info, "Verification code sent to your phone.")}
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Verification code sent to your phone."
+           )}
 
         {:error, :rate_limited, _remaining} ->
           # Rate limited
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Please wait before requesting another verification code."
            )}
@@ -2740,7 +2744,10 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:pending_email, nil)
                    |> assign(:current_email, updated_user.email)
                    |> push_patch(to: ~p"/users/settings")
-                   |> put_flash(:info, "Email address updated successfully.")}
+                   |> YscWeb.Flash.put_toast(
+                     :info,
+                     "Email address updated successfully."
+                   )}
 
                 {:error, _changeset} ->
                   {:noreply,
@@ -2844,13 +2851,16 @@ defmodule YscWeb.UserSettingsLive do
              :email_resend_disabled_until,
              Ysc.ResendRateLimiter.disabled_until(60)
            )
-           |> put_flash(:info, "Verification code sent to your email.")}
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Verification code sent to your email."
+           )}
 
         {:error, :rate_limited, _remaining} ->
           # Rate limited
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Please wait before requesting another verification code."
            )}
@@ -2940,7 +2950,10 @@ defmodule YscWeb.UserSettingsLive do
          socket
          |> assign(:user, updated_user)
          |> assign(:notification_form, notification_form)
-         |> put_flash(:info, "Notification preferences updated successfully.")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Notification preferences updated successfully."
+         )}
 
       {:error, changeset} ->
         {:noreply, assign(socket, notification_form: to_form(changeset))}
@@ -2976,7 +2989,10 @@ defmodule YscWeb.UserSettingsLive do
          socket
          |> assign(:user, updated_user)
          |> assign(:address_form, address_form)
-         |> put_flash(:info, "Billing address updated successfully.")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Billing address updated successfully."
+         )}
 
       {:error, changeset} ->
         {:noreply, assign(socket, address_form: to_form(changeset))}
@@ -2996,7 +3012,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if user.state != :active do
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "You must have an approved account to manage your membership plan."
@@ -3004,7 +3020,7 @@ defmodule YscWeb.UserSettingsLive do
     else
       if Accounts.sub_account?(user) do
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Sub-accounts cannot purchase their own membership. You share the membership of your primary account."
@@ -3041,7 +3057,10 @@ defmodule YscWeb.UserSettingsLive do
 
                 {:noreply,
                  socket
-                 |> put_flash(:info, "Membership activated successfully!")
+                 |> YscWeb.Flash.put_toast(
+                   :info,
+                   "Membership activated successfully!"
+                 )
                  |> redirect(to: ~p"/users/membership")}
 
               {:error, reason} ->
@@ -3064,13 +3083,16 @@ defmodule YscWeb.UserSettingsLive do
 
                 {:noreply,
                  socket
-                 |> put_flash(:info, "Membership activated successfully!")
+                 |> YscWeb.Flash.put_toast(
+                   :info,
+                   "Membership activated successfully!"
+                 )
                  |> redirect(to: ~p"/users/membership")}
             end
 
           {:error, :sub_accounts_cannot_create_subscriptions} ->
             {:noreply,
-             put_flash(
+             YscWeb.Flash.put_toast(
                socket,
                :error,
                "Sub-accounts cannot purchase their own membership. You share the membership of your primary account."
@@ -3088,7 +3110,7 @@ defmodule YscWeb.UserSettingsLive do
 
             {:noreply,
              socket
-             |> put_flash(:error, error_message)}
+             |> YscWeb.Flash.put_toast(:error, error_message)}
         end
       end
     end
@@ -3160,7 +3182,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if user.state != :active do
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "You must have an approved account to update your payment method."
@@ -3197,7 +3219,7 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:all_payment_methods, updated_payment_methods)
                    |> assign(:default_payment_method, updated_default)
                    |> assign(:show_new_payment_form, false)
-                   |> put_flash(
+                   |> YscWeb.Flash.put_toast(
                      :info,
                      "Payment method updated and set as default"
                    )
@@ -3205,7 +3227,7 @@ defmodule YscWeb.UserSettingsLive do
 
                 {:error, stripe_error} ->
                   {:noreply,
-                   put_flash(
+                   YscWeb.Flash.put_toast(
                      socket,
                      :error,
                      "Payment method saved but failed to set as default in Stripe: #{stripe_error.message}"
@@ -3214,7 +3236,7 @@ defmodule YscWeb.UserSettingsLive do
 
             {:error, _reason} ->
               {:noreply,
-               put_flash(
+               YscWeb.Flash.put_toast(
                  socket,
                  :error,
                  "Failed to store payment method"
@@ -3223,7 +3245,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, _reason} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Failed to retrieve payment method from Stripe"
@@ -3259,7 +3281,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :user_not_active} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "You must have an approved account to update your payment method."
@@ -3270,7 +3292,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :payment_method_not_found} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Payment method not found"
@@ -3298,7 +3320,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:noreply,
        socket
-       |> put_flash(
+       |> YscWeb.Flash.put_toast(
          :error,
          "Failed to create payment account. Please try again or contact support."
        )
@@ -3344,7 +3366,7 @@ defmodule YscWeb.UserSettingsLive do
 
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Failed to initialize payment form: #{error_message}"
            )
@@ -3385,7 +3407,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if user.state != :active do
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "You must have an approved account to cancel your membership."
@@ -3403,15 +3425,15 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           put_flash(socket, :info, "Membership cancelled.")
+           YscWeb.Flash.put_toast(socket, :info, "Membership cancelled.")
            |> redirect(to: ~p"/users/membership")}
 
         {:error, reason} when is_binary(reason) ->
-          {:noreply, put_flash(socket, :error, reason)}
+          {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
 
         {:error, _changeset} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Failed to cancel membership. Please try again."
@@ -3426,7 +3448,7 @@ defmodule YscWeb.UserSettingsLive do
          ) do
       {:ok, _subscription} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :info,
            "Scheduled downgrade cancelled. Your membership will stay at its current level."
@@ -3435,15 +3457,15 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :no_scheduled_downgrade} ->
         {:noreply,
-         put_flash(socket, :error, "No scheduled downgrade found.")
+         YscWeb.Flash.put_toast(socket, :error, "No scheduled downgrade found.")
          |> redirect(to: ~p"/users/membership")}
 
       {:error, reason} when is_binary(reason) ->
-        {:noreply, put_flash(socket, :error, reason)}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
 
       {:error, _} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Failed to cancel scheduled downgrade. Please try again."
@@ -3456,7 +3478,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if user.state != :active do
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "You must have an approved account to cancel your membership."
@@ -3464,7 +3486,7 @@ defmodule YscWeb.UserSettingsLive do
     else
       case Subscriptions.resume(socket.assigns.current_membership) do
         {:error, reason} ->
-          {:noreply, put_flash(socket, :error, reason)}
+          {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
 
         {:ok, _subscription} ->
           # Cache invalidation is handled in Subscriptions.resume (via update_subscription)
@@ -3476,7 +3498,7 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           put_flash(socket, :info, "Membership reactivated.")
+           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.")
            |> redirect(to: ~p"/users/membership")}
 
         _subscription ->
@@ -3489,7 +3511,7 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           put_flash(socket, :info, "Membership reactivated.")
+           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.")
            |> redirect(to: ~p"/users/membership")}
       end
     end
@@ -3561,7 +3583,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :user_not_active} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "You must have an approved account to change your membership plan."
@@ -3569,7 +3591,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :invalid_membership_type} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Invalid membership type selected"
@@ -3577,7 +3599,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :membership_not_found} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Current membership not found"
@@ -3585,7 +3607,7 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :change_not_allowed} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "This membership change is not allowed"
@@ -3595,11 +3617,11 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply, socket}
 
       {:error, reason} when is_binary(reason) ->
-        {:noreply, put_flash(socket, :error, reason)}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
 
       {:error, _reason} ->
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Failed to change membership plan. Please try again."
@@ -3632,7 +3654,7 @@ defmodule YscWeb.UserSettingsLive do
       :membership_form,
       to_form(%{"membership_type" => membership_type_str})
     )
-    |> put_flash(:info, "Your membership has been updated.")
+    |> YscWeb.Flash.put_toast(:info, "Your membership has been updated.")
   end
 
   defp process_email_change_after_reauth(socket) do
@@ -3661,7 +3683,7 @@ defmodule YscWeb.UserSettingsLive do
     |> assign(:reauth_error, nil)
     |> assign(:reauth_verified_at, DateTime.utc_now())
     |> push_patch(to: ~p"/users/settings/email-verification?email=#{new_email}")
-    |> put_flash(
+    |> YscWeb.Flash.put_toast(
       :info,
       "Email change initiated. Please verify the code sent to your new email address."
     )
@@ -3727,7 +3749,7 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:selecting_payment_method, false)
-         |> put_flash(:info, "Payment method set as default")}
+         |> YscWeb.Flash.put_toast(:info, "Payment method set as default")}
 
       {:error, :database_error} ->
         handle_database_error(socket)
@@ -3835,13 +3857,16 @@ defmodule YscWeb.UserSettingsLive do
   defp handle_database_error(socket) do
     {:noreply,
      revert_optimistic_update(socket)
-     |> put_flash(:error, "Failed to set payment method as default")}
+     |> YscWeb.Flash.put_toast(
+       :error,
+       "Failed to set payment method as default"
+     )}
   end
 
   defp handle_stripe_error(socket, stripe_error) do
     {:noreply,
      revert_optimistic_update(socket)
-     |> put_flash(
+     |> YscWeb.Flash.put_toast(
        :error,
        "Failed to update default payment method in Stripe: #{stripe_error.message}"
      )}
@@ -3980,7 +4005,7 @@ defmodule YscWeb.UserSettingsLive do
        :membership_form,
        to_form(%{"membership_type" => Atom.to_string(new_atom)})
      )
-     |> put_flash(:info, success_message)
+     |> YscWeb.Flash.put_toast(:info, success_message)
      |> redirect(to: ~p"/users/membership")}
   end
 
@@ -3988,7 +4013,7 @@ defmodule YscWeb.UserSettingsLive do
     invalidate_membership_cache(user)
 
     {:noreply,
-     put_flash(
+     YscWeb.Flash.put_toast(
        socket,
        :info,
        "Your membership plan will switch at your next renewal."
@@ -3998,7 +4023,7 @@ defmodule YscWeb.UserSettingsLive do
 
   defp handle_membership_change_error(socket, reason) do
     {:noreply,
-     put_flash(
+     YscWeb.Flash.put_toast(
        socket,
        :error,
        "Failed to change membership: #{inspect(reason)}"
@@ -4519,7 +4544,7 @@ defmodule YscWeb.UserSettingsLive do
         <div class="flex-1">
           <div class="flex items-center gap-2">
             <h3 class="font-bold text-zinc-900 text-lg leading-tight">
-              <%= get_payment_title(@payment_info) %>
+              {get_payment_title(@payment_info)}
             </h3>
             <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
               <.badge type="red">Cancelled</.badge>
@@ -4529,19 +4554,19 @@ defmodule YscWeb.UserSettingsLive do
             <% end %>
           </div>
           <p class="text-xs font-mono text-zinc-400 mt-1">
-            <%= get_payment_reference(@payment_info) %>
+            {get_payment_reference(@payment_info)}
           </p>
         </div>
       </div>
 
       <div class="space-y-2 mb-4">
-        <%= render_payment_details(assigns) %>
+        {render_payment_details(assigns)}
       </div>
 
       <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
         <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
           <strong>Booking Cancelled:</strong>
-          This booking has been cancelled. <%= if @payment_info.payment do
+          This booking has been cancelled. {if @payment_info.payment do
             refund_data = get_refund_data_for_payment(@payment_info.payment)
 
             if refund_data && refund_data.total_refunded do
@@ -4549,14 +4574,14 @@ defmodule YscWeb.UserSettingsLive do
             else
               " Refund information is available in the booking details."
             end
-          end %>
+          end}
         </div>
       <% end %>
 
       <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
         <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
           <strong>Order Cancelled:</strong>
-          This ticket order has been cancelled. <%= if @payment_info.payment do
+          This ticket order has been cancelled. {if @payment_info.payment do
             refund_data = get_refund_data_for_payment(@payment_info.payment)
 
             if refund_data && refund_data.total_refunded do
@@ -4564,21 +4589,21 @@ defmodule YscWeb.UserSettingsLive do
             else
               " Refund information is available in the order details."
             end
-          end %>
+          end}
         </div>
       <% end %>
 
       <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
         <div class="text-right">
           <p class="text-lg font-black text-zinc-900">
-            <%= if @payment_info.payment do
+            {if @payment_info.payment do
               Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
             else
               "Free"
-            end %>
+            end}
           </p>
           <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
-            Paid on <%= if @payment_info.payment do
+            Paid on {if @payment_info.payment do
               if @payment_info.payment.payment_date do
                 Timex.format!(@payment_info.payment.payment_date, "{Mshort} {D}")
               else
@@ -4586,11 +4611,11 @@ defmodule YscWeb.UserSettingsLive do
               end
             else
               Timex.format!(@payment_info.ticket_order.inserted_at, "{Mshort} {D}")
-            end %>
+            end}
           </p>
         </div>
         <div class="flex items-center gap-3">
-          <%= render_payment_status_badge(@payment_info) %>
+          {render_payment_status_badge(@payment_info)}
           <%= if @payment_info.type == :booking && @payment_info.booking do %>
             <.link
               navigate={~p"/bookings/#{@payment_info.booking.id}/receipt"}
@@ -4637,7 +4662,7 @@ defmodule YscWeb.UserSettingsLive do
           <div>
             <div class="flex items-center gap-2">
               <h3 class="font-bold text-zinc-900 text-sm">
-                <%= get_payment_title(@payment_info) %>
+                {get_payment_title(@payment_info)}
               </h3>
               <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
                 <.badge type="red" class="text-xs">Cancelled</.badge>
@@ -4647,26 +4672,26 @@ defmodule YscWeb.UserSettingsLive do
               <% end %>
             </div>
             <p class="text-xs font-mono text-zinc-400 mt-0.5">
-              <%= get_payment_reference(@payment_info) %>
+              {get_payment_reference(@payment_info)}
             </p>
           </div>
         </div>
       </td>
       <td class="px-6 py-4">
         <div class="text-sm text-zinc-600">
-          <%= render_payment_details_compact(assigns) %>
+          {render_payment_details_compact(assigns)}
         </div>
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-right">
         <p class="text-base font-black text-zinc-900">
-          <%= if @payment_info.payment do
+          {if @payment_info.payment do
             Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
           else
             "Free"
-          end %>
+          end}
         </p>
         <p class="text-xs text-zinc-400 uppercase tracking-wider font-bold">
-          <%= if @payment_info.payment do
+          {if @payment_info.payment do
             if @payment_info.payment.payment_date do
               Timex.format!(@payment_info.payment.payment_date, "{Mshort} {D}")
             else
@@ -4674,11 +4699,11 @@ defmodule YscWeb.UserSettingsLive do
             end
           else
             Timex.format!(@payment_info.ticket_order.inserted_at, "{Mshort} {D}")
-          end %>
+          end}
         </p>
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-center">
-        <%= render_payment_status_badge(@payment_info) %>
+        {render_payment_status_badge(@payment_info)}
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-center">
         <%= if @payment_info.type == :booking && @payment_info.booking do %>
@@ -4801,26 +4826,26 @@ defmodule YscWeb.UserSettingsLive do
         ~H"""
         <div class="flex flex-col text-sm text-zinc-500">
           <p class="font-medium text-zinc-700 italic">
-            <%= Timex.format!(@booking.checkin_date, "{Mshort} {D}") %> – <%= Timex.format!(
+            {Timex.format!(@booking.checkin_date, "{Mshort} {D}")} – {Timex.format!(
               @booking.checkout_date,
               "{Mshort} {D}, {YYYY}"
-            ) %>
+            )}
           </p>
           <p class="text-xs">
-            <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do
+            {if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do
               Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)
             else
               ""
-            end %>
-            <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 &&
-                     @booking.guests_count > 0 do
+            end}
+            {if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 &&
+                  @booking.guests_count > 0 do
               " • "
             else
               ""
-            end %>
-            <%= if @booking.guests_count > 0 do
+            end}
+            {if @booking.guests_count > 0 do
               "#{@booking.guests_count} #{if @booking.guests_count == 1, do: "guest", else: "guests"}"
-            end %>
+            end}
           </p>
         </div>
         """
@@ -4834,14 +4859,14 @@ defmodule YscWeb.UserSettingsLive do
         ~H"""
         <div class="flex flex-col text-sm text-zinc-500">
           <p class="font-medium text-zinc-700">
-            <%= if @event do
+            {if @event do
               @event.title
             else
               "Event"
-            end %>
+            end}
           </p>
           <p class="text-xs">
-            <%= if @ticket_order.tickets do
+            {if @ticket_order.tickets do
               tickets = @ticket_order.tickets
               refunded_count = Enum.count(tickets, fn t -> t.status == :cancelled end)
               active_tickets = Enum.filter(tickets, fn t -> t.status != :cancelled end)
@@ -4867,7 +4892,7 @@ defmodule YscWeb.UserSettingsLive do
               end
             else
               "No ticket details"
-            end %>
+            end}
           </p>
         </div>
         """
@@ -4888,7 +4913,7 @@ defmodule YscWeb.UserSettingsLive do
         ~H"""
         <div class="flex flex-col text-sm text-zinc-500">
           <p class="font-medium text-zinc-700">
-            <%= case @subscription.subscription_items do
+            {case @subscription.subscription_items do
               [item | _] ->
                 plans = Application.get_env(:ysc, :membership_plans)
                 plan = Enum.find(plans, &(&1.stripe_price_id == item.stripe_price_id))
@@ -4901,7 +4926,7 @@ defmodule YscWeb.UserSettingsLive do
 
               _ ->
                 "Single"
-            end %> Membership
+            end} Membership
           </p>
         </div>
         """
@@ -4924,26 +4949,26 @@ defmodule YscWeb.UserSettingsLive do
 
         ~H"""
         <p class="font-medium text-zinc-700 italic">
-          <%= Timex.format!(@booking.checkin_date, "{Mshort} {D}") %> – <%= Timex.format!(
+          {Timex.format!(@booking.checkin_date, "{Mshort} {D}")} – {Timex.format!(
             @booking.checkout_date,
             "{Mshort} {D}, {YYYY}"
-          ) %>
+          )}
         </p>
         <p class="text-xs mt-0.5">
-          <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do
+          {if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do
             Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)
           else
             ""
-          end %>
-          <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 &&
-                   @booking.guests_count > 0 do
+          end}
+          {if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 &&
+                @booking.guests_count > 0 do
             " • "
           else
             ""
-          end %>
-          <%= if @booking.guests_count > 0 do
+          end}
+          {if @booking.guests_count > 0 do
             "#{@booking.guests_count} #{if @booking.guests_count == 1, do: "guest", else: "guests"}"
-          end %>
+          end}
         </p>
         """
 
@@ -4955,14 +4980,14 @@ defmodule YscWeb.UserSettingsLive do
 
         ~H"""
         <p class="font-medium text-zinc-700">
-          <%= if @event do
+          {if @event do
             @event.title
           else
             "Event"
-          end %>
+          end}
         </p>
         <p class="text-xs mt-0.5">
-          <%= if @ticket_order.tickets do
+          {if @ticket_order.tickets do
             tickets = @ticket_order.tickets
             refunded_count = Enum.count(tickets, fn t -> t.status == :cancelled end)
             active_tickets = Enum.filter(tickets, fn t -> t.status != :cancelled end)
@@ -4988,7 +5013,7 @@ defmodule YscWeb.UserSettingsLive do
             end
           else
             "No ticket details"
-          end %>
+          end}
         </p>
         """
 
@@ -5007,7 +5032,7 @@ defmodule YscWeb.UserSettingsLive do
 
         ~H"""
         <p class="font-medium text-zinc-700">
-          <%= case @subscription.subscription_items do
+          {case @subscription.subscription_items do
             [item | _] ->
               plans = Application.get_env(:ysc, :membership_plans)
               plan = Enum.find(plans, &(&1.stripe_price_id == item.stripe_price_id))
@@ -5020,7 +5045,7 @@ defmodule YscWeb.UserSettingsLive do
 
             _ ->
               "Single"
-          end %> Membership
+          end} Membership
         </p>
         """
 
@@ -5067,7 +5092,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if user.state != :active do
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "You must have an approved account to retry invoice payments."
@@ -5098,7 +5123,7 @@ defmodule YscWeb.UserSettingsLive do
 
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :info,
              "Payment retry successful! Your invoice has been paid and your membership will be updated shortly."
            )
@@ -5106,7 +5131,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, :invoice_not_found} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Invoice not found. Please contact support if this issue persists."
@@ -5114,7 +5139,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, :unauthorized} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "This invoice does not belong to your account."
@@ -5122,7 +5147,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, :already_paid} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :info,
              "This invoice has already been paid. Your membership is up to date."
@@ -5130,7 +5155,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, :invalid_invoice_status} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "This invoice cannot be paid in its current state. Please update your payment method and try again."
@@ -5145,7 +5170,7 @@ defmodule YscWeb.UserSettingsLive do
             end
 
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              display_message
@@ -5153,7 +5178,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, _reason} ->
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, contact support."
@@ -5164,7 +5189,7 @@ defmodule YscWeb.UserSettingsLive do
 
   defp handle_retry_invoice_payment(socket, _invalid_invoice_id) do
     {:noreply,
-     put_flash(
+     YscWeb.Flash.put_toast(
        socket,
        :error,
        "Invalid invoice ID. Please use the link from your email or contact support."

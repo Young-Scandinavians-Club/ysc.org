@@ -55,7 +55,7 @@ defmodule YscWeb.UserForgotPasswordLive do
       rate_limited_ip?(ip) ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Too many attempts from your connection. Please try again later."
          )
@@ -64,7 +64,7 @@ defmodule YscWeb.UserForgotPasswordLive do
       rate_limited_identifier?(email) ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Too many attempts for this email. Please try again later."
          )
@@ -86,7 +86,7 @@ defmodule YscWeb.UserForgotPasswordLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, info)
+         |> YscWeb.Flash.put_toast(:info, info)
          |> redirect(to: ~p"/")}
     end
   end

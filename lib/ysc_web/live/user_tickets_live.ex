@@ -61,7 +61,7 @@ defmodule YscWeb.UserTicketsLive do
                 <div class="flex justify-between items-start mb-6">
                   <.status_badge status={ticket_order.status} />
                   <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] leading-none">
-                    Order #<%= ticket_order.reference_id %>
+                    Order #{ticket_order.reference_id}
                   </p>
                 </div>
 
@@ -70,23 +70,23 @@ defmodule YscWeb.UserTicketsLive do
                   class="block group-hover:text-teal-600 transition-colors"
                 >
                   <h2 class="text-3xl font-black text-zinc-900 tracking-tighter mb-2">
-                    <%= ticket_order.event.title %>
+                    {ticket_order.event.title}
                   </h2>
                 </.link>
 
                 <div class="flex flex-wrap gap-4 text-sm text-zinc-500 font-medium">
                   <div class="flex items-center gap-1.5">
                     <.icon name="hero-calendar" class="w-4 h-4 text-teal-600" />
-                    <%= format_date(ticket_order.event.start_date) %>
+                    {format_date(ticket_order.event.start_date)}
                   </div>
                   <div class="flex items-center gap-1.5">
                     <.icon name="hero-ticket" class="w-4 h-4 text-teal-600" />
-                    <%= length(ticket_order.tickets) %> Ticket<%= if length(
-                                                                       ticket_order.tickets
-                                                                     ) !=
-                                                                       1,
-                                                                     do: "s",
-                                                                     else: "" %>
+                    {length(ticket_order.tickets)} Ticket{if length(
+                                                               ticket_order.tickets
+                                                             ) !=
+                                                               1,
+                                                             do: "s",
+                                                             else: ""}
                   </div>
                 </div>
 
@@ -96,7 +96,7 @@ defmodule YscWeb.UserTicketsLive do
                     <div class="flex items-center gap-2 mb-4 text-sm text-amber-600">
                       <.icon name="hero-clock" class="w-4 h-4" />
                       <span class="font-semibold">
-                        Expires <%= format_time_remaining(ticket_order.expires_at) %>
+                        Expires {format_time_remaining(ticket_order.expires_at)}
                       </span>
                     </div>
                     <div class="flex gap-2">
@@ -139,31 +139,31 @@ defmodule YscWeb.UserTicketsLive do
                     <%= for ticket <- ticket_order.tickets do %>
                       <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm">
                         <p class="text-xs font-black text-zinc-900">
-                          <%= ticket.ticket_tier.name %>
+                          {ticket.ticket_tier.name}
                         </p>
                         <p class="text-xs font-mono text-zinc-400 mt-1">
-                          #<%= ticket.reference_id %>
+                          #{ticket.reference_id}
                         </p>
                         <div class="mt-3 pt-3 border-t border-zinc-50 flex justify-between items-center">
                           <span class="text-xs font-bold text-teal-600 uppercase">
-                            <%= String.capitalize(to_string(ticket.status)) %>
+                            {String.capitalize(to_string(ticket.status))}
                           </span>
                           <span class="text-xs font-bold text-zinc-900">
                             <%= case ticket.ticket_tier.type do %>
                               <% :free -> %>
                                 Free
                               <% "donation" -> %>
-                                <%= get_donation_amount_for_ticket(
+                                {get_donation_amount_for_ticket(
                                   ticket,
                                   ticket_order
-                                ) %>
+                                )}
                               <% :donation -> %>
-                                <%= get_donation_amount_for_ticket(
+                                {get_donation_amount_for_ticket(
                                   ticket,
                                   ticket_order
-                                ) %>
+                                )}
                               <% _ -> %>
-                                <%= format_price(ticket.ticket_tier.price) %>
+                                {format_price(ticket.ticket_tier.price)}
                             <% end %>
                           </span>
                         </div>
@@ -177,7 +177,7 @@ defmodule YscWeb.UserTicketsLive do
                         Total Paid
                       </p>
                       <p class="text-2xl font-black text-zinc-900">
-                        <%= format_price(ticket_order.total_amount) %>
+                        {format_price(ticket_order.total_amount)}
                       </p>
                     </div>
                     <.link
@@ -213,22 +213,22 @@ defmodule YscWeb.UserTicketsLive do
                 <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500 hover:bg-white hover:shadow-lg">
                   <div class="flex justify-between items-start mb-4">
                     <span class="text-xs font-black text-zinc-400 uppercase tracking-widest border border-zinc-200 px-2 py-0.5 rounded">
-                      <%= format_visited_date(item) %>
+                      {format_visited_date(item)}
                     </span>
                     <.icon name="hero-check-badge" class="w-5 h-5 text-zinc-300" />
                   </div>
 
                   <h4 class="text-xl font-black text-zinc-900 tracking-tighter mb-1">
-                    <%= item.title %>
+                    {item.title}
                   </h4>
                   <p class="text-xs font-medium text-zinc-400 flex items-center gap-1 mb-4">
                     <.icon name="hero-map-pin" class="w-3 h-3" />
-                    <%= item.location %>
+                    {item.location}
                   </p>
 
                   <div class="pt-4 border-t border-zinc-100 flex justify-between items-center">
                     <p class="text-xs font-mono text-zinc-400">
-                      #<%= item.reference_id %>
+                      #{item.reference_id}
                     </p>
                     <.link
                       navigate={item.receipt_path}
@@ -283,7 +283,7 @@ defmodule YscWeb.UserTicketsLive do
 
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
-        {:noreply, put_flash(socket, :error, "Order not found")}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, "Order not found")}
 
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
@@ -305,11 +305,15 @@ defmodule YscWeb.UserTicketsLive do
             {:noreply,
              socket
              |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
-             |> put_flash(:info, "Order cancelled successfully")}
+             |> YscWeb.Flash.put_toast(:info, "Order cancelled successfully")}
 
           {:error, reason} ->
             {:noreply,
-             put_flash(socket, :error, "Failed to cancel order: #{reason}")}
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to cancel order: #{reason}"
+             )}
         end
     end
   end
@@ -320,7 +324,7 @@ defmodule YscWeb.UserTicketsLive do
 
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
-        {:noreply, put_flash(socket, :error, "Order not found")}
+        {:noreply, YscWeb.Flash.put_toast(socket, :error, "Order not found")}
 
       ticket_order ->
         # Verify the order status is pending
@@ -331,7 +335,8 @@ defmodule YscWeb.UserTicketsLive do
              to: ~p"/events/#{ticket_order.event_id}?resume_order=#{order_id}"
            )}
         else
-          {:noreply, put_flash(socket, :error, "Cannot resume this order")}
+          {:noreply,
+           YscWeb.Flash.put_toast(socket, :error, "Cannot resume this order")}
         end
     end
   end
@@ -356,7 +361,7 @@ defmodule YscWeb.UserTicketsLive do
         _ -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
       end
     ]}>
-      <%= String.capitalize(to_string(@status)) %>
+      {String.capitalize(to_string(@status))}
     </span>
     """
   end

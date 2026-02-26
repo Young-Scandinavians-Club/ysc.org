@@ -11,7 +11,10 @@ defmodule YscWeb.ImpersonationController do
 
     unless current_user.role == :admin do
       conn
-      |> put_flash(:error, "You do not have permission to impersonate users.")
+      |> YscWeb.Flash.put_toast(
+        :error,
+        "You do not have permission to impersonate users."
+      )
       |> redirect(to: ~p"/")
       |> halt()
     end
@@ -19,7 +22,7 @@ defmodule YscWeb.ImpersonationController do
     case Accounts.get_user(user_id) do
       nil ->
         conn
-        |> put_flash(:error, "User not found.")
+        |> YscWeb.Flash.put_toast(:error, "User not found.")
         |> redirect(to: ~p"/admin/users")
         |> halt()
 
@@ -27,7 +30,10 @@ defmodule YscWeb.ImpersonationController do
         conn
         |> put_session(:impersonated_user_id, user_id)
         |> put_session(:original_admin_id, current_user.id)
-        |> put_flash(:info, "Impersonating user. Use the red banner to stop.")
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Impersonating user. Use the red banner to stop."
+        )
         |> redirect(to: ~p"/")
     end
   end
@@ -45,13 +51,13 @@ defmodule YscWeb.ImpersonationController do
         conn
         |> delete_session(:impersonated_user_id)
         |> delete_session(:original_admin_id)
-        |> put_flash(:info, "Stopped impersonating.")
+        |> YscWeb.Flash.put_toast(:info, "Stopped impersonating.")
         |> redirect(to: ~p"/admin")
       else
         conn
         |> delete_session(:impersonated_user_id)
         |> delete_session(:original_admin_id)
-        |> put_flash(:info, "Stopped impersonating.")
+        |> YscWeb.Flash.put_toast(:info, "Stopped impersonating.")
         |> redirect(to: ~p"/")
       end
     else

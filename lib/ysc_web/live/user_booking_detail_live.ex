@@ -16,7 +16,10 @@ defmodule YscWeb.UserBookingDetailLive do
     if is_nil(user) do
       {:ok,
        socket
-       |> put_flash(:error, "You must be signed in to view this booking.")
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "You must be signed in to view this booking."
+       )
        |> redirect(to: ~p"/")}
     else
       # SECURITY: Filter by user_id in the database query to prevent unauthorized access
@@ -31,7 +34,7 @@ defmodule YscWeb.UserBookingDetailLive do
         nil ->
           {:ok,
            socket
-           |> put_flash(:error, "Booking not found.")
+           |> YscWeb.Flash.put_toast(:error, "Booking not found.")
            |> redirect(to: ~p"/")}
 
         booking ->
@@ -75,7 +78,7 @@ defmodule YscWeb.UserBookingDetailLive do
             {:error, _reason} ->
               {:ok,
                socket
-               |> put_flash(
+               |> YscWeb.Flash.put_toast(
                  :error,
                  "You don't have permission to view this booking."
                )
@@ -144,7 +147,7 @@ defmodule YscWeb.UserBookingDetailLive do
              |> assign(:refund_info, refund_info)
              |> assign(:can_cancel, false)
              |> assign(:show_cancel_modal, false)
-             |> put_flash(:info, refund_message)}
+             |> YscWeb.Flash.put_toast(:info, refund_message)}
 
           {:error, reason} ->
             error_message =
@@ -171,14 +174,14 @@ defmodule YscWeb.UserBookingDetailLive do
             {:noreply,
              socket
              |> assign(:show_cancel_modal, false)
-             |> put_flash(:error, error_message)}
+             |> YscWeb.Flash.put_toast(:error, error_message)}
         end
 
       {:error, _reason} ->
         {:noreply,
          socket
          |> assign(:show_cancel_modal, false)
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "You don't have permission to cancel this booking."
          )}
@@ -228,7 +231,7 @@ defmodule YscWeb.UserBookingDetailLive do
                   <div class="pt-3 border-t border-blue-200">
                     <p class="font-semibold mb-2">Cancellation Policy:</p>
                     <div class="text-sm text-blue-800 space-y-2">
-                      <%= # Sort rules by days_before_checkin ascending (most restrictive first)
+                      {# Sort rules by days_before_checkin ascending (most restrictive first)
                       sorted_rules =
                         Enum.sort_by(
                           @refund_info.policy_rules,
@@ -258,7 +261,7 @@ defmodule YscWeb.UserBookingDetailLive do
                       end
                       |> Enum.map(fn text -> "<p>#{text}</p>" end)
                       |> Enum.join("")
-                      |> raw() %>
+                      |> raw()}
                     </div>
                   </div>
                 <% else %>
@@ -296,7 +299,7 @@ defmodule YscWeb.UserBookingDetailLive do
               <div>
                 <div class="text-sm text-zinc-600 mb-0.5">Booking Reference</div>
                 <.badge>
-                  <%= @booking.reference_id %>
+                  {@booking.reference_id}
                 </.badge>
               </div>
               <!-- Status Badge -->
@@ -314,44 +317,44 @@ defmodule YscWeb.UserBookingDetailLive do
                   }
                   class="text-sm"
                 >
-                  <%= String.capitalize(to_string(@booking.status)) %>
+                  {String.capitalize(to_string(@booking.status))}
                 </.badge>
               </div>
 
               <div>
                 <div class="text-sm text-zinc-600">Property</div>
                 <div class="font-medium text-zinc-900">
-                  <%= format_property_name(@booking.property) %>
+                  {format_property_name(@booking.property)}
                 </div>
               </div>
 
               <div>
                 <div class="text-sm text-zinc-600">Check-in</div>
                 <div class="font-medium text-zinc-900">
-                  <%= format_date(@booking.checkin_date, @timezone) %>
+                  {format_date(@booking.checkin_date, @timezone)}
                 </div>
               </div>
 
               <div>
                 <div class="text-sm text-zinc-600">Check-out</div>
                 <div class="font-medium text-zinc-900">
-                  <%= format_date(@booking.checkout_date, @timezone) %>
+                  {format_date(@booking.checkout_date, @timezone)}
                 </div>
               </div>
 
               <div>
                 <div class="text-sm text-zinc-600">Nights</div>
                 <div class="font-medium text-zinc-900">
-                  <%= Date.diff(@booking.checkout_date, @booking.checkin_date) %>
+                  {Date.diff(@booking.checkout_date, @booking.checkin_date)}
                 </div>
               </div>
 
               <div>
                 <div class="text-sm text-zinc-600">Guests</div>
                 <div class="font-medium text-zinc-900">
-                  <%= @booking.guests_count %>
+                  {@booking.guests_count}
                   <%= if @booking.children_count > 0 do %>
-                    (<%= @booking.children_count %> children)
+                    ({@booking.children_count} children)
                   <% end %>
                 </div>
               </div>
@@ -374,10 +377,10 @@ defmodule YscWeb.UserBookingDetailLive do
               <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
                 <div>
                   <div class="text-sm text-zinc-600">
-                    <%= if length(@booking.rooms) == 1, do: "Room", else: "Rooms" %>
+                    {if length(@booking.rooms) == 1, do: "Room", else: "Rooms"}
                   </div>
                   <div class="font-medium text-zinc-900">
-                    <%= Enum.map_join(@booking.rooms, ", ", fn room -> room.name end) %>
+                    {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
                   </div>
                 </div>
               <% end %>
@@ -392,23 +395,23 @@ defmodule YscWeb.UserBookingDetailLive do
 
               <div class="space-y-3">
                 <%= if @price_breakdown do %>
-                  <%= render_price_breakdown(assigns) %>
+                  {render_price_breakdown(assigns)}
                 <% end %>
 
                 <div class="flex justify-between text-sm">
                   <span class="text-zinc-600">Payment Method</span>
                   <span class="text-zinc-900">
-                    <%= get_payment_method_description(@payment) %>
+                    {get_payment_method_description(@payment)}
                   </span>
                 </div>
 
                 <div class="flex justify-between text-sm">
                   <span class="text-zinc-600">Payment Date</span>
                   <span class="text-zinc-900">
-                    <%= format_datetime(
+                    {format_datetime(
                       @payment.payment_date || @payment.inserted_at,
                       @timezone
-                    ) %>
+                    )}
                   </span>
                 </div>
 
@@ -423,7 +426,7 @@ defmodule YscWeb.UserBookingDetailLive do
                         _ -> "gray"
                       end
                     }>
-                      <%= String.capitalize(to_string(@payment.status)) %>
+                      {String.capitalize(to_string(@payment.status))}
                     </.badge>
                   </span>
                 </div>
@@ -434,7 +437,7 @@ defmodule YscWeb.UserBookingDetailLive do
                       Total Paid
                     </span>
                     <span class="text-2xl font-bold text-zinc-900">
-                      <%= MoneyHelper.format_money!(@payment.amount) %>
+                      {MoneyHelper.format_money!(@payment.amount)}
                     </span>
                   </div>
                 </div>
@@ -462,7 +465,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
                   <p class="text-sm text-blue-800">
                     <strong>Estimated Refund:</strong>
-                    <%= MoneyHelper.format_money!(@refund_info.estimated_refund) %>
+                    {MoneyHelper.format_money!(@refund_info.estimated_refund)}
                   </p>
                 </div>
               <% end %>
@@ -631,21 +634,21 @@ defmodule YscWeb.UserBookingDetailLive do
             <%= for room_item <- @breakdown["rooms"] do %>
               <div class="flex justify-between text-sm">
                 <span class="text-zinc-600">
-                  <%= room_item["room_name"] || "Room" %> (<%= room_item["nights"] ||
-                    0 %> nights)
+                  {room_item["room_name"] || "Room"} ({room_item["nights"] ||
+                    0} nights)
                 </span>
                 <span class="text-zinc-900">
-                  <%= format_money_from_map(room_item["total"]) %>
+                  {format_money_from_map(room_item["total"])}
                 </span>
               </div>
             <% end %>
           <% else %>
             <div class="flex justify-between text-sm">
               <span class="text-zinc-600">
-                Room Booking (<%= @breakdown["nights"] || 0 %> nights)
+                Room Booking ({@breakdown["nights"] || 0} nights)
               </span>
               <span class="text-zinc-900">
-                <%= format_money_from_map(@breakdown["total"]) %>
+                {format_money_from_map(@breakdown["total"])}
               </span>
             </div>
           <% end %>
@@ -653,7 +656,7 @@ defmodule YscWeb.UserBookingDetailLive do
           <div class="flex justify-between text-sm">
             <span class="text-zinc-600">Booking Total</span>
             <span class="text-zinc-900">
-              <%= format_money_from_map(@breakdown["total"]) %>
+              {format_money_from_map(@breakdown["total"])}
             </span>
           </div>
         <% end %>
@@ -664,7 +667,7 @@ defmodule YscWeb.UserBookingDetailLive do
       <div class="flex justify-between text-sm">
         <span class="text-zinc-600">Total</span>
         <span class="text-zinc-900">
-          <%= MoneyHelper.format_money!(@booking.total_price) %>
+          {MoneyHelper.format_money!(@booking.total_price)}
         </span>
       </div>
       """

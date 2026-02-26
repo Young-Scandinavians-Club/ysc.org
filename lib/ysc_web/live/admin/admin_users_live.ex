@@ -105,16 +105,16 @@ defmodule YscWeb.AdminUsersLive do
                   do: "green",
                   else: "red"
               }>
-                <%= @selected_user_application.review_outcome %>
+                {@selected_user_application.review_outcome}
               </.badge>
             </span>
             on
             <span class="font-semibold">
-              <%= Timex.format!(
+              {Timex.format!(
                 @selected_user_application.reviewed_at,
                 "%Y-%m-%d",
                 :strftime
-              ) %>
+              )}
             </span>
             by <span class="font-semibold"><%= @selected_user_application.reviewed_by.email %></span>.
           </p>
@@ -123,7 +123,7 @@ defmodule YscWeb.AdminUsersLive do
         <p class="leading-6 text-sm text-zinc-800 mb-4 font-semibold">
           Submitted:
           <.badge>
-            <%= "#{Timex.format!(Timex.Timezone.convert(@selected_user_application.completed, "America/Los_Angeles"), "{YYYY}-{0M}-{0D}")} (#{Timex.from_now(@selected_user_application.completed)})" %>
+            {"#{Timex.format!(Timex.Timezone.convert(@selected_user_application.completed, "America/Los_Angeles"), "{YYYY}-{0M}-{0D}")} (#{Timex.from_now(@selected_user_application.completed)})"}
           </.badge>
         </p>
 
@@ -132,13 +132,13 @@ defmodule YscWeb.AdminUsersLive do
         </h3>
         <ul class="leading-6 text-zinc-800 text-sm pb-6">
           <li>
-            <span class="font-semibold">Email:</span> <%= @selected_user.email %>
+            <span class="font-semibold">Email:</span> {@selected_user.email}
           </li>
           <li>
-            <span class="font-semibold">Name:</span> <%= "#{@selected_user.first_name} #{@selected_user.last_name}" %>
+            <span class="font-semibold">Name:</span> {"#{@selected_user.first_name} #{@selected_user.last_name}"}
           </li>
           <li>
-            <span class="font-semibold">Birth date:</span> <%= @selected_user_application.birth_date %>
+            <span class="font-semibold">Birth date:</span> {@selected_user_application.birth_date}
           </li>
 
           <li :if={length(@selected_user.family_members) > 0}>
@@ -146,9 +146,9 @@ defmodule YscWeb.AdminUsersLive do
             <ul class="space-y-1 text-zinc-800 list-disc list-inside">
               <li :for={family_member <- @selected_user.family_members}>
                 <span class="text-xs font-medium me-2 px-2.5 py-1 rounded text-left bg-blue-100 text-blue-800">
-                  <%= String.capitalize("#{family_member.type}") %>
+                  {String.capitalize("#{family_member.type}")}
                 </span>
-                <%= "#{family_member.first_name} #{family_member.last_name} (#{family_member.birth_date})" %>
+                {"#{family_member.first_name} #{family_member.last_name} (#{family_member.birth_date})"}
               </li>
             </ul>
           </li>
@@ -159,31 +159,31 @@ defmodule YscWeb.AdminUsersLive do
         </h3>
         <ul class="leading-6 text-sm text-zinc-800 pb-6">
           <li>
-            <span class="font-semibold">Membership type:</span> <%= @selected_user_application.membership_type %>
+            <span class="font-semibold">Membership type:</span> {@selected_user_application.membership_type}
           </li>
 
           <li class="pt-2">
             <p class="font-semibold">Eligibility:</p>
             <ul class="space-y-1 text-zinc-800 list-disc list-inside">
               <li :for={reason <- @selected_user_application.membership_eligibility}>
-                <%= Map.get(
+                {Map.get(
                   Ysc.Accounts.SignupApplication.eligibility_lookup(),
                   reason
-                ) %>
+                )}
               </li>
             </ul>
           </li>
           <li class="pt-2">
-            <span class="font-semibold">Occupation:</span> <%= @selected_user_application.occupation %>
+            <span class="font-semibold">Occupation:</span> {@selected_user_application.occupation}
           </li>
           <li class="pt-2">
-            <span class="font-semibold">Place of birth:</span> <%= @selected_user_application.place_of_birth %>
+            <span class="font-semibold">Place of birth:</span> {@selected_user_application.place_of_birth}
           </li>
           <li class="pt-2">
-            <span class="font-semibold">Citizenship:</span> <%= @selected_user_application.citizenship %>
+            <span class="font-semibold">Citizenship:</span> {@selected_user_application.citizenship}
           </li>
           <li class="pt-2">
-            <span class="font-semibold">Most connected Nordic country:</span> <%= @selected_user_application.most_connected_nordic_country %>
+            <span class="font-semibold">Most connected Nordic country:</span> {@selected_user_application.most_connected_nordic_country}
           </li>
 
           <li class="pt-2">
@@ -215,26 +215,52 @@ defmodule YscWeb.AdminUsersLive do
           </li>
         </ul>
 
-        <div class="flex flex-row justify-between w-full pt-8">
-          <button
+        <div class="flex flex-col gap-6 w-full pt-8">
+          <.form
             :if={@selected_user.state == :pending_approval}
-            phx-click="deny-application"
-            phx-value-user-id={@selected_user.id}
-            phx-value-application-id={@selected_user_application.id}
-            class="phx-submit-loading:opacity-75 rounded bg-red-700 hover:bg-red-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
-            data-confirm="You are about to reject this application. Are you sure?"
+            for={@rejection_form}
+            id="reject-application-form"
+            phx-submit="deny-application"
+            class="flex flex-col gap-4"
           >
-            <.icon name="hero-no-symbol" class="w-5 h-5 mb-0.5 me-1" /> Reject
-          </button>
-          <button
+            <div class="rounded-md bg-amber-50 border border-amber-200 p-3">
+              <p class="text-sm font-medium text-amber-800 mb-2">
+                Optional rejection note (internal use only)
+              </p>
+              <p class="text-sm text-amber-700 mb-3">
+                You may add a note explaining why this application was rejected. This note is for internal records only and will not be sent to the applicant.
+              </p>
+              <.input
+                field={@rejection_form[:note]}
+                type="textarea"
+                label="Rejection note (optional)"
+                class="mt-1 block w-full rounded border-zinc-300 text-zinc-900 sm:text-sm"
+                rows="3"
+              />
+            </div>
+            <div class="flex flex-row justify-between w-full">
+              <button
+                type="submit"
+                class="phx-submit-loading:opacity-75 rounded bg-red-700 hover:bg-red-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+                data-confirm="You are about to reject this application. Are you sure?"
+              >
+                <.icon name="hero-no-symbol" class="w-5 h-5 mb-0.5 me-1" /> Reject
+              </button>
+            </div>
+          </.form>
+          <div
             :if={@selected_user.state == :pending_approval}
-            phx-click="approve-application"
-            phx-value-user-id={@selected_user.id}
-            phx-value-application-id={@selected_user_application.id}
-            class="phx-submit-loading:opacity-75 rounded bg-green-700 hover:bg-green-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+            class="flex flex-row justify-end w-full"
           >
-            <.icon name="hero-check" class="w-5 h-5 mb-0.5 me-1" /> Approve
-          </button>
+            <button
+              phx-click="approve-application"
+              phx-value-user-id={@selected_user.id}
+              phx-value-application-id={@selected_user_application.id}
+              class="phx-submit-loading:opacity-75 rounded bg-green-700 hover:bg-green-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+            >
+              <.icon name="hero-check" class="w-5 h-5 mb-0.5 me-1" /> Approve
+            </button>
+          </div>
         </div>
       </.modal>
 
@@ -315,7 +341,7 @@ defmodule YscWeb.AdminUsersLive do
                   name="hero-exclamation-circle-mini"
                   class="mt-0.5 w-5 h-5 flex-none"
                 />
-                <%= @export_error %>
+                {@export_error}
               </p>
 
               <a
@@ -489,13 +515,13 @@ defmodule YscWeb.AdminUsersLive do
                   <div :if={user.phone_number} class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">Phone:</span>
                     <span class="text-sm text-zinc-900">
-                      <%= format_phone_number(user.phone_number) %>
+                      {format_phone_number(user.phone_number)}
                     </span>
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">State:</span>
                     <.badge type={user_state_to_badge_type(user.state)}>
-                      <%= user_state_to_readable(user.state) %>
+                      {user_state_to_readable(user.state)}
                     </.badge>
                   </div>
                   <div class="flex items-center gap-2">
@@ -506,7 +532,7 @@ defmodule YscWeb.AdminUsersLive do
                       <% membership_type -> %>
                         <div class="flex items-center gap-1">
                           <.badge type="sky">
-                            <%= String.capitalize("#{membership_type}") %>
+                            {String.capitalize("#{membership_type}")}
                           </.badge>
                           <%= if membership_inherited?(user) do %>
                             <.tooltip tooltip_text="Membership inherited from parent account">
@@ -562,22 +588,23 @@ defmodule YscWeb.AdminUsersLive do
               <Flop.Phoenix.pagination
                 meta={@meta}
                 path={~p"/admin/users"}
-                opts={[
-                  wrapper_attrs: [class: "flex items-center justify-center py-4"],
-                  pagination_list_attrs: [
-                    class: ["flex gap-0 order-2 justify-center items-center"]
-                  ],
-                  previous_link_attrs: [
-                    class:
-                      "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                  ],
-                  next_link_attrs: [
-                    class:
-                      "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                  ],
-                  page_links: {:ellipsis, 3}
+                class="flex items-center justify-center py-4"
+                page_list_attrs={[
+                  class: "flex gap-0 order-2 justify-center items-center"
                 ]}
-              />
+                page_links={3}
+              >
+                <:previous attrs={[
+                  class:
+                    "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                ]}>
+                </:previous>
+                <:next attrs={[
+                  class:
+                    "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                ]}>
+                </:next>
+              </Flop.Phoenix.pagination>
             </div>
           </div>
           <!-- Desktop Table View -->
@@ -607,7 +634,7 @@ defmodule YscWeb.AdminUsersLive do
                 </.link>
               </:col>
               <:col :let={{_, user}} label="Phone" field={:phone_number}>
-                <%= format_phone_number(user.phone_number) %>
+                {format_phone_number(user.phone_number)}
               </:col>
               <:col
                 :let={{_, user}}
@@ -616,7 +643,7 @@ defmodule YscWeb.AdminUsersLive do
                 thead_th_attrs={[class: "dance"]}
               >
                 <.badge type={user_state_to_badge_type(user.state)}>
-                  <%= user_state_to_readable(user.state) %>
+                  {user_state_to_readable(user.state)}
                 </.badge>
               </:col>
               <:col :let={{_, user}} label="Membership" field={:membership_type}>
@@ -626,7 +653,7 @@ defmodule YscWeb.AdminUsersLive do
                   <% membership_type -> %>
                     <div class="flex items-center gap-1">
                       <.badge type="sky">
-                        <%= String.capitalize("#{membership_type}") %>
+                        {String.capitalize("#{membership_type}")}
                       </.badge>
                       <%= if membership_inherited?(user) do %>
                         <.tooltip tooltip_text="Membership inherited from parent account">
@@ -675,26 +702,23 @@ defmodule YscWeb.AdminUsersLive do
             <Flop.Phoenix.pagination
               meta={@meta}
               path={~p"/admin/users"}
-              opts={[
-                wrapper_attrs: [
-                  class: "flex items-center justify-center py-10 h-10 text-base"
-                ],
-                pagination_list_attrs: [
-                  class: [
-                    "flex gap-0 order-2 justify-center items-center"
-                  ]
-                ],
-                previous_link_attrs: [
-                  class:
-                    "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                next_link_attrs: [
-                  class:
-                    "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-                ],
-                page_links: {:ellipsis, 5}
+              class="flex items-center justify-center py-10 h-10 text-base"
+              page_list_attrs={[
+                class: "flex gap-0 order-2 justify-center items-center"
               ]}
-            />
+              page_links={5}
+            >
+              <:previous attrs={[
+                class:
+                  "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:previous>
+              <:next attrs={[
+                class:
+                  "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+              ]}>
+              </:next>
+            </Flop.Phoenix.pagination>
           </div>
         </div>
       </div>
@@ -727,7 +751,8 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:file_export_path, "")
      |> assign(:export_error, "Something went wrong")
      |> assign(form: to_form(%{}, as: "csv_export"))
-     |> assign(form: to_form(user_changeset, as: "user"))}
+     |> assign(form: to_form(user_changeset, as: "user"))
+     |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))}
   end
 
   @spec mount(any(), any(), map()) :: {:ok, map()}
@@ -904,7 +929,10 @@ defmodule YscWeb.AdminUsersLive do
         {:noreply,
          socket
          |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
-         |> put_flash(:info, "User was approved and is now a member!")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "User was approved and is now a member!"
+         )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         errors =
@@ -923,59 +951,89 @@ defmodule YscWeb.AdminUsersLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, "Could not approve application — #{error_detail}")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Could not approve application — #{error_detail}"
+         )}
 
       {:error, _} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Could not approve application. Please try again."
          )}
     end
   end
 
-  def handle_event("deny-application", _params, socket) do
+  def handle_event("deny-application", params, socket) do
     user = socket.assigns[:selected_user]
     application = socket.assigns[:selected_user_application]
     current_user = socket.assigns[:current_user]
 
-    case Accounts.record_application_outcome(
-           :rejected,
-           user,
-           application,
-           current_user
-         ) do
-      :ok ->
-        YscWeb.Emails.Notifier.schedule_email(
-          user.email,
-          "#{user.id}",
-          "Update on your Young Scandinavians Club application",
-          "application_rejected",
-          %{first_name: user.first_name},
-          """
-          ==============================
+    reject_params = params["reject"] || %{}
 
-          Hi #{user.email},
+    note =
+      reject_params["note"]
+      |> Kernel.||("")
+      |> String.trim()
 
-          We regret to inform you that your application has been rejected.
+    if note != "" and String.length(note) > 5000 do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Rejection note must be 5000 characters or fewer."
+       )}
+    else
+      case Accounts.record_application_outcome(
+             :rejected,
+             user,
+             application,
+             current_user
+           ) do
+        :ok ->
+          if note != "" and note != nil do
+            Accounts.create_user_note(
+              user,
+              %{"note" => note, "category" => "rejection"},
+              current_user
+            )
+          end
 
-          If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
+          YscWeb.Emails.Notifier.schedule_email(
+            user.email,
+            "#{user.id}",
+            "Update on your Young Scandinavians Club application",
+            "application_rejected",
+            %{first_name: user.first_name},
+            """
+            ==============================
 
-          ==============================
-          """,
-          user.id
-        )
+            Hi #{user.email},
 
-        {:noreply,
-         socket
-         |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
-         |> put_flash(:info, "User application was rejected!")}
+            We regret to inform you that your application has been rejected.
 
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Could not reject application. Please try again.")}
+            If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
+
+            ==============================
+            """,
+            user.id
+          )
+
+          {:noreply,
+           socket
+           |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
+           |> YscWeb.Flash.put_toast(:info, "User application was rejected!")}
+
+        {:error, _} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Could not reject application. Please try again."
+           )}
+      end
     end
   end
 

@@ -50,7 +50,7 @@ defmodule YscWeb.UserConfirmationLive do
       {:ok, _} ->
         {:noreply,
          socket
-         |> put_flash(:info, "User confirmed successfully.")
+         |> YscWeb.Flash.put_toast(:info, "User confirmed successfully.")
          |> redirect(to: ~p"/")}
 
       :error ->
@@ -66,7 +66,7 @@ defmodule YscWeb.UserConfirmationLive do
           %{} ->
             {:noreply,
              socket
-             |> put_flash(
+             |> YscWeb.Flash.put_toast(
                :error,
                "User confirmation link is invalid or it has expired."
              )

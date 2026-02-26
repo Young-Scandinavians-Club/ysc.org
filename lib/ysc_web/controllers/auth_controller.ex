@@ -35,7 +35,7 @@ defmodule YscWeb.AuthController do
   def callback(%{assigns: %{ueberauth_failure: _fails}} = conn, _params) do
     # User cancelled or OAuth provider returned an error
     conn
-    |> put_flash(
+    |> YscWeb.Flash.put_toast(
       :error,
       "Authentication was cancelled or failed. Please try again."
     )
@@ -50,7 +50,7 @@ defmodule YscWeb.AuthController do
       handle_oauth_success(conn, email, auth.provider)
     else
       conn
-      |> put_flash(
+      |> YscWeb.Flash.put_toast(
         :error,
         "Unable to retrieve email from your account. Please contact support."
       )
@@ -61,7 +61,10 @@ defmodule YscWeb.AuthController do
   def callback(conn, _params) do
     # Unexpected state - no auth and no failure
     conn
-    |> put_flash(:error, "Authentication error occurred. Please try again.")
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "Authentication error occurred. Please try again."
+    )
     |> redirect(to: ~p"/users/log-in")
   end
 
@@ -77,7 +80,7 @@ defmodule YscWeb.AuthController do
       nil ->
         # User doesn't exist - they need to apply for membership first
         conn
-        |> put_flash(
+        |> YscWeb.Flash.put_toast(
           :error,
           "No account found with this email. Please apply for membership first."
         )
@@ -110,7 +113,7 @@ defmodule YscWeb.AuthController do
           # Log user in
           conn
           |> delete_session(:oauth_redirect_to)
-          |> put_flash(
+          |> YscWeb.Flash.put_toast(
             :info,
             "Successfully signed in with #{String.capitalize(to_string(provider))}!"
           )
@@ -119,7 +122,10 @@ defmodule YscWeb.AuthController do
         else
           # Account not in allowed state
           conn
-          |> put_flash(:error, "Your account is not currently active.")
+          |> YscWeb.Flash.put_toast(
+            :error,
+            "Your account is not currently active."
+          )
           |> redirect(to: ~p"/users/log-in")
         end
     end

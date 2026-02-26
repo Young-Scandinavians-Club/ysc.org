@@ -85,7 +85,7 @@ defmodule YscWeb.Components.Events.EventCard do
                 name={badge.icon}
                 class="w-3.5 h-3.5 inline me-0.5 relative z-10"
               />
-              <span class="relative z-10"><%= badge.text %></span>
+              <span class="relative z-10">{badge.text}</span>
             </span>
           <% end %>
         </div>
@@ -100,7 +100,7 @@ defmodule YscWeb.Components.Events.EventCard do
               else: "text-zinc-900 bg-zinc-100"
             )
           ]}>
-            <%= format_event_date(@event) %>
+            {format_event_date(@event)}
           </span>
           <span
             :if={@event.start_time && @event.start_time != ""}
@@ -109,7 +109,7 @@ defmodule YscWeb.Components.Events.EventCard do
               if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
             ]}
           >
-            <%= format_start_time(@event.start_time) %>
+            {format_start_time(@event.start_time)}
           </span>
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
@@ -117,7 +117,7 @@ defmodule YscWeb.Components.Events.EventCard do
             "text-2xl font-black tracking-tighter leading-tight mb-4 group-hover:text-blue-600 transition-colors line-clamp-2 min-h-[4rem]",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")
           ]}>
-            <%= @event.title %>
+            {@event.title}
           </h3>
         </.link>
         <p
@@ -127,7 +127,7 @@ defmodule YscWeb.Components.Events.EventCard do
             if(@variant == "dark", do: "text-zinc-300", else: "text-zinc-500")
           ]}
         >
-          <%= @event.description %>
+          {@event.description}
         </p>
 
         <div class={[
@@ -143,7 +143,7 @@ defmodule YscWeb.Components.Events.EventCard do
               ]}
             >
               <.icon name="hero-map-pin" class="w-5 h-5" />
-              <%= @event.location_name %>
+              {@event.location_name}
             </span>
             <span class={[
               "backdrop-blur-md px-4 py-2 rounded-xl text-sm font-black shadow-sm ring-1",
@@ -153,7 +153,7 @@ defmodule YscWeb.Components.Events.EventCard do
               ),
               @sold_out && "line-through opacity-60"
             ]}>
-              <%= @event.pricing_info.display_text %>
+              {@event.pricing_info.display_text}
             </span>
           </div>
           <.icon

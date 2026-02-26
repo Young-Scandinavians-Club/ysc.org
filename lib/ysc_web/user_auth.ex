@@ -231,7 +231,7 @@ defmodule YscWeb.UserAuth do
     else
       socket =
         socket
-        |> Phoenix.LiveView.put_flash(
+        |> YscWeb.Flash.put_toast(
           :error,
           "You must sign in to access this page."
         )
@@ -253,7 +253,7 @@ defmodule YscWeb.UserAuth do
     else
       socket =
         socket
-        |> Phoenix.LiveView.put_flash(
+        |> YscWeb.Flash.put_toast(
           :error,
           "You do not have permission to access this page"
         )
@@ -274,7 +274,7 @@ defmodule YscWeb.UserAuth do
     else
       socket =
         socket
-        |> Phoenix.LiveView.put_flash(:error, "Your account is not active")
+        |> YscWeb.Flash.put_toast(:error, "Your account is not active")
         |> Phoenix.LiveView.redirect(to: ~p"/pending-review")
 
       {:halt, socket}
@@ -380,7 +380,7 @@ defmodule YscWeb.UserAuth do
       conn
     else
       conn
-      |> put_flash(:error, "You must sign in to access this page.")
+      |> YscWeb.Flash.put_toast(:error, "You must sign in to access this page.")
       |> maybe_store_return_to()
       |> redirect(to: ~p"/users/log-in")
       |> halt()
@@ -394,7 +394,10 @@ defmodule YscWeb.UserAuth do
       conn
     else
       conn
-      |> put_flash(:error, "You do not have permission to access this page.")
+      |> YscWeb.Flash.put_toast(
+        :error,
+        "You do not have permission to access this page."
+      )
       |> maybe_store_return_to()
       |> redirect(to: ~p"/")
       |> halt()
@@ -408,7 +411,10 @@ defmodule YscWeb.UserAuth do
       conn
     else
       conn
-      |> put_flash(:error, "Your account has not been approved yet")
+      |> YscWeb.Flash.put_toast(
+        :error,
+        "Your account has not been approved yet"
+      )
       |> redirect(to: ~p"/pending-review")
       |> halt()
     end

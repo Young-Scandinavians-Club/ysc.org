@@ -48,4 +48,4 @@ defenum(UserEventType, [
   "family_removed"
 ])
 
-defenum(UserNoteCategory, ["general", "violation"])
+defenum(UserNoteCategory, ["general", "violation", "rejection"])

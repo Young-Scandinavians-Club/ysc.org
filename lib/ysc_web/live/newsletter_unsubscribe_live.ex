@@ -114,14 +114,20 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
         {:noreply,
          socket
          |> assign(:unsubscribed, true)
-         |> put_flash(:info, "You have been unsubscribed from our newsletter.")}
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "You have been unsubscribed from our newsletter."
+         )}
 
       {:error, _} ->
         # Always show a safe message; never crash. User can use contact or try again.
         {:noreply,
          socket
          |> assign(:error, "Something went wrong. Please try again.")
-         |> put_flash(:error, "Could not unsubscribe. Please try again.")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Could not unsubscribe. Please try again."
+         )}
     end
   end
 end

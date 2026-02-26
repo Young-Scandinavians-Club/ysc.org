@@ -465,7 +465,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div class="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
                 <div class="flex justify-between items-start mb-3">
                   <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
-                    <%= booking.reference_id %>
+                    {booking.reference_id}
                   </span>
                   <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>
                     <span class="text-xs font-bold text-amber-600 italic">
@@ -478,17 +478,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <% end %>
                 </div>
                 <p class="font-bold text-zinc-900 text-lg leading-none">
-                  <%= Calendar.strftime(booking.checkin_date, "%b %d") %> — <%= Calendar.strftime(
+                  {Calendar.strftime(booking.checkin_date, "%b %d")} — {Calendar.strftime(
                     booking.checkout_date,
                     "%b %d"
-                  ) %>
+                  )}
                 </p>
                 <p class="text-sm text-zinc-500 mt-1">
-                  <%= booking.guests_count %> <%= if booking.guests_count == 1,
+                  {booking.guests_count} {if booking.guests_count == 1,
                     do: "Guest",
-                    else: "Guests" %> • <%= if booking.booking_mode == :buyout,
+                    else: "Guests"} • {if booking.booking_mode == :buyout,
                     do: "Full Buyout",
-                    else: "Shared Stay" %>
+                    else: "Shared Stay"}
                 </p>
                 <.link
                   navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -716,9 +716,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                         class="w-full px-3 py-2 border border-zinc-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span class="text-zinc-900">
-                          <%= @guests_count %> <%= if @guests_count == 1,
+                          {@guests_count} {if @guests_count == 1,
                             do: "guest",
-                            else: "guests" %>
+                            else: "guests"}
                         </span>
                         <.icon
                           name="hero-chevron-down"
@@ -772,7 +772,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 class="w-12 text-center font-medium text-lg text-zinc-900"
                                 aria-live="polite"
                               >
-                                <%= @guests_count %>
+                                {@guests_count}
                               </span>
                               <button
                                 type="button"
@@ -817,7 +817,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Error Messages -->
                 <div class="mt-4 space-y-1">
                   <p :if={@form_errors[:guests_count]} class="text-red-600 text-sm">
-                    <%= @form_errors[:guests_count] %>
+                    {@form_errors[:guests_count]}
                   </p>
                 </div>
               </section>
@@ -867,19 +867,19 @@ defmodule YscWeb.ClearLakeBookingLive do
                     :if={@date_validation_errors[:weekend]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:weekend] %>
+                    {@date_validation_errors[:weekend]}
                   </p>
                   <p
                     :if={@date_validation_errors[:max_nights]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:max_nights] %>
+                    {@date_validation_errors[:max_nights]}
                   </p>
                   <p
                     :if={@date_validation_errors[:availability]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:availability] %>
+                    {@date_validation_errors[:availability]}
                   </p>
                 </div>
               </section>
@@ -910,11 +910,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                       :if={@guests_count && @guests_count > 0}
                       class="font-semibold text-teal-700"
                     >
-                      Dates with fewer than <%= @guests_count %> spot<%= if @guests_count ==
-                                                                              1,
-                                                                            do: "",
-                                                                            else:
-                                                                              "s" %> available are disabled.
+                      Dates with fewer than {@guests_count} spot{if @guests_count ==
+                                                                      1,
+                                                                    do: "",
+                                                                    else: "s"} available are disabled.
                     </span>
                   </p>
                   <p class="text-xs text-zinc-600">
@@ -936,40 +935,40 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Error Messages -->
                 <div class="mt-4 space-y-1">
                   <p :if={@form_errors[:checkin_date]} class="text-red-600 text-sm">
-                    <%= @form_errors[:checkin_date] %>
+                    {@form_errors[:checkin_date]}
                   </p>
                   <p :if={@form_errors[:checkout_date]} class="text-red-600 text-sm">
-                    <%= @form_errors[:checkout_date] %>
+                    {@form_errors[:checkout_date]}
                   </p>
                   <p
                     :if={@date_validation_errors[:weekend]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:weekend] %>
+                    {@date_validation_errors[:weekend]}
                   </p>
                   <p
                     :if={@date_validation_errors[:max_nights]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:max_nights] %>
+                    {@date_validation_errors[:max_nights]}
                   </p>
                   <p
                     :if={@date_validation_errors[:active_booking]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:active_booking] %>
+                    {@date_validation_errors[:active_booking]}
                   </p>
                   <p
                     :if={@date_validation_errors[:advance_booking_limit]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:advance_booking_limit] %>
+                    {@date_validation_errors[:advance_booking_limit]}
                   </p>
                   <p
                     :if={@date_validation_errors[:season_date_range]}
                     class="text-red-600 text-sm"
                   >
-                    <%= @date_validation_errors[:season_date_range] %>
+                    {@date_validation_errors[:season_date_range]}
                   </p>
                 </div>
               </section>
@@ -987,7 +986,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   />
                 </div>
                 <div class="ms-3">
-                  <p class="text-sm text-red-800"><%= @price_error %></p>
+                  <p class="text-sm text-red-800">{@price_error}</p>
                 </div>
               </div>
             </div>
@@ -1004,26 +1003,24 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <div class="flex justify-between items-start text-sm">
                     <span class="text-zinc-500 font-medium">Check-in</span>
                     <span class="font-semibold text-zinc-900 text-right">
-                      <%= Calendar.strftime(@checkin_date, "%b %d, %Y") %>
+                      {Calendar.strftime(@checkin_date, "%b %d, %Y")}
                     </span>
                   </div>
                   <div class="flex justify-between items-start text-sm">
                     <span class="text-zinc-500 font-medium">Check-out</span>
                     <span class="font-semibold text-zinc-900 text-right">
-                      <%= Calendar.strftime(@checkout_date, "%b %d, %Y") %>
+                      {Calendar.strftime(@checkout_date, "%b %d, %Y")}
                     </span>
                   </div>
                   <div class="flex justify-between items-start text-sm">
                     <span class="text-zinc-500 font-medium">Nights</span>
                     <span class="font-semibold text-zinc-900">
-                      <%= Date.diff(@checkout_date, @checkin_date) %> <%= if Date.diff(
-                                                                               @checkout_date,
-                                                                               @checkin_date
-                                                                             ) == 1,
-                                                                             do:
-                                                                               "night",
-                                                                             else:
-                                                                               "nights" %>
+                      {Date.diff(@checkout_date, @checkin_date)} {if Date.diff(
+                                                                       @checkout_date,
+                                                                       @checkin_date
+                                                                     ) == 1,
+                                                                     do: "night",
+                                                                     else: "nights"}
                     </span>
                   </div>
                 </div>
@@ -1034,9 +1031,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                 >
                   <span class="text-zinc-500 font-medium">Guests</span>
                   <span class="font-semibold text-zinc-900">
-                    <%= @guests_count %> <%= if @guests_count == 1,
+                    {@guests_count} {if @guests_count == 1,
                       do: "guest",
-                      else: "guests" %>
+                      else: "guests"}
                   </span>
                 </div>
                 <!-- Booking Mode -->
@@ -1099,7 +1096,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         Availability Issue
                       </h4>
                       <p class="text-xs text-amber-700 leading-relaxed">
-                        <%= @availability_error %>
+                        {@availability_error}
                       </p>
                     </div>
                   </div>
@@ -1134,21 +1131,21 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <% total_guest_nights = nights * @guests_count %>
                         <div class="flex justify-between items-center text-zinc-600">
                           <span>
-                            Spot Rental (<%= @guests_count %> × <%= nights %> night<%= if nights !=
-                                                                                            1,
-                                                                                          do:
-                                                                                            "s",
-                                                                                          else:
-                                                                                            "" %>)
+                            Spot Rental ({@guests_count} × {nights} night{if nights !=
+                                                                               1,
+                                                                             do:
+                                                                               "s",
+                                                                             else:
+                                                                               ""})
                           </span>
                           <span class="font-bold text-zinc-900">
-                            <%= MoneyHelper.format_money!(
+                            {MoneyHelper.format_money!(
                               Money.mult(
                                 price_per_guest_per_night,
                                 total_guest_nights
                               )
                               |> elem(1)
-                            ) %>
+                            )}
                           </span>
                         </div>
                       </span>
@@ -1169,15 +1166,15 @@ defmodule YscWeb.ClearLakeBookingLive do
                           end %>
                         <div class="flex justify-between items-center text-zinc-600">
                           <span>
-                            Full Buyout (<%= nights %> night<%= if nights != 1,
+                            Full Buyout ({nights} night{if nights != 1,
                               do: "s",
-                              else: "" %>)
+                              else: ""})
                           </span>
                           <span class="font-bold text-zinc-900">
-                            <%= MoneyHelper.format_money!(
+                            {MoneyHelper.format_money!(
                               Money.mult(price_per_night, nights)
                               |> elem(1)
-                            ) %>
+                            )}
                           </span>
                         </div>
                       </span>
@@ -1192,7 +1189,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           :if={!@availability_error}
                           class="text-2xl font-black text-teal-600"
                         >
-                          <%= MoneyHelper.format_money!(@calculated_price) %>
+                          {MoneyHelper.format_money!(@calculated_price)}
                         </span>
                         <span
                           :if={@availability_error}
@@ -1207,10 +1204,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Error Messages -->
                 <div :if={@price_error || @availability_error} class="space-y-1">
                   <p :if={@price_error} class="text-red-600 text-xs">
-                    <%= @price_error %>
+                    {@price_error}
                   </p>
                   <p :if={@availability_error} class="text-red-600 text-xs">
-                    <%= @availability_error %>
+                    {@availability_error}
                   </p>
                 </div>
                 <!-- Missing Info List (Smart Sidebar) -->
@@ -1454,7 +1451,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Ready to Experience Clear Lake?
                 </h4>
                 <p class="text-teal-100">
-                  <%= raw(@booking_disabled_reason) %>
+                  {raw(@booking_disabled_reason)}
                 </p>
               </div>
               <.link
@@ -1546,7 +1543,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             >
               <div>
                 <h4 class="text-xl font-bold text-teal-900">Ready to reserve?</h4>
-                <p class="text-teal-700"><%= raw(@booking_disabled_reason) %></p>
+                <p class="text-teal-700">{raw(@booking_disabled_reason)}</p>
                 <p :if={@user} class="text-teal-600 text-sm mt-2">
                   You will be able to use the booking system as soon as you pay for membership.
                 </p>
@@ -2579,7 +2576,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            availability_error ||
              "Sorry, there is not enough capacity for your requested dates and number of guests."
@@ -2598,7 +2595,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       {:error, :property_unavailable} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Sorry, the property is not available for your requested dates."
          )
@@ -2616,7 +2613,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message)
          |> assign(
            form_errors: %{general: error_message},
            calculated_price: socket.assigns.calculated_price
@@ -2628,7 +2625,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message)
          |> assign(
            form_errors: form_errors,
            calculated_price: nil,
@@ -2642,7 +2639,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message)
          |> assign(
            form_errors: form_errors,
            calculated_price: nil,
@@ -2655,7 +2652,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message)
          |> assign(
            form_errors: %{general: error_message},
            calculated_price: socket.assigns.calculated_price

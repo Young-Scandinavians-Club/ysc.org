@@ -6,7 +6,12 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = {
-    content: ["./js/**/*.js", "../lib/*_web.ex", "../lib/*_web/**/*.*ex"],
+    content: [
+        "./js/**/*.js",
+        "../lib/*_web.ex",
+        "../lib/*_web/**/*.*ex",
+        "../deps/live_toast/lib/**/*.*ex",
+    ],
     theme: {
         extend: {
             colors: {
@@ -34,9 +39,6 @@ module.exports = {
         //
         //     <div class="phx-click-loading:animate-ping">
         //
-        plugin(({ addVariant }) =>
-            addVariant("phx-no-feedback", [".phx-no-feedback&", ".phx-no-feedback &"])
-        ),
         plugin(({ addVariant }) =>
             addVariant("phx-click-loading", [
                 ".phx-click-loading&",

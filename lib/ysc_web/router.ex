@@ -114,6 +114,7 @@ defmodule YscWeb.Router do
 
     live_session :mount_site_settings,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -165,6 +166,7 @@ defmodule YscWeb.Router do
 
     live_session :redirect_if_user_is_authenticated,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :redirect_if_user_is_authenticated},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -200,6 +202,7 @@ defmodule YscWeb.Router do
 
     live_session :password_reset,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -219,6 +222,7 @@ defmodule YscWeb.Router do
 
     live_session :account_setup,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -235,6 +239,7 @@ defmodule YscWeb.Router do
 
     live_session :require_authenticated_user,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -280,6 +285,7 @@ defmodule YscWeb.Router do
 
     live_session :current_user,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -304,6 +310,7 @@ defmodule YscWeb.Router do
 
     live_session :require_admin,
       on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.UserAuth, :ensure_admin},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings}

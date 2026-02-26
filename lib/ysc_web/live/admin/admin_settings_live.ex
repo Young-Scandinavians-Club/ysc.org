@@ -39,7 +39,7 @@ defmodule YscWeb.AdminSettingsLive do
           <.form for={@form} id="admin-settings-form" phx-submit="update-settings">
             <div :for={scope <- @scopes}>
               <h2 class="text-lg leading-8 font-semibold text-zinc-800">
-                <%= String.capitalize(scope) %>
+                {String.capitalize(scope)}
               </h2>
               <div>
                 <ul>
@@ -48,9 +48,9 @@ defmodule YscWeb.AdminSettingsLive do
                       class="leading-6 text-zinc-800 font-semibold"
                       for={entry.id}
                     >
-                      <%= entry.name
+                      {entry.name
                       |> String.replace("_", " ")
-                      |> String.capitalize() %>:
+                      |> String.capitalize()}:
                     </label>
                     <input
                       id={entry.id}
@@ -124,42 +124,42 @@ defmodule YscWeb.AdminSettingsLive do
           >
             <%= for {queue, stats} <- @queue_stats do %>
               <div class="bg-white shadow rounded-lg p-4">
-                <h3 class="font-semibold text-zinc-900 mb-3"><%= queue %></h3>
+                <h3 class="font-semibold text-zinc-900 mb-3">{queue}</h3>
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Available</span>
                     <.badge type="default" class="!me-0">
-                      <%= Map.get(stats, "available", 0) %>
+                      {Map.get(stats, "available", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Executing</span>
                     <.badge type="yellow" class="!me-0">
-                      <%= Map.get(stats, "executing", 0) %>
+                      {Map.get(stats, "executing", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Scheduled</span>
                     <.badge type="sky" class="!me-0">
-                      <%= Map.get(stats, "scheduled", 0) %>
+                      {Map.get(stats, "scheduled", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Retryable</span>
                     <.badge type="yellow" class="!me-0">
-                      <%= Map.get(stats, "retryable", 0) %>
+                      {Map.get(stats, "retryable", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Completed</span>
                     <.badge type="green" class="!me-0">
-                      <%= Map.get(stats, "completed", 0) %>
+                      {Map.get(stats, "completed", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Discarded</span>
                     <.badge type="red" class="!me-0">
-                      <%= Map.get(stats, "discarded", 0) %>
+                      {Map.get(stats, "discarded", 0)}
                     </.badge>
                   </div>
                 </div>
@@ -234,13 +234,13 @@ defmodule YscWeb.AdminSettingsLive do
                   ]}
                 >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                    <%= String.slice(to_string(job.id), 0..20) %>...
+                    {String.slice(to_string(job.id), 0..20)}...
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <span class="font-medium"><%= job.worker %></span>
+                    <span class="font-medium">{job.worker}</span>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <%= job.queue %>
+                    {job.queue}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <span class={[
@@ -255,7 +255,7 @@ defmodule YscWeb.AdminSettingsLive do
                         >
                         </span>
                       <% end %>
-                      <%= job.state %>
+                      {job.state}
                     </span>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
@@ -266,10 +266,10 @@ defmodule YscWeb.AdminSettingsLive do
                         data-utc-time={DateTime.to_iso8601(job.completed_at)}
                         data-prefix=""
                       >
-                        <%= Calendar.strftime(
+                        {Calendar.strftime(
                           job.completed_at,
                           "%Y-%m-%d %H:%M:%S UTC"
-                        ) %>
+                        )}
                       </span>
                     <% else %>
                       <%= if job.scheduled_at do %>
@@ -279,10 +279,10 @@ defmodule YscWeb.AdminSettingsLive do
                           data-utc-time={DateTime.to_iso8601(job.scheduled_at)}
                           data-prefix="Scheduled: "
                         >
-                          Scheduled: <%= Calendar.strftime(
+                          Scheduled: {Calendar.strftime(
                             job.scheduled_at,
                             "%Y-%m-%d %H:%M:%S UTC"
-                          ) %>
+                          )}
                         </span>
                       <% else %>
                         <%= if job.inserted_at do %>
@@ -292,10 +292,10 @@ defmodule YscWeb.AdminSettingsLive do
                             data-utc-time={DateTime.to_iso8601(job.inserted_at)}
                             data-prefix=""
                           >
-                            <%= Calendar.strftime(
+                            {Calendar.strftime(
                               job.inserted_at,
                               "%Y-%m-%d %H:%M:%S UTC"
-                            ) %>
+                            )}
                           </span>
                         <% else %>
                           N/A
@@ -305,19 +305,19 @@ defmodule YscWeb.AdminSettingsLive do
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                     <%= if job.completed_at && job.attempted_at do %>
-                      <%= format_duration(
+                      {format_duration(
                         DateTime.diff(
                           job.completed_at,
                           job.attempted_at,
                           :millisecond
                         )
-                      ) %>
+                      )}
                     <% else %>
                       N/A
                     <% end %>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <%= job.attempt %>/<%= job.max_attempts %>
+                    {job.attempt}/{job.max_attempts}
                   </td>
                   <td
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium"
@@ -353,7 +353,7 @@ defmodule YscWeb.AdminSettingsLive do
             <div>
               <h3 class="text-sm font-semibold text-zinc-700 mb-2">Worker</h3>
               <p class="text-sm text-zinc-900 font-mono">
-                <%= @selected_job.worker %>
+                {@selected_job.worker}
               </p>
             </div>
             <div>
@@ -376,15 +376,15 @@ defmodule YscWeb.AdminSettingsLive do
                 <%= for error <- @selected_job.errors do %>
                   <div class="bg-red-50 p-3 rounded border border-red-200">
                     <p class="text-xs text-red-900 font-mono">
-                      <%= Map.get(error, :error) || Map.get(error, "error") %>
+                      {Map.get(error, :error) || Map.get(error, "error")}
                     </p>
                     <p class="text-xs text-red-600 mt-1">
-                      Attempt <%= Map.get(error, :attempt) ||
-                        Map.get(error, "attempt") %>
+                      Attempt {Map.get(error, :attempt) ||
+                        Map.get(error, "attempt")}
                       <%= if at = Map.get(error, :at) || Map.get(error, "at") do %>
-                        at <%= if is_struct(at),
+                        at {if is_struct(at),
                           do: DateTime.to_iso8601(at),
-                          else: to_string(at) %>
+                          else: to_string(at)}
                       <% end %>
                     </p>
                   </div>
@@ -394,16 +394,16 @@ defmodule YscWeb.AdminSettingsLive do
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span class="font-semibold text-zinc-700">Queue:</span>
-                <span class="text-zinc-900"><%= @selected_job.queue %></span>
+                <span class="text-zinc-900">{@selected_job.queue}</span>
               </div>
               <div>
                 <span class="font-semibold text-zinc-700">Priority:</span>
-                <span class="text-zinc-900"><%= @selected_job.priority %></span>
+                <span class="text-zinc-900">{@selected_job.priority}</span>
               </div>
               <div>
                 <span class="font-semibold text-zinc-700">Attempts:</span>
                 <span class="text-zinc-900">
-                  <%= @selected_job.attempt %>/<%= @selected_job.max_attempts %>
+                  {@selected_job.attempt}/{@selected_job.max_attempts}
                 </span>
               </div>
               <div>
@@ -420,7 +420,7 @@ defmodule YscWeb.AdminSettingsLive do
                     >
                     </span>
                   <% end %>
-                  <%= @selected_job.state %>
+                  {@selected_job.state}
                 </span>
               </div>
             </div>
@@ -493,7 +493,7 @@ defmodule YscWeb.AdminSettingsLive do
 
     {:noreply,
      socket
-     |> put_flash(:error, "Failed to load job statistics")
+     |> YscWeb.Flash.put_toast(:error, "Failed to load job statistics")
      |> assign(:oban_data_loaded, true)}
   end
 
@@ -509,7 +509,7 @@ defmodule YscWeb.AdminSettingsLive do
 
     {:noreply,
      socket
-     |> put_flash(:info, "Settings Updated")
+     |> YscWeb.Flash.put_toast(:info, "Settings Updated")
      |> redirect(to: ~p"/admin/settings")}
   end
 
@@ -521,14 +521,17 @@ defmodule YscWeb.AdminSettingsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Job re-scheduled successfully")
+         |> YscWeb.Flash.put_toast(:info, "Job re-scheduled successfully")
          |> assign(:recent_jobs, recent_jobs)
          |> assign(:queue_stats, queue_stats)}
 
       {:error, reason} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Failed to re-schedule job: #{inspect(reason)}")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to re-schedule job: #{inspect(reason)}"
+         )}
     end
   end
 
@@ -539,7 +542,7 @@ defmodule YscWeb.AdminSettingsLive do
       nil ->
         {:noreply,
          socket
-         |> put_flash(:error, "Job not found")
+         |> YscWeb.Flash.put_toast(:error, "Job not found")
          |> assign(:show_job_modal, false)
          |> assign(:selected_job, nil)}
 

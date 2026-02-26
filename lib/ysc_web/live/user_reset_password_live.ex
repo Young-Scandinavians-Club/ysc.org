@@ -80,7 +80,10 @@ defmodule YscWeb.UserResetPasswordLive do
       {:error, :rate_limited, _} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Too many attempts. Please try again later.")
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Too many attempts. Please try again later."
+         )
          |> redirect(to: ~p"/users/log-in")}
 
       :ok ->
@@ -104,7 +107,7 @@ defmodule YscWeb.UserResetPasswordLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Password reset successfully.")
+         |> YscWeb.Flash.put_toast(:info, "Password reset successfully.")
          |> redirect(to: ~p"/users/log-in")}
 
       {:error, changeset} ->
@@ -117,7 +120,10 @@ defmodule YscWeb.UserResetPasswordLive do
       assign(socket, user: user, token: token)
     else
       socket
-      |> put_flash(:error, "Reset password link is invalid or it has expired.")
+      |> YscWeb.Flash.put_toast(
+        :error,
+        "Reset password link is invalid or it has expired."
+      )
       |> redirect(to: ~p"/")
     end
   end

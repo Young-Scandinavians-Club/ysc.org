@@ -28,7 +28,7 @@ defmodule YscWeb.AdminDashboardLive do
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
           <div>
             <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
-              Welcome back, <%= String.capitalize(@current_user.first_name) %> 👋
+              Welcome back, {String.capitalize(@current_user.first_name)} 👋
             </h1>
             <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
               <span class="relative inline-flex w-2 h-2">
@@ -57,7 +57,7 @@ defmodule YscWeb.AdminDashboardLive do
               <%= if @loading_dashboard do %>
                 Loading dashboard...
               <% else %>
-                Build: <%= @build_version %>
+                Build: {@build_version}
               <% end %>
             </p>
           </div>
@@ -75,7 +75,7 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
               <div class="flex items-baseline gap-2">
                 <p class="text-3xl font-black text-zinc-900">
-                  <%= @pending_reviews_count %>
+                  {@pending_reviews_count}
                 </p>
                 <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded italic">
                   Pending
@@ -88,7 +88,7 @@ defmodule YscWeb.AdminDashboardLive do
                   This Month
                 </p>
                 <p class="text-sm font-black text-zinc-700">
-                  <%= @applications_this_month %>
+                  {@applications_this_month}
                 </p>
                 <p class="text-xs text-zinc-500 mt-0.5">
                   <%= if @applications_last_month > 0 do %>
@@ -97,7 +97,7 @@ defmodule YscWeb.AdminDashboardLive do
                         do: "text-emerald-600",
                         else: "text-rose-600"
                     }>
-                      <%= if @applications_month_change >= 0, do: "+", else: "" %><%= @applications_month_change %>%
+                      {if @applications_month_change >= 0, do: "+", else: ""}{@applications_month_change}%
                     </span>
                   <% else %>
                     <span class="text-zinc-400">—</span>
@@ -107,7 +107,7 @@ defmodule YscWeb.AdminDashboardLive do
               <div>
                 <p class="text-xs font-bold text-zinc-400 uppercase">YTD</p>
                 <p class="text-sm font-black text-zinc-700">
-                  <%= @applications_this_year %>
+                  {@applications_this_year}
                 </p>
                 <p class="text-xs text-zinc-500 mt-0.5">
                   <%= if @applications_last_year > 0 do %>
@@ -116,7 +116,7 @@ defmodule YscWeb.AdminDashboardLive do
                         do: "text-emerald-600",
                         else: "text-rose-600"
                     }>
-                      <%= if @applications_year_change >= 0, do: "+", else: "" %><%= @applications_year_change %>%
+                      {if @applications_year_change >= 0, do: "+", else: ""}{@applications_year_change}%
                     </span>
                   <% else %>
                     <span class="text-zinc-400">—</span>
@@ -129,11 +129,11 @@ defmodule YscWeb.AdminDashboardLive do
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
               <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Total Revenue (<%= Timex.format!(DateTime.utc_now(), "{Mshort}") %>)
+                Total Revenue ({Timex.format!(DateTime.utc_now(), "{Mshort}")})
               </p>
               <div class="flex items-baseline gap-2">
                 <p class="text-3xl font-black text-emerald-600">
-                  <%= format_money(@current_month_revenue) %>
+                  {format_money(@current_month_revenue)}
                 </p>
                 <span class={[
                   "text-xs font-bold flex items-center",
@@ -143,7 +143,7 @@ defmodule YscWeb.AdminDashboardLive do
                     name={get_revenue_change_icon(@revenue_change_direction)}
                     class="w-3 h-3 mr-1"
                   />
-                  <%= @revenue_change_text %>
+                  {@revenue_change_text}
                 </span>
               </div>
             </div>
@@ -153,15 +153,15 @@ defmodule YscWeb.AdminDashboardLive do
                   vs Last Month
                 </p>
                 <p class="text-sm font-bold text-zinc-500">
-                  <%= format_money(@last_month_revenue) %>
+                  {format_money(@last_month_revenue)}
                 </p>
               </div>
               <div>
                 <p class="text-xs font-bold text-zinc-400 uppercase">
-                  vs <%= Timex.format!(DateTime.utc_now(), "{Mshort}") %> '23
+                  vs {Timex.format!(DateTime.utc_now(), "{Mshort}")} '23
                 </p>
                 <p class="text-sm font-bold text-zinc-500">
-                  <%= format_money(@last_year_month_revenue) %>
+                  {format_money(@last_year_month_revenue)}
                 </p>
               </div>
             </div>
@@ -199,7 +199,7 @@ defmodule YscWeb.AdminDashboardLive do
                   <span class="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>Bookings
                 </span>
                 <span class="text-sm font-black text-zinc-700">
-                  <%= format_money(@revenue_bookings) %>
+                  {format_money(@revenue_bookings)}
                 </span>
               </div>
               <div class="flex justify-between items-center">
@@ -207,7 +207,7 @@ defmodule YscWeb.AdminDashboardLive do
                   <span class="w-2 h-2 rounded-full bg-purple-500 mr-2"></span>Events
                 </span>
                 <span class="text-sm font-black text-zinc-700">
-                  <%= format_money(@revenue_events) %>
+                  {format_money(@revenue_events)}
                 </span>
               </div>
               <div class="flex justify-between items-center">
@@ -215,7 +215,7 @@ defmodule YscWeb.AdminDashboardLive do
                   <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>Membership
                 </span>
                 <span class="text-sm font-black text-zinc-700">
-                  <%= format_money(@revenue_membership) %>
+                  {format_money(@revenue_membership)}
                 </span>
               </div>
             </div>
@@ -227,7 +227,7 @@ defmodule YscWeb.AdminDashboardLive do
                 Active Now
               </p>
               <p class="text-3xl font-black text-zinc-900">
-                <%= @active_guests_count %>
+                {@active_guests_count}
               </p>
               <p class="text-xs text-zinc-500 mt-1 font-medium">
                 Guests across properties
@@ -246,7 +246,7 @@ defmodule YscWeb.AdminDashboardLive do
                 :if={@active_guests_count > length(@active_guests_sample)}
                 class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-500 ring-2 ring-white"
               >
-                +<%= @active_guests_count - length(@active_guests_sample) %>
+                +{@active_guests_count - length(@active_guests_sample)}
               </div>
             </div>
           </div>
@@ -269,7 +269,7 @@ defmodule YscWeb.AdminDashboardLive do
                   :if={@pending_reviews_count > 0}
                   class="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-black rounded uppercase ring-1 ring-amber-200"
                 >
-                  <%= @pending_reviews_count %> PENDING
+                  {@pending_reviews_count} PENDING
                 </span>
               </div>
 
@@ -309,14 +309,14 @@ defmodule YscWeb.AdminDashboardLive do
 
                   <div class="flex-1 min-w-0">
                     <h4 class="font-bold text-zinc-900 truncate text-lg tracking-tight">
-                      <%= "#{user.first_name} #{user.last_name}" %>
+                      {"#{user.first_name} #{user.last_name}"}
                     </h4>
                     <div class="flex items-center gap-3 mt-0.5">
                       <span class={get_status_badge_classes(user)}>
-                        <%= get_status_badge_text(user) %>
+                        {get_status_badge_text(user)}
                       </span>
                       <span class="text-xs text-zinc-400 italic font-medium">
-                        <%= get_time_waiting_text(user) %>
+                        {get_time_waiting_text(user)}
                       </span>
                     </div>
                   </div>
@@ -327,14 +327,14 @@ defmodule YscWeb.AdminDashboardLive do
                         Plan Type
                       </p>
                       <p class="text-xs font-bold text-zinc-700">
-                        <%= get_membership_type_display(user) %>
+                        {get_membership_type_display(user)}
                       </p>
                     </div>
                     <.button
                       phx-click="navigate-to-review"
                       phx-value-user-id={user.id}
                     >
-                      <%= get_review_button_text(user) %>
+                      {get_review_button_text(user)}
                     </.button>
                   </div>
                 </div>
@@ -368,10 +368,10 @@ defmodule YscWeb.AdminDashboardLive do
                         }
                         class="text-sm font-semibold text-zinc-800 hover:text-blue-600"
                       >
-                        <%= comment.post.title %>
+                        {comment.post.title}
                       </.link>
                       <p class="text-sm text-zinc-600 mt-1 line-clamp-2">
-                        <%= comment.text %>
+                        {comment.text}
                       </p>
                     </div>
                   </div>
@@ -379,14 +379,14 @@ defmodule YscWeb.AdminDashboardLive do
                     <span>
                       By
                       <span class="font-medium text-zinc-700">
-                        <%= "#{comment.author.first_name} #{comment.author.last_name}" %>
+                        {"#{comment.author.first_name} #{comment.author.last_name}"}
                       </span>
                     </span>
                     <span>
-                      <%= Timex.format!(
+                      {Timex.format!(
                         comment.inserted_at,
                         "{YYYY}-{0M}-{0D} {h12}:{m} {AM}"
-                      ) %>
+                      )}
                     </span>
                   </div>
                 </li>
@@ -428,7 +428,7 @@ defmodule YscWeb.AdminDashboardLive do
                       navigate={~p"/events/#{event.id}"}
                       class="text-sm font-bold text-zinc-900 leading-tight group-hover:text-blue-600 transition-colors flex-1"
                     >
-                      <%= event.title %>
+                      {event.title}
                     </.link>
                     <.icon
                       name="hero-arrow-top-right-on-square"
@@ -443,11 +443,11 @@ defmodule YscWeb.AdminDashboardLive do
                   <div :if={not Enum.empty?(tiers)} class="space-y-4">
                     <div :for={tier <- tiers} class="space-y-1">
                       <div class="flex justify-between text-xs font-black text-zinc-400 uppercase tracking-widest">
-                        <span><%= tier.name %></span>
+                        <span>{tier.name}</span>
                         <span class="text-zinc-900">
-                          <%= tier.sold_tickets_count %> / <%= if tier.quantity,
+                          {tier.sold_tickets_count} / {if tier.quantity,
                             do: tier.quantity,
-                            else: "∞" %>
+                            else: "∞"}
                         </span>
                       </div>
                       <div

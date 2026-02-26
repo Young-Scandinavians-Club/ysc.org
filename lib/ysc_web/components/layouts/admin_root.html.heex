@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <.live_title suffix=" · YSC.org Admin">
-      <%= assigns[:page_title] || "YSC Admin" %>
+      {assigns[:page_title] || "YSC Admin"}
     </.live_title>
     <link
       phx-track-static
@@ -63,7 +63,7 @@
       "flex flex-col min-h-screen",
       assigns[:impersonating?] && "pb-[72px]"
     ]}>
-      <%= @inner_content %>
+      {@inner_content}
     </div>
   </body>
 </html>

@@ -79,7 +79,7 @@ defmodule YscWeb.EventDetailsLive do
                   class="flex items-center gap-3 mb-4"
                 >
                   <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
-                    <%= format_start_date(@event.start_date) %>
+                    {format_start_date(@event.start_date)}
                   </p>
                   <%= if @event_selling_fast do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
@@ -93,14 +93,14 @@ defmodule YscWeb.EventDetailsLive do
                   :if={@event.title != nil && @event.title != ""}
                   class="text-2xl md:text-4xl lg:text-5xl font-black text-zinc-900 tracking-tighter leading-tight transition-all"
                 >
-                  <%= @event.title %>
+                  {@event.title}
                 </h1>
 
                 <p
                   :if={@event.description != nil && @event.description != ""}
                   class="hidden sm:block text-lg text-zinc-600 font-light leading-relaxed"
                 >
-                  <%= @event.description %>
+                  {@event.description}
                 </p>
               </div>
             </div>
@@ -178,7 +178,7 @@ defmodule YscWeb.EventDetailsLive do
                               "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                           )
                         ]}>
-                          <%= order_label %>
+                          {order_label}
                         </span>
                         <%= if purchase_date do %>
                           <span class={[
@@ -188,7 +188,7 @@ defmodule YscWeb.EventDetailsLive do
                               else: "text-zinc-500"
                             )
                           ]}>
-                            • <%= purchase_date %>
+                            • {purchase_date}
                           </span>
                         <% end %>
                         <%= if all_refunded do %>
@@ -249,9 +249,9 @@ defmodule YscWeb.EventDetailsLive do
                             <div class="mt-2 space-y-1">
                               <%= if partial_refund do %>
                                 <p class="text-xs text-amber-300/90 uppercase tracking-widest font-bold mb-2">
-                                  <%= length(confirmed_tickets) %> of <%= length(
+                                  {length(confirmed_tickets)} of {length(
                                     all_order_tickets
-                                  ) %> tickets confirmed
+                                  )} tickets confirmed
                                 </p>
                               <% end %>
                               <%= for {tier_name, confirmed_tier_tickets} <- confirmed_tiers_by_name do %>
@@ -276,13 +276,13 @@ defmodule YscWeb.EventDetailsLive do
                                 ]}>
                                   <%= if partial_refund && has_refunded_tickets do %>
                                     <span class="line-through opacity-60">
-                                      <%= original_count %>x
+                                      {original_count}x
                                     </span>
                                     <span class="ml-1">
-                                      <%= new_count %>x <%= tier_name %>
+                                      {new_count}x {tier_name}
                                     </span>
                                   <% else %>
-                                    <%= new_count %>x <%= tier_name %>
+                                    {new_count}x {tier_name}
                                   <% end %>
                                 </p>
                               <% end %>
@@ -337,17 +337,17 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
                 <p class="font-black text-xl text-zinc-900 tracking-tighter leading-none">
                   <%= if @event.start_date != nil do %>
-                    <%= Timex.format!(@event.start_date, "{Mshort} {D}") %>
+                    {Timex.format!(@event.start_date, "{Mshort} {D}")}
                   <% else %>
                     TBD
                   <% end %>
                 </p>
                 <p class="text-sm text-zinc-500 mt-2 font-medium">
                   <%= if @event.start_time != nil do %>
-                    Starts at <%= case format_time(@event.start_time) do
+                    Starts at {case format_time(@event.start_time) do
                       %Time{} = time -> Timex.format!(time, "{h12}:{m} {AM}")
                       _ -> ""
-                    end %>
+                    end}
                   <% else %>
                     Time TBD
                   <% end %>
@@ -375,14 +375,14 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
                 <p class="font-black text-xl text-zinc-900 tracking-tighter leading-none">
                   <%= if @event.location_name != nil && @event.location_name != "" do %>
-                    <%= @event.location_name %>
+                    {@event.location_name}
                   <% else %>
                     TBD
                   <% end %>
                 </p>
                 <p class="text-sm text-zinc-500 mt-2 font-medium">
                   <%= if @event.address != nil && @event.address != "" do %>
-                    <%= @event.address %>
+                    {@event.address}
                   <% else %>
                     Location TBD
                   <% end %>
@@ -394,8 +394,8 @@ defmodule YscWeb.EventDetailsLive do
                     Duration
                   </p>
                   <p class="font-black text-xl text-zinc-900 tracking-tighter leading-none">
-                    <%= case {format_time(@event.start_time),
-                              format_time(@event.end_time)} do
+                    {case {format_time(@event.start_time),
+                           format_time(@event.end_time)} do
                       {%Time{} = start_time, %Time{} = end_time} ->
                         duration_minutes = Time.diff(end_time, start_time, :minute)
                         hours = div(duration_minutes, 60)
@@ -417,7 +417,7 @@ defmodule YscWeb.EventDetailsLive do
 
                       _ ->
                         "TBD"
-                    end %>
+                    end}
                   </p>
                 </div>
               <% end %>
@@ -438,13 +438,13 @@ defmodule YscWeb.EventDetailsLive do
                     :if={@event.location_name != nil && @event.location_name != ""}
                     class="font-semibold text-zinc-900"
                   >
-                    <%= @event.location_name %>
+                    {@event.location_name}
                   </p>
                   <p
                     :if={@event.address != nil && @event.address != ""}
                     class="text-zinc-600"
                   >
-                    <%= @event.address %>
+                    {@event.address}
                   </p>
                 </div>
               </div>
@@ -521,7 +521,7 @@ defmodule YscWeb.EventDetailsLive do
                             "text-zinc-600 bg-zinc-100 hover:bg-zinc-200 hover:text-zinc-800"
                         ]}
                       >
-                        <%= agenda.title %>
+                        {agenda.title}
                       </button>
                     </li>
                   <% end %>
@@ -552,21 +552,21 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
                         <div class="w-36 flex-shrink-0">
                           <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                            <%= format_start_end(
+                            {format_start_end(
                               agenda_item.start_time,
                               agenda_item.end_time
-                            ) %>
+                            )}
                           </span>
                         </div>
                         <div class="flex-1 min-w-0">
                           <h4 class="text-lg font-black text-zinc-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors">
-                            <%= agenda_item.title %>
+                            {agenda_item.title}
                           </h4>
                           <p
                             :if={agenda_item.description != nil}
                             class="text-sm text-zinc-500 font-light mt-2 leading-relaxed"
                           >
-                            <%= agenda_item.description %>
+                            {agenda_item.description}
                           </p>
                         </div>
                       </div>
@@ -583,7 +583,7 @@ defmodule YscWeb.EventDetailsLive do
               </h3>
               <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-light leading-relaxed">
                 <div id="article-body" class="post-render" phx-hook="GLightboxHook">
-                  <%= raw(event_body(@event)) %>
+                  {raw(event_body(@event))}
                 </div>
               </article>
             </section>
@@ -623,13 +623,13 @@ defmodule YscWeb.EventDetailsLive do
                         ""
                       end
                     ]}>
-                      <%= @event.pricing_info.display_text %>
+                      {@event.pricing_info.display_text}
                     </p>
                     <p
                       :if={@event.start_date != nil}
                       class="text-sm text-zinc-500 mt-2"
                     >
-                      <%= format_start_date(@event.start_date) %>
+                      {format_start_date(@event.start_date)}
                     </p>
                   </div>
                 <% end %>
@@ -668,7 +668,7 @@ defmodule YscWeb.EventDetailsLive do
                                 Limited Availability
                               </p>
                               <p class="text-xs font-mono text-zinc-400">
-                                <%= sold_percentage %>% Booked
+                                {sold_percentage}% Booked
                               </p>
                             </div>
                             <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
@@ -681,12 +681,12 @@ defmodule YscWeb.EventDetailsLive do
                           </div>
                         <% else %>
                           <p class="text-[11px] text-orange-700 font-medium">
-                            <%= if available_capacity != :unlimited &&
-                                     available_capacity <= 10 do
+                            {if available_capacity != :unlimited &&
+                                  available_capacity <= 10 do
                               "Less than #{available_capacity} spot#{if available_capacity == 1, do: "", else: "s"} remaining"
                             else
                               "Going Fast"
-                            end %>
+                            end}
                           </p>
                         <% end %>
                       </div>
@@ -725,7 +725,7 @@ defmodule YscWeb.EventDetailsLive do
                             class="flex items-center gap-3 text-sm text-zinc-600 font-medium"
                           >
                             <.icon name="hero-users" class="w-5 h-5 text-blue-500" />
-                            <%= @available_capacity %> Spots Available
+                            {@available_capacity} Spots Available
                           </div>
                           <%= if @async_data_loaded && @active_membership? && @attendees_count != nil && @attendees_count >= 5 && @attendees_list != nil && length(@attendees_list) > 0 do %>
                             <% attendees_to_show = Enum.take(@attendees_list, 5) %>
@@ -758,13 +758,13 @@ defmodule YscWeb.EventDetailsLive do
                                 <%= if remaining_count > 0 do %>
                                   <div class="relative w-8 h-8 rounded-full border-2 border-white bg-zinc-100 flex items-center justify-center -ml-2">
                                     <span class="text-xs font-semibold text-zinc-600">
-                                      +<%= remaining_count %>
+                                      +{remaining_count}
                                     </span>
                                   </div>
                                 <% end %>
                               </div>
                               <span class="flex-1 min-w-0">
-                                <%= names_to_show
+                                {names_to_show
                                 |> Enum.map(fn attendee ->
                                   attendee_name =
                                     "#{attendee.first_name || ""} #{attendee.last_name || ""}"
@@ -774,16 +774,16 @@ defmodule YscWeb.EventDetailsLive do
                                     do: attendee_name,
                                     else: attendee.email || "Someone"
                                 end)
-                                |> Enum.join(", ") %>
+                                |> Enum.join(", ")}
                                 <%= if names_remaining > 0 do %>
-                                  +<%= names_remaining %> <%= if names_remaining ==
-                                                                   1,
-                                                                 do: "more is",
-                                                                 else: "more are" %> going
+                                  +{names_remaining} {if names_remaining ==
+                                                           1,
+                                                         do: "more is",
+                                                         else: "more are"} going
                                 <% else %>
-                                  <%= if length(@attendees_list) == 1,
+                                  {if length(@attendees_list) == 1,
                                     do: "is",
-                                    else: "are" %> going
+                                    else: "are"} going
                                 <% end %>
                               </span>
                             </button>
@@ -947,7 +947,7 @@ defmodule YscWeb.EventDetailsLive do
                             ""
                           end
                         ]}>
-                          <%= @event.pricing_info.display_text %>
+                          {@event.pricing_info.display_text}
                         </p>
                         <%= if @event_selling_fast && !@event_at_capacity do %>
                           <span class="text-xs font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded">
@@ -964,28 +964,28 @@ defmodule YscWeb.EventDetailsLive do
                       <%= if @event.start_date != nil do %>
                         <%!-- Mobile: Short format (Wed, Dec 25) --%>
                         <p class="sm:hidden text-xs font-bold text-zinc-400 uppercase tracking-widest truncate">
-                          <%= format_start_date_short(@event.start_date) %>
+                          {format_start_date_short(@event.start_date)}
                           <%= if @event.start_time != nil do %>
-                            • <%= case format_time(@event.start_time) do
+                            • {case format_time(@event.start_time) do
                               %Time{} = time ->
                                 Timex.format!(time, "{h12}:{m} {AM}")
 
                               _ ->
                                 ""
-                            end %>
+                            end}
                           <% end %>
                         </p>
                         <%!-- Desktop: Full format (Wednesday, December 25) --%>
                         <p class="hidden sm:block text-xs font-bold text-zinc-400 uppercase tracking-widest truncate">
-                          <%= format_start_date(@event.start_date) %>
+                          {format_start_date(@event.start_date)}
                           <%= if @event.start_time != nil do %>
-                            • <%= case format_time(@event.start_time) do
+                            • {case format_time(@event.start_time) do
                               %Time{} = time ->
                                 Timex.format!(time, "{h12}:{m} {AM}")
 
                               _ ->
                                 ""
-                            end %>
+                            end}
                           <% end %>
                         </p>
                       <% end %>
@@ -1085,9 +1085,9 @@ defmodule YscWeb.EventDetailsLive do
         <!-- Left Panel: Ticket Tiers -->
         <div class="lg:w-2/3 space-y-8">
           <div class="w-full border-b border-zinc-200 pb-4">
-            <h2 class="text-2xl font-semibold"><%= @event.title %></h2>
+            <h2 class="text-2xl font-semibold">{@event.title}</h2>
             <p :if={@event.start_date != nil} class="text-sm text-zinc-600">
-              <%= format_start_date(@event.start_date) %>
+              {format_start_date(@event.start_date)}
             </p>
           </div>
 
@@ -1153,12 +1153,12 @@ defmodule YscWeb.EventDetailsLive do
                     <div>
                       <div class="flex items-center gap-2">
                         <h4 class="font-semibold text-lg text-zinc-900">
-                          <%= ticket_tier.name %>
+                          {ticket_tier.name}
                         </h4>
                         <%= if has_reservation do %>
                           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
                             <.icon name="hero-ticket" class="w-3 h-3" />
-                            <%= reserved_quantity %> reserved
+                            {reserved_quantity} reserved
                           </span>
                         <% end %>
                       </div>
@@ -1166,31 +1166,31 @@ defmodule YscWeb.EventDetailsLive do
                         :if={ticket_tier.description}
                         class="text-base text-zinc-600 mt-2"
                       >
-                        <%= ticket_tier.description %>
+                        {ticket_tier.description}
                       </p>
                       <%= if has_reservation do %>
                         <div class="mt-1 space-y-1">
                           <p class="text-sm text-blue-600 font-medium">
-                            You have <%= reserved_quantity %> <%= if reserved_quantity ==
-                                                                       1,
-                                                                     do: "ticket",
-                                                                     else: "tickets" %> reserved for this tier
+                            You have {reserved_quantity} {if reserved_quantity ==
+                                                               1,
+                                                             do: "ticket",
+                                                             else: "tickets"} reserved for this tier
                             <%= if has_discount do %>
                               <.badge
                                 type="green"
                                 class="inline-flex items-center gap-1 ml-2 py-0.5 rounded-full border border-green-200 text-green-700 me-0"
                               >
                                 <.icon name="hero-tag" class="w-3 h-3" />
-                                <%= reservation_info.discount_percentage
-                                |> Float.round(2) %>% off
+                                {reservation_info.discount_percentage
+                                |> Float.round(2)}% off
                               </.badge>
                             <% end %>
                           </p>
                           <%= if has_discount && Money.positive?(reservation_info.discount_savings) do %>
                             <p class="text-xs text-green-600">
-                              You'll save <%= format_price(
+                              You'll save {format_price(
                                 reservation_info.discount_savings
-                              ) %> with your reserved tickets
+                              )} with your reserved tickets
                             </p>
                           <% end %>
                         </div>
@@ -1215,7 +1215,7 @@ defmodule YscWeb.EventDetailsLive do
                           <% "free" -> %>
                             Free
                           <% _ -> %>
-                            <%= format_price(ticket_tier.price) %>
+                            {format_price(ticket_tier.price)}
                         <% end %>
                       </p>
                       <p
@@ -1238,11 +1238,10 @@ defmodule YscWeb.EventDetailsLive do
                           <% is_sale_ended -> %>
                             Sale ended
                           <% is_pre_sale -> %>
-                            Sale starts in <%= days_until_sale %> <%= if days_until_sale ==
-                                                                           1,
-                                                                         do: "day",
-                                                                         else:
-                                                                           "days" %>
+                            Sale starts in {days_until_sale} {if days_until_sale ==
+                                                                   1,
+                                                                 do: "day",
+                                                                 else: "days"}
                           <% is_event_at_capacity -> %>
                             Sold Out (Event at capacity)
                           <% available == :unlimited -> %>
@@ -1250,7 +1249,7 @@ defmodule YscWeb.EventDetailsLive do
                           <% available == 0 -> %>
                             Sold Out
                           <% true -> %>
-                            <%= "#{available} remaining" %>
+                            {"#{available} remaining"}
                         <% end %>
                       </p>
                     </div>
@@ -1364,7 +1363,7 @@ defmodule YscWeb.EventDetailsLive do
                             else: "text-zinc-900"
                           )
                         ]}>
-                          <%= get_ticket_quantity(@selected_tickets, ticket_tier.id) %>
+                          {get_ticket_quantity(@selected_tickets, ticket_tier.id)}
                         </span>
                         <% current_qty =
                           get_ticket_quantity(@selected_tickets, ticket_tier.id) %>
@@ -1407,20 +1406,20 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_pre_sale} class="mt-2">
                     <p class="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
                       <.icon name="hero-clock" class="w-4 h-4 inline me-1" />
-                      Sale starts <%= Timex.format!(
+                      Sale starts {Timex.format!(
                         ticket_tier.start_date,
                         "{Mshort} {D}, {YYYY}"
-                      ) %>
+                      )}
                     </p>
                   </div>
 
                   <div :if={!is_donation && is_sale_ended} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-x-circle" class="w-4 h-4 inline me-1" />
-                      Sale ended on <%= Timex.format!(
+                      Sale ended on {Timex.format!(
                         ticket_tier.end_date,
                         "{Mshort} {D}, {YYYY}"
-                      ) %>
+                      )}
                     </p>
                   </div>
 
@@ -1472,7 +1471,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_event_at_capacity} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-users" class="w-4 h-4 inline me-1" />
-                      Event is at capacity (<%= @event.max_attendees %> attendees). All tickets are sold out.
+                      Event is at capacity ({@event.max_attendees} attendees). All tickets are sold out.
                     </p>
                   </div>
                 </div>
@@ -1494,7 +1493,7 @@ defmodule YscWeb.EventDetailsLive do
 
             <div>
               <h2 class="text-lg font-semibold mb-6 hidden lg:block">
-                <%= @event.title %>
+                {@event.title}
               </h2>
               <h3 class="font-semibold mb-2">Order Summary</h3>
             </div>
@@ -1514,9 +1513,9 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="space-y-1">
                     <div class="flex justify-between text-base">
                       <span>
-                        <%= breakdown.tier_name %>
+                        {breakdown.tier_name}
                         <%= if breakdown.quantity > 1 do %>
-                          × <%= breakdown.quantity %>
+                          × {breakdown.quantity}
                         <% end %>
                       </span>
                       <span class={[
@@ -1529,20 +1528,20 @@ defmodule YscWeb.EventDetailsLive do
                       ]}>
                         <%= if Money.positive?(breakdown.original_price) && Money.positive?(breakdown.discount_amount) do %>
                           <span class="text-zinc-400 line-through mr-2">
-                            <%= format_price(breakdown.original_price) %>
+                            {format_price(breakdown.original_price)}
                           </span>
                         <% end %>
-                        <%= format_price(breakdown.final_price) %>
+                        {format_price(breakdown.final_price)}
                       </span>
                     </div>
                     <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
                       <div class="flex justify-between text-sm text-green-600">
                         <span>
-                          Reserved discount (<%= breakdown.discount_percentage
-                          |> Float.round(2) %>%)
+                          Reserved discount ({breakdown.discount_percentage
+                          |> Float.round(2)}%)
                         </span>
                         <span class="font-medium">
-                          -<%= format_price(breakdown.discount_amount) %>
+                          -{format_price(breakdown.discount_amount)}
                         </span>
                       </div>
                     <% end %>
@@ -1574,11 +1573,11 @@ defmodule YscWeb.EventDetailsLive do
                   <%= if Money.positive?(pricing.discount_amount) do %>
                     <div class="flex justify-between text-sm text-zinc-600">
                       <span>Subtotal:</span>
-                      <span><%= format_price(pricing.subtotal) %></span>
+                      <span>{format_price(pricing.subtotal)}</span>
                     </div>
                     <div class="flex justify-between text-sm text-green-600 font-medium">
                       <span>Discount:</span>
-                      <span>-<%= format_price(pricing.discount_amount) %></span>
+                      <span>-{format_price(pricing.discount_amount)}</span>
                     </div>
                   <% end %>
                   <div class="flex justify-between font-semibold text-lg">
@@ -1590,7 +1589,7 @@ defmodule YscWeb.EventDetailsLive do
                         ""
                       end
                     ]}>
-                      <%= format_price(pricing.total) %>
+                      {format_price(pricing.total)}
                     </span>
                   </div>
                 </div>
@@ -1605,14 +1604,14 @@ defmodule YscWeb.EventDetailsLive do
                         ""
                       end
                     ]}>
-                      <%= calculate_total_price(
+                      {calculate_total_price(
                         @selected_tickets,
                         @event.id,
                         @ticket_tiers,
                         @reservations_by_tier,
                         @current_user,
                         @user_reservations
-                      ) %>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -1697,7 +1696,7 @@ defmodule YscWeb.EventDetailsLive do
             <div class="text-center">
               <h2 class="text-2xl font-semibold">Complete Your Purchase</h2>
               <p class="text-zinc-600 mt-2">
-                Order: <%= @ticket_order.reference_id %>
+                Order: {@ticket_order.reference_id}
               </p>
             </div>
 
@@ -1937,12 +1936,12 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="flex items-center gap-3">
                         <div>
                           <h4 class="text-base font-semibold text-zinc-900">
-                            Ticket <%= index + 1 %> of <%= length(
+                            Ticket {index + 1} of {length(
                               tickets_requiring_registration
-                            ) %>
+                            )}
                           </h4>
                           <p class="text-xs text-zinc-600">
-                            <%= ticket.ticket_tier.name %>
+                            {ticket.ticket_tier.name}
                           </p>
                         </div>
                         <%= if is_registration_complete do %>
@@ -1998,7 +1997,7 @@ defmodule YscWeb.EventDetailsLive do
                               me_already_selected_for_other_ticket && !is_for_me
                             }
                           >
-                            Me (<%= @current_user.first_name || @current_user.email %>)
+                            Me ({@current_user.first_name || @current_user.email})
                             <%= if me_already_selected_for_other_ticket && !is_for_me do %>
                               (Already selected for another ticket)
                             <% end %>
@@ -2007,7 +2006,7 @@ defmodule YscWeb.EventDetailsLive do
                             <optgroup label="Family Members">
                               <%= for family_member <- other_family_members do %>
                                 <option value={"family_#{family_member.id}"}>
-                                  <%= family_member.first_name %> <%= family_member.last_name %>
+                                  {family_member.first_name} {family_member.last_name}
                                 </option>
                               <% end %>
                             </optgroup>
@@ -2107,10 +2106,10 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <p class="text-sm text-blue-800">
                           <strong>
-                            <%= form_data.first_name %> <%= form_data.last_name %>
+                            {form_data.first_name} {form_data.last_name}
                           </strong>
                           <br />
-                          <span class="text-blue-600"><%= form_data.email %></span>
+                          <span class="text-blue-600">{form_data.email}</span>
                         </p>
                       </div>
                     </div>
@@ -2230,14 +2229,14 @@ defmodule YscWeb.EventDetailsLive do
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-zinc-600">Amount due:</span>
                   <span class="text-2xl font-bold text-zinc-900">
-                    <%= calculate_total_price(
+                    {calculate_total_price(
                       @selected_tickets,
                       @event.id,
                       @ticket_tiers,
                       @reservations_by_tier,
                       @current_user,
                       @user_reservations
-                    ) %>
+                    )}
                   </span>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3">
@@ -2246,14 +2245,14 @@ defmodule YscWeb.EventDetailsLive do
                     id="submit-payment"
                     disabled={!all_registrations_complete}
                   >
-                    Confirm and Pay <%= calculate_total_price(
+                    Confirm and Pay {calculate_total_price(
                       @selected_tickets,
                       @event.id,
                       @ticket_tiers,
                       @reservations_by_tier,
                       @current_user,
                       @user_reservations
-                    ) %>
+                    )}
                   </.button>
                   <.button
                     class="sm:flex-1 w-full sm:w-auto bg-transparent text-zinc-500 hover:text-zinc-700 py-4 rounded-lg font-medium transition-colors"
@@ -2281,7 +2280,7 @@ defmodule YscWeb.EventDetailsLive do
               </div>
 
               <div>
-                <h2 class="text-lg font-semibold mb-6"><%= @event.title %></h2>
+                <h2 class="text-lg font-semibold mb-6">{@event.title}</h2>
                 <h3 class="font-semibold mb-2">Order Summary</h3>
               </div>
 
@@ -2300,28 +2299,28 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="space-y-1">
                       <div class="flex justify-between text-base">
                         <span>
-                          <%= breakdown.tier_name %>
+                          {breakdown.tier_name}
                           <%= if breakdown.quantity > 1 do %>
-                            × <%= breakdown.quantity %>
+                            × {breakdown.quantity}
                           <% end %>
                         </span>
                         <span class="font-medium">
                           <%= if Money.positive?(breakdown.original_price) && Money.positive?(breakdown.discount_amount) do %>
                             <span class="text-zinc-400 line-through mr-2">
-                              <%= format_price(breakdown.original_price) %>
+                              {format_price(breakdown.original_price)}
                             </span>
                           <% end %>
-                          <%= format_price(breakdown.final_price) %>
+                          {format_price(breakdown.final_price)}
                         </span>
                       </div>
                       <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
                         <div class="flex justify-between text-sm text-green-600">
                           <span>
-                            Reserved discount (<%= breakdown.discount_percentage
-                            |> Float.round(2) %>%)
+                            Reserved discount ({breakdown.discount_percentage
+                            |> Float.round(2)}%)
                           </span>
                           <span class="font-medium">
-                            -<%= format_price(breakdown.discount_amount) %>
+                            -{format_price(breakdown.discount_amount)}
                           </span>
                         </div>
                       <% end %>
@@ -2350,17 +2349,17 @@ defmodule YscWeb.EventDetailsLive do
                     <%= if Money.positive?(pricing.discount_amount) do %>
                       <div class="flex justify-between text-sm text-zinc-600">
                         <span>Subtotal:</span>
-                        <span><%= format_price(pricing.subtotal) %></span>
+                        <span>{format_price(pricing.subtotal)}</span>
                       </div>
                       <div class="flex justify-between text-sm text-green-600 font-medium">
                         <span>Discount:</span>
-                        <span>-<%= format_price(pricing.discount_amount) %></span>
+                        <span>-{format_price(pricing.discount_amount)}</span>
                       </div>
                     <% end %>
                     <div class="flex justify-between font-semibold text-lg">
                       <span>Total:</span>
                       <span>
-                        <%= format_price(pricing.total) %>
+                        {format_price(pricing.total)}
                       </span>
                     </div>
                   </div>
@@ -2369,14 +2368,14 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex justify-between font-semibold text-lg">
                       <span>Total:</span>
                       <span>
-                        <%= calculate_total_price(
+                        {calculate_total_price(
                           @selected_tickets,
                           @event.id,
                           @ticket_tiers,
                           @reservations_by_tier,
                           @current_user,
                           @user_reservations
-                        ) %>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -2442,10 +2441,10 @@ defmodule YscWeb.EventDetailsLive do
               <div class="flex items-center justify-between mb-4">
                 <div>
                   <h3 class="text-lg font-semibold text-zinc-900">
-                    Ticket #<%= ticket.reference_id %>
+                    Ticket #{ticket.reference_id}
                   </h3>
                   <p class="text-sm text-zinc-600">
-                    <%= ticket.ticket_tier.name %>
+                    {ticket.ticket_tier.name}
                   </p>
                 </div>
               </div>
@@ -2546,7 +2545,7 @@ defmodule YscWeb.EventDetailsLive do
             <%= for {tier_id, quantity} <- @selected_tickets do %>
               <% tier = Enum.find(@event.ticket_tiers, &(&1.id == tier_id)) %>
               <div class="flex justify-between items-center text-zinc-600">
-                <span><%= tier.name %> × <%= quantity %></span>
+                <span>{tier.name} × {quantity}</span>
                 <span class="text-zinc-500">Free</span>
               </div>
             <% end %>
@@ -2646,12 +2645,10 @@ defmodule YscWeb.EventDetailsLive do
                 <div class="flex items-center justify-between mb-2">
                   <div>
                     <h4 class="text-sm font-semibold text-zinc-900">
-                      Ticket <%= index + 1 %> of <%= length(
-                        tickets_requiring_registration
-                      ) %>
+                      Ticket {index + 1} of {length(tickets_requiring_registration)}
                     </h4>
                     <p class="text-xs text-zinc-600">
-                      <%= ticket.ticket_tier.name %>
+                      {ticket.ticket_tier.name}
                     </p>
                   </div>
                 </div>
@@ -2698,7 +2695,7 @@ defmodule YscWeb.EventDetailsLive do
                           me_already_selected_for_other_ticket && !is_for_me
                         }
                       >
-                        Me (<%= @current_user.first_name || @current_user.email %>)
+                        Me ({@current_user.first_name || @current_user.email})
                         <%= if me_already_selected_for_other_ticket && !is_for_me do %>
                           (Already selected for another ticket)
                         <% end %>
@@ -2707,7 +2704,7 @@ defmodule YscWeb.EventDetailsLive do
                         <optgroup label="Family Members">
                           <%= for family_member <- other_family_members do %>
                             <option value={"family_#{family_member.id}"}>
-                              <%= family_member.first_name %> <%= family_member.last_name %>
+                              {family_member.first_name} {family_member.last_name}
                             </option>
                           <% end %>
                         </optgroup>
@@ -2804,10 +2801,10 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p class="text-sm text-blue-800">
                       <strong>
-                        <%= form_data.first_name %> <%= form_data.last_name %>
+                        {form_data.first_name} {form_data.last_name}
                       </strong>
                       <br />
-                      <span class="text-blue-600"><%= form_data.email %></span>
+                      <span class="text-blue-600">{form_data.email}</span>
                     </p>
                   </div>
                 </div>
@@ -2856,22 +2853,22 @@ defmodule YscWeb.EventDetailsLive do
           <div class="space-y-3">
             <div class="flex justify-between">
               <span class="text-zinc-600">Order ID:</span>
-              <span class="font-medium"><%= @ticket_order.reference_id %></span>
+              <span class="font-medium">{@ticket_order.reference_id}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-zinc-600">Event:</span>
-              <span class="font-medium"><%= @event.title %></span>
+              <span class="font-medium">{@event.title}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-zinc-600">Date:</span>
               <span class="font-medium">
-                <%= Calendar.strftime(@event.start_date, "%B %d, %Y") %>
+                {Calendar.strftime(@event.start_date, "%B %d, %Y")}
               </span>
             </div>
             <div class="flex justify-between">
               <span class="text-zinc-600">Time:</span>
               <span class="font-medium">
-                <%= Calendar.strftime(@event.start_time, "%I:%M %p") %>
+                {Calendar.strftime(@event.start_time, "%I:%M %p")}
               </span>
             </div>
           </div>
@@ -2888,17 +2885,17 @@ defmodule YscWeb.EventDetailsLive do
                 <div class="flex justify-between items-center p-3 bg-zinc-50 rounded">
                   <div>
                     <p class="font-medium text-zinc-900">
-                      <%= ticket.ticket_tier.name %>
+                      {ticket.ticket_tier.name}
                     </p>
                     <p class="text-sm text-zinc-500">
-                      Ticket #<%= ticket.reference_id %>
+                      Ticket #{ticket.reference_id}
                     </p>
                   </div>
                   <div class="text-right">
                     <p class="font-semibold text-zinc-900">
                       <%= cond do %>
                         <% ticket.ticket_tier.type == "donation" || ticket.ticket_tier.type == :donation -> %>
-                          <%= get_donation_amount_for_single_ticket(ticket) %>
+                          {get_donation_amount_for_single_ticket(ticket)}
                         <% ticket.ticket_tier.price == nil -> %>
                           Free
                         <% Money.zero?(ticket.ticket_tier.price) -> %>
@@ -2906,15 +2903,15 @@ defmodule YscWeb.EventDetailsLive do
                         <% true -> %>
                           <%= if has_discount do %>
                             <span class="text-zinc-400 line-through mr-2 text-sm">
-                              <%= case Money.to_string(ticket.ticket_tier.price) do
+                              {case Money.to_string(ticket.ticket_tier.price) do
                                 {:ok, amount} -> amount
                                 {:error, _} -> "Error"
-                              end %>
+                              end}
                             </span>
-                            <%= case Money.sub(
-                                       ticket.ticket_tier.price,
-                                       ticket_discount_amount
-                                     ) do
+                            {case Money.sub(
+                                    ticket.ticket_tier.price,
+                                    ticket_discount_amount
+                                  ) do
                               {:ok, discounted} ->
                                 case Money.to_string(discounted) do
                                   {:ok, amount} -> amount
@@ -2926,12 +2923,12 @@ defmodule YscWeb.EventDetailsLive do
                                   {:ok, amount} -> amount
                                   {:error, _} -> "Error"
                                 end
-                            end %>
+                            end}
                           <% else %>
-                            <%= case Money.to_string(ticket.ticket_tier.price) do
+                            {case Money.to_string(ticket.ticket_tier.price) do
                               {:ok, amount} -> amount
                               {:error, _} -> "Error"
-                            end %>
+                            end}
                           <% end %>
                       <% end %>
                     </p>
@@ -2959,14 +2956,14 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="flex justify-between text-xs text-green-600 px-3">
                     <span>
                       Reserved discount<%= if discount_percentage do %>
-                        (<%= discount_percentage %>%)
+                        ({discount_percentage}%)
                       <% end %>
                     </span>
                     <span class="font-medium">
-                      -<%= case Money.to_string(ticket_discount_amount) do
+                      -{case Money.to_string(ticket_discount_amount) do
                         {:ok, amount} -> amount
                         {:error, _} -> "$0.00"
-                      end %>
+                      end}
                     </span>
                   </div>
                 <% end %>
@@ -2984,19 +2981,19 @@ defmodule YscWeb.EventDetailsLive do
               <div class="flex justify-between text-sm text-zinc-600">
                 <span>Subtotal:</span>
                 <span>
-                  <%= case Money.to_string(gross_total) do
+                  {case Money.to_string(gross_total) do
                     {:ok, amount} -> amount
                     {:error, _} -> "$0.00"
-                  end %>
+                  end}
                 </span>
               </div>
               <div class="flex justify-between text-sm text-green-600 font-medium">
                 <span>Discount:</span>
                 <span>
-                  -<%= case Money.to_string(total_discount) do
+                  -{case Money.to_string(total_discount) do
                     {:ok, amount} -> amount
                     {:error, _} -> "$0.00"
-                  end %>
+                  end}
                 </span>
               </div>
             <% end %>
@@ -3006,10 +3003,10 @@ defmodule YscWeb.EventDetailsLive do
                 <%= if Money.zero?(@ticket_order.total_amount) do %>
                   Free
                 <% else %>
-                  <%= case Money.to_string(@ticket_order.total_amount) do
+                  {case Money.to_string(@ticket_order.total_amount) do
                     {:ok, amount} -> amount
                     {:error, _} -> "Error"
-                  end %>
+                  end}
                 <% end %>
               </p>
             </div>
@@ -3023,7 +3020,7 @@ defmodule YscWeb.EventDetailsLive do
               <p class="text-sm text-blue-800">
                 <strong>Confirmation Email Sent</strong>
                 <br /> We've sent a detailed confirmation email to
-                <strong><%= @current_user.email %></strong>
+                <strong>{@current_user.email}</strong>
                 with your ticket details.
               </p>
             </div>
@@ -3064,12 +3061,12 @@ defmodule YscWeb.EventDetailsLive do
           <h2 class="text-2xl font-semibold text-zinc-900 mb-2">Who's Going</h2>
           <p class="text-zinc-600">
             <%= if @attendees_count do %>
-              <%= @attendees_count %> <%= if @attendees_count == 1,
+              {@attendees_count} {if @attendees_count == 1,
                 do: "person",
-                else: "people" %> <%= if @attendees_count ==
-                                           1,
-                                         do: "is",
-                                         else: "are" %> attending this event
+                else: "people"} {if @attendees_count ==
+                                      1,
+                                    do: "is",
+                                    else: "are"} attending this event
             <% else %>
               People attending this event
             <% end %>
@@ -3096,18 +3093,18 @@ defmodule YscWeb.EventDetailsLive do
                 />
                 <div class="flex-1 min-w-0">
                   <p class="font-medium text-zinc-900">
-                    <%= display_name %>
+                    {display_name}
                     <span class="text-zinc-500 font-normal">
-                      (<%= ticket_count %> <%= if ticket_count == 1,
+                      ({ticket_count} {if ticket_count == 1,
                         do: "ticket",
-                        else: "tickets" %>)
+                        else: "tickets"})
                     </span>
                   </p>
                   <p
                     :if={attendee.email && attendee_name != ""}
                     class="text-sm text-zinc-500 truncate"
                   >
-                    <%= attendee.email %>
+                    {attendee.email}
                   </p>
                 </div>
               </div>
@@ -3139,7 +3136,7 @@ defmodule YscWeb.EventDetailsLive do
       nil ->
         {:ok,
          socket
-         |> put_flash(:error, "Event not found")
+         |> YscWeb.Flash.put_toast(:error, "Event not found")
          |> redirect(to: ~p"/events")}
 
       event ->
@@ -3587,7 +3584,7 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> put_flash(:error, "Order not found")
+        |> YscWeb.Flash.put_toast(:error, "Order not found")
         |> push_patch(to: ~p"/events/#{event_id}")
 
       ticket_order ->
@@ -3624,7 +3621,7 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             socket
-            |> put_flash(
+            |> YscWeb.Flash.put_toast(
               :error,
               "This order has expired. Please create a new order."
             )
@@ -3661,7 +3658,7 @@ defmodule YscWeb.EventDetailsLive do
             end
 
           socket
-          |> put_flash(:error, error_message)
+          |> YscWeb.Flash.put_toast(:error, error_message)
           |> push_patch(to: ~p"/events/#{event_id}")
         end
     end
@@ -3685,7 +3682,7 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> put_flash(:error, "Order not found")
+        |> YscWeb.Flash.put_toast(:error, "Order not found")
 
       ticket_order ->
         Ysc.Logging.debug(
@@ -3720,7 +3717,7 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             socket
-            |> put_flash(
+            |> YscWeb.Flash.put_toast(
               :error,
               "This order has expired. Please create a new order."
             )
@@ -3761,7 +3758,7 @@ defmodule YscWeb.EventDetailsLive do
             end
 
           socket
-          |> put_flash(:error, error_message)
+          |> YscWeb.Flash.put_toast(:error, error_message)
         end
     end
   end
@@ -3931,7 +3928,10 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             socket
-            |> put_flash(:error, "Failed to restore payment: #{reason}")
+            |> YscWeb.Flash.put_toast(
+              :error,
+              "Failed to restore payment: #{reason}"
+            )
             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
         end
 
@@ -4832,7 +4832,7 @@ defmodule YscWeb.EventDetailsLive do
         {:error, _reason} ->
           {:noreply,
            socket
-           |> put_flash(
+           |> YscWeb.Flash.put_toast(
              :error,
              "Failed to save registration details. Please try again."
            )}
@@ -4840,7 +4840,7 @@ defmodule YscWeb.EventDetailsLive do
     else
       {:noreply,
        socket
-       |> put_flash(
+       |> YscWeb.Flash.put_toast(
          :error,
          "Please fill in all required fields for each ticket."
        )}
@@ -5003,7 +5003,7 @@ defmodule YscWeb.EventDetailsLive do
     # Handle checkout expiration
     {:noreply,
      socket
-     |> put_flash(
+     |> YscWeb.Flash.put_toast(
        :error,
        "Your checkout session has expired. Please select your tickets again to continue."
      )
@@ -5533,7 +5533,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, :overbooked} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Sorry, the event is now at capacity or the selected tickets are no longer available."
          )
@@ -5542,7 +5542,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, :event_capacity_exceeded} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Sorry, the event has reached its maximum capacity. The selected tickets are no longer available."
          )
@@ -5551,7 +5551,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, :stale_inventory} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "The ticket availability changed while you were booking. Please refresh and try again."
          )
@@ -5560,7 +5560,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, :event_not_available} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "This event is no longer available for ticket purchase."
          )
@@ -5569,7 +5569,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, :membership_required} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "An active membership is required to purchase tickets. Please ensure your membership is active and try again."
          )
@@ -5588,7 +5588,7 @@ defmodule YscWeb.EventDetailsLive do
 
         {:noreply,
          socket
-         |> put_flash(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message)
          |> assign(:show_ticket_modal, false)}
 
       {:error, reason} ->
@@ -5602,7 +5602,7 @@ defmodule YscWeb.EventDetailsLive do
 
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "There was an unexpected error processing your ticket order. Please try again."
          )
@@ -6042,7 +6042,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, _reason} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Failed to save registration details. Please try again."
          )}
@@ -6172,7 +6172,7 @@ defmodule YscWeb.EventDetailsLive do
 
     {:noreply,
      socket
-     |> put_flash(
+     |> YscWeb.Flash.put_toast(
        :error,
        error_message
      )}
@@ -6209,7 +6209,10 @@ defmodule YscWeb.EventDetailsLive do
       {:error, reason} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Failed to confirm free tickets: #{reason}")
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to confirm free tickets: #{reason}"
+         )
          |> assign(:show_free_ticket_confirmation, false)}
     end
   end
@@ -6251,7 +6254,7 @@ defmodule YscWeb.EventDetailsLive do
       {:error, _reason} ->
         {:noreply,
          socket
-         |> put_flash(
+         |> YscWeb.Flash.put_toast(
            :error,
            "Payment processed but there was an issue confirming your tickets. Please contact support."
          )
@@ -7087,7 +7090,10 @@ defmodule YscWeb.EventDetailsLive do
         {:error, reason} ->
           {:noreply,
            socket
-           |> put_flash(:error, "Failed to create payment: #{reason}")
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to create payment: #{reason}"
+           )
            |> assign(:show_ticket_modal, false)
            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
       end

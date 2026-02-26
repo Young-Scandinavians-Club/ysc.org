@@ -1,6 +1,8 @@
 defmodule YscWeb.Layouts do
   use YscWeb, :html
 
+  import LiveToast, only: [toast_group: 1]
+
   embed_templates "layouts/*"
 
   def fullscreen?(conn_or_path) when is_binary(conn_or_path) do

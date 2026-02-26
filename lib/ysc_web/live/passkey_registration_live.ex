@@ -20,7 +20,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
           :if={@error}
           class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
         >
-          <p class="text-sm text-red-800"><%= @error %></p>
+          <p class="text-sm text-red-800">{@error}</p>
         </div>
 
         <div
@@ -50,7 +50,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
         >
           <.icon :if={@loading} name="hero-arrow-path" class="w-5 h-5 animate-spin" />
           <.icon :if={!@loading} name="hero-key" class="w-5 h-5" />
-          <%= if @loading, do: "Creating Passkey...", else: "Create Passkey" %>
+          {if @loading, do: "Creating Passkey...", else: "Create Passkey"}
         </.button>
 
         <div :if={!@passkey_supported} class="text-center text-sm text-zinc-500">
@@ -73,7 +73,10 @@ defmodule YscWeb.PasskeyRegistrationLive do
     if is_nil(user) do
       {:ok,
        socket
-       |> put_flash(:error, "You must be signed in to add a passkey.")
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "You must be signed in to add a passkey."
+       )
        |> redirect(to: ~p"/users/log-in")}
     else
       {:ok,
@@ -263,7 +266,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
                  |> assign(:error, nil)
                  |> assign(:loading, false)
                  |> assign(:passkey_challenge, nil)
-                 |> put_flash(
+                 |> YscWeb.Flash.put_toast(
                    :info,
                    "Passkey added successfully! You can now use it to sign in."
                  )}

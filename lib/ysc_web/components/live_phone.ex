@@ -295,7 +295,7 @@ defmodule LivePhone do
     >
       <span class={"live_phone-country-flag rounded w-7 h-6 fi fi-" <> String.downcase(@country)} />
       <span class="live_phone-country-code text-sm text-zinc-600 px-3 mt-0.5">
-        <%= @region_code %>
+        {@region_code}
       </span>
       <span class={"w-4 text-zinc-600 mt-1 #{if @opened?, do: "hero-chevron-up", else: "hero-chevron-down"}"} />
     </div>
@@ -375,10 +375,10 @@ defmodule LivePhone do
       <span class={"live_phone-country-item-flag rounded-full w-6 h-6 fi fi-" <>  String.downcase(@country.code)}>
       </span>
       <span class="live_phone-country-item-name text-zinc-600 inline-block text-sm px-2 whitespace-nowrap text-ellipsis overflow-hidden">
-        <%= @country.name %>
+        {@country.name}
       </span>
       <span class="live_phone-country-code text-sm text-zinc-400">
-        +<%= @country.region_code %>
+        +{@country.region_code}
       </span>
     </li>
     """

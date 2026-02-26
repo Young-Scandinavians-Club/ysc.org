@@ -491,7 +491,7 @@ defmodule YscWeb.UserLoginLive do
       )
 
       {:noreply,
-       put_flash(
+       YscWeb.Flash.put_toast(
          socket,
          :error,
          "Authentication session expired. Please try again."
@@ -550,7 +550,7 @@ defmodule YscWeb.UserLoginLive do
           )
 
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Invalid passkey. Please try again or use another sign-in method."
@@ -575,7 +575,7 @@ defmodule YscWeb.UserLoginLive do
               )
 
               {:noreply,
-               put_flash(
+               YscWeb.Flash.put_toast(
                  socket,
                  :error,
                  "Invalid passkey response. Please try again or use another sign-in method."
@@ -604,7 +604,7 @@ defmodule YscWeb.UserLoginLive do
 
               if is_nil(user_id_from_handle) do
                 {:noreply,
-                 put_flash(
+                 YscWeb.Flash.put_toast(
                    socket,
                    :error,
                    "Invalid passkey response. Please try again or use another sign-in method."
@@ -634,7 +634,7 @@ defmodule YscWeb.UserLoginLive do
                   )
 
                   {:noreply,
-                   put_flash(
+                   YscWeb.Flash.put_toast(
                      socket,
                      :error,
                      "Passkey verification failed. Please try again or use another sign-in method."
@@ -665,7 +665,7 @@ defmodule YscWeb.UserLoginLive do
                     )
 
                     {:noreply,
-                     put_flash(
+                     YscWeb.Flash.put_toast(
                        socket,
                        :error,
                        "Passkey credential ID mismatch. Please try again or use another sign-in method."
@@ -711,7 +711,7 @@ defmodule YscWeb.UserLoginLive do
               )
 
               {:noreply,
-               put_flash(
+               YscWeb.Flash.put_toast(
                  socket,
                  :error,
                  "Passkey credential ID mismatch. Please try again or use another sign-in method."
@@ -770,7 +770,7 @@ defmodule YscWeb.UserLoginLive do
       end
 
     {:noreply,
-     put_flash(socket, :error, error_message)
+     YscWeb.Flash.put_toast(socket, :error, error_message)
      |> assign(:passkey_loading, false)
      |> assign(:passkey_challenge, nil)
      |> assign(:passkey_auth_mode, nil)}
@@ -788,7 +788,7 @@ defmodule YscWeb.UserLoginLive do
     )
 
     {:noreply,
-     put_flash(
+     YscWeb.Flash.put_toast(
        socket,
        :error,
        "An error occurred during authentication. Please try again."
@@ -894,13 +894,10 @@ defmodule YscWeb.UserLoginLive do
           {:ok, _updated_passkey} =
             Ysc.Accounts.update_passkey_sign_count(passkey, new_sign_count)
 
-          # Get the user and log them in
-          user = Ysc.Accounts.get_user!(user_id)
-
-          # Log successful authentication
-          Ysc.Accounts.AuthService.log_login_success(user, socket, %{
-            method: "passkey"
-          })
+          # Do not log login here: we redirect to /users/log-in/passkey and
+          # UserSessionController.passkey_login will log with the real conn
+          # (IP + User-Agent). Logging from the socket would create a duplicate
+          # event with 127.0.0.1 and "Unknown browser on Unknown OS".
 
           # Clear the challenge and loading state
           socket =
@@ -908,12 +905,19 @@ defmodule YscWeb.UserLoginLive do
             |> assign(:passkey_loading, false)
             |> assign(:passkey_challenge, nil)
             |> assign(:passkey_auth_mode, nil)
-            |> put_flash(:info, "Welcome back!")
+            |> YscWeb.Flash.success_with_title("Welcome back!", "Welcome back!")
 
-          # Redirect to session controller to log in (since we need a conn, not socket)
-          encoded_user_id = Base.url_encode64(user_id, padding: false)
+          # One-time signed token so the controller can trust this redirect came from
+          # a successful passkey verification (prevents logging in with just a user_id).
+          token =
+            Phoenix.Token.sign(
+              YscWeb.Endpoint,
+              "passkey_login",
+              user_id,
+              max_age: 120
+            )
 
-          query_params = %{"user_id" => encoded_user_id}
+          query_params = %{"token" => token}
 
           query_params =
             if socket.assigns.redirect_to && socket.assigns.redirect_to != "" do
@@ -933,7 +937,6 @@ defmodule YscWeb.UserLoginLive do
             redirect_url: redirect_url,
             base_path: base_path,
             query_string: query_string,
-            encoded_user_id: encoded_user_id,
             user_id_hex: Base.encode16(user_id, case: :lower),
             query_params: query_params,
             has_redirect_to: Map.has_key?(query_params, "redirect_to")
@@ -955,7 +958,7 @@ defmodule YscWeb.UserLoginLive do
           )
 
           {:noreply,
-           put_flash(
+           YscWeb.Flash.put_toast(
              socket,
              :error,
              "Security check failed. Please try again."
@@ -989,7 +992,7 @@ defmodule YscWeb.UserLoginLive do
         })
 
         {:noreply,
-         put_flash(
+         YscWeb.Flash.put_toast(
            socket,
            :error,
            "Passkey verification failed. Please try again or use another sign-in method."
