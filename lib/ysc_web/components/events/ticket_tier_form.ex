@@ -268,7 +268,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Ticket tier #{action} successfully")
+         |> YscWeb.Flash.put_toast(:info, "Ticket tier #{action} successfully",
+           title: "Ticket tier"
+         )
          |> assign_form(changeset)
          |> push_navigate(
            to: ~p"/admin/events/#{socket.assigns.event_id}/tickets"

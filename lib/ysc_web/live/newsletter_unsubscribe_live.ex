@@ -116,7 +116,8 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
          |> assign(:unsubscribed, true)
          |> YscWeb.Flash.put_toast(
            :info,
-           "You have been unsubscribed from our newsletter."
+           "You have been unsubscribed from our newsletter.",
+           title: "Newsletter"
          )}
 
       {:error, _} ->
@@ -126,7 +127,8 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
          |> assign(:error, "Something went wrong. Please try again.")
          |> YscWeb.Flash.put_toast(
            :error,
-           "Could not unsubscribe. Please try again."
+           "Could not unsubscribe. Please try again.",
+           title: "Newsletter"
          )}
     end
   end

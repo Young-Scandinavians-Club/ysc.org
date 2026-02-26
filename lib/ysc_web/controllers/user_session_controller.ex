@@ -40,14 +40,17 @@ defmodule YscWeb.UserSessionController do
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "Your account is not currently active."
+          "Your account is not currently active.",
+          title: "Login"
         )
         |> redirect(to: ~p"/users/log-in")
       end
     else
       # Invalid token
       conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid login session.")
+      |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
+        title: "Login"
+      )
       |> redirect(to: ~p"/users/log-in")
     end
   end
@@ -74,14 +77,17 @@ defmodule YscWeb.UserSessionController do
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "Your account is not currently active."
+          "Your account is not currently active.",
+          title: "Login"
         )
         |> redirect(to: ~p"/users/log-in")
       end
     else
       # Invalid token
       conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid login session.")
+      |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
+        title: "Login"
+      )
       |> redirect(to: ~p"/users/log-in")
     end
   end
@@ -124,7 +130,8 @@ defmodule YscWeb.UserSessionController do
         conn
         |> YscWeb.Flash.put_toast(
           :info,
-          "Please verify your email address before signing in."
+          "Please verify your email address before signing in.",
+          title: "Login"
         )
         |> redirect(to: ~p"/account/setup/#{user.id}")
       else
@@ -148,7 +155,7 @@ defmodule YscWeb.UserSessionController do
             end
 
           conn
-          |> YscWeb.Flash.put_toast(:info, info)
+          |> YscWeb.Flash.put_toast(:info, info, title: "Login")
           |> delete_session(:failed_login_attempts)
           |> delete_session(:user_return_to)
           |> put_session(:just_logged_in, true)
@@ -169,7 +176,8 @@ defmodule YscWeb.UserSessionController do
           conn
           |> YscWeb.Flash.put_toast(
             :error,
-            "Your account is not currently active. Please contact info@ysc.org for more information."
+            "Your account is not currently active. Please contact info@ysc.org for more information.",
+            title: "Login"
           )
           |> YscWeb.Flash.put_toast(:email, String.slice(email, 0, 160))
           |> put_session(:failed_login_attempts, failed_attempts)
@@ -190,7 +198,9 @@ defmodule YscWeb.UserSessionController do
 
       # In order to prevent user enumeration attacks, don't disclose whether the email is registered.
       conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid email or password")
+      |> YscWeb.Flash.put_toast(:error, "Invalid email or password",
+        title: "Login"
+      )
       |> YscWeb.Flash.put_toast(:email, String.slice(email, 0, 160))
       |> put_session(:failed_login_attempts, failed_attempts)
       |> redirect(to: ~p"/users/log-in")
@@ -204,7 +214,9 @@ defmodule YscWeb.UserSessionController do
     end
 
     conn
-    |> YscWeb.Flash.put_toast(:info, "Signed out successfully.")
+    |> YscWeb.Flash.put_toast(:info, "Signed out successfully.",
+      title: "Logout"
+    )
     |> UserAuth.log_out_user()
   end
 
@@ -217,6 +229,7 @@ defmodule YscWeb.UserSessionController do
 
   @passkey_login_token_max_age 120
 
+  # sobelow_skip ["XSS.SendResp"]
   def passkey_login(conn, params) do
     require Ysc.Logging
 
@@ -262,6 +275,33 @@ defmodule YscWeb.UserSessionController do
       %{"token" => token} ->
         passkey_login_with_token(conn, token, "")
 
+      %{"user_id" => user_id} when is_binary(user_id) and user_id != "" ->
+        case Ysc.AuthRateLimit.check_identifier(user_id) do
+          :ok ->
+            conn
+            |> YscWeb.Flash.put_toast(:error, "Invalid login request.",
+              title: "Login"
+            )
+            |> redirect(to: ~p"/users/log-in")
+
+          {:error, :rate_limited, retry_after_sec} ->
+            body = """
+            <!DOCTYPE html>
+            <html><head><title>Too Many Requests</title></head>
+            <body><h1>Too many attempts</h1><p>Please try again in #{retry_after_sec} seconds.</p></body>
+            </html>
+            """
+
+            conn
+            |> put_resp_header(
+              "retry-after",
+              Integer.to_string(retry_after_sec)
+            )
+            |> put_resp_content_type("text/html")
+            |> send_resp(429, body)
+            |> halt()
+        end
+
       _ ->
         Ysc.Logging.warning(
           "[UserSessionController] passkey_login called with invalid params",
@@ -275,7 +315,9 @@ defmodule YscWeb.UserSessionController do
         )
 
         conn
-        |> YscWeb.Flash.put_toast(:error, "Invalid login request.")
+        |> YscWeb.Flash.put_toast(:error, "Invalid login request.",
+          title: "Login"
+        )
         |> redirect(to: ~p"/users/log-in")
     end
   end
@@ -347,7 +389,9 @@ defmodule YscWeb.UserSessionController do
         )
 
         conn
-        |> YscWeb.Flash.put_toast(:error, "Invalid login session.")
+        |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
+          title: "Login"
+        )
         |> redirect(to: ~p"/users/log-in")
 
       {:error, reason} ->
@@ -359,7 +403,8 @@ defmodule YscWeb.UserSessionController do
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "Invalid or expired login link. Please sign in again."
+          "Invalid or expired login link. Please sign in again.",
+          title: "Login"
         )
         |> redirect(to: ~p"/users/log-in")
     end
@@ -424,7 +469,8 @@ defmodule YscWeb.UserSessionController do
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "Your account is not currently active."
+          "Your account is not currently active.",
+          title: "Login"
         )
         |> redirect(to: ~p"/users/log-in")
       end
@@ -435,7 +481,9 @@ defmodule YscWeb.UserSessionController do
       })
 
       conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid login session.")
+      |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
+        title: "Login"
+      )
       |> redirect(to: ~p"/users/log-in")
     end
   end

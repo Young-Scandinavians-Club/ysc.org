@@ -17,10 +17,10 @@ defmodule YscWeb.Flash do
   def put_toast(conn_or_socket, kind, msg, opts \\ [])
 
   def put_toast(%Plug.Conn{} = conn, kind, msg, opts),
-    do: LiveToast.put_toast(conn, kind, msg, opts)
+    do: LiveToast.put_toast(conn, kind, msg, default_icon_opts(kind, opts))
 
   def put_toast(socket, kind, msg, opts),
-    do: LiveToast.put_toast(socket, kind, msg, opts)
+    do: LiveToast.put_toast(socket, kind, msg, default_icon_opts(kind, opts))
 
   @doc """
   Send a toast without pipeline (e.g. in handle_event). Use when you need to
@@ -34,8 +34,29 @@ defmodule YscWeb.Flash do
       end
   """
   def send_toast(kind, msg, opts \\ []) do
-    LiveToast.send_toast(kind, msg, opts)
+    LiveToast.send_toast(kind, msg, default_icon_opts(kind, opts))
   end
+
+  defp default_icon_opts(kind, opts) do
+    {icon, default_title} =
+      case kind do
+        :info -> {&YscWeb.CoreComponents.flash_toast_icon_success/1, "Success"}
+        :error -> {&YscWeb.CoreComponents.flash_toast_icon_error/1, "Error"}
+        _ -> {nil, nil}
+      end
+
+    opts
+    |> maybe_put(:icon, icon, Keyword.has_key?(opts, :icon))
+    # LiveToast only renders the icon inside the title block; without a title the icon is never shown.
+    |> maybe_put(
+      :title,
+      default_title,
+      icon != nil && !Keyword.has_key?(opts, :title)
+    )
+  end
+
+  defp maybe_put(opts, _key, _value, false), do: opts
+  defp maybe_put(opts, key, value, true), do: Keyword.put(opts, key, value)
 
   @doc "Convenience: success toast (kind :info)."
   def success(conn_or_socket, msg, opts \\ []) do
@@ -50,8 +71,7 @@ defmodule YscWeb.Flash do
   @doc """
   Success toast with a title. Use for high-value confirmations (e.g. payment, booking).
 
-  For icons, pass a function component from your LiveView, e.g.:
-  `icon: fn assigns -> ~H"<.icon name=\"hero-check-circle\" class=\"w-5 h-5\" />" end`
+  A default success icon is shown unless you pass a custom `:icon` (a function component).
   """
   def success_with_title(conn_or_socket, title, msg, opts \\ []) do
     put_toast(conn_or_socket, :info, msg, Keyword.put_new(opts, :title, title))

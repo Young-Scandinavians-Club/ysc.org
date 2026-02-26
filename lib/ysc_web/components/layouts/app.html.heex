@@ -9,12 +9,6 @@
 <% is_hero_mode = hero_mode?(current_path, @current_user) %>
 
 <div id="app-container" class="w-full flex flex-col min-h-screen">
-  <.toast_group
-    flash={@flash}
-    connected={assigns[:socket] != nil}
-    toasts_sync={assigns[:toasts_sync] || []}
-  />
-
   <header
     :if={!is_fullscreen}
     id="site-header"
@@ -817,4 +811,12 @@
       </div>
     </div>
   </footer>
+
+  <.toast_group
+    flash={@flash}
+    connected={assigns[:socket] != nil}
+    corner={:top_right}
+    toasts_sync={assigns[:toasts_sync] || []}
+    group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
+  />
 </div>

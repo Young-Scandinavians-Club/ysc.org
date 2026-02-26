@@ -2317,7 +2317,7 @@ defmodule YscWeb.TahoeBookingLive do
                         @checkin_date &&
                           @checkout_date &&
                           @selected_booking_mode == :room &&
-                          length(get_selected_rooms_for_submit(assigns) || []) == 0
+                          length(selected_room_ids_list(assigns)) == 0
                       }>
                         Please select at least one room
                       </li>
@@ -4844,7 +4844,8 @@ defmodule YscWeb.TahoeBookingLive do
            )
            |> YscWeb.Flash.put_toast(
              :info,
-             "Booking created! Please complete payment to confirm."
+             "Booking created! Please complete payment to confirm.",
+             title: "Booking"
            )
            |> push_navigate(to: ~p"/bookings/checkout/#{booking.id}")}
 
@@ -4853,7 +4854,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Sorry, there is not enough capacity for your requested dates."
+             "Sorry, there is not enough capacity for your requested dates.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{
@@ -4869,7 +4871,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Sorry, the property is not available for your requested dates."
+             "Sorry, the property is not available for your requested dates.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{
@@ -4885,7 +4888,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Sorry, some rooms are already booked for your requested dates."
+             "Sorry, some rooms are already booked for your requested dates.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{
@@ -4902,7 +4906,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Sorry, some rooms are already booked for your requested dates."
+             "Sorry, some rooms are already booked for your requested dates.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{
@@ -4918,7 +4923,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "The availability changed while you were booking. Please refresh the calendar and try again."
+             "The availability changed while you were booking. Please refresh the calendar and try again.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{
@@ -4934,7 +4940,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Please fill in all required fields."
+             "Please fill in all required fields.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{general: "Please fill in all required fields."},
@@ -4946,7 +4953,9 @@ defmodule YscWeb.TahoeBookingLive do
         {:error, %Ecto.Changeset{} = changeset} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Please fix the errors below.")
+           |> YscWeb.Flash.put_toast(:error, "Please fix the errors below.",
+             title: "Booking"
+           )
            |> assign(
              form_errors: format_errors(changeset),
              calculated_price: nil,
@@ -4960,7 +4969,8 @@ defmodule YscWeb.TahoeBookingLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "An error occurred while creating your booking. Please try again."
+             "An error occurred while creating your booking. Please try again.",
+             title: "Booking"
            )
            |> assign(
              form_errors: %{
@@ -6922,6 +6932,15 @@ defmodule YscWeb.TahoeBookingLive do
       assigns.selected_room_ids
     else
       assigns.selected_room_id
+    end
+  end
+
+  # Always returns a list of selected room IDs (for use with length/1, etc.)
+  defp selected_room_ids_list(assigns) do
+    case get_selected_rooms_for_submit(assigns) do
+      ids when is_list(ids) -> ids
+      nil -> []
+      id -> [id]
     end
   end
 

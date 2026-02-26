@@ -11,7 +11,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
       is_nil(invite) ->
         {:ok,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Invalid invitation link.")
+         |> YscWeb.Flash.put_toast(:error, "Invalid invitation link.",
+           title: "Invitation"
+         )
          |> redirect(to: ~p"/")}
 
       not FamilyInvite.valid?(invite) ->
@@ -85,14 +87,17 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Account created successfully! You can now log in with your email and password."
+           "Account created successfully! You can now log in with your email and password.",
+           title: "Family invitation"
          )
          |> redirect(to: ~p"/users/log-in")}
 
       {:error, :invite_not_found} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Invitation not found.")
+         |> YscWeb.Flash.put_toast(:error, "Invitation not found.",
+           title: "Invitation"
+         )
          |> redirect(to: ~p"/")}
 
       {:error, :invite_expired_or_used} ->
@@ -100,7 +105,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "This invitation has expired or has already been used."
+           "This invitation has expired or has already been used.",
+           title: "Invitation"
          )
          |> redirect(to: ~p"/")}
 

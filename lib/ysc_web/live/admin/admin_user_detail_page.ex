@@ -574,150 +574,283 @@ defmodule YscWeb.AdminUserDetailsLive do
           </div>
         </div>
 
-        <div :if={@live_action == :application} class="max-w-lg py-8 px-2">
+        <div :if={@live_action == :application} class="max-w-2xl py-8 px-2">
           <div :if={@selected_user_application == nil}>
             <p class="text-sm text-zinc-800">No application found</p>
           </div>
 
-          <div :if={@selected_user_application != nil}>
-            <p class="leading-6 text-sm text-zinc-800 mb-4 font-semibold">
-              Submitted:
-              <.badge>
-                {if @selected_user_application.completed do
-                  date_str =
-                    @selected_user_application.completed
-                    |> DateTime.shift_zone!("America/Los_Angeles")
-                    |> Timex.format!("{YYYY}-{0M}-{0D}")
-
-                  "#{date_str} (#{Timex.from_now(@selected_user_application.completed)})"
-                else
-                  "N/A"
-                end}
-              </.badge>
-            </p>
-
-            <p
-              :if={@selected_user_application.review_outcome != nil}
-              class="leading-6 text-sm text-zinc-800 mb-4 font-semibold"
-            >
-              Review outcome:
-              <.badge>
-                {@selected_user_application.review_outcome}
-              </.badge>
-            </p>
-
-            <p
-              :if={@selected_user_application.reviewed_by != nil}
-              class="leading-6 text-sm text-zinc-800 mb-4"
-            >
-              <span class="font-semibold">Reviewed by:</span> {@selected_user_application.reviewed_by.first_name} {@selected_user_application.reviewed_by.last_name} ({@selected_user_application.reviewed_by.email})
-            </p>
-
-            <p
-              :if={@selected_user_application.reviewed_at != nil}
-              class="leading-6 text-sm text-zinc-800 mb-4"
-            >
-              <span class="font-semibold">Reviewed at:</span>
-              <.badge>
-                {if @selected_user_application.reviewed_at do
-                  format_datetime_for_display(
-                    @selected_user_application.reviewed_at
+          <div :if={@selected_user_application != nil} class="space-y-6">
+            <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
+              <div class="min-w-0">
+                <h2 class="text-2xl font-bold text-zinc-900">Application</h2>
+                <p class="text-sm text-zinc-500 mt-0.5">
+                  <%= if @selected_user.state == :pending_approval do %>
+                    Submitted {if @selected_user_application.completed,
+                      do: Timex.from_now(@selected_user_application.completed),
+                      else: "N/A"}
+                  <% else %>
+                    <%= if @selected_user_application.reviewed_at do %>
+                      Reviewed {Timex.format!(
+                        @selected_user_application.reviewed_at,
+                        "%b %d, %Y",
+                        :strftime
+                      )} by {if @selected_user_application.reviewed_by,
+                        do: @selected_user_application.reviewed_by.email,
+                        else: "—"}
+                    <% else %>
+                      Submitted {if @selected_user_application.completed,
+                        do: Timex.from_now(@selected_user_application.completed),
+                        else: "N/A"}
+                    <% end %>
+                  <% end %>
+                </p>
+              </div>
+              <span :if={@selected_user.state == :pending_approval} class="shrink-0">
+                <.badge type="default">Pending Review</.badge>
+              </span>
+              <span
+                :if={
+                  @selected_user.state != :pending_approval &&
+                    @selected_user_application.review_outcome != nil
+                }
+                class="shrink-0"
+              >
+                <.badge type={
+                  review_outcome_to_badge_type(
+                    @selected_user_application.review_outcome
                   )
-                else
-                  "N/A"
-                end}
-              </.badge>
-            </p>
+                }>
+                  {@selected_user_application.review_outcome}
+                </.badge>
+              </span>
+            </div>
 
-            <h3 class="leading-6 text-zinc-800 font-semibold mb-2">
-              Applicant Details
-            </h3>
-            <ul class="leading-6 text-zinc-800 text-sm pb-6">
-              <li>
-                <span class="font-semibold">Email:</span> {@selected_user.email}
-              </li>
-              <li>
-                <span class="font-semibold">Name:</span> {"#{@selected_user.first_name} #{@selected_user.last_name}"}
-              </li>
-              <li>
-                <span class="font-semibold">Birth date:</span> {@selected_user_application.birth_date}
-              </li>
+            <section>
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                Applicant Details
+              </h3>
+              <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                <div class="py-2">
+                  <dt class="text-sm font-semibold text-zinc-600">Full Name</dt>
+                  <dd class="mt-0.5 text-sm text-zinc-900">
+                    {"#{@selected_user.first_name} #{@selected_user.last_name}"}
+                  </dd>
+                </div>
+                <div class="py-2">
+                  <dt class="text-sm font-semibold text-zinc-600">Email</dt>
+                  <dd class="mt-0.5 text-sm text-zinc-900 underline decoration-zinc-200">
+                    {@selected_user.email}
+                  </dd>
+                </div>
+                <div class="py-2">
+                  <dt class="text-sm font-semibold text-zinc-600">Birth Date</dt>
+                  <dd class="mt-0.5 text-sm text-zinc-900">
+                    {format_birth_date(@selected_user_application.birth_date)}
+                  </dd>
+                </div>
+                <div
+                  :if={length(@selected_user.family_members) > 0}
+                  class="py-2 sm:col-span-2"
+                >
+                  <dt class="text-sm font-semibold text-zinc-600">
+                    Family members
+                  </dt>
+                  <dd class="mt-1 text-sm text-zinc-900">
+                    <ul class="space-y-1 list-disc list-inside">
+                      <li :for={family_member <- @selected_user.family_members}>
+                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded bg-blue-100 text-blue-800">
+                          {String.capitalize("#{family_member.type}")}
+                        </span>
+                        {"#{family_member.first_name} #{family_member.last_name} (#{format_birth_date(family_member.birth_date)})"}
+                      </li>
+                    </ul>
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
-              <li :if={length(@selected_user.family_members) > 0}>
-                <p class="font-semibold">Family members:</p>
-                <ul class="space-y-1 text-zinc-800 list-disc list-inside">
-                  <li :for={family_member <- @selected_user.family_members}>
-                    <span class="text-xs font-medium me-2 px-2.5 py-1 rounded text-left bg-blue-100 text-blue-800">
-                      {String.capitalize("#{family_member.type}")}
-                    </span>
-                    {"#{family_member.first_name} #{family_member.last_name} (#{family_member.birth_date})"}
-                  </li>
-                </ul>
-              </li>
-            </ul>
-
-            <h3 class="leading-6 text-zinc-800 font-semibold mb-2">
-              Application Answers
-            </h3>
-            <ul class="leading-6 text-sm text-zinc-800 pb-6">
-              <li>
-                <span class="font-semibold">Membership type:</span> {@selected_user_application.membership_type}
-              </li>
-
-              <li class="pt-2">
-                <p class="font-semibold">Eligibility:</p>
-                <ul class="space-y-1 text-zinc-800 list-disc list-inside">
-                  <li :for={
-                    reason <- @selected_user_application.membership_eligibility
+            <section>
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                Answers
+              </h3>
+              <div class="space-y-4">
+                <div class="py-2">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1.5">
+                    Membership type
+                  </p>
+                  <.badge type={
+                    if to_string(@selected_user_application.membership_type) ==
+                         "family", do: "green", else: "default"
                   }>
-                    {Map.get(
-                      Ysc.Accounts.SignupApplication.eligibility_lookup(),
-                      reason
+                    {String.capitalize(
+                      "#{@selected_user_application.membership_type}"
                     )}
-                  </li>
-                </ul>
-              </li>
-              <li class="pt-2">
-                <span class="font-semibold">Occupation:</span> {@selected_user_application.occupation}
-              </li>
-              <li class="pt-2">
-                <span class="font-semibold">Place of birth:</span> {@selected_user_application.place_of_birth}
-              </li>
-              <li class="pt-2">
-                <span class="font-semibold">Citizenship:</span> {@selected_user_application.citizenship}
-              </li>
-              <li class="pt-2">
-                <span class="font-semibold">Most connected Nordic country:</span> {@selected_user_application.most_connected_nordic_country}
-              </li>
+                  </.badge>
+                </div>
+                <div class="bg-zinc-50 rounded-lg p-4 ring-1 ring-zinc-200/50">
+                  <p class="text-sm font-semibold text-zinc-700 mb-2">
+                    Eligibility & Connections
+                  </p>
+                  <ul class="text-sm space-y-1 list-disc list-inside text-zinc-600">
+                    <li :for={
+                      reason <- @selected_user_application.membership_eligibility
+                    }>
+                      {Map.get(
+                        Ysc.Accounts.SignupApplication.eligibility_lookup(),
+                        reason
+                      )}
+                    </li>
+                  </ul>
+                </div>
 
-              <li class="pt-2">
-                <span class="font-semibold">Link to Scandinavia:</span>
-                <input
-                  type="textarea"
-                  class="mt-2 block w-full rounded text-zinc-900 sm:text-sm sm:leading-6 bg-zinc-100 px-2 py-3"
-                  value={@selected_user_application.link_to_scandinavia}
-                  disabled={true}
-                />
-              </li>
-              <li class="pt-2">
-                <span class="font-semibold">Lived in Scandinavia:</span>
-                <input
-                  type="textarea"
-                  class="mt-2 block w-full rounded text-zinc-900 sm:text-sm sm:leading-6 bg-zinc-100 px-2 py-3"
-                  value={@selected_user_application.lived_in_scandinavia}
-                  disabled={true}
-                />
-              </li>
-              <li class="pt-2">
-                <span class="font-semibold">Spoken languages:</span>
-                <input
-                  type="textarea"
-                  class="mt-2 block w-full rounded text-zinc-900 sm:text-sm sm:leading-6 bg-zinc-100 px-2 py-3"
-                  value={@selected_user_application.spoken_languages}
-                  disabled={true}
-                />
-              </li>
-            </ul>
+                <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">Occupation</dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900">
+                      {@selected_user_application.occupation}
+                    </dd>
+                  </div>
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">
+                      Place of birth
+                    </dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
+                      <span
+                        :if={
+                          country_to_flag_class(
+                            @selected_user_application.place_of_birth
+                          )
+                        }
+                        class="shrink-0"
+                      >
+                        <.flag
+                          country={
+                            country_to_flag_class(
+                              @selected_user_application.place_of_birth
+                            )
+                          }
+                          class="h-4 w-6 rounded inline-block align-middle"
+                        />
+                      </span>
+                      {nordic_country_display_name(
+                        @selected_user_application.place_of_birth
+                      ) || @selected_user_application.place_of_birth}
+                    </dd>
+                  </div>
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">Citizenship</dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
+                      <span
+                        :if={
+                          country_to_flag_class(
+                            @selected_user_application.citizenship
+                          )
+                        }
+                        class="shrink-0"
+                      >
+                        <.flag
+                          country={
+                            country_to_flag_class(
+                              @selected_user_application.citizenship
+                            )
+                          }
+                          class="h-4 w-6 rounded inline-block align-middle"
+                        />
+                      </span>
+                      {nordic_country_display_name(
+                        @selected_user_application.citizenship
+                      ) || @selected_user_application.citizenship}
+                    </dd>
+                  </div>
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">
+                      Most connected Nordic country
+                    </dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
+                      <span
+                        :if={
+                          country_to_flag_class(
+                            @selected_user_application.most_connected_nordic_country
+                          )
+                        }
+                        class="shrink-0"
+                      >
+                        <.flag
+                          country={
+                            country_to_flag_class(
+                              @selected_user_application.most_connected_nordic_country
+                            )
+                          }
+                          class="h-4 w-6 rounded inline-block align-middle"
+                        />
+                      </span>
+                      {nordic_country_display_name(
+                        @selected_user_application.most_connected_nordic_country
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    Link to Scandinavia
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.link_to_scandinavia}
+                  </div>
+                </div>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    Lived in Scandinavia
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.lived_in_scandinavia}
+                  </div>
+                </div>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    Spoken languages
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.spoken_languages}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section
+              :if={
+                @selected_user_application.review_outcome == :rejected &&
+                  length(@rejection_notes) > 0
+              }
+              class="pt-6 border-t border-zinc-200"
+            >
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                Rejection notes
+              </h3>
+              <div class="space-y-4">
+                <div
+                  :for={note <- @rejection_notes}
+                  class="bg-red-50/50 rounded-lg p-4 border border-red-100"
+                >
+                  <div class="flex items-start justify-between gap-4 mb-2">
+                    <p class="text-sm font-semibold text-zinc-900">
+                      <%= if note.created_by do %>
+                        {"#{note.created_by.first_name} #{note.created_by.last_name}"}
+                      <% else %>
+                        Unknown reviewer
+                      <% end %>
+                    </p>
+                    <p class="text-xs text-zinc-500 shrink-0">
+                      {format_datetime_for_display(note.inserted_at)}
+                    </p>
+                  </div>
+                  <p class="text-sm text-zinc-800 whitespace-pre-wrap">
+                    {note.note}
+                  </p>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
 
@@ -1608,7 +1741,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                                   <% end %>
                                 </p>
                                 <.badge type={
-                                  if note.category == :violation,
+                                  if note.category in [:violation, :rejection],
                                     do: "red",
                                     else: "default"
                                 }>
@@ -1786,6 +1919,7 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> assign(:sub_accounts, [])
      |> assign(:family_members, [])
      |> assign(:user_notes, [])
+     |> assign(:rejection_notes, [])
      |> assign(
        :note_form,
        to_form(note_changeset(%{category: "general"}), as: "note")
@@ -1815,6 +1949,9 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         :logs ->
           load_user_notes(socket, user_id)
+
+        :application ->
+          load_rejection_notes(socket, user_id)
 
         _ ->
           socket
@@ -1847,7 +1984,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       {:ok, updated_user} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "User updated")
+         |> YscWeb.Flash.put_toast(:info, "User updated", title: "Profile")
          |> redirect(to: ~p"/admin/users/#{updated_user.id}/details")}
 
       {:error, changeset} ->
@@ -1862,7 +1999,8 @@ defmodule YscWeb.AdminUserDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to save: #{inspect(changeset.errors)}"
+           "Failed to save: #{inspect(changeset.errors)}",
+           title: "Save failed"
          )}
     end
   end
@@ -2004,14 +2142,17 @@ defmodule YscWeb.AdminUserDetailsLive do
            Accounts.has_lifetime_membership?(updated_user)
          )
          |> assign(:lifetime_form, to_form(lifetime_changeset, as: "lifetime"))
-         |> YscWeb.Flash.put_toast(:info, flash_message)}
+         |> YscWeb.Flash.put_toast(:info, flash_message,
+           title: "Lifetime membership"
+         )}
 
       {:error, changeset} ->
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to update lifetime membership: #{inspect(changeset.errors)}"
+           "Failed to update lifetime membership: #{inspect(changeset.errors)}",
+           title: "Lifetime membership"
          )}
     end
   end
@@ -2065,7 +2206,9 @@ defmodule YscWeb.AdminUserDetailsLive do
     if is_nil(plan_id_str) or plan_id_str == "" do
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Please select a membership plan")}
+       |> YscWeb.Flash.put_toast(:error, "Please select a membership plan",
+         title: "Membership"
+       )}
     else
       plan_id = String.to_existing_atom(plan_id_str)
 
@@ -2114,7 +2257,8 @@ defmodule YscWeb.AdminUserDetailsLive do
            )
            |> YscWeb.Flash.put_toast(
              :info,
-             "Membership subscription created (paid elsewhere)."
+             "Membership subscription created (paid elsewhere).",
+             title: "Subscription"
            )}
 
         {:error, :sub_accounts_cannot_create_subscriptions} ->
@@ -2122,7 +2266,8 @@ defmodule YscWeb.AdminUserDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Sub-accounts cannot have their own subscriptions."
+             "Sub-accounts cannot have their own subscriptions.",
+             title: "Subscription"
            )}
 
         {:error, :user_already_has_active_subscription} ->
@@ -2130,7 +2275,8 @@ defmodule YscWeb.AdminUserDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "User already has an active subscription."
+             "User already has an active subscription.",
+             title: "Subscription"
            )}
 
         {:error, :invalid_plan} ->
@@ -2138,7 +2284,8 @@ defmodule YscWeb.AdminUserDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Invalid membership plan selected."
+             "Invalid membership plan selected.",
+             title: "Subscription"
            )}
 
         {:error, :could_not_create_stripe_customer} ->
@@ -2146,7 +2293,8 @@ defmodule YscWeb.AdminUserDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Could not create or link Stripe customer for user."
+             "Could not create or link Stripe customer for user.",
+             title: "Subscription"
            )}
 
         {:error, err} ->
@@ -2155,7 +2303,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               do: err,
               else: "Failed to create subscription: #{inspect(err)}"
 
-          {:noreply, socket |> YscWeb.Flash.put_toast(:error, message)}
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, message, title: "Subscription")}
       end
     end
   end
@@ -2172,7 +2322,8 @@ defmodule YscWeb.AdminUserDetailsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "User does not have an active subscription to change"
+         "User does not have an active subscription to change",
+         title: "Membership type"
        )}
     else
       new_membership_type_str = membership_type_params["membership_type"]
@@ -2180,7 +2331,9 @@ defmodule YscWeb.AdminUserDetailsLive do
       if is_nil(new_membership_type_str) or new_membership_type_str == "" do
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Please select a membership type")}
+         |> YscWeb.Flash.put_toast(:error, "Please select a membership type",
+           title: "Membership type"
+         )}
       else
         new_membership_type = String.to_existing_atom(new_membership_type_str)
 
@@ -2200,7 +2353,8 @@ defmodule YscWeb.AdminUserDetailsLive do
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "Invalid membership type selected"
+               "Invalid membership type selected",
+               title: "Membership type"
              )}
 
           is_nil(current_plan) ->
@@ -2208,7 +2362,8 @@ defmodule YscWeb.AdminUserDetailsLive do
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "Could not determine current membership plan"
+               "Could not determine current membership plan",
+               title: "Membership type"
              )}
 
           current_type == new_membership_type ->
@@ -2252,7 +2407,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                  socket
                  |> assign(:active_subscription, updated_subscription)
                  |> assign(:scheduled_downgrade_info, nil)
-                 |> YscWeb.Flash.put_toast(:info, message)}
+                 |> YscWeb.Flash.put_toast(:info, message,
+                   title: "Membership type"
+                 )}
 
               {:error, error} ->
                 error_message =
@@ -2266,7 +2423,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :error,
-                   "Failed to update membership: #{error_message}"
+                   "Failed to update membership: #{error_message}",
+                   title: "Membership type"
                  )}
             end
 
@@ -2304,7 +2462,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                  )
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Membership type changed from #{String.capitalize("#{current_type}")} to #{String.capitalize("#{new_membership_type}")}"
+                   "Membership type changed from #{String.capitalize("#{current_type}")} to #{String.capitalize("#{new_membership_type}")}",
+                   title: "Membership type"
                  )}
 
               {:scheduled, subscription} ->
@@ -2317,7 +2476,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                  |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Downgrade scheduled. Membership will change to #{String.capitalize("#{new_membership_type}")} at next renewal."
+                   "Downgrade scheduled. Membership will change to #{String.capitalize("#{new_membership_type}")} at next renewal.",
+                   title: "Membership type"
                  )}
 
               {:error, error} ->
@@ -2332,7 +2492,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :error,
-                   "Failed to change membership type: #{error_message}"
+                   "Failed to change membership type: #{error_message}",
+                   title: "Membership type"
                  )}
             end
         end
@@ -2351,7 +2512,9 @@ defmodule YscWeb.AdminUserDetailsLive do
         nil ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Bank account not found")
+           |> YscWeb.Flash.put_toast(:error, "Bank account not found",
+             title: "Bank account"
+           )
            |> assign(:unsealed_account_id, nil)
            |> assign(:unsealed_account, nil)}
 
@@ -2362,7 +2525,10 @@ defmodule YscWeb.AdminUserDetailsLive do
            |> assign(:unsealed_account, decrypted_account)}
       end
     else
-      {:noreply, YscWeb.Flash.put_toast(socket, :error, "Unauthorized")}
+      {:noreply,
+       YscWeb.Flash.put_toast(socket, :error, "Unauthorized",
+         title: "Bank account"
+       )}
     end
   end
 
@@ -2382,7 +2548,10 @@ defmodule YscWeb.AdminUserDetailsLive do
 
     if active_subscription == nil do
       {:noreply,
-       socket |> YscWeb.Flash.put_toast(:error, "No active subscription found")}
+       socket
+       |> YscWeb.Flash.put_toast(:error, "No active subscription found",
+         title: "Membership period"
+       )}
     else
       case parse_datetime(membership_params["period_end_date"]) do
         {:ok, new_end_date} ->
@@ -2423,7 +2592,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                )
                |> YscWeb.Flash.put_toast(
                  :info,
-                 "Membership period updated successfully"
+                 "Membership period updated successfully",
+                 title: "Membership period"
                )}
 
             {:error, error} ->
@@ -2431,13 +2601,17 @@ defmodule YscWeb.AdminUserDetailsLive do
                socket
                |> YscWeb.Flash.put_toast(
                  :error,
-                 "Failed to update membership period: #{inspect(error)}"
+                 "Failed to update membership period: #{inspect(error)}",
+                 title: "Membership period"
                )}
           end
 
         {:error, _reason} ->
           {:noreply,
-           socket |> YscWeb.Flash.put_toast(:error, "Invalid date format")}
+           socket
+           |> YscWeb.Flash.put_toast(:error, "Invalid date format",
+             title: "Membership period"
+           )}
       end
     end
   end
@@ -2461,7 +2635,9 @@ defmodule YscWeb.AdminUserDetailsLive do
            to_form(note_changeset(%{category: "general"}), as: "note")
          )
          |> assign(:user_notes, Accounts.list_user_notes(selected_user.id))
-         |> YscWeb.Flash.put_toast(:info, "Note added successfully")}
+         |> YscWeb.Flash.put_toast(:info, "Note added successfully",
+           title: "Note"
+         )}
 
       {:error, changeset} ->
         {:noreply,
@@ -2469,7 +2645,8 @@ defmodule YscWeb.AdminUserDetailsLive do
          |> assign(:note_form, to_form(changeset, as: "note"))
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to add note: #{format_changeset_errors(changeset)}"
+           "Failed to add note: #{format_changeset_errors(changeset)}",
+           title: "Note"
          )}
     end
   end
@@ -2592,6 +2769,11 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp load_user_notes(socket, user_id) do
     user_notes = Accounts.list_user_notes(user_id)
     assign(socket, :user_notes, user_notes)
+  end
+
+  defp load_rejection_notes(socket, user_id) do
+    rejection_notes = Accounts.list_user_notes_by_category(user_id, :rejection)
+    assign(socket, :rejection_notes, rejection_notes)
   end
 
   defp format_phone_number(phone_number) do
@@ -2834,4 +3016,45 @@ defmodule YscWeb.AdminUserDetailsLive do
       "#{field}: #{Enum.join(messages, ", ")}"
     end)
   end
+
+  defp country_to_flag_class(nil), do: nil
+
+  defp country_to_flag_class(code) when is_binary(code) do
+    normalized = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
+
+    if normalized in ["SE", "NO", "FI", "DK", "IS"] do
+      "fi-#{String.downcase(normalized)}"
+    else
+      nil
+    end
+  end
+
+  defp nordic_country_display_name(nil), do: ""
+
+  defp nordic_country_display_name(code) when is_binary(code) do
+    key = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
+
+    Map.get(
+      %{
+        "SE" => "Sweden",
+        "NO" => "Norway",
+        "FI" => "Finland",
+        "DK" => "Denmark",
+        "IS" => "Iceland"
+      },
+      key,
+      code
+    )
+  end
+
+  defp format_birth_date(nil), do: ""
+
+  defp format_birth_date(%Date{} = date),
+    do: Timex.format!(date, "%b %d, %Y", :strftime)
+
+  defp format_birth_date(other), do: to_string(other)
+
+  defp review_outcome_to_badge_type(:approved), do: "green"
+  defp review_outcome_to_badge_type(:rejected), do: "red"
+  defp review_outcome_to_badge_type(_), do: "default"
 end

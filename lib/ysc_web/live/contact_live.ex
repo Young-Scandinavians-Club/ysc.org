@@ -304,7 +304,9 @@ defmodule YscWeb.ContactLive do
           {:noreply,
            socket
            |> assign(:submitted, true)
-           |> YscWeb.Flash.put_toast(:info, "Your message has been sent")}
+           |> YscWeb.Flash.put_toast(:info, "Your message has been sent",
+             title: "Contact"
+           )}
 
         {:error, changeset} ->
           {:noreply, assign_form(socket, changeset)}
@@ -317,7 +319,9 @@ defmodule YscWeb.ContactLive do
               {:noreply,
                socket
                |> assign(:submitted, true)
-               |> YscWeb.Flash.put_toast(:info, "Your message has been sent")}
+               |> YscWeb.Flash.put_toast(:info, "Your message has been sent",
+                 title: "Contact"
+               )}
 
             {:error, changeset} ->
               {:noreply, assign_form(socket, changeset)}
@@ -326,7 +330,9 @@ defmodule YscWeb.ContactLive do
         {:error, _} ->
           socket =
             socket
-            |> YscWeb.Flash.put_toast(:error, "Please try submitting again")
+            |> YscWeb.Flash.put_toast(:error, "Please try submitting again",
+              title: "Contact"
+            )
             |> Turnstile.refresh()
 
           {:noreply, assign_form(socket, changeset)}

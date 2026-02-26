@@ -227,7 +227,9 @@ defmodule YscWeb.PostLive do
       nil ->
         {:ok,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Article not found")
+         |> YscWeb.Flash.put_toast(:error, "Article not found",
+           title: "Article"
+         )
          |> redirect(to: ~p"/news")}
 
       post ->
@@ -331,7 +333,9 @@ defmodule YscWeb.PostLive do
     if new_comment.user_id == socket.assigns[:current_user].id do
       {:noreply,
        new_socket
-       |> YscWeb.Flash.put_toast(:info, "Your comment has been posted!")
+       |> YscWeb.Flash.put_toast(:info, "Your comment has been posted!",
+         title: "Comment"
+       )
        |> assign(:loading, false)
        |> assign_form(new_comment_changeset)}
     else

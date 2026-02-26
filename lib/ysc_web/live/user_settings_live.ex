@@ -1,6 +1,9 @@
 defmodule YscWeb.UserSettingsLive do
   use YscWeb, :live_view
 
+  @phone_verification_token_salt "phone_verification"
+  @phone_verification_token_max_age 3600
+
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.UserNotifier
@@ -1506,6 +1509,7 @@ defmodule YscWeb.UserSettingsLive do
                       <% end %>
                     </p>
                     <.button
+                      data-testid="change-membership-plan-button"
                       disabled={@default_payment_method == nil || !@user_is_active}
                       phx-click="change-membership"
                       phx-value-membership_type={
@@ -1992,6 +1996,32 @@ defmodule YscWeb.UserSettingsLive do
         socket
       end
 
+    # Restore pending_phone_number from signed token so reload on phone-verification keeps modal working
+    socket =
+      if socket.assigns[:live_action] == :phone_verification && params["token"] do
+        case Phoenix.Token.verify(
+               YscWeb.Endpoint,
+               @phone_verification_token_salt,
+               params["token"],
+               max_age: @phone_verification_token_max_age
+             ) do
+          {:ok, phone} when is_binary(phone) ->
+            socket
+            |> assign(:pending_phone_number, phone)
+            |> assign(:phone_verification_code_state, %{})
+
+          _ ->
+            socket
+            |> push_patch(to: ~p"/users/settings")
+            |> YscWeb.Flash.put_toast(
+              :error,
+              "Verification link expired. Please change your phone number again to get a new code."
+            )
+        end
+      else
+        socket
+      end
+
     {:noreply, socket}
   end
 
@@ -2085,6 +2115,7 @@ defmodule YscWeb.UserSettingsLive do
         to_form(%{"membership_type" => nil})
       )
       |> assign(:phone_verification_form, to_form(%{"verification_code" => ""}))
+      |> assign(:phone_verification_code_state, %{})
       |> assign(:sms_resend_disabled_until, nil)
       |> assign(:pending_phone_number, nil)
       |> assign(:phone_code_valid, false)
@@ -2426,15 +2457,31 @@ defmodule YscWeb.UserSettingsLive do
           profile_form =
             Accounts.change_user_profile(updated_user, user_params) |> to_form()
 
+          token =
+            Phoenix.Token.sign(
+              YscWeb.Endpoint,
+              @phone_verification_token_salt,
+              new_phone,
+              max_age: @phone_verification_token_max_age
+            )
+
+          path =
+            ~p"/users/settings/phone-verification"
+            |> URI.parse()
+            |> Map.put(:query, URI.encode_query(%{"token" => token}))
+            |> URI.to_string()
+
           {:noreply,
            socket
            |> assign(:user, updated_user)
            |> assign(:profile_form, profile_form)
            |> assign(:pending_phone_number, new_phone)
-           |> push_patch(to: ~p"/users/settings/phone-verification")
+           |> assign(:phone_verification_code_state, %{})
+           |> push_patch(to: path)
            |> YscWeb.Flash.put_toast(
              :info,
-             "Phone number update initiated. Please verify the code sent to your new number."
+             "Phone number update initiated. Please verify the code sent to your new number.",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
            )}
 
         {:error, changeset} ->
@@ -2468,15 +2515,29 @@ defmodule YscWeb.UserSettingsLive do
     pending_phone = socket.assigns.pending_phone_number
 
     if pending_phone do
-      # Handle both OTP array format and single string format
-      normalized_code = normalize_verification_code(code)
+      # Accumulate digits in a dedicated assign (phx-input may send only the changed
+      # field, or some inputs can be sent as _unused_ until focused)
+      current_code = socket.assigns[:phone_verification_code_state] || %{}
+      current_code = if is_map(current_code), do: current_code, else: %{}
+
+      merged_code =
+        if is_map(code) do
+          Map.merge(current_code, code)
+        else
+          code
+        end
+
+      normalized_code = normalize_verification_code(merged_code)
+
       # Basic validation - ensure it's 6 digits
       is_valid =
         String.length(normalized_code) == 6 &&
           String.match?(normalized_code, ~r/^\d{6}$/)
 
       {:noreply,
-       assign(socket, phone_code_valid: is_valid, phone_verification_error: nil)}
+       socket
+       |> assign(phone_code_valid: is_valid, phone_verification_error: nil)
+       |> assign(phone_verification_code_state: merged_code)}
     else
       {:noreply, socket}
     end
@@ -2514,10 +2575,12 @@ defmodule YscWeb.UserSettingsLive do
                    socket
                    |> assign(:user, updated_user)
                    |> assign(:pending_phone_number, nil)
+                   |> assign(:phone_verification_code_state, %{})
                    |> push_patch(to: ~p"/users/settings")
                    |> YscWeb.Flash.put_toast(
                      :info,
-                     "Phone number updated and verified successfully."
+                     "Phone number updated and verified successfully.",
+                     icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
                    )}
 
                 {:error, _} ->
@@ -2916,7 +2979,10 @@ defmodule YscWeb.UserSettingsLive do
 
   def handle_event("cancel_phone_verification_confirmed", _params, socket) do
     # User confirmed they want to close the modal
-    {:noreply, push_navigate(socket, to: ~p"/users/settings")}
+    {:noreply,
+     socket
+     |> assign(:phone_verification_code_state, %{})
+     |> push_navigate(to: ~p"/users/settings")}
   end
 
   def handle_event("validate_notifications", params, socket) do
@@ -3927,7 +3993,8 @@ defmodule YscWeb.UserSettingsLive do
     direction =
       if new_plan.amount > current_plan.amount, do: :upgrade, else: :downgrade
 
-    with :ok <- validate_downgrade_with_sub_accounts(user, direction) do
+    with :ok <- validate_payment_method_for_upgrade(socket, direction),
+         :ok <- validate_downgrade_with_sub_accounts(user, direction) do
       process_membership_change(
         socket,
         user,
@@ -3938,6 +4005,20 @@ defmodule YscWeb.UserSettingsLive do
       )
     end
   end
+
+  # Manual (paid elsewhere) memberships have no payment method in Stripe. If we allow
+  # upgrade without one, Stripe creates an invoice that cannot be paid and the
+  # subscription goes incomplete, which can lead to lost membership in our app.
+  defp validate_payment_method_for_upgrade(socket, :upgrade) do
+    if socket.assigns[:default_payment_method] do
+      :ok
+    else
+      {:error,
+       "To upgrade, please add a payment method first. Use the Payment method step above to add a card or bank account."}
+    end
+  end
+
+  defp validate_payment_method_for_upgrade(_socket, :downgrade), do: :ok
 
   defp validate_downgrade_with_sub_accounts(user, :downgrade) do
     sub_accounts = Accounts.get_sub_accounts(user)
@@ -4089,9 +4170,9 @@ defmodule YscWeb.UserSettingsLive do
 
   # Helper function to normalize verification code from OTP array/map or string format
   defp normalize_verification_code(code) when is_map(code) do
-    # Handle map format: %{"0" => "1", "1" => "2", ...}
-    # Sort by key and join values, filtering out empty values
+    # Handle map format: %{"0" => "1", "1" => "2", ...}; form may include "_unused_N" keys
     code
+    |> Enum.filter(fn {k, _v} -> match?({_, _}, Integer.parse(k)) end)
     |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
     |> Enum.map(fn {_k, v} -> v end)
     |> Enum.reject(&(&1 == "" || &1 == nil))

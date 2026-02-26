@@ -4,6 +4,12 @@
 
 /* This file is for your main application CSS */
 
+/* Toast container: always on top (nav, modals, overlays). Explicit here to avoid Tailwind purging. */
+#toast-group,
+.toast-container-above-all {
+  z-index: 10000;
+}
+
 /* Improve scrolling performance and prevent layout shifts */
 
 html {

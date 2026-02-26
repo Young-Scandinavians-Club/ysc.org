@@ -2388,6 +2388,20 @@ defmodule Ysc.Accounts do
     |> Repo.all()
   end
 
+  @doc """
+  Lists user notes filtered by category (e.g. :rejection).
+
+  Returns notes ordered by most recent first, with created_by preloaded.
+  """
+  def list_user_notes_by_category(user_id, category) do
+    from(n in UserNote,
+      where: n.user_id == ^user_id and n.category == ^category,
+      order_by: [desc: n.inserted_at],
+      preload: [:created_by]
+    )
+    |> Repo.all()
+  end
+
   # Helper function to check if we're in dev/sandbox mode
   defp dev_or_sandbox? do
     Ysc.Env.non_prod?()

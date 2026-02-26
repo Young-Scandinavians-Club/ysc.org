@@ -29,7 +29,9 @@ defmodule YscWeb.BookingCheckoutLive do
 
       {:error, {:redirect, path, message}} ->
         {:ok,
-         socket |> YscWeb.Flash.put_toast(:error, message) |> redirect(to: path)}
+         socket
+         |> YscWeb.Flash.put_toast(:error, message, title: "Checkout")
+         |> redirect(to: path)}
     end
   end
 
@@ -106,7 +108,8 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to calculate price: #{inspect(reason)}"
+           "Failed to calculate price: #{inspect(reason)}",
+           title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
     end
@@ -1575,7 +1578,8 @@ defmodule YscWeb.BookingCheckoutLive do
                  )
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Guest information saved. Please complete payment."
+                   "Guest information saved. Please complete payment.",
+                   title: "Checkout"
                  )}
 
               {:error, reason} ->
@@ -1613,7 +1617,7 @@ defmodule YscWeb.BookingCheckoutLive do
          assign(socket,
            guest_info_errors: %{general: error_message}
          )
-         |> YscWeb.Flash.put_toast(:error, error_message)}
+         |> YscWeb.Flash.put_toast(:error, error_message, title: "Checkout")}
 
       {:error, invalid_changesets} when is_list(invalid_changesets) ->
         errors =
@@ -1651,7 +1655,9 @@ defmodule YscWeb.BookingCheckoutLive do
      assign(socket,
        guest_info_errors: %{general: "No guest information provided"}
      )
-     |> YscWeb.Flash.put_toast(:error, "Please provide guest information.")}
+     |> YscWeb.Flash.put_toast(:error, "Please provide guest information.",
+       title: "Checkout"
+     )}
   end
 
   @impl true
@@ -1665,7 +1671,8 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your booking has been canceled and the availability has been released."
+           "Your booking has been canceled and the availability has been released.",
+           title: "Checkout"
          )
          |> redirect(to: redirect_path)}
 
@@ -1674,7 +1681,8 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to cancel booking: #{inspect(reason)}. Please try again or contact support."
+           "Failed to cancel booking: #{inspect(reason)}. Please try again or contact support.",
+           title: "Checkout"
          )}
     end
   end
@@ -1702,7 +1710,8 @@ defmodule YscWeb.BookingCheckoutLive do
        )
        |> YscWeb.Flash.put_toast(
          :error,
-         "This booking has expired. Please create a new booking."
+         "This booking has expired. Please create a new booking.",
+         title: "Checkout"
        )}
     else
       case process_payment_success(socket.assigns.booking, payment_intent_id) do
@@ -1746,7 +1755,8 @@ defmodule YscWeb.BookingCheckoutLive do
        )
        |> YscWeb.Flash.put_toast(
          :error,
-         "This booking has expired. Please create a new booking."
+         "This booking has expired. Please create a new booking.",
+         title: "Checkout"
        )}
     else
       # Schedule next check in 5 seconds

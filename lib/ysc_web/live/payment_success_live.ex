@@ -48,7 +48,8 @@ defmodule YscWeb.PaymentSuccessLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "You must be signed in to view this page."
+         "You must be signed in to view this page.",
+         title: "Payment"
        )
        |> redirect(to: ~p"/")}
     else
@@ -75,14 +76,17 @@ defmodule YscWeb.PaymentSuccessLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :error,
-                   "Payment was successful, but we couldn't find your booking or order. Please contact support."
+                   "Payment was successful, but we couldn't find your booking or order. Please contact support.",
+                   title: "Payment"
                  )
                  |> redirect(to: ~p"/")}
             end
           else
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, "Invalid payment information.")
+             |> YscWeb.Flash.put_toast(:error, "Invalid payment information.",
+               title: "Payment"
+             )
              |> redirect(to: ~p"/")}
           end
 
@@ -99,7 +103,9 @@ defmodule YscWeb.PaymentSuccessLive do
               {:ok, redirect_path} ->
                 {:ok,
                  socket
-                 |> YscWeb.Flash.put_toast(:error, failure_message)
+                 |> YscWeb.Flash.put_toast(:error, failure_message,
+                   title: "Payment"
+                 )
                  |> redirect(to: redirect_path)}
 
               {:error, reason} ->
@@ -112,13 +118,17 @@ defmodule YscWeb.PaymentSuccessLive do
 
                 {:ok,
                  socket
-                 |> YscWeb.Flash.put_toast(:error, failure_message)
+                 |> YscWeb.Flash.put_toast(:error, failure_message,
+                   title: "Payment"
+                 )
                  |> redirect(to: ~p"/")}
             end
           else
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, failure_message)
+             |> YscWeb.Flash.put_toast(:error, failure_message,
+               title: "Payment"
+             )
              |> redirect(to: ~p"/")}
           end
 
@@ -128,7 +138,8 @@ defmodule YscWeb.PaymentSuccessLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Payment status is unclear. Please check your booking or order status."
+             "Payment status is unclear. Please check your booking or order status.",
+             title: "Payment"
            )
            |> redirect(to: ~p"/")}
       end

@@ -60,4 +60,4 @@ soft_limit = 1000
 
 [[vm]]
 size = 'shared-cpu-1x'
-memory = 512
+memory = 1024

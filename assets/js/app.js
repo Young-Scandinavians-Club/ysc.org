@@ -112,7 +112,7 @@ let Hooks = {
     DecadeIndicator,
     FooterRotator,
     ScrollMoreIndicator,
-    LiveToast: createLiveToastHook(6000, 3),
+    LiveToast: createLiveToastHook(5000, 3),
 };
 Hooks.LivePhone = LivePhone;
 

@@ -37,7 +37,8 @@ defmodule YscWeb.AuthController do
     conn
     |> YscWeb.Flash.put_toast(
       :error,
-      "Authentication was cancelled or failed. Please try again."
+      "Authentication was cancelled or failed. Please try again.",
+      title: "Authentication"
     )
     |> redirect(to: ~p"/users/log-in")
   end
@@ -52,7 +53,8 @@ defmodule YscWeb.AuthController do
       conn
       |> YscWeb.Flash.put_toast(
         :error,
-        "Unable to retrieve email from your account. Please contact support."
+        "Unable to retrieve email from your account. Please contact support.",
+        title: "Authentication"
       )
       |> redirect(to: ~p"/users/log-in")
     end
@@ -63,7 +65,8 @@ defmodule YscWeb.AuthController do
     conn
     |> YscWeb.Flash.put_toast(
       :error,
-      "Authentication error occurred. Please try again."
+      "Authentication error occurred. Please try again.",
+      title: "Authentication"
     )
     |> redirect(to: ~p"/users/log-in")
   end
@@ -82,7 +85,8 @@ defmodule YscWeb.AuthController do
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "No account found with this email. Please apply for membership first."
+          "No account found with this email. Please apply for membership first.",
+          title: "Authentication"
         )
         |> redirect(to: ~p"/users/log-in")
 
@@ -115,7 +119,8 @@ defmodule YscWeb.AuthController do
           |> delete_session(:oauth_redirect_to)
           |> YscWeb.Flash.put_toast(
             :info,
-            "Successfully signed in with #{String.capitalize(to_string(provider))}!"
+            "Successfully signed in with #{String.capitalize(to_string(provider))}!",
+            title: "Authentication"
           )
           |> put_session(:just_logged_in, true)
           |> UserAuth.log_in_user(updated_user, %{}, redirect_to)
@@ -124,7 +129,8 @@ defmodule YscWeb.AuthController do
           conn
           |> YscWeb.Flash.put_toast(
             :error,
-            "Your account is not currently active."
+            "Your account is not currently active.",
+            title: "Authentication"
           )
           |> redirect(to: ~p"/users/log-in")
         end

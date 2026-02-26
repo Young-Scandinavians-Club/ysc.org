@@ -359,7 +359,9 @@ defmodule YscWeb.ConductViolationReportLive do
            socket
            |> assign(:submitted, true)
            |> assign(:submitted_summary, summary_text)
-           |> YscWeb.Flash.put_toast(:info, "Your report has been submitted")}
+           |> YscWeb.Flash.put_toast(:info, "Your report has been submitted",
+             title: "Report"
+           )}
 
         {:error, changeset} ->
           {:noreply, assign_form(socket, changeset)}
@@ -375,7 +377,8 @@ defmodule YscWeb.ConductViolationReportLive do
                |> assign(:submitted_summary, summary_text)
                |> YscWeb.Flash.put_toast(
                  :info,
-                 "Your report has been submitted"
+                 "Your report has been submitted",
+                 title: "Report"
                )}
 
             {:error, changeset} ->
@@ -385,7 +388,9 @@ defmodule YscWeb.ConductViolationReportLive do
         {:error, _} ->
           socket =
             socket
-            |> YscWeb.Flash.put_toast(:error, "Please try submitting again")
+            |> YscWeb.Flash.put_toast(:error, "Please try submitting again",
+              title: "Report"
+            )
             |> Turnstile.refresh()
 
           {:noreply, assign_form(socket, changeset)}

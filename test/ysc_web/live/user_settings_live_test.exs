@@ -26,6 +26,9 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       refute has_element?(view, "#flash-info")
 
+      refute view |> render() |> to_string() =~
+               "Your membership has been updated"
+
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "memberships:user:#{user.id}",
@@ -33,7 +36,10 @@ defmodule YscWeb.UserSettingsLiveTest do
          %MessagePassingEvents.MembershipUpdated{user_id: user.id}}
       )
 
-      assert has_element?(view, "#flash-info")
+      # render/1 synchronises with the LiveView process (test README: no sleep needed after PubSub)
+      assert view |> render() |> to_string() =~
+               "Your membership has been updated",
+             "Expected membership update toast to appear after PubSub broadcast"
     end
 
     test "reloads membership data and updates the UI on receiving a PubSub event",
@@ -229,6 +235,75 @@ defmodule YscWeb.UserSettingsLiveTest do
         Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
         Application.delete_env(:ysc, :cancel_scheduled_downgrade_callback)
       end
+    end
+  end
+
+  describe "membership upgrade requires payment method" do
+    test "change membership plan button is disabled when user has no payment method",
+         %{conn: conn} do
+      # Manual (paid elsewhere) members have no payment method. Upgrading would
+      # create an invoice that cannot be paid. UI must disable upgrade and show
+      # message to add a payment method first.
+      user = user_fixture(%{state: :active})
+
+      # Give user a stripe_id so load_settings_data doesn't call Stripe to create customer
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(
+          stripe_id: "cus_test_#{System.unique_integer()}"
+        )
+        |> Repo.update()
+
+      user = Repo.reload(user)
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+      assert single_plan, "membership_plans must include single"
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_no_pm_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_no_pm_#{System.unique_integer()}",
+          stripe_product_id: "prod_single",
+          stripe_price_id: single_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      # User has no payment methods (manual membership)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+
+      # Wait for async load_settings_data so membership and payment methods are loaded
+      render(view)
+      assert view |> element("#membership_form") |> has_element?()
+
+      # Select family (upgrade) so the "Change Membership Plan" button appears
+      render_change(view, "validate_membership", %{
+        "membership_type" => "family"
+      })
+
+      # When there is no payment method, the button must be disabled
+      # (manual/paid-elsewhere members have no payment method; upgrade would create unpaid invoice)
+      assert has_element?(
+               view,
+               "[data-testid=\"change-membership-plan-button\"]"
+             )
+
+      change_btn =
+        view |> element("[data-testid=\"change-membership-plan-button\"]")
+
+      assert change_btn |> render() =~ "disabled"
     end
   end
 end

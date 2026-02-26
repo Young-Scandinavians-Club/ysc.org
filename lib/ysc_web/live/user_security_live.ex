@@ -236,7 +236,9 @@ defmodule YscWeb.UserSecurityLive do
               {:noreply,
                socket
                |> assign(:passkeys, updated_passkeys)
-               |> YscWeb.Flash.put_toast(:info, "Passkey deleted successfully.")}
+               |> YscWeb.Flash.put_toast(:info, "Passkey deleted successfully.",
+                 title: "Passkey"
+               )}
 
             {:error, _changeset} ->
               {:noreply,

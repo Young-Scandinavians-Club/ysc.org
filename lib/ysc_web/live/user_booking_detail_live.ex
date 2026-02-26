@@ -18,7 +18,8 @@ defmodule YscWeb.UserBookingDetailLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "You must be signed in to view this booking."
+         "You must be signed in to view this booking.",
+         title: "Booking"
        )
        |> redirect(to: ~p"/")}
     else
@@ -34,7 +35,9 @@ defmodule YscWeb.UserBookingDetailLive do
         nil ->
           {:ok,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Booking not found.")
+           |> YscWeb.Flash.put_toast(:error, "Booking not found.",
+             title: "Booking"
+           )
            |> redirect(to: ~p"/")}
 
         booking ->
@@ -80,7 +83,8 @@ defmodule YscWeb.UserBookingDetailLive do
                socket
                |> YscWeb.Flash.put_toast(
                  :error,
-                 "You don't have permission to view this booking."
+                 "You don't have permission to view this booking.",
+                 title: "Booking"
                )
                |> redirect(to: ~p"/")}
           end
@@ -147,7 +151,7 @@ defmodule YscWeb.UserBookingDetailLive do
              |> assign(:refund_info, refund_info)
              |> assign(:can_cancel, false)
              |> assign(:show_cancel_modal, false)
-             |> YscWeb.Flash.put_toast(:info, refund_message)}
+             |> YscWeb.Flash.put_toast(:info, refund_message, title: "Booking")}
 
           {:error, reason} ->
             error_message =
@@ -174,7 +178,7 @@ defmodule YscWeb.UserBookingDetailLive do
             {:noreply,
              socket
              |> assign(:show_cancel_modal, false)
-             |> YscWeb.Flash.put_toast(:error, error_message)}
+             |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")}
         end
 
       {:error, _reason} ->
@@ -183,7 +187,8 @@ defmodule YscWeb.UserBookingDetailLive do
          |> assign(:show_cancel_modal, false)
          |> YscWeb.Flash.put_toast(
            :error,
-           "You don't have permission to cancel this booking."
+           "You don't have permission to cancel this booking.",
+           title: "Booking"
          )}
     end
   end

@@ -824,8 +824,16 @@ defmodule Ysc.Subscriptions do
          new_price_id,
          direction
        ) do
+    # Callback allows tests to stub the initial retrieve (avoid hitting Stripe).
+    initial_retrieve_fn =
+      Application.get_env(
+        :ysc,
+        :subscription_retrieve_initial_plan_change_callback
+      ) ||
+        fn sid, opts -> Stripe.Subscription.retrieve(sid, opts) end
+
     with {:ok, stripe_sub} <-
-           Stripe.Subscription.retrieve(subscription.stripe_id,
+           initial_retrieve_fn.(subscription.stripe_id,
              expand: ["items.data.price"]
            ),
          [first_item | _] when first_item != nil <- stripe_sub.items.data do
@@ -853,34 +861,70 @@ defmodule Ysc.Subscriptions do
             # Release any existing schedule first (e.g. scheduled downgrade user is canceling)
             _ = maybe_release_schedule(stripe_sub)
 
-            # For upgrades: charge proration delta immediately and update subscription
+            # For upgrades: charge proration delta immediately and update subscription.
+            # Note: Manual (paid elsewhere) memberships have no default payment method in
+            # Stripe; the user settings flow requires a payment method before allowing
+            # upgrade. Without one, Stripe would create an unpaid invoice and the
+            # subscription would go incomplete.
             # Use proration_behavior: "always_invoice" to ensure immediate charge
             update_items = [
               %{id: stripe_item_id, price: new_price_id, quantity: 1}
             ]
 
-            case Stripe.Subscription.update(subscription.stripe_id, %{
-                   items: update_items,
-                   proration_behavior: "always_invoice",
-                   billing_cycle_anchor: "unchanged"
-                 }) do
+            update_params = %{
+              items: update_items,
+              proration_behavior: "always_invoice",
+              billing_cycle_anchor: "unchanged"
+            }
+
+            # Callback allows tests to stub the update (avoid hitting Stripe).
+            update_fn =
+              Application.get_env(
+                :ysc,
+                :subscription_update_plan_change_callback
+              ) ||
+                fn sid, params -> Stripe.Subscription.update(sid, params) end
+
+            case update_fn.(subscription.stripe_id, update_params) do
               {:ok, _stripe_subscription} ->
-                # Retrieve updated subscription to sync with Stripe
-                case Stripe.Subscription.retrieve(subscription.stripe_id) do
+                # Retrieve updated subscription to sync with Stripe.
+                # Do not overwrite with "incomplete": when Stripe creates an invoice for
+                # the proration, status can be "incomplete" until payment. If we save that,
+                # the user would see no membership until invoice is paid. Keep existing
+                # record so the user retains membership; subscription.updated will sync
+                # when payment succeeds.
+                # Callback allows tests to stub the retrieve (e.g. return status "incomplete").
+                retrieve_fn =
+                  Application.get_env(
+                    :ysc,
+                    :subscription_retrieve_after_plan_change_callback
+                  ) ||
+                    fn sid -> Stripe.Subscription.retrieve(sid) end
+
+                case retrieve_fn.(subscription.stripe_id) do
                   {:ok, updated_stripe_subscription} ->
-                    update_subscription(subscription, %{
-                      stripe_status: updated_stripe_subscription.status,
-                      current_period_start:
-                        updated_stripe_subscription.current_period_start &&
-                          DateTime.from_unix!(
-                            updated_stripe_subscription.current_period_start
-                          ),
-                      current_period_end:
-                        updated_stripe_subscription.current_period_end &&
-                          DateTime.from_unix!(
-                            updated_stripe_subscription.current_period_end
-                          )
-                    })
+                    if updated_stripe_subscription.status in [
+                         "active",
+                         "trialing"
+                       ] do
+                      update_subscription(subscription, %{
+                        stripe_status: updated_stripe_subscription.status,
+                        current_period_start:
+                          updated_stripe_subscription.current_period_start &&
+                            DateTime.from_unix!(
+                              updated_stripe_subscription.current_period_start
+                            ),
+                        current_period_end:
+                          updated_stripe_subscription.current_period_end &&
+                            DateTime.from_unix!(
+                              updated_stripe_subscription.current_period_end
+                            )
+                      })
+                    else
+                      # Status is incomplete (or similar); leave DB unchanged so user
+                      # keeps current membership until payment completes
+                      {:ok, subscription}
+                    end
 
                   {:error, error} ->
                     {:error, error}

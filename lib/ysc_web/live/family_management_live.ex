@@ -94,14 +94,17 @@ defmodule YscWeb.FamilyManagementLive do
         {:noreply,
          socket
          |> assign(:invites, invites)
-         |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}")}
+         |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}",
+           title: "Family"
+         )}
 
       {:error, :user_not_active} ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Your account must be active to send invites."
+           "Your account must be active to send invites.",
+           title: "Family"
          )}
 
       {:error, :invalid_membership_type} ->
@@ -109,7 +112,8 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You must have a family or lifetime membership to send invites."
+           "You must have a family or lifetime membership to send invites.",
+           title: "Family"
          )}
 
       {:error, :max_sub_accounts_reached} ->
@@ -117,7 +121,8 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You have reached the maximum number of sub-accounts (10)."
+           "You have reached the maximum number of sub-accounts (10).",
+           title: "Family"
          )}
 
       {:error, :email_already_registered} ->
@@ -125,7 +130,8 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This email is already registered."
+           "This email is already registered.",
+           title: "Family"
          )}
 
       {:error, :pending_invite_exists} ->
@@ -133,7 +139,8 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "A pending invitation already exists for this email."
+           "A pending invitation already exists for this email.",
+           title: "Family"
          )}
 
       {:error, changeset} ->
@@ -142,7 +149,8 @@ defmodule YscWeb.FamilyManagementLive do
          |> assign(:invite_form, to_form(changeset))
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to send invitation. Please check the email address."
+           "Failed to send invitation. Please check the email address.",
+           title: "Family"
          )}
     end
   end
@@ -157,18 +165,23 @@ defmodule YscWeb.FamilyManagementLive do
         {:noreply,
          socket
          |> assign(:invites, invites)
-         |> YscWeb.Flash.put_toast(:info, "Invitation revoked.")}
+         |> YscWeb.Flash.put_toast(:info, "Invitation revoked.",
+           title: "Family"
+         )}
 
       {:error, :not_found} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Invitation not found.")}
+         YscWeb.Flash.put_toast(socket, :error, "Invitation not found.",
+           title: "Family"
+         )}
 
       {:error, :unauthorized} ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You are not authorized to revoke this invitation."
+           "You are not authorized to revoke this invitation.",
+           title: "Family"
          )}
 
       {:error, :already_accepted} ->
@@ -176,7 +189,8 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This invitation has already been accepted."
+           "This invitation has already been accepted.",
+           title: "Family"
          )}
     end
   end
@@ -193,14 +207,17 @@ defmodule YscWeb.FamilyManagementLive do
           {:noreply,
            socket
            |> assign(:sub_accounts, sub_accounts)
-           |> YscWeb.Flash.put_toast(:info, "Sub-account removed successfully.")}
+           |> YscWeb.Flash.put_toast(:info, "Sub-account removed successfully.",
+             title: "Family"
+           )}
 
         {:error, _} ->
           {:noreply,
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to remove sub-account."
+             "Failed to remove sub-account.",
+             title: "Family"
            )}
       end
     else
@@ -208,7 +225,8 @@ defmodule YscWeb.FamilyManagementLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "Sub-account not found or unauthorized."
+         "Sub-account not found or unauthorized.",
+         title: "Family"
        )}
     end
   end

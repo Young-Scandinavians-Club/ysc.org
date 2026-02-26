@@ -919,6 +919,185 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert subscription.current_period_end == original_period_end
       assert Subscriptions.active?(subscription)
     end
+
+    test "recreates subscription when subscription.updated received but subscription missing locally (e.g. was deleted on incomplete_expired)" do
+      user = user_with_stripe_id()
+      stripe_sub_id = "sub_recreated_#{System.unique_integer()}"
+
+      # No local subscription - simulates we had deleted it when it went incomplete_expired
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+
+      ts = System.os_time(:second)
+
+      fake_stripe_subscription = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: user.stripe_id,
+        status: "active",
+        start_date: ts,
+        current_period_start: ts,
+        current_period_end: ts + 30 * 24 * 60 * 60,
+        ended_at: nil,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      callback = fn _id, _opts -> {:ok, fake_stripe_subscription} end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :subscription_retrieve_for_webhook_callback,
+          callback
+        )
+
+        event_data = %Stripe.Subscription{
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "active",
+          start_date: ts,
+          current_period_start: ts,
+          current_period_end: ts + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        }
+
+        event = build_stripe_event("customer.subscription.updated", event_data)
+        assert :ok = WebhookHandler.handle_event(event)
+
+        subscription =
+          Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+
+        assert subscription != nil
+        assert subscription.user_id == user.id
+        assert subscription.stripe_status == "active"
+        assert Subscriptions.active?(subscription)
+      after
+        Application.delete_env(
+          :ysc,
+          :subscription_retrieve_for_webhook_callback
+        )
+      end
+    end
+
+    test "recreates subscription when status is trialing and subscription missing locally" do
+      user = user_with_stripe_id()
+      stripe_sub_id = "sub_trialing_#{System.unique_integer()}"
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+
+      ts = System.os_time(:second)
+
+      fake_stripe_subscription = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: user.stripe_id,
+        status: "trialing",
+        start_date: ts,
+        current_period_start: ts,
+        current_period_end: ts + 30 * 24 * 60 * 60,
+        ended_at: nil,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      callback = fn _id, _opts -> {:ok, fake_stripe_subscription} end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :subscription_retrieve_for_webhook_callback,
+          callback
+        )
+
+        event_data = %Stripe.Subscription{
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "trialing",
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        }
+
+        event = build_stripe_event("customer.subscription.updated", event_data)
+        assert :ok = WebhookHandler.handle_event(event)
+
+        subscription =
+          Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+
+        assert subscription != nil
+        assert subscription.stripe_status == "trialing"
+      after
+        Application.delete_env(
+          :ysc,
+          :subscription_retrieve_for_webhook_callback
+        )
+      end
+    end
+
+    test "does not recreate subscription when status is incomplete and subscription missing locally" do
+      user = user_with_stripe_id()
+      stripe_sub_id = "sub_incomplete_#{System.unique_integer()}"
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+
+      event_data = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: user.stripe_id,
+        status: "incomplete",
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event = build_stripe_event("customer.subscription.updated", event_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      # Should not create - we only recreate for active/trialing
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+    end
+
+    test "does not recreate subscription when subscription missing locally and user not found for customer" do
+      # User exists but has different stripe_id - event has unknown customer
+      _user = user_with_stripe_id()
+      stripe_sub_id = "sub_orphan_#{System.unique_integer()}"
+      unknown_customer_id = "cus_unknown_#{System.unique_integer()}"
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+
+      event_data = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: unknown_customer_id,
+        status: "active",
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event = build_stripe_event("customer.subscription.updated", event_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+    end
   end
 
   describe "payment method webhooks" do

@@ -92,174 +92,292 @@ defmodule YscWeb.AdminUsersLive do
         on_cancel={JS.navigate(~p"/admin/users?#{@params}")}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
-          Review Application
-        </h2>
-
-        <.alert_box :if={@selected_user.state != :pending_approval}>
-          <p class="leading-6 text-sm text-zinc-800">
-            This application has already been reviewed. It was
-            <span>
+        <div class="max-w-2xl mx-auto">
+          <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
+            <div class="min-w-0">
+              <h2 class="text-2xl font-bold text-zinc-900">Review Application</h2>
+              <p class="text-sm text-zinc-500 mt-0.5">
+                {if @selected_user.state == :pending_approval do
+                  "Submitted " <>
+                    Timex.from_now(@selected_user_application.completed)
+                else
+                  "Reviewed " <>
+                    Timex.format!(
+                      @selected_user_application.reviewed_at,
+                      "%b %d, %Y",
+                      :strftime
+                    ) <>
+                    " by " <> @selected_user_application.reviewed_by.email
+                end}
+              </p>
+            </div>
+            <span :if={@selected_user.state == :pending_approval} class="shrink-0">
+              <.badge type="default">Pending Review</.badge>
+            </span>
+            <span
+              :if={
+                @selected_user.state != :pending_approval &&
+                  @selected_user_application.review_outcome != nil
+              }
+              class="shrink-0"
+            >
               <.badge type={
-                if @selected_user_application.review_outcome == :approved,
-                  do: "green",
-                  else: "red"
+                review_outcome_to_badge_type(
+                  @selected_user_application.review_outcome
+                )
               }>
                 {@selected_user_application.review_outcome}
               </.badge>
             </span>
-            on
-            <span class="font-semibold">
-              {Timex.format!(
-                @selected_user_application.reviewed_at,
-                "%Y-%m-%d",
-                :strftime
-              )}
-            </span>
-            by <span class="font-semibold"><%= @selected_user_application.reviewed_by.email %></span>.
-          </p>
-        </.alert_box>
+          </div>
 
-        <p class="leading-6 text-sm text-zinc-800 mb-4 font-semibold">
-          Submitted:
-          <.badge>
-            {"#{Timex.format!(Timex.Timezone.convert(@selected_user_application.completed, "America/Los_Angeles"), "{YYYY}-{0M}-{0D}")} (#{Timex.from_now(@selected_user_application.completed)})"}
-          </.badge>
-        </p>
+          <div class="space-y-6">
+            <section>
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                Applicant Details
+              </h3>
+              <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                <div class="py-2">
+                  <dt class="text-sm font-semibold text-zinc-600">Full Name</dt>
+                  <dd class="mt-0.5 text-sm text-zinc-900">
+                    {"#{@selected_user.first_name} #{@selected_user.last_name}"}
+                  </dd>
+                </div>
+                <div class="py-2">
+                  <dt class="text-sm font-semibold text-zinc-600">Email</dt>
+                  <dd class="mt-0.5 text-sm text-zinc-900 underline decoration-zinc-200">
+                    {@selected_user.email}
+                  </dd>
+                </div>
+                <div class="py-2">
+                  <dt class="text-sm font-semibold text-zinc-600">Birth Date</dt>
+                  <dd class="mt-0.5 text-sm text-zinc-900">
+                    {format_birth_date(@selected_user_application.birth_date)}
+                  </dd>
+                </div>
+                <div
+                  :if={length(@selected_user.family_members) > 0}
+                  class="py-2 sm:col-span-2"
+                >
+                  <dt class="text-sm font-semibold text-zinc-600">
+                    Family members
+                  </dt>
+                  <dd class="mt-1 text-sm text-zinc-900">
+                    <ul class="space-y-1 list-disc list-inside">
+                      <li :for={family_member <- @selected_user.family_members}>
+                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded bg-blue-100 text-blue-800">
+                          {String.capitalize("#{family_member.type}")}
+                        </span>
+                        {"#{family_member.first_name} #{family_member.last_name} (#{format_birth_date(family_member.birth_date)})"}
+                      </li>
+                    </ul>
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
-        <h3 class="leading-6 text-zinc-800 font-semibold mb-2">
-          Applicant Details
-        </h3>
-        <ul class="leading-6 text-zinc-800 text-sm pb-6">
-          <li>
-            <span class="font-semibold">Email:</span> {@selected_user.email}
-          </li>
-          <li>
-            <span class="font-semibold">Name:</span> {"#{@selected_user.first_name} #{@selected_user.last_name}"}
-          </li>
-          <li>
-            <span class="font-semibold">Birth date:</span> {@selected_user_application.birth_date}
-          </li>
+            <section>
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                Answers
+              </h3>
+              <div class="space-y-4">
+                <div class="py-2">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1.5">
+                    Membership type
+                  </p>
+                  <.badge type={
+                    if to_string(@selected_user_application.membership_type) ==
+                         "family", do: "green", else: "default"
+                  }>
+                    {String.capitalize(
+                      "#{@selected_user_application.membership_type}"
+                    )}
+                  </.badge>
+                </div>
+                <div class="bg-zinc-50 rounded-lg p-4 ring-1 ring-zinc-200/50">
+                  <p class="text-sm font-semibold text-zinc-700 mb-2">
+                    Eligibility & Connections
+                  </p>
+                  <ul class="text-sm space-y-1 list-disc list-inside text-zinc-600">
+                    <li :for={
+                      reason <- @selected_user_application.membership_eligibility
+                    }>
+                      {Map.get(
+                        Ysc.Accounts.SignupApplication.eligibility_lookup(),
+                        reason
+                      )}
+                    </li>
+                  </ul>
+                </div>
 
-          <li :if={length(@selected_user.family_members) > 0}>
-            <p class="font-semibold">Family members:</p>
-            <ul class="space-y-1 text-zinc-800 list-disc list-inside">
-              <li :for={family_member <- @selected_user.family_members}>
-                <span class="text-xs font-medium me-2 px-2.5 py-1 rounded text-left bg-blue-100 text-blue-800">
-                  {String.capitalize("#{family_member.type}")}
-                </span>
-                {"#{family_member.first_name} #{family_member.last_name} (#{family_member.birth_date})"}
-              </li>
-            </ul>
-          </li>
-        </ul>
+                <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">Occupation</dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900">
+                      {@selected_user_application.occupation}
+                    </dd>
+                  </div>
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">
+                      Place of birth
+                    </dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
+                      <span
+                        :if={
+                          country_to_flag_class(
+                            @selected_user_application.place_of_birth
+                          )
+                        }
+                        class="shrink-0"
+                      >
+                        <.flag
+                          country={
+                            country_to_flag_class(
+                              @selected_user_application.place_of_birth
+                            )
+                          }
+                          class="h-4 w-6 rounded inline-block align-middle"
+                        />
+                      </span>
+                      {nordic_country_display_name(
+                        @selected_user_application.place_of_birth
+                      ) || @selected_user_application.place_of_birth}
+                    </dd>
+                  </div>
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">Citizenship</dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
+                      <span
+                        :if={
+                          country_to_flag_class(
+                            @selected_user_application.citizenship
+                          )
+                        }
+                        class="shrink-0"
+                      >
+                        <.flag
+                          country={
+                            country_to_flag_class(
+                              @selected_user_application.citizenship
+                            )
+                          }
+                          class="h-4 w-6 rounded inline-block align-middle"
+                        />
+                      </span>
+                      {nordic_country_display_name(
+                        @selected_user_application.citizenship
+                      ) || @selected_user_application.citizenship}
+                    </dd>
+                  </div>
+                  <div class="py-2">
+                    <dt class="text-sm font-semibold text-zinc-600">
+                      Most connected Nordic country
+                    </dt>
+                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
+                      <span
+                        :if={
+                          country_to_flag_class(
+                            @selected_user_application.most_connected_nordic_country
+                          )
+                        }
+                        class="shrink-0"
+                      >
+                        <.flag
+                          country={
+                            country_to_flag_class(
+                              @selected_user_application.most_connected_nordic_country
+                            )
+                          }
+                          class="h-4 w-6 rounded inline-block align-middle"
+                        />
+                      </span>
+                      {nordic_country_display_name(
+                        @selected_user_application.most_connected_nordic_country
+                      )}
+                    </dd>
+                  </div>
+                </dl>
 
-        <h3 class="leading-6 text-zinc-800 font-semibold mb-2">
-          Application Answers
-        </h3>
-        <ul class="leading-6 text-sm text-zinc-800 pb-6">
-          <li>
-            <span class="font-semibold">Membership type:</span> {@selected_user_application.membership_type}
-          </li>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    Link to Scandinavia
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.link_to_scandinavia}
+                  </div>
+                </div>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    Lived in Scandinavia
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.lived_in_scandinavia}
+                  </div>
+                </div>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    Spoken languages
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.spoken_languages}
+                  </div>
+                </div>
+              </div>
+            </section>
 
-          <li class="pt-2">
-            <p class="font-semibold">Eligibility:</p>
-            <ul class="space-y-1 text-zinc-800 list-disc list-inside">
-              <li :for={reason <- @selected_user_application.membership_eligibility}>
-                {Map.get(
-                  Ysc.Accounts.SignupApplication.eligibility_lookup(),
-                  reason
-                )}
-              </li>
-            </ul>
-          </li>
-          <li class="pt-2">
-            <span class="font-semibold">Occupation:</span> {@selected_user_application.occupation}
-          </li>
-          <li class="pt-2">
-            <span class="font-semibold">Place of birth:</span> {@selected_user_application.place_of_birth}
-          </li>
-          <li class="pt-2">
-            <span class="font-semibold">Citizenship:</span> {@selected_user_application.citizenship}
-          </li>
-          <li class="pt-2">
-            <span class="font-semibold">Most connected Nordic country:</span> {@selected_user_application.most_connected_nordic_country}
-          </li>
-
-          <li class="pt-2">
-            <span class="font-semibold">Link to Scandinavia:</span>
-            <input
-              type="textarea"
-              class="mt-2 block w-full rounded text-zinc-900 sm:text-sm sm:leading-6 bg-zinc-100 px-2 py-3"
-              value={@selected_user_application.link_to_scandinavia}
-              disabled={true}
-            />
-          </li>
-          <li class="pt-2">
-            <span class="font-semibold">Lived in Scandinavia:</span>
-            <input
-              type="textarea"
-              class="mt-2 block w-full rounded text-zinc-900 sm:text-sm sm:leading-6 bg-zinc-100 px-2 py-3"
-              value={@selected_user_application.lived_in_scandinavia}
-              disabled={true}
-            />
-          </li>
-          <li class="pt-2">
-            <span class="font-semibold">Spoken languages:</span>
-            <input
-              type="textarea"
-              class="mt-2 block w-full rounded text-zinc-900 sm:text-sm sm:leading-6 bg-zinc-100 px-2 py-3"
-              value={@selected_user_application.spoken_languages}
-              disabled={true}
-            />
-          </li>
-        </ul>
-
-        <div class="flex flex-col gap-6 w-full pt-8">
-          <.form
-            :if={@selected_user.state == :pending_approval}
-            for={@rejection_form}
-            id="reject-application-form"
-            phx-submit="deny-application"
-            class="flex flex-col gap-4"
-          >
-            <div class="rounded-md bg-amber-50 border border-amber-200 p-3">
-              <p class="text-sm font-medium text-amber-800 mb-2">
-                Optional rejection note (internal use only)
-              </p>
-              <p class="text-sm text-amber-700 mb-3">
-                You may add a note explaining why this application was rejected. This note is for internal records only and will not be sent to the applicant.
-              </p>
-              <.input
-                field={@rejection_form[:note]}
-                type="textarea"
-                label="Rejection note (optional)"
-                class="mt-1 block w-full rounded border-zinc-300 text-zinc-900 sm:text-sm"
-                rows="3"
-              />
-            </div>
-            <div class="flex flex-row justify-between w-full">
-              <button
-                type="submit"
-                class="phx-submit-loading:opacity-75 rounded bg-red-700 hover:bg-red-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
-                data-confirm="You are about to reject this application. Are you sure?"
-              >
-                <.icon name="hero-no-symbol" class="w-5 h-5 mb-0.5 me-1" /> Reject
-              </button>
-            </div>
-          </.form>
-          <div
-            :if={@selected_user.state == :pending_approval}
-            class="flex flex-row justify-end w-full"
-          >
-            <button
-              phx-click="approve-application"
-              phx-value-user-id={@selected_user.id}
-              phx-value-application-id={@selected_user_application.id}
-              class="phx-submit-loading:opacity-75 rounded bg-green-700 hover:bg-green-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+            <div
+              :if={@selected_user.state == :pending_approval}
+              class="pt-6 border-t border-zinc-200 flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-4"
             >
-              <.icon name="hero-check" class="w-5 h-5 mb-0.5 me-1" /> Approve
-            </button>
+              <div class="flex flex-col gap-3">
+                <button
+                  type="button"
+                  phx-click="toggle-reject-form"
+                  class="text-sm font-semibold text-red-600 hover:text-red-700 py-2 px-4 text-left"
+                >
+                  Reject Application...
+                </button>
+                <div
+                  :if={@show_reject_form}
+                  class="rounded-md bg-zinc-50 border border-zinc-200 p-3"
+                >
+                  <.form
+                    for={@rejection_form}
+                    id="reject-application-form"
+                    phx-submit="deny-application"
+                    class="space-y-3"
+                  >
+                    <p class="text-sm text-zinc-600">
+                      Optional rejection note (internal use only; not sent to the applicant).
+                    </p>
+                    <.input
+                      field={@rejection_form[:note]}
+                      type="textarea"
+                      label="Rejection note (optional)"
+                      class="mt-1 block w-full rounded border-zinc-300 text-zinc-900 sm:text-sm"
+                      rows="3"
+                    />
+                    <button
+                      type="submit"
+                      data-confirm="You are about to reject this application. Are you sure?"
+                      class="phx-submit-loading:opacity-75 rounded bg-red-600 hover:bg-red-700 py-2 px-3 text-sm font-semibold text-white transition-colors"
+                    >
+                      <.icon name="hero-no-symbol" class="w-4 h-4 inline me-1" />
+                      Confirm Reject
+                    </button>
+                  </.form>
+                </div>
+              </div>
+              <.button
+                color="green"
+                phx-click="approve-application"
+                phx-value-user-id={@selected_user.id}
+                phx-value-application-id={@selected_user_application.id}
+                class="shrink-0"
+              >
+                <.icon name="hero-check" class="w-4 h-4 me-2" /> Approve Member
+              </.button>
+            </div>
           </div>
         </div>
       </.modal>
@@ -752,7 +870,8 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:export_error, "Something went wrong")
      |> assign(form: to_form(%{}, as: "csv_export"))
      |> assign(form: to_form(user_changeset, as: "user"))
-     |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))}
+     |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
+     |> assign(:show_reject_form, false)}
   end
 
   @spec mount(any(), any(), map()) :: {:ok, map()}
@@ -966,6 +1085,11 @@ defmodule YscWeb.AdminUsersLive do
     end
   end
 
+  def handle_event("toggle-reject-form", _params, socket) do
+    {:noreply,
+     assign(socket, :show_reject_form, !socket.assigns[:show_reject_form])}
+  end
+
   def handle_event("deny-application", params, socket) do
     user = socket.assigns[:selected_user]
     application = socket.assigns[:selected_user_application]
@@ -1135,4 +1259,45 @@ defmodule YscWeb.AdminUsersLive do
   defp membership_inherited?(user) do
     Accounts.sub_account?(user) && get_active_membership_type(user) != nil
   end
+
+  defp country_to_flag_class(nil), do: nil
+
+  defp country_to_flag_class(code) when is_binary(code) do
+    normalized = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
+
+    if normalized in ["SE", "NO", "FI", "DK", "IS"] do
+      "fi-#{String.downcase(normalized)}"
+    else
+      nil
+    end
+  end
+
+  defp nordic_country_display_name(nil), do: ""
+
+  defp nordic_country_display_name(code) when is_binary(code) do
+    key = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
+
+    Map.get(
+      %{
+        "SE" => "Sweden",
+        "NO" => "Norway",
+        "FI" => "Finland",
+        "DK" => "Denmark",
+        "IS" => "Iceland"
+      },
+      key,
+      code
+    )
+  end
+
+  defp format_birth_date(nil), do: ""
+
+  defp format_birth_date(%Date{} = date),
+    do: Timex.format!(date, "%b %d, %Y", :strftime)
+
+  defp format_birth_date(other), do: to_string(other)
+
+  defp review_outcome_to_badge_type(:approved), do: "green"
+  defp review_outcome_to_badge_type(:rejected), do: "red"
+  defp review_outcome_to_badge_type(_), do: "default"
 end

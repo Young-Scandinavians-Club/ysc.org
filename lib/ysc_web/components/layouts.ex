@@ -5,6 +5,29 @@ defmodule YscWeb.Layouts do
 
   embed_templates "layouts/*"
 
+  @doc """
+  Toast container classes with z-[10000] so toasts render above modals (z-50)
+  and mobile menu overlays (z-[9999]).
+  """
+  def toast_group_class_fn(assigns) do
+    [
+      # base: fixed + toast-container-above-all (z-index in app.css) so toasts sit above nav, modals, overlays
+      "fixed toast-container-above-all max-h-screen w-full p-4 md:max-w-[420px] pointer-events-none grid origin-center",
+      assigns[:corner] == :bottom_left &&
+        "items-end bottom-0 left-0 flex-col-reverse sm:top-auto",
+      assigns[:corner] == :bottom_center &&
+        "items-end bottom-0 left-1/2 transform -translate-x-1/2 flex-col-reverse sm:top-auto",
+      assigns[:corner] == :bottom_right &&
+        "items-end bottom-0 right-0 flex-col-reverse sm:top-auto",
+      assigns[:corner] == :top_left &&
+        "items-start top-0 left-0 flex-col sm:bottom-auto",
+      assigns[:corner] == :top_center &&
+        "items-start top-0 left-1/2 transform -translate-x-1/2 flex-col sm:bottom-auto",
+      assigns[:corner] == :top_right &&
+        "items-start top-0 right-0 flex-col sm:bottom-auto"
+    ]
+  end
+
   def fullscreen?(conn_or_path) when is_binary(conn_or_path) do
     String.starts_with?(conn_or_path, [
       "/users/log-in",

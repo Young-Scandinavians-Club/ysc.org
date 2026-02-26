@@ -283,7 +283,10 @@ defmodule YscWeb.UserTicketsLive do
 
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
-        {:noreply, YscWeb.Flash.put_toast(socket, :error, "Order not found")}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Order not found",
+           title: "Order"
+         )}
 
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
@@ -305,14 +308,17 @@ defmodule YscWeb.UserTicketsLive do
             {:noreply,
              socket
              |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
-             |> YscWeb.Flash.put_toast(:info, "Order cancelled successfully")}
+             |> YscWeb.Flash.put_toast(:info, "Order cancelled successfully",
+               title: "Order"
+             )}
 
           {:error, reason} ->
             {:noreply,
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Failed to cancel order: #{reason}"
+               "Failed to cancel order: #{reason}",
+               title: "Order"
              )}
         end
     end
@@ -324,7 +330,10 @@ defmodule YscWeb.UserTicketsLive do
 
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
-        {:noreply, YscWeb.Flash.put_toast(socket, :error, "Order not found")}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Order not found",
+           title: "Order"
+         )}
 
       ticket_order ->
         # Verify the order status is pending
@@ -336,7 +345,9 @@ defmodule YscWeb.UserTicketsLive do
            )}
         else
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :error, "Cannot resume this order")}
+           YscWeb.Flash.put_toast(socket, :error, "Cannot resume this order",
+             title: "Order"
+           )}
         end
     end
   end

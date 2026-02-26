@@ -16,7 +16,8 @@ defmodule YscWeb.OrderConfirmationLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "You must be signed in to view this order."
+         "You must be signed in to view this order.",
+         title: "Order"
        )
        |> redirect(to: ~p"/events")}
     else
@@ -42,7 +43,7 @@ defmodule YscWeb.OrderConfirmationLive do
         nil ->
           {:ok,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Order not found")
+           |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
            |> redirect(to: ~p"/events")}
 
         ticket_order ->

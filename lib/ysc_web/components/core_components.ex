@@ -81,7 +81,7 @@ defmodule YscWeb.CoreComponents do
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
               class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1 p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
             >
-              <div class="absolute top-4 right-4 sm:top-6 sm:right-7 z-10">
+              <div class="absolute top-1 right-1 sm:top-0.5 sm:right-0.5 z-10">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
@@ -1348,6 +1348,36 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <span :if={@id != nil} id={@id} class={[@name, @class]} />
     <span :if={@id == nil} class={[@name, @class]} />
+    """
+  end
+
+  attr :name, :string, required: true
+  attr :class, :string, default: nil
+
+  def flash_toast_icon(%{name: "hero-" <> _} = assigns) do
+    ~H"""
+    <.icon name={@name} class={["w-5 h-5 flex-shrink-0 me-1", @class]} />
+    """
+  end
+
+  @doc false
+  def flash_toast_icon_success(assigns) do
+    ~H"""
+    <.flash_toast_icon name="hero-check-circle" class="text-green-500" />
+    """
+  end
+
+  @doc false
+  def flash_toast_icon_error(assigns) do
+    ~H"""
+    <.flash_toast_icon name="hero-x-circle" class="text-red-500" />
+    """
+  end
+
+  @doc false
+  def flash_toast_icon_warning(assigns) do
+    ~H"""
+    <.flash_toast_icon name="hero-exclamation-triangle" class="text-yellow-500" />
     """
   end
 

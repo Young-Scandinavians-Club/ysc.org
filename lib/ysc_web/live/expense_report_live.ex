@@ -69,7 +69,8 @@ defmodule YscWeb.ExpenseReportLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "You must be an active user to access this page."
+         "You must be an active user to access this page.",
+         title: "Expense report"
        )
        |> redirect(to: ~p"/")}
     end
@@ -473,7 +474,9 @@ defmodule YscWeb.ExpenseReportLive do
         {:postpone, _} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Upload is still in progress")}
+           |> YscWeb.Flash.put_toast(:error, "Upload is still in progress",
+             title: "Expense report"
+           )}
 
         {:error, reason} ->
           Ysc.Logging.error("Failed to upload receipt", reason: inspect(reason))
@@ -482,7 +485,8 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload receipt: #{reason}"
+             "Failed to upload receipt: #{reason}",
+             title: "Expense report"
            )}
 
         # consume_uploaded_entry can return the value directly if callback returns {:ok, value}
@@ -520,12 +524,16 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload receipt: Unexpected result"
+             "Failed to upload receipt: Unexpected result",
+             title: "Expense report"
            )}
       end
     else
       {:noreply,
-       socket |> YscWeb.Flash.put_toast(:error, "Upload entry not found")}
+       socket
+       |> YscWeb.Flash.put_toast(:error, "Upload entry not found",
+         title: "Expense report"
+       )}
     end
   end
 
@@ -610,7 +618,9 @@ defmodule YscWeb.ExpenseReportLive do
         {:postpone, _} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Upload is still in progress")}
+           |> YscWeb.Flash.put_toast(:error, "Upload is still in progress",
+             title: "Expense report"
+           )}
 
         {:error, reason} ->
           Ysc.Logging.error("Failed to upload proof", reason: inspect(reason))
@@ -619,7 +629,8 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload proof: #{reason}"
+             "Failed to upload proof: #{reason}",
+             title: "Expense report"
            )}
 
         # consume_uploaded_entry can return the value directly if callback returns {:ok, value}
@@ -657,12 +668,16 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload proof: Unexpected result"
+             "Failed to upload proof: Unexpected result",
+             title: "Expense report"
            )}
       end
     else
       {:noreply,
-       socket |> YscWeb.Flash.put_toast(:error, "Upload entry not found")}
+       socket
+       |> YscWeb.Flash.put_toast(:error, "Upload entry not found",
+         title: "Expense report"
+       )}
     end
   end
 
@@ -868,7 +883,9 @@ defmodule YscWeb.ExpenseReportLive do
          |> assign(:bank_account_form, nil)
          |> assign(:form, to_form(updated_changeset))
          |> push_patch(to: ~p"/expensereport")
-         |> YscWeb.Flash.put_toast(:info, "Bank account added successfully")}
+         |> YscWeb.Flash.put_toast(:info, "Bank account added successfully",
+           title: "Expense report"
+         )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,

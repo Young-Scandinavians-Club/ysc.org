@@ -402,7 +402,9 @@ defmodule YscWeb.VolunteerLive do
           {:noreply,
            socket
            |> assign(:submitted, true)
-           |> YscWeb.Flash.put_toast(:info, "Volunteer application submitted")}
+           |> YscWeb.Flash.put_toast(:info, "Volunteer application submitted",
+             title: "Volunteer"
+           )}
 
         {:error, changeset} ->
           {:noreply, assign_form(socket, changeset)}
@@ -416,7 +418,8 @@ defmodule YscWeb.VolunteerLive do
                assign(socket, submitted: true)
                |> YscWeb.Flash.put_toast(
                  :info,
-                 "Thank you for your interest in volunteering with the YSC!"
+                 "Thank you for your interest in volunteering with the YSC!",
+                 title: "Volunteer"
                )}
 
             {:error, changeset} ->
@@ -426,7 +429,9 @@ defmodule YscWeb.VolunteerLive do
         {:error, _} ->
           socket =
             socket
-            |> YscWeb.Flash.put_toast(:error, "Please try submitting again")
+            |> YscWeb.Flash.put_toast(:error, "Please try submitting again",
+              title: "Volunteer"
+            )
             |> Turnstile.refresh()
 
           {:noreply, assign_form(socket, changeset)}

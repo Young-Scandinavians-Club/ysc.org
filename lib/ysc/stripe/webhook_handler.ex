@@ -736,6 +736,16 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp handle("customer.subscription.updated", %Stripe.Subscription{} = event) do
     subscription = Subscriptions.get_subscription_by_stripe_id(event.id)
 
+    # If we don't have the subscription locally (e.g. we deleted it when it went
+    # incomplete_expired, then it was reactivated in Stripe), create it when status
+    # is now active or trialing so the user gets their membership back.
+    subscription =
+      if subscription do
+        subscription
+      else
+        maybe_recreate_subscription_from_updated_event(event)
+      end
+
     if subscription do
       status = event.status
 
@@ -2116,6 +2126,53 @@ defmodule Ysc.Stripe.WebhookHandler do
       {:family, "single"} -> false
       {"family", "single"} -> false
       _ -> nil
+    end
+  end
+
+  # Recreate local subscription when we receive subscription.updated for a subscription
+  # we don't have locally (e.g. we deleted it on incomplete_expired, then it became
+  # active again). Only recreates when status is active or trialing.
+  defp maybe_recreate_subscription_from_updated_event(
+         %Stripe.Subscription{} = event
+       ) do
+    if event.status in ["active", "trialing"] do
+      user = Ysc.Accounts.get_user_from_stripe_id(event.customer)
+
+      if user do
+        # Webhook payload may not have expanded items; retrieve from Stripe for full data.
+        # Callback allows tests to stub the retrieve without hitting Stripe.
+        retrieve_fn =
+          Application.get_env(:ysc, :subscription_retrieve_for_webhook_callback) ||
+            fn id, opts -> Stripe.Subscription.retrieve(id, opts) end
+
+        case retrieve_fn.(event.id, expand: ["items.data.price"]) do
+          {:ok, stripe_subscription} ->
+            case Subscriptions.create_subscription_from_stripe(
+                   user,
+                   stripe_subscription
+                 ) do
+              {:ok, subscription} ->
+                Ysc.Logging.info(
+                  "Recreated subscription from subscription.updated (was missing locally)",
+                  user_id: user.id,
+                  subscription_id: subscription.id,
+                  stripe_subscription_id: event.id
+                )
+
+                subscription
+
+              {:error, _reason} ->
+                nil
+            end
+
+          {:error, _} ->
+            nil
+        end
+      else
+        nil
+      end
+    else
+      nil
     end
   end
 

@@ -76,8 +76,12 @@ defmodule YscWeb.AdminUsersLiveTest do
         live(conn, ~p"/admin/users/#{pending_user.id}/review")
 
       view
-      |> element("button", "Reject")
+      |> element("button", "Reject Application...")
       |> render_click()
+
+      view
+      |> element("#reject-application-form")
+      |> render_submit(%{"reject" => %{"note" => ""}})
 
       assert_redirected(view, "/admin/users?id=#{pending_user.id}")
 

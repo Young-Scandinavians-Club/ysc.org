@@ -6,6 +6,7 @@ defmodule YscWeb.UserRegistrationLive do
   alias Ysc.Accounts.User
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.SignupApplication
+  alias YscWeb.Workers.CreateStripeCustomerWorker
 
   def render(assigns) do
     ~H"""
@@ -102,6 +103,30 @@ defmodule YscWeb.UserRegistrationLive do
               if @current_step !== 1, do: "hidden", else: "flex flex-col space-y-3"
             }>
               <.header class="text-left">Account Information</.header>
+              <div
+                :if={@email_already_taken}
+                class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+                role="alert"
+              >
+                <p class="font-medium">This email is already registered.</p>
+                <p class="mt-1 text-amber-700">
+                  If this is you, sign in to your account or reset your password if you've forgotten how to sign in.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <.link
+                    navigate={~p"/users/log-in"}
+                    class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500"
+                  >
+                    Sign in
+                  </.link>
+                  <.link
+                    navigate={~p"/users/reset-password"}
+                    class="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                  >
+                    Reset password
+                  </.link>
+                </div>
+              </div>
               <.input
                 field={@form[:email]}
                 type="email"
@@ -399,7 +424,11 @@ defmodule YscWeb.UserRegistrationLive do
       |> assign(:step_2_invalid, false)
       |> assign(:show_family_input, false)
       |> assign(:browser_timezone, browser_timezone)
-      |> assign(trigger_submit: false, check_errors: false)
+      |> assign(
+        trigger_submit: false,
+        check_errors: false,
+        email_already_taken: false
+      )
       |> assign_new(:started, fn -> DateTime.to_string(DateTime.utc_now()) end)
       |> assign_form(changeset)
 
@@ -447,6 +476,11 @@ defmodule YscWeb.UserRegistrationLive do
       {:ok, user} ->
         Accounts.deliver_application_submitted_notification(user)
 
+        # Create Stripe customer in background so it's ready when user visits settings
+        %{"user_id" => user.id}
+        |> CreateStripeCustomerWorker.new()
+        |> Oban.insert()
+
         YscWeb.Emails.Notifier.schedule_email_to_board(
           "#{user.id}",
           "New Membership Application Received - Action Needed",
@@ -477,13 +511,18 @@ defmodule YscWeb.UserRegistrationLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Application submitted successfully! Please complete your account setup."
+           "Application submitted successfully! Please complete your account setup.",
+           title: "Registration"
          )
          |> redirect(to: ~p"/account/setup/#{user.id}?from_signup=true")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        email_taken? = email_already_taken_error?(changeset)
+
         {:noreply,
-         socket |> assign(check_errors: true) |> assign_form(changeset)}
+         socket
+         |> assign(check_errors: true, email_already_taken: email_taken?)
+         |> assign_form(changeset)}
     end
   end
 
@@ -498,6 +537,7 @@ defmodule YscWeb.UserRegistrationLive do
 
     re_val =
       assign_form(socket, Map.put(form_data, :action, :validate))
+      |> assign(:email_already_taken, false)
 
     {:noreply, re_val |> evaluate_steps() |> show_family_input?(user_params)}
   end
@@ -571,6 +611,19 @@ defmodule YscWeb.UserRegistrationLive do
      socket
      |> assign(:current_step, new_step)
      |> push_event("scroll-to-top", %{})}
+  end
+
+  defp email_already_taken_error?(changeset) do
+    case Keyword.get(changeset.errors, :email) do
+      {msg, _opts} when is_binary(msg) ->
+        msg_lower = String.downcase(msg)
+
+        String.contains?(msg_lower, "already") or
+          String.contains?(msg_lower, "taken")
+
+      _ ->
+        false
+    end
   end
 
   # Determine the appropriate step based on which fields are filled
