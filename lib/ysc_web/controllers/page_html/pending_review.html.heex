@@ -1,11 +1,13 @@
 <div class="min-h-[60vh] flex flex-col items-center justify-center py-8 lg:py-10 px-4">
-  <div class="w-full max-w-xl mx-auto prose prose-zinc prose-a:text-blue-600 pb-10 text-center">
-    <.icon
-      name="hero-document-magnifying-glass"
-      class="h-16 w-16 text-blue-600 mx-auto"
-    />
+  <div class="w-full max-w-xl mx-auto prose prose-zinc prose-a:text-blue-600 pb-10">
+    <div class="text-center">
+      <.icon
+        name="hero-document-magnifying-glass"
+        class="h-16 w-16 text-blue-500 mx-auto"
+      />
+    </div>
 
-    <h2 class="text-center">
+    <h2>
       Your Membership Application is Under Review
     </h2>
 
@@ -26,29 +28,29 @@
     <h3 class="text-left">What to expect next</h3>
 
     <ol class="list-none pl-0 space-y-3 text-left">
-      <li class="flex gap-3">
-        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center">
+      <li class="flex gap-3 items-start pl-0">
+        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
           1
         </span>
-        <span>
+        <span class="min-w-0 pt-0.5">
           <strong>Board review:</strong>
           We typically review applications within 14 days.
         </span>
       </li>
-      <li class="flex gap-3">
-        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center">
+      <li class="flex gap-3 items-start pl-0">
+        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
           2
         </span>
-        <span>
+        <span class="min-w-0 pt-0.5">
           <strong>Email notification:</strong>
           You'll receive an update via email as soon as a decision is made.
         </span>
       </li>
-      <li class="flex gap-3">
-        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center">
+      <li class="flex gap-3 items-start pl-0">
+        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
           3
         </span>
-        <span>
+        <span class="min-w-0 pt-0.5">
           <strong>Activation:</strong>
           If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
         </span>
@@ -68,7 +70,7 @@
 
     <p class="text-left">
       Feel free to explore our
-      <.link class="hover:underline" navigate={~p"/events"}>
+      <.link class="hover:underline" href={~p"/events"}>
         events calendar
       </.link>
       <%= if @site_setting_socials_instagram || @site_setting_socials_facebook do %>
