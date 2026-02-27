@@ -162,7 +162,7 @@ defmodule YscWeb.UserSettingsLive do
               type="otp"
               label="Verification Code"
               required
-              phx-change="validate_email_code"
+              phx-input="validate_email_code"
             />
             <p class="text-xs text-zinc-600 mt-1">
               Didn't receive the code? Check your email or
@@ -1991,7 +1991,9 @@ defmodule YscWeb.UserSettingsLive do
     # Restore pending_email from URL params for email verification
     socket =
       if socket.assigns[:live_action] == :email_verification && params["email"] do
-        assign(socket, :pending_email, params["email"])
+        socket
+        |> assign(:pending_email, params["email"])
+        |> assign(:email_verification_code_state, %{})
       else
         socket
       end
@@ -2121,6 +2123,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:phone_code_valid, false)
       |> assign(:phone_verification_error, nil)
       |> assign(:email_verification_form, to_form(%{"verification_code" => ""}))
+      |> assign(:email_verification_code_state, %{})
       |> assign(:email_resend_disabled_until, nil)
       |> assign(:pending_email, nil)
       |> assign(:email_code_valid, false)
@@ -2713,8 +2716,19 @@ defmodule YscWeb.UserSettingsLive do
     pending_email = socket.assigns.pending_email
 
     if pending_email do
-      # Handle both OTP array format and single string format
-      normalized_code = normalize_verification_code(code)
+      # Accumulate digits in a dedicated assign (phx-input may send only the changed
+      # field, or paste can send as map; merge so we normalize the full code)
+      current_code = socket.assigns[:email_verification_code_state] || %{}
+      current_code = if is_map(current_code), do: current_code, else: %{}
+
+      merged_code =
+        if is_map(code) do
+          Map.merge(current_code, code)
+        else
+          code
+        end
+
+      normalized_code = normalize_verification_code(merged_code)
       # Basic validation - ensure it's 6 digits
       is_valid =
         String.length(normalized_code) == 6 &&
@@ -2725,7 +2739,9 @@ defmodule YscWeb.UserSettingsLive do
       )
 
       {:noreply,
-       assign(socket, email_code_valid: is_valid, email_verification_error: nil)}
+       socket
+       |> assign(email_code_valid: is_valid, email_verification_error: nil)
+       |> assign(:email_verification_code_state, merged_code)}
     else
       Ysc.Logging.debug("No pending email for validation")
       {:noreply, socket}
@@ -2805,6 +2821,7 @@ defmodule YscWeb.UserSettingsLive do
                    socket
                    |> assign(:user, updated_user)
                    |> assign(:pending_email, nil)
+                   |> assign(:email_verification_code_state, %{})
                    |> assign(:current_email, updated_user.email)
                    |> push_patch(to: ~p"/users/settings")
                    |> YscWeb.Flash.put_toast(
@@ -2955,7 +2972,10 @@ defmodule YscWeb.UserSettingsLive do
 
   def handle_event("cancel_email_verification_confirmed", _params, socket) do
     # User confirmed they want to close the modal
-    {:noreply, push_navigate(socket, to: ~p"/users/settings")}
+    {:noreply,
+     socket
+     |> assign(:email_verification_code_state, %{})
+     |> push_navigate(to: ~p"/users/settings")}
   end
 
   def handle_event("confirm_cancel_phone_verification", _params, socket) do
