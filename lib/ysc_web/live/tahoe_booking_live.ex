@@ -21,6 +21,8 @@ defmodule YscWeb.TahoeBookingLive do
   require Ysc.Logging
   import Ecto.Query
 
+  @max_cabin_capacity 17
+
   @impl true
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
@@ -241,6 +243,7 @@ defmodule YscWeb.TahoeBookingLive do
         buyout_refund_policy: buyout_refund_policy,
         room_refund_policy: room_refund_policy,
         date_tooltips: %{},
+        max_cabin_capacity: @max_cabin_capacity,
         load_radar: true,
         terms_agreed: false,
         info_tab: requested_info_tab || :general,
@@ -1262,8 +1265,24 @@ defmodule YscWeb.TahoeBookingLive do
                                   id="increase-guests-button"
                                   phx-click="increase-guests"
                                   phx-click-stop
+                                  disabled={
+                                    (parse_guests_count(@guests_count) || 1) +
+                                      (parse_children_count(@children_count) || 0) >=
+                                      @max_cabin_capacity
+                                  }
                                   aria-label="Increase number of adults"
-                                  class="w-10 h-10 rounded-full border-2 border-blue-700 bg-blue-700 hover:bg-blue-800 hover:border-blue-800 text-white flex items-center justify-center transition-all duration-200 font-semibold"
+                                  class={[
+                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
+                                    if(
+                                      (parse_guests_count(@guests_count) || 1) +
+                                        (parse_children_count(@children_count) || 0) >=
+                                        @max_cabin_capacity,
+                                      do:
+                                        "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed",
+                                      else:
+                                        "border-blue-700 bg-blue-700 hover:bg-blue-800 hover:border-blue-800 text-white"
+                                    )
+                                  ]}
                                 >
                                   <.icon name="hero-plus" class="w-5 h-5" />
                                 </button>
@@ -1313,8 +1332,24 @@ defmodule YscWeb.TahoeBookingLive do
                                   id="increase-children-button"
                                   phx-click="increase-children"
                                   phx-click-stop
+                                  disabled={
+                                    (parse_guests_count(@guests_count) || 1) +
+                                      (parse_children_count(@children_count) || 0) >=
+                                      @max_cabin_capacity
+                                  }
                                   aria-label="Increase number of children"
-                                  class="w-10 h-10 rounded-full border-2 border-blue-700 bg-blue-700 hover:bg-blue-800 hover:border-blue-800 text-white flex items-center justify-center transition-all duration-200 font-semibold"
+                                  class={[
+                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
+                                    if(
+                                      (parse_guests_count(@guests_count) || 1) +
+                                        (parse_children_count(@children_count) || 0) >=
+                                        @max_cabin_capacity,
+                                      do:
+                                        "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed",
+                                      else:
+                                        "border-blue-700 bg-blue-700 hover:bg-blue-800 hover:border-blue-800 text-white"
+                                    )
+                                  ]}
                                 >
                                   <.icon name="hero-plus" class="w-5 h-5" />
                                 </button>
@@ -4664,7 +4699,10 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   def handle_event("increase-guests", _params, socket) do
-    new_count = (socket.assigns.guests_count || 1) + 1
+    current_guests = socket.assigns.guests_count || 1
+    current_children = socket.assigns.children_count || 0
+    max_adults = @max_cabin_capacity - current_children
+    new_count = min(current_guests + 1, max(1, max_adults))
 
     socket =
       socket
@@ -4701,7 +4739,10 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   def handle_event("increase-children", _params, socket) do
-    new_count = (socket.assigns.children_count || 0) + 1
+    current_guests = socket.assigns.guests_count || 1
+    current_children = socket.assigns.children_count || 0
+    max_children = @max_cabin_capacity - current_guests
+    new_count = min(current_children + 1, max(0, max_children))
 
     socket =
       socket
@@ -4738,7 +4779,11 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   def handle_event("guests-changed", %{"guests_count" => guests_str}, socket) do
-    guests_count = parse_integer(guests_str) || 1
+    current_children = socket.assigns.children_count || 0
+    max_adults = @max_cabin_capacity - current_children
+
+    guests_count =
+      (parse_integer(guests_str) || 1) |> min(max(1, max_adults)) |> max(1)
 
     socket =
       socket
@@ -4759,7 +4804,11 @@ defmodule YscWeb.TahoeBookingLive do
         %{"children_count" => children_str},
         socket
       ) do
-    children_count = parse_integer(children_str) || 0
+    current_guests = socket.assigns.guests_count || 1
+    max_children = @max_cabin_capacity - current_guests
+
+    children_count =
+      (parse_integer(children_str) || 0) |> min(max(0, max_children)) |> max(0)
 
     socket =
       socket
@@ -5970,41 +6019,50 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp parse_guests_from_params(params) do
-    case Map.get(params, "guests_count") do
-      nil ->
-        1
+    raw =
+      case Map.get(params, "guests_count") do
+        nil ->
+          1
 
-      guests_str when is_binary(guests_str) ->
-        case Integer.parse(guests_str) do
-          {parsed, _} when parsed > 0 -> parsed
-          _ -> 1
-        end
+        guests_str when is_binary(guests_str) ->
+          case Integer.parse(guests_str) do
+            {parsed, _} when parsed > 0 -> parsed
+            _ -> 1
+          end
 
-      guests when is_integer(guests) and guests > 0 ->
-        guests
+        guests when is_integer(guests) and guests > 0 ->
+          guests
 
-      _ ->
-        1
-    end
+        _ ->
+          1
+      end
+
+    min(max(1, raw), @max_cabin_capacity)
   end
 
   defp parse_children_from_params(params) do
-    case Map.get(params, "children_count") do
-      nil ->
-        0
+    guests = parse_guests_from_params(params)
 
-      children_str when is_binary(children_str) ->
-        case Integer.parse(children_str) do
-          {parsed, _} when parsed >= 0 -> parsed
-          _ -> 0
-        end
+    raw =
+      case Map.get(params, "children_count") do
+        nil ->
+          0
 
-      children when is_integer(children) and children >= 0 ->
-        children
+        children_str when is_binary(children_str) ->
+          case Integer.parse(children_str) do
+            {parsed, _} when parsed >= 0 -> parsed
+            _ -> 0
+          end
 
-      _ ->
-        0
-    end
+        children when is_integer(children) and children >= 0 ->
+          children
+
+        _ ->
+          0
+      end
+
+    max_children = @max_cabin_capacity - guests
+    min(max(0, raw), max(0, max_children))
   end
 
   defp parse_tab_from_params(params) do
