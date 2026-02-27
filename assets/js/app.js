@@ -204,6 +204,9 @@ let liveSocket = new LiveSocket("/live", Socket, {
     },
     hooks: Hooks,
     uploaders: Uploaders,
+    // Delay before showing "Attempting to reconnect" so short connection blips don't flash the message.
+    // If the socket reconnects within this window, the message is never shown and the timer is cleared.
+    disconnectedTimeout: 1000,
 });
 
 window.addEventListener("phx:live_reload:attached", ({ detail: reloader }) => {

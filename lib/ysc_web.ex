@@ -57,6 +57,12 @@ defmodule YscWeb do
         layout: {YscWeb.Layouts, :app}
 
       unquote(html_helpers())
+
+      # Global event: "clear" is sent by the client-error flash in the layout when dismissed.
+      # No-op on the server; the UI is updated via JS. Prevents FunctionClauseError in any LiveView.
+      def handle_event("clear", _params, socket) do
+        {:noreply, socket}
+      end
     end
   end
 

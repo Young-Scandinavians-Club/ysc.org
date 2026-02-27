@@ -187,6 +187,8 @@ defmodule YscWeb.CoreComponents do
   attr :flash, :map, required: true, doc: "the map of flash messages"
 
   def flash_group(assigns) do
+    # client-error: shown only after LiveSocket.disconnectedTimeout (see app.js) so short
+    # blips do not flash the message. Hidden immediately on reconnect via phx-connected.
     ~H"""
     <.flash id="flash-info" kind={:info} title="Success!" flash={@flash} />
     <.flash id="flash-error" kind={:error} title="Error!" flash={@flash} />
@@ -196,7 +198,6 @@ defmodule YscWeb.CoreComponents do
       title="We can't find the internet"
       phx-disconnected={show(".phx-client-error #client-error")}
       phx-connected={hide("#client-error")}
-      class="delay-700"
       hidden
     >
       Attempting to reconnect
