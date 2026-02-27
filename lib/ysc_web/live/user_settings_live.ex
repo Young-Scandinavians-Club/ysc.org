@@ -653,6 +653,13 @@ defmodule YscWeb.UserSettingsLive do
                   ]}
                 />
 
+                <.input
+                  field={@profile_form[:date_of_birth]}
+                  type="date"
+                  label="Date of Birth"
+                  max={@today_max}
+                />
+
                 <:actions>
                   <.button phx-disable-with="Updating...">Update Profile</.button>
                 </:actions>
@@ -2072,6 +2079,16 @@ defmodule YscWeb.UserSettingsLive do
     membership_plans = Application.get_env(:ysc, :membership_plans)
     public_key = Application.get_env(:stripity_stripe, :public_key)
 
+    # Timezone from browser for date inputs (e.g. date of birth max = today in user TZ)
+    connect_params = get_connect_params(socket) || %{}
+    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+
+    today_max =
+      timezone
+      |> DateTime.now!()
+      |> DateTime.to_date()
+      |> Date.to_iso8601()
+
     # Basic changesets that don't require DB queries (use existing user data)
     email_changeset = Accounts.change_user_email(user)
     profile_changeset = Accounts.change_user_profile(user)
@@ -2081,6 +2098,8 @@ defmodule YscWeb.UserSettingsLive do
     socket =
       socket
       |> assign(:page_title, "User Settings")
+      |> assign(:timezone, timezone)
+      |> assign(:today_max, today_max)
       |> assign(:user, user)
       |> assign(:user_is_active, user_is_active)
       |> assign(:is_sub_account, is_sub_account)

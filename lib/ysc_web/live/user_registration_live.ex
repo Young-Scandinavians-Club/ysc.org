@@ -143,7 +143,7 @@ defmodule YscWeb.UserRegistrationLive do
                   field={rf[:birth_date]}
                   label="Birth Date*"
                   type="date"
-                  max={Date.to_iso8601(Date.utc_today())}
+                  max={@today_max}
                   required
                 />
                 <.input field={rf[:occupation]} label="Occupation" />
@@ -184,6 +184,7 @@ defmodule YscWeb.UserRegistrationLive do
                         type="date-text"
                         field={nested_f[:birth_date]}
                         placeholder="Birth Date"
+                        max={@today_max}
                       />
 
                       <label class="cursor-pointer py-3 block align-middle items-center justify-center text-center">
@@ -404,6 +405,13 @@ defmodule YscWeb.UserRegistrationLive do
     browser_timezone =
       connect_params |> Map.get("timezone", "America/Los_Angeles")
 
+    # Today in user's timezone for date input max (so "today" is correct for their locale)
+    today_max =
+      browser_timezone
+      |> DateTime.now!()
+      |> DateTime.to_date()
+      |> Date.to_iso8601()
+
     application_changeset =
       SignupApplication.application_changeset(
         %SignupApplication{},
@@ -424,6 +432,7 @@ defmodule YscWeb.UserRegistrationLive do
       |> assign(:step_2_invalid, false)
       |> assign(:show_family_input, false)
       |> assign(:browser_timezone, browser_timezone)
+      |> assign(:today_max, today_max)
       |> assign(
         trigger_submit: false,
         check_errors: false,

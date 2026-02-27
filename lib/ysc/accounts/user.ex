@@ -309,12 +309,14 @@ defmodule Ysc.Accounts.User do
       :first_name,
       :last_name,
       :phone_number,
-      :most_connected_country
+      :most_connected_country,
+      :date_of_birth
     ])
     |> validate_length(:first_name, min: 1, max: 150)
     |> validate_length(:last_name, min: 1, max: 150)
     |> validate_required([:first_name, :last_name])
     |> validate_phone(opts)
+    |> validate_date_of_birth()
   end
 
   @doc """

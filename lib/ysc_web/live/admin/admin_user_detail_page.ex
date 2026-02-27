@@ -218,6 +218,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 field={@form[:date_of_birth]}
                 type="date"
                 label="Date of Birth"
+                max={@today_max}
               />
               <.input
                 field={@form[:most_connected_country]}
@@ -1780,6 +1781,16 @@ defmodule YscWeb.AdminUserDetailsLive do
   def mount(%{"id" => id} = _params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
+    # Timezone from browser for date inputs (date of birth max = today in user TZ)
+    connect_params = get_connect_params(socket) || %{}
+    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+
+    today_max =
+      timezone
+      |> DateTime.now!()
+      |> DateTime.to_date()
+      |> Date.to_iso8601()
+
     selected_user =
       Accounts.get_user!(id, [
         :family_members,
@@ -1915,6 +1926,8 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> assign(:unsealed_account_id, nil)
      |> assign(:unsealed_account, nil)
      |> assign(:original_form_data, original_form_data)
+     |> assign(:timezone, timezone)
+     |> assign(:today_max, today_max)
      |> assign(:primary_user, nil)
      |> assign(:sub_accounts, [])
      |> assign(:family_members, [])
