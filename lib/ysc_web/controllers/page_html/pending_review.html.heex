@@ -1,13 +1,16 @@
-<div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
-  <div class="max-w-xl mx-auto lg:mx-0 prose prose-zinc prose-a:text-blue-600 pb-10">
-    <.icon name="hero-document-magnifying-glass" class="h-16 w-16" />
+<div class="min-h-[60vh] flex flex-col items-center justify-center py-8 lg:py-10 px-4">
+  <div class="w-full max-w-xl mx-auto prose prose-zinc prose-a:text-blue-600 pb-10 text-center">
+    <.icon
+      name="hero-document-magnifying-glass"
+      class="h-16 w-16 text-blue-600 mx-auto"
+    />
 
-    <h2>
+    <h2 class="text-center">
       Your Membership Application is Under Review
     </h2>
 
-    <p class="font-bold">
-      Application submitted on:
+    <p class="font-bold text-left">
+      Submitted on:
       <span class="mx-1 bg-blue-100 text-blue-800 text-sm font-medium me-2 px-2 py-1 rounded">
         {Timex.format!(
           @application_submitted_date,
@@ -16,40 +19,87 @@
       </span>
     </p>
 
-    <p>
-      The YSC board will review your membership application as soon as possible and let you know the outcome via email. If your application is approved, you will be able to access the website and pay your membership dues online. Only after your membership is paid will your account be moved to active member status, enabling cabin bookings and event ticket purchases.
+    <p class="text-left">
+      Thanks for applying to the Young Scandinavians Club! We're excited to have you. Our board is currently reviewing your details to ensure everything is in order.
     </p>
 
-    <ul>
-      <li>
-        <strong>Review Process:</strong>
-        Our board will review your application as soon as possible. We typically aim to make decisions within 2 weeks.
-      </li>
-      <li>
-        <strong>Communication:</strong>
-        We will let you know the outcome of your application via email.
-      </li>
-      <li>
-        <strong>Membership Approval:</strong>
-        If your application is approved, you can access the website and pay your membership dues. After payment is completed, your account will be activated as a member, which enables booking cabins and purchasing event tickets.
-      </li>
-    </ul>
+    <h3 class="text-left">What to expect next</h3>
 
-    <h3>
-      Haven't heard from us in a while?
-    </h3>
+    <ol class="list-none pl-0 space-y-3 text-left">
+      <li class="flex gap-3">
+        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center">
+          1
+        </span>
+        <span>
+          <strong>Board review:</strong>
+          We typically review applications within 14 days.
+        </span>
+      </li>
+      <li class="flex gap-3">
+        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center">
+          2
+        </span>
+        <span>
+          <strong>Email notification:</strong>
+          You'll receive an update via email as soon as a decision is made.
+        </span>
+      </li>
+      <li class="flex gap-3">
+        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center">
+          3
+        </span>
+        <span>
+          <strong>Activation:</strong>
+          If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
+        </span>
+      </li>
+    </ol>
 
-    <p>
-      If you haven't heard from us within 4 weeks, please feel free to reach out to us at <.link
+    <h3 class="text-left">Need help?</h3>
+
+    <p class="text-left">
+      If you haven't heard from us after 4 weeks, or if you have questions in the meantime, please reach out to <.link
         class="hover:underline"
         href="mailto:memberships@ysc.org"
-      >memberships@ysc.org</.link>. We're always happy to answer any questions you may have.
+      >memberships@ysc.org</.link>.
     </p>
 
-    <h3>We hope to see you soon!</h3>
+    <h3 class="text-left">While you wait...</h3>
 
-    <p>
-      We're excited to welcome you to the Young Scandinavians Club! In the meantime, please feel free to explore our website and learn more about our upcoming events and activities.
+    <p class="text-left">
+      Feel free to explore our
+      <.link class="hover:underline" navigate={~p"/events"}>
+        events calendar
+      </.link>
+      <%= if @site_setting_socials_instagram || @site_setting_socials_facebook do %>
+        or follow us on
+        <%= if @site_setting_socials_instagram do %>
+          <.link
+            class="hover:underline"
+            href={@site_setting_socials_instagram}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Instagram
+          </.link>
+          <%= if @site_setting_socials_facebook do %>
+            and
+          <% end %>
+        <% end %>
+        <%= if @site_setting_socials_facebook do %>
+          <.link
+            class="hover:underline"
+            href={@site_setting_socials_facebook}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Facebook
+          </.link>
+        <% end %>
+        to see what the club has been up to lately.
+      <% else %>
+        to see what the club has been up to lately.
+      <% end %>
     </p>
   </div>
 </div>

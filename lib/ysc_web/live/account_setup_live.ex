@@ -502,6 +502,8 @@ defmodule YscWeb.AccountSetupLive do
         |> assign(:user_needs, user_needs)
         |> assign(:code_valid, false)
         |> assign(:phone_code_valid, false)
+        |> assign(:email_verification_code_state, %{})
+        |> assign(:phone_verification_code_state, %{})
         |> assign(:email_resend_disabled_until, nil)
         |> assign(:sms_resend_disabled_until, nil)
 
@@ -662,14 +664,28 @@ defmodule YscWeb.AccountSetupLive do
         %{"verification_code" => code},
         socket
       ) do
-    # Handle both OTP array format and single string format
-    normalized_code = normalize_verification_code(code)
+    # Accumulate digits in a dedicated assign (phx-input may send only the changed
+    # field, or paste can send as map; merge so we normalize the full code)
+    current_code = socket.assigns[:email_verification_code_state] || %{}
+    current_code = if is_map(current_code), do: current_code, else: %{}
+
+    merged_code =
+      if is_map(code) do
+        Map.merge(current_code, code)
+      else
+        code
+      end
+
+    normalized_code = normalize_verification_code(merged_code)
     # Basic validation - ensure it's 6 digits
     is_valid =
       String.length(normalized_code) == 6 &&
         String.match?(normalized_code, ~r/^\d{6}$/)
 
-    {:noreply, assign(socket, :code_valid, is_valid)}
+    {:noreply,
+     socket
+     |> assign(:code_valid, is_valid)
+     |> assign(:email_verification_code_state, merged_code)}
   end
 
   def handle_event(
@@ -1069,14 +1085,28 @@ defmodule YscWeb.AccountSetupLive do
     user_needs = socket.assigns.user_needs
 
     if current_user && user_needs.phone_verification do
-      # Handle both OTP array format and single string format
-      normalized_code = normalize_verification_code(code)
+      # Accumulate digits in a dedicated assign (phx-input may send only the changed
+      # field, or paste can send as map; merge so we normalize the full code)
+      current_code = socket.assigns[:phone_verification_code_state] || %{}
+      current_code = if is_map(current_code), do: current_code, else: %{}
+
+      merged_code =
+        if is_map(code) do
+          Map.merge(current_code, code)
+        else
+          code
+        end
+
+      normalized_code = normalize_verification_code(merged_code)
       # Basic validation - ensure it's 6 digits
       is_valid =
         String.length(normalized_code) == 6 &&
           String.match?(normalized_code, ~r/^\d{6}$/)
 
-      {:noreply, assign(socket, phone_code_valid: is_valid)}
+      {:noreply,
+       socket
+       |> assign(:phone_code_valid, is_valid)
+       |> assign(:phone_verification_code_state, merged_code)}
     else
       {:noreply, socket}
     end

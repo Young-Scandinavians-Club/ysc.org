@@ -527,11 +527,17 @@ defmodule YscWeb.UserRegistrationLive do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         email_taken? = email_already_taken_error?(changeset)
+        step_with_error = step_with_first_error(changeset)
+        show_family = show_family_input_from_changeset?(changeset)
 
         {:noreply,
          socket
          |> assign(check_errors: true, email_already_taken: email_taken?)
-         |> assign_form(changeset)}
+         |> assign(:current_step, step_with_error)
+         |> assign(:show_family_input, show_family)
+         |> assign_form(changeset)
+         |> evaluate_steps()
+         |> push_event("scroll-to-top", %{})}
     end
   end
 
@@ -620,6 +626,62 @@ defmodule YscWeb.UserRegistrationLive do
      socket
      |> assign(:current_step, new_step)
      |> push_event("scroll-to-top", %{})}
+  end
+
+  # Which step (0, 1, or 2) has the first validation error; used to jump to that step on save failure
+  defp step_with_first_error(changeset) do
+    reg_form_errors =
+      case changeset.changes do
+        %{registration_form: reg_cs} when is_struct(reg_cs, Ecto.Changeset) ->
+          reg_cs.errors
+
+        _ ->
+          []
+      end
+
+    reg_keys = Keyword.keys(reg_form_errors)
+    base_keys = Keyword.keys(changeset.errors)
+
+    step_0_error? =
+      Enum.any?(reg_keys, fn k ->
+        k in [:membership_type, :membership_eligibility]
+      end)
+
+    step_1_error? =
+      Enum.any?(base_keys, fn k ->
+        k in [:email, :password, :first_name, :last_name]
+      end) or
+        Enum.any?(reg_keys, fn k ->
+          k in [:birth_date, :address, :city, :country, :postal_code]
+        end)
+
+    step_2_error? =
+      Enum.any?(reg_keys, fn k ->
+        k in [
+          :place_of_birth,
+          :citizenship,
+          :most_connected_nordic_country,
+          :agreed_to_bylaws
+        ]
+      end)
+
+    cond do
+      step_0_error? -> 0
+      step_1_error? -> 1
+      step_2_error? -> 2
+      true -> 2
+    end
+  end
+
+  defp show_family_input_from_changeset?(changeset) do
+    case Ecto.Changeset.get_change(changeset, :registration_form) do
+      %Ecto.Changeset{} = reg_cs ->
+        Ecto.Changeset.get_change(reg_cs, :membership_type) == "family" or
+          Ecto.Changeset.get_field(reg_cs, :membership_type, nil) == "family"
+
+      _ ->
+        false
+    end
   end
 
   defp email_already_taken_error?(changeset) do
