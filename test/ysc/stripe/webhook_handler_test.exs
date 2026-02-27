@@ -826,6 +826,37 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert subscription.stripe_status == "active"
     end
 
+    test "does not create subscription from customer.subscription.created when status is incomplete" do
+      # Admin "paid elsewhere" and checkout create subscriptions that start as
+      # incomplete; Stripe sends subscription.created before we pay. If we
+      # created locally here we'd race with the flow that then creates/updates
+      # with active data, leaving an incomplete record and "missing" membership.
+      user = user_with_stripe_id()
+      stripe_sub_id = "sub_incomplete_#{System.unique_integer()}"
+
+      subscription_data = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: user.stripe_id,
+        status: "incomplete",
+        start_date: System.os_time(:second),
+        current_period_start: nil,
+        current_period_end: nil,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event =
+        build_stripe_event("customer.subscription.created", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+    end
+
     test "marks subscription as cancelled when deleted" do
       user = user_with_stripe_id()
       subscription = create_subscription(user)

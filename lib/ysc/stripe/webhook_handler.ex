@@ -717,8 +717,16 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("customer.subscription.created", %Stripe.Subscription{} = event) do
-    customer = Ysc.Accounts.get_user_from_stripe_id(event.customer)
-    Subscriptions.create_subscription_from_stripe(customer, event)
+    # Only create locally when status is active or trialing. Subscriptions often
+    # start as "incomplete" (e.g. admin "paid elsewhere" or checkout); we pay the
+    # invoice or the user pays, then subscription.updated fires with "active".
+    # If we create from "incomplete" here, we race with the admin/checkout flow
+    # which then finds our incomplete record and returns it without updating,
+    # so the membership appears missing (active? is false for incomplete).
+    if event.status in ["active", "trialing"] do
+      customer = Ysc.Accounts.get_user_from_stripe_id(event.customer)
+      Subscriptions.create_subscription_from_stripe(customer, event)
+    end
 
     :ok
   end
