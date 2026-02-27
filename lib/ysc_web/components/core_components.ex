@@ -81,7 +81,7 @@ defmodule YscWeb.CoreComponents do
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
               class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1 p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
             >
-              <div class="absolute top-1 right-1 sm:top-0.5 sm:right-0.5 z-10">
+              <div class="absolute top-1 right-2 sm:top-0.5 sm:right-1 z-10">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
@@ -1378,6 +1378,13 @@ defmodule YscWeb.CoreComponents do
   def flash_toast_icon_warning(assigns) do
     ~H"""
     <.flash_toast_icon name="hero-exclamation-triangle" class="text-yellow-500" />
+    """
+  end
+
+  @doc false
+  def flash_toast_icon_clock(assigns) do
+    ~H"""
+    <.flash_toast_icon name="hero-clock" class="text-blue-500" />
     """
   end
 

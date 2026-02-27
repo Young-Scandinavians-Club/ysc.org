@@ -370,11 +370,12 @@ defmodule Ysc.Payments do
         end
 
       existing_payment_method ->
-        # For existing payment methods, preserve the is_default field
-        attrs_with_default =
-          Map.put(attrs, :is_default, existing_payment_method.is_default)
-
-        update_payment_method(existing_payment_method, attrs_with_default)
+        # Do not pass is_default so we never overwrite it. Default is owned by
+        # user actions (e.g. add payment method, select default); webhooks only
+        # sync metadata. This avoids a race where payment_method.attached runs
+        # after the LiveView set the new PM as default but still had a stale
+        # read of is_default: false, which would overwrite the default.
+        update_payment_method(existing_payment_method, attrs)
     end
   end
 

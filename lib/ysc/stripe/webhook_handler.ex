@@ -704,13 +704,31 @@ defmodule Ysc.Stripe.WebhookHandler do
     user = Ysc.Accounts.get_user_from_stripe_id(event.id)
 
     if user do
-      # Temporarily disable automatic syncing to prevent race conditions
-      # The user-initiated payment method selection should handle this
-      Ysc.Logging.info(
-        "Customer updated webhook received, skipping automatic sync to prevent race conditions",
-        user_id: user.id,
-        customer_id: event.id
-      )
+      # Sync default payment method from Stripe so our DB matches. When the user
+      # adds a new PM we set default in Stripe; this webhook ensures we also have
+      # it as default locally (avoids "none selected" if LiveView and other webhooks
+      # race).
+      stripe_default_pm = get_stripe_customer_default_payment_method(event)
+
+      if stripe_default_pm do
+        case Ysc.Payments.get_payment_method_by_provider(
+               :stripe,
+               stripe_default_pm
+             ) do
+          nil ->
+            Ysc.Logging.warning(
+              "customer.updated: Stripe default payment method not found locally",
+              user_id: user.id,
+              stripe_payment_method_id: stripe_default_pm
+            )
+
+          local_pm ->
+            case Ysc.Payments.set_default_payment_method(user, local_pm) do
+              {:ok, _} -> :ok
+              {:error, _} -> :ok
+            end
+        end
+      end
     end
 
     :ok
@@ -911,10 +929,16 @@ defmodule Ysc.Stripe.WebhookHandler do
     user = Ysc.Accounts.get_user_from_stripe_id(payment_method.customer)
 
     if user do
-      # Just sync the payment method data without changing default status
       case Ysc.Payments.sync_payment_method_from_stripe(user, payment_method) do
-        {:ok, _payment_method_record} ->
-          # Payment method created/updated successfully
+        {:ok, payment_method_record} ->
+          # If LiveView tagged this PM as "set as default", ensure it is default
+          # (handles webhook arriving before/after LiveView and avoids race)
+          maybe_set_default_from_metadata(
+            user,
+            payment_method,
+            payment_method_record
+          )
+
           :ok
 
         {:error, _} ->
@@ -952,8 +976,19 @@ defmodule Ysc.Stripe.WebhookHandler do
     user = Ysc.Accounts.get_user_from_stripe_id(payment_method.customer)
 
     if user do
-      # Just sync the payment method data without changing default status
-      Ysc.Payments.sync_payment_method_from_stripe(user, payment_method)
+      case Ysc.Payments.sync_payment_method_from_stripe(user, payment_method) do
+        {:ok, payment_method_record} ->
+          maybe_set_default_from_metadata(
+            user,
+            payment_method,
+            payment_method_record
+          )
+
+          :ok
+
+        {:error, _} ->
+          :ok
+      end
     end
 
     :ok
@@ -1537,6 +1572,38 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle(_event_name, _event_object), do: :ok
+
+  defp get_stripe_customer_default_payment_method(%{invoice_settings: inv})
+       when is_map(inv) or is_struct(inv) do
+    Map.get(inv, :default_payment_method) ||
+      Map.get(inv, "default_payment_method")
+  end
+
+  defp get_stripe_customer_default_payment_method(_), do: nil
+
+  # When the LiveView adds a payment method it sets metadata set_as_default: "true"
+  # on the PaymentMethod in Stripe. When we receive attached/updated with that
+  # metadata, set this PM as default so webhook order cannot overwrite it.
+  defp maybe_set_default_from_metadata(
+         user,
+         stripe_payment_method,
+         local_payment_method
+       ) do
+    metadata = Map.get(stripe_payment_method, :metadata) || %{}
+
+    set_as_default =
+      metadata["set_as_default"] == "true" or
+        metadata[:set_as_default] == "true"
+
+    if set_as_default do
+      case Ysc.Payments.set_default_payment_method(user, local_payment_method) do
+        {:ok, _} -> :ok
+        {:error, _} -> :ok
+      end
+    else
+      :ok
+    end
+  end
 
   # Helper function to process a new payout
   defp process_new_payout(payout) do

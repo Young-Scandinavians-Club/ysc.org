@@ -473,7 +473,7 @@ defmodule YscWeb.UserSettingsLive do
               phx-click={JS.navigate(~p"/users/membership")}
               class="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 bg-white hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Cancel
+              Close
             </button>
             <button
               :if={@show_new_payment_form && @payment_intent_secret}
@@ -3257,6 +3257,13 @@ defmodule YscWeb.UserSettingsLive do
       # Retrieve the payment method from Stripe and store it locally
       case Stripe.PaymentMethod.retrieve(payment_method_id) do
         {:ok, stripe_payment_method} ->
+          # Tag in Stripe so webhooks know to set this as default (avoids race with
+          # payment_method.attached / payment_method.updated overwriting default)
+          _ =
+            Stripe.PaymentMethod.update(payment_method_id, %{
+              metadata: %{set_as_default: "true"}
+            })
+
           # Store the payment method in our database and set it as default
           case Ysc.Payments.upsert_and_set_default_payment_method_from_stripe(
                  user,

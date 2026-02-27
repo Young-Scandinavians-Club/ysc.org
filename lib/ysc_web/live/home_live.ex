@@ -2128,7 +2128,9 @@ defmodule YscWeb.HomeLive do
          |> assign(show_passkey_prompt: false)
          |> YscWeb.Flash.put_toast(
            :info,
-           "We'll remind you about passkeys in 30 days."
+           "We'll remind you about passkeys in 30 days.",
+           title: "Reminder scheduled",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_clock/1
          )}
 
       {:error, _changeset} ->
@@ -2201,7 +2203,9 @@ defmodule YscWeb.HomeLive do
          )
          |> YscWeb.Flash.put_toast(
            :info,
-           "Thank you for subscribing to our newsletter!"
+           "Thank you for subscribing to our newsletter!",
+           title: "You're subscribed",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
          )}
 
       {:error, :invalid_email} ->

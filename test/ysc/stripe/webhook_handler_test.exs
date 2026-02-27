@@ -1676,6 +1676,45 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert :ok = WebhookHandler.handle_event(event)
     end
 
+    test "customer.updated syncs default payment method from Stripe" do
+      user = user_with_stripe_id()
+      stripe_pm_id = "pm_sync_default_#{System.unique_integer([:positive])}"
+
+      {:ok, _pm1} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_other_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, pm2} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: stripe_pm_id,
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      customer_data = %Stripe.Customer{
+        id: user.stripe_id,
+        email: user.email,
+        invoice_settings: %{default_payment_method: stripe_pm_id}
+      }
+
+      event = build_stripe_event("customer.updated", customer_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      default = Ysc.Payments.get_default_payment_method(user)
+      assert default.id == pm2.id
+    end
+
     test "cancels all subscriptions when customer is deleted" do
       user = user_with_stripe_id()
       subscription = create_subscription(user, %{stripe_status: "active"})
