@@ -1549,6 +1549,31 @@ defmodule Ysc.Accounts do
     :ok
   end
 
+  @doc """
+  Revokes a specific session for the user by encoded session ID (Base64).
+  Used when the user signs out a session from the Security settings page.
+  Returns :ok if the session was revoked, :error if invalid or not found.
+  """
+  def revoke_user_session_by_id(user, encoded_session_id)
+      when is_binary(encoded_session_id) do
+    case Base.decode64(encoded_session_id) do
+      {:ok, token} ->
+        query =
+          from t in UserToken,
+            where:
+              t.user_id == ^user.id and t.context == "session" and
+                t.token == ^token
+
+        case Repo.delete_all(query) do
+          {1, _} -> :ok
+          _ -> :error
+        end
+
+      :error ->
+        :error
+    end
+  end
+
   ## Confirmation
 
   @doc ~S"""

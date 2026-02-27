@@ -6,6 +6,37 @@ defmodule YscWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
+  Merges toasts_sync with any welcome-back toast and returns {toasts_sync, flash}.
+  When a welcome toast is added, :info is removed from flash so Components.flashes
+  does not render a duplicate on first paint. The LiveToast patch adds the sync
+  toast to the stream even without a matching flash.
+  """
+  def toasts_sync_with_flash(assigns) do
+    base = assigns[:toasts_sync] || []
+    flash = assigns[:flash] || %{}
+    # Support both string and atom keys (session/redirect may use either)
+    info_msg = flash["info"] || flash[:info]
+
+    if info_msg && is_binary(info_msg) &&
+         String.contains?(info_msg, "Welcome back") do
+      welcome_toast = %LiveToast{
+        kind: :info,
+        msg: info_msg,
+        title: "Welcome back! 👋",
+        icon: &YscWeb.CoreComponents.flash_toast_icon_success/1,
+        uuid: Ecto.UUID.generate(),
+        sync: true
+      }
+
+      # Strip both key forms so Components.flashes does not show a second toast
+      flash_for_toast = flash |> Map.delete("info") |> Map.delete(:info)
+      {[welcome_toast | base], flash_for_toast}
+    else
+      {base, flash}
+    end
+  end
+
+  @doc """
   Toast container classes with z-[10000] so toasts render above modals (z-50)
   and mobile menu overlays (z-[9999]).
   """

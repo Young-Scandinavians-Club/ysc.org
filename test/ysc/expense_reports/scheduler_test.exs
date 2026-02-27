@@ -77,16 +77,21 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
     end
 
     test "logs debug message on success" do
-      # Process must emit debug; capture_log level allows capturing it
-      Logger.configure(level: :debug)
-
+      # capture_log's :level option does not override Logger.level/0 (test defaults to :error),
+      # so we must set Logger to :debug inside the capture so the message is emitted.
       log =
         ExUnit.CaptureLog.capture_log([level: :debug], fn ->
-          Scheduler.schedule_immediate_sync()
+          Logger.configure(level: :debug)
+
+          try do
+            Scheduler.schedule_immediate_sync()
+          after
+            Logger.configure(level: :error)
+          end
         end)
 
-      Logger.configure(level: :error)
-      assert log =~ "Scheduled expense report QuickBooks sync job"
+      assert log =~ "Scheduled expense report QuickBooks sync job",
+             "Expected debug log to be captured. Got: #{inspect(log)}"
     end
 
     test "can be called multiple times successfully" do

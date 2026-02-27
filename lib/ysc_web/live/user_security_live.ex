@@ -37,6 +37,7 @@ defmodule YscWeb.UserSecurityLive do
       |> assign(:user_has_password, !is_nil(user.hashed_password))
       |> assign(:login_history, [])
       |> assign(:login_history_loading, true)
+      |> assign(:revoked_session_ids, [])
 
     # Load passkeys and login history asynchronously only if connected
     socket =
@@ -216,6 +217,59 @@ defmodule YscWeb.UserSecurityLive do
     do: {:noreply, socket}
 
   def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "revoke_session",
+        %{"session_id" => encoded_session_id},
+        socket
+      ) do
+    user = socket.assigns.current_user
+
+    case Accounts.revoke_user_session_by_id(user, encoded_session_id) do
+      :ok ->
+        # Disconnect any LiveView sockets using this session (e.g. other tab or device)
+        if live_socket_id =
+             YscWeb.UserAuth.live_socket_id_from_encoded_session(
+               encoded_session_id
+             ) do
+          YscWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
+        end
+
+        current_session_id = socket.assigns[:current_session_id]
+
+        if current_session_id && encoded_session_id == current_session_id do
+          # User revoked their current session — sign them out
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "You have signed out.",
+             title: "Session ended"
+           )
+           |> push_navigate(to: ~p"/users/log-in")}
+        else
+          {:noreply,
+           socket
+           |> assign(:revoked_session_ids, [
+             encoded_session_id | socket.assigns.revoked_session_ids
+           ])
+           |> YscWeb.Flash.put_toast(:info, "Session signed out.",
+             title: "Session"
+           )}
+        end
+
+      :error ->
+        # Token may already be revoked (e.g. from another tab or previous visit); hide the button
+        {:noreply,
+         socket
+         |> assign(:revoked_session_ids, [
+           encoded_session_id | socket.assigns.revoked_session_ids
+         ])
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "That session may already be signed out.",
+           title: "Session"
+         )}
+    end
+  end
 
   def handle_event("delete_passkey", %{"passkey_id" => id}, socket) do
     user = socket.assigns.current_user
@@ -634,11 +688,11 @@ defmodule YscWeb.UserSecurityLive do
                 </:actions>
               </.simple_form>
             </div>
-            <!-- Recent Logins Section -->
+            <!-- Recent Activity Section -->
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Recent Logins</h2>
+              <h2 class="text-zinc-900 font-bold text-xl">Recent Activity</h2>
               <p class="text-zinc-600 text-sm">
-                Review where and how you signed in. If you see an unfamiliar login, change your password and sign out other sessions.
+                Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out other sessions.
               </p>
 
               <div
@@ -648,7 +702,7 @@ defmodule YscWeb.UserSecurityLive do
                 <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
                 </div>
                 <span class="ml-3 text-zinc-600 text-sm">
-                  Loading login history...
+                  Loading activity...
                 </span>
               </div>
 
@@ -656,46 +710,104 @@ defmodule YscWeb.UserSecurityLive do
                 :if={!@login_history_loading && @login_history == []}
                 class="text-center py-8"
               >
-                <p class="text-zinc-600 text-sm">No login history yet.</p>
+                <p class="text-zinc-600 text-sm">No sign-in history yet.</p>
               </div>
 
-              <div
-                :if={!@login_history_loading && @login_history != []}
-                class="space-y-3"
-              >
-                <div
-                  :for={event <- @login_history}
-                  class="flex items-start justify-between gap-4 p-4 border border-zinc-200 rounded-lg"
-                >
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 flex-wrap mb-1">
-                      <.icon
-                        name={device_type_icon(event.device_type)}
-                        class="w-5 h-5 text-zinc-600 shrink-0"
-                      />
-                      <span class={login_status_badge(event)}>
-                        {if event.success, do: "Successful", else: "Failed"}
-                      </span>
-                      <%= if event.is_suspicious do %>
-                        <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-                          <.icon
-                            name="hero-exclamation-triangle"
-                            class="w-3 h-3 me-1"
-                          /> Flagged
-                        </span>
-                      <% end %>
+              <%= if !@login_history_loading && @login_history != [] do %>
+                <% {current_event, past_events} =
+                  split_current_and_past_events(@login_history, @current_session_id) %>
+                <div class="space-y-6">
+                  <%= if current_event do %>
+                    <div>
+                      <h3 class="text-sm font-semibold text-zinc-700 mb-3">
+                        Current session
+                      </h3>
+                      <div class="flex items-start justify-between gap-4 p-4 border border-blue-200 rounded-lg bg-blue-50/50">
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <span class="inline-flex items-center rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+                              Current session
+                            </span>
+                            <span class="text-zinc-600 text-xs">
+                              {sign_in_method_label(current_event)}
+                            </span>
+                          </div>
+                          <p class="text-sm text-zinc-900 font-medium">
+                            {login_device_description(current_event)}
+                          </p>
+                          <p class="text-xs text-zinc-500 mt-1">
+                            {format_login_time(current_event.inserted_at, @timezone)} · {format_location(
+                              current_event
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <p class="text-sm text-zinc-900 font-medium">
-                      {login_device_description(event)}
-                    </p>
-                    <p class="text-xs text-zinc-500 mt-1">
-                      {format_login_time(event.inserted_at, @timezone)} · {mask_ip(
-                        event.ip_address
-                      )}
-                    </p>
+                  <% end %>
+                  <div>
+                    <h3 class="text-sm font-semibold text-zinc-700 mb-3">
+                      Past sign-ins
+                    </h3>
+                    <div class="space-y-3">
+                      <div
+                        :for={event <- past_events}
+                        class="flex items-start justify-between gap-4 p-4 border border-zinc-200 rounded-lg"
+                      >
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <.icon
+                              name={device_type_icon(event.device_type)}
+                              class="w-5 h-5 text-zinc-600 shrink-0"
+                            />
+                            <span class={login_status_badge(event)}>
+                              {if event.success,
+                                do: "Successful",
+                                else: "Failed sign-in"}
+                            </span>
+                            <span class="text-zinc-500 text-xs">
+                              {sign_in_method_label(event)}
+                            </span>
+                            <%= if event.is_suspicious do %>
+                              <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                                <.icon
+                                  name="hero-exclamation-triangle"
+                                  class="w-3 h-3 me-1"
+                                /> Flagged
+                              </span>
+                            <% end %>
+                          </div>
+                          <p class="text-sm text-zinc-900 font-medium">
+                            {login_device_description(event)}
+                          </p>
+                          <p class="text-xs text-zinc-500 mt-1">
+                            {format_login_time(event.inserted_at, @timezone)} · {format_location(
+                              event
+                            )}
+                          </p>
+                        </div>
+                        <div class="shrink-0">
+                          <%= if event.success && event.session_id && event.session_id != @current_session_id && event.session_id not in @revoked_session_ids do %>
+                            <.button
+                              phx-click="revoke_session"
+                              phx-value-session_id={event.session_id}
+                              phx-confirm="Sign out this session? You will need to sign in again on that device."
+                              phx-disable-with="Signing out..."
+                              variant="secondary"
+                              class="text-sm"
+                            >
+                              Sign out this session
+                            </.button>
+                          <% else %>
+                            <%= if !event.success do %>
+                              <span class="text-xs text-zinc-500">Details</span>
+                            <% end %>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              <% end %>
             </div>
           </div>
         </div>
@@ -768,5 +880,49 @@ defmodule YscWeb.UserSecurityLive do
     browser = event.browser || "Unknown browser"
     os = event.operating_system || "Unknown OS"
     "#{browser} on #{os}"
+  end
+
+  defp split_current_and_past_events(events, current_session_id) do
+    current =
+      Enum.find(events, fn e ->
+        e.success && e.session_id && e.session_id == current_session_id
+      end)
+
+    past =
+      if current do
+        Enum.reject(events, &(&1.id == current.id))
+      else
+        events
+      end
+
+    {current, past}
+  end
+
+  defp sign_in_method_label(event) do
+    meta = event.metadata || %{}
+    method = Map.get(meta, "auth_method") || Map.get(meta, :auth_method)
+
+    case method do
+      "email_password" -> "Password"
+      "passkey" -> "Passkey"
+      "google" -> "Google"
+      "facebook" -> "Facebook"
+      "oauth" -> "OAuth"
+      other when is_binary(other) and other != "" -> String.capitalize(other)
+      _ -> "Sign-in"
+    end
+  end
+
+  defp format_location(event) do
+    parts =
+      [event.city, event.region, event.country]
+      |> Enum.reject(&(is_nil(&1) || &1 == ""))
+
+    if parts != [] do
+      Enum.join(parts, ", ")
+    else
+      masked = mask_ip(event.ip_address)
+      if masked != "—", do: masked, else: "—"
+    end
   end
 end

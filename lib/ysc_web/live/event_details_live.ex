@@ -4030,9 +4030,14 @@ defmodule YscWeb.EventDetailsLive do
 
   # Retrieve existing payment intent or create a new one
   defp retrieve_or_create_payment_intent(ticket_order, user) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
     if ticket_order.payment_intent_id do
       # Try to retrieve existing payment intent
-      case Stripe.PaymentIntent.retrieve(ticket_order.payment_intent_id, %{}) do
+      case stripe_client.retrieve_payment_intent(
+             ticket_order.payment_intent_id,
+             %{}
+           ) do
         {:ok, payment_intent} ->
           # Check if payment intent is still valid (not succeeded or canceled)
           if payment_intent.status in [
@@ -4642,7 +4647,10 @@ defmodule YscWeb.EventDetailsLive do
           payment_intent_id ->
             # Check payment intent status from Stripe
             # If it requires action (redirect), don't cancel - user is completing payment
-            case Stripe.PaymentIntent.retrieve(payment_intent_id, %{}) do
+            stripe_client =
+              Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+            case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
               {:ok, payment_intent} ->
                 # Don't cancel if payment intent is in a state that indicates active payment processing
                 # Statuses that indicate redirect/action required: requires_action (Amazon Pay, CashApp, etc.)

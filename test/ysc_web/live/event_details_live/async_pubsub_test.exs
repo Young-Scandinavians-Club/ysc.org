@@ -22,6 +22,11 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       {:ok, build_payment_intent(%{amount: params.amount})}
     end)
 
+    # Required when LiveView restores checkout from URL with order_id and order has payment_intent_id
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      {:ok, build_payment_intent(%{id: id, status: "requires_payment_method"})}
+    end)
+
     on_exit(fn ->
       Application.delete_env(:ysc, :stripe_client)
     end)

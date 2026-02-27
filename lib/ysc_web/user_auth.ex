@@ -10,6 +10,7 @@ defmodule YscWeb.UserAuth do
   import Phoenix.Controller
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.AuthService
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Subscriptions
 
@@ -49,11 +50,18 @@ defmodule YscWeb.UserAuth do
           nil
       end
 
-    conn
-    |> renew_session()
-    |> put_token_in_session(token)
-    |> maybe_write_remember_me_cookie(token, params)
-    |> redirect(to: validated_redirect || signed_in_path_for_user(user, conn))
+    conn =
+      conn
+      |> renew_session()
+      |> put_token_in_session(token)
+      |> maybe_write_remember_me_cookie(token, params)
+
+    # Log sign-in after session is set so auth_events.session_id is populated (for "Current session" on Security page)
+    AuthService.log_login_success(user, conn, params)
+
+    redirect(conn,
+      to: validated_redirect || signed_in_path_for_user(user, conn)
+    )
   end
 
   # Get the appropriate signed-in path for a user
@@ -109,6 +117,21 @@ defmodule YscWeb.UserAuth do
       end
     end)
   end
+
+  @doc """
+  Returns the LiveView socket topic ID for a session given its encoded session ID
+  (Base64, as stored in auth_events). Used when revoking a session so we can
+  broadcast "disconnect" and close any persistent LiveView connections for that session.
+  """
+  def live_socket_id_from_encoded_session(encoded_session_id)
+      when is_binary(encoded_session_id) do
+    case Base.decode64(encoded_session_id) do
+      {:ok, token} -> "users_sessions:#{Base.url_encode64(token)}"
+      :error -> nil
+    end
+  end
+
+  def live_socket_id_from_encoded_session(_), do: nil
 
   @doc """
   Logs the user out.
@@ -314,10 +337,14 @@ defmodule YscWeb.UserAuth do
   end
 
   defp mount_current_user(socket, session) do
+    user_token = session["user_token"]
+
     user_from_token =
-      if user_token = session["user_token"] do
-        Accounts.get_user_by_session_token(user_token)
-      end
+      if user_token, do: Accounts.get_user_by_session_token(user_token)
+
+    # Encode session token for comparison with auth_events.session_id (used on Security page)
+    current_session_id =
+      if is_binary(user_token), do: Base.encode64(user_token), else: nil
 
     impersonated_user_id = session["impersonated_user_id"]
 
@@ -332,6 +359,9 @@ defmodule YscWeb.UserAuth do
         else
           user_from_token
         end
+      end)
+      |> Phoenix.Component.assign_new(:current_session_id, fn ->
+        current_session_id
       end)
       |> Phoenix.Component.assign_new(:impersonating?, fn ->
         impersonated_user_id != nil

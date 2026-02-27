@@ -7,7 +7,6 @@ defmodule YscWeb.AuthController do
   plug Ueberauth
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.AuthService
   alias YscWeb.UserAuth
 
   @doc """
@@ -104,17 +103,9 @@ defmodule YscWeb.AuthController do
               user
             end
 
-          # Log successful authentication
-          AuthService.log_login_success(updated_user, conn, %{
-            "provider" => to_string(provider),
-            "oauth" => true,
-            "method" => to_string(provider)
-          })
-
           # Get redirect_to from session if it was stored
           redirect_to = get_session(conn, :oauth_redirect_to)
 
-          # Log user in
           conn
           |> delete_session(:oauth_redirect_to)
           |> YscWeb.Flash.put_toast(
@@ -123,7 +114,14 @@ defmodule YscWeb.AuthController do
             title: "Authentication"
           )
           |> put_session(:just_logged_in, true)
-          |> UserAuth.log_in_user(updated_user, %{}, redirect_to)
+          |> UserAuth.log_in_user(
+            updated_user,
+            %{
+              "method" => to_string(provider),
+              "provider" => to_string(provider)
+            },
+            redirect_to
+          )
         else
           # Account not in allowed state
           conn

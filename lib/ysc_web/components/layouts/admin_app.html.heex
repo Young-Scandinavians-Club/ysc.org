@@ -1,9 +1,14 @@
 <div id="app-container" class="w-full flex flex-col min-h-screen">
+  <% {toasts_sync, flash} = YscWeb.Layouts.toasts_sync_with_flash(assigns) %>
+  <% flash_for_display =
+    if assigns[:socket] != nil and Phoenix.LiveView.connected?(assigns[:socket]),
+      do: flash,
+      else: assigns[:flash] || %{} %>
   <.toast_group
-    flash={@flash}
+    flash={flash_for_display}
     connected={assigns[:socket] != nil}
     corner={:top_right}
-    toasts_sync={assigns[:toasts_sync] || []}
+    toasts_sync={toasts_sync}
     group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
   />
 

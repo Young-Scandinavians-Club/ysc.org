@@ -16,7 +16,7 @@ defmodule YscWeb.UserSessionController do
   end
 
   def create(conn, params) do
-    create(conn, params, "Welcome back!")
+    create(conn, params, "Welcome back! 👋 Good to see you again.")
   end
 
   def auto_login(conn, %{"token" => encoded_token, "redirect_to" => redirect_to}) do
@@ -25,16 +25,13 @@ defmodule YscWeb.UserSessionController do
 
     if user = Accounts.get_user_by_session_token(token) do
       if user.state in [:pending_approval, :active] do
-        # Log successful sign-in
-        AuthService.log_login_success(user, conn, %{
-          token: token,
-          method: "email_password"
-        })
-
-        # Reset failed sign-in attempts and log in user
         conn
         |> delete_session(:failed_login_attempts)
-        |> UserAuth.log_in_user(user, %{}, redirect_to)
+        |> UserAuth.log_in_user(
+          user,
+          %{"method" => "email_password"},
+          redirect_to
+        )
       else
         # Account not active
         conn
@@ -61,17 +58,10 @@ defmodule YscWeb.UserSessionController do
 
     if user = Accounts.get_user_by_session_token(token) do
       if user.state in [:pending_approval, :active] do
-        # Log successful sign-in
-        AuthService.log_login_success(user, conn, %{
-          token: token,
-          method: "email_password"
-        })
-
-        # Reset failed sign-in attempts and log in user
         # UserAuth.log_in_user will redirect to the appropriate path based on user state
         conn
         |> delete_session(:failed_login_attempts)
-        |> UserAuth.log_in_user(user, %{})
+        |> UserAuth.log_in_user(user, %{"method" => "email_password"})
       else
         # Account not active
         conn
@@ -137,14 +127,6 @@ defmodule YscWeb.UserSessionController do
       else
         # Check if user is in an allowed state for login
         if user.state in [:pending_approval, :active] do
-          # Log successful sign-in
-          AuthService.log_login_success(
-            user,
-            conn,
-            Map.put(user_params, :method, "email_password")
-          )
-
-          # Reset failed sign-in attempts on successful sign-in
           # Validate redirect_to is internal before using it
           validated_redirect =
             if redirect_to &&
@@ -154,12 +136,19 @@ defmodule YscWeb.UserSessionController do
               nil
             end
 
+          user_params_with_method =
+            Map.put(user_params, "method", "email_password")
+
           conn
           |> YscWeb.Flash.put_toast(:info, info, title: "Login")
           |> delete_session(:failed_login_attempts)
           |> delete_session(:user_return_to)
           |> put_session(:just_logged_in, true)
-          |> UserAuth.log_in_user(user, user_params, validated_redirect)
+          |> UserAuth.log_in_user(
+            user,
+            user_params_with_method,
+            validated_redirect
+          )
         else
           # Log failed sign-in attempt due to account state
           AuthService.log_login_failure(
@@ -431,10 +420,6 @@ defmodule YscWeb.UserSessionController do
 
     if user do
       if user.state in [:pending_approval, :active] do
-        # Log successful sign-in
-        AuthService.log_login_success(user, conn, %{method: "passkey"})
-
-        # Reset failed sign-in attempts and log in user
         validated_redirect =
           if redirect_to && redirect_to != "" &&
                YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
@@ -455,7 +440,16 @@ defmodule YscWeb.UserSessionController do
         conn
         |> delete_session(:failed_login_attempts)
         |> put_session(:just_logged_in, true)
-        |> UserAuth.log_in_user(user, %{}, validated_redirect)
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Welcome back! 👋 Good to see you again.",
+          title: "Welcome back! 👋"
+        )
+        |> UserAuth.log_in_user(
+          user,
+          %{"method" => "passkey"},
+          validated_redirect
+        )
       else
         # Account not active
         Ysc.Logging.warning(

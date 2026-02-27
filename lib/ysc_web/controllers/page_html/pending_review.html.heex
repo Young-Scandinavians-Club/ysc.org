@@ -1,107 +1,115 @@
 <div class="min-h-[60vh] flex flex-col items-center justify-center py-8 lg:py-10 px-4">
-  <div class="w-full max-w-xl mx-auto prose prose-zinc prose-a:text-blue-600 pb-10">
-    <div class="text-center">
-      <.icon
-        name="hero-document-magnifying-glass"
-        class="h-16 w-16 text-blue-500 mx-auto"
+  <div class="w-full max-w-2xl mx-auto space-y-8">
+    <%!-- Fun hero image: what's waiting for you at the club --%>
+    <div class="rounded-2xl overflow-hidden">
+      <img
+        src={~p"/images/clear_lake/old_dock_photo.jpg"}
+        alt="YSC members on the dock at Clear Lake waving and enjoying the day"
+        class="w-full aspect-[16/10] object-cover rounded-2xl"
       />
+      <p class="text-center text-sm text-zinc-500 mt-1.5">
+        This could be you—members at Clear Lake
+      </p>
     </div>
 
-    <h2>
-      Your Membership Application is Under Review
-    </h2>
+    <div class="prose prose-zinc prose-a:text-blue-600 pb-10 max-w-xl mx-auto">
+      <h2>
+        Your Membership Application is Under Review
+      </h2>
 
-    <p class="font-bold text-left">
-      Submitted on:
-      <span class="mx-1 bg-blue-100 text-blue-800 text-sm font-medium me-2 px-2 py-1 rounded">
-        {Timex.format!(
-          @application_submitted_date,
-          "{YYYY}-{0M}-{0D}"
-        )} ({@time_delta})
-      </span>
-    </p>
-
-    <p class="text-left">
-      Thanks for applying to the Young Scandinavians Club! We're excited to have you. Our board is currently reviewing your details to ensure everything is in order.
-    </p>
-
-    <h3 class="text-left">What to expect next</h3>
-
-    <ol class="list-none pl-0 space-y-3 text-left">
-      <li class="flex gap-3 items-start pl-0">
-        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
-          1
+      <p class="font-bold text-left">
+        Submitted on:
+        <span class="mx-1 bg-blue-100 text-blue-800 text-sm font-medium me-2 px-2 py-1 rounded">
+          {Timex.format!(
+            @application_submitted_date,
+            "{YYYY}-{0M}-{0D}"
+          )}
         </span>
-        <span class="min-w-0 pt-0.5">
-          <strong>Board review:</strong>
-          We typically review applications within 14 days.
-        </span>
-      </li>
-      <li class="flex gap-3 items-start pl-0">
-        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
-          2
-        </span>
-        <span class="min-w-0 pt-0.5">
-          <strong>Email notification:</strong>
-          You'll receive an update via email as soon as a decision is made.
-        </span>
-      </li>
-      <li class="flex gap-3 items-start pl-0">
-        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
-          3
-        </span>
-        <span class="min-w-0 pt-0.5">
-          <strong>Activation:</strong>
-          If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
-        </span>
-      </li>
-    </ol>
+      </p>
 
-    <h3 class="text-left">Need help?</h3>
+      <p class="text-left">
+        Thanks for applying to the Young Scandinavians Club! We're excited to have you. Our board is currently reviewing your details to ensure everything is in order.
+      </p>
 
-    <p class="text-left">
-      If you haven't heard from us after 4 weeks, or if you have questions in the meantime, please reach out to <.link
-        class="hover:underline"
-        href="mailto:memberships@ysc.org"
-      >memberships@ysc.org</.link>.
-    </p>
+      <h3 class="text-left">What to expect next</h3>
 
-    <h3 class="text-left">While you wait...</h3>
+      <ol class="list-none pl-0 space-y-3 text-left">
+        <li class="flex gap-3 items-start pl-0">
+          <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
+            1
+          </span>
+          <span class="min-w-0 pt-0.5">
+            <strong>Board review:</strong>
+            We typically review applications within 14 days.
+          </span>
+        </li>
+        <li class="flex gap-3 items-start pl-0">
+          <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
+            2
+          </span>
+          <span class="min-w-0 pt-0.5">
+            <strong>Email notification:</strong>
+            You'll receive an update via email as soon as a decision is made.
+          </span>
+        </li>
+        <li class="flex gap-3 items-start pl-0">
+          <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
+            3
+          </span>
+          <span class="min-w-0 pt-0.5">
+            <strong>Activation:</strong>
+            If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
+          </span>
+        </li>
+      </ol>
 
-    <p class="text-left">
-      Feel free to explore our
-      <.link class="hover:underline" href={~p"/events"}>
-        events calendar
-      </.link>
-      <%= if @site_setting_socials_instagram || @site_setting_socials_facebook do %>
-        or follow us on
-        <%= if @site_setting_socials_instagram do %>
+      <h3 class="text-left">Need help?</h3>
+
+      <p class="text-left">
+        If you haven't heard from us after 21 days, or if you have questions in the meantime, please reach out to <.link
+          class="hover:underline"
+          href="mailto:memberships@ysc.org"
+        >memberships@ysc.org</.link>.
+      </p>
+
+      <div class="mt-8 pt-8 border-t border-zinc-200 not-prose">
+        <h3 class="text-left text-lg font-semibold text-zinc-900">
+          While you wait...
+        </h3>
+        <p class="text-left text-zinc-600 mb-4">
+          Check out our upcoming events or see what we've been up to lately:
+        </p>
+
+        <div class="flex flex-wrap gap-3">
           <.link
-            class="hover:underline"
-            href={@site_setting_socials_instagram}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={~p"/events"}
+            class="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors"
           >
-            Instagram
+            <.icon name="hero-calendar-days" class="w-5 h-5 me-2" />
+            Events Calendar
           </.link>
-          <%= if @site_setting_socials_facebook do %>
-            and
+          <%= if @site_setting_socials_instagram do %>
+            <.link
+              href={@site_setting_socials_instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center px-4 py-2 bg-zinc-50 text-zinc-700 rounded-lg font-medium hover:bg-zinc-100 transition-colors"
+            >
+              <.icon name="hero-photo" class="w-5 h-5 me-2" /> Instagram
+            </.link>
           <% end %>
-        <% end %>
-        <%= if @site_setting_socials_facebook do %>
-          <.link
-            class="hover:underline"
-            href={@site_setting_socials_facebook}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Facebook
-          </.link>
-        <% end %>
-        to see what the club has been up to lately.
-      <% else %>
-        to see what the club has been up to lately.
-      <% end %>
-    </p>
+          <%= if @site_setting_socials_facebook do %>
+            <.link
+              href={@site_setting_socials_facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center px-4 py-2 bg-zinc-50 text-zinc-700 rounded-lg font-medium hover:bg-zinc-100 transition-colors"
+            >
+              <.icon name="hero-user-group" class="w-5 h-5 me-2" /> Facebook
+            </.link>
+          <% end %>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

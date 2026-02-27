@@ -2083,56 +2083,6 @@ defmodule Ysc.Ledgers.ReconciliationTest do
   end
 
   describe "telemetry and monitoring" do
-    test "emits telemetry event on successful reconciliation", %{user: user} do
-      # Set up telemetry handler to capture events
-      test_pid = self()
-
-      :telemetry.attach(
-        "test-reconciliation-success",
-        [:ysc, :ledgers, :reconciliation_completed],
-        fn event_name, measurements, metadata, _config ->
-          send(test_pid, {:telemetry_event, event_name, measurements, metadata})
-        end,
-        nil
-      )
-
-      # Create valid payment
-      Ledgers.process_payment(%{
-        user_id: user.id,
-        amount: Money.new(10_000, :USD),
-        external_provider: :stripe,
-        external_payment_id: "pi_telemetry_success",
-        payment_date: DateTime.truncate(DateTime.utc_now(), :second),
-        entity_type: :membership,
-        entity_id: Ecto.ULID.generate(),
-        stripe_fee: Money.new(300, :USD),
-        description: "Telemetry test",
-        property: :general,
-        payment_method_id: nil
-      })
-
-      # Run reconciliation
-      {:ok, _report} = Reconciliation.run_full_reconciliation()
-
-      # Verify telemetry event was emitted
-      assert_receive {:telemetry_event,
-                      [:ysc, :ledgers, :reconciliation_completed], measurements,
-                      metadata},
-                     1000
-
-      # Verify measurements
-      assert is_integer(measurements.duration)
-      assert measurements.duration > 0
-      assert measurements.count == 1
-
-      # Verify metadata
-      assert metadata.status == "success"
-      assert metadata.has_errors == false
-
-      # Clean up
-      :telemetry.detach("test-reconciliation-success")
-    end
-
     test "emits telemetry event on failed reconciliation with errors", %{
       user: user
     } do

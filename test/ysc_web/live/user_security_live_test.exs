@@ -277,27 +277,27 @@ defmodule YscWeb.UserSecurityLiveTest do
     end
   end
 
-  describe "recent logins" do
-    test "shows Recent Logins section", %{conn: conn} do
+  describe "recent activity" do
+    test "shows Recent Activity section", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} = live(conn, ~p"/users/settings/security")
 
-      assert html =~ "Recent Logins"
+      assert html =~ "Recent Activity"
       assert html =~ "Review where and how you signed in"
     end
 
-    test "shows loading state for login history on initial mount", %{conn: conn} do
+    test "shows loading state for activity on initial mount", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} = live(conn, ~p"/users/settings/security")
 
-      assert html =~ "Loading login history"
+      assert html =~ "Loading activity"
     end
 
-    test "shows empty state when user has no login history", %{conn: conn} do
+    test "shows empty state when user has no sign-in history", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
@@ -306,11 +306,13 @@ defmodule YscWeb.UserSecurityLiveTest do
       render_async(view)
 
       html = render(view)
-      assert html =~ "Recent Logins"
-      assert html =~ "No login history yet"
+      assert html =~ "Recent Activity"
+      assert html =~ "No sign-in history yet"
     end
 
-    test "displays recent login events with device and masked IP", %{conn: conn} do
+    test "displays recent sign-in events with device and masked IP", %{
+      conn: conn
+    } do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
@@ -330,13 +332,13 @@ defmodule YscWeb.UserSecurityLiveTest do
       render_async(view)
 
       html = render(view)
-      assert html =~ "Recent Logins"
+      assert html =~ "Recent Activity"
       assert html =~ "Successful"
       assert html =~ "Chrome on macOS"
       assert html =~ "192.168.xxx.xxx"
     end
 
-    test "displays failed login when present", %{conn: conn} do
+    test "displays failed sign-in when present", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
@@ -357,12 +359,12 @@ defmodule YscWeb.UserSecurityLiveTest do
       render_async(view)
 
       html = render(view)
-      assert html =~ "Recent Logins"
-      assert html =~ "Failed"
+      assert html =~ "Recent Activity"
+      assert html =~ "Failed sign-in"
       assert html =~ "10.0.xxx.xxx"
     end
 
-    test "shows flagged badge for suspicious login event", %{conn: conn} do
+    test "shows flagged badge for suspicious sign-in event", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
@@ -383,12 +385,12 @@ defmodule YscWeb.UserSecurityLiveTest do
       render_async(view)
 
       html = render(view)
-      assert html =~ "Recent Logins"
+      assert html =~ "Recent Activity"
       assert html =~ "Successful"
       assert html =~ "Flagged"
     end
 
-    test "limits to 10 most recent login events", %{conn: conn} do
+    test "limits to 10 most recent sign-in events", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 

@@ -812,11 +812,17 @@
     </div>
   </footer>
 
+  <% {toasts_sync, flash} = YscWeb.Layouts.toasts_sync_with_flash(assigns) %>
+  <%!-- When not connected (initial HTML), flash_group is used and ignores toasts_sync — pass full flash so the message shows --%>
+  <% flash_for_display =
+    if assigns[:socket] != nil and Phoenix.LiveView.connected?(assigns[:socket]),
+      do: flash,
+      else: assigns[:flash] || %{} %>
   <.toast_group
-    flash={@flash}
+    flash={flash_for_display}
     connected={assigns[:socket] != nil}
     corner={:top_right}
-    toasts_sync={assigns[:toasts_sync] || []}
+    toasts_sync={toasts_sync}
     group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
   />
 </div>

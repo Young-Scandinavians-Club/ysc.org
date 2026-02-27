@@ -905,7 +905,10 @@ defmodule YscWeb.UserLoginLive do
             |> assign(:passkey_loading, false)
             |> assign(:passkey_challenge, nil)
             |> assign(:passkey_auth_mode, nil)
-            |> YscWeb.Flash.success_with_title("Welcome back!", "Welcome back!")
+            |> YscWeb.Flash.success_with_title(
+              "Welcome back! 👋",
+              "Welcome back! 👋 Good to see you again."
+            )
 
           # One-time signed token so the controller can trust this redirect came from
           # a successful passkey verification (prevents logging in with just a user_id).
