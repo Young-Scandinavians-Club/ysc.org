@@ -32,12 +32,10 @@ defmodule YscWeb.UserResetPasswordLiveTest do
     test "does not render reset password with invalid token", %{conn: conn} do
       {:error, {:redirect, to}} = live(conn, ~p"/users/reset-password/invalid")
 
-      assert to == %{
-               flash: %{
-                 "error" => "Reset password link is invalid or it has expired."
-               },
-               to: ~p"/"
-             }
+      assert to[:to] == ~p"/"
+
+      assert to[:flash]["error"] ==
+               "Reset password link is invalid or it has expired."
     end
 
     test "renders errors for invalid data", %{conn: conn, token: token} do
