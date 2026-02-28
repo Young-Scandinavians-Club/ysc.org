@@ -46,28 +46,29 @@ defmodule YscWeb.ImpersonationController do
     # When impersonating, current_user is the impersonated user; require_admin
     # uses real_current_user so we can still reach this action.
     original_admin_id = get_session(conn, :original_admin_id)
+    impersonated_user_id = get_session(conn, :impersonated_user_id)
 
     if original_admin_id do
       user_token = get_session(conn, :user_token)
       admin = user_token && Accounts.get_user_by_session_token(user_token)
 
-      if admin && admin.id == original_admin_id && admin.role == :admin do
-        conn
-        |> delete_session(:impersonated_user_id)
-        |> delete_session(:original_admin_id)
-        |> YscWeb.Flash.put_toast(:info, "Stopped impersonating.",
-          title: "Impersonation"
-        )
-        |> redirect(to: ~p"/admin")
-      else
-        conn
-        |> delete_session(:impersonated_user_id)
-        |> delete_session(:original_admin_id)
-        |> YscWeb.Flash.put_toast(:info, "Stopped impersonating.",
-          title: "Impersonation"
-        )
-        |> redirect(to: ~p"/")
-      end
+      redirect_to =
+        if admin && admin.id == original_admin_id && admin.role == :admin &&
+             impersonated_user_id do
+          ~p"/admin/users/#{impersonated_user_id}/details"
+        else
+          if admin && admin.id == original_admin_id && admin.role == :admin,
+            do: ~p"/admin",
+            else: ~p"/"
+        end
+
+      conn
+      |> delete_session(:impersonated_user_id)
+      |> delete_session(:original_admin_id)
+      |> YscWeb.Flash.put_toast(:info, "Stopped impersonating.",
+        title: "Impersonation"
+      )
+      |> redirect(to: redirect_to)
     else
       conn
       |> redirect(to: ~p"/")

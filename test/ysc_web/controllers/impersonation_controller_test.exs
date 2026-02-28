@@ -96,7 +96,7 @@ defmodule YscWeb.ImpersonationControllerTest do
       refute get_session(conn, :original_admin_id)
     end
 
-    test "clears impersonation and redirects to /admin when session is valid",
+    test "clears impersonation and redirects to impersonated user's admin detail page when session is valid",
          %{
            conn: conn
          } do
@@ -109,6 +109,29 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> init_test_session(%{})
         |> put_session(:user_token, token)
         |> put_session(:impersonated_user_id, target.id)
+        |> put_session(:original_admin_id, admin.id)
+        |> get(~p"/admin/stop-impersonation")
+
+      assert redirected_to(conn) == ~p"/admin/users/#{target.id}/details"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Stopped impersonating"
+
+      refute get_session(conn, :impersonated_user_id)
+      refute get_session(conn, :original_admin_id)
+    end
+
+    test "clears impersonation and redirects to /admin when session is valid but impersonated_user_id is missing",
+         %{
+           conn: conn
+         } do
+      admin = user_fixture(%{role: "admin"})
+      token = Ysc.Accounts.generate_user_session_token(admin)
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> put_session(:user_token, token)
         |> put_session(:original_admin_id, admin.id)
         |> get(~p"/admin/stop-impersonation")
 
