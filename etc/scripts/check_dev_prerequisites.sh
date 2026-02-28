@@ -85,7 +85,7 @@ echo ""
 
 # Check database migrations
 echo "${BOLD}→ Checking database migrations...${RESET}"
-PENDING_MIGRATIONS=$(mix ecto.migrations 2>/dev/null | grep -c "down" || echo "0")
+PENDING_MIGRATIONS=$(mix ecto.migrations 2>/dev/null | grep -c "down" || true)
 if [ "$PENDING_MIGRATIONS" -gt "0" ]; then
   echo "${RED}✗ Database has pending migrations ($PENDING_MIGRATIONS migration(s) not applied)${RESET}"
   echo "${TEAL}  Hint: Run: mix ecto.migrate${RESET}"
