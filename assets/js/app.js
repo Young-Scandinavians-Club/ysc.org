@@ -70,6 +70,36 @@ import FooterRotator from "./footer_rotator";
 import ScrollMoreIndicator from "./scroll_more_indicator";
 import { createLiveToastHook } from "../../deps/live_toast";
 
+const DEFAULT_TOAST_DURATION_MS = 5000;
+const MAX_TOAST_ITEMS = 3;
+
+/**
+ * Wraps LiveToast hook so flash toasts (from redirects) also auto-clear.
+ * LiveToast renders flash messages with duration=0 and skips the auto-dismiss
+ * timeout; we schedule lv:clear-flash after DEFAULT_TOAST_DURATION_MS for those.
+ */
+function createLiveToastHookWithFlashAutoClear(durationMs, maxItems) {
+    const baseHook = createLiveToastHook(durationMs, maxItems);
+    return {
+        ...baseHook,
+        mounted() {
+            baseHook.mounted.call(this);
+            const el = this.el;
+            const isFlash = el.dataset ? .component === "flash";
+            const isTransientFlash =
+                el.id &&
+                el.id.startsWith("flash-") &&
+                !["server-error", "client-error"].includes(el.id);
+            if (isFlash && isTransientFlash) {
+                const key = el.id.replace(/^flash-/, "");
+                window.setTimeout(() => {
+                    this.pushEvent("lv:clear-flash", { key });
+                }, durationMs);
+            }
+        }
+    };
+}
+
 let Hooks = {
     StickyNavbar,
     BlurHashCanvas,
@@ -112,7 +142,10 @@ let Hooks = {
     DecadeIndicator,
     FooterRotator,
     ScrollMoreIndicator,
-    LiveToast: createLiveToastHook(5000, 3),
+    LiveToast: createLiveToastHookWithFlashAutoClear(
+        DEFAULT_TOAST_DURATION_MS,
+        MAX_TOAST_ITEMS
+    ),
 };
 Hooks.LivePhone = LivePhone;
 
@@ -139,7 +172,7 @@ waitForSentry().then((available) => {
     if (available) {
         // Build integrations array - only include available integrations
         const integrations = [];
-        
+
         // Add BrowserTracing if available (Performance Bundle includes this)
         if (typeof window.Sentry.browserTracingIntegration === 'function') {
             integrations.push(window.Sentry.browserTracingIntegration({
@@ -147,7 +180,7 @@ waitForSentry().then((available) => {
                 tracePropagationTargets: ["localhost", /^\//],
             }));
         }
-        
+
         // Add Replay if available (some bundles include this)
         if (typeof window.Sentry.replayIntegration === 'function') {
             integrations.push(window.Sentry.replayIntegration({
@@ -157,7 +190,7 @@ waitForSentry().then((available) => {
                 errorSampleRate: 1.0,
             }));
         }
-        
+
         window.Sentry.init({
             dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
             integrations: integrations,
