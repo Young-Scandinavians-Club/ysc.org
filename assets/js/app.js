@@ -85,7 +85,7 @@ function createLiveToastHookWithFlashAutoClear(durationMs, maxItems) {
         mounted() {
             baseHook.mounted.call(this);
             const el = this.el;
-            const isFlash = el.dataset ? .component === "flash";
+            const isFlash = el.dataset?.component === "flash";
             const isTransientFlash =
                 el.id &&
                 el.id.startsWith("flash-") &&
