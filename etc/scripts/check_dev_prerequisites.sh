@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
 # check_dev_prerequisites.sh - Verify all prerequisites are met before starting dev server
+# shellcheck source-path=SCRIPTDIR
 
-set -e
+set -euo pipefail
 
-# Check if formatting variables are passed as environment variables
-if [ -z "$BOLD" ] || [ -z "$RESET" ] || [ -z "$RED" ] || [ -z "$GREEN" ] || [ -z "$TEAL" ]; then
-  # If not passed, set them here
-  BOLD=$(tput bold)
-  RESET=$(tput sgr0)
-  RED=$(tput setaf 1)
-  GREEN=$(tput setaf 2)
-  TEAL=$(tput setaf 6)
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_colors.sh
+. "$SCRIPT_DIR/_colors.sh"
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then
@@ -26,17 +21,17 @@ echo ""
 
 # Check environment variables
 echo "${BOLD}→ Checking environment variables...${RESET}"
-if [ -z "$STRIPE_SECRET" ]; then
+if [ -z "${STRIPE_SECRET:-}" ]; then
   echo "${RED}✗ Required environment variable ${BOLD}STRIPE_SECRET${RESET}${RED} not set.${RESET}"
   echo "${TEAL}  Hint: Add it to your .env file (see .env.example)${RESET}"
   exit 1
 fi
-if [ -z "$STRIPE_PUBLIC_KEY" ]; then
+if [ -z "${STRIPE_PUBLIC_KEY:-}" ]; then
   echo "${RED}✗ Required environment variable ${BOLD}STRIPE_PUBLIC_KEY${RESET}${RED} not set.${RESET}"
   echo "${TEAL}  Hint: Add it to your .env file (see .env.example)${RESET}"
   exit 1
 fi
-if [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
+if [ -z "${STRIPE_WEBHOOK_SECRET:-}" ]; then
   echo "${RED}✗ Required environment variable ${BOLD}STRIPE_WEBHOOK_SECRET${RESET}${RED} not set.${RESET}"
   echo "${TEAL}  Hint: Run stripe listen --forward-to localhost:4000/webhooks/stripe${RESET}"
   exit 1
@@ -56,7 +51,7 @@ fi
 POSTGRES_RUNNING=$(docker ps --filter "name=postgres" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -c "postgres" || echo "0")
 if [ "$POSTGRES_RUNNING" -eq "0" ]; then
   echo "${RED}✗ PostgreSQL container is not running${RESET}"
-  echo "${TEAL}  Hint: Start containers with: docker-compose -f ${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml} up -d${RESET}"
+  echo "${TEAL}  Hint: Start containers with: docker compose -f ${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml} up -d${RESET}"
   echo "${TEAL}  Or run: make dev-setup${RESET}"
   exit 1
 fi
@@ -66,7 +61,7 @@ echo "${GREEN}✓ PostgreSQL container is running${RESET}"
 LOCALSTACK_RUNNING=$(docker ps --filter "name=localstack" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -c "localstack" || echo "0")
 if [ "$LOCALSTACK_RUNNING" -eq "0" ]; then
   echo "${RED}✗ LocalStack container is not running${RESET}"
-  echo "${TEAL}  Hint: Start containers with: docker-compose -f ${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml} up -d${RESET}"
+  echo "${TEAL}  Hint: Start containers with: docker compose -f ${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml} up -d${RESET}"
   echo "${TEAL}  Or run: make dev-setup${RESET}"
   exit 1
 fi
@@ -75,7 +70,7 @@ echo ""
 
 # Check database connection
 echo "${BOLD}→ Checking database connection...${RESET}"
-if ! PGPASSWORD=${PGPASSWORD:-postgres} psql -h localhost -U postgres -d "${DBNAME:-ysc_dev}" -c "SELECT 1" >/dev/null 2>&1; then
+if ! PGPASSWORD="${PGPASSWORD:-postgres}" psql -h localhost -U postgres -d "${DBNAME:-ysc_dev}" -c "SELECT 1" >/dev/null 2>&1; then
   echo "${RED}✗ Cannot connect to database${RESET}"
   echo "${TEAL}  Hint: Wait for PostgreSQL to be ready or run: make dev-setup${RESET}"
   exit 1

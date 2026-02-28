@@ -44,7 +44,7 @@ dev: ## Start the local dev server
 dev-setup:  ## Set up local dev environment
 	@echo "$(BOLD)Setting up development environment...$(RESET)"
 	@mix deps.get
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d
+	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@./etc/scripts/_wait_db_connection.sh
 	@if [ "$($(reset-db))" = "true" ]; then $(MAKE) reset-db; fi
 	@$(MAKE) setup-s3
@@ -55,7 +55,7 @@ dev-setup:  ## Set up local dev environment
 .PHONY: dev-services
 dev-services:  ## Start Docker services (postgres, localstack, etc.)
 	@echo "$(BOLD)Starting Docker services...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d
+	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@./etc/scripts/_wait_db_connection.sh
 	@echo "$(GREEN)Docker services are running!$(RESET)"
 
@@ -87,7 +87,7 @@ setup-dev-db:  ## Create, migrate and seed the local dev database
 .PHONY: tests
 tests:  ## Run the test suite (starts postgres if needed)
 	@echo "$(BOLD)Ensuring PostgreSQL is running...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d postgres || true
+	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d postgres || true
 	@DBNAME=postgres ./etc/scripts/_wait_db_connection.sh true
 	@echo "$(BOLD)Running test suite...$(RESET)"
 	@MIX_ENV=test mix test --cover
@@ -142,12 +142,12 @@ preflight-parallel:  ## Run all CI checks in parallel where possible (faster)
 
 .PHONY: clean-compose
 clean-compose:  ## Remove docker containers and volumes
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) down -v --remove-orphans
+	@docker compose -f $(DOCKER_COMPOSE_FILE) down -v --remove-orphans
 
 .PHONY: clean-docker
 clean-docker: clean-compose  ## Delete docker images, volumes and networks
 	@echo "$(BOLD)** Cleaning up Docker resources...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) rm -f -s -v
+	@docker compose -f $(DOCKER_COMPOSE_FILE) rm -f -s -v
 
 .PHONY: clean-elixir
 clean-elixir:  ## Clean up Elixir and Phoenix files

@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 # preflight_parallel.sh - Run all CI checks in parallel where possible (faster)
+# shellcheck source-path=SCRIPTDIR
 
-set -e
+set -euo pipefail
 
-# Check if formatting variables are passed as environment variables
-if [ -z "$BOLD" ] || [ -z "$RESET" ] || [ -z "$RED" ] || [ -z "$GREEN" ] || [ -z "$TEAL" ]; then
-  BOLD=$(tput bold)
-  RESET=$(tput sgr0)
-  RED=$(tput setaf 1)
-  GREEN=$(tput setaf 2)
-  TEAL=$(tput setaf 6)
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_colors.sh
+. "$SCRIPT_DIR/_colors.sh"
 
 echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
 echo "${BOLD}                      🚀 PREFLIGHT CHECKS (PARALLEL)                        ${RESET}"
@@ -20,11 +16,12 @@ echo "${TEAL}Running CI checks in parallel for faster execution...${RESET}"
 echo ""
 
 echo "${BOLD}Ensuring PostgreSQL is running...${RESET}"
-docker-compose -f "${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml}" up -d postgres || true
-DBNAME=postgres ./etc/scripts/_wait_db_connection.sh true
+docker compose -f "${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml}" up -d postgres || true
+DBNAME=postgres "$SCRIPT_DIR/_wait_db_connection.sh"
 echo "${GREEN}✓ PostgreSQL is ready${RESET}"
 echo ""
 
+# ── Phase 1: Sequential prerequisites ────────────────────────────────────────
 echo "${BOLD}[Phase 1] Installing dependencies...${RESET}"
 if ! mix deps.get; then
   echo "${RED}✗ Dependencies installation failed${RESET}"
@@ -33,7 +30,18 @@ fi
 echo "${GREEN}✓ Dependencies installed${RESET}"
 echo ""
 
-echo "${BOLD}[Phase 2] Running parallel checks (format, deps audit, compile, shell scripts)...${RESET}"
+# ── Phase 2: Compile (sequential — gates credo, sobelow, and tests) ───────────
+# Running compile alone avoids races with other mix tasks that also write to _build/dev.
+echo "${BOLD}[Phase 2] Compiling with warnings as errors...${RESET}"
+if ! mix compile --warnings-as-errors; then
+  echo "${RED}✗ Compilation failed${RESET}"
+  exit 1
+fi
+echo "${GREEN}✓ Compilation successful${RESET}"
+echo ""
+
+# ── Phase 3: Parallel checks that do not touch _build ────────────────────────
+echo "${BOLD}[Phase 3] Running parallel checks (format, deps audit, shell scripts)...${RESET}"
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
@@ -53,24 +61,16 @@ pid_format=$!
 pid_audit=$!
 
 (
-  mix compile --warnings-as-errors >"$tmpdir/compile.log" 2>&1 &&
-    echo "✓ compile" >"$tmpdir/compile.status" ||
-    echo "✗ compile" >"$tmpdir/compile.status"
-) &
-pid_compile=$!
-
-(
   make shell-lint shell-format-check >"$tmpdir/shell.log" 2>&1 &&
     echo "✓ shell" >"$tmpdir/shell.status" ||
     echo "✗ shell" >"$tmpdir/shell.status"
 ) &
 pid_shell=$!
 
-wait $pid_format $pid_audit $pid_compile $pid_shell
+wait $pid_format $pid_audit $pid_shell
 
 format_status=$(cat "$tmpdir/format.status")
 audit_status=$(cat "$tmpdir/audit.status")
-compile_status=$(cat "$tmpdir/compile.status")
 shell_status=$(cat "$tmpdir/shell.status")
 
 if [[ "$format_status" == "✗ format" ]]; then
@@ -85,12 +85,6 @@ if [[ "$audit_status" == "✗ deps.audit" ]]; then
   exit 1
 fi
 
-if [[ "$compile_status" == "✗ compile" ]]; then
-  echo "${RED}✗ Compilation failed${RESET}"
-  cat "$tmpdir/compile.log"
-  exit 1
-fi
-
 if [[ "$shell_status" == "✗ shell" ]]; then
   echo "${RED}✗ Shell script checks failed${RESET}"
   cat "$tmpdir/shell.log"
@@ -99,11 +93,13 @@ fi
 
 echo "${GREEN}✓ Code formatting is correct${RESET}"
 echo "${GREEN}✓ Dependency audit passed${RESET}"
-echo "${GREEN}✓ Compilation successful${RESET}"
 echo "${GREEN}✓ Shell scripts OK${RESET}"
 echo ""
 
-echo "${BOLD}[Phase 3] Running parallel checks (credo, sobelow, tests)...${RESET}"
+# ── Phase 4: Parallel checks that read compiled _build/dev artifacts ──────────
+# credo and sobelow read from _build/dev (compiled above); test uses _build/test.
+# All three are safe to run in parallel since no concurrent writes to the same env.
+echo "${BOLD}[Phase 4] Running parallel checks (credo, sobelow, tests)...${RESET}"
 
 (
   mix credo --strict >"$tmpdir/credo.log" 2>&1 &&

@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
 # release.sh - Create a new release: update version in mix.exs, create git tag, commit and push
+# shellcheck source-path=SCRIPTDIR
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MIX_EXS="$PROJECT_ROOT/mix.exs"
 
-# Colors
-BOLD=$(tput bold)
-RESET=$(tput sgr0)
-RED=$(tput setaf 1)
-GREEN=$(tput setaf 2)
-TEAL=$(tput setaf 6)
+# shellcheck source=_colors.sh
+. "$SCRIPT_DIR/_colors.sh"
 
 usage() {
   echo "Usage: $0 [TAG]"
@@ -27,7 +24,7 @@ usage() {
 }
 
 # Get tag from argument or prompt
-if [ -n "$1" ]; then
+if [ -n "${1:-}" ]; then
   TAG="$1"
 else
   echo "${BOLD}Create new release${RESET}"
@@ -56,7 +53,7 @@ fi
 
 cd "$PROJECT_ROOT"
 
-# Check for uncommitted changes (other than mix.exs which we'll change)
+# Check for uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
   echo "${RED}Error: Working directory has uncommitted changes. Commit or stash them first.${RESET}"
   git status --short
@@ -70,7 +67,13 @@ if [ "$BRANCH" != "main" ]; then
   exit 1
 fi
 
-# Check tag doesn't already exist
+# Sync with remote before making any changes to avoid a push rejection mid-release
+echo "${TEAL}Syncing with origin/main...${RESET}"
+git pull --rebase origin main
+echo "${GREEN}✓ Up to date with origin/main${RESET}"
+echo ""
+
+# Check tag doesn't already exist (re-check after pull in case remote has it)
 if git rev-parse "$GIT_TAG" >/dev/null 2>&1; then
   echo "${RED}Error: Tag $GIT_TAG already exists${RESET}"
   exit 1

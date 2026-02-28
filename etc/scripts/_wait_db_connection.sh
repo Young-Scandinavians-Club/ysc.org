@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-# USAGE
-# DBNAME=postgres://... ./wait-for-postgres
+# USAGE: DBNAME=<database_name> ./etc/scripts/_wait_db_connection.sh [command...]
+#
+# Waits for PostgreSQL to accept connections, then execs any trailing arguments.
+# Example (wait only):   DBNAME=postgres ./etc/scripts/_wait_db_connection.sh
+# Example (then run):    DBNAME=ysc_dev ./etc/scripts/_wait_db_connection.sh mix ecto.migrate
 
 # $1 - the max number of attempts
-# $2 - the seconds to sleep
+# $2 - the seconds to sleep between attempts
 # $3... - the command to run
 retry() {
-  max_attempts="${1}"
+  local max_attempts="${1}"
   shift
-  seconds="${1}"
+  local seconds="${1}"
   shift
-  cmd=("$@")
-  attempt_num=1
+  local cmd=("$@")
+  local attempt_num=1
 
   until "${cmd[@]}"; do
     if [ "${attempt_num}" -eq "${max_attempts}" ]; then
