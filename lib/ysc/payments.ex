@@ -187,11 +187,16 @@ defmodule Ysc.Payments do
              unset_count: elem(unset_result, 0)
            )
 
-           # Then set the new payment method as default
-           updated_payment_method =
-             payment_method
-             |> PaymentMethod.changeset(%{is_default: true})
-             |> Repo.update!()
+           # Use update_all to unconditionally set is_default = true in the DB.
+           # A changeset-based update would be a no-op when the in-memory struct
+           # already has is_default: true (Ecto detects "no change"), but the DB
+           # record was just unset in the step above, so we must force the SQL.
+           {1, [updated_payment_method]} =
+             from(pm in PaymentMethod,
+               where: pm.id == ^payment_method.id,
+               select: pm
+             )
+             |> Repo.update_all(set: [is_default: true])
 
            Ysc.Logging.info("Set new default payment method",
              user_id: user.id,

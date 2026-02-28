@@ -5427,9 +5427,9 @@ defmodule YscWeb.UserSettingsLive do
     "payment-ticket-#{ticket_order.id}"
   end
 
-  defp payment_dom_id(%{type: :membership, subscription: subscription})
-       when not is_nil(subscription) do
-    "payment-membership-#{subscription.id}"
+  defp payment_dom_id(%{type: :membership, payment: payment})
+       when not is_nil(payment) do
+    "payment-membership-#{payment.id}"
   end
 
   defp payment_dom_id(%{type: :donation, payment: payment})
