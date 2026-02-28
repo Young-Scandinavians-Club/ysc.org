@@ -770,7 +770,7 @@ defmodule YscWeb.UserLoginLive do
       end
 
     {:noreply,
-     YscWeb.Flash.put_toast(socket, :error, error_message)
+     YscWeb.Flash.put_toast(socket, :error, error_message, title: "Login")
      |> assign(:passkey_loading, false)
      |> assign(:passkey_challenge, nil)
      |> assign(:passkey_auth_mode, nil)}
@@ -791,7 +791,8 @@ defmodule YscWeb.UserLoginLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "An error occurred during authentication. Please try again."
+       "An error occurred during authentication. Please try again.",
+       title: "Login"
      )
      |> assign(:passkey_loading, false)
      |> assign(:passkey_challenge, nil)

@@ -109,7 +109,7 @@ defmodule YscWeb.UserResetPasswordLive do
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "Password reset successfully.",
-           title: "Password reset"
+           title: "Password"
          )
          |> redirect(to: ~p"/users/log-in")}
 

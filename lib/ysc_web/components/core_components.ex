@@ -1436,6 +1436,20 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc false
+  def flash_toast_icon_payment(assigns) do
+    ~H"""
+    <.flash_toast_icon name="hero-credit-card" class="text-indigo-500" />
+    """
+  end
+
+  @doc false
+  def flash_toast_icon_calendar(assigns) do
+    ~H"""
+    <.flash_toast_icon name="hero-calendar-days" class="text-sky-500" />
+    """
+  end
+
   @doc """
   Renders a fixed red banner at the bottom when an admin is impersonating a user.
   Shows the impersonated user's name and email and a "Stop Impersonating" button.

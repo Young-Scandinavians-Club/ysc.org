@@ -21,7 +21,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "This invitation has expired or has already been used."
+           "This invitation has expired or has already been used.",
+           title: "Invitation"
          )
          |> redirect(to: ~p"/")}
 

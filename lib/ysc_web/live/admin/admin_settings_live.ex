@@ -493,7 +493,9 @@ defmodule YscWeb.AdminSettingsLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:error, "Failed to load job statistics")
+     |> YscWeb.Flash.put_toast(:error, "Failed to load job statistics",
+       title: "Settings"
+     )
      |> assign(:oban_data_loaded, true)}
   end
 
@@ -509,7 +511,7 @@ defmodule YscWeb.AdminSettingsLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Settings Updated")
+     |> YscWeb.Flash.put_toast(:info, "Settings Updated", title: "Settings")
      |> redirect(to: ~p"/admin/settings")}
   end
 
@@ -521,7 +523,9 @@ defmodule YscWeb.AdminSettingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Job re-scheduled successfully")
+         |> YscWeb.Flash.put_toast(:info, "Job re-scheduled successfully",
+           title: "Job"
+         )
          |> assign(:recent_jobs, recent_jobs)
          |> assign(:queue_stats, queue_stats)}
 
@@ -542,7 +546,7 @@ defmodule YscWeb.AdminSettingsLive do
       nil ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Job not found")
+         |> YscWeb.Flash.put_toast(:error, "Job not found", title: "Job")
          |> assign(:show_job_modal, false)
          |> assign(:selected_job, nil)}
 

@@ -19,11 +19,33 @@ defmodule YscWeb.Flash do
   """
   def put_toast(conn_or_socket, kind, msg, opts \\ [])
 
-  def put_toast(%Plug.Conn{} = conn, kind, msg, opts),
-    do: LiveToast.put_toast(conn, kind, msg, default_icon_opts(kind, opts))
+  def put_toast(%Plug.Conn{} = conn, kind, msg, opts) do
+    opts = default_icon_opts(kind, opts)
+    conn = LiveToast.put_toast(conn, kind, msg, opts)
 
-  def put_toast(socket, kind, msg, opts),
-    do: LiveToast.put_toast(socket, kind, msg, default_icon_opts(kind, opts))
+    # Store title in flash so layout can show it after redirect (LiveToast.put_toast ignores opts for Conn)
+    if opts[:title] do
+      Phoenix.Controller.put_flash(conn, "#{kind}_toast_title", opts[:title])
+    else
+      conn
+    end
+  end
+
+  def put_toast(socket, kind, msg, opts) do
+    opts = default_icon_opts(kind, opts)
+
+    # Store custom title in flash so it survives redirect; toasts_sync assign is lost on redirect
+    # and the new page would otherwise render from flash only (title becomes "Info"/"Error", no icon).
+    socket =
+      if opts[:title] do
+        key = "#{kind}_toast_title"
+        Phoenix.LiveView.put_flash(socket, key, opts[:title])
+      else
+        socket
+      end
+
+    LiveToast.put_toast(socket, kind, msg, opts)
+  end
 
   @doc """
   Send a toast without pipeline (e.g. in handle_event). Use when you need to

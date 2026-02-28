@@ -3221,7 +3221,8 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Sub-accounts cannot purchase their own membership. You share the membership of your primary account."
+               "Sub-accounts cannot purchase their own membership. You share the membership of your primary account.",
+               title: "Membership"
              )}
 
           {:error, error} ->
@@ -3236,7 +3237,9 @@ defmodule YscWeb.UserSettingsLive do
 
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, error_message)}
+             |> YscWeb.Flash.put_toast(:error, error_message,
+               title: "Membership"
+             )}
         end
       end
     end
@@ -3355,7 +3358,8 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:show_new_payment_form, false)
                    |> YscWeb.Flash.put_toast(
                      :info,
-                     "Payment method updated and set as default"
+                     "Payment method updated and set as default",
+                     title: "Payment"
                    )
                    |> redirect(to: ~p"/users/membership")}
 
@@ -3364,7 +3368,8 @@ defmodule YscWeb.UserSettingsLive do
                    YscWeb.Flash.put_toast(
                      socket,
                      :error,
-                     "Payment method saved but failed to set as default in Stripe: #{stripe_error.message}"
+                     "Payment method saved but failed to set as default in Stripe: #{stripe_error.message}",
+                     title: "Payment"
                    )}
               end
 
@@ -3373,7 +3378,8 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Failed to store payment method"
+                 "Failed to store payment method",
+                 title: "Payment"
                )}
           end
 
@@ -3382,7 +3388,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to retrieve payment method from Stripe"
+             "Failed to retrieve payment method from Stripe",
+             title: "Payment"
            )}
       end
     end
@@ -3418,7 +3425,8 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You must have an approved account to update your payment method."
+           "You must have an approved account to update your payment method.",
+           title: "Payment"
          )}
 
       {:error, :already_selecting} ->
@@ -3429,7 +3437,8 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Payment method not found"
+           "Payment method not found",
+           title: "Payment"
          )}
     end
   end
@@ -3456,7 +3465,8 @@ defmodule YscWeb.UserSettingsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Failed to create payment account. Please try again or contact support."
+         "Failed to create payment account. Please try again or contact support.",
+         title: "Payment"
        )
        |> assign(:show_new_payment_form, false)}
     else
@@ -3502,7 +3512,8 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to initialize payment form: #{error_message}"
+             "Failed to initialize payment form: #{error_message}",
+             title: "Payment"
            )
            |> assign(:show_new_payment_form, false)}
       end
@@ -3544,7 +3555,8 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to cancel your membership."
+         "You must have an approved account to cancel your membership.",
+         title: "Membership"
        )}
     else
       # Schedule cancellation at end of current period in Stripe and persist locally
@@ -3735,7 +3747,8 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You must have an approved account to change your membership plan."
+           "You must have an approved account to change your membership plan.",
+           title: "Membership"
          )}
 
       {:error, :invalid_membership_type} ->
@@ -3743,7 +3756,8 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Invalid membership type selected"
+           "Invalid membership type selected",
+           title: "Membership"
          )}
 
       {:error, :membership_not_found} ->
@@ -3751,7 +3765,8 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Current membership not found"
+           "Current membership not found",
+           title: "Membership"
          )}
 
       {:error, :change_not_allowed} ->
@@ -3759,21 +3774,24 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This membership change is not allowed"
+           "This membership change is not allowed",
+           title: "Membership"
          )}
 
       {:error, :same_plan} ->
         {:noreply, socket}
 
       {:error, reason} when is_binary(reason) ->
-        {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
 
       {:error, _reason} ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Failed to change membership plan. Please try again."
+           "Failed to change membership plan. Please try again.",
+           title: "Membership"
          )}
     end
   end
@@ -4013,7 +4031,8 @@ defmodule YscWeb.UserSettingsLive do
      revert_optimistic_update(socket)
      |> YscWeb.Flash.put_toast(
        :error,
-       "Failed to set payment method as default"
+       "Failed to set payment method as default",
+       title: "Payment"
      )}
   end
 
@@ -4022,7 +4041,8 @@ defmodule YscWeb.UserSettingsLive do
      revert_optimistic_update(socket)
      |> YscWeb.Flash.put_toast(
        :error,
-       "Failed to update default payment method in Stripe: #{stripe_error.message}"
+       "Failed to update default payment method in Stripe: #{stripe_error.message}",
+       title: "Payment"
      )}
   end
 
@@ -5266,7 +5286,8 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to retry invoice payments."
+         "You must have an approved account to retry invoice payments.",
+         title: "Invoice"
        )}
     else
       Ysc.Logging.info("Retrying invoice payment",
@@ -5296,7 +5317,8 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :info,
-             "Payment retry successful! Your invoice has been paid and your membership will be updated shortly."
+             "Payment retry successful! Your invoice has been paid and your membership will be updated shortly.",
+             title: "Invoice"
            )
            |> redirect(to: ~p"/users/membership")}
 
@@ -5305,7 +5327,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Invoice not found. Please contact support if this issue persists."
+             "Invoice not found. Please contact support if this issue persists.",
+             title: "Invoice"
            )}
 
         {:error, :unauthorized} ->
@@ -5313,7 +5336,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This invoice does not belong to your account."
+             "This invoice does not belong to your account.",
+             title: "Invoice"
            )}
 
         {:error, :already_paid} ->
@@ -5321,7 +5345,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :info,
-             "This invoice has already been paid. Your membership is up to date."
+             "This invoice has already been paid. Your membership is up to date.",
+             title: "Invoice"
            )}
 
         {:error, :invalid_invoice_status} ->
@@ -5329,7 +5354,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This invoice cannot be paid in its current state. Please update your payment method and try again."
+             "This invoice cannot be paid in its current state. Please update your payment method and try again.",
+             title: "Invoice"
            )}
 
         {:error, error_message} when is_binary(error_message) ->
@@ -5344,7 +5370,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             display_message
+             display_message,
+             title: "Invoice"
            )}
 
         {:error, _reason} ->
@@ -5352,7 +5379,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, contact support."
+             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, contact support.",
+             title: "Invoice"
            )}
       end
     end
@@ -5363,7 +5391,8 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "Invalid invoice ID. Please use the link from your email or contact support."
+       "Invalid invoice ID. Please use the link from your email or contact support.",
+       title: "Invoice"
      )}
   end
 

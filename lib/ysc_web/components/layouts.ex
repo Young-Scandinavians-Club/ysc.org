@@ -6,35 +6,88 @@ defmodule YscWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
-  Merges toasts_sync with any welcome-back toast and returns {toasts_sync, flash}.
-  When a welcome toast is added, :info is removed from flash so Components.flashes
-  does not render a duplicate on first paint. The LiveToast patch adds the sync
-  toast to the stream even without a matching flash.
+  Builds toasts_sync and flash for the toast group. Promotes flash messages that
+  have a custom title (from redirects via YscWeb.Flash) into full toasts with
+  title and icon. Welcome-back message gets a dedicated title and icon.
+  Uses stable UUIDs for promoted toasts so re-renders don't duplicate.
   """
   def toasts_sync_with_flash(assigns) do
     base = assigns[:toasts_sync] || []
     flash = assigns[:flash] || %{}
-    # Support both string and atom keys (session/redirect may use either)
-    info_msg = flash["info"] || flash[:info]
+    flash = normalize_flash_keys(flash)
 
-    if info_msg && is_binary(info_msg) &&
-         String.contains?(info_msg, "Welcome back") do
-      welcome_toast = %LiveToast{
-        kind: :info,
-        msg: info_msg,
-        title: "Welcome back! 👋",
-        icon: &YscWeb.CoreComponents.flash_toast_icon_success/1,
-        uuid: Ecto.UUID.generate(),
-        sync: true
-      }
+    # Build sync toasts from flash (with title/icon). Pass full flash so:
+    # - when not connected, flash_group has something to show
+    # - when connected, LiveToast matches sync_toast.msg to flash[kind] and clears it (one toast, no duplicate)
+    info_msg = flash["info"]
 
-      # Strip both key forms so Components.flashes does not show a second toast
-      flash_for_toast = flash |> Map.delete("info") |> Map.delete(:info)
-      {[welcome_toast | base], flash_for_toast}
-    else
-      {base, flash}
-    end
+    toasts_sync =
+      if info_msg && is_binary(info_msg) &&
+           String.contains?(info_msg, "Welcome back") do
+        [welcome_toast(info_msg) | base]
+      else
+        promoted = promote_flash_to_toasts(flash)
+        promoted ++ base
+      end
+
+    {toasts_sync, flash}
   end
+
+  defp welcome_toast(info_msg) do
+    %LiveToast{
+      kind: :info,
+      msg: info_msg,
+      title: "Welcome back! 👋",
+      icon: &YscWeb.CoreComponents.flash_toast_icon_success/1,
+      uuid: stable_toast_uuid(:info, info_msg, "Welcome back! 👋"),
+      sync: true,
+      duration: 6000
+    }
+  end
+
+  defp promote_flash_to_toasts(flash) do
+    [:info, :error, :warning]
+    |> Enum.flat_map(fn kind ->
+      msg = flash[to_string(kind)]
+      title = flash["#{kind}_toast_title"]
+
+      if is_binary(msg) && is_binary(title) do
+        [
+          %LiveToast{
+            kind: kind,
+            msg: msg,
+            title: title,
+            icon: default_icon_for_kind(kind),
+            uuid: stable_toast_uuid(kind, msg, title),
+            sync: true,
+            duration: 6000
+          }
+        ]
+      else
+        []
+      end
+    end)
+  end
+
+  defp normalize_flash_keys(flash) do
+    Enum.reduce(flash, %{}, fn
+      {k, v}, acc when is_atom(k) -> Map.put(acc, to_string(k), v)
+      {k, v}, acc -> Map.put(acc, k, v)
+    end)
+  end
+
+  defp stable_toast_uuid(kind, msg, title) do
+    "redirect-#{kind}-#{:erlang.phash2({kind, msg, title})}"
+  end
+
+  defp default_icon_for_kind(:info),
+    do: &YscWeb.CoreComponents.flash_toast_icon_success/1
+
+  defp default_icon_for_kind(:error),
+    do: &YscWeb.CoreComponents.flash_toast_icon_error/1
+
+  defp default_icon_for_kind(:warning),
+    do: &YscWeb.CoreComponents.flash_toast_icon_warning/1
 
   @doc """
   Toast container classes with z-[10000] so toasts render above modals (z-50)

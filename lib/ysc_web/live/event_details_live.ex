@@ -3136,7 +3136,7 @@ defmodule YscWeb.EventDetailsLive do
       nil ->
         {:ok,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Event not found")
+         |> YscWeb.Flash.put_toast(:error, "Event not found", title: "Event")
          |> redirect(to: ~p"/events")}
 
       event ->
@@ -3584,7 +3584,7 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> YscWeb.Flash.put_toast(:error, "Order not found")
+        |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
         |> push_patch(to: ~p"/events/#{event_id}")
 
       ticket_order ->
@@ -3623,7 +3623,8 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "This order has expired. Please create a new order."
+              "This order has expired. Please create a new order.",
+              title: "Order"
             )
             |> push_patch(to: ~p"/events/#{event_id}")
           else
@@ -3658,7 +3659,7 @@ defmodule YscWeb.EventDetailsLive do
             end
 
           socket
-          |> YscWeb.Flash.put_toast(:error, error_message)
+          |> YscWeb.Flash.put_toast(:error, error_message, title: "Order")
           |> push_patch(to: ~p"/events/#{event_id}")
         end
     end
@@ -3682,7 +3683,7 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> YscWeb.Flash.put_toast(:error, "Order not found")
+        |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
 
       ticket_order ->
         Ysc.Logging.debug(
@@ -3719,7 +3720,8 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "This order has expired. Please create a new order."
+              "This order has expired. Please create a new order.",
+              title: "Order"
             )
           else
             checkout_step =
@@ -3758,7 +3760,7 @@ defmodule YscWeb.EventDetailsLive do
             end
 
           socket
-          |> YscWeb.Flash.put_toast(:error, error_message)
+          |> YscWeb.Flash.put_toast(:error, error_message, title: "Order")
         end
     end
   end
@@ -3930,7 +3932,8 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "Failed to restore payment: #{reason}"
+              "Failed to restore payment: #{reason}",
+              title: "Payment"
             )
             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
         end
@@ -4842,7 +4845,8 @@ defmodule YscWeb.EventDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to save registration details. Please try again."
+             "Failed to save registration details. Please try again.",
+             title: "Registration"
            )}
       end
     else
@@ -4850,7 +4854,8 @@ defmodule YscWeb.EventDetailsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Please fill in all required fields for each ticket."
+         "Please fill in all required fields for each ticket.",
+         title: "Registration"
        )}
     end
   end
@@ -5013,7 +5018,8 @@ defmodule YscWeb.EventDetailsLive do
      socket
      |> YscWeb.Flash.put_toast(
        :error,
-       "Your checkout session has expired. Please select your tickets again to continue."
+       "Your checkout session has expired. Please select your tickets again to continue.",
+       title: "Checkout"
      )
      |> assign(:show_payment_modal, false)
      |> assign(:payment_intent, nil)
@@ -5543,7 +5549,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Sorry, the event is now at capacity or the selected tickets are no longer available."
+           "Sorry, the event is now at capacity or the selected tickets are no longer available.",
+           title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}
 
@@ -5552,7 +5559,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Sorry, the event has reached its maximum capacity. The selected tickets are no longer available."
+           "Sorry, the event has reached its maximum capacity. The selected tickets are no longer available.",
+           title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}
 
@@ -5561,7 +5569,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "The ticket availability changed while you were booking. Please refresh and try again."
+           "The ticket availability changed while you were booking. Please refresh and try again.",
+           title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}
 
@@ -5570,7 +5579,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "This event is no longer available for ticket purchase."
+           "This event is no longer available for ticket purchase.",
+           title: "Event"
          )
          |> assign(:show_ticket_modal, false)}
 
@@ -5579,7 +5589,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "An active membership is required to purchase tickets. Please ensure your membership is active and try again."
+           "An active membership is required to purchase tickets. Please ensure your membership is active and try again.",
+           title: "Membership"
          )
          |> assign(:show_ticket_modal, false)}
 
@@ -5596,7 +5607,7 @@ defmodule YscWeb.EventDetailsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message, title: "Tickets")
          |> assign(:show_ticket_modal, false)}
 
       {:error, reason} ->
@@ -5612,7 +5623,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "There was an unexpected error processing your ticket order. Please try again."
+           "There was an unexpected error processing your ticket order. Please try again.",
+           title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}
     end
@@ -6052,7 +6064,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to save registration details. Please try again."
+           "Failed to save registration details. Please try again.",
+           title: "Registration"
          )}
     end
   end
@@ -6182,7 +6195,8 @@ defmodule YscWeb.EventDetailsLive do
      socket
      |> YscWeb.Flash.put_toast(
        :error,
-       error_message
+       error_message,
+       title: "Registration"
      )}
   end
 
@@ -6219,7 +6233,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to confirm free tickets: #{reason}"
+           "Failed to confirm free tickets: #{reason}",
+           title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
     end
@@ -6264,7 +6279,8 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Payment processed but there was an issue confirming your tickets. Please contact support."
+           "Payment processed but there was an issue confirming your tickets. Please contact support.",
+           title: "Tickets"
          )
          |> assign(:show_payment_modal, false)}
     end
@@ -7100,7 +7116,8 @@ defmodule YscWeb.EventDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to create payment: #{reason}"
+             "Failed to create payment: #{reason}",
+             title: "Payment"
            )
            |> assign(:show_ticket_modal, false)
            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}

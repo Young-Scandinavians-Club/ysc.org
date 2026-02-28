@@ -40,7 +40,9 @@ defmodule YscWeb.BookingReceiptLive do
         nil ->
           {:ok,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Booking not found.")
+           |> YscWeb.Flash.put_toast(:error, "Booking not found.",
+             title: "Booking"
+           )
            |> redirect(to: ~p"/")}
 
         booking ->
@@ -186,7 +188,7 @@ defmodule YscWeb.BookingReceiptLive do
         {:noreply,
          socket
          |> assign(:show_cancel_modal, false)
-         |> YscWeb.Flash.put_toast(:info, refund_message)
+         |> YscWeb.Flash.put_toast(:info, refund_message, title: "Booking")
          |> redirect(to: ~p"/bookings/#{booking.id}/receipt")}
 
       {:error, reason} ->

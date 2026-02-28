@@ -70,35 +70,9 @@ import FooterRotator from "./footer_rotator";
 import ScrollMoreIndicator from "./scroll_more_indicator";
 import { createLiveToastHook } from "../../deps/live_toast";
 
-const DEFAULT_TOAST_DURATION_MS = 5000;
+// Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
+const TOAST_DURATION_MS = 6000;
 const MAX_TOAST_ITEMS = 3;
-
-/**
- * Wraps LiveToast hook so flash toasts (from redirects) also auto-clear.
- * LiveToast renders flash messages with duration=0 and skips the auto-dismiss
- * timeout; we schedule lv:clear-flash after DEFAULT_TOAST_DURATION_MS for those.
- */
-function createLiveToastHookWithFlashAutoClear(durationMs, maxItems) {
-    const baseHook = createLiveToastHook(durationMs, maxItems);
-    return {
-        ...baseHook,
-        mounted() {
-            baseHook.mounted.call(this);
-            const el = this.el;
-            const isFlash = el.dataset?.component === "flash";
-            const isTransientFlash =
-                el.id &&
-                el.id.startsWith("flash-") &&
-                !["server-error", "client-error"].includes(el.id);
-            if (isFlash && isTransientFlash) {
-                const key = el.id.replace(/^flash-/, "");
-                window.setTimeout(() => {
-                    this.pushEvent("lv:clear-flash", { key });
-                }, durationMs);
-            }
-        }
-    };
-}
 
 let Hooks = {
     StickyNavbar,
@@ -142,10 +116,7 @@ let Hooks = {
     DecadeIndicator,
     FooterRotator,
     ScrollMoreIndicator,
-    LiveToast: createLiveToastHookWithFlashAutoClear(
-        DEFAULT_TOAST_DURATION_MS,
-        MAX_TOAST_ITEMS
-    ),
+    LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
 };
 Hooks.LivePhone = LivePhone;
 

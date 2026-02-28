@@ -1050,7 +1050,8 @@ defmodule YscWeb.AdminUsersLive do
          |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
          |> YscWeb.Flash.put_toast(
            :info,
-           "User was approved and is now a member!"
+           "User was approved and is now a member!",
+           title: "Application"
          )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -1072,7 +1073,8 @@ defmodule YscWeb.AdminUsersLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Could not approve application — #{error_detail}"
+           "Could not approve application — #{error_detail}",
+           title: "Application"
          )}
 
       {:error, _} ->
@@ -1080,7 +1082,8 @@ defmodule YscWeb.AdminUsersLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Could not approve application. Please try again."
+           "Could not approve application. Please try again.",
+           title: "Application"
          )}
     end
   end
@@ -1107,7 +1110,8 @@ defmodule YscWeb.AdminUsersLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Rejection note must be 5000 characters or fewer."
+         "Rejection note must be 5000 characters or fewer.",
+         title: "Application"
        )}
     else
       case Accounts.record_application_outcome(
@@ -1148,14 +1152,17 @@ defmodule YscWeb.AdminUsersLive do
           {:noreply,
            socket
            |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
-           |> YscWeb.Flash.put_toast(:info, "User application was rejected!")}
+           |> YscWeb.Flash.put_toast(:info, "User application was rejected!",
+             title: "Application"
+           )}
 
         {:error, _} ->
           {:noreply,
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Could not reject application. Please try again."
+             "Could not reject application. Please try again.",
+             title: "Application"
            )}
       end
     end

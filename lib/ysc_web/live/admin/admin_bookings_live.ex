@@ -4267,7 +4267,9 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Blackout saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Blackout saved successfully",
+           title: "Blackout"
+         )
          |> push_navigate(
            to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
          )
@@ -4299,7 +4301,9 @@ defmodule YscWeb.AdminBookingsLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Blackout deleted successfully")
+     |> YscWeb.Flash.put_toast(:info, "Blackout deleted successfully",
+       title: "Blackout"
+     )
      |> push_navigate(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
      |> update_calendar_view(socket.assigns.selected_property)}
   end
@@ -4336,7 +4340,10 @@ defmodule YscWeb.AdminBookingsLive do
       end
 
     {:noreply,
-     socket |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully")}
+     socket
+     |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
+       title: "Booking"
+     )}
   end
 
   def handle_event("view-booking", %{"booking-id" => booking_id}, socket) do
@@ -4869,7 +4876,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, _updated_refund} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Refund rejected")
+         |> YscWeb.Flash.put_toast(:info, "Refund rejected", title: "Refund")
          |> assign(:selected_pending_refund, nil)
          |> assign(:reject_refund_form, nil)
          |> load_pending_refunds()}
@@ -4996,7 +5003,9 @@ defmodule YscWeb.AdminBookingsLive do
 
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:info, "Refund processed successfully")
+           |> YscWeb.Flash.put_toast(:info, "Refund processed successfully",
+             title: "Refund"
+           )
            |> assign(:show_refund_modal, false)
            |> push_navigate(
              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
@@ -5599,7 +5608,9 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, _pricing_rule} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Pricing rule saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Pricing rule saved successfully",
+           title: "Pricing"
+         )
          |> push_navigate(
            to:
              ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
@@ -5716,7 +5727,9 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Season updated successfully")
+         |> YscWeb.Flash.put_toast(:info, "Season updated successfully",
+           title: "Season"
+         )
          |> assign(:seasons, seasons)
          |> assign_filtered_data(
            socket.assigns.selected_property,
@@ -5789,7 +5802,9 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Refund policy saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Refund policy saved successfully",
+           title: "Refund policy"
+         )
          |> assign(:refund_policies, refund_policies)
          |> assign_filtered_data(
            socket.assigns.selected_property,
@@ -5916,7 +5931,9 @@ defmodule YscWeb.AdminBookingsLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Refund policy rule deleted successfully")
+     |> YscWeb.Flash.put_toast(:info, "Refund policy rule deleted successfully",
+       title: "Refund policy"
+     )
      |> assign(:refund_policy_rules, refund_policy_rules)}
   end
 
@@ -5944,7 +5961,9 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Door code set successfully")
+         |> YscWeb.Flash.put_toast(:info, "Door code set successfully",
+           title: "Door code"
+         )
          |> assign(:door_codes, door_codes)
          |> assign(:active_door_code, active_door_code)
          |> assign(:door_code_form, door_code_form)
@@ -5963,7 +5982,9 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Failed to set door code: #{errors}")}
+         |> YscWeb.Flash.put_toast(:error, "Failed to set door code: #{errors}",
+           title: "Door code"
+         )}
     end
   end
 
@@ -6034,7 +6055,9 @@ defmodule YscWeb.AdminBookingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Room saved successfully")
+         |> YscWeb.Flash.put_toast(:info, "Room saved successfully",
+           title: "Room"
+         )
          |> assign(:rooms, rooms)
          |> assign_filtered_data(
            socket.assigns.selected_property,
@@ -6061,7 +6084,9 @@ defmodule YscWeb.AdminBookingsLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Room deleted successfully")
+     |> YscWeb.Flash.put_toast(:info, "Room deleted successfully",
+       title: "Room"
+     )
      |> assign(:rooms, rooms)
      |> assign_filtered_data(
        socket.assigns.selected_property,

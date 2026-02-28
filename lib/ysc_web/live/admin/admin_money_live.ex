@@ -222,7 +222,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:payment_related_entity, related_entity)
     else
       socket
-      |> YscWeb.Flash.put_toast(:error, "Payment not found")
+      |> YscWeb.Flash.put_toast(:error, "Payment not found", title: "Payment")
       |> push_navigate(to: build_money_path(socket))
     end
   end
@@ -276,7 +276,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:refund_form, refund_form)
     else
       socket
-      |> YscWeb.Flash.put_toast(:error, "Payment not found")
+      |> YscWeb.Flash.put_toast(:error, "Payment not found", title: "Payment")
       |> push_navigate(to: build_money_path(socket))
     end
   end
@@ -297,7 +297,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:selected_payout, payout)
     else
       socket
-      |> YscWeb.Flash.put_toast(:error, "Payout not found")
+      |> YscWeb.Flash.put_toast(:error, "Payout not found", title: "Payout")
       |> push_navigate(to: build_money_path(socket))
     end
   end
@@ -398,7 +398,9 @@ defmodule YscWeb.AdminMoneyLive do
     else
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Payout not found for this payment")}
+       |> YscWeb.Flash.put_toast(:error, "Payout not found for this payment",
+         title: "Payout"
+       )}
     end
   end
 
@@ -431,7 +433,8 @@ defmodule YscWeb.AdminMoneyLive do
      |> assign(:selected_payout, payout)
      |> YscWeb.Flash.put_toast(
        :info,
-       "QuickBooks sync job enqueued for payout #{payout.stripe_payout_id}"
+       "QuickBooks sync job enqueued for payout #{payout.stripe_payout_id}",
+       title: "Payout"
      )}
   end
 
@@ -485,7 +488,8 @@ defmodule YscWeb.AdminMoneyLive do
                socket
                |> YscWeb.Flash.put_toast(
                  :info,
-                 "Refunded #{length(ticket_ids)} ticket(s) successfully. Amount: #{Money.to_string!(calculated_refund_amount)}"
+                 "Refunded #{length(ticket_ids)} ticket(s) successfully. Amount: #{Money.to_string!(calculated_refund_amount)}",
+                 title: "Refund"
                )
                |> assign(:accounts_with_balances, accounts_with_balances)
                |> assign(:payments_page, 1)
@@ -501,7 +505,8 @@ defmodule YscWeb.AdminMoneyLive do
                socket
                |> YscWeb.Flash.put_toast(
                  :error,
-                 "Failed to process refund in ledger"
+                 "Failed to process refund in ledger",
+                 title: "Refund"
                )}
           end
 
@@ -510,7 +515,8 @@ defmodule YscWeb.AdminMoneyLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to refund tickets: #{inspect(reason)}"
+             "Failed to refund tickets: #{inspect(reason)}",
+             title: "Refund"
            )}
       end
     else
@@ -574,7 +580,7 @@ defmodule YscWeb.AdminMoneyLive do
 
               {:noreply,
                socket
-               |> YscWeb.Flash.put_toast(:info, flash_message)
+               |> YscWeb.Flash.put_toast(:info, flash_message, title: "Refund")
                |> assign(:accounts_with_balances, accounts_with_balances)
                |> assign(:payments_page, 1)
                |> assign(:ledger_entries_page, 1)
@@ -587,13 +593,17 @@ defmodule YscWeb.AdminMoneyLive do
             {:error, _changeset} ->
               {:noreply,
                socket
-               |> YscWeb.Flash.put_toast(:error, "Failed to process refund")}
+               |> YscWeb.Flash.put_toast(:error, "Failed to process refund",
+                 title: "Refund"
+               )}
           end
 
         {:error, _} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Invalid amount format")}
+           |> YscWeb.Flash.put_toast(:error, "Invalid amount format",
+             title: "Refund"
+           )}
       end
     end
   end
@@ -625,7 +635,9 @@ defmodule YscWeb.AdminMoneyLive do
 
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:info, "Credit added successfully")
+             |> YscWeb.Flash.put_toast(:info, "Credit added successfully",
+               title: "Credit"
+             )
              |> assign(:show_credit_modal, false)
              |> assign(:selected_user, nil)
              |> assign(:accounts_with_balances, accounts_with_balances)
@@ -639,13 +651,17 @@ defmodule YscWeb.AdminMoneyLive do
           {:error, _changeset} ->
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, "Failed to add credit")}
+             |> YscWeb.Flash.put_toast(:error, "Failed to add credit",
+               title: "Credit"
+             )}
         end
 
       {:error, _} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Invalid amount format")}
+         |> YscWeb.Flash.put_toast(:error, "Invalid amount format",
+           title: "Credit"
+         )}
     end
   end
 
@@ -884,7 +900,9 @@ defmodule YscWeb.AdminMoneyLive do
     else
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Expense report not found")}
+       |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+         title: "Expense report"
+       )}
     end
   end
 
@@ -930,7 +948,8 @@ defmodule YscWeb.AdminMoneyLive do
            socket
            |> YscWeb.Flash.put_toast(
              :info,
-             "Expense report status updated successfully"
+             "Expense report status updated successfully",
+             title: "Expense report"
            )
            |> assign(:show_expense_report_modal, false)
            |> assign(:selected_expense_report, nil)
@@ -950,7 +969,9 @@ defmodule YscWeb.AdminMoneyLive do
 
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, error_message)
+           |> YscWeb.Flash.put_toast(:error, error_message,
+             title: "Expense report"
+           )
            |> assign(
              :expense_report_status_form,
              to_form(changeset, as: :expense_report_status)
@@ -959,7 +980,9 @@ defmodule YscWeb.AdminMoneyLive do
     else
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Expense report not found")
+       |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+         title: "Expense report"
+       )
        |> assign(:show_expense_report_modal, false)
        |> assign(:selected_expense_report, nil)}
     end

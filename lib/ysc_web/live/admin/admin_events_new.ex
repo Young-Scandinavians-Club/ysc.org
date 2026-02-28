@@ -594,7 +594,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Event deleted.")
+     |> YscWeb.Flash.put_toast(:info, "Event deleted.", title: "Event")
      |> push_navigate(to: "/admin/events")}
   end
 
@@ -604,7 +604,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Event published.")
+     |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
      |> push_navigate(to: "/admin/events")}
   end
 
@@ -649,7 +649,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.")
+     |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.",
+       title: "Event"
+     )
      |> push_navigate(to: "/admin/events/#{socket.assigns.event.id}/edit")}
   end
 
@@ -659,7 +661,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Event cancelled.")
+     |> YscWeb.Flash.put_toast(:info, "Event cancelled.", title: "Event")
      |> push_navigate(to: "/admin/events")}
   end
 
@@ -1117,7 +1119,9 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info({:redirect_to_tickets, event_id}, socket) do
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Ticket reservation created successfully")
+     |> YscWeb.Flash.put_toast(:info, "Ticket reservation created successfully",
+       title: "Tickets"
+     )
      |> push_navigate(to: ~p"/admin/events/#{event_id}/tickets")}
   end
 

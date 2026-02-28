@@ -2579,7 +2579,8 @@ defmodule YscWeb.ClearLakeBookingLive do
          |> YscWeb.Flash.put_toast(
            :error,
            availability_error ||
-             "Sorry, there is not enough capacity for your requested dates and number of guests."
+             "Sorry, there is not enough capacity for your requested dates and number of guests.",
+           title: "Booking"
          )
          |> assign(
            form_errors: %{
@@ -2597,7 +2598,8 @@ defmodule YscWeb.ClearLakeBookingLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Sorry, the property is not available for your requested dates."
+           "Sorry, the property is not available for your requested dates.",
+           title: "Booking"
          )
          |> assign(
            form_errors: %{
@@ -2613,7 +2615,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
          |> assign(
            form_errors: %{general: error_message},
            calculated_price: socket.assigns.calculated_price
@@ -2625,7 +2627,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
          |> assign(
            form_errors: form_errors,
            calculated_price: nil,
@@ -2639,7 +2641,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
          |> assign(
            form_errors: form_errors,
            calculated_price: nil,
@@ -2652,7 +2654,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, error_message)
+         |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
          |> assign(
            form_errors: %{general: error_message},
            calculated_price: socket.assigns.calculated_price

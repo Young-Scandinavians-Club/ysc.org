@@ -544,7 +544,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "Cannot delete ticket tier with sold tickets"
+         "Cannot delete ticket tier with sold tickets",
+         title: "Tickets"
        )}
     else
       case Events.delete_ticket_tier(ticket_tier) do
@@ -554,7 +555,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:info, "Ticket tier deleted successfully")
+           |> YscWeb.Flash.put_toast(:info, "Ticket tier deleted successfully",
+             title: "Tickets"
+           )
            |> assign(:ticket_tiers, ticket_tiers)}
 
         {:error, _changeset} ->
@@ -562,7 +565,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to delete ticket tier"
+             "Failed to delete ticket tier",
+             title: "Tickets"
            )}
       end
     end
@@ -581,12 +585,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, message)
+         |> YscWeb.Flash.put_toast(:info, message, title: "Tickets")
          |> assign(:event, updated_event)}
 
       {:error, _} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to update event")}
+         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
+           title: "Event"
+         )}
     end
   end
 
@@ -596,12 +602,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       {:ok, updated_event} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Event marked as 'Tickets TBD'")
+         |> YscWeb.Flash.put_toast(:info, "Event marked as 'Tickets TBD'",
+           title: "Tickets"
+         )
          |> assign(:event, updated_event)}
 
       {:error, _} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to update event")}
+         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
+           title: "Event"
+         )}
     end
   end
 
@@ -611,12 +621,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       {:ok, updated_event} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Tickets TBD flag cleared")
+         |> YscWeb.Flash.put_toast(:info, "Tickets TBD flag cleared",
+           title: "Tickets"
+         )
          |> assign(:event, updated_event)}
 
       {:error, _} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to update event")}
+         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
+           title: "Event"
+         )}
     end
   end
 
@@ -657,7 +671,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Reservations are not available for donation tiers"
+         "Reservations are not available for donation tiers",
+         title: "Reservation"
        )}
     else
       {:noreply,
@@ -689,13 +704,17 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Reservation cancelled successfully")
+         |> YscWeb.Flash.put_toast(:info, "Reservation cancelled successfully",
+           title: "Reservation"
+         )
          |> assign(:ticket_tiers, ticket_tiers)
          |> assign(:reservations_by_tier, reservations_by_tier)}
 
       {:error, _changeset} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to cancel reservation")}
+         YscWeb.Flash.put_toast(socket, :error, "Failed to cancel reservation",
+           title: "Reservation"
+         )}
     end
   end
 
@@ -747,7 +766,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
        socket
        |> YscWeb.Flash.put_toast(
          :info,
-         "Ticket reservation created successfully"
+         "Ticket reservation created successfully",
+         title: "Reservation"
        )
        |> assign(:show_reserve_modal, false)
        |> assign(:reserving_tier, nil)
