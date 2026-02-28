@@ -1495,7 +1495,7 @@ defmodule YscWeb.ExpenseReportLive do
           </div>
         <% end %>
         <!-- Totals Card -->
-        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6 print-no-break">
           <div class="px-6 py-4 border-b border-zinc-200">
             <h2 class="text-lg font-semibold text-zinc-900">Totals</h2>
           </div>

@@ -697,6 +697,22 @@ trix-toolbar .trix-button-row {
   .max-w-xl {
     max-width: 100% !important;
   }
+  /* Keep the totals card and other marked sections together on one page */
+  .print-no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* Avoid breaking expense/income line items across pages */
+  .space-y-3 > div,
+  .space-y-4 > div {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* Start each major card on the same page if possible */
+  .bg-white.rounded-lg.shadow-sm {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
 }
 
 trix-toolbar .trix-button-group {

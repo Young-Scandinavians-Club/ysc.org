@@ -39,7 +39,15 @@ config :ysc, YscWeb.Endpoint,
     tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
   ],
   live_reload: [
-    web_console_logger: true
+    web_console_logger: true,
+    patterns: [
+      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg|swiftui\.styles)$",
+      ~r"assets/js/.*(js)$",
+      ~r"priv/gettext/.*(po)$",
+      ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$",
+      ~r"lib/ysc_web/(live|components)/.*neex$",
+      ~r"lib/ysc_web/styles/.*(ex|neex|heex)$"
+    ]
   ]
 
 # ## SSL Support
@@ -64,20 +72,6 @@ config :ysc, YscWeb.Endpoint,
 # If desired, both `http:` and `https:` keys can be
 # configured to run both http and https servers on
 # different ports.
-
-# Watch static and templates for browser reloading.
-config :ysc, YscWeb.Endpoint,
-  live_reload: [
-    patterns: [
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg|swiftui\.styles)$",
-      ~r"assets/js/.*(js)$",
-      ~r"assets/css/.*(css)$",
-      ~r"priv/gettext/.*(po)$",
-      ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$",
-      ~r"lib/ysc_web/(live|components)/.*neex$",
-      ~r"lib/ysc_web/styles/.*(ex|neex|heex)$"
-    ]
-  ]
 
 # Enable dev routes for dashboard and mailbox
 config :ysc, dev_routes: true
