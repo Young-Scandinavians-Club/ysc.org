@@ -277,7 +277,10 @@ defmodule YscWeb.UserSecurityLive do
     # Get passkey and verify it belongs to current user
     case Repo.get(Ysc.Accounts.UserPasskey, id) do
       nil ->
-        {:noreply, YscWeb.Flash.put_toast(socket, :error, "Passkey not found.")}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Passkey not found.",
+           title: "Passkey"
+         )}
 
       passkey ->
         if passkey.user_id == user.id do
@@ -299,7 +302,8 @@ defmodule YscWeb.UserSecurityLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Failed to delete passkey. Please try again."
+                 "Failed to delete passkey. Please try again.",
+                 title: "Passkey"
                )}
           end
         else
@@ -307,7 +311,8 @@ defmodule YscWeb.UserSecurityLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "You are not authorized to delete this passkey."
+             "You are not authorized to delete this passkey.",
+             title: "Passkey"
            )}
         end
     end

@@ -410,16 +410,14 @@ defmodule YscWeb.ExpenseReportLive do
 
   def handle_event("consume-receipt", %{"ref" => ref, "index" => index}, socket) do
     index = String.to_integer(index)
+    ref_str = to_string(ref)
 
-    # Find the specific entry by ref
-    entry =
-      socket.assigns.uploads.receipt.entries
-      |> Enum.find(fn entry -> to_string(entry.ref) == ref end)
+    # Only consider completed entries (avoids race with in-progress uploads)
+    {done_entries, _in_progress} = uploaded_entries(socket, :receipt)
+    entry = Enum.find(done_entries, fn e -> to_string(e.ref) == ref_str end)
 
     if entry do
-      # Consume only this specific entry
-      # The callback must return {:ok, value} or {:postpone, value}
-      # Preserve the original filename to maintain file extension
+      # Consume only this specific entry; callback must return {:ok, value} or {:postpone, value}
       original_filename = entry.client_name
 
       result =
@@ -539,16 +537,14 @@ defmodule YscWeb.ExpenseReportLive do
 
   def handle_event("consume-proof", %{"ref" => ref, "index" => index}, socket) do
     index = String.to_integer(index)
+    ref_str = to_string(ref)
 
-    # Find the specific entry by ref
-    entry =
-      socket.assigns.uploads.proof.entries
-      |> Enum.find(fn entry -> to_string(entry.ref) == ref end)
+    # Only consider completed entries (avoids race with in-progress uploads)
+    {done_entries, _in_progress} = uploaded_entries(socket, :proof)
+    entry = Enum.find(done_entries, fn e -> to_string(e.ref) == ref_str end)
 
     if entry do
-      # Consume only this specific entry
-      # The callback must return {:ok, value} or {:postpone, value}
-      # Preserve the original filename to maintain file extension
+      # Consume only this specific entry; callback must return {:ok, value} or {:postpone, value}
       original_filename = entry.client_name
 
       result =
@@ -2136,6 +2132,11 @@ defmodule YscWeb.ExpenseReportLive do
                             </p>
                           </div>
                         </label>
+                        <%= for err <- upload_errors(@uploads.receipt) do %>
+                          <p class="mt-2 text-sm text-red-600">
+                            {upload_error_to_string(err)}
+                          </p>
+                        <% end %>
                         <!-- Upload progress for entries - only show if entry matches this expense item index -->
                         <%= for entry <- @uploads.receipt.entries do %>
                           <%= if entry.client_name do %>
@@ -2168,6 +2169,11 @@ defmodule YscWeb.ExpenseReportLive do
                                       File selected: {entry.client_name}
                                     </span>
                                   </div>
+                                  <%= for err <- upload_errors(@uploads.receipt, entry) do %>
+                                    <p class="mb-2 text-sm text-red-600">
+                                      {upload_error_to_string(err)}
+                                    </p>
+                                  <% end %>
                                   <progress
                                     value={entry.progress}
                                     max="100"
@@ -2474,6 +2480,11 @@ defmodule YscWeb.ExpenseReportLive do
                             </p>
                           </div>
                         </label>
+                        <%= for err <- upload_errors(@uploads.proof) do %>
+                          <p class="mt-2 text-sm text-red-600">
+                            {upload_error_to_string(err)}
+                          </p>
+                        <% end %>
                         <!-- Upload progress for entries - only show if entry matches this income item index -->
                         <%= for entry <- @uploads.proof.entries do %>
                           <%= if entry.client_name do %>
@@ -2506,6 +2517,11 @@ defmodule YscWeb.ExpenseReportLive do
                                       File selected: {entry.client_name}
                                     </span>
                                   </div>
+                                  <%= for err <- upload_errors(@uploads.proof, entry) do %>
+                                    <p class="mb-2 text-sm text-red-600">
+                                      {upload_error_to_string(err)}
+                                    </p>
+                                  <% end %>
                                   <progress
                                     value={entry.progress}
                                     max="100"
@@ -3450,6 +3466,14 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp error_to_string({msg, _opts}), do: msg
+
+  defp upload_error_to_string(:too_large), do: "File is too large (max 10MB)"
+
+  defp upload_error_to_string(:not_accepted),
+    do: "Invalid file type. Use PDF, JPG, JPEG, PNG, or WEBP"
+
+  defp upload_error_to_string(:too_many_files), do: "Too many files selected"
+  defp upload_error_to_string(err), do: "Upload error: #{inspect(err)}"
 
   # Timeline component for expense report status
   defp timeline_section(assigns) do

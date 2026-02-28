@@ -582,7 +582,8 @@ defmodule YscWeb.AdminPostEditorLive do
        socket
        |> YscWeb.Flash.put_toast(
          :info,
-         "Please set a featured image before publishing."
+         "Please set a featured image before publishing.",
+         title: "Featured image required"
        )
        |> push_navigate(to: ~p"/admin/posts/#{post.id}/settings")}
     else
@@ -598,13 +599,17 @@ defmodule YscWeb.AdminPostEditorLive do
           {:noreply,
            socket
            |> assign(:post, new_post)
-           |> YscWeb.Flash.put_toast(:info, "The post was published!")
+           |> YscWeb.Flash.put_toast(:info, "The post was published!",
+             title: "Published"
+           )
            |> redirect(to: ~p"/admin/posts/#{post.id}")}
 
         {:error, _changeset} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Something went wrong")
+           |> YscWeb.Flash.put_toast(:error, "Something went wrong",
+             title: "Publish failed"
+           )
            |> redirect(to: ~p"/admin/posts")}
       end
     end
@@ -630,13 +635,17 @@ defmodule YscWeb.AdminPostEditorLive do
         {:noreply,
          socket
          |> assign(:post, new_post)
-         |> YscWeb.Flash.put_toast(:info, "The post recovered.")
+         |> YscWeb.Flash.put_toast(:info, "The post recovered.",
+           title: "Post restored"
+         )
          |> redirect(to: ~p"/admin/posts/#{post.id}")}
 
       {:error, _changeset} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Something went wrong")
+         |> YscWeb.Flash.put_toast(:error, "Something went wrong",
+           title: "Restore failed"
+         )
          |> redirect(to: ~p"/admin/posts")}
     end
   end
@@ -661,13 +670,17 @@ defmodule YscWeb.AdminPostEditorLive do
         {:noreply,
          socket
          |> assign(:post, new_post)
-         |> YscWeb.Flash.put_toast(:info, "The post was deleted.")
+         |> YscWeb.Flash.put_toast(:info, "The post was deleted.",
+           title: "Post deleted"
+         )
          |> redirect(to: ~p"/admin/posts")}
 
       {:error, _changeset} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Something went wrong")
+         |> YscWeb.Flash.put_toast(:error, "Something went wrong",
+           title: "Delete failed"
+         )
          |> redirect(to: ~p"/admin/posts")}
     end
   end
@@ -703,7 +716,9 @@ defmodule YscWeb.AdminPostEditorLive do
 
       {:error, _changeset} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Could not set featured image")}
+         YscWeb.Flash.put_toast(socket, :error, "Could not set featured image",
+           title: "Featured image"
+         )}
     end
   end
 
@@ -729,7 +744,8 @@ defmodule YscWeb.AdminPostEditorLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Could not remove featured image"
+           "Could not remove featured image",
+           title: "Featured image"
          )}
     end
   end
@@ -800,7 +816,8 @@ defmodule YscWeb.AdminPostEditorLive do
               YscWeb.Flash.put_toast(
                 socket,
                 :error,
-                "Could not set featured image"
+                "Could not set featured image",
+                title: "Featured image"
               )
           end
 

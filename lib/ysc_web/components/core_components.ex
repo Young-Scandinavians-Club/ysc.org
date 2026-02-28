@@ -280,6 +280,7 @@ defmodule YscWeb.CoreComponents do
 
   def button(assigns) do
     variant = assigns[:variant] || "solid"
+    color = assigns[:color] || "blue"
 
     base_classes =
       "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6"
@@ -287,10 +288,12 @@ defmodule YscWeb.CoreComponents do
     variant_classes =
       case variant do
         "outline" ->
-          "border border-#{assigns.color}-200 hover:bg-#{assigns.color}-50 text-#{assigns.color}-700 active:text-#{assigns.color}-700 bg-transparent"
+          Map.get(button_outline_color_classes(), color) ||
+            Map.get(button_outline_color_classes(), "blue")
 
         _ ->
-          "bg-#{assigns.color}-700 hover:bg-#{assigns.color}-800 text-zinc-100 active:text-zinc-100/80"
+          Map.get(button_solid_color_classes(), color) ||
+            Map.get(button_solid_color_classes(), "blue")
       end
 
     assigns =
@@ -321,12 +324,21 @@ defmodule YscWeb.CoreComponents do
   slot :inner_block, required: true
 
   def button_link(assigns) do
+    color = assigns[:color] || "blue"
+
+    color_classes =
+      Map.get(button_solid_color_classes(), color) ||
+        Map.get(button_solid_color_classes(), "blue")
+
+    assigns = assign(assigns, :color_classes, color_classes)
+
     ~H"""
     <button
       type={@type}
       class={[
-        "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded hover:bg-#{@color}-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80",
-        "text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80",
+        "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80",
+        "text-sm font-semibold leading-6",
+        @color_classes,
         @class
       ]}
       {@rest}
@@ -334,6 +346,41 @@ defmodule YscWeb.CoreComponents do
       {render_slot(@inner_block)}
     </button>
     """
+  end
+
+  # Static class maps so Tailwind JIT sees full class names (dynamic bg-#{color}-700 is not purged).
+  defp button_solid_color_classes do
+    %{
+      "blue" =>
+        "bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80",
+      "red" =>
+        "bg-red-700 hover:bg-red-800 text-zinc-100 active:text-zinc-100/80",
+      "green" =>
+        "bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80",
+      "amber" =>
+        "bg-amber-700 hover:bg-amber-800 text-zinc-100 active:text-zinc-100/80",
+      "zinc" =>
+        "bg-zinc-700 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80",
+      "teal" =>
+        "bg-teal-700 hover:bg-teal-800 text-zinc-100 active:text-zinc-100/80"
+    }
+  end
+
+  defp button_outline_color_classes do
+    %{
+      "blue" =>
+        "border border-blue-200 hover:bg-blue-50 text-blue-700 active:text-blue-700 bg-transparent",
+      "red" =>
+        "border border-red-200 hover:bg-red-50 text-red-700 active:text-red-700 bg-transparent",
+      "green" =>
+        "border border-green-200 hover:bg-green-50 text-green-700 active:text-green-700 bg-transparent",
+      "amber" =>
+        "border border-amber-200 hover:bg-amber-50 text-amber-700 active:text-amber-700 bg-transparent",
+      "zinc" =>
+        "border border-zinc-200 hover:bg-zinc-50 text-zinc-700 active:text-zinc-700 bg-transparent",
+      "teal" =>
+        "border border-teal-200 hover:bg-teal-50 text-teal-700 active:text-teal-700 bg-transparent"
+    }
   end
 
   @doc """

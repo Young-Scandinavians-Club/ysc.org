@@ -2024,7 +2024,8 @@ defmodule YscWeb.UserSettingsLive do
             |> push_patch(to: ~p"/users/settings")
             |> YscWeb.Flash.put_toast(
               :error,
-              "Verification link expired. Please change your phone number again to get a new code."
+              "Verification link expired. Please change your phone number again to get a new code.",
+              title: "Phone"
             )
         end
       else
@@ -2048,13 +2049,16 @@ defmodule YscWeb.UserSettingsLive do
             new_email
           )
 
-          YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.")
+          YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.",
+            title: "Email"
+          )
 
         :error ->
           YscWeb.Flash.put_toast(
             socket,
             :error,
-            "Email change link is invalid or it has expired."
+            "Email change link is invalid or it has expired.",
+            title: "Email"
           )
       end
 
@@ -2342,7 +2346,9 @@ defmodule YscWeb.UserSettingsLive do
     else
       # Email hasn't changed
       {:noreply,
-       YscWeb.Flash.put_toast(socket, :info, "Email address is the same.")}
+       YscWeb.Flash.put_toast(socket, :info, "Email address is the same.",
+         title: "Email"
+       )}
     end
   end
 
@@ -2503,6 +2509,7 @@ defmodule YscWeb.UserSettingsLive do
            |> YscWeb.Flash.put_toast(
              :info,
              "Phone number update initiated. Please verify the code sent to your new number.",
+             title: "Phone",
              icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
            )}
 
@@ -2520,7 +2527,9 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> assign(:user, updated_user)
            |> assign(:profile_form, profile_form)
-           |> YscWeb.Flash.put_toast(:info, "Profile updated successfully.")}
+           |> YscWeb.Flash.put_toast(:info, "Profile updated successfully.",
+             title: "Profile"
+           )}
 
         {:error, changeset} ->
           {:noreply, assign(socket, profile_form: to_form(changeset))}
@@ -2602,6 +2611,7 @@ defmodule YscWeb.UserSettingsLive do
                    |> YscWeb.Flash.put_toast(
                      :info,
                      "Phone number updated and verified successfully.",
+                     title: "Phone",
                      icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
                    )}
 
@@ -2705,7 +2715,8 @@ defmodule YscWeb.UserSettingsLive do
            )
            |> YscWeb.Flash.put_toast(
              :info,
-             "Verification code sent to your phone."
+             "Verification code sent to your phone.",
+             title: "Phone"
            )}
 
         {:error, :rate_limited, _remaining} ->
@@ -2714,7 +2725,8 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Please wait before requesting another verification code."
+             "Please wait before requesting another verification code.",
+             title: "Phone"
            )}
       end
     else
@@ -2845,7 +2857,8 @@ defmodule YscWeb.UserSettingsLive do
                    |> push_patch(to: ~p"/users/settings")
                    |> YscWeb.Flash.put_toast(
                      :info,
-                     "Email address updated successfully."
+                     "Email address updated successfully.",
+                     title: "Email"
                    )}
 
                 {:error, _changeset} ->
@@ -2952,7 +2965,8 @@ defmodule YscWeb.UserSettingsLive do
            )
            |> YscWeb.Flash.put_toast(
              :info,
-             "Verification code sent to your email."
+             "Verification code sent to your email.",
+             title: "Email"
            )}
 
         {:error, :rate_limited, _remaining} ->
@@ -2961,7 +2975,8 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Please wait before requesting another verification code."
+             "Please wait before requesting another verification code.",
+             title: "Email"
            )}
       end
     else
@@ -3057,7 +3072,8 @@ defmodule YscWeb.UserSettingsLive do
          |> assign(:notification_form, notification_form)
          |> YscWeb.Flash.put_toast(
            :info,
-           "Notification preferences updated successfully."
+           "Notification preferences updated successfully.",
+           title: "Notifications"
          )}
 
       {:error, changeset} ->
@@ -3096,7 +3112,8 @@ defmodule YscWeb.UserSettingsLive do
          |> assign(:address_form, address_form)
          |> YscWeb.Flash.put_toast(
            :info,
-           "Billing address updated successfully."
+           "Billing address updated successfully.",
+           title: "Billing"
          )}
 
       {:error, changeset} ->
@@ -3120,7 +3137,8 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to manage your membership plan."
+         "You must have an approved account to manage your membership plan.",
+         title: "Membership"
        )}
     else
       if Accounts.sub_account?(user) do
@@ -3128,7 +3146,8 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Sub-accounts cannot purchase their own membership. You share the membership of your primary account."
+           "Sub-accounts cannot purchase their own membership. You share the membership of your primary account.",
+           title: "Membership"
          )}
       else
         membership_atom = String.to_existing_atom(membership_type)
@@ -3164,7 +3183,8 @@ defmodule YscWeb.UserSettingsLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Membership activated successfully!"
+                   "Membership activated successfully!",
+                   title: "Membership"
                  )
                  |> redirect(to: ~p"/users/membership")}
 
@@ -3190,7 +3210,8 @@ defmodule YscWeb.UserSettingsLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Membership activated successfully!"
+                   "Membership activated successfully!",
+                   title: "Membership"
                  )
                  |> redirect(to: ~p"/users/membership")}
             end
@@ -3290,7 +3311,8 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to update your payment method."
+         "You must have an approved account to update your payment method.",
+         title: "Payment"
        )}
     else
       # Retrieve the payment method from Stripe and store it locally
@@ -3537,18 +3559,22 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :info, "Membership cancelled.")
+           YscWeb.Flash.put_toast(socket, :info, "Membership cancelled.",
+             title: "Membership"
+           )
            |> redirect(to: ~p"/users/membership")}
 
         {:error, reason} when is_binary(reason) ->
-          {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
+          {:noreply,
+           YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
 
         {:error, _changeset} ->
           {:noreply,
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to cancel membership. Please try again."
+             "Failed to cancel membership. Please try again.",
+             title: "Membership"
            )}
       end
     end
@@ -3563,24 +3589,29 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :info,
-           "Scheduled downgrade cancelled. Your membership will stay at its current level."
+           "Scheduled downgrade cancelled. Your membership will stay at its current level.",
+           title: "Membership"
          )
          |> redirect(to: ~p"/users/membership")}
 
       {:error, :no_scheduled_downgrade} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "No scheduled downgrade found.")
+         YscWeb.Flash.put_toast(socket, :error, "No scheduled downgrade found.",
+           title: "Membership"
+         )
          |> redirect(to: ~p"/users/membership")}
 
       {:error, reason} when is_binary(reason) ->
-        {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
 
       {:error, _} ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Failed to cancel scheduled downgrade. Please try again."
+           "Failed to cancel scheduled downgrade. Please try again.",
+           title: "Membership"
          )}
     end
   end
@@ -3593,12 +3624,14 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to cancel your membership."
+         "You must have an approved account to cancel your membership.",
+         title: "Membership"
        )}
     else
       case Subscriptions.resume(socket.assigns.current_membership) do
         {:error, reason} ->
-          {:noreply, YscWeb.Flash.put_toast(socket, :error, reason)}
+          {:noreply,
+           YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
 
         {:ok, _subscription} ->
           # Cache invalidation is handled in Subscriptions.resume (via update_subscription)
@@ -3610,7 +3643,9 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.")
+           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
+             title: "Membership"
+           )
            |> redirect(to: ~p"/users/membership")}
 
         _subscription ->
@@ -3623,7 +3658,9 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.")
+           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
+             title: "Membership"
+           )
            |> redirect(to: ~p"/users/membership")}
       end
     end
@@ -3766,7 +3803,9 @@ defmodule YscWeb.UserSettingsLive do
       :membership_form,
       to_form(%{"membership_type" => membership_type_str})
     )
-    |> YscWeb.Flash.put_toast(:info, "Your membership has been updated.")
+    |> YscWeb.Flash.put_toast(:info, "Your membership has been updated.",
+      title: "Membership"
+    )
   end
 
   defp process_email_change_after_reauth(socket) do
@@ -3797,7 +3836,8 @@ defmodule YscWeb.UserSettingsLive do
     |> push_patch(to: ~p"/users/settings/email-verification?email=#{new_email}")
     |> YscWeb.Flash.put_toast(
       :info,
-      "Email change initiated. Please verify the code sent to your new email address."
+      "Email change initiated. Please verify the code sent to your new email address.",
+      title: "Email"
     )
   end
 
@@ -3861,7 +3901,9 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:selecting_payment_method, false)
-         |> YscWeb.Flash.put_toast(:info, "Payment method set as default")}
+         |> YscWeb.Flash.put_toast(:info, "Payment method set as default",
+           title: "Payment"
+         )}
 
       {:error, :database_error} ->
         handle_database_error(socket)
@@ -4132,7 +4174,7 @@ defmodule YscWeb.UserSettingsLive do
        :membership_form,
        to_form(%{"membership_type" => Atom.to_string(new_atom)})
      )
-     |> YscWeb.Flash.put_toast(:info, success_message)
+     |> YscWeb.Flash.put_toast(:info, success_message, title: "Membership")
      |> redirect(to: ~p"/users/membership")}
   end
 
@@ -4143,7 +4185,8 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :info,
-       "Your membership plan will switch at your next renewal."
+       "Your membership plan will switch at your next renewal.",
+       title: "Membership"
      )
      |> redirect(to: ~p"/users/membership")}
   end
@@ -4153,7 +4196,8 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "Failed to change membership: #{inspect(reason)}"
+       "Failed to change membership: #{inspect(reason)}",
+       title: "Membership"
      )}
   end
 

@@ -2,6 +2,9 @@ defmodule YscWeb.Flash do
   @moduledoc """
   Centralized toast/flash facade. All callers use these functions so styling,
   placement, and behavior can be changed in one place.
+
+  For `:info`, `:error`, and `:warning` a default title and icon are applied
+  (Success / Error / Warning). Pass `title: "Context"` to show a clearer label.
   """
 
   @doc """
@@ -40,9 +43,17 @@ defmodule YscWeb.Flash do
   defp default_icon_opts(kind, opts) do
     {icon, default_title} =
       case kind do
-        :info -> {&YscWeb.CoreComponents.flash_toast_icon_success/1, "Success"}
-        :error -> {&YscWeb.CoreComponents.flash_toast_icon_error/1, "Error"}
-        _ -> {nil, nil}
+        :info ->
+          {&YscWeb.CoreComponents.flash_toast_icon_success/1, "Success"}
+
+        :error ->
+          {&YscWeb.CoreComponents.flash_toast_icon_error/1, "Error"}
+
+        :warning ->
+          {&YscWeb.CoreComponents.flash_toast_icon_warning/1, "Warning"}
+
+        _ ->
+          {nil, nil}
       end
 
     opts

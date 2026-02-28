@@ -256,7 +256,8 @@ defmodule YscWeb.UserAuth do
         socket
         |> YscWeb.Flash.put_toast(
           :error,
-          "You must sign in to access this page."
+          "You must sign in to access this page.",
+          title: "Sign in required"
         )
         |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
 
@@ -278,7 +279,8 @@ defmodule YscWeb.UserAuth do
         socket
         |> YscWeb.Flash.put_toast(
           :error,
-          "You do not have permission to access this page"
+          "You do not have permission to access this page",
+          title: "Access denied"
         )
         |> Phoenix.LiveView.redirect(to: ~p"/")
 
@@ -297,7 +299,9 @@ defmodule YscWeb.UserAuth do
     else
       socket =
         socket
-        |> YscWeb.Flash.put_toast(:error, "Your account is not active")
+        |> YscWeb.Flash.put_toast(:error, "Your account is not active",
+          title: "Account"
+        )
         |> Phoenix.LiveView.redirect(to: ~p"/pending-review")
 
       {:halt, socket}
@@ -410,7 +414,9 @@ defmodule YscWeb.UserAuth do
       conn
     else
       conn
-      |> YscWeb.Flash.put_toast(:error, "You must sign in to access this page.")
+      |> YscWeb.Flash.put_toast(:error, "You must sign in to access this page.",
+        title: "Sign in required"
+      )
       |> maybe_store_return_to()
       |> redirect(to: ~p"/users/log-in")
       |> halt()
@@ -426,7 +432,8 @@ defmodule YscWeb.UserAuth do
       conn
       |> YscWeb.Flash.put_toast(
         :error,
-        "You do not have permission to access this page."
+        "You do not have permission to access this page.",
+        title: "Access denied"
       )
       |> maybe_store_return_to()
       |> redirect(to: ~p"/")
@@ -443,7 +450,8 @@ defmodule YscWeb.UserAuth do
       conn
       |> YscWeb.Flash.put_toast(
         :error,
-        "Your account has not been approved yet"
+        "Your account has not been approved yet",
+        title: "Account"
       )
       |> redirect(to: ~p"/pending-review")
       |> halt()

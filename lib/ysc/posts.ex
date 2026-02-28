@@ -101,7 +101,14 @@ defmodule Ysc.Posts do
       post = Repo.preload(post, :author)
       position = post.author && post.author.board_position
       position_str = if position, do: to_string(position), else: nil
-      Map.put(params, "board_position_at_publish", position_str)
+
+      # Use same key type as params so Ecto.Changeset.cast does not get mixed keys
+      key =
+        if Map.has_key?(params, :state),
+          do: :board_position_at_publish,
+          else: "board_position_at_publish"
+
+      Map.put(params, key, position_str)
     else
       params
     end
