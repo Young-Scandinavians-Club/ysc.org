@@ -38,7 +38,7 @@ dev: ## Start the local dev server
 		DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" \
 		PGPASSWORD="$(PGPASSWORD)" DBNAME="$(DBNAME)" \
 		./etc/scripts/check_dev_prerequisites.sh
-	@mix phx.server
+	@set -a; [ -f .env ] && . .env; set +a; mix phx.server
 
 .PHONY: dev-setup
 dev-setup:  ## Set up local dev environment
