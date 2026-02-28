@@ -2410,7 +2410,8 @@ defmodule Ysc.Ledgers do
             entity_type: entity_type,
             ticket_order: ticket_order,
             booking: booking,
-            subscription: subscription
+            subscription: subscription,
+            revenue_entry: revenue_entry
           })
       }
 
@@ -2488,7 +2489,8 @@ defmodule Ysc.Ledgers do
           entity_type: entity_type,
           ticket_order: ticket_order,
           booking: booking,
-          subscription: subscription
+          subscription: subscription,
+          revenue_entry: revenue_entry
         })
     }
 
@@ -2537,6 +2539,30 @@ defmodule Ysc.Ledgers do
       "Free Tickets: #{event_title} (#{ticket_summary})"
     else
       "Free Tickets: #{event_title}"
+    end
+  end
+
+  defp build_payment_description(%{
+         entity_type: :membership,
+         subscription: subscription,
+         revenue_entry: revenue_entry
+       })
+       when not is_nil(revenue_entry) do
+    entry_desc = revenue_entry.description || ""
+
+    if String.contains?(entry_desc, "Prorated") do
+      # Ledger entry is "Revenue from membership: Prorated upgrade (Single to Family)"
+      case String.split(entry_desc, "Revenue from membership: ", parts: 2) do
+        [_, rest] -> String.trim(rest)
+        _ -> entry_desc
+      end
+    else
+      if subscription do
+        plan_type = get_membership_plan_type(subscription)
+        "Membership Payment - #{String.capitalize(to_string(plan_type))}"
+      else
+        "Membership Payment"
+      end
     end
   end
 

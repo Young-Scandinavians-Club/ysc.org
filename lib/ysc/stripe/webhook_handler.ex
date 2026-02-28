@@ -1229,8 +1229,29 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             # Now process payment with pre-fetched data
             amount_paid = invoice[:amount_paid] || invoice["amount_paid"]
+
+            billing_reason =
+              invoice[:billing_reason] || invoice["billing_reason"]
+
             description = invoice[:description] || invoice["description"]
             number = invoice[:number] || invoice["number"]
+
+            # For subscription_update (proration), build a clear description so it shows in payment history
+            membership_type =
+              get_membership_type_from_subscription_id(subscription_id)
+
+            payment_description =
+              if billing_reason == "subscription_update" do
+                proration_details =
+                  extract_proration_details(invoice, membership_type)
+
+                build_proration_payment_description(
+                  proration_details,
+                  membership_type
+                )
+              else
+                "Membership payment - #{description || "Invoice #{number}"}"
+              end
 
             payment_attrs = %{
               user_id: user.id,
@@ -1240,8 +1261,7 @@ defmodule Ysc.Stripe.WebhookHandler do
               entity_id: entity_id,
               external_payment_id: invoice_id,
               stripe_fee: stripe_fee,
-              description:
-                "Membership payment - #{description || "Invoice #{number}"}",
+              description: payment_description,
               property: nil,
               payment_method_id: payment_method_id
             }
@@ -2066,13 +2086,15 @@ defmodule Ysc.Stripe.WebhookHandler do
               nil
 
             subscriptions ->
-              # For subscription_update, get the most recently updated subscription
-              # For subscription_create, get the most recently created subscription
-              # We sort by updated_at for updates and inserted_at for creates
+              # For subscription_update, get the most recently updated subscription.
+              # Include both "active" and "past_due" because invoice.payment_succeeded can fire
+              # before subscription.updated, so the subscription may still be past_due when we
+              # process the proration invoice (the payment we're recording is what clears past_due).
+              # For subscription_create, get the most recently created subscription.
               subscription =
                 if billing_reason == "subscription_update" do
                   subscriptions
-                  |> Enum.filter(&(&1.stripe_status == "active"))
+                  |> Enum.filter(&(&1.stripe_status in ["active", "past_due"]))
                   |> Enum.sort_by(& &1.updated_at, {:desc, DateTime})
                   |> List.first()
                 else
@@ -2106,6 +2128,34 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
     end
   end
+
+  # Builds the payment/ledger description for proration invoices so payment history shows it clearly
+  defp build_proration_payment_description(proration_details, membership_type) do
+    case proration_details do
+      %{old_membership_type: old_type, is_upgrade: true}
+      when not is_nil(old_type) ->
+        old_str = format_membership_type_for_description(old_type)
+        new_str = format_membership_type_for_description(membership_type)
+        "Prorated upgrade (#{old_str} to #{new_str})"
+
+      %{old_membership_type: old_type, is_upgrade: false}
+      when not is_nil(old_type) ->
+        old_str = format_membership_type_for_description(old_type)
+        new_str = format_membership_type_for_description(membership_type)
+        "Prorated change (#{old_str} to #{new_str})"
+
+      _ ->
+        "Prorated membership update"
+    end
+  end
+
+  defp format_membership_type_for_description(type)
+       when type in [:single, "single"], do: "Single"
+
+  defp format_membership_type_for_description(type)
+       when type in [:family, "family"], do: "Family"
+
+  defp format_membership_type_for_description(_), do: "Membership"
 
   # Helper function to extract proration details from a subscription_update invoice
   # This analyzes the line items to determine if it's an upgrade or downgrade
