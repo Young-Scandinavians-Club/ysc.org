@@ -821,22 +821,6 @@ defmodule YscWeb.UserSettingsLive do
               class="rounded border border-zinc-100 p-6 space-y-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
-              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                <div class="flex gap-3">
-                  <.icon
-                    name="hero-star"
-                    class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
-                  />
-                  <div>
-                    <h3 class="text-sm font-semibold text-blue-800">
-                      Lifetime Membership
-                    </h3>
-                    <p class="text-sm text-blue-700 mt-1">
-                      You have a lifetime membership that never expires. Your membership cannot be cancelled or changed.
-                    </p>
-                  </div>
-                </div>
-              </div>
               <.membership_status
                 current_membership={@current_membership}
                 primary_user={@primary_user}

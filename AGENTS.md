@@ -75,7 +75,7 @@ This is a web application written using the Phoenix web framework.
         require Ysc.Logging
 
         def my_function do
-          Ysc.Logging.error("Something went wrong", 
+          Ysc.Logging.error("Something went wrong",
             error: exception,
             stacktrace: __STACKTRACE__,
             extra: %{user_id: user.id}
