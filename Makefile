@@ -47,10 +47,13 @@ dev-setup:  ## Set up local dev environment
 	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@./etc/scripts/_wait_db_connection.sh
 	@if [ "$($(reset-db))" = "true" ]; then $(MAKE) reset-db; fi
-	@$(MAKE) setup-s3
 	@$(MAKE) setup-dev-db
 	@echo "$(GREEN)Your local dev env is ready!$(RESET)"
 	@echo "Run $(BOLD)make dev$(RESET) to start the server and then visit $(BOLD)http://localhost:4000/$(RESET)"
+
+# I always write this wrong. I'm too lazy to fix it so lets alias it to dev-setup.
+.PHONY: setup-dev
+setup-dev: dev-setup
 
 .PHONY: dev-services
 dev-services:  ## Start Docker services (postgres, localstack, etc.)
@@ -63,11 +66,8 @@ dev-services:  ## Start Docker services (postgres, localstack, etc.)
 setup: dev-setup
 
 .PHONY: setup-s3
-setup-s3:  ## Set up local S3 buckets
-	@awslocal s3api create-bucket --bucket media || true
-	@awslocal s3api put-bucket-cors --bucket media --cors-configuration file://etc/config/s3_bucket_cors_rules.json || true
-	@awslocal s3api create-bucket --bucket expense-reports || true
-	@echo "$(GREEN)Note: expense-reports bucket is backend-only (no CORS configured)$(RESET)"
+setup-s3:  ## No-op: S3 buckets are created automatically by localstack-init when you run make dev-services
+	@echo "$(GREEN)S3 buckets (media, expense-reports) are created automatically when LocalStack starts.$(RESET)"
 
 .PHONY: shell
 shell:  ## Open a shell in the dev container
