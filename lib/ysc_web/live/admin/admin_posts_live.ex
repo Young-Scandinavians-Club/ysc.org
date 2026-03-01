@@ -1,8 +1,7 @@
 defmodule YscWeb.AdminPostsLive do
   alias Ysc.Posts.Post
 
-  use Phoenix.LiveView,
-    layout: {YscWeb.Layouts, :admin_app}
+  use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS

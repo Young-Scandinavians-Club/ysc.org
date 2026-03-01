@@ -1,6 +1,5 @@
 defmodule YscWeb.AdminDashboardLive do
-  use Phoenix.LiveView,
-    layout: {YscWeb.Layouts, :admin_app}
+  use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
 

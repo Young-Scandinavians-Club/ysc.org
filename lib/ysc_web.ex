@@ -66,6 +66,21 @@ defmodule YscWeb do
     end
   end
 
+  def admin_live_view do
+    quote do
+      use Phoenix.LiveView,
+        layout: {YscWeb.Layouts, :admin_app}
+
+      unquote(html_helpers())
+
+      # Global event: "clear" is sent by the client-error flash in the layout when dismissed.
+      # No-op on the server; the UI is updated via JS. Prevents FunctionClauseError in any LiveView.
+      def handle_event("clear", _params, socket) do
+        {:noreply, socket}
+      end
+    end
+  end
+
   def live_component do
     quote do
       use Phoenix.LiveComponent

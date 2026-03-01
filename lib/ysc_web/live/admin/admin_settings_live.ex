@@ -4,8 +4,7 @@ defmodule YscWeb.AdminSettingsLive do
   alias Oban.Job
   alias Phoenix.LiveView.JS
 
-  use Phoenix.LiveView,
-    layout: {YscWeb.Layouts, :admin_app}
+  use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
 

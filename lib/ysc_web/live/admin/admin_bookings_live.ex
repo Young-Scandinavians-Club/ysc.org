@@ -1,6 +1,5 @@
 defmodule YscWeb.AdminBookingsLive do
-  use Phoenix.LiveView,
-    layout: {YscWeb.Layouts, :admin_app}
+  use YscWeb, :admin_live_view
 
   import Phoenix.HTML
   import YscWeb.CoreComponents
