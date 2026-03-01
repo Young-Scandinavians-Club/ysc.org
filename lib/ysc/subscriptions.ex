@@ -398,6 +398,8 @@ defmodule Ysc.Subscriptions do
   """
   def get_scheduled_downgrade_info(nil), do: nil
 
+  def get_scheduled_downgrade_info(%{type: :lifetime}), do: nil
+
   def get_scheduled_downgrade_info(%Subscription{} = subscription) do
     case Application.get_env(:ysc, :get_scheduled_downgrade_info_callback) do
       callback when is_function(callback, 1) ->
