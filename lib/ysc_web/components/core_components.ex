@@ -375,7 +375,7 @@ defmodule YscWeb.CoreComponents do
       "green" =>
         "border border-green-200 hover:bg-green-50 text-green-700 active:text-green-700 bg-transparent",
       "amber" =>
-        "border border-amber-200 hover:bg-amber-50 text-amber-700 active:text-amber-700 bg-transparent",
+        "border border-amber-200 hover:bg-amber-100 text-amber-700 active:text-amber-700 bg-transparent",
       "zinc" =>
         "border border-zinc-200 hover:bg-zinc-50 text-zinc-700 active:text-zinc-700 bg-transparent",
       "teal" =>
