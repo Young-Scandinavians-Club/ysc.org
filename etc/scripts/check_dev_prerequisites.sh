@@ -68,9 +68,10 @@ fi
 echo "${GREEN}✓ LocalStack container is running${RESET}"
 echo ""
 
-# Check database connection
+# Check database connection (use psql inside postgres container so host needs no PostgreSQL client)
 echo "${BOLD}→ Checking database connection...${RESET}"
-if ! PGPASSWORD="${PGPASSWORD:-postgres}" psql -h localhost -U postgres -d "${DBNAME:-ysc_dev}" -c "SELECT 1" >/dev/null 2>&1; then
+DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml}"
+if ! docker compose -f "${DOCKER_COMPOSE_FILE}" exec -T -e PGPASSWORD="${PGPASSWORD:-postgres}" postgres psql -h localhost -U postgres -d "${DBNAME:-ysc_dev}" -c "SELECT 1" >/dev/null 2>&1; then
   echo "${RED}✗ Cannot connect to database${RESET}"
   echo "${TEAL}  Hint: Wait for PostgreSQL to be ready or run: make dev-setup${RESET}"
   exit 1
