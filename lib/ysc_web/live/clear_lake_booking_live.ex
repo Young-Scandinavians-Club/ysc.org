@@ -43,9 +43,9 @@ defmodule YscWeb.ClearLakeBookingLive do
 
     # For initial static render, defer heavy operations until socket is connected
     # This ensures fast time-to-paint for the initial HTML response
-    {user_with_subs, can_book, booking_disabled_reason, active_tab,
-     membership_type, day_booking_allowed, buyout_booking_allowed, booking_mode,
-     active_bookings} =
+    {user_with_subs, can_book, booking_error_title, booking_disabled_reason,
+     active_tab, membership_type, day_booking_allowed, buyout_booking_allowed,
+     booking_mode, active_bookings} =
       if connected?(socket) do
         # Load user with subscriptions and subscription_items FIRST (to avoid multiple fetches)
         # Preloading subscription_items prevents duplicate queries in get_membership_plan_type
@@ -76,7 +76,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           end
 
         # Check if user can book (pass user_with_subs to avoid re-fetching)
-        {can_book, booking_disabled_reason} =
+        {can_book, booking_error_title, booking_disabled_reason} =
           check_booking_eligibility(user_with_subs)
 
         # If user can't book, default to information tab
@@ -119,13 +119,14 @@ defmodule YscWeb.ClearLakeBookingLive do
             do: get_active_bookings(user_with_subs.id),
             else: []
 
-        {user_with_subs, can_book, booking_disabled_reason, active_tab,
-         membership_type, day_booking_allowed, buyout_booking_allowed,
-         booking_mode, active_bookings}
+        {user_with_subs, can_book, booking_error_title, booking_disabled_reason,
+         active_tab, membership_type, day_booking_allowed,
+         buyout_booking_allowed, booking_mode, active_bookings}
       else
         # Static render: use minimal data for fast initial paint
         user_with_subs = user
         can_book = true
+        booking_error_title = nil
         booking_disabled_reason = nil
         active_tab = requested_tab
         membership_type = if user, do: :none, else: :none
@@ -134,9 +135,9 @@ defmodule YscWeb.ClearLakeBookingLive do
         booking_mode = booking_mode || :day
         active_bookings = []
 
-        {user_with_subs, can_book, booking_disabled_reason, active_tab,
-         membership_type, day_booking_allowed, buyout_booking_allowed,
-         booking_mode, active_bookings}
+        {user_with_subs, can_book, booking_error_title, booking_disabled_reason,
+         active_tab, membership_type, day_booking_allowed,
+         buyout_booking_allowed, booking_mode, active_bookings}
       end
 
     socket =
@@ -164,6 +165,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         membership_type: membership_type,
         active_tab: active_tab,
         can_book: can_book,
+        booking_error_title: booking_error_title,
         booking_disabled_reason: booking_disabled_reason,
         day_booking_allowed: day_booking_allowed,
         buyout_booking_allowed: buyout_booking_allowed,
@@ -214,10 +216,14 @@ defmodule YscWeb.ClearLakeBookingLive do
     # Use the user with subscriptions preloaded if available
     user_for_check = socket.assigns[:user] || socket.assigns.current_user
 
-    {can_book, booking_disabled_reason} =
+    {can_book, booking_error_title, booking_disabled_reason} =
       if socket.assigns[:can_book] != nil do
         # Already computed in mount - reuse it
-        {socket.assigns.can_book, socket.assigns.booking_disabled_reason}
+        {
+          socket.assigns.can_book,
+          socket.assigns.booking_error_title,
+          socket.assigns.booking_disabled_reason
+        }
       else
         # First time (shouldn't happen normally since mount runs first)
         check_booking_eligibility(user_for_check)
@@ -261,9 +267,10 @@ defmodule YscWeb.ClearLakeBookingLive do
     guests_changed = guests_count != socket.assigns.guests_count
     booking_mode_changed = booking_mode != socket.assigns.selected_booking_mode
 
-    # Also check if can_book or booking_disabled_reason changed
+    # Also check if can_book, booking_error_title, or booking_disabled_reason changed
     can_book_changed =
       can_book != socket.assigns.can_book ||
+        booking_error_title != socket.assigns.booking_error_title ||
         booking_disabled_reason != socket.assigns.booking_disabled_reason
 
     # Only update if something actually changed
@@ -347,6 +354,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           date_validation_errors: %{},
           active_tab: active_tab,
           can_book: can_book,
+          booking_error_title: booking_error_title,
           booking_disabled_reason: booking_disabled_reason,
           day_booking_allowed: day_booking_allowed,
           buyout_booking_allowed: buyout_booking_allowed,
@@ -1469,6 +1477,31 @@ defmodule YscWeb.ClearLakeBookingLive do
     </section>
     <!-- Main Content Grid: 2-column layout (For logged-in users) -->
     <section :if={@user} class="max-w-screen-xl mx-auto px-4 py-20">
+      <%!-- Booking Eligibility Banner (same as Tahoe) --%>
+      <div
+        :if={!@can_book}
+        class="mb-8 bg-amber-50 border border-amber-200 rounded p-4"
+      >
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <.icon
+              name="hero-exclamation-triangle-solid"
+              class="h-5 w-5 text-amber-600"
+            />
+          </div>
+          <div class="ms-2 flex-1">
+            <h3
+              :if={@booking_error_title}
+              class="text-sm font-semibold text-amber-900"
+            >
+              {@booking_error_title}
+            </h3>
+            <div class="mt-2 text-sm text-amber-800">
+              <p>{raw(@booking_disabled_reason)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Left Column: Main Content (2 columns on large screens) -->
         <div class="lg:col-span-2 space-y-20">
@@ -2880,6 +2913,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
     {
       false,
+      "Sign In Required",
       "You must be signed in to make a booking. Please #{sign_in_link} to continue."
     }
   end
@@ -2889,6 +2923,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     if user.state != :active do
       {
         false,
+        "Membership Pending Approval",
         "Your membership application is pending approval. You will be able to make bookings once your application has been approved."
       }
     else
@@ -2896,10 +2931,11 @@ defmodule YscWeb.ClearLakeBookingLive do
       # user should already have subscriptions preloaded (with subscription_items)
       # to avoid duplicate queries
       if Accounts.has_active_membership?(user) do
-        {true, nil}
+        {true, nil, nil}
       else
         {
           false,
+          "Membership Required",
           "You need an active membership to make bookings. Please activate or renew your membership to continue."
         }
       end
