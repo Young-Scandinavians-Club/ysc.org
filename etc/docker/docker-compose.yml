@@ -35,32 +35,9 @@ services:
     volumes:
       - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # One-shot init: creates S3 buckets when LocalStack is ready (no awslocal needed on host)
-  localstack-init:
-    image: public.ecr.aws/aws-cli/aws-cli:2.15.0
-    depends_on:
-      localstack:
-        condition: service_healthy
-    volumes:
+      # Init: create S3 buckets when LocalStack is ready (no awslocal needed on host)
+      - ./localstack-init/ready.d/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
       - ../config/s3_bucket_cors_rules.json:/config/s3_bucket_cors_rules.json:ro
-    environment:
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_DEFAULT_REGION: us-east-1
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        aws --endpoint-url=http://localstack:4566 s3api create-bucket --bucket media || true
-        aws --endpoint-url=http://localstack:4566 s3api put-bucket-cors --bucket media --cors-configuration file:///config/s3_bucket_cors_rules.json || true
-        aws --endpoint-url=http://localstack:4566 s3api create-bucket --bucket expense-reports || true
-        echo "S3 buckets (media, expense-reports) initialized"
 
 volumes:
   pgadmin-data:

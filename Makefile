@@ -66,7 +66,7 @@ dev-services:  ## Start Docker services (postgres, localstack, etc.)
 setup: dev-setup
 
 .PHONY: setup-s3
-setup-s3:  ## No-op: S3 buckets are created automatically by localstack-init when you run make dev-services
+setup-s3:  ## No-op: S3 buckets are created automatically by LocalStack init when you run make dev-services
 	@echo "$(GREEN)S3 buckets (media, expense-reports) are created automatically when LocalStack starts.$(RESET)"
 
 .PHONY: shell
