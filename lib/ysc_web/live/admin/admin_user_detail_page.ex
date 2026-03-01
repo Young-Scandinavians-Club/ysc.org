@@ -1997,7 +1997,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       {:ok, updated_user} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "User updated", title: "Profile")
+         |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
          |> redirect(to: ~p"/admin/users/#{updated_user.id}/details")}
 
       {:error, changeset} ->
@@ -2219,7 +2219,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     if is_nil(plan_id_str) or plan_id_str == "" do
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Please select a membership plan",
+       |> YscWeb.Flash.put_toast(:error, "Please select a membership plan.",
          title: "Membership"
        )}
     else
@@ -2344,7 +2344,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       if is_nil(new_membership_type_str) or new_membership_type_str == "" do
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Please select a membership type",
+         |> YscWeb.Flash.put_toast(:error, "Please select a membership type.",
            title: "Membership type"
          )}
       else
@@ -2525,7 +2525,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         nil ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Bank account not found",
+           |> YscWeb.Flash.put_toast(:error, "Bank account not found.",
              title: "Bank account"
            )
            |> assign(:unsealed_account_id, nil)
@@ -2539,7 +2539,10 @@ defmodule YscWeb.AdminUserDetailsLive do
       end
     else
       {:noreply,
-       YscWeb.Flash.put_toast(socket, :error, "Unauthorized",
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "You don't have permission to do this.",
          title: "Bank account"
        )}
     end
@@ -2562,7 +2565,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     if active_subscription == nil do
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "No active subscription found",
+       |> YscWeb.Flash.put_toast(:error, "No active subscription found.",
          title: "Membership period"
        )}
     else
@@ -2622,7 +2625,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:error, _reason} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Invalid date format",
+           |> YscWeb.Flash.put_toast(:error, "Invalid date format.",
              title: "Membership period"
            )}
       end

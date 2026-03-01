@@ -66,13 +66,13 @@ defmodule YscWeb.Flash do
     {icon, default_title} =
       case kind do
         :info ->
-          {&YscWeb.CoreComponents.flash_toast_icon_success/1, "Success"}
+          {&YscWeb.CoreComponents.flash_toast_icon_success/1, "Done"}
 
         :error ->
-          {&YscWeb.CoreComponents.flash_toast_icon_error/1, "Error"}
+          {&YscWeb.CoreComponents.flash_toast_icon_error/1, "Oops"}
 
         :warning ->
-          {&YscWeb.CoreComponents.flash_toast_icon_warning/1, "Warning"}
+          {&YscWeb.CoreComponents.flash_toast_icon_warning/1, "Heads up"}
 
         _ ->
           {nil, nil}

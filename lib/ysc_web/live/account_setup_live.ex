@@ -797,7 +797,8 @@ defmodule YscWeb.AccountSetupLive do
          |> YscWeb.Flash.put_toast(
            :info,
            "A new verification code has been sent to your email.",
-           title: "Email verification"
+           title: "Email verification",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
          )}
 
       {:error, :rate_limited, _remaining} ->
@@ -1229,7 +1230,8 @@ defmodule YscWeb.AccountSetupLive do
            |> YscWeb.Flash.put_toast(
              :info,
              "Verification code sent to your phone.",
-             title: "Phone verification"
+             title: "Phone verification",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
            )}
 
         {:error, :rate_limited, _remaining} ->

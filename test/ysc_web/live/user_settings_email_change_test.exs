@@ -68,7 +68,7 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       # Should not show modal, shows message instead
       refute has_element?(view, "#reauth-modal")
-      assert result =~ "Email address is the same"
+      assert result =~ "That is already your email address."
     end
   end
 

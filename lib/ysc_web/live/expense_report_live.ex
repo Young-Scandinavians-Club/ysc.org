@@ -802,8 +802,8 @@ defmodule YscWeb.ExpenseReportLive do
            |> assign(:form, to_form(changeset))
            |> assign(:totals, totals)
            |> YscWeb.Flash.error_with_title(
-             "Please fix",
-             "Please fix the errors below before submitting"
+             "Form errors",
+             "Please fix the errors before submitting."
            )}
       end
     else

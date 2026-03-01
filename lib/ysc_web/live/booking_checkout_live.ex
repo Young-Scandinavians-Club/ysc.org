@@ -1644,7 +1644,7 @@ defmodule YscWeb.BookingCheckoutLive do
         {:noreply,
          assign(socket, guest_info_errors: errors)
          |> YscWeb.Flash.error_with_title(
-           "Please fix",
+           "Form errors",
            "Please fix the errors below."
          )}
     end
@@ -1655,7 +1655,7 @@ defmodule YscWeb.BookingCheckoutLive do
      assign(socket,
        guest_info_errors: %{general: "No guest information provided"}
      )
-     |> YscWeb.Flash.put_toast(:error, "Please provide guest information.",
+     |> YscWeb.Flash.put_toast(:error, "Guest information is required.",
        title: "Checkout"
      )}
   end
@@ -1718,9 +1718,11 @@ defmodule YscWeb.BookingCheckoutLive do
         {:ok, booking} ->
           {:noreply,
            socket
-           |> YscWeb.Flash.success_with_title(
-             "Success",
-             "Payment successful! Your booking is confirmed."
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Payment successful! Your booking is confirmed.",
+             title: "Booking confirmed",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
            )
            |> push_navigate(
              to: ~p"/bookings/#{booking.id}/receipt?confetti=true"

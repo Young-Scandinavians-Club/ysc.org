@@ -2050,7 +2050,8 @@ defmodule YscWeb.UserSettingsLive do
           )
 
           YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.",
-            title: "Email"
+            title: "Email",
+            icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
           )
 
         :error ->
@@ -2346,7 +2347,10 @@ defmodule YscWeb.UserSettingsLive do
     else
       # Email hasn't changed
       {:noreply,
-       YscWeb.Flash.put_toast(socket, :info, "Email address is the same.",
+       YscWeb.Flash.put_toast(
+         socket,
+         :info,
+         "That is already your email address.",
          title: "Email"
        )}
     end
@@ -2716,7 +2720,8 @@ defmodule YscWeb.UserSettingsLive do
            |> YscWeb.Flash.put_toast(
              :info,
              "Verification code sent to your phone.",
-             title: "Phone"
+             title: "Phone",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
            )}
 
         {:error, :rate_limited, _remaining} ->
@@ -2858,7 +2863,8 @@ defmodule YscWeb.UserSettingsLive do
                    |> YscWeb.Flash.put_toast(
                      :info,
                      "Email address updated successfully.",
-                     title: "Email"
+                     title: "Email",
+                     icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
                    )}
 
                 {:error, _changeset} ->
@@ -2966,7 +2972,8 @@ defmodule YscWeb.UserSettingsLive do
            |> YscWeb.Flash.put_toast(
              :info,
              "Verification code sent to your email.",
-             title: "Email"
+             title: "Email",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
            )}
 
         {:error, :rate_limited, _remaining} ->
@@ -3358,8 +3365,9 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:show_new_payment_form, false)
                    |> YscWeb.Flash.put_toast(
                      :info,
-                     "Payment method updated and set as default",
-                     title: "Payment"
+                     "Payment method updated and set as default.",
+                     title: "Payment",
+                     icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
                    )
                    |> redirect(to: ~p"/users/membership")}
 
@@ -3437,7 +3445,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Payment method not found",
+           "Payment method not found.",
            title: "Payment"
          )}
     end
@@ -3756,7 +3764,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Invalid membership type selected",
+           "Invalid membership type selected.",
            title: "Membership"
          )}
 
@@ -3765,7 +3773,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Current membership not found",
+           "Current membership not found.",
            title: "Membership"
          )}
 
@@ -3774,7 +3782,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This membership change is not allowed",
+           "This membership change is not allowed.",
            title: "Membership"
          )}
 
@@ -3855,7 +3863,8 @@ defmodule YscWeb.UserSettingsLive do
     |> YscWeb.Flash.put_toast(
       :info,
       "Email change initiated. Please verify the code sent to your new email address.",
-      title: "Email"
+      title: "Email",
+      icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
     )
   end
 
@@ -3919,8 +3928,9 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:selecting_payment_method, false)
-         |> YscWeb.Flash.put_toast(:info, "Payment method set as default",
-           title: "Payment"
+         |> YscWeb.Flash.put_toast(:info, "Payment method set as default.",
+           title: "Payment",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
          )}
 
       {:error, :database_error} ->
@@ -4206,7 +4216,8 @@ defmodule YscWeb.UserSettingsLive do
        socket,
        :info,
        "Your membership plan will switch at your next renewal.",
-       title: "Membership"
+       title: "Membership",
+       icon: &YscWeb.CoreComponents.flash_toast_icon_clock/1
      )
      |> redirect(to: ~p"/users/membership")}
   end
@@ -5318,7 +5329,8 @@ defmodule YscWeb.UserSettingsLive do
            |> YscWeb.Flash.put_toast(
              :info,
              "Payment retry successful! Your invoice has been paid and your membership will be updated shortly.",
-             title: "Invoice"
+             title: "Invoice",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
            )
            |> redirect(to: ~p"/users/membership")}
 

@@ -308,7 +308,7 @@ defmodule YscWeb.UserTicketsLive do
             {:noreply,
              socket
              |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
-             |> YscWeb.Flash.put_toast(:info, "Order cancelled successfully",
+             |> YscWeb.Flash.put_toast(:info, "Order cancelled.",
                title: "Order"
              )}
 
@@ -345,7 +345,10 @@ defmodule YscWeb.UserTicketsLive do
            )}
         else
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :error, "Cannot resume this order",
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "This order can't be resumed.",
              title: "Order"
            )}
         end

@@ -242,7 +242,8 @@ defmodule YscWeb.UserSecurityLive do
           {:noreply,
            socket
            |> YscWeb.Flash.put_toast(:info, "You have signed out.",
-             title: "Session ended"
+             title: "Session ended",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
            )
            |> push_navigate(to: ~p"/users/log-in")}
         else
@@ -252,7 +253,8 @@ defmodule YscWeb.UserSecurityLive do
              encoded_session_id | socket.assigns.revoked_session_ids
            ])
            |> YscWeb.Flash.put_toast(:info, "Session signed out.",
-             title: "Session"
+             title: "Session ended",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
            )}
         end
 
@@ -294,7 +296,8 @@ defmodule YscWeb.UserSecurityLive do
                socket
                |> assign(:passkeys, updated_passkeys)
                |> YscWeb.Flash.put_toast(:info, "Passkey deleted successfully.",
-                 title: "Passkey"
+                 title: "Passkey",
+                 icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
                )}
 
             {:error, _changeset} ->

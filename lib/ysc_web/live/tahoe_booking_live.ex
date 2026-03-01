@@ -4894,7 +4894,8 @@ defmodule YscWeb.TahoeBookingLive do
            |> YscWeb.Flash.put_toast(
              :info,
              "Booking created! Please complete payment to confirm.",
-             title: "Booking"
+             title: "Booking",
+             icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
            )
            |> push_navigate(to: ~p"/bookings/checkout/#{booking.id}")}
 

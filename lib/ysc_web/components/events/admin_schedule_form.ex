@@ -111,7 +111,8 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "Event scheduled successfully",
-           title: "Event"
+           title: "Event",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
          )}
 
       {:error, changeset} ->

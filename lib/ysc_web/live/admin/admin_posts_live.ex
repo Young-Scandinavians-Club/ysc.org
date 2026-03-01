@@ -358,7 +358,10 @@ defmodule YscWeb.AdminPostsLive do
       _ ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Something went wrong try again.")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Something went wrong. Please try again."
+         )}
     end
   end
 
@@ -440,7 +443,10 @@ defmodule YscWeb.AdminPostsLive do
       _ ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Something went wrong try again.")}
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Something went wrong. Please try again."
+         )}
     end
   end
 

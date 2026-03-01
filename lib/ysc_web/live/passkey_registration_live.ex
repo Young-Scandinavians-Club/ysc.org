@@ -268,7 +268,9 @@ defmodule YscWeb.PasskeyRegistrationLive do
                  |> assign(:passkey_challenge, nil)
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Passkey added successfully! You can now use it to sign in."
+                   "Passkey added successfully! You can now use it to sign in.",
+                   title: "Passkey added",
+                   icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
                  )}
 
               {:error, changeset} ->

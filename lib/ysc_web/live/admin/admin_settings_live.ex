@@ -511,7 +511,7 @@ defmodule YscWeb.AdminSettingsLive do
 
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(:info, "Settings Updated", title: "Settings")
+     |> YscWeb.Flash.put_toast(:info, "Settings updated.", title: "Settings")
      |> redirect(to: ~p"/admin/settings")}
   end
 
@@ -523,9 +523,7 @@ defmodule YscWeb.AdminSettingsLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Job re-scheduled successfully",
-           title: "Job"
-         )
+         |> YscWeb.Flash.put_toast(:info, "Job rescheduled.", title: "Job")
          |> assign(:recent_jobs, recent_jobs)
          |> assign(:queue_stats, queue_stats)}
 
