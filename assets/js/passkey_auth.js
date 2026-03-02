@@ -6,8 +6,7 @@
  * Uses builtin browser functionality (parseRequestOptionsFromJSON) when available.
  */
 const PasskeyAuth = {
-    mounted() {
-        // Device detection: Detect if device is an iPhone or iPad (iOS mobile device)
+    detectAndPushSupport() {
         const userAgent = navigator.userAgent;
         const isIOSMobile = /iPhone|iPad|iPod/.test(userAgent);
 
@@ -15,46 +14,37 @@ const PasskeyAuth = {
             this.pushEvent("device_detected", { device: "ios_mobile" });
         }
 
-        // Check if WebAuthn/Passkey is supported
-        const hasPublicKeyCredential = typeof window.PublicKeyCredential !== "undefined";
-        const isPasskeySupported = hasPublicKeyCredential;
+        const isPasskeySupported = typeof window.PublicKeyCredential !== "undefined";
 
-        // Send event to LiveView with passkey support status
         try {
             this.pushEvent("passkey_support_detected", { supported: isPasskeySupported });
         } catch (error) {
             console.error("[PasskeyAuth] Error pushing passkey_support_detected event", error);
             if (window.Sentry) {
                 window.Sentry.captureException(error, {
-                    tags: {
-                        component: "passkey_auth",
-                        event: "passkey_support_detected"
-                    },
-                    extra: {
-                        isPasskeySupported,
-                        userAgent
-                    }
+                    tags: { component: "passkey_auth", event: "passkey_support_detected" },
+                    extra: { isPasskeySupported, userAgent }
                 });
             }
         }
 
-        // Send user agent to LiveView for device nickname generation
         try {
             this.pushEvent("user_agent_received", { user_agent: userAgent });
         } catch (error) {
             console.error("[PasskeyAuth] Error pushing user_agent_received event", error);
             if (window.Sentry) {
                 window.Sentry.captureException(error, {
-                    tags: {
-                        component: "passkey_auth",
-                        event: "user_agent_received"
-                    },
-                    extra: {
-                        userAgent
-                    }
+                    tags: { component: "passkey_auth", event: "user_agent_received" },
+                    extra: { userAgent }
                 });
             }
         }
+    },
+
+    mounted() {
+        this.detectAndPushSupport();
+
+        const isPasskeySupported = typeof window.PublicKeyCredential !== "undefined";
 
         // If WebAuthn is not supported, return early
         if (!isPasskeySupported) {
@@ -514,6 +504,13 @@ const PasskeyAuth = {
                 });
             }
         });
+    },
+
+    reconnected() {
+        // Re-send support/device detection after a LiveView reconnect. When the
+        // WebSocket drops and reconnects, the server mounts fresh and resets
+        // passkey_supported to false, so we must push the status again.
+        this.detectAndPushSupport();
     }
 };
 
