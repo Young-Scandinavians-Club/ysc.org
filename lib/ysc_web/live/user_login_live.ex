@@ -318,6 +318,20 @@ defmodule YscWeb.UserLoginLive do
           nil
       end
 
+    # Show toast when redirected from auto_login with expired/invalid token (query param
+    # avoids session flash overwriting a concurrent successful login).
+    socket =
+      if params["reason"] == "expired_link" do
+        YscWeb.Flash.put_toast(
+          socket,
+          :error,
+          "Invalid or expired login link. Please sign in again.",
+          title: "Login"
+        )
+      else
+        socket
+      end
+
     {:ok,
      assign(socket, form: form)
      |> assign(:page_title, "Sign in")

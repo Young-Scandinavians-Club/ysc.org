@@ -80,11 +80,11 @@ defmodule YscWeb.AuthController do
   defp handle_oauth_success(conn, email, provider) do
     case Accounts.get_user_by_email(email) do
       nil ->
-        # User doesn't exist - they need to apply for membership first
+        # User doesn't exist - use generic message to avoid user enumeration
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "No account found with this email. Please apply for membership first.",
+          "Unable to sign in. Please try again or contact support.",
           title: "Authentication"
         )
         |> redirect(to: ~p"/users/log-in")

@@ -19,66 +19,83 @@ defmodule YscWeb.UserSessionController do
     create(conn, params, "Welcome back! 👋 Good to see you again.")
   end
 
-  def auto_login(conn, %{"token" => encoded_token, "redirect_to" => redirect_to}) do
-    # Token-based auto-login from account setup - skip CSRF protection
-    token = Base.url_decode64!(encoded_token)
+  @auto_login_token_max_age 120
 
-    if user = Accounts.get_user_by_session_token(token) do
-      if user.state in [:pending_approval, :active] do
+  def auto_login(conn, %{"token" => token, "redirect_to" => redirect_to}) do
+    do_auto_login(conn, token, redirect_to)
+  end
+
+  def auto_login(conn, %{"token" => token}) do
+    do_auto_login(conn, token, nil)
+  end
+
+  def auto_login(conn, _params) do
+    # Redirect without setting flash to avoid overwriting a concurrent successful
+    # login's session (e.g. prefetch or duplicate request without token).
+    redirect(conn, to: ~p"/users/log-in")
+  end
+
+  defp do_auto_login(conn, token, redirect_to) when is_binary(token) do
+    case Phoenix.Token.verify(
+           YscWeb.Endpoint,
+           "auto_login",
+           token,
+           max_age: @auto_login_token_max_age
+         ) do
+      {:ok, user_id} when is_binary(user_id) ->
+        do_auto_login_with_user_id(conn, user_id, redirect_to)
+
+      _ ->
+        # Use query param instead of session flash so a concurrent successful
+        # login response cannot be overwritten by this failure's session cookie.
+        redirect(conn, to: ~p"/users/log-in?reason=expired_link")
+    end
+  end
+
+  defp do_auto_login(conn, _token, _redirect_to),
+    do: redirect(conn, to: ~p"/users/log-in")
+
+  defp do_auto_login_with_user_id(conn, user_id, redirect_to) do
+    user =
+      try do
+        Accounts.get_user(user_id)
+      rescue
+        Ecto.Query.CastError -> nil
+      end
+
+    cond do
+      is_nil(user) ->
+        conn
+        |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
+          title: "Login"
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      user.state not in [:pending_approval, :active] ->
+        conn
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "Your account is not currently active.",
+          title: "Login"
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      true ->
+        validated_redirect =
+          if redirect_to && redirect_to != "" &&
+               YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
+            redirect_to
+          else
+            nil
+          end
+
         conn
         |> delete_session(:failed_login_attempts)
         |> UserAuth.log_in_user(
           user,
           %{"method" => "email_password"},
-          redirect_to
+          validated_redirect
         )
-      else
-        # Account not active
-        conn
-        |> YscWeb.Flash.put_toast(
-          :error,
-          "Your account is not currently active.",
-          title: "Login"
-        )
-        |> redirect(to: ~p"/users/log-in")
-      end
-    else
-      # Invalid token
-      conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
-        title: "Login"
-      )
-      |> redirect(to: ~p"/users/log-in")
-    end
-  end
-
-  def auto_login(conn, %{"token" => encoded_token}) do
-    # Token-based auto-login from account setup - skip CSRF protection
-    token = Base.url_decode64!(encoded_token)
-
-    if user = Accounts.get_user_by_session_token(token) do
-      if user.state in [:pending_approval, :active] do
-        # UserAuth.log_in_user will redirect to the appropriate path based on user state
-        conn
-        |> delete_session(:failed_login_attempts)
-        |> UserAuth.log_in_user(user, %{"method" => "email_password"})
-      else
-        # Account not active
-        conn
-        |> YscWeb.Flash.put_toast(
-          :error,
-          "Your account is not currently active.",
-          title: "Login"
-        )
-        |> redirect(to: ~p"/users/log-in")
-      end
-    else
-      # Invalid token
-      conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
-        title: "Login"
-      )
-      |> redirect(to: ~p"/users/log-in")
     end
   end
 

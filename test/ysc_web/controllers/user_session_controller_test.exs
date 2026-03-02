@@ -196,94 +196,52 @@ defmodule YscWeb.UserSessionControllerTest do
       # Mark email as verified so user can log in without being redirected to account setup
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
-      # Generate a valid session token
-      token = Ysc.Accounts.generate_user_session_token(user)
-      encoded_token = Base.url_encode64(token)
+      # Short-lived one-time token (same as account setup flow)
+      one_time_token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
 
-      # Make request to auto-login
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: encoded_token}}")
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
 
-      # Should redirect to pending review page for pending approval users
       assert redirected_to(conn) == ~p"/pending-review"
-
-      # Should be logged in
       assert get_session(conn, :user_token)
     end
 
     test "auto-logs in user with valid token and redirects to dashboard for active users",
-         %{
-           conn: conn
-         } do
-      # Create an active user
+         %{conn: conn} do
       user = user_fixture(%{state: :active})
-
-      # Mark email as verified so user can log in without being redirected to account setup
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
-      # Generate a valid session token
-      token = Ysc.Accounts.generate_user_session_token(user)
-      encoded_token = Base.url_encode64(token)
+      one_time_token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
 
-      # Make request to auto-login
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: encoded_token}}")
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
 
-      # Should redirect to dashboard for active users
       assert redirected_to(conn) == ~p"/"
-
-      # Should be logged in
       assert get_session(conn, :user_token)
     end
 
-    test "redirects to login with invalid token", %{conn: conn} do
-      # Use an invalid base64 token that will decode but not match any user
-      invalid_token = Base.url_encode64("invalid_token_data")
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: invalid_token}}")
+    test "redirects to login with invalid token (reason in query to avoid overwriting successful login session)",
+         %{
+           conn: conn
+         } do
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: "invalid_token"}}")
 
-      assert redirected_to(conn) == ~p"/users/log-in"
-
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid login session."
+      assert redirected_to(conn) =~ "/users/log-in"
+      assert redirected_to(conn) =~ "reason=expired_link"
     end
 
     test "redirects to login for inactive accounts", %{conn: conn} do
-      # Create a user that's suspended (not in allowed states)
       user = user_fixture(%{state: :suspended})
 
-      # Generate a valid session token
-      token = Ysc.Accounts.generate_user_session_token(user)
-      encoded_token = Base.url_encode64(token)
+      one_time_token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
 
-      # Make request to auto-login
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: encoded_token}}")
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
                "Your account is not currently active."
-    end
-
-    test "handles expired tokens", %{conn: conn, user: user} do
-      # Generate a token
-      token = Ysc.Accounts.generate_user_session_token(user)
-      encoded_token = Base.url_encode64(token)
-
-      # Manually expire the token by updating the inserted_at timestamp
-      # (In a real scenario, this would happen after 60 days)
-      expired_time =
-        DateTime.add(DateTime.utc_now(), -61, :day)
-        |> DateTime.truncate(:second)
-
-      Ysc.Repo.get_by(Ysc.Accounts.UserToken, token: token)
-      |> Ecto.Changeset.change(inserted_at: expired_time)
-      |> Ysc.Repo.update()
-
-      # Make request to auto-login
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: encoded_token}}")
-
-      assert redirected_to(conn) == ~p"/users/log-in"
-
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid login session."
     end
   end
 end
