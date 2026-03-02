@@ -47,7 +47,6 @@ defmodule YscWeb.AdminEventsLive do
             phx-submit="search"
           />
         </div>
-
         <div class="py-6 w-full">
           <div id="admin-event-filters" class="pb-4 flex">
             <.dropdown id="filter-events-dropdown" class="group hover:bg-zinc-100">
