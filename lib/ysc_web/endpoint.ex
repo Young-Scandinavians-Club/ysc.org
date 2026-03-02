@@ -87,6 +87,9 @@ defmodule YscWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
 
+  # Restrict /metrics to private IPs in production (before PromEx.Plug)
+  plug YscWeb.Plugs.MetricsAuth
+
   # Prometheus metrics endpoint - must be before router
   plug PromEx.Plug, prom_ex_module: Ysc.PromEx, path: "/metrics"
 

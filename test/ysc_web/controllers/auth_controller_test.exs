@@ -210,10 +210,9 @@ defmodule YscWeb.AuthControllerTest do
         |> AuthController.callback(%{})
 
       assert redirected_to(conn) == ~p"/users/log-in"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "No account found"
-
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
-               "apply for membership"
+      # Generic message to avoid user enumeration
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Unable to sign in. Please try again or contact support."
     end
   end
 

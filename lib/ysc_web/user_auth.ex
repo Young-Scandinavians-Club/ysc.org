@@ -19,7 +19,19 @@ defmodule YscWeb.UserAuth do
   # the token expiry itself in UserToken.
   @max_age 60 * 60 * 24 * 60
   @remember_me_cookie "_ysc_web_user_remember_me"
-  @remember_me_options [sign: true, max_age: @max_age, same_site: "Lax"]
+
+  defp remember_me_options do
+    # In production (no code_reloader), use secure cookie; in dev allow HTTP
+    secure = Application.get_env(:ysc, YscWeb.Endpoint)[:code_reloader] != true
+
+    [
+      sign: true,
+      max_age: @max_age,
+      same_site: "Lax",
+      http_only: true,
+      secure: secure
+    ]
+  end
 
   @doc """
   Logs the user in.
@@ -80,7 +92,7 @@ defmodule YscWeb.UserAuth do
   end
 
   defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
-    put_resp_cookie(conn, @remember_me_cookie, token, @remember_me_options)
+    put_resp_cookie(conn, @remember_me_cookie, token, remember_me_options())
   end
 
   defp maybe_write_remember_me_cookie(conn, _token, _params) do

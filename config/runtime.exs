@@ -95,6 +95,7 @@ if config_env() == :prod do
 
   config :ysc, YscWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
+    check_origin: ["https://#{host}"],
     http: [
       # Bind on all interfaces (0.0.0.0) to be reachable by fly-proxy
       # This is required for Fly.io deployments
