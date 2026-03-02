@@ -6,10 +6,10 @@ defmodule YscWeb.UserForgotPasswordLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm py-10">
+    <div class="mx-auto max-w-sm py-4">
       <.link
         navigate={~p"/"}
-        class="flex items-center text-center justify-center py-10 hover:opacity-80 transition duration-200 ease-in-out"
+        class="flex items-center text-center justify-center py-8 hover:opacity-80 transition duration-200 ease-in-out"
       >
         <.ysc_logo class="h-28" />
       </.link>
@@ -32,7 +32,9 @@ defmodule YscWeb.UserForgotPasswordLive do
         </:actions>
       </.simple_form>
 
-      <.back navigate={~p"/users/log-in"}>Back</.back>
+      <div class="text-center mt-4">
+        <.back navigate={~p"/users/log-in"}>Back</.back>
+      </div>
     </div>
     """
   end

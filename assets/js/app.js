@@ -371,10 +371,14 @@ document.addEventListener("click", (event) => {
                 input.type = "text";
                 icon.classList.remove("hero-eye-solid");
                 icon.classList.add("hero-eye-slash-solid");
+                button.setAttribute("aria-label", "Hide password");
+                button.setAttribute("aria-pressed", "true");
             } else {
                 input.type = "password";
                 icon.classList.remove("hero-eye-slash-solid");
                 icon.classList.add("hero-eye-solid");
+                button.setAttribute("aria-label", "Show password");
+                button.setAttribute("aria-pressed", "false");
             }
         }
     }

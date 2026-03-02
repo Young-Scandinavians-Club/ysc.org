@@ -6,11 +6,11 @@ defmodule YscWeb.AccountSetupLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-xl mx-auto py-10">
+    <div class="max-w-xl mx-auto py-4">
       <div class="flex w-full mx-auto items-center text-center justify-center">
         <.link
           navigate={~p"/"}
-          class="p-10 hover:opacity-80 transition duration-200 ease-in-out"
+          class="p-8 hover:opacity-80 transition duration-200 ease-in-out"
         >
           <.ysc_logo class="h-28" />
         </.link>
