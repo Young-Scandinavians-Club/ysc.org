@@ -69,6 +69,7 @@ import DecadeIndicator from "./decade_indicator";
 import FooterRotator from "./footer_rotator";
 import ScrollMoreIndicator from "./scroll_more_indicator";
 import HeroVideoControls from "./hero_video_controls";
+import FocusSearchInput from "./focus_search_input";
 import { createLiveToastHook } from "../../deps/live_toast";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
@@ -118,6 +119,7 @@ let Hooks = {
     FooterRotator,
     ScrollMoreIndicator,
     HeroVideoControls,
+    FocusSearchInput,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
 };
 Hooks.LivePhone = LivePhone;
@@ -248,6 +250,24 @@ window.addEventListener("phx:focus-first-input", (e) => {
         );
         if (input) input.focus();
     }, 150);
+});
+
+window.addEventListener("phx:focus-search", (e) => {
+    const targetId = e.detail?.id;
+    if (!targetId) return;
+    const tryFocus = (attempt = 0) => {
+        const el = document.getElementById(targetId);
+        if (el) {
+            el.focus();
+            return;
+        }
+        if (attempt < 20) {
+            setTimeout(() => tryFocus(attempt + 1), 50);
+        }
+    };
+    requestAnimationFrame(() => {
+        setTimeout(() => tryFocus(0), 50);
+    });
 });
 
 window.addEventListener("phx:scroll-to-price-details", () => {

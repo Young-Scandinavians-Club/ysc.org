@@ -25,7 +25,7 @@ defmodule YscWeb.AdminUsersLive do
       <.modal
         :if={@live_action == :edit}
         id="edit-user-modal"
-        on_cancel={JS.navigate(~p"/admin/users?#{@params}")}
+        on_cancel={JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
         <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
@@ -72,7 +72,7 @@ defmodule YscWeb.AdminUsersLive do
 
           <div class="flex flex-row justify-end w-full pt-8">
             <button
-              phx-click={JS.navigate(~p"/admin/users?#{@params}")}
+              phx-click={JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")}
               class="rounded hover:bg-zinc-100 py-2 px-3 mr-4 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-600"
             >
               Cancel
@@ -88,7 +88,7 @@ defmodule YscWeb.AdminUsersLive do
       <.modal
         :if={@live_action == :review}
         id="review-user-modal"
-        on_cancel={JS.navigate(~p"/admin/users?#{@params}")}
+        on_cancel={JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
         <div class="max-w-2xl mx-auto">
@@ -594,7 +594,7 @@ defmodule YscWeb.AdminUsersLive do
                   navigate={
                     if user.state == :pending_approval,
                       do: ~p"/admin/users/#{user.id}/review?#{@params}",
-                      else: ~p"/admin/users/#{user.id}/details"
+                      else: ~p"/admin/users/#{user.id}/details?#{@params}"
                   }
                   class="block"
                 >
@@ -657,7 +657,7 @@ defmodule YscWeb.AdminUsersLive do
                   </button>
                   <button
                     :if={user.state != :pending_approval}
-                    phx-click={JS.navigate(~p"/admin/users/#{user.id}/details")}
+                    phx-click={JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")}
                     class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                   >
                     Edit
@@ -718,7 +718,7 @@ defmodule YscWeb.AdminUsersLive do
                   navigate={
                     if user.state == :pending_approval,
                       do: ~p"/admin/users/#{user.id}/review?#{@params}",
-                      else: ~p"/admin/users/#{user.id}/details"
+                      else: ~p"/admin/users/#{user.id}/details?#{@params}"
                   }
                   class="cursor-pointer hover:opacity-80 transition-opacity"
                 >
@@ -844,6 +844,7 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:empty, false)
      |> assign(:page_title, "Users")
      |> assign(:params, params)
+     |> assign(:focus_search_input, nil)
      |> assign(:export_status, :not_exporting)
      |> assign(:export_progress, 0)
      |> assign(:file_export_path, "")
@@ -862,6 +863,7 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:empty, false)
      |> assign(:page_title, "Users")
      |> assign(:params, params)
+     |> assign(:focus_search_input, nil)
      |> assign(:export_status, :not_exporting)
      |> assign(:export_progress, 0)
      |> assign(:file_export_path, "")
@@ -896,6 +898,7 @@ defmodule YscWeb.AdminUsersLive do
          assign(socket, meta: meta)
          |> assign(:empty, no_results?(users))
          |> assign(:params, params)
+         |> assign(:focus_search_input, nil)
          |> stream(:users, users, reset: true)}
 
       {:error, _meta} ->
@@ -916,7 +919,10 @@ defmodule YscWeb.AdminUsersLive do
     new_params =
       Map.put(socket.assigns[:params], "search", %{"query" => search_query})
 
-    {:noreply, push_patch(socket, to: ~p"/admin/users?#{new_params}")}
+    {:noreply,
+     socket
+     |> assign(:focus_search_input, nil)
+     |> push_patch(to: ~p"/admin/users?#{new_params}")}
   end
 
   def handle_event("change", %{"search" => search_query}, socket)
@@ -924,7 +930,19 @@ defmodule YscWeb.AdminUsersLive do
     new_params =
       Map.put(socket.assigns[:params], "search", %{"query" => search_query})
 
-    {:noreply, push_patch(socket, to: ~p"/admin/users?#{new_params}")}
+    {:noreply,
+     socket
+     |> assign(:focus_search_input, nil)
+     |> push_patch(to: ~p"/admin/users?#{new_params}")}
+  end
+
+  def handle_event("clear-search", %{"input-id" => input_id}, socket) do
+    new_params = Map.delete(socket.assigns[:params], "search")
+
+    {:noreply,
+     socket
+     |> assign(:focus_search_input, input_id)
+     |> push_patch(to: ~p"/admin/users?#{new_params}")}
   end
 
   def handle_event("export-csv", %{"csv_export" => fields}, socket) do
@@ -1287,4 +1305,10 @@ defmodule YscWeb.AdminUsersLive do
   defp review_outcome_to_badge_type(:approved), do: "green"
   defp review_outcome_to_badge_type(:rejected), do: "red"
   defp review_outcome_to_badge_type(_), do: "default"
+
+  defp list_params_for_back(params) when is_map(params) do
+    Map.drop(params, ["id"])
+  end
+
+  defp list_params_for_back(_), do: %{}
 end

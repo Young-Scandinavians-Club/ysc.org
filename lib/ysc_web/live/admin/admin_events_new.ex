@@ -27,7 +27,8 @@ defmodule YscWeb.AdminEventsNewLive do
       board_position={@current_user.board_position}
     >
       <div class="flex py-6 flex-col">
-        <div class="flex flex-row justify-between">
+        <.back navigate={~p"/admin/events?#{@list_params}"}>Back</.back>
+        <div class="flex flex-row justify-between pt-4">
           <div class="flex flex-col space-y-1">
             <div class="flex flex-row items-center space-x-3">
               <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
@@ -543,7 +544,7 @@ defmodule YscWeb.AdminEventsNewLive do
     """
   end
 
-  def mount(%{"id" => id} = _params, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     if connected?(socket) do
       Agendas.subscribe(id)
       Events.subscribe()
@@ -580,6 +581,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
      |> assign(trigger_submit: false, check_errors: false)
      |> stream(:agendas, agendas)
+     |> assign(:list_params, Map.drop(params, ["id"]))
      |> assign(form: to_form(event_changeset, as: "event"))
      |> allow_upload(:file,
        accept: ~w(.jpg .jpeg .png .gif .webp),
