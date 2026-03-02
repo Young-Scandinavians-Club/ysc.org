@@ -35,7 +35,16 @@ defmodule YscWeb.ConnCase do
     Ysc.DataCase.setup_sandbox(tags)
     # Ensure basic site settings exist
     Ysc.Settings.ensure_settings_exist()
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+
+    secret_key_base =
+      Application.get_env(:ysc, YscWeb.Endpoint)[:secret_key_base] ||
+        String.duplicate("test", 16)
+
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Map.put(:secret_key_base, secret_key_base)
+
+    {:ok, conn: conn}
   end
 
   @doc """
