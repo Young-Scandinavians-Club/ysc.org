@@ -6,7 +6,7 @@ defmodule YscWeb.AccountSetupLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-xl mx-auto py-4">
+    <div class="max-w-xl mx-auto py-4 px-4">
       <div class="flex w-full mx-auto items-center text-center justify-center">
         <.link
           navigate={~p"/"}

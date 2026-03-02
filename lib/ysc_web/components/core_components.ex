@@ -2484,37 +2484,37 @@ defmodule YscWeb.CoreComponents do
       |> assign(:stepper_max_length, length(assigns.steps))
 
     ~H"""
-    <ol class="flex items-center w-full px-4 py-3 space-x-2 text-sm font-medium text-center border rounded text-zinc-400 border-zinc-100 sm:text-base sm:p-4 sm:space-x-4 rtl:space-x-reverse">
+    <ol class="flex items-center justify-between w-full px-2 py-2 text-sm font-medium text-center border rounded text-zinc-400 border-zinc-100 sm:px-4 sm:py-3 sm:text-base">
       <%= for {val, idx} <- Enum.with_index(@steps) do %>
-        <li :if={idx != @active_step}>
+        <li :if={idx != @active_step} class="shrink-0">
           <button
             phx-click="set-step"
             phx-value-step={idx}
-            class="flex items-center leading-6 text-sm"
+            class="flex items-center gap-x-2 leading-6 text-sm"
           >
-            <span class="flex items-center text-zinc-400 justify-center w-6 h-6 text-xs font-bold border rounded me-2 shrink-0 border-zinc-400">
+            <span class="flex items-center text-zinc-400 justify-center w-6 h-6 text-xs font-bold border rounded shrink-0 border-zinc-400">
               {idx + 1}
             </span>
-            {val}
+            <span class="hidden sm:inline mx-2">{val}</span>
             <.icon
               :if={idx + 1 < assigns[:stepper_max_length]}
               name="hero-chevron-right"
-              class="w-5 h-5 ml-2"
+              class="w-4 h-4 sm:w-5 sm:h-5"
             />
           </button>
         </li>
         <li
           :if={idx == @active_step}
-          class="flex items-center leading-6 text-blue-800 text-sm"
+          class="flex items-center gap-x-2 leading-6 text-blue-800 text-sm min-w-0"
         >
-          <span class="flex items-center text-zinc-100 justify-center w-6 h-6 text-xs font-bold bg-blue-600 border border-blue-600 rounded me-2 shrink-0">
+          <span class="flex items-center text-zinc-100 justify-center w-6 h-6 text-xs font-bold bg-blue-600 border border-blue-600 rounded shrink-0">
             {idx + 1}
           </span>
-          {val}
+          <span class="truncate mx-2 sm:truncate-none">{val}</span>
           <.icon
             :if={idx + 1 < assigns[:stepper_max_length]}
             name="hero-chevron-right"
-            class="w-5 h-5 ml-2"
+            class="w-4 h-4 shrink-0 sm:w-5 sm:h-5"
           />
         </li>
       <% end %>

@@ -237,6 +237,17 @@ window.addEventListener("phx:scroll-to-top", () => {
     }, 100);
 });
 
+window.addEventListener("phx:focus-first-input", (e) => {
+    setTimeout(() => {
+        const container = document.getElementById(e.detail.id);
+        if (!container) return;
+        const input = container.querySelector(
+            'input:not([type="hidden"]):not([type="checkbox"]), select, textarea'
+        );
+        if (input) input.focus();
+    }, 150);
+});
+
 window.addEventListener("phx:scroll-to-price-details", () => {
     const priceDetails = document.getElementById("price-details-section");
     if (priceDetails) {

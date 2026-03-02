@@ -10,7 +10,7 @@ defmodule YscWeb.UserRegistrationLive do
 
   def render(assigns) do
     ~H"""
-    <div id="registration-wrapper" class="max-w-xl mx-auto py-4">
+    <div id="registration-wrapper" class="max-w-xl mx-auto py-4 px-4">
       <div class="flex w-full mx-auto items-center text-center justify-center">
         <.link
           navigate={~p"/"}
@@ -26,8 +26,8 @@ defmodule YscWeb.UserRegistrationLive do
         />
       </div>
 
-      <div id="registration-form" class="px-2 py-8">
-        <div :if={@current_step === 0}>
+      <div id="registration-form" class="px-2 pt-8 pb-4">
+        <div :if={@current_step === 0} id="step-0-content">
           <.header class="text-left">
             Apply for membership
             <:subtitle>
@@ -56,12 +56,13 @@ defmodule YscWeb.UserRegistrationLive do
           phx-trigger-action={@trigger_submit}
           method="post"
         >
-          <div class="space-y-4">
+          <div class="space-y-4 min-h-[28rem]">
+            <p class="text-right text-xs text-zinc-400">* Required fields</p>
             <.error :if={@check_errors}>
               Oops, something went wrong! Please check the errors below.
             </.error>
 
-            <div class={if @current_step !== 0, do: "hidden"}>
+            <div id="step-0-content" class={if @current_step !== 0, do: "hidden"}>
               <div class="py-4 space">
                 <p class="mb-4 text-sm font-semibold leading-6 text-zinc-800">
                   Who is applying for membership today?*
@@ -92,16 +93,21 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="Tell us about your connection to Scandinavia (select all that apply)"
+                    label="Tell us about your connection to Scandinavia (select all that apply)*"
                     options={SignupApplication.eligibility_options()}
                   />
                 </.inputs_for>
               </div>
             </div>
 
-            <div class={
-              if @current_step !== 1, do: "hidden", else: "flex flex-col space-y-3"
-            }>
+            <div
+              id="step-1-content"
+              class={
+                if @current_step !== 1,
+                  do: "hidden",
+                  else: "flex flex-col space-y-3"
+              }
+            >
               <.header class="text-left">Account Information</.header>
               <div
                 :if={@email_already_taken}
@@ -132,11 +138,22 @@ defmodule YscWeb.UserRegistrationLive do
                 type="email"
                 label="Email*"
                 placeholder="example@ysc.org"
+                autocomplete="email"
                 required
               />
               <.header class="text-left pt-6">Personal Information</.header>
-              <.input field={@form[:first_name]} label="First Name*" required />
-              <.input field={@form[:last_name]} label="Last Name*" required />
+              <.input
+                field={@form[:first_name]}
+                label="First Name*"
+                autocomplete="given-name"
+                required
+              />
+              <.input
+                field={@form[:last_name]}
+                label="Last Name*"
+                autocomplete="family-name"
+                required
+              />
 
               <.inputs_for :let={rf} field={@form[:registration_form]}>
                 <.input
@@ -159,7 +176,7 @@ defmodule YscWeb.UserRegistrationLive do
 
                 <div :if={!@trigger_submit}>
                   <.inputs_for :let={nested_f} field={@form[:family_members]}>
-                    <div class="flex space-x-2">
+                    <div class="relative mb-3 rounded-lg border border-zinc-200 p-3 space-y-2 sm:mb-0 sm:flex sm:items-start sm:space-y-0 sm:gap-3 sm:rounded-none sm:border-0 sm:p-0">
                       <input
                         type="hidden"
                         name="user[family_members_order][]"
@@ -169,25 +186,30 @@ defmodule YscWeb.UserRegistrationLive do
                         type="select"
                         options={[Spouse: "spouse", Child: "child"]}
                         field={nested_f[:type]}
+                        label="Type"
                       />
-                      <.input
-                        type="text"
-                        field={nested_f[:first_name]}
-                        placeholder="First Name"
-                      />
-                      <.input
-                        type="text"
-                        field={nested_f[:last_name]}
-                        placeholder="Last Name"
-                      />
+                      <div class="grid grid-cols-2 gap-x-3 sm:contents">
+                        <.input
+                          type="text"
+                          field={nested_f[:first_name]}
+                          placeholder="First Name"
+                          label="First Name"
+                        />
+                        <.input
+                          type="text"
+                          field={nested_f[:last_name]}
+                          placeholder="Last Name"
+                          label="Last Name"
+                        />
+                      </div>
                       <.input
                         type="date-text"
                         field={nested_f[:birth_date]}
                         placeholder="Birth Date"
+                        label="Birth Date"
                         max={@today_max}
                       />
-
-                      <label class="cursor-pointer py-3 block align-middle items-center justify-center text-center">
+                      <label class="absolute top-2 right-2 sm:top-0 cursor-pointer">
                         <input
                           type="checkbox"
                           name="user[family_members_delete][]"
@@ -196,7 +218,7 @@ defmodule YscWeb.UserRegistrationLive do
                         />
                         <.icon
                           name="hero-x-circle"
-                          class="w-6 h-6 text-rose-600 px-2 py-2 hover:text-rose-400 transition duration-200 ease-in-out"
+                          class="w-6 h-6 text-red-400 transition-all duration-150 hover:text-red-600 hover:scale-125 active:scale-95"
                         />
                       </label>
                     </div>
@@ -204,13 +226,13 @@ defmodule YscWeb.UserRegistrationLive do
                 </div>
 
                 <div class="w-full py-4">
-                  <label class="w-full block border border-1 border-zinc-100 cursor-pointer rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80 text-center align-center">
+                  <label class="w-full flex items-center justify-center gap-x-1.5 border border-dashed border-zinc-300 cursor-pointer rounded hover:bg-zinc-50 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-700 active:text-zinc-700/80">
                     <input
                       type="checkbox"
                       name="user[family_members_order][]"
                       class="hidden"
                     />
-                    <.icon name="hero-plus-circle" class="w-6 h-6" />
+                    <.icon name="hero-plus-circle" class="w-5 h-5" />
                     Add Family Member
                   </label>
                 </div>
@@ -218,23 +240,48 @@ defmodule YscWeb.UserRegistrationLive do
 
               <.inputs_for :let={rf} field={@form[:registration_form]}>
                 <.header class="text-left pt-6">Mailing Address</.header>
-                <.input field={rf[:address]} label="Address*" required />
-                <.input field={rf[:city]} label="City*" required />
-                <.input field={rf[:region]} label="State/Province" />
+                <.input
+                  field={rf[:address]}
+                  label="Address*"
+                  autocomplete="address-line1"
+                  required
+                />
+                <.input
+                  field={rf[:city]}
+                  label="City*"
+                  autocomplete="address-level2"
+                  required
+                />
+                <.input
+                  field={rf[:region]}
+                  label="State/Province"
+                  autocomplete="address-level1"
+                />
                 <.input
                   prompt="Select country/region"
                   type="country-select"
                   field={rf[:country]}
                   label="Country/Region*"
+                  autocomplete="country"
                   required
                 />
-                <.input field={rf[:postal_code]} label="ZIP/Postal Code*" required />
+                <.input
+                  field={rf[:postal_code]}
+                  label="ZIP/Postal Code*"
+                  autocomplete="postal-code"
+                  required
+                />
               </.inputs_for>
             </div>
 
-            <div class={
-              if @current_step !== 2, do: "hidden", else: "flex flex-col space-y-3"
-            }>
+            <div
+              id="step-2-content"
+              class={
+                if @current_step !== 2,
+                  do: "hidden",
+                  else: "flex flex-col space-y-3"
+              }
+            >
               <.header class="text-left">Additional Questions</.header>
               <.inputs_for :let={rf} field={@form[:registration_form]}>
                 <.input
@@ -333,13 +380,13 @@ defmodule YscWeb.UserRegistrationLive do
 
             <div
               id="registration-actions"
-              class="flex flex-row justify-between py-6"
+              class="sticky bottom-0 z-10 flex flex-row justify-between items-center -mx-6 px-6 sm:mx-0 sm:px-0 py-3 bg-white border-t border-zinc-100 mt-2"
             >
               <div>
                 <div :if={@current_step > 0}>
                   <button
                     type="button"
-                    class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
+                    class="flex items-center gap-x-1.5 rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
                     phx-click="prev-step"
                   >
                     <.icon name="hero-arrow-left-solid" class="w-4 h-4" />
@@ -348,11 +395,11 @@ defmodule YscWeb.UserRegistrationLive do
                 </div>
               </div>
 
-              <div>
+              <div class={[@current_step > 1 && "flex-1 sm:flex-none ml-3"]}>
                 <div :if={@current_step < 2}>
                   <button
                     type="button"
-                    class="rounded bg-blue-700 hover:bg-blue-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+                    class="flex items-center gap-x-1.5 rounded bg-blue-700 hover:bg-blue-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
                     phx-click="next-step"
                     disabled={
                       disable_next_button(
@@ -376,7 +423,7 @@ defmodule YscWeb.UserRegistrationLive do
                   </button>
                 </div>
 
-                <div :if={@current_step > 1}>
+                <div :if={@current_step > 1} class="w-full">
                   <.button
                     phx-disable-with="Submitting application..."
                     class="w-full"
@@ -603,7 +650,8 @@ defmodule YscWeb.UserRegistrationLive do
     {:noreply,
      socket
      |> assign(:current_step, new_step)
-     |> push_event("scroll-to-top", %{})}
+     |> push_event("scroll-to-top", %{})
+     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
   end
 
   def handle_event("prev-step", _value, socket) do
@@ -612,7 +660,8 @@ defmodule YscWeb.UserRegistrationLive do
     {:noreply,
      socket
      |> assign(:current_step, new_step)
-     |> push_event("scroll-to-top", %{})}
+     |> push_event("scroll-to-top", %{})
+     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
   end
 
   def handle_event("next-step", _values, socket) do
@@ -625,7 +674,8 @@ defmodule YscWeb.UserRegistrationLive do
     {:noreply,
      socket
      |> assign(:current_step, new_step)
-     |> push_event("scroll-to-top", %{})}
+     |> push_event("scroll-to-top", %{})
+     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
   end
 
   # Which step (0, 1, or 2) has the first validation error; used to jump to that step on save failure
