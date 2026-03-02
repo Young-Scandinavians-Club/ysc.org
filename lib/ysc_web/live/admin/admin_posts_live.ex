@@ -225,6 +225,8 @@ defmodule YscWeb.AdminPostsLive do
             items={@streams.posts}
             meta={@meta}
             path={~p"/admin/posts"}
+            row_click={fn {_, post} -> JS.navigate(~p"/admin/posts/#{post.id}") end}
+            opts={[tbody_tr_attrs: [class: "cursor-pointer hover:underline"]]}
           >
             <:col :let={{_, post}} label="Title" field={:title}>
               <p class="text-sm font-semibold">

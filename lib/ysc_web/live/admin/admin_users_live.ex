@@ -731,6 +731,12 @@ defmodule YscWeb.AdminUsersLive do
               items={@streams.users}
               meta={@meta}
               path={~p"/admin/users"}
+              row_click={fn {_, user} ->
+                if user.state == :pending_approval,
+                  do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
+                  else: JS.navigate(~p"/admin/users/#{user.id}/details")
+              end}
+              opts={[tbody_tr_attrs: [class: "cursor-pointer hover:underline"]]}
             >
               <:col :let={{_, user}} label="Name" field={:first_name}>
                 <.link

@@ -350,6 +350,12 @@ defmodule YscWeb.AdminUserDetailsLive do
               items={@streams.ticket_orders}
               meta={@ticket_orders_meta}
               path={~p"/admin/users/#{@user_id}/details/orders"}
+              row_click={fn {_, order} ->
+                if order.event_id,
+                  do: JS.navigate(~p"/admin/events/#{order.event_id}/tickets"),
+                  else: JS.navigate(~p"/admin/events")
+              end}
+              opts={[tbody_tr_attrs: [class: "cursor-pointer hover:underline"]]}
             >
               <:col :let={{_, order}} label="Order ID" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
@@ -445,6 +451,8 @@ defmodule YscWeb.AdminUserDetailsLive do
               items={@streams.bookings}
               meta={@bookings_meta}
               path={~p"/admin/users/#{@user_id}/details/bookings"}
+              row_click={fn {_, booking} -> JS.navigate(~p"/admin/bookings/#{booking.id}") end}
+              opts={[tbody_tr_attrs: [class: "cursor-pointer hover:underline"]]}
             >
               <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">

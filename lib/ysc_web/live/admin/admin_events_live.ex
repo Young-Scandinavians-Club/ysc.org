@@ -168,6 +168,8 @@ defmodule YscWeb.AdminEventsLive do
             items={@streams.events}
             meta={@meta}
             path={~p"/admin/events"}
+            row_click={fn {_, event} -> JS.navigate(~p"/admin/events/#{event.id}/edit") end}
+            opts={[tbody_tr_attrs: [class: "cursor-pointer hover:underline"]]}
           >
             <:col :let={{_, event}} label="Title" field={:title}>
               <p class="text-sm font-semibold">

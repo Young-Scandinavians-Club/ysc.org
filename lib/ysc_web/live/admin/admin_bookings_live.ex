@@ -2317,6 +2317,16 @@ defmodule YscWeb.AdminBookingsLive do
                 items={@streams.reservations}
                 meta={@reservation_meta}
                 path={~p"/admin/bookings"}
+                row_click={fn {_, booking} ->
+                  query_params = %{
+                    "property" => Atom.to_string(@selected_property),
+                    "from_date" => Date.to_string(@calendar_start_date),
+                    "to_date" => Date.to_string(@calendar_end_date)
+                  }
+                  query_string = URI.encode_query(query_params)
+                  JS.navigate("/admin/bookings/bookings/#{booking.id}/edit?#{query_string}")
+                end}
+                opts={[tbody_tr_attrs: [class: "cursor-pointer hover:underline"]]}
               >
                 <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                   <.badge type="default" class="whitespace-nowrap">
