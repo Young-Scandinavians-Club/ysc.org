@@ -49,12 +49,48 @@ defmodule Ysc.Events do
     |> Repo.preload(:organizer)
   end
 
-  def list_events_paginated(params) do
-    Event
-    |> where([e], e.state not in ["deleted"])
-    |> join(:left, [p], u in assoc(p, :organizer), as: :organizer)
-    |> preload([organizer: p], organizer: p)
+  def list_events_paginated(params), do: list_events_paginated(params, nil)
+
+  def list_events_paginated(params, nil), do: list_events_paginated(params, "")
+
+  def list_events_paginated(params, search_term) when search_term == "" do
+    base_query()
     |> Flop.validate_and_run(params, for: Event)
+  end
+
+  def list_events_paginated(params, search_term) do
+    fuzzy_search_event(search_term)
+    |> Flop.validate_and_run(params, for: Event)
+  end
+
+  defp base_query do
+    from(e in Event,
+      where: e.state not in ["deleted"],
+      left_join: u in assoc(e, :organizer),
+      as: :organizer,
+      preload: [organizer: u]
+    )
+  end
+
+  defp fuzzy_search_event(search_term) do
+    search_like = "%#{search_term}%"
+
+    from(e in Event,
+      left_join: u in assoc(e, :organizer),
+      as: :organizer,
+      where:
+        e.state not in ["deleted"] and
+          (fragment("SIMILARITY(?, ?) > 0.2", e.title, ^search_term) or
+             ilike(e.title, ^search_like) or
+             ilike(coalesce(e.description, ""), ^search_like) or
+             ilike(coalesce(e.reference_id, ""), ^search_like) or
+             (not is_nil(u.id) and
+                (fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
+                   fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
+                   ilike(u.first_name, ^search_like) or
+                   ilike(u.last_name, ^search_like)))),
+      preload: [organizer: u]
+    )
   end
 
   @doc """

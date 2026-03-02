@@ -36,7 +36,42 @@ defmodule YscWeb.AdminEventsLive do
       </div>
 
       <div class="w-full pt-4">
-        <div id="admin-event-filters" class="pb-4 flex">
+        <div>
+          <form
+            id="event-search-form"
+            action=""
+            novalidate=""
+            role="search"
+            phx-change="change"
+            class="relative"
+          >
+            <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+              <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
+            </div>
+            <input
+              id="event-search"
+              type="search"
+              name="search[query]"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              enterkeyhint="search"
+              spellcheck="false"
+              placeholder="Search by title, description or organizer"
+              value={
+                case @params["search"] do
+                  %{"query" => query} -> query
+                  query when is_binary(query) -> query
+                  _ -> ""
+                end
+              }
+              tabindex="0"
+              phx-debounce="200"
+              class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </form>
+        </div>
+        <div id="admin-event-filters" class="pb-4 flex pt-4">
           <.dropdown id="filter-events-dropdown" class="group hover:bg-zinc-100">
             <:button_block>
               <.icon
@@ -220,22 +255,42 @@ defmodule YscWeb.AdminEventsLive do
     {:ok,
      socket
      |> assign(:page_title, "Events")
-     |> assign(:active_page, :events), temporary_assigns: [author_filter: []]}
+     |> assign(:active_page, :events)
+     |> assign(:params, %{}), temporary_assigns: [author_filter: []]}
   end
 
   def handle_params(params, _uri, socket) do
-    case Events.list_events_paginated(params) do
+    search_term =
+      case params["search"] do
+        %{"query" => query} when is_binary(query) -> query
+        _ -> nil
+      end
+
+    case Events.list_events_paginated(params, search_term) do
       {:ok, {events, meta}} ->
         author_filter = Events.get_all_authors()
 
         {:noreply,
          assign(socket, meta: meta)
          |> assign(author_filter: author_filter)
+         |> assign(:params, params)
          |> stream(:events, events, reset: true)}
 
       {:error, _meta} ->
         {:noreply, push_navigate(socket, to: ~p"/admin/events")}
     end
+  end
+
+  def handle_event("change", %{"search" => %{"query" => search_query}}, socket) do
+    new_params = Map.put(socket.assigns[:params], "search", %{"query" => search_query})
+
+    {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
+  end
+
+  def handle_event("change", %{"search" => search_query}, socket) when is_binary(search_query) do
+    new_params = Map.put(socket.assigns[:params], "search", %{"query" => search_query})
+
+    {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
   end
 
   def handle_event("update-filter", params, socket) do
@@ -246,7 +301,15 @@ defmodule YscWeb.AdminEventsLive do
         Map.put(red, k, maybe_update_filter(v))
       end)
 
-    new_params = Map.replace(params, "filters", updated_filters)
+    new_params =
+      params
+      |> Map.replace("filters", updated_filters)
+      |> then(fn p ->
+        case socket.assigns[:params]["search"] do
+          nil -> p
+          search -> Map.put(p, "search", search)
+        end
+      end)
 
     {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
   end
