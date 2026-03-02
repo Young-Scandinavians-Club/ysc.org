@@ -118,7 +118,8 @@ defmodule YscWeb.AuthController do
             updated_user,
             %{
               "method" => to_string(provider),
-              "provider" => to_string(provider)
+              "provider" => to_string(provider),
+              "remember_me" => "true"
             },
             redirect_to
           )

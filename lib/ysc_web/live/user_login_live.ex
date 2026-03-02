@@ -271,22 +271,19 @@ defmodule YscWeb.UserLoginLive do
         />
 
         <:actions>
-          <.input
-            field={@form[:remember_me]}
-            type="checkbox"
-            label="Keep me signed in"
-          />
-          <.link
-            href={~p"/users/reset-password"}
-            class="text-sm font-semibold hover:underline text-blue-600"
-          >
-            Forgot your password?
-          </.link>
-        </:actions>
-        <:actions>
-          <.button phx-disable-with="Signing in..." class="w-full">
-            Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1 -mt-0.5" />
-          </.button>
+          <div class="flex flex-col gap-3 w-full">
+            <.button phx-disable-with="Signing in..." class="w-full">
+              Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1 -mt-0.5" />
+            </.button>
+            <div class="text-center">
+              <.link
+                href={~p"/users/reset-password"}
+                class="text-sm font-semibold hover:underline text-blue-600"
+              >
+                Forgot your password?
+              </.link>
+            </div>
+          </div>
         </:actions>
       </.simple_form>
     </div>
