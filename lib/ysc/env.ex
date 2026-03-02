@@ -78,6 +78,10 @@ defmodule Ysc.Env do
   Returns true if running in a non-production environment (dev, test, or sandbox).
 
   Useful for enabling debug features or relaxing validation in lower environments.
+
+  **Security note:** Sandbox is assumed to be internal-only (e.g. not publicly
+  accessible). Features that bypass verification (e.g. dev/sandbox-only codes)
+  rely on this assumption.
   """
   @spec non_prod?() :: boolean()
   def non_prod? do

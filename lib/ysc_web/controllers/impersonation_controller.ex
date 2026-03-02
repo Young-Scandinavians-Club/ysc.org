@@ -9,17 +9,6 @@ defmodule YscWeb.ImpersonationController do
   def impersonate(conn, %{"user_id" => user_id}) do
     current_user = conn.assigns.current_user
 
-    unless current_user.role == :admin do
-      conn
-      |> YscWeb.Flash.put_toast(
-        :error,
-        "You do not have permission to impersonate users.",
-        title: "Impersonation"
-      )
-      |> redirect(to: ~p"/")
-      |> halt()
-    end
-
     case Accounts.get_user(user_id) do
       nil ->
         conn

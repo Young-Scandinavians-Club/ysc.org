@@ -40,7 +40,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Verify Your Email Address
             <:subtitle>
-              We sent a verification code to <strong><%= @user.email %></strong>. Please enter it below to continue.
+              We sent a verification code to <strong><%= @display_email %></strong>. Please enter it below to continue.
             </:subtitle>
           </.header>
 
@@ -363,6 +363,22 @@ defmodule YscWeb.AccountSetupLive do
     Ysc.Env.non_prod?()
   end
 
+  defp mask_email(email) when is_binary(email) do
+    case String.split(email, "@") do
+      [local, domain] ->
+        masked_local =
+          String.slice(local, 0, 1) <>
+            String.duplicate("*", max(String.length(local) - 1, 3))
+
+        "#{masked_local}@#{domain}"
+
+      _ ->
+        "***@***"
+    end
+  end
+
+  defp mask_email(_), do: "***@***"
+
   # Helper functions for resend rate limiting - delegate to ResendRateLimiter
   defp email_resend_available?(assigns),
     do: Ysc.ResendRateLimiter.resend_available?(assigns, :email)
@@ -486,10 +502,13 @@ defmodule YscWeb.AccountSetupLive do
 
       # Start at step 0 - user progresses through the flow
 
+      display_email = if is_owner, do: user.email, else: mask_email(user.email)
+
       socket =
         socket
         |> assign(:page_title, "Complete Your Account Setup")
         |> assign(:user, user)
+        |> assign(:display_email, display_email)
         |> assign(:current_step, current_step)
         |> assign(:email_verified, false)
         |> assign(:from_signup, false)
@@ -712,15 +731,16 @@ defmodule YscWeb.AccountSetupLive do
         # Determine next step, skipping password if already set
         next_step = if is_nil(updated_user.password_set_at), do: 1, else: 4
 
-        # Create session token and log the user in
-        token = Accounts.generate_user_session_token(updated_user)
+        # Short-lived one-time token for auto-login (verified by controller, then session created)
+        one_time_token =
+          Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
 
         # Redirect to auto-login to establish session, then back to account setup
         {:noreply,
          socket
          |> Phoenix.LiveView.redirect(
            to:
-             ~p"/users/log-in/auto?#{%{token: Base.url_encode64(token), redirect_to: "/account/setup/#{updated_user.id}?step=#{next_step}"}}"
+             ~p"/users/log-in/auto?#{%{token: one_time_token, redirect_to: "/account/setup/#{updated_user.id}?step=#{next_step}"}}"
          )}
 
       {:error, :not_found} ->
@@ -1017,14 +1037,14 @@ defmodule YscWeb.AccountSetupLive do
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
 
-      # After skipping phone setup, complete account setup
-      # Generate session token and redirect for auto-login
-      token = Accounts.generate_user_session_token(user)
+      # Short-lived one-time token for auto-login (verified by controller, then session created)
+      one_time_token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
 
       {:noreply,
        socket
        |> Phoenix.LiveView.redirect(
-         to: ~p"/users/log-in/auto?#{%{token: Base.url_encode64(token)}}"
+         to: ~p"/users/log-in/auto?#{%{token: one_time_token}}"
        )}
     end
   end

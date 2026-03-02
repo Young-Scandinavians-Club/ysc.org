@@ -115,7 +115,7 @@ defmodule Ysc.VerificationCache do
     case Map.get(state.codes, key) do
       {stored_code, expires_at} ->
         if DateTime.compare(expires_at, DateTime.utc_now()) == :gt do
-          if provided_code == stored_code do
+          if Plug.Crypto.secure_compare(provided_code, stored_code) do
             # Code matches, remove it and return success
             {_removed, codes} = Map.pop(state.codes, key)
             timers = cancel_timer(state.timers, key)

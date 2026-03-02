@@ -310,13 +310,14 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         end
 
       if is_https do
-        # Set HSTS with 1 year max-age and includeSubDomains
+        # Set HSTS with 1 year max-age, includeSubDomains, and preload
         # max-age: 31,536,000 seconds = 1 year
         # includeSubDomains: Apply to all subdomains
+        # preload: Allow inclusion in browser HSTS preload lists
         put_resp_header(
           conn,
           "strict-transport-security",
-          "max-age=31536000; includeSubDomains"
+          "max-age=31536000; includeSubDomains; preload"
         )
       else
         conn

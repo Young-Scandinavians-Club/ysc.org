@@ -162,7 +162,11 @@ defmodule YscWeb.Router do
   ## Authentication routes
 
   scope "/", YscWeb do
-    pipe_through [:browser, :redirect_if_user_is_authenticated]
+    pipe_through [
+      :browser,
+      :redirect_if_user_is_authenticated,
+      :auth_rate_limit
+    ]
 
     live_session :redirect_if_user_is_authenticated,
       on_mount: [
