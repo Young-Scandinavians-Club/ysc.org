@@ -137,7 +137,9 @@ defmodule YscWeb.UserSessionController do
             end
 
           user_params_with_method =
-            Map.put(user_params, "method", "email_password")
+            user_params
+            |> Map.put("method", "email_password")
+            |> Map.put("remember_me", "true")
 
           conn
           |> YscWeb.Flash.put_toast(:info, info, title: "Login")
@@ -447,7 +449,7 @@ defmodule YscWeb.UserSessionController do
         )
         |> UserAuth.log_in_user(
           user,
-          %{"method" => "passkey"},
+          %{"method" => "passkey", "remember_me" => "true"},
           validated_redirect
         )
       else
