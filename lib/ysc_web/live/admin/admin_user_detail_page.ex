@@ -56,6 +56,22 @@ defmodule YscWeb.AdminUserDetailsLive do
           </div>
         </div>
 
+        <div
+          :if={
+            @selected_user.state == :rejected &&
+              @selected_user_application != nil &&
+              @selected_user_application.review_outcome == :rejected
+          }
+          class="mb-4"
+        >
+          <.link
+            navigate={~p"/admin/users/#{@user_id}/details/application"}
+            class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors font-semibold border border-amber-200"
+          >
+            <.icon name="hero-arrow-path" class="w-5 h-5" /> Override rejection
+          </.link>
+        </div>
+
         <div class="pt-4">
           <div class="text-sm font-medium text-center text-zinc-500 border-b border-zinc-200">
             <ul class="flex flex-wrap -mb-px">
@@ -623,6 +639,79 @@ defmodule YscWeb.AdminUserDetailsLive do
                   {@selected_user_application.review_outcome}
                 </.badge>
               </span>
+            </div>
+
+            <div
+              :if={
+                @selected_user.state == :rejected &&
+                  @selected_user_application.review_outcome == :rejected
+              }
+              class="rounded-md border border-amber-200 bg-amber-50 p-4 space-y-3"
+            >
+              <h3 class="text-sm font-semibold text-amber-900">
+                Override rejection and approve member
+              </h3>
+              <p class="text-sm text-amber-800">
+                If new information has come to light and this member now qualifies, you can override the previous rejection. This will send a new approval email and re-activate the member.
+              </p>
+
+              <div class="flex flex-wrap items-center gap-3 pt-1">
+                <.button
+                  color="green"
+                  phx-click="open-retroactive-approve-email"
+                  class="shrink-0"
+                >
+                  <.icon name="hero-arrow-path" class="w-4 h-4 me-1" />
+                  Override rejection and approve member
+                </.button>
+              </div>
+
+              <section
+                :if={@retro_email_form}
+                class="mt-3 rounded-md bg-white border border-zinc-200 p-3 space-y-3"
+              >
+                <h4 class="text-sm font-semibold text-zinc-800">
+                  Review and send updated approval email
+                </h4>
+                <p class="text-sm text-zinc-600">
+                  The member will only be re-activated once this email is sent.
+                </p>
+
+                <.form
+                  for={@retro_email_form}
+                  id="retroactive-approval-email-form"
+                  phx-submit="confirm-retroactive-approve-email"
+                  class="space-y-4 pt-1"
+                >
+                  <.input
+                    field={@retro_email_form[:subject]}
+                    type="text"
+                    label="Subject"
+                  />
+
+                  <.input
+                    field={@retro_email_form[:body]}
+                    type="textarea"
+                    label="Email body"
+                    rows="8"
+                  />
+
+                  <div class="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      phx-click="cancel-retroactive-approve-email"
+                      class="rounded hover:bg-zinc-100 py-2 px-3 text-sm font-semibold leading-6 text-zinc-600"
+                    >
+                      Cancel
+                    </button>
+
+                    <.button type="submit" color="green" class="shrink-0">
+                      <.icon name="hero-check" class="w-4 h-4 me-1" />
+                      Send email and approve
+                    </.button>
+                  </div>
+                </.form>
+              </section>
             </div>
 
             <section>
@@ -1932,6 +2021,7 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> assign(:family_members, [])
      |> assign(:user_notes, [])
      |> assign(:rejection_notes, [])
+     |> assign(:retro_email_form, nil)
      |> assign(
        :note_form,
        to_form(note_changeset(%{category: "general"}), as: "note")
@@ -2663,6 +2753,128 @@ defmodule YscWeb.AdminUserDetailsLive do
            "Failed to add note: #{format_changeset_errors(changeset)}",
            title: "Note"
          )}
+    end
+  end
+
+  def handle_event("open-retroactive-approve-email", _params, socket) do
+    user = socket.assigns[:selected_user]
+    application = socket.assigns[:selected_user_application]
+
+    subject = YscWeb.Emails.ApplicationApproved.default_subject(user)
+    body = YscWeb.Emails.ApplicationApproved.default_body(user, application)
+
+    retro_email_form =
+      %{"subject" => subject, "body" => body}
+      |> to_form(as: "email")
+
+    {:noreply, assign(socket, :retro_email_form, retro_email_form)}
+  end
+
+  def handle_event("cancel-retroactive-approve-email", _params, socket) do
+    {:noreply, assign(socket, :retro_email_form, nil)}
+  end
+
+  def handle_event(
+        "confirm-retroactive-approve-email",
+        %{"email" => email_params},
+        socket
+      ) do
+    user = socket.assigns[:selected_user]
+    application = socket.assigns[:selected_user_application]
+    current_user = socket.assigns[:current_user]
+
+    subject =
+      email_params["subject"]
+      |> Kernel.||("")
+      |> String.trim()
+
+    body =
+      email_params["body"]
+      |> Kernel.||("")
+      |> String.trim()
+
+    if subject == "" or body == "" do
+      retro_email_form =
+        %{"subject" => subject, "body" => body}
+        |> to_form(as: "email")
+
+      {:noreply,
+       socket
+       |> assign(:retro_email_form, retro_email_form)
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Subject and email body are required.",
+         title: "Application"
+       )}
+    else
+      case Accounts.record_application_outcome(
+             :approved,
+             user,
+             application,
+             current_user
+           ) do
+        :ok ->
+          first_name =
+            user.first_name
+            |> Kernel.||("")
+            |> to_string()
+            |> String.trim()
+
+          greeting_name =
+            if first_name != "" do
+              String.capitalize(first_name)
+            else
+              user.email |> to_string()
+            end
+
+          pay_url = YscWeb.Emails.ApplicationApproved.pay_membership_url()
+
+          text_body =
+            """
+            Hej #{greeting_name},
+
+            #{body}
+
+            Pay your membership: #{pay_url}
+            """
+            |> String.trim()
+
+          YscWeb.Emails.Notifier.schedule_email(
+            user.email,
+            "#{user.id}",
+            subject,
+            "application_approved",
+            %{first_name: user.first_name, custom_body: body},
+            text_body,
+            user.id
+          )
+
+          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
+            user.id
+          )
+
+          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
+            user.id
+          )
+
+          {:noreply,
+           socket
+           |> assign(:retro_email_form, nil)
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "User was approved and is now a member! The approval email has been queued for delivery.",
+             title: "Application"
+           )}
+
+        {:error, _} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Could not approve application. Please try again.",
+             title: "Application"
+           )}
+      end
     end
   end
 

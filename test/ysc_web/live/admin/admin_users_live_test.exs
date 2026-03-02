@@ -35,7 +35,7 @@ defmodule YscWeb.AdminUsersLiveTest do
       refute html =~ "Other User"
     end
 
-    test "approves a user application", %{conn: conn} do
+    test "approves a user application with customizable email", %{conn: conn} do
       pending_user =
         user_fixture(%{
           state: "pending_approval",
@@ -51,9 +51,22 @@ defmodule YscWeb.AdminUsersLiveTest do
       assert render(view) =~ "Review Application"
       assert render(view) =~ "Approve Me"
 
+      # Open the email compose step
       view
-      |> element("button", "Approve")
+      |> element("button", "Approve Member")
       |> render_click()
+
+      assert render(view) =~ "Review and send decision email"
+
+      # Submit the email form with a custom subject/body
+      view
+      |> form("#application-decision-email-form", %{
+        "email" => %{
+          "subject" => "Custom approval subject",
+          "body" => "Custom approval body"
+        }
+      })
+      |> render_submit()
 
       assert_redirected(view, "/admin/users?id=#{pending_user.id}")
 
@@ -62,7 +75,7 @@ defmodule YscWeb.AdminUsersLiveTest do
       assert updated_user.state == :active
     end
 
-    test "rejects a user application", %{conn: conn} do
+    test "rejects a user application with customizable email", %{conn: conn} do
       pending_user =
         user_fixture(%{
           state: "pending_approval",
@@ -75,13 +88,23 @@ defmodule YscWeb.AdminUsersLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/admin/users/#{pending_user.id}/review")
 
+      # Open the email compose step for rejection
       view
       |> element("button", "Reject Application...")
       |> render_click()
 
+      assert render(view) =~ "Review and send decision email"
+
+      # Submit the email form with a custom subject/body and no internal note
       view
-      |> element("#reject-application-form")
-      |> render_submit(%{"reject" => %{"note" => ""}})
+      |> form("#application-decision-email-form", %{
+        "email" => %{
+          "subject" => "Custom rejection subject",
+          "body" => "Custom rejection body",
+          "note" => ""
+        }
+      })
+      |> render_submit()
 
       assert_redirected(view, "/admin/users?id=#{pending_user.id}")
 

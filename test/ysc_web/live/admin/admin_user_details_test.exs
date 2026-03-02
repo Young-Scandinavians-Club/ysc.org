@@ -45,6 +45,63 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "application tab - retroactive approval" do
+    test "shows override rejection UI for rejected users with an application", %{conn: conn} do
+      rejected_user =
+        user_fixture(%{
+          state: "rejected",
+          first_name: "Retro",
+          last_name: "Active"
+        })
+
+      signup_application_fixture(rejected_user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{rejected_user.id}/details/application")
+
+      assert has_element?(
+               view,
+               "button",
+               "Override rejection and approve member"
+             )
+    end
+
+    test "retroactively approves a rejected user via email confirmation", %{conn: conn} do
+      rejected_user =
+        user_fixture(%{
+          state: "rejected",
+          first_name: "Retro",
+          last_name: "Member"
+        })
+
+      signup_application_fixture(rejected_user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{rejected_user.id}/details/application")
+
+      # Open the retroactive approval email form
+      view
+      |> element("button", "Override rejection and approve member")
+      |> render_click()
+
+      assert has_element?(view, "#retroactive-approval-email-form")
+
+      # Submit the email form with a custom subject/body
+      view
+      |> form("#retroactive-approval-email-form", %{
+        "email" => %{
+          "subject" => "Retroactive approval subject",
+          "body" => "Retroactive approval body"
+        }
+      })
+      |> render_submit()
+
+      # Verify user state in DB
+      updated_user = Ysc.Accounts.get_user!(rejected_user.id)
+      assert updated_user.state == :active
+    end
+  end
+
   describe "navigation tabs" do
     test "displays profile tab", %{conn: conn} do
       user = user_fixture()

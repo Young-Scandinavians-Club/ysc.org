@@ -22,13 +22,23 @@ defmodule Ysc.Accounts.User do
       :role,
       :board_position
     ],
-    sortable: [:email, :first_name, :last_name, :state, :role],
+    sortable: [:email, :first_name, :last_name, :state, :role, :reviewed_at],
     default_limit: 50,
     max_limit: 200,
     default_order: %{
-      order_by: [:first_name, :last_name],
-      order_directions: [:asc, :asc]
-    }
+      order_by: [:reviewed_at],
+      order_directions: [:desc]
+    },
+    adapter_opts: [
+      join_fields: [
+        reviewed_at: [
+          binding: :registration_form,
+          field: :reviewed_at,
+          ecto_type: :utc_datetime,
+          path: [:registration_form, :reviewed_at]
+        ]
+      ]
+    ]
   }
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}

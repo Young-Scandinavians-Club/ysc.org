@@ -326,56 +326,101 @@ defmodule YscWeb.AdminUsersLive do
 
             <div
               :if={@selected_user.state == :pending_approval}
-              class="pt-6 border-t border-zinc-200 flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-4"
+              class="pt-6 border-t border-zinc-200 space-y-4"
             >
-              <div class="flex flex-col gap-3">
-                <button
-                  type="button"
-                  phx-click="toggle-reject-form"
-                  class="text-sm font-semibold text-red-600 hover:text-red-700 py-2 px-4 text-left"
-                >
-                  Reject Application...
-                </button>
-                <div
-                  :if={@show_reject_form}
-                  class="rounded-md bg-zinc-50 border border-zinc-200 p-3"
-                >
-                  <.form
-                    for={@rejection_form}
-                    id="reject-application-form"
-                    phx-submit="deny-application"
-                    class="space-y-3"
+              <div class="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                <div class="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    phx-click="open-reject-email"
+                    class="text-sm font-semibold text-red-600 hover:text-red-700 py-2 px-4 text-left"
                   >
-                    <p class="text-sm text-zinc-600">
-                      Optional rejection note (internal use only; not sent to the applicant).
-                    </p>
-                    <.input
-                      field={@rejection_form[:note]}
-                      type="textarea"
-                      label="Rejection note (optional)"
-                      class="mt-1 block w-full rounded border-zinc-300 text-zinc-900 sm:text-sm"
-                      rows="3"
-                    />
-                    <button
-                      type="submit"
-                      data-confirm="You are about to reject this application. Are you sure?"
-                      class="phx-submit-loading:opacity-75 rounded bg-red-600 hover:bg-red-700 py-2 px-3 text-sm font-semibold text-white transition-colors"
-                    >
-                      <.icon name="hero-no-symbol" class="w-4 h-4 inline me-1" />
-                      Confirm Reject
-                    </button>
-                  </.form>
+                    Reject Application...
+                  </button>
                 </div>
+                <.button
+                  color="green"
+                  phx-click="open-approve-email"
+                  phx-value-user-id={@selected_user.id}
+                  phx-value-application-id={@selected_user_application.id}
+                  class="shrink-0"
+                >
+                  <.icon name="hero-check" class="w-4 h-4 me-2" /> Approve Member
+                </.button>
               </div>
-              <.button
-                color="green"
-                phx-click="approve-application"
-                phx-value-user-id={@selected_user.id}
-                phx-value-application-id={@selected_user_application.id}
-                class="shrink-0"
+
+              <section
+                :if={@decision_mode in [:approve, :reject]}
+                class="mt-4 rounded-md bg-zinc-50 border border-zinc-200 p-4 space-y-3"
               >
-                <.icon name="hero-check" class="w-4 h-4 me-2" /> Approve Member
-              </.button>
+                <h3 class="text-sm font-semibold text-zinc-800">
+                  Review and send decision email
+                </h3>
+                <p class="text-sm text-zinc-600">
+                  Your decision will only be applied once this email is sent.
+                </p>
+
+                <.form
+                  :if={@email_form}
+                  for={@email_form}
+                  id="application-decision-email-form"
+                  phx-submit={
+                    if @decision_mode == :approve,
+                      do: "confirm-approve-email",
+                      else: "confirm-reject-email"
+                  }
+                  class="space-y-4 pt-1"
+                >
+                  <.input
+                    field={@email_form[:subject]}
+                    type="text"
+                    label="Subject"
+                  />
+
+                  <.input
+                    field={@email_form[:body]}
+                    type="textarea"
+                    label="Email body"
+                    rows="8"
+                  />
+
+                  <.input
+                    :if={@decision_mode == :reject}
+                    field={@email_form[:note]}
+                    type="textarea"
+                    label="Internal rejection note (optional, not sent to the applicant)"
+                    rows="3"
+                  />
+
+                  <div class="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      phx-click="cancel-decision-email"
+                      class="rounded hover:bg-zinc-100 py-2 px-3 text-sm font-semibold leading-6 text-zinc-600"
+                    >
+                      Cancel
+                    </button>
+
+                    <.button
+                      type="submit"
+                      color={if @decision_mode == :approve, do: "green", else: "red"}
+                      class="shrink-0"
+                    >
+                      <.icon
+                        name={
+                          if @decision_mode == :approve,
+                            do: "hero-check",
+                            else: "hero-no-symbol"
+                        }
+                        class="w-4 h-4 me-1"
+                      />
+                      <%= if @decision_mode == :approve,
+                        do: "Send email and approve",
+                        else: "Send email and reject" %>
+                    </.button>
+                  </div>
+                </.form>
+              </section>
             </div>
           </div>
         </div>
@@ -664,7 +709,7 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                 </div>
 
-                <div class="flex justify-end pt-3 border-t border-zinc-200">
+                <div class="flex justify-end gap-2 pt-3 border-t border-zinc-200">
                   <button
                     :if={user.state == :pending_approval}
                     phx-click={
@@ -762,6 +807,9 @@ defmodule YscWeb.AdminUsersLive do
                 <.badge type={user_state_to_badge_type(user.state)}>
                   {user_state_to_readable(user.state)}
                 </.badge>
+              </:col>
+              <:col :let={{_, user}} label="Date reviewed" field={:reviewed_at}>
+                {format_reviewed_at(user.registration_form)}
               </:col>
               <:col :let={{_, user}} label="Membership" field={:membership_type}>
                 <%= case get_active_membership_type(user) do %>
@@ -869,8 +917,8 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:export_error, "Something went wrong")
      |> assign(form: to_form(%{}, as: "csv_export"))
      |> assign(form: to_form(user_changeset, as: "user"))
-     |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
-     |> assign(:show_reject_form, false)}
+     |> assign(:decision_mode, nil)
+     |> assign(:email_form, nil)}
   end
 
   @spec mount(any(), any(), map()) :: {:ok, map()}
@@ -994,164 +1042,157 @@ defmodule YscWeb.AdminUsersLive do
      |> push_patch(to: ~p"/admin/users?#{new_params}")}
   end
 
-  def handle_event("approve-application", _params, socket) do
+  def handle_event("open-approve-email", _params, socket) do
     user = socket.assigns[:selected_user]
     application = socket.assigns[:selected_user_application]
-    current_user = socket.assigns[:current_user]
+    subject = YscWeb.Emails.ApplicationApproved.default_subject(user)
+    body = YscWeb.Emails.ApplicationApproved.default_body(user, application)
 
-    case Accounts.record_application_outcome(
-           :approved,
-           user,
-           application,
-           current_user
-         ) do
-      :ok ->
-        YscWeb.Emails.Notifier.schedule_email(
-          user.email,
-          "#{user.id}",
-          "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)",
-          "application_approved",
-          %{first_name: user.first_name},
-          """
-          ==============================
+    email_form =
+      %{"subject" => subject, "body" => body}
+      |> to_form(as: "email")
 
-          Hi #{user.email},
-
-          Your application has been approved! 🎉
-
-          To complete your membership, please pay your membership dues by visiting the link below:
-
-          #{YscWeb.Endpoint.url()}/users/membership
-
-          If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
-
-
-          Velkommen!
-
-          Young Scandinavians Club
-
-          ==============================
-          """,
-          user.id
-        )
-
-        # Schedule reminder emails if user hasn't paid
-        YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
-          user.id
-        )
-
-        YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
-          user.id
-        )
-
-        {:noreply,
-         socket
-         |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "User was approved and is now a member!",
-           title: "Application"
-         )}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        errors =
-          Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-            Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
-              opts
-              |> Keyword.get(String.to_existing_atom(key), key)
-              |> to_string()
-            end)
-          end)
-
-        error_detail =
-          Enum.map_join(errors, "; ", fn {field, msgs} ->
-            "#{field}: #{Enum.join(msgs, ", ")}"
-          end)
-
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Could not approve application — #{error_detail}",
-           title: "Application"
-         )}
-
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Could not approve application. Please try again.",
-           title: "Application"
-         )}
-    end
-  end
-
-  def handle_event("toggle-reject-form", _params, socket) do
     {:noreply,
-     assign(socket, :show_reject_form, !socket.assigns[:show_reject_form])}
+     socket
+     |> assign(:decision_mode, :approve)
+     |> assign(:email_form, email_form)}
   end
 
-  def handle_event("deny-application", params, socket) do
+  def handle_event("open-reject-email", _params, socket) do
+    user = socket.assigns[:selected_user]
+    application = socket.assigns[:selected_user_application]
+    subject = YscWeb.Emails.ApplicationRejected.default_subject(user)
+    body = YscWeb.Emails.ApplicationRejected.default_body(user, application)
+
+    email_form =
+      %{"subject" => subject, "body" => body, "note" => ""}
+      |> to_form(as: "email")
+
+    {:noreply,
+     socket
+     |> assign(:decision_mode, :reject)
+     |> assign(:email_form, email_form)}
+  end
+
+  def handle_event("cancel-decision-email", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:decision_mode, nil)
+     |> assign(:email_form, nil)}
+  end
+
+  def handle_event("confirm-approve-email", %{"email" => email_params}, socket) do
     user = socket.assigns[:selected_user]
     application = socket.assigns[:selected_user_application]
     current_user = socket.assigns[:current_user]
 
-    reject_params = params["reject"] || %{}
-
-    note =
-      reject_params["note"]
+    subject =
+      email_params["subject"]
       |> Kernel.||("")
       |> String.trim()
 
-    if note != "" and String.length(note) > 5000 do
+    body =
+      email_params["body"]
+      |> Kernel.||("")
+      |> String.trim()
+
+    if subject == "" or body == "" do
+      email_form =
+        %{"subject" => subject, "body" => body}
+        |> to_form(as: "email")
+
       {:noreply,
        socket
+       |> assign(:decision_mode, :approve)
+       |> assign(:email_form, email_form)
        |> YscWeb.Flash.put_toast(
          :error,
-         "Rejection note must be 5000 characters or fewer.",
+         "Subject and email body are required.",
          title: "Application"
        )}
     else
       case Accounts.record_application_outcome(
-             :rejected,
+             :approved,
              user,
              application,
              current_user
            ) do
         :ok ->
-          if note != "" and note != nil do
-            Accounts.create_user_note(
-              user,
-              %{"note" => note, "category" => "rejection"},
-              current_user
-            )
-          end
+          first_name =
+            user.first_name
+            |> Kernel.||("")
+            |> to_string()
+            |> String.trim()
+
+          greeting_name =
+            if first_name != "" do
+              String.capitalize(first_name)
+            else
+              user.email |> to_string()
+            end
+
+          pay_url = YscWeb.Emails.ApplicationApproved.pay_membership_url()
+
+          text_body =
+            """
+            Hej #{greeting_name},
+
+            #{body}
+
+            Pay your membership: #{pay_url}
+            """
+            |> String.trim()
 
           YscWeb.Emails.Notifier.schedule_email(
             user.email,
             "#{user.id}",
-            "Update on your Young Scandinavians Club application",
-            "application_rejected",
-            %{first_name: user.first_name},
-            """
-            ==============================
+            subject,
+            "application_approved",
+            %{first_name: user.first_name, custom_body: body},
+            text_body,
+            user.id
+          )
 
-            Hi #{user.email},
+          # Schedule reminder emails if user hasn't paid
+          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
+            user.id
+          )
 
-            We regret to inform you that your application has been rejected.
-
-            If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
-
-            ==============================
-            """,
+          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
             user.id
           )
 
           {:noreply,
            socket
+           |> assign(:decision_mode, nil)
+           |> assign(:email_form, nil)
            |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
-           |> YscWeb.Flash.put_toast(:info, "User application was rejected!",
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "User was approved and is now a member! The approval email has been queued for delivery.",
+             title: "Application"
+           )}
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          errors =
+            Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+              Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+                opts
+                |> Keyword.get(String.to_existing_atom(key), key)
+                |> to_string()
+              end)
+            end)
+
+          error_detail =
+            Enum.map_join(errors, "; ", fn {field, msgs} ->
+              "#{field}: #{Enum.join(msgs, ", ")}"
+            end)
+
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Could not approve application — #{error_detail}",
              title: "Application"
            )}
 
@@ -1160,10 +1201,131 @@ defmodule YscWeb.AdminUsersLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Could not reject application. Please try again.",
+             "Could not approve application. Please try again.",
              title: "Application"
            )}
       end
+    end
+  end
+
+  def handle_event("confirm-reject-email", %{"email" => email_params}, socket) do
+    user = socket.assigns[:selected_user]
+    application = socket.assigns[:selected_user_application]
+    current_user = socket.assigns[:current_user]
+
+    subject =
+      email_params["subject"]
+      |> Kernel.||("")
+      |> String.trim()
+
+    body =
+      email_params["body"]
+      |> Kernel.||("")
+      |> String.trim()
+
+    note =
+      email_params["note"]
+      |> Kernel.||("")
+      |> String.trim()
+
+    cond do
+      subject == "" or body == "" ->
+        email_form =
+          %{"subject" => subject, "body" => body, "note" => note}
+          |> to_form(as: "email")
+
+        {:noreply,
+         socket
+         |> assign(:decision_mode, :reject)
+         |> assign(:email_form, email_form)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Subject and email body are required.",
+           title: "Application"
+         )}
+
+      note != "" and String.length(note) > 5000 ->
+        email_form =
+          %{"subject" => subject, "body" => body, "note" => note}
+          |> to_form(as: "email")
+
+        {:noreply,
+         socket
+         |> assign(:decision_mode, :reject)
+         |> assign(:email_form, email_form)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Rejection note must be 5000 characters or fewer.",
+           title: "Application"
+         )}
+
+      true ->
+        case Accounts.record_application_outcome(
+               :rejected,
+               user,
+               application,
+               current_user
+             ) do
+          :ok ->
+            if note != "" and note != nil do
+              Accounts.create_user_note(
+                user,
+                %{"note" => note, "category" => "rejection"},
+                current_user
+              )
+            end
+
+            first_name =
+              user.first_name
+              |> Kernel.||("")
+              |> to_string()
+              |> String.trim()
+
+            greeting_name =
+              if first_name != "" do
+                String.capitalize(first_name)
+              else
+                user.email |> to_string()
+              end
+
+            text_body =
+              """
+              Hej #{greeting_name},
+
+              #{body}
+              """
+              |> String.trim()
+
+            YscWeb.Emails.Notifier.schedule_email(
+              user.email,
+              "#{user.id}",
+              subject,
+              "application_rejected",
+              %{first_name: user.first_name, custom_body: body},
+              text_body,
+              user.id
+            )
+
+            {:noreply,
+             socket
+             |> assign(:decision_mode, nil)
+             |> assign(:email_form, nil)
+             |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "User application was rejected and the email has been queued for delivery!",
+               title: "Application"
+             )}
+
+          {:error, _} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Could not reject application. Please try again.",
+               title: "Application"
+             )}
+        end
     end
   end
 
@@ -1248,6 +1410,11 @@ defmodule YscWeb.AdminUsersLive do
   defp export_field_to_label(field), do: "#{field}"
 
   # "pending_approval", "rejected", "active", "suspended", "deleted"
+  defp format_reviewed_at(nil), do: "—"
+  defp format_reviewed_at(%{reviewed_at: nil}), do: "—"
+  defp format_reviewed_at(%{reviewed_at: dt}),
+    do: Timex.format!(dt, "%b %d, %Y", :strftime)
+
   defp user_state_to_badge_type(:active), do: "green"
   defp user_state_to_badge_type(:pending_approval), do: "yellow"
   defp user_state_to_badge_type(:rejected), do: "red"

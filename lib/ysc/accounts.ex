@@ -1125,7 +1125,12 @@ defmodule Ysc.Accounts do
     # Check if sorting by membership_type
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
-    base_query = from(u in User, where: u.state != :deleted)
+    base_query =
+      from(u in User,
+        where: u.state != :deleted,
+        left_join: r in assoc(u, :registration_form), as: :registration_form,
+        preload: [registration_form: r]
+      )
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
@@ -1175,9 +1180,12 @@ defmodule Ysc.Accounts do
     # Check if sorting by membership_type
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
-    case Flop.validate_and_run(fuzzy_search_user(search_term), other_params,
-           for: User
-         ) do
+    base_query =
+      fuzzy_search_user(search_term)
+      |> join(:left, [u], r in assoc(u, :registration_form), as: :registration_form)
+      |> preload([u, r], [registration_form: r])
+
+    case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
         # Apply membership filters if any
         filtered_users = apply_membership_filters(users, membership_filters)
@@ -2168,7 +2176,8 @@ defmodule Ysc.Accounts do
           Enum.find_index(order_by, &(&1 == "membership_type"))
 
         if membership_sort_index do
-          direction = Enum.at(order_directions, membership_sort_index, :asc)
+          raw_direction = Enum.at(order_directions, membership_sort_index, "asc")
+          direction = normalize_sort_direction(raw_direction)
 
           # Remove membership_type from order_by and order_directions
           new_order_by = List.delete_at(order_by, membership_sort_index)
@@ -2190,6 +2199,12 @@ defmodule Ysc.Accounts do
         {nil, params}
     end
   end
+
+  defp normalize_sort_direction("asc"), do: :asc
+  defp normalize_sort_direction("desc"), do: :desc
+  defp normalize_sort_direction(:asc), do: :asc
+  defp normalize_sort_direction(:desc), do: :desc
+  defp normalize_sort_direction(_), do: :desc
 
   # Helper function to apply membership sorting to users
   defp apply_membership_sorting(users, nil), do: users

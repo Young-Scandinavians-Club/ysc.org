@@ -29,14 +29,22 @@
       Hej <%= @first_name %>,
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      Thank you for your interest in joining the Young Scandinavians Club. We appreciate you taking the time to submit an application.
-    </mj-text>
-    <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      Unfortunately, we are unable to approve your application at this time.
-    </mj-text>
-    <mj-spacer height="12px"></mj-spacer>
+
+    <%= if assigns[:custom_body] do %>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+        <%= Phoenix.HTML.raw(String.replace(@custom_body, "\n", "<br />")) %>
+      </mj-text>
+      <mj-spacer height="12px"></mj-spacer>
+    <% else %>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+        Thank you for your interest in joining the Young Scandinavians Club. We appreciate you taking the time to submit an application.
+      </mj-text>
+      <mj-spacer height="12px"></mj-spacer>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+        Unfortunately, we are unable to approve your application at this time.
+      </mj-text>
+    <% end %>
+
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       To be eligible for membership, applicants must meet certain criteria as outlined in our bylaws. This includes demonstrating a strong connection to Scandinavian culture through one or more of the following:
     </mj-text>
