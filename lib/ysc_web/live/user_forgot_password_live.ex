@@ -6,7 +6,7 @@ defmodule YscWeb.UserForgotPasswordLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm py-4">
+    <div class="mx-auto max-w-sm py-4 px-4">
       <.link
         navigate={~p"/"}
         class="flex items-center text-center justify-center py-8 hover:opacity-80 transition duration-200 ease-in-out"

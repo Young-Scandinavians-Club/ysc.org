@@ -4,7 +4,7 @@ defmodule YscWeb.UserLoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="max-w-sm mx-auto py-4">
+    <div class="max-w-sm mx-auto py-4 px-4">
       <.link
         navigate={~p"/"}
         class="flex items-center text-center justify-center py-8 hover:opacity-80 transition duration-200 ease-in-out"
@@ -271,7 +271,7 @@ defmodule YscWeb.UserLoginLive do
         />
 
         <:actions>
-          <div class="flex flex-col gap-3 w-full">
+          <div class="flex flex-col gap-3 w-full pb-4">
             <.button phx-disable-with="Signing in..." class="w-full">
               Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1 -mt-0.5" />
             </.button>

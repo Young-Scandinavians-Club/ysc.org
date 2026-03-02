@@ -5,7 +5,7 @@ defmodule YscWeb.UserConfirmationLive do
 
   def render(%{live_action: :edit} = assigns) do
     ~H"""
-    <div class="max-w-sm mx-auto py-4">
+    <div class="max-w-sm mx-auto py-4 px-4">
       <.link
         navigate={~p"/"}
         class="flex items-center text-center justify-center py-8 hover:opacity-80 transition duration-200 ease-in-out"
