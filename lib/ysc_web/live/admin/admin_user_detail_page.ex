@@ -33,7 +33,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     >
       <div class="flex flex-col justify-between py-6">
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
-        <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
 
         <div class="flex flex-row items-center justify-between pt-4">
           <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
@@ -63,7 +62,6 @@ defmodule YscWeb.AdminUserDetailsLive do
             <ul class="flex flex-wrap -mb-px">
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
                   navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
@@ -1969,14 +1967,11 @@ defmodule YscWeb.AdminUserDetailsLive do
        to_form(note_changeset(%{category: "general"}), as: "note")
      )
      |> assign(:list_params, Map.drop(params, ["id"]))
-     |> assign(:list_params, Map.drop(params, ["id"]))
      |> assign(form: user_form)}
   end
 
   def handle_params(params, _uri, socket) do
     user_id = socket.assigns.user_id
-    list_params = Map.drop(params, ["id"])
-    socket = assign(socket, :list_params, list_params)
     list_params = Map.drop(params, ["id"])
     socket = assign(socket, :list_params, list_params)
 
