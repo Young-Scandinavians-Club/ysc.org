@@ -879,6 +879,7 @@ defmodule YscWeb.CoreComponents do
           name={@name}
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          autocomplete={@is_password_toggle && "current-password"}
           class={[
             "mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
             @is_password_toggle && "pr-10",
@@ -893,7 +894,8 @@ defmodule YscWeb.CoreComponents do
           type="button"
           class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer password-toggle-btn"
           data-target={"##{@id}"}
-          aria-label="Toggle password visibility"
+          aria-label="Show password"
+          aria-pressed="false"
         >
           <.icon
             name="hero-eye-solid"
