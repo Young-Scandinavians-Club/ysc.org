@@ -3485,7 +3485,6 @@ defmodule YscWeb.CoreComponents do
       <div
         :if={@video}
         class="absolute bottom-4 right-4 z-20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
-        aria-hidden="true"
       >
         <button
           type="button"
