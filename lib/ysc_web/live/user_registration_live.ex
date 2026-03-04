@@ -27,7 +27,7 @@ defmodule YscWeb.UserRegistrationLive do
       </div>
 
       <div id="registration-form" class="px-2 pt-8 pb-4">
-        <div :if={@current_step === 0} id="step-0-content">
+        <div :if={@current_step === 0} id="step-0-header">
           <.header class="text-left">
             Apply for membership
             <:subtitle>
