@@ -3455,8 +3455,10 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <section
       id="hero-section"
+      phx-hook={@video && "HeroVideoControls"}
       class={[
         "relative w-full flex items-center justify-center overflow-hidden -mt-[88px] pt-[88px]",
+        @video && "group",
         !@video && "bg-cover bg-center bg-no-repeat",
         @class
       ]}
@@ -3468,6 +3470,7 @@ defmodule YscWeb.CoreComponents do
     >
       <video
         :if={@video}
+        id="hero-video"
         autoplay
         muted
         loop
@@ -3477,6 +3480,27 @@ defmodule YscWeb.CoreComponents do
       >
         <source src={@video} type="video/mp4" />
       </video>
+
+      <%!-- Pause/play control: visible on hover (or always on touch) for performance --%>
+      <div
+        :if={@video}
+        class="absolute bottom-4 right-4 z-20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+        aria-hidden="true"
+      >
+        <button
+          type="button"
+          data-hero-video-toggle
+          aria-label="Pause video"
+          class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+        >
+          <span class="pause-icon inline-flex [.paused_&]:hidden">
+            <.icon name="hero-pause" class="w-6 h-6" />
+          </span>
+          <span class="play-icon hidden [.paused_&]:!inline-flex">
+            <.icon name="hero-play" class="w-6 h-6" />
+          </span>
+        </button>
+      </div>
 
       <div
         :if={@overlay}
