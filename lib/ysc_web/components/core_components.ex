@@ -2612,6 +2612,8 @@ defmodule YscWeb.CoreComponents do
   attr :on_change, :string, default: "update-filter"
   attr :target, :string, default: nil
 
+  slot :inner_block
+
   @spec filter_form(map()) :: Phoenix.LiveView.Rendered.t()
   def filter_form(%{meta: meta} = assigns) do
     assigns =
@@ -2634,6 +2636,7 @@ defmodule YscWeb.CoreComponents do
           {i.rest}
         />
       </.filter_fields>
+      {render_slot(@inner_block)}
     </.form>
     """
   end
@@ -2702,6 +2705,48 @@ defmodule YscWeb.CoreComponents do
     else
       "https://gravatar.com/avatar/#{email_hash}?d=#{YscWeb.Endpoint.url()}#{image_path}&s=512"
     end
+  end
+
+  attr :id, :string, default: nil
+  attr :input_id, :string, required: true
+  attr :name, :string, required: true
+  attr :value, :string, default: ""
+  attr :placeholder, :string, default: "Search..."
+  attr :on_change, :string, default: "change"
+  attr :debounce, :string, default: "200"
+  attr :rest, :global, include: ~w(phx-submit phx-submit-disable)
+
+  def admin_search_bar(assigns) do
+    ~H"""
+    <form
+      id={@id}
+      action=""
+      novalidate=""
+      role="search"
+      phx-change={@on_change}
+      class="relative"
+      {@rest}
+    >
+      <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+        <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
+      </div>
+      <input
+        id={@input_id}
+        type="search"
+        name={@name}
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        enterkeyhint="search"
+        spellcheck="false"
+        placeholder={@placeholder}
+        value={@value}
+        tabindex="0"
+        phx-debounce={@debounce}
+        class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
+      />
+    </form>
+    """
   end
 
   attr :color, :string, default: "blue"

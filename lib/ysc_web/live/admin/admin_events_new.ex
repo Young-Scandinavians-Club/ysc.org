@@ -131,6 +131,20 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <div class="w-full divide-y divide-zinc-100 text-sm text-zinc-700">
                 <ul class="py-2 text-sm font-medium text-zinc-800 px-2">
+                  <li class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100">
+                    <button
+                      type="button"
+                      class="w-full text-left px-1"
+                      phx-click="copy-event"
+                      data-confirm="Copy this event?"
+                    >
+                      <.icon
+                        name="hero-document-duplicate"
+                        class="me-1 -mt-1 w-5 h-5"
+                      />Copy Event
+                    </button>
+                  </li>
+
                   <li
                     :if={@event.state == :published}
                     class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
@@ -588,6 +602,22 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   @impl true
+  def handle_event("copy-event", _, socket) do
+    event = socket.assigns.event
+
+    case Events.copy_event(event) do
+      {:ok, new_event} ->
+        {:noreply,
+         push_navigate(socket, to: ~p"/admin/events/#{new_event.id}/edit")}
+
+      {:error, _reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Failed to copy event")
+         |> push_navigate(to: ~p"/admin/events")}
+    end
+  end
+
   def handle_event("delete-event", _, socket) do
     Events.delete_event(socket.assigns.event)
 
