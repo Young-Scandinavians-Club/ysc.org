@@ -1311,9 +1311,13 @@ A comprehensive search functionality across the application.
 
 ## Contributing
 
-Contributions to this project are managed by the web tech group. Here's the general workflow for making changes:
+Contributions to this project are managed by the web tech group.
 
-1.  **Create a branch**: Create a new branch from `main` for your feature or bug fix. Use a descriptive name (e.g., `feature/add-dark-mode` or `fix/login-bug`).
+**📋 For a detailed step-by-step guide**, see **[Life of a Changeset](docs/LIFE_OF_A_CHANGESET.md)** — branch naming (`YOUR_NAME/NAME_OF_YOUR_CHANGE`), opening a PR against `main`, waiting for checks, requesting review, and merging.
+
+Here's the general workflow for making changes:
+
+1.  **Create a branch**: Create a new branch from `main` for your feature or bug fix. Use the naming convention `YOUR_NAME/NAME_OF_YOUR_CHANGE` (e.g., `johan/recon-report-imp` or `alice/fix-login-bug`). See [Life of a Changeset](docs/LIFE_OF_A_CHANGESET.md) for details.
 2.  **Make your changes**: Implement your changes, following the project's coding style and conventions.
 3.  **Write tests**: Add tests to cover any new functionality or bug fixes.
 4.  **Run preflight checks**: Before committing, run `make preflight` to ensure all CI checks pass locally.

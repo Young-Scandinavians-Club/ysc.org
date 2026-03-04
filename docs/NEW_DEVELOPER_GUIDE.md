@@ -19,6 +19,11 @@ Welcome! This document provides an overview of all the documentation available t
   - Git workflow
   - IEx tips
 
+### 🔀 Contributing
+- **[LIFE_OF_A_CHANGESET.md](LIFE_OF_A_CHANGESET.md)** - How to contribute in detail
+  - Branch naming: `YOUR_NAME/NAME_OF_YOUR_CHANGE`
+  - Open PR against `main`, wait for checks, request review, merge
+
 ### 🔧 Troubleshooting
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide
   - Installation issues

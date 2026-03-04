@@ -10,6 +10,14 @@ defmodule Ysc.Ledgers.Reconciliation do
   - No orphaned ledger entries exist
   - The ledger is balanced
 
+  ## Entity totals – known limitation (Events)
+
+  **Events** may show FAIL when there are mixed event+donation (or event+donation+discount)
+  payments. For those payments, the stripe receivable is recorded as a single `:event`
+  entry for the full amount, while revenue is split (event_revenue + donation_revenue).
+  So event_revenue net is less than stripe :event net. This is a ledger design limitation,
+  not a bug; overall ledger balance remains correct. See `docs/RECONCILIATION_FIX_2026_02_15.md`.
+
   ## Usage
 
       # Run full reconciliation
@@ -1130,9 +1138,13 @@ defmodule Ysc.Ledgers.Reconciliation do
     ║ ENTITY TOTALS
     ╠══════════════════════════════════════════════════════════════════
     ║ Memberships Match: #{format_boolean(report.checks.entity_totals.memberships.match)}
+    #{format_entity_detail("Memberships", report.checks.entity_totals.memberships)}
     ║ Bookings Match: #{format_boolean(report.checks.entity_totals.bookings.match)}
+    #{format_entity_detail("Bookings", report.checks.entity_totals.bookings)}
     ║ Events Match: #{format_boolean(report.checks.entity_totals.events.match)}
+    #{format_entity_detail("Events", report.checks.entity_totals.events)}
     ║ Donations Match: #{format_boolean(report.checks.entity_totals.donations.match)}
+    #{format_entity_detail("Donations", report.checks.entity_totals.donations)}
     ╚══════════════════════════════════════════════════════════════════
     """
   end
@@ -1142,4 +1154,13 @@ defmodule Ysc.Ledgers.Reconciliation do
 
   defp format_boolean(true), do: "✅ Yes"
   defp format_boolean(false), do: "❌ No"
+
+  defp format_entity_detail(_label, %{match: true}), do: ""
+
+  defp format_entity_detail(label, %{
+         ledger_revenue: ledger_revenue,
+         payment_total: payment_total
+       }) do
+    "║   #{label} ledger: #{Money.to_string!(ledger_revenue)} vs stripe/payment: #{Money.to_string!(payment_total)}"
+  end
 end
