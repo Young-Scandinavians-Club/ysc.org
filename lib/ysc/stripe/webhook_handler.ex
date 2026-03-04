@@ -803,7 +803,29 @@ defmodule Ysc.Stripe.WebhookHandler do
         # Stripe sends null for current_period_start and current_period_end. We must NOT
         # overwrite existing values with nil, or active?/1 will incorrectly return false
         # (nil current_period_end is treated as inactive), causing "no membership" for users.
-        attrs = %{stripe_status: event.status}
+        #
+        # CRITICAL: Don't downgrade an active subscription to "incomplete" during upgrade
+        # transitions. When upgrading (e.g. Single → Family), Stripe creates a proration
+        # invoice and briefly marks the subscription as "incomplete" until payment settles.
+        # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth (which
+        # filters by stripe_status IN ('active','trialing')) will find nothing and the user
+        # will see a "No membership" banner until the follow-up "active" webhook arrives.
+        # We still update subscription items so the plan change is reflected immediately.
+        attrs =
+          if event.status == "incomplete" and
+               subscription.stripe_status in ["active", "trialing"] do
+            Ysc.Logging.debug(
+              "Skipping incomplete status for active subscription during upgrade transition",
+              subscription_id: subscription.id,
+              stripe_subscription_id: event.id,
+              current_stripe_status: subscription.stripe_status
+            )
+
+            %{}
+          else
+            %{stripe_status: event.status}
+          end
+
         attrs = maybe_put_datetime(attrs, :start_date, event.start_date)
 
         attrs =
