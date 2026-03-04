@@ -617,17 +617,19 @@ defmodule Ysc.Alerts.Discord do
     entity_fields =
       if report.checks.entity_totals do
         et = report.checks.entity_totals
+
         lines = [
           "Memberships: #{format_boolean(et.memberships.match)}",
           "Bookings: #{format_boolean(et.bookings.match)}#{entity_amounts_line(et.bookings)}",
           "Events: #{format_boolean(et.events.match)}#{entity_amounts_line(et.events)}",
           "Donations: #{format_boolean(et.donations.match)}#{entity_amounts_line(et.donations)}"
         ]
+
         note =
-          if !et.events.match do
-            "\n_(Events ❌ can be due to mixed event+donation payments; see RECONCILIATION_FIX_2026_02_15.md)_"
-          else
+          if et.events.match do
             ""
+          else
+            "\n_(Events ❌ can be due to mixed event+donation payments; see RECONCILIATION_FIX_2026_02_15.md)_"
           end
 
         [
