@@ -17,7 +17,8 @@ defmodule Ysc.Events.Event do
     Flop.Schema,
     filterable: [
       :state,
-      :organizer_id
+      :organizer_id,
+      :title
     ],
     sortable: [:state, :title, :start_date, :organizer_name, :inserted_at],
     default_limit: 50,

@@ -72,12 +72,43 @@ defmodule Ysc.Posts do
     |> Repo.preload([:author, :featured_image])
   end
 
-  def list_posts_paginated(params) do
+  def list_posts_paginated(params, opts \\ []) do
+    date_from = Keyword.get(opts, :date_from, "")
+    date_to = Keyword.get(opts, :date_to, "")
+
     Post
     |> where([p], p.state not in [:deleted])
+    |> maybe_filter_posted_from(date_from)
+    |> maybe_filter_posted_to(date_to)
     |> join(:left, [p], u in assoc(p, :author), as: :author)
     |> preload([author: p], author: p)
     |> Flop.validate_and_run(params, for: Post)
+  end
+
+  defp maybe_filter_posted_from(query, ""), do: query
+
+  defp maybe_filter_posted_from(query, date_str) do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        datetime = DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+        where(query, [p], p.inserted_at >= ^datetime)
+
+      _ ->
+        query
+    end
+  end
+
+  defp maybe_filter_posted_to(query, ""), do: query
+
+  defp maybe_filter_posted_to(query, date_str) do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        datetime = DateTime.new!(date, ~T[23:59:59], "Etc/UTC")
+        where(query, [p], p.inserted_at <= ^datetime)
+
+      _ ->
+        query
+    end
   end
 
   def update_post(post, params, %User{} = current_user, opts \\ []) do

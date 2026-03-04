@@ -8,7 +8,10 @@ defmodule Ysc.Events do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.Events.Agenda
+  alias Ysc.Events.AgendaItem
   alias Ysc.Events.Event
+  alias Ysc.Events.FaqQuestion
   alias Ysc.Events.TicketTier
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
@@ -49,12 +52,43 @@ defmodule Ysc.Events do
     |> Repo.preload(:organizer)
   end
 
-  def list_events_paginated(params) do
+  def list_events_paginated(params, opts \\ []) do
+    date_from = Keyword.get(opts, :date_from, "")
+    date_to = Keyword.get(opts, :date_to, "")
+
     Event
     |> where([e], e.state not in ["deleted"])
+    |> maybe_filter_start_date_from(date_from)
+    |> maybe_filter_start_date_to(date_to)
     |> join(:left, [p], u in assoc(p, :organizer), as: :organizer)
     |> preload([organizer: p], organizer: p)
     |> Flop.validate_and_run(params, for: Event)
+  end
+
+  defp maybe_filter_start_date_from(query, ""), do: query
+
+  defp maybe_filter_start_date_from(query, date_str) do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        datetime = DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+        where(query, [e], e.start_date >= ^datetime)
+
+      _ ->
+        query
+    end
+  end
+
+  defp maybe_filter_start_date_to(query, ""), do: query
+
+  defp maybe_filter_start_date_to(query, date_str) do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        datetime = DateTime.new!(date, ~T[23:59:59], "Etc/UTC")
+        where(query, [e], e.start_date <= ^datetime)
+
+      _ ->
+        query
+    end
   end
 
   @doc """
@@ -71,6 +105,125 @@ defmodule Ysc.Events do
 
       {:error, changeset} ->
         {:error, changeset}
+    end
+  end
+
+  @doc """
+  Deep-copy an event as a new draft, including agendas (with items), ticket tiers, and FAQ questions.
+  The new event is unpublished (state: :draft). No tickets are copied.
+  Returns `{:ok, new_event}` or `{:error, reason}`.
+  """
+  def copy_event(%Event{} = event) do
+    event =
+      Repo.preload(event, [
+        :ticket_tiers,
+        :faq_questions,
+        agendas: :agenda_items
+      ])
+
+    event_attrs = %{
+      state: :draft,
+      published_at: nil,
+      publish_at: nil,
+      organizer_id: event.organizer_id,
+      title: "Copy of #{event.title}",
+      description: event.description,
+      max_attendees: event.max_attendees,
+      unlimited_capacity:
+        event.max_attendees == nil or event.max_attendees == 0,
+      age_restriction: event.age_restriction,
+      raw_details: event.raw_details,
+      rendered_details: event.rendered_details,
+      image_id: event.image_id,
+      location_name: event.location_name,
+      address: event.address,
+      latitude: event.latitude,
+      longitude: event.longitude,
+      place_id: event.place_id,
+      partiful_link: event.partiful_link,
+      tickets_tbd: event.tickets_tbd,
+      start_date: event.start_date,
+      start_time: event.start_time,
+      end_date: event.end_date,
+      end_time: event.end_time
+    }
+
+    result =
+      Repo.transaction(fn ->
+        case %Event{}
+             |> Event.changeset(event_attrs)
+             |> Repo.insert() do
+          {:ok, new_event} ->
+            Enum.each(event.agendas || [], fn agenda ->
+              agenda_cs =
+                %Agenda{}
+                |> Agenda.changeset(%{
+                  event_id: new_event.id,
+                  title: agenda.title
+                })
+                |> Ecto.Changeset.put_change(:position, agenda.position || 0)
+
+              {:ok, new_agenda} = Repo.insert(agenda_cs)
+
+              Enum.each(agenda.agenda_items || [], fn item ->
+                item_cs =
+                  %AgendaItem{}
+                  |> AgendaItem.changeset(%{
+                    agenda_id: new_agenda.id,
+                    title: item.title,
+                    description: item.description,
+                    start_time: item.start_time,
+                    end_time: item.end_time
+                  })
+                  |> Ecto.Changeset.put_change(:position, item.position || 0)
+
+                Repo.insert!(item_cs)
+              end)
+            end)
+
+            Enum.each(event.ticket_tiers || [], fn tier ->
+              tier_attrs = %{
+                event_id: new_event.id,
+                name: tier.name,
+                description: tier.description,
+                type: tier.type,
+                price: tier.price,
+                quantity: tier.quantity,
+                unlimited_quantity: tier.quantity == nil or tier.quantity == 0,
+                requires_registration: tier.requires_registration,
+                start_date: tier.start_date,
+                end_date: tier.end_date
+              }
+
+              %TicketTier{}
+              |> TicketTier.changeset(tier_attrs)
+              |> Repo.insert!()
+            end)
+
+            Enum.each(event.faq_questions || [], fn faq ->
+              %FaqQuestion{}
+              |> Ecto.Changeset.change(%{
+                event_id: new_event.id,
+                question: faq.question,
+                answer: faq.answer
+              })
+              |> Repo.insert!()
+            end)
+
+            new_event
+
+          {:error, changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+
+    case result do
+      {:ok, new_event} ->
+        broadcast(%Ysc.MessagePassingEvents.EventAdded{event: new_event})
+        {:ok, new_event}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

@@ -12,7 +12,8 @@ defmodule Ysc.Posts.Post do
     Flop.Schema,
     filterable: [
       :state,
-      :user_id
+      :user_id,
+      :title
     ],
     sortable: [:inserted_at, :title, :state, :author_name],
     default_limit: 50,

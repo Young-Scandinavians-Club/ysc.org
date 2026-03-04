@@ -74,73 +74,250 @@ defmodule YscWeb.AdminPostsLive do
       </div>
 
       <div class="w-full pt-4">
-        <div id="admin-user-filters" class="pb-4 flex">
-          <.dropdown id="filter-posts-dropdown" class="group hover:bg-zinc-100">
-            <:button_block>
-              <.icon
-                name="hero-funnel"
-                class="mr-1 text-zinc-600 w-5 h-5 group-hover:text-zinc-800 -mt-0.5"
-              /> Filters
-            </:button_block>
-
-            <div class="w-full px-4 py-3">
-              <.filter_form
-                fields={[
-                  state: [
-                    label: "State",
-                    type: "checkgroup",
-                    multiple: true,
-                    op: :in,
-                    options: [
-                      {"Published", :published},
-                      {"Draft", :draft}
-                    ]
-                  ],
-                  user_id: [
-                    label: "Author",
-                    type: "checkgroup",
-                    multiple: true,
-                    op: :in,
-                    options: @author_filter
-                  ]
-                ]}
-                meta={@meta}
-                id="posts-filter-form"
-              />
-            </div>
-
-            <div class="px-4 py-4">
-              <button
-                class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                phx-click={JS.navigate(~p"/admin/posts")}
-              >
-                <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
-              </button>
-            </div>
-          </.dropdown>
+        <div>
+          <.admin_search_bar
+            id="posts-search-form"
+            input_id="posts-search-input"
+            name="q"
+            value={@search_query}
+            placeholder="Search by post title..."
+            on_change="search"
+            phx-submit="search"
+          />
         </div>
-        <!-- Mobile Card View -->
-        <div class="block md:hidden space-y-4">
-          <%= for {_, post} <- @streams.posts do %>
-            <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-              <div class="flex items-start justify-between mb-3">
-                <div class="flex-1 min-w-0">
-                  <h3 class="text-base font-semibold text-zinc-900 mb-1 truncate">
-                    {post.title}
-                  </h3>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-sm text-zinc-600">
-                      {"#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}"}
-                    </span>
-                    <span class="text-zinc-400">•</span>
-                    <span class="text-sm text-zinc-600">
-                      {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
+
+        <div class="py-6 w-full">
+          <div id="admin-post-filters" class="pb-4 flex">
+            <.dropdown id="filter-posts-dropdown" class="group hover:bg-zinc-100">
+              <:button_block>
+                <.icon
+                  name="hero-funnel"
+                  class="mr-1 text-zinc-600 w-5 h-5 group-hover:text-zinc-800 -mt-0.5"
+                /> Filters
+              </:button_block>
+
+              <div class="w-full px-4 py-3">
+                <.filter_form
+                  fields={[
+                    state: [
+                      label: "State",
+                      type: "checkgroup",
+                      multiple: true,
+                      op: :in,
+                      options: [
+                        {"Published", :published},
+                        {"Draft", :draft}
+                      ]
+                    ],
+                    user_id: [
+                      label: "Author",
+                      type: "checkgroup",
+                      multiple: true,
+                      op: :in,
+                      options: @author_filter
+                    ]
+                  ]}
+                  meta={@meta}
+                  id="posts-filter-form"
+                >
+                  <div class="mt-4">
+                    <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
+                      Date Posted
+                    </p>
+                    <div class="space-y-2">
+                      <.input
+                        type="date"
+                        name="date_from"
+                        value={@date_from}
+                        label="From"
+                        id="filter-date-from"
+                        phx-debounce="300"
+                      />
+                      <.input
+                        type="date"
+                        name="date_to"
+                        value={@date_to}
+                        label="To"
+                        id="filter-date-to"
+                        phx-debounce="300"
+                      />
+                    </div>
+                  </div>
+                </.filter_form>
+              </div>
+
+              <div class="px-4 py-4">
+                <button
+                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
+                  phx-click={JS.navigate(~p"/admin/posts")}
+                >
+                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
+                </button>
+              </div>
+            </.dropdown>
+          </div>
+          <%!-- Mobile Card View --%>
+          <div class="block md:hidden space-y-4">
+            <%= for {_, post} <- @streams.posts do %>
+              <div
+                class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
+              >
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex-1 min-w-0">
+                    <h3 class="text-base font-semibold text-zinc-900 mb-1 truncate">
+                      {post.title}
+                    </h3>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-sm text-zinc-600">
+                        {"#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}"}
+                      </span>
+                      <span class="text-zinc-400">•</span>
+                      <span class="text-sm text-zinc-600">
+                        {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="ml-2 flex-shrink-0 rounded p-1.5 hover:bg-zinc-100"
+                    phx-click="toggle-featured"
+                    phx-value-id={post.id}
+                  >
+                    <.icon
+                      name={
+                        if post.featured_post,
+                          do: "hero-star-solid",
+                          else: "hero-star"
+                      }
+                      class={"w-5 h-5 #{if post.featured_post, do: "text-yellow-500", else: "text-zinc-600"}"}
+                    />
+                    <span class="sr-only">Toggle featured</span>
+                  </button>
+                </div>
+
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <.tooltip
+                      :if={post.published_on != nil}
+                      tooltip_text={
+                        Timex.format!(post.published_on, "%b %e, %Y", :strftime)
+                      }
+                    >
+                      <.badge type={post_state_to_badge_style(post.state)}>
+                        {String.capitalize("#{post.state}")}
+                      </.badge>
+                    </.tooltip>
+
+                    <.badge
+                      :if={post.published_on == nil}
+                      type={post_state_to_badge_style(post.state)}
+                    >
+                      {String.capitalize("#{post.state}")}
+                    </.badge>
+
+                    <span
+                      :if={post.comment_count > 0}
+                      class="flex items-center gap-1 text-zinc-600 text-sm"
+                    >
+                      <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4" />
+                      {post.comment_count}
                     </span>
                   </div>
+
+                  <button
+                    phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
+                    class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                  >
+                    Edit
+                  </button>
                 </div>
+              </div>
+            <% end %>
+            <%!-- Mobile Pagination --%>
+            <div :if={@meta} class="pt-4">
+              <Flop.Phoenix.pagination
+                meta={@meta}
+                path={~p"/admin/posts"}
+                class="flex items-center justify-center py-4"
+                page_list_attrs={[
+                  class: "flex gap-0 order-2 justify-center items-center"
+                ]}
+                page_links={3}
+              >
+                <:previous attrs={[
+                  class:
+                    "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                ]}>
+                </:previous>
+                <:next attrs={[
+                  class:
+                    "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                ]}>
+                </:next>
+              </Flop.Phoenix.pagination>
+            </div>
+          </div>
+          <%!-- Desktop Table View --%>
+          <div class="hidden md:block">
+            <Flop.Phoenix.table
+              id="admin_posts_list"
+              items={@streams.posts}
+              meta={@meta}
+              path={~p"/admin/posts"}
+              row_click={
+                fn {_, post} -> JS.navigate(~p"/admin/posts/#{post.id}") end
+              }
+              opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
+            >
+              <:col :let={{_, post}} label="Title" field={:title}>
+                <p class="text-sm font-semibold">
+                  {post.title}
+                  <span
+                    :if={post.comment_count > 0}
+                    class="relative text-zinc-600 ml-2 rounded px-2 py-1 text-sm"
+                  >
+                    <.icon
+                      name="hero-chat-bubble-oval-left"
+                      class="w-4 h-4 -mt-0.5"
+                    />
+                    {post.comment_count}
+                  </span>
+                </p>
+              </:col>
+
+              <:col :let={{_, post}} label="Author" field={:author_name}>
+                {"#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}"}
+              </:col>
+
+              <:col :let={{_, post}} label="State" field={:state}>
+                <.tooltip
+                  :if={post.published_on != nil}
+                  tooltip_text={
+                    Timex.format!(post.published_on, "%b %e, %Y", :strftime)
+                  }
+                >
+                  <.badge type={post_state_to_badge_style(post.state)}>
+                    {String.capitalize("#{post.state}")}
+                  </.badge>
+                </.tooltip>
+
+                <.badge
+                  :if={post.published_on == nil}
+                  type={post_state_to_badge_style(post.state)}
+                >
+                  {String.capitalize("#{post.state}")}
+                </.badge>
+              </:col>
+
+              <:col :let={{_, post}} label="Created" field={:inserted_at}>
+                {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
+              </:col>
+
+              <:action :let={{_, post}} label="Pinned">
                 <button
                   type="button"
-                  class="ml-2 flex-shrink-0 rounded p-1.5 hover:bg-zinc-100"
+                  class="rounded px-2 py-1 text-sm flex items-center gap-1 hover:bg-zinc-100"
                   phx-click="toggle-featured"
                   phx-value-id={post.id}
                 >
@@ -150,149 +327,22 @@ defmodule YscWeb.AdminPostsLive do
                         do: "hero-star-solid",
                         else: "hero-star"
                     }
-                    class={"w-5 h-5 #{if post.featured_post, do: "text-yellow-500", else: "text-zinc-600"}"}
+                    class={"w-4 h-4 #{if post.featured_post, do: "text-yellow-500", else: "text-zinc-600"}"}
                   />
                   <span class="sr-only">Toggle featured</span>
                 </button>
-              </div>
+              </:action>
 
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                  <.tooltip
-                    :if={post.published_on != nil}
-                    tooltip_text={
-                      Timex.format!(post.published_on, "%b %e, %Y", :strftime)
-                    }
-                  >
-                    <.badge type={post_state_to_badge_style(post.state)}>
-                      {String.capitalize("#{post.state}")}
-                    </.badge>
-                  </.tooltip>
-
-                  <.badge
-                    :if={post.published_on == nil}
-                    type={post_state_to_badge_style(post.state)}
-                  >
-                    {String.capitalize("#{post.state}")}
-                  </.badge>
-
-                  <span
-                    :if={post.comment_count > 0}
-                    class="flex items-center gap-1 text-zinc-600 text-sm"
-                  >
-                    <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4" />
-                    {post.comment_count}
-                  </span>
-                </div>
-
+              <:action :let={{_, post}} label="Action">
                 <button
                   phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
                 >
                   Edit
                 </button>
-              </div>
-            </div>
-          <% end %>
-          <!-- Mobile Pagination -->
-          <div :if={@meta} class="pt-4">
-            <Flop.Phoenix.pagination
-              meta={@meta}
-              path={~p"/admin/posts"}
-              class="flex items-center justify-center py-4"
-              page_list_attrs={[
-                class: "flex gap-0 order-2 justify-center items-center"
-              ]}
-              page_links={3}
-            >
-              <:previous attrs={[
-                class:
-                  "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-              ]}>
-              </:previous>
-              <:next attrs={[
-                class:
-                  "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
-              ]}>
-              </:next>
-            </Flop.Phoenix.pagination>
+              </:action>
+            </Flop.Phoenix.table>
           </div>
-        </div>
-        <!-- Desktop Table View -->
-        <div class="hidden md:block">
-          <Flop.Phoenix.table
-            id="admin_posts_list"
-            items={@streams.posts}
-            meta={@meta}
-            path={~p"/admin/posts"}
-          >
-            <:col :let={{_, post}} label="Title" field={:title}>
-              <p class="text-sm font-semibold">
-                {post.title}
-                <span
-                  :if={post.comment_count > 0}
-                  class="relative text-zinc-600 ml-2 rounded px-2 py-1 text-sm"
-                >
-                  <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4 -mt-0.5" />
-                  {post.comment_count}
-                </span>
-              </p>
-            </:col>
-
-            <:col :let={{_, post}} label="Author" field={:author_name}>
-              {"#{String.capitalize(post.author.first_name)} #{String.capitalize(post.author.last_name)}"}
-            </:col>
-
-            <:col :let={{_, post}} label="State" field={:state}>
-              <.tooltip
-                :if={post.published_on != nil}
-                tooltip_text={
-                  Timex.format!(post.published_on, "%b %e, %Y", :strftime)
-                }
-              >
-                <.badge type={post_state_to_badge_style(post.state)}>
-                  {String.capitalize("#{post.state}")}
-                </.badge>
-              </.tooltip>
-
-              <.badge
-                :if={post.published_on == nil}
-                type={post_state_to_badge_style(post.state)}
-              >
-                {String.capitalize("#{post.state}")}
-              </.badge>
-            </:col>
-
-            <:col :let={{_, post}} label="Created" field={:inserted_at}>
-              {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
-            </:col>
-
-            <:action :let={{_, post}} label="Pinned">
-              <button
-                type="button"
-                class="rounded px-2 py-1 text-sm flex items-center gap-1 hover:bg-zinc-100"
-                phx-click="toggle-featured"
-                phx-value-id={post.id}
-              >
-                <.icon
-                  name={
-                    if post.featured_post, do: "hero-star-solid", else: "hero-star"
-                  }
-                  class={"w-4 h-4 #{if post.featured_post, do: "text-yellow-500", else: "text-zinc-600"}"}
-                />
-                <span class="sr-only">Toggle featured</span>
-              </button>
-            </:action>
-
-            <:action :let={{_, post}} label="Action">
-              <button
-                phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                class="text-blue-600 font-semibold hover:underline cursor-pointer"
-              >
-                Edit
-              </button>
-            </:action>
-          </Flop.Phoenix.table>
         </div>
       </div>
     </.side_menu>
@@ -307,18 +357,33 @@ defmodule YscWeb.AdminPostsLive do
      socket
      |> assign(:page_title, "Posts")
      |> assign(:active_page, :news)
+     |> assign(:search_query, "")
+     |> assign(:date_from, "")
+     |> assign(:date_to, "")
      |> assign(form: to_form(new_post_changeset, as: "new_post")),
      temporary_assigns: [author_filter: []]}
   end
 
   def handle_params(params, _uri, socket) do
-    case Posts.list_posts_paginated(params) do
+    date_from = Map.get(params, "date_from", "")
+    date_to = Map.get(params, "date_to", "")
+
+    case Posts.list_posts_paginated(params,
+           date_from: date_from,
+           date_to: date_to
+         ) do
       {:ok, {posts, meta}} ->
         author_filter = Ysc.Posts.get_all_authors()
+        title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
+        search_query = if title_filter, do: title_filter.value, else: ""
 
         {:noreply,
-         assign(socket, meta: meta)
-         |> assign(author_filter: author_filter)
+         socket
+         |> assign(:meta, meta)
+         |> assign(:author_filter, author_filter)
+         |> assign(:search_query, search_query)
+         |> assign(:date_from, date_from)
+         |> assign(:date_to, date_to)
          |> stream(:posts, posts, reset: true)}
 
       {:error, _meta} ->
@@ -326,15 +391,90 @@ defmodule YscWeb.AdminPostsLive do
     end
   end
 
-  def handle_event("update-filter", params, socket) do
-    params = Map.delete(params, "_target")
+  def handle_event("search", %{"q" => q}, socket) do
+    existing_filters =
+      socket.assigns.meta.flop.filters
+      |> Enum.reject(&(&1.field == :title))
 
-    updated_filters =
-      Enum.reduce(params["filters"], %{}, fn {k, v}, red ->
-        Map.put(red, k, maybe_update_filter(v))
+    new_filters =
+      if q != "" do
+        [%Flop.Filter{field: :title, op: :ilike, value: q} | existing_filters]
+      else
+        existing_filters
+      end
+
+    filter_params =
+      new_filters
+      |> Enum.with_index()
+      |> Enum.into(%{}, fn {filter, idx} ->
+        {"#{idx}",
+         %{
+           "field" => "#{filter.field}",
+           "op" => "#{filter.op}",
+           "value" => "#{filter.value}"
+         }}
       end)
 
-    new_params = Map.replace(params, "filters", updated_filters)
+    date_from = socket.assigns.date_from
+    date_to = socket.assigns.date_to
+
+    new_params =
+      %{"filters" => filter_params}
+      |> then(fn p ->
+        if date_from != "", do: Map.put(p, "date_from", date_from), else: p
+      end)
+      |> then(fn p ->
+        if date_to != "", do: Map.put(p, "date_to", date_to), else: p
+      end)
+
+    {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
+  end
+
+  def handle_event("update-filter", params, socket) do
+    date_from = Map.get(params, "date_from", "")
+    date_to = Map.get(params, "date_to", "")
+
+    params =
+      params
+      |> Map.delete("_target")
+      |> Map.delete("date_from")
+      |> Map.delete("date_to")
+
+    updated_filters =
+      Enum.reduce(params["filters"] || %{}, %{}, fn {k, v}, acc ->
+        updated = maybe_update_filter(v)
+
+        if updated["value"] in ["", nil] do
+          acc
+        else
+          Map.put(acc, k, updated)
+        end
+      end)
+
+    title_filter =
+      Enum.find(socket.assigns.meta.flop.filters, &(&1.field == :title))
+
+    final_filters =
+      if title_filter && title_filter.value != "" do
+        next_idx = map_size(updated_filters)
+
+        Map.put(updated_filters, "#{next_idx}", %{
+          "field" => "title",
+          "op" => "ilike",
+          "value" => title_filter.value
+        })
+      else
+        updated_filters
+      end
+
+    new_params =
+      Map.merge(params, %{"filters" => final_filters})
+      |> then(fn p ->
+        if date_from != "", do: Map.put(p, "date_from", date_from), else: p
+      end)
+      |> then(fn p ->
+        if date_to != "", do: Map.put(p, "date_to", date_to), else: p
+      end)
 
     {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
   end
