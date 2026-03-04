@@ -5,6 +5,8 @@ defmodule YscWeb.AdminEventsLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
+  alias Ysc.Events
+
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
     %{conn: log_in_user(conn, user), admin: user}
@@ -41,6 +43,28 @@ defmodule YscWeb.AdminEventsLiveTest do
       |> render_click()
 
       assert_redirected(view, ~p"/admin/events/#{event.id}/edit")
+    end
+
+    test "copy event creates a draft and redirects to edit the new event", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_fixture(%{title: "To Copy", organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      view
+      |> element("#admin_events_list button", "Copy")
+      |> render_click()
+
+      {path, _flash} = assert_redirect(view)
+      assert path =~ ~r|/admin/events/[^/]+/edit|
+
+      # Copied event should exist as draft with "Copy of" title
+      [copied] =
+        Events.list_events(%{}) |> Enum.filter(&(&1.title == "Copy of To Copy"))
+
+      assert copied.state == :draft
     end
   end
 end
