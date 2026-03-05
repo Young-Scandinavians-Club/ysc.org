@@ -462,7 +462,14 @@ body.overflow-hidden {
 }
 
 
-/* Override hero-mode white text for mobile slide-in menu (it has white background) */
+/* Override hero-mode white text and shadows for mobile slide-in menu (it has white background) */
+
+#site-header.hero-mode .mobile-menu-panel .nav-link,
+#site-header.hero-mode .mobile-menu-panel button.nav-link,
+#site-header.hero-mode .mobile-menu-panel .menu-label,
+#site-header.hero-mode .mobile-menu-panel #avatar-menu-link {
+    text-shadow: none;
+}
 
 .mobile-menu-panel .nav-link,
 #site-header.hero-mode .mobile-menu-panel .nav-link {

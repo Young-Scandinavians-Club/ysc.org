@@ -616,15 +616,26 @@ defmodule Ysc.Alerts.Discord do
 
     entity_fields =
       if report.checks.entity_totals do
+        et = report.checks.entity_totals
+
+        lines = [
+          "Memberships: #{format_boolean(et.memberships.match)}",
+          "Bookings: #{format_boolean(et.bookings.match)}#{entity_amounts_line(et.bookings)}",
+          "Events: #{format_boolean(et.events.match)}#{entity_amounts_line(et.events)}",
+          "Donations: #{format_boolean(et.donations.match)}#{entity_amounts_line(et.donations)}"
+        ]
+
+        note =
+          if et.events.match do
+            ""
+          else
+            "\n_(Events ❌ can be due to mixed event+donation payments; see RECONCILIATION_FIX_2026_02_15.md)_"
+          end
+
         [
           %{
             name: "Entity Totals",
-            value: """
-            Memberships: #{format_boolean(report.checks.entity_totals.memberships.match)}
-            Bookings: #{format_boolean(report.checks.entity_totals.bookings.match)}
-            Events: #{format_boolean(report.checks.entity_totals.events.match)}
-            Donations: #{format_boolean(report.checks.entity_totals.donations.match)}
-            """,
+            value: Enum.join(lines, "\n") <> note,
             inline: false
           }
         ]
@@ -643,4 +654,10 @@ defmodule Ysc.Alerts.Discord do
   defp format_boolean(true), do: "✅"
   defp format_boolean(false), do: "❌"
   defp format_boolean(_), do: "❓"
+
+  defp entity_amounts_line(%{match: true}), do: ""
+
+  defp entity_amounts_line(%{ledger_revenue: l, payment_total: p}) do
+    " (ledger: #{Money.to_string!(l)} vs #{Money.to_string!(p)})"
+  end
 end

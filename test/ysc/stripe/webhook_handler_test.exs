@@ -1129,6 +1129,109 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
     end
+
+    test "preserves active status when incomplete webhook arrives during upgrade transition (active -> incomplete)" do
+      # When upgrading a plan (e.g. Single → Family), Stripe creates a proration invoice
+      # and briefly marks the subscription "incomplete" until payment settles. We must NOT
+      # persist "incomplete" to the DB, or the user will see a "No membership" banner
+      # until the follow-up "active" webhook arrives.
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "active",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      event_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "incomplete",
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event = build_stripe_event("customer.subscription.updated", event_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      subscription = Ysc.Repo.reload(subscription)
+      assert subscription.stripe_status == "active"
+      assert Subscriptions.active?(subscription)
+    end
+
+    test "preserves trialing status when incomplete webhook arrives during upgrade transition (trialing -> incomplete)" do
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "trialing",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      event_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "incomplete",
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event = build_stripe_event("customer.subscription.updated", event_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      subscription = Ysc.Repo.reload(subscription)
+      assert subscription.stripe_status == "trialing"
+    end
+
+    test "saves incomplete status when subscription was already incomplete (new unpaid subscription)" do
+      # A brand-new subscription that was never paid should stay "incomplete".
+      # The upgrade-transition guard must not suppress this.
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "incomplete",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      event_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "incomplete",
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event = build_stripe_event("customer.subscription.updated", event_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      subscription = Ysc.Repo.reload(subscription)
+      assert subscription.stripe_status == "incomplete"
+    end
   end
 
   describe "payment method webhooks" do

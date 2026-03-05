@@ -2612,6 +2612,8 @@ defmodule YscWeb.CoreComponents do
   attr :on_change, :string, default: "update-filter"
   attr :target, :string, default: nil
 
+  slot :inner_block
+
   @spec filter_form(map()) :: Phoenix.LiveView.Rendered.t()
   def filter_form(%{meta: meta} = assigns) do
     assigns =
@@ -2634,6 +2636,7 @@ defmodule YscWeb.CoreComponents do
           {i.rest}
         />
       </.filter_fields>
+      {render_slot(@inner_block)}
     </.form>
     """
   end
@@ -2702,6 +2705,48 @@ defmodule YscWeb.CoreComponents do
     else
       "https://gravatar.com/avatar/#{email_hash}?d=#{YscWeb.Endpoint.url()}#{image_path}&s=512"
     end
+  end
+
+  attr :id, :string, default: nil
+  attr :input_id, :string, required: true
+  attr :name, :string, required: true
+  attr :value, :string, default: ""
+  attr :placeholder, :string, default: "Search..."
+  attr :on_change, :string, default: "change"
+  attr :debounce, :string, default: "200"
+  attr :rest, :global, include: ~w(phx-submit phx-submit-disable)
+
+  def admin_search_bar(assigns) do
+    ~H"""
+    <form
+      id={@id}
+      action=""
+      novalidate=""
+      role="search"
+      phx-change={@on_change}
+      class="relative"
+      {@rest}
+    >
+      <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+        <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
+      </div>
+      <input
+        id={@input_id}
+        type="search"
+        name={@name}
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        enterkeyhint="search"
+        spellcheck="false"
+        placeholder={@placeholder}
+        value={@value}
+        tabindex="0"
+        phx-debounce={@debounce}
+        class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
+      />
+    </form>
+    """
   end
 
   attr :color, :string, default: "blue"
@@ -3410,8 +3455,10 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <section
       id="hero-section"
+      phx-hook={@video && "HeroVideoControls"}
       class={[
-        "relative w-full flex items-center justify-center overflow-hidden -mt-[88px] pt-[88px]",
+        "relative w-full flex items-center justify-center overflow-x-hidden overflow-y-auto -mt-[88px] pt-[88px]",
+        @video && "group",
         !@video && "bg-cover bg-center bg-no-repeat",
         @class
       ]}
@@ -3423,6 +3470,7 @@ defmodule YscWeb.CoreComponents do
     >
       <video
         :if={@video}
+        id="hero-video"
         autoplay
         muted
         loop
@@ -3433,13 +3481,33 @@ defmodule YscWeb.CoreComponents do
         <source src={@video} type="video/mp4" />
       </video>
 
+      <%!-- Pause/play control: visible on hover (or always on touch) for performance --%>
+      <div
+        :if={@video}
+        class="absolute bottom-4 right-4 z-20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+      >
+        <button
+          type="button"
+          data-hero-video-toggle
+          aria-label="Pause video"
+          class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+        >
+          <span class="pause-icon inline-flex [.paused_&]:hidden">
+            <.icon name="hero-pause" class="w-6 h-6" />
+          </span>
+          <span class="play-icon hidden [.paused_&]:!inline-flex">
+            <.icon name="hero-play" class="w-6 h-6" />
+          </span>
+        </button>
+      </div>
+
       <div
         :if={@overlay}
         class={["absolute inset-0 z-[1]", @overlay_opacity]}
         aria-hidden="true"
       />
 
-      <div class="relative z-10 max-w-screen-lg mx-auto px-4 py-16 text-center text-white">
+      <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 py-12 sm:py-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
         <h1
           :if={@title != []}
           class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-lg"

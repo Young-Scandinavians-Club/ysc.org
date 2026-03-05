@@ -1,8 +1,10 @@
 defmodule Ysc.EventsTest do
   use Ysc.DataCase
 
+  alias Ysc.Agendas
   alias Ysc.Events
-  alias Ysc.Events.Ticket
+  alias Ysc.Events.{FaqQuestion, Ticket}
+  alias Ysc.Repo
   import Ysc.AccountsFixtures
 
   setup do
@@ -304,6 +306,128 @@ defmodule Ysc.EventsTest do
 
       assert {:ok, deleted} = Events.delete_event(event)
       assert deleted.state == :deleted
+    end
+  end
+
+  describe "copy_event/1" do
+    test "creates a draft event with copied details and new reference_id", %{
+      user: user
+    } do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Original Event",
+          description: "Original description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert {:ok, copied} = Events.copy_event(source)
+
+      assert copied.state == :draft
+      assert copied.title == "Copy of Original Event"
+      assert copied.description == source.description
+      assert copied.organizer_id == source.organizer_id
+      refute copied.reference_id == source.reference_id
+      assert copied.published_at == nil
+      assert copied.publish_at == nil
+      assert copied.id != source.id
+    end
+
+    test "copies agendas and agenda items", %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Event With Agenda",
+          description: "Desc",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, agenda} = Agendas.create_agenda(source, %{title: "Day 1"})
+
+      {:ok, _item} =
+        Agendas.create_agenda_item(source.id, agenda, %{
+          title: "Opening Session"
+        })
+
+      source =
+        Events.get_event!(source.id) |> Repo.preload(agendas: :agenda_items)
+
+      assert {:ok, copied} = Events.copy_event(source)
+
+      copied =
+        Events.get_event!(copied.id) |> Repo.preload(agendas: :agenda_items)
+
+      assert length(copied.agendas) == 1
+      assert hd(copied.agendas).title == "Day 1"
+      assert hd(copied.agendas).event_id == copied.id
+      assert length(hd(copied.agendas).agenda_items) == 1
+      assert hd(hd(copied.agendas).agenda_items).title == "Opening Session"
+    end
+
+    test "copies ticket tiers but not tickets", %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Event With Tiers",
+          description: "Desc",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _tier} =
+        Events.create_ticket_tier(%{
+          name: "General",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: source.id
+        })
+
+      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
+
+      assert {:ok, copied} = Events.copy_event(source)
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert length(copied.ticket_tiers) == 1
+      assert hd(copied.ticket_tiers).name == "General"
+      assert hd(copied.ticket_tiers).event_id == copied.id
+
+      tickets = Events.list_tickets_for_event(copied.id)
+      assert tickets == []
+    end
+
+    test "copies FAQ questions", %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Event With FAQ",
+          description: "Desc",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      %FaqQuestion{}
+      |> Ecto.Changeset.change(%{
+        event_id: source.id,
+        question: "When?",
+        answer: "Tomorrow."
+      })
+      |> Repo.insert!()
+
+      source = Events.get_event!(source.id) |> Repo.preload(:faq_questions)
+
+      assert {:ok, copied} = Events.copy_event(source)
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:faq_questions)
+      assert length(copied.faq_questions) == 1
+      faq = hd(copied.faq_questions)
+      assert faq.question == "When?"
+      assert faq.answer == "Tomorrow."
+      assert faq.event_id == copied.id
     end
   end
 

@@ -2276,40 +2276,21 @@ defmodule YscWeb.AdminBookingsLive do
 
           <div class="w-full pt-4">
             <div>
-              <form
-                action=""
-                novalidate=""
-                role="search"
-                phx-change="change-reservation-search"
+              <.admin_search_bar
+                input_id="reservation-search"
+                name="search[query]"
+                value={
+                  case @reservation_params["search"] do
+                    %{"query" => query} -> query
+                    query when is_binary(query) -> query
+                    _ -> ""
+                  end
+                }
+                placeholder="Search by name, email or booking reference"
+                on_change="change-reservation-search"
                 phx-submit="change-reservation-search"
                 phx-submit-disable
-                class="relative"
-              >
-                <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
-                  <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
-                </div>
-                <input
-                  id="reservation-search"
-                  type="search"
-                  name="search[query]"
-                  autocomplete="off"
-                  autocorrect="off"
-                  autocapitalize="off"
-                  enterkeyhint="search"
-                  spellcheck="false"
-                  placeholder="Search by name, email or booking reference"
-                  value={
-                    case @reservation_params["search"] do
-                      %{"query" => query} -> query
-                      query when is_binary(query) -> query
-                      _ -> ""
-                    end
-                  }
-                  tabindex="0"
-                  phx-debounce="200"
-                  class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </form>
+              />
             </div>
             <div class="py-6 w-full overflow-x-auto">
               <Flop.Phoenix.table

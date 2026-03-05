@@ -262,16 +262,18 @@ defmodule YscWeb.UserLoginLive do
         phx-update="ignore"
       >
         <input type="hidden" name="redirect_to" value={@redirect_to} />
-        <.input field={@form[:email]} type="email" label="Email" required />
-        <.input
-          field={@form[:password]}
-          type="password-toggle"
-          label="Password"
-          required
-        />
+        <div class="space-y-4">
+          <.input field={@form[:email]} type="email" label="Email" required />
+          <.input
+            field={@form[:password]}
+            type="password-toggle"
+            label="Password"
+            required
+          />
+        </div>
 
         <:actions>
-          <div class="flex flex-col gap-3 w-full pb-4">
+          <div class="flex flex-col gap-3 w-full pb-2">
             <.button phx-disable-with="Signing in..." class="w-full">
               Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1 -mt-0.5" />
             </.button>
