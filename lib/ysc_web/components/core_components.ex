@@ -2236,7 +2236,7 @@ defmodule YscWeb.CoreComponents do
         <span
           role="tooltip"
           class={[
-            "absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-4 py-2 block rounded tooltip group-hover:opacity-100 whitespace-normal",
+            "absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-4 py-2 block rounded tooltip group-hover:opacity-100 group-hover:pointer-events-auto whitespace-normal",
             @max_width,
             @text_align
           ]}
@@ -2258,7 +2258,7 @@ defmodule YscWeb.CoreComponents do
       {render_slot(@inner_block)}
       <span
         role="tooltip"
-        class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-3 py-2 inline-block text-left rounded tooltip group-hover:opacity-100"
+        class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-3 py-2 inline-block text-left rounded tooltip group-hover:opacity-100 group-hover:pointer-events-auto"
       >
         {render_slot(@tooltip_body)}
       </span>
