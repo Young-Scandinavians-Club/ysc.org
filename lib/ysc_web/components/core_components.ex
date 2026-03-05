@@ -2013,7 +2013,7 @@ defmodule YscWeb.CoreComponents do
         class={
           Enum.join(
             [
-              "w-10 rounded-full ring-2 ring-zinc-200 ring-offset-2 ring-offset-white",
+              "w-10 h-10 rounded-full ring-2 ring-zinc-200 ring-offset-2 ring-offset-white",
               @right && "order-2"
             ],
             " "
