@@ -1,7 +1,7 @@
 const STORAGE_KEY = "ysc_admin_button_corner";
 const DRAG_THRESHOLD_PX = 5;
 const BASE_CLASSES =
-  "fixed z-[60] group print:hidden transition-[left,right,top,bottom] duration-300 ease-out";
+  "fixed z-[60] group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
 
 const CORNER_CLASSES = {
   "top-left": "top-6 left-6",
@@ -27,15 +27,16 @@ function saveCorner(corner) {
 }
 
 function applyCorner(el, corner) {
-  const classes = `${BASE_CLASSES} ${CORNER_CLASSES[corner]}`;
-  el.className = classes;
+  const rightCorner = corner === "top-right" || corner === "bottom-right";
+  const cornerRightClass = rightCorner ? " corner-right" : "";
+  el.className = `${BASE_CLASSES} ${CORNER_CLASSES[corner]}${cornerRightClass}`;
 }
 
-function cornerFromPosition(rect, viewportWidth, viewportHeight) {
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const vertical = centerY < viewportHeight / 2 ? "top" : "bottom";
-  const horizontal = centerX < viewportWidth / 2 ? "left" : "right";
+function cornerFromPoint(clientX, clientY, viewportWidth, viewportHeight) {
+  const vertical =
+    clientY < viewportHeight / 2 ? "top" : "bottom";
+  const horizontal =
+    clientX < viewportWidth / 2 ? "left" : "right";
   return `${vertical}-${horizontal}`;
 }
 
@@ -77,31 +78,61 @@ const AdminFloatingButton = {
 
   handleMousedown(event) {
     if (event.button !== 0) return;
-    this.dragStart = { x: event.clientX, y: event.clientY };
+    event.preventDefault();
+    const wrapper = this.el;
+    const rect = wrapper.getBoundingClientRect();
+    this.dragStart = {
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
     this.isDragging = false;
   },
 
   handleMousemove(event) {
     if (this.dragStart == null) return;
+    const wrapper = this.el;
     const dx = event.clientX - this.dragStart.x;
     const dy = event.clientY - this.dragStart.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance >= DRAG_THRESHOLD_PX) {
+
+    if (!this.isDragging && distance >= DRAG_THRESHOLD_PX) {
       this.isDragging = true;
+      wrapper.style.transition = "none";
+      wrapper.style.right = "auto";
+      wrapper.style.bottom = "auto";
+      wrapper.style.left = `${event.clientX - this.dragStart.offsetX}px`;
+      wrapper.style.top = `${event.clientY - this.dragStart.offsetY}px`;
+    }
+
+    if (this.isDragging) {
+      wrapper.style.left = `${event.clientX - this.dragStart.offsetX}px`;
+      wrapper.style.top = `${event.clientY - this.dragStart.offsetY}px`;
     }
   },
 
-  handleMouseup() {
+  handleMouseup(event) {
     if (this.dragStart == null) return;
 
+    const wrapper = this.el;
+
     if (this.isDragging) {
-      const wrapper = this.el;
-      const rect = wrapper.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const corner = cornerFromPosition(rect, viewportWidth, viewportHeight);
+      const corner = cornerFromPoint(
+        event.clientX,
+        event.clientY,
+        viewportWidth,
+        viewportHeight
+      );
       applyCorner(wrapper, corner);
       saveCorner(corner);
+      wrapper.style.left = "";
+      wrapper.style.top = "";
+      wrapper.style.right = "";
+      wrapper.style.bottom = "";
+      wrapper.style.transition = "";
       this.justDragged = true;
       const self = this;
       setTimeout(() => {
