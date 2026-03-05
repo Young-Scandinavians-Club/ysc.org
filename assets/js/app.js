@@ -69,6 +69,7 @@ import DecadeIndicator from "./decade_indicator";
 import FooterRotator from "./footer_rotator";
 import ScrollMoreIndicator from "./scroll_more_indicator";
 import HeroVideoControls from "./hero_video_controls";
+import AdminFloatingButton from "./admin_floating_button";
 import { createLiveToastHook } from "../../deps/live_toast";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
@@ -118,6 +119,7 @@ let Hooks = {
     FooterRotator,
     ScrollMoreIndicator,
     HeroVideoControls,
+    AdminFloatingButton,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
 };
 Hooks.LivePhone = LivePhone;
