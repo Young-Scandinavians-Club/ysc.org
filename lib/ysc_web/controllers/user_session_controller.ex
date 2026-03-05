@@ -224,7 +224,9 @@ defmodule YscWeb.UserSessionController do
     redirect_to = params["redirect_to"] || conn.query_params["redirect_to"]
 
     conn
-    |> YscWeb.Flash.put_toast(:info, "Signed out successfully.", title: "Logout")
+    |> YscWeb.Flash.put_toast(:info, "Signed out successfully.",
+      title: "Logout"
+    )
     |> UserAuth.log_out_user(redirect_to)
   end
 

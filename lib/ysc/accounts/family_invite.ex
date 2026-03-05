@@ -42,7 +42,13 @@ defmodule Ysc.Accounts.FamilyInvite do
   """
   def changeset(invite, attrs) do
     invite
-    |> cast(attrs, [:email, :token, :primary_user_id, :created_by_user_id, :relationship])
+    |> cast(attrs, [
+      :email,
+      :token,
+      :primary_user_id,
+      :created_by_user_id,
+      :relationship
+    ])
     |> validate_required([
       :email,
       :token,

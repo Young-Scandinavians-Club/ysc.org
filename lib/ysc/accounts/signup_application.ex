@@ -40,7 +40,10 @@ defmodule Ysc.Accounts.SignupApplication do
   @timestamps_opts [type: :utc_datetime]
   schema "signup_applications" do
     belongs_to :user, Ysc.Accounts.User, foreign_key: :user_id, references: :id
-    belongs_to :family_invite, Ysc.Accounts.FamilyInvite, foreign_key: :family_invite_id, references: :id
+
+    belongs_to :family_invite, Ysc.Accounts.FamilyInvite,
+      foreign_key: :family_invite_id,
+      references: :id
 
     field :membership_type, MembershipType
     field :membership_eligibility, {:array, MembershipEligibility}, default: []

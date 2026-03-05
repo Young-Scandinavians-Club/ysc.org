@@ -42,9 +42,11 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         if current_user && !can_link_existing do
           {:ok,
            socket
-           |> push_navigate(to: ~p"/family-invite/#{invite.token}/logout-required")}
+           |> push_navigate(
+             to: ~p"/family-invite/#{invite.token}/logout-required"
+           )}
         else
-            # Pre-fill email and most_connected_country from invite/primary user, but allow editing
+          # Pre-fill email and most_connected_country from invite/primary user, but allow editing
           initial_params = %{"email" => invite.email}
 
           # Pre-fill most_connected_country from primary user if available
@@ -117,7 +119,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
       {:error, :invite_not_found} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Invitation not found.", title: "Invitation")
+         |> YscWeb.Flash.put_toast(:error, "Invitation not found.",
+           title: "Invitation"
+         )
          |> redirect(to: ~p"/")}
 
       {:error, :invite_expired_or_used} ->
@@ -216,8 +220,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         <div :if={@can_link_existing} class="mt-8">
           <div class="rounded-lg border border-blue-200 bg-blue-50 p-6">
             <p class="text-sm text-blue-800 mb-4">
-              You're logged in as <strong>{@current_user.email}</strong>. Click below to join
-              <strong>{@invite.primary_user.first_name}</strong>'s family membership.
+              You're logged in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.
             </p>
             <.button
               phx-click="link_existing"
@@ -236,7 +239,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
               You already have an account with this email. Log in to accept this invitation.
             </p>
             <.link
-              navigate={~p"/users/log-in?redirect_to=#{~p"/family-invite/#{@invite.token}/accept"}"}
+              navigate={
+                ~p"/users/log-in?redirect_to=#{~p"/family-invite/#{@invite.token}/accept"}"
+              }
               class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500"
             >
               Log in to accept
@@ -291,10 +296,12 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         </div>
 
         <%!-- When existing user but logged in with different account --%>
-        <div :if={@existing_user && @current_user && !@can_link_existing} class="mt-8">
+        <div
+          :if={@existing_user && @current_user && !@can_link_existing}
+          class="mt-8"
+        >
           <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-4">
-            You're logged in as a different account. To accept this invitation for
-            <strong>{@invite.email}</strong>, please log out and either log in with that email or
+            You're logged in as a different account. To accept this invitation for <strong>{@invite.email}</strong>, please log out and either log in with that email or
             create a new account with that email.
           </p>
         </div>

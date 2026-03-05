@@ -49,7 +49,8 @@ defmodule YscWeb.FamilyManagementLive do
       invites = FamilyInvites.list_invites(user)
 
       invite_form =
-        to_form(%{"email" => "", "family_member_id" => "", "relationship" => "child"},
+        to_form(
+          %{"email" => "", "family_member_id" => "", "relationship" => "child"},
           as: "invite"
         )
 
@@ -83,6 +84,7 @@ defmodule YscWeb.FamilyManagementLive do
     user = socket.assigns.current_user
     email = invite_params["email"]
     family_member_id = invite_params["family_member_id"]
+
     relationship =
       case invite_params["relationship"] do
         "spouse" -> :spouse
@@ -90,6 +92,7 @@ defmodule YscWeb.FamilyManagementLive do
       end
 
     opts = [relationship: relationship]
+
     opts =
       if family_member_id && family_member_id != "",
         do: Keyword.put(opts, :family_member_id, family_member_id),
@@ -637,7 +640,9 @@ defmodule YscWeb.FamilyManagementLive do
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-zinc-200">
-                        <tr :for={invite <- Enum.filter(@invites, &is_nil(&1.accepted_at))}>
+                        <tr :for={
+                          invite <- Enum.filter(@invites, &is_nil(&1.accepted_at))
+                        }>
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                             {invite.email}
                           </td>

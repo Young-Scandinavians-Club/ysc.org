@@ -111,7 +111,11 @@ defmodule Ysc.Accounts.FamilyInvites do
               # Mark email as verified (email was verified by primary user when sending invite)
               # and ensure password_set_at is set if password was provided
               now = DateTime.utc_now() |> DateTime.truncate(:second)
-              update_attrs = %{email_verified_at: now, family_relationship: relationship}
+
+              update_attrs = %{
+                email_verified_at: now,
+                family_relationship: relationship
+              }
 
               # Ensure password_set_at is set if password was provided but wasn't set by changeset
               update_attrs =
@@ -267,8 +271,10 @@ defmodule Ysc.Accounts.FamilyInvites do
     end
   end
 
-  defp emails_match?(user_email, invite_email) when is_binary(user_email) and is_binary(invite_email) do
-    String.downcase(String.trim(user_email)) == String.downcase(String.trim(invite_email))
+  defp emails_match?(user_email, invite_email)
+       when is_binary(user_email) and is_binary(invite_email) do
+    String.downcase(String.trim(user_email)) ==
+      String.downcase(String.trim(invite_email))
   end
 
   defp emails_match?(_, _), do: false
@@ -458,7 +464,9 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   defp count_spouses(primary_user) do
     from(u in User,
-      where: u.primary_user_id == ^primary_user.id and u.family_relationship == "spouse"
+      where:
+        u.primary_user_id == ^primary_user.id and
+          u.family_relationship == "spouse"
     )
     |> Repo.aggregate(:count, :id)
   end
@@ -477,7 +485,9 @@ defmodule Ysc.Accounts.FamilyInvites do
   defp validate_relationship_limits(primary_user, relationship) do
     cond do
       relationship == :spouse || relationship == "spouse" ->
-        spouses = count_spouses(primary_user) + count_pending_spouse_invites(primary_user)
+        spouses =
+          count_spouses(primary_user) +
+            count_pending_spouse_invites(primary_user)
 
         if spouses >= @max_spouses do
           {:error, :max_spouses_reached}
@@ -531,6 +541,7 @@ defmodule Ysc.Accounts.FamilyInvites do
 
     # Button text depends on whether invitee has an existing account
     existing_user = Ysc.Accounts.get_user_by_email(invite.email)
+
     invite_button_text =
       if existing_user do
         "Join family membership"

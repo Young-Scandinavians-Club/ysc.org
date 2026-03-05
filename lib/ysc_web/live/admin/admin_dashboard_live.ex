@@ -261,8 +261,8 @@ defmodule YscWeb.AdminDashboardLive do
               View all memberships →
             </p>
           </.link>
-
-          <!-- Active Now Card -->
+          
+    <!-- Active Now Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
               <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
@@ -551,7 +551,12 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:revenue_mix_membership_percent, 0)
       |> assign(:active_guests_count, 0)
       |> assign(:active_guests_sample, [])
-      |> assign(:membership_stats, %{total: 0, single: 0, family: 0, lifetime: 0})
+      |> assign(:membership_stats, %{
+        total: 0,
+        single: 0,
+        family: 0,
+        lifetime: 0
+      })
 
     # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do

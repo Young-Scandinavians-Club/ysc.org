@@ -159,7 +159,8 @@ defmodule YscWeb.UserAuth do
     end
 
     redirect_path =
-      if redirect_to && String.starts_with?(redirect_to, "/") && !String.starts_with?(redirect_to, "//") do
+      if redirect_to && String.starts_with?(redirect_to, "/") &&
+           !String.starts_with?(redirect_to, "//") do
         redirect_to
       else
         ~p"/"

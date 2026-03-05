@@ -299,7 +299,12 @@ defmodule Ysc.Accounts.User do
   """
   def approve_user_changeset(user, attrs) do
     user
-    |> cast(attrs, [:state, :date_of_birth, :primary_user_id, :family_relationship])
+    |> cast(attrs, [
+      :state,
+      :date_of_birth,
+      :primary_user_id,
+      :family_relationship
+    ])
     |> validate_date_of_birth()
   end
 

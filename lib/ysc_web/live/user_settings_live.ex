@@ -827,7 +827,10 @@ defmodule YscWeb.UserSettingsLive do
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
-              <div :if={@pending_family_invites != []} class="mt-6 border-t border-zinc-100 pt-4">
+              <div
+                :if={@pending_family_invites != []}
+                class="mt-6 border-t border-zinc-100 pt-4"
+              >
                 <h3 class="text-sm font-semibold text-zinc-900">
                   Pending Family Invitations
                 </h3>
@@ -877,7 +880,10 @@ defmodule YscWeb.UserSettingsLive do
                 <.icon name="hero-user-group" class="w-4 h-4" />
                 Add family members to your membership
               </.link>
-              <div :if={@pending_family_invites != []} class="mt-6 border-t border-zinc-100 pt-4">
+              <div
+                :if={@pending_family_invites != []}
+                class="mt-6 border-t border-zinc-100 pt-4"
+              >
                 <h3 class="text-sm font-semibold text-zinc-900">
                   Pending Family Invitations
                 </h3>
@@ -1243,7 +1249,10 @@ defmodule YscWeb.UserSettingsLive do
                   Add family members to your membership
                 </.link>
 
-                <div :if={@pending_family_invites != []} class="mt-6 border-t border-zinc-100 pt-4">
+                <div
+                  :if={@pending_family_invites != []}
+                  class="mt-6 border-t border-zinc-100 pt-4"
+                >
                   <h3 class="text-sm font-semibold text-zinc-900">
                     Pending Family Invitations
                   </h3>
@@ -2235,7 +2244,9 @@ defmodule YscWeb.UserSettingsLive do
     email_changeset = Accounts.change_user_email(user)
     profile_changeset = Accounts.change_user_profile(user)
     notification_changeset = Accounts.change_notification_preferences(user)
-    pending_family_invites = FamilyInvites.list_pending_invites_for_email(user.email)
+
+    pending_family_invites =
+      FamilyInvites.list_pending_invites_for_email(user.email)
 
     # Base socket assigns that don't require expensive queries
     socket =
@@ -4068,7 +4079,8 @@ defmodule YscWeb.UserSettingsLive do
         membership -> Subscriptions.get_scheduled_downgrade_info(membership)
       end
 
-    pending_family_invites = FamilyInvites.list_pending_invites_for_email(user.email)
+    pending_family_invites =
+      FamilyInvites.list_pending_invites_for_email(user.email)
 
     socket
     |> assign(:user, user)

@@ -176,6 +176,7 @@ defmodule YscWeb.HomeLive do
 
     # For family/lifetime members, get family group (primary + sub-accounts)
     user_for_family = primary_user || user_with_subs
+
     family_group =
       if user_for_family do
         Accounts.get_family_group(user_for_family)
@@ -184,7 +185,8 @@ defmodule YscWeb.HomeLive do
       end
 
     # Get active plan type for showing "Your Family" section
-    active_plan_type = Ysc.Accounts.MembershipCache.get_membership_plan_type(user_for_family)
+    active_plan_type =
+      Ysc.Accounts.MembershipCache.get_membership_plan_type(user_for_family)
 
     # Only show family section for primary users with family/lifetime and linked members
     other_family_members =
@@ -202,6 +204,7 @@ defmodule YscWeb.HomeLive do
     # Handle logged-in user async results
     {is_sub_account, primary_user, other_family_members} =
       Map.get(results, :user_data, {false, nil, []})
+
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
     upcoming_events = Map.get(results, :events, [])

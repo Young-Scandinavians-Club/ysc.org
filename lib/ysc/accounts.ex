@@ -1778,40 +1778,40 @@ defmodule Ysc.Accounts do
             :user,
             User.approve_user_changeset(user, user_approval_attrs)
           )
-        |> Ecto.Multi.update(
-          :application,
-          SignupApplication.review_outcome_changeset(application, %{
-            reviewed_at: DateTime.utc_now(),
-            review_outcome: :approved,
-            reviewed_by_user_id: current_user.id
-          })
-        )
-        |> Ecto.Multi.insert(
-          :application_event,
-          SignupApplicationEvent.new_event_changeset(
-            %SignupApplicationEvent{},
-            %{
-              event: :review_completed,
-              application_id: application.id,
-              user_id: user.id,
-              reviewer_user_id: current_user.id,
-              result: "approved"
-            }
+          |> Ecto.Multi.update(
+            :application,
+            SignupApplication.review_outcome_changeset(application, %{
+              reviewed_at: DateTime.utc_now(),
+              review_outcome: :approved,
+              reviewed_by_user_id: current_user.id
+            })
           )
-        )
-        |> Ecto.Multi.insert(
-          :user_event,
-          UserEvent.new_user_event_changeset(
-            %UserEvent{},
-            %{
-              user_id: user.id,
-              updated_by_user_id: current_user.id,
-              type: :state_update,
-              from: "#{user.state}",
-              to: "active"
-            }
+          |> Ecto.Multi.insert(
+            :application_event,
+            SignupApplicationEvent.new_event_changeset(
+              %SignupApplicationEvent{},
+              %{
+                event: :review_completed,
+                application_id: application.id,
+                user_id: user.id,
+                reviewer_user_id: current_user.id,
+                result: "approved"
+              }
+            )
           )
-        )
+          |> Ecto.Multi.insert(
+            :user_event,
+            UserEvent.new_user_event_changeset(
+              %UserEvent{},
+              %{
+                user_id: user.id,
+                updated_by_user_id: current_user.id,
+                type: :state_update,
+                from: "#{user.state}",
+                to: "active"
+              }
+            )
+          )
 
         # When family invite, mark invite as accepted
         multi_with_invite =
@@ -2412,44 +2412,53 @@ defmodule Ysc.Accounts do
 
   defp has_family_or_lifetime_membership?(user) do
     has_lifetime_membership?(user) or
-      (case user.subscriptions do
-         %Ecto.Association.NotLoaded{} ->
-           subs = Ysc.Subscriptions.list_subscriptions(user)
-           Enum.any?(subs, fn s ->
-             s = Repo.preload(s, :subscription_items)
+      case user.subscriptions do
+        %Ecto.Association.NotLoaded{} ->
+          subs = Ysc.Subscriptions.list_subscriptions(user)
 
-             case s.subscription_items do
-               [item | _] ->
-                 plans = Application.get_env(:ysc, :membership_plans, [])
-                 Enum.any?(plans, fn p -> p.stripe_price_id == item.stripe_price_id and p.id == :family end)
+          Enum.any?(subs, fn s ->
+            s = Repo.preload(s, :subscription_items)
 
-               _ ->
-                 false
-             end
-           end)
+            case s.subscription_items do
+              [item | _] ->
+                plans = Application.get_env(:ysc, :membership_plans, [])
 
-         subs when is_list(subs) ->
-           Enum.any?(subs, fn s ->
-             s = Repo.preload(s, :subscription_items)
+                Enum.any?(plans, fn p ->
+                  p.stripe_price_id == item.stripe_price_id and p.id == :family
+                end)
 
-             case s.subscription_items do
-               [item | _] ->
-                 plans = Application.get_env(:ysc, :membership_plans, [])
-                 Enum.any?(plans, fn p -> p.stripe_price_id == item.stripe_price_id and p.id == :family end)
+              _ ->
+                false
+            end
+          end)
 
-               _ ->
-                 false
-             end
-           end)
+        subs when is_list(subs) ->
+          Enum.any?(subs, fn s ->
+            s = Repo.preload(s, :subscription_items)
 
-         _ ->
-           false
-       end)
+            case s.subscription_items do
+              [item | _] ->
+                plans = Application.get_env(:ysc, :membership_plans, [])
+
+                Enum.any?(plans, fn p ->
+                  p.stripe_price_id == item.stripe_price_id and p.id == :family
+                end)
+
+              _ ->
+                false
+            end
+          end)
+
+        _ ->
+          false
+      end
   end
 
   defp count_spouses(primary_user) do
     from(u in User,
-      where: u.primary_user_id == ^primary_user.id and u.family_relationship == "spouse"
+      where:
+        u.primary_user_id == ^primary_user.id and
+          u.family_relationship == "spouse"
     )
     |> Repo.aggregate(:count, :id)
   end
@@ -2517,9 +2526,11 @@ defmodule Ysc.Accounts do
       case result do
         {:ok, %{sub_account: updated_sub_account}} ->
           MembershipCache.invalidate_user(updated_sub_account.id)
+
           if primary_user do
             send_family_member_removed_email(updated_sub_account, primary_user)
           end
+
           {:ok, updated_sub_account}
 
         {:error, _, changeset, _} ->
@@ -2583,7 +2594,8 @@ defmodule Ysc.Accounts do
       primary_user_name: primary_name
     }
 
-    idempotency_key = "family_member_removed_#{removed_user.id}_#{primary_user.id}"
+    idempotency_key =
+      "family_member_removed_#{removed_user.id}_#{primary_user.id}"
 
     YscWeb.Emails.Notifier.schedule_email(
       removed_user.email,
@@ -2725,7 +2737,10 @@ defmodule Ysc.Accounts do
 
         [sub | _] ->
           membership_plans = Application.get_env(:ysc, :membership_plans, [])
-          price_to_type = Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
+
+          price_to_type =
+            Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
+
           sub = Repo.preload(sub, :subscription_items)
 
           case sub.subscription_items do
@@ -2738,15 +2753,20 @@ defmodule Ysc.Accounts do
 
         multiple ->
           membership_plans = Application.get_env(:ysc, :membership_plans, [])
-          price_to_type = Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
+
+          price_to_type =
+            Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
 
           multiple
           |> Enum.map(fn s ->
             s = Repo.preload(s, :subscription_items)
 
             case s.subscription_items do
-              [item | _] -> Map.get(price_to_type, item.stripe_price_id, :single)
-              _ -> :single
+              [item | _] ->
+                Map.get(price_to_type, item.stripe_price_id, :single)
+
+              _ ->
+                :single
             end
           end)
           |> Enum.max_by(fn t ->

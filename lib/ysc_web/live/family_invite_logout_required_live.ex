@@ -25,7 +25,9 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
       is_nil(invite) ->
         {:ok,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Invalid invitation link.", title: "Invitation")
+         |> YscWeb.Flash.put_toast(:error, "Invalid invitation link.",
+           title: "Invitation"
+         )
          |> redirect(to: ~p"/")}
 
       not Ysc.Accounts.FamilyInvite.valid?(invite) ->
@@ -79,7 +81,8 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
           <p :if={@existing_user} class="text-zinc-600 mb-6">
             To accept this invitation for <strong>{@invite.email}</strong>, you need to log out from the
             current account and then log in using <strong>{@invite.email}</strong>. After logging in, go to
-            your <strong>Membership</strong> page to review and accept the pending family invitation.
+            your <strong>Membership</strong>
+            page to review and accept the pending family invitation.
           </p>
           <p :if={!@existing_user} class="text-zinc-600 mb-6">
             To accept this invitation for <strong>{@invite.email}</strong>, you need to log out and
@@ -88,7 +91,11 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
             membership.
           </p>
           <form action={@logout_redirect_url} method="post">
-            <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+            <input
+              type="hidden"
+              name="_csrf_token"
+              value={Phoenix.Controller.get_csrf_token()}
+            />
             <input type="hidden" name="redirect_to" value={@redirect_to} />
             <button
               type="submit"

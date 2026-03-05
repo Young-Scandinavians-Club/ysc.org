@@ -459,6 +459,7 @@ defmodule YscWeb.UserRegistrationLive do
 
     # Check for family invite link (from logout-required flow)
     family_invite = get_family_invite_from_params(params)
+
     initial_attrs =
       if family_invite do
         %{

@@ -262,7 +262,9 @@ defmodule YscWeb.AdminMembershipsLive do
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <.link
-                        navigate={~p"/admin/users/#{membership.primary_user.id}/details/membership"}
+                        navigate={
+                          ~p"/admin/users/#{membership.primary_user.id}/details/membership"
+                        }
                         class="text-sm font-medium text-blue-600 hover:text-blue-800"
                       >
                         Manage
@@ -275,7 +277,10 @@ defmodule YscWeb.AdminMembershipsLive do
           </div>
 
           <div :if={@memberships == []} class="py-16 text-center">
-            <.icon name="hero-user-group" class="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+            <.icon
+              name="hero-user-group"
+              class="w-12 h-12 text-zinc-300 mx-auto mb-4"
+            />
             <p class="text-zinc-500 font-medium">No memberships found</p>
             <p class="text-sm text-zinc-400 mt-1">
               <%= if @type_filter do %>
