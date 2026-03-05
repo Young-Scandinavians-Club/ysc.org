@@ -17,6 +17,7 @@ defmodule YscWeb.CoreComponents do
   use Phoenix.Component
   use Gettext, backend: YscWeb.Gettext
 
+  import Exgravatar
   import Flop.Phoenix
   alias Phoenix.LiveView.JS
 
@@ -2677,9 +2678,6 @@ defmodule YscWeb.CoreComponents do
 
     cleaned_email = String.downcase(email) |> String.trim()
 
-    email_hash =
-      :crypto.hash(:sha256, cleaned_email) |> Base.encode16(case: :lower)
-
     image_id =
       user_id |> String.replace(~r/[^\d]/, "") |> String.to_integer() |> rem(2)
 
@@ -2692,18 +2690,19 @@ defmodule YscWeb.CoreComponents do
 
     assigns =
       assigns
-      |> assign(:full_path, full_path(email_hash, image_path))
+      |> assign(:full_path, full_path(cleaned_email, image_path))
 
     ~H"""
     <img class={@class} src={@full_path} loading="lazy" alt="User avatar" />
     """
   end
 
-  defp full_path(email_hash, image_path) do
+  defp full_path(email, image_path) do
     if Application.get_env(:ysc, :dev_routes, false) == true do
       image_path
     else
-      "https://gravatar.com/avatar/#{email_hash}?d=#{YscWeb.Endpoint.url()}#{image_path}&s=512"
+      default_url = YscWeb.Endpoint.url() <> image_path
+      gravatar_url(email, s: 512, d: default_url)
     end
   end
 
