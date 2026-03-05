@@ -4,10 +4,10 @@ const BASE_CLASSES =
   "fixed z-[60] group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
 
 const CORNER_CLASSES = {
-  "top-left": "top-6 left-6",
-  "top-right": "top-6 right-6",
-  "bottom-left": "bottom-6 left-6",
-  "bottom-right": "bottom-6 right-6",
+  "top-left": "top-4 left-4",
+  "top-right": "top-4 right-4",
+  "bottom-left": "bottom-4 left-4",
+  "bottom-right": "bottom-4 right-4",
 };
 
 const VALID_CORNERS = Object.keys(CORNER_CLASSES);
