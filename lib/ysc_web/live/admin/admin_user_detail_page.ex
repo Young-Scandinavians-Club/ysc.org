@@ -2,6 +2,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
+  alias Phoenix.LiveView.JS
 
   use Phoenix.VerifiedRoutes,
     endpoint: YscWeb.Endpoint,
@@ -366,6 +367,13 @@ defmodule YscWeb.AdminUserDetailsLive do
               items={@streams.ticket_orders}
               meta={@ticket_orders_meta}
               path={~p"/admin/users/#{@user_id}/details/orders"}
+              row_click={
+                fn {_id, order} ->
+                  order.event_id &&
+                    JS.navigate(~p"/admin/events/#{order.event_id}/tickets")
+                end
+              }
+              opts={[tbody_tr_attrs: [class: "hover:bg-zinc-50 cursor-pointer"]]}
             >
               <:col :let={{_, order}} label="Order ID" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
@@ -461,6 +469,12 @@ defmodule YscWeb.AdminUserDetailsLive do
               items={@streams.bookings}
               meta={@bookings_meta}
               path={~p"/admin/users/#{@user_id}/details/bookings"}
+              row_click={
+                fn {_id, booking} ->
+                  JS.navigate(~p"/admin/bookings/#{booking.id}")
+                end
+              }
+              opts={[tbody_tr_attrs: [class: "hover:bg-zinc-50 cursor-pointer"]]}
             >
               <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
@@ -556,14 +570,6 @@ defmodule YscWeb.AdminUserDetailsLive do
                   {Calendar.strftime(booking.inserted_at, "%b %d, %Y")}
                 </span>
               </:col>
-              <:action :let={{_, booking}} label="Action">
-                <.link
-                  navigate={~p"/admin/bookings/#{booking.id}"}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                >
-                  View
-                </.link>
-              </:action>
             </Flop.Phoenix.table>
 
             <Flop.Phoenix.pagination
