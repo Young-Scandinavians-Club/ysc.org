@@ -13,6 +13,7 @@ import ScrollPreserver from "./scroll_preserver";
 import Autocomplete from "./autocomplete";
 import ClipboardCopy from "./clipboard_copy";
 import GrowingInput from "./growing_input_field";
+import FocusSearchInput from "./focus_search_input";
 
 window.__adminHooks = {
     TrixHook,
@@ -27,4 +28,5 @@ window.__adminHooks = {
     Autocomplete,
     ClipboardCopy,
     GrowingInput,
+    FocusSearchInput,
 };
