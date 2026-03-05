@@ -41,18 +41,28 @@ defmodule YscWeb.Endpoint do
 
   # Serve at "/" the static files from "priv/static" directory.
   #
-  # You should set gzip to true if you are running phx.digest
-  # when deploying your static files in production.
-  plug Plug.Static,
-    at: "/",
-    from: :ysc,
-    encodings: [{"zstd", ".zst"}],
-    gzip: true,
-    brotli: true,
-    only: YscWeb.static_paths(),
-    # Aggressive caching for Cloudflare - Phoenix digest ensures all assets are hashed
-    # 1 year cache (31536000 seconds) with immutable flag since hashed assets never change
-    cache_control_for_etags: "public, max-age=31536000, immutable"
+  # In production, assets are fingerprinted by phx.digest so we can cache
+  # them aggressively. In development we must NOT cache them or browsers will
+  # ignore updates made by the esbuild/tailwind watchers even after LiveReload
+  # triggers a page refresh.
+  if code_reloading? do
+    plug Plug.Static,
+      at: "/",
+      from: :ysc,
+      gzip: false,
+      only: YscWeb.static_paths()
+  else
+    plug Plug.Static,
+      at: "/",
+      from: :ysc,
+      encodings: [{"zstd", ".zst"}],
+      gzip: true,
+      brotli: true,
+      only: YscWeb.static_paths(),
+      # Aggressive caching for Cloudflare - Phoenix digest ensures all assets are hashed
+      # 1 year cache (31536000 seconds) with immutable flag since hashed assets never change
+      cache_control_for_etags: "public, max-age=31536000, immutable"
+  end
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
