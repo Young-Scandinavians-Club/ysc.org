@@ -11,6 +11,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
+  @max_spouses 1
 
   @doc """
   Creates a family invite for the given primary user.
@@ -19,27 +20,31 @@ defmodule Ysc.Accounts.FamilyInvites do
   - Primary user is active
   - Primary user has family or lifetime membership
   - Primary user has less than 10 sub-accounts
-  - Email is not already a user
+  - Max 1 spouse (when relationship is :spouse)
   - Email doesn't have a pending invite from this primary user
+  - If email is already registered, allows linking existing user (does not reject)
 
   Returns {:ok, invite} or {:error, reason}
 
   ## Options
   - `family_member_id` - Optional ID of a family member from registration form to include in email
+  - `relationship` - Required. Either :spouse or :child. Max 1 spouse per family.
   """
   def create_invite(primary_user, email, opts \\ []) do
     family_member_id = Keyword.get(opts, :family_member_id)
+    relationship = Keyword.get(opts, :relationship, :child)
 
     with :ok <- validate_primary_user_eligibility(primary_user),
-         :ok <- validate_email_available(email, primary_user.id),
+         :ok <- validate_relationship_limits(primary_user, relationship),
          :ok <- validate_no_pending_invite(email, primary_user.id) do
       token = FamilyInvite.build_token()
 
       attrs = %{
-        email: email,
+        email: String.downcase(String.trim(email)),
         token: token,
         primary_user_id: primary_user.id,
-        created_by_user_id: primary_user.id
+        created_by_user_id: primary_user.id,
+        relationship: relationship
       }
 
       case %FamilyInvite{}
@@ -95,6 +100,9 @@ defmodule Ysc.Accounts.FamilyInvites do
                )
                |> Repo.insert() do
             {:ok, user} ->
+              # Set family_relationship from invite
+              relationship = invite.relationship || :child
+
               # Mark invite as accepted
               invite
               |> FamilyInvite.accept_changeset()
@@ -103,7 +111,7 @@ defmodule Ysc.Accounts.FamilyInvites do
               # Mark email as verified (email was verified by primary user when sending invite)
               # and ensure password_set_at is set if password was provided
               now = DateTime.utc_now() |> DateTime.truncate(:second)
-              update_attrs = %{email_verified_at: now}
+              update_attrs = %{email_verified_at: now, family_relationship: relationship}
 
               # Ensure password_set_at is set if password was provided but wasn't set by changeset
               update_attrs =
@@ -114,7 +122,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                   update_attrs
                 end
 
-              # Update user with verification and password_set_at
+              # Update user with verification, password_set_at, and family_relationship
               updated_user =
                 user
                 |> Ecto.Changeset.change(update_attrs)
@@ -201,6 +209,71 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Links an existing user to a family membership via invite.
+
+  The user must be logged in and their email must match the invite.
+  Returns {:ok, user} or {:error, reason}.
+  """
+  def link_existing_user(token, current_user) do
+    invite = get_invite_by_token(token)
+
+    cond do
+      is_nil(invite) ->
+        {:error, :invite_not_found}
+
+      not FamilyInvite.valid?(invite) ->
+        {:error, :invite_expired_or_used}
+
+      not emails_match?(current_user.email, invite.email) ->
+        {:error, :email_mismatch}
+
+      Ysc.Accounts.sub_account?(current_user) ->
+        {:error, :already_linked_to_family}
+
+      current_user.id == invite.primary_user_id ->
+        {:error, :cannot_link_self}
+
+      true ->
+        Repo.transaction(fn ->
+          relationship = invite.relationship || :child
+
+          updated_user =
+            current_user
+            |> Ecto.Changeset.change(%{
+              primary_user_id: invite.primary_user_id,
+              family_relationship: relationship
+            })
+            |> Repo.update!()
+
+          invite
+          |> FamilyInvite.accept_changeset()
+          |> Repo.update!()
+
+          # Create UserEvent to track family addition
+          %UserEvent{}
+          |> UserEvent.new_user_event_changeset(%{
+            user_id: updated_user.id,
+            updated_by_user_id: invite.primary_user_id,
+            type: :family_added,
+            from: "none",
+            to: "#{invite.primary_user_id}"
+          })
+          |> Repo.insert!()
+
+          Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
+
+          updated_user
+        end)
+    end
+  end
+
+  defp emails_match?(user_email, invite_email) when is_binary(user_email) and is_binary(invite_email) do
+    String.downcase(String.trim(user_email)) == String.downcase(String.trim(invite_email))
+  end
+
+  defp emails_match?(_, _), do: false
+
+  @doc """
   Lists all invites for a primary user (pending and accepted).
   """
   def list_invites(primary_user) do
@@ -213,9 +286,35 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Lists all pending, valid invites for the given email address.
+
+  Used to surface invitations on the recipient's membership page so they
+  can accept without needing the original email link.
+  """
+  def list_pending_invites_for_email(email) when is_binary(email) do
+    normalized_email =
+      email
+      |> String.downcase()
+      |> String.trim()
+
+    now = DateTime.utc_now()
+
+    from(i in FamilyInvite,
+      where:
+        fragment("lower(trim(?))", i.email) == ^normalized_email and
+          is_nil(i.accepted_at) and
+          i.expires_at > ^now,
+      order_by: [desc: i.inserted_at],
+      preload: [:primary_user]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Revokes a pending invite.
 
   Only the primary user who created the invite can revoke it.
+  Sends a cancellation email to the invitee before deleting the invite.
   """
   def revoke_invite(invite_id, primary_user) do
     invite = Repo.get(FamilyInvite, invite_id)
@@ -231,7 +330,49 @@ defmodule Ysc.Accounts.FamilyInvites do
         {:error, :already_accepted}
 
       true ->
+        send_invite_cancellation_email(invite, primary_user)
         Repo.delete(invite)
+    end
+  end
+
+  defp send_invite_cancellation_email(invite, primary_user) do
+    primary_user = ensure_primary_user_loaded(primary_user)
+
+    email_vars = %{
+      primary_user_name: primary_user.first_name,
+      invite_email: invite.email
+    }
+
+    idempotency_key = "family_invite_cancelled_#{invite.id}"
+
+    Notifier.schedule_email(
+      invite.email,
+      idempotency_key,
+      "Family Membership Invitation Cancelled - YSC",
+      "family_invite_cancelled",
+      email_vars,
+      """
+      ==============================
+
+      Hi there,
+
+      Your family membership invitation from #{primary_user.first_name} has been cancelled.
+
+      You will no longer be able to use the invitation link that was previously sent to #{invite.email}.
+
+      If you have questions about this cancellation, please contact the person who invited you or reach out to YSC.
+
+      ==============================
+      """,
+      primary_user.id
+    )
+  end
+
+  defp ensure_primary_user_loaded(primary_user) do
+    if is_nil(primary_user.first_name) do
+      Repo.get!(User, primary_user.id)
+    else
+      primary_user
     end
   end
 
@@ -315,13 +456,40 @@ defmodule Ysc.Accounts.FamilyInvites do
     |> Repo.aggregate(:count, :id)
   end
 
-  defp validate_email_available(email, primary_user_id) do
-    existing_user = Ysc.Accounts.get_user_by_email(email)
+  defp count_spouses(primary_user) do
+    from(u in User,
+      where: u.primary_user_id == ^primary_user.id and u.family_relationship == "spouse"
+    )
+    |> Repo.aggregate(:count, :id)
+  end
 
-    if existing_user && existing_user.id != primary_user_id do
-      {:error, :email_already_registered}
-    else
-      :ok
+  defp count_pending_spouse_invites(primary_user) do
+    from(i in FamilyInvite,
+      where:
+        i.primary_user_id == ^primary_user.id and
+          is_nil(i.accepted_at) and
+          i.expires_at > ^DateTime.utc_now() and
+          (i.relationship == "spouse" or i.relationship == :spouse)
+    )
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp validate_relationship_limits(primary_user, relationship) do
+    cond do
+      relationship == :spouse || relationship == "spouse" ->
+        spouses = count_spouses(primary_user) + count_pending_spouse_invites(primary_user)
+
+        if spouses >= @max_spouses do
+          {:error, :max_spouses_reached}
+        else
+          :ok
+        end
+
+      count_sub_accounts(primary_user) >= @max_sub_accounts ->
+        {:error, :max_sub_accounts_reached}
+
+      true ->
+        :ok
     end
   end
 
@@ -361,12 +529,22 @@ defmodule Ysc.Accounts.FamilyInvites do
 
     idempotency_key = "family_invite_#{invite.id}"
 
+    # Button text depends on whether invitee has an existing account
+    existing_user = Ysc.Accounts.get_user_by_email(invite.email)
+    invite_button_text =
+      if existing_user do
+        "Join family membership"
+      else
+        "Create account and join membership"
+      end
+
     # Include family member name in email variables if available
     email_vars = %{
       primary_user_name: primary_user.first_name,
       invite_url: invite_url,
       expires_in_days: 30,
-      family_member_name: family_member_name
+      family_member_name: family_member_name,
+      invite_button_text: invite_button_text
     }
 
     Notifier.schedule_email(

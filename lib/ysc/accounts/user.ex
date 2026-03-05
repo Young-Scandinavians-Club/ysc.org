@@ -57,6 +57,8 @@ defmodule Ysc.Accounts.User do
     belongs_to :primary_user, User, foreign_key: :primary_user_id
     has_many :sub_accounts, User, foreign_key: :primary_user_id
 
+    field :family_relationship, FamilyMemberType
+
     field :most_connected_country, :string
     field :lifetime_membership_awarded_at, :utc_datetime
     field :stripe_id, :string
@@ -206,7 +208,8 @@ defmodule Ysc.Accounts.User do
       :phone_number,
       :most_connected_country,
       :sms_opt_in,
-      :date_of_birth
+      :date_of_birth,
+      :family_relationship
     ])
     |> put_change(:primary_user_id, primary_user_id)
     |> put_change(:state, :active)
@@ -296,7 +299,7 @@ defmodule Ysc.Accounts.User do
   """
   def approve_user_changeset(user, attrs) do
     user
-    |> cast(attrs, [:state, :date_of_birth])
+    |> cast(attrs, [:state, :date_of_birth, :primary_user_id, :family_relationship])
     |> validate_date_of_birth()
   end
 

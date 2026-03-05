@@ -73,6 +73,7 @@ defmodule YscWeb.HomeLive do
       # Will be populated after async load
       is_sub_account: false,
       primary_user: nil,
+      other_family_members: [],
       upcoming_tickets: [],
       future_bookings: [],
       upcoming_events: [],
@@ -173,13 +174,34 @@ defmodule YscWeb.HomeLive do
         do: Accounts.get_primary_user(user_with_subs),
         else: nil
 
-    {is_sub_account, primary_user}
+    # For family/lifetime members, get family group (primary + sub-accounts)
+    user_for_family = primary_user || user_with_subs
+    family_group =
+      if user_for_family do
+        Accounts.get_family_group(user_for_family)
+      else
+        []
+      end
+
+    # Get active plan type for showing "Your Family" section
+    active_plan_type = Ysc.Accounts.MembershipCache.get_membership_plan_type(user_for_family)
+
+    # Only show family section for primary users with family/lifetime and linked members
+    other_family_members =
+      if active_plan_type in [:family, :lifetime] and not is_sub_account do
+        Enum.reject(family_group, &(&1.id == user_with_subs.id))
+      else
+        []
+      end
+
+    {is_sub_account, primary_user, other_family_members}
   end
 
   @impl true
   def handle_async(:load_home_data, {:ok, results}, socket) do
     # Handle logged-in user async results
-    {is_sub_account, primary_user} = Map.get(results, :user_data, {false, nil})
+    {is_sub_account, primary_user, other_family_members} =
+      Map.get(results, :user_data, {false, nil, []})
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
     upcoming_events = Map.get(results, :events, [])
@@ -197,6 +219,7 @@ defmodule YscWeb.HomeLive do
       assign(socket,
         is_sub_account: is_sub_account,
         primary_user: primary_user,
+        other_family_members: other_family_members,
         upcoming_tickets: upcoming_tickets,
         future_bookings: future_bookings,
         upcoming_events: upcoming_events,
@@ -1624,6 +1647,32 @@ defmodule YscWeb.HomeLive do
               </div>
             </div>
 
+            <%!-- Your Family Section (family/lifetime members with linked users) --%>
+            <section :if={@async_data_loaded && @other_family_members != []}>
+              <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                Your Family
+              </h3>
+              <div class="rounded-lg border border-zinc-200 bg-white p-4 space-y-3">
+                <%= for member <- @other_family_members do %>
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-zinc-900 font-medium">
+                      {member.first_name} {member.last_name}
+                    </span>
+                    <span class="text-zinc-500 text-xs">
+                      {format_family_relationship(member.family_relationship)}
+                    </span>
+                  </div>
+                <% end %>
+                <.link
+                  navigate={~p"/users/settings/family"}
+                  class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
+                >
+                  Manage family
+                  <.icon name="hero-arrow-right" class="w-3.5 h-3.5" />
+                </.link>
+              </div>
+            </section>
+
             <%!-- Latest Updates Section --%>
             <section>
               <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
@@ -2512,6 +2561,13 @@ defmodule YscWeb.HomeLive do
   end
 
   defp format_post_date(_), do: ""
+
+  defp format_family_relationship(nil), do: "Child"
+  defp format_family_relationship("spouse"), do: "Spouse"
+  defp format_family_relationship("child"), do: "Child"
+  defp format_family_relationship(:spouse), do: "Spouse"
+  defp format_family_relationship(:child), do: "Child"
+  defp format_family_relationship(_), do: "Child"
 
   defp format_booking_date(%Date{} = date) do
     Calendar.strftime(date, "%b %d")

@@ -14,6 +14,8 @@ defmodule Ysc.Accounts do
   alias Ysc.Accounts.{
     Address,
     BoardPosition,
+    FamilyInvite,
+    MembershipCache,
     User,
     UserToken,
     UserNotifier,
@@ -1749,14 +1751,33 @@ defmodule Ysc.Accounts do
            }) do
       with :ok <-
              Policy.authorize(:user_update, current_user, %{user_id: user.id}) do
-        Ecto.Multi.new()
-        |> Ecto.Multi.update(
-          :user,
-          User.approve_user_changeset(user, %{
-            state: :active,
-            date_of_birth: application.birth_date
-          })
-        )
+        # When application is linked to a family invite, load invite for linking
+        {invite, user_approval_attrs} =
+          if application.family_invite_id do
+            invite = Repo.get!(FamilyInvite, application.family_invite_id)
+            relationship = invite.relationship || "child"
+
+            {invite,
+             %{
+               state: :active,
+               date_of_birth: application.birth_date,
+               primary_user_id: invite.primary_user_id,
+               family_relationship: relationship
+             }}
+          else
+            {nil,
+             %{
+               state: :active,
+               date_of_birth: application.birth_date
+             }}
+          end
+
+        base_multi =
+          Ecto.Multi.new()
+          |> Ecto.Multi.update(
+            :user,
+            User.approve_user_changeset(user, user_approval_attrs)
+          )
         |> Ecto.Multi.update(
           :application,
           SignupApplication.review_outcome_changeset(application, %{
@@ -1791,9 +1812,23 @@ defmodule Ysc.Accounts do
             }
           )
         )
+
+        # When family invite, mark invite as accepted
+        multi_with_invite =
+          if invite do
+            base_multi
+            |> Ecto.Multi.update(
+              :invite,
+              FamilyInvite.accept_changeset(invite)
+            )
+          else
+            base_multi
+          end
+
+        multi_with_invite
         |> Repo.transaction()
         |> case do
-          {:ok, _} -> :ok
+          {:ok, _} -> {:ok, application}
           {:error, _, changeset, _} -> {:error, changeset}
         end
       end
@@ -2336,37 +2371,392 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Admin-only: Links an existing user to a primary user's family membership.
+
+  Bypasses the normal invite flow. Use for manual admin corrections.
+  Returns {:ok, user} or {:error, reason}.
+
+  ## Options
+  - `:relationship` - :spouse or :child (default: :child)
+  """
+  def admin_link_user_to_family(primary_user, user_to_link, opts \\ []) do
+    relationship = Keyword.get(opts, :relationship, :child)
+
+    cond do
+      user_to_link.id == primary_user.id ->
+        {:error, :cannot_link_self}
+
+      sub_account?(user_to_link) ->
+        {:error, :already_linked_to_family}
+
+      not primary_user?(primary_user) ->
+        {:error, :not_primary_user}
+
+      not has_family_or_lifetime_membership?(primary_user) ->
+        {:error, :primary_must_have_family_or_lifetime}
+
+      relationship == :spouse ->
+        if count_spouses(primary_user) >= 1 do
+          {:error, :max_spouses_reached}
+        else
+          do_admin_link_user(primary_user, user_to_link, relationship)
+        end
+
+      length(get_sub_accounts(primary_user)) >= 10 ->
+        {:error, :max_sub_accounts_reached}
+
+      true ->
+        do_admin_link_user(primary_user, user_to_link, relationship)
+    end
+  end
+
+  defp has_family_or_lifetime_membership?(user) do
+    has_lifetime_membership?(user) or
+      (case user.subscriptions do
+         %Ecto.Association.NotLoaded{} ->
+           subs = Ysc.Subscriptions.list_subscriptions(user)
+           Enum.any?(subs, fn s ->
+             s = Repo.preload(s, :subscription_items)
+
+             case s.subscription_items do
+               [item | _] ->
+                 plans = Application.get_env(:ysc, :membership_plans, [])
+                 Enum.any?(plans, fn p -> p.stripe_price_id == item.stripe_price_id and p.id == :family end)
+
+               _ ->
+                 false
+             end
+           end)
+
+         subs when is_list(subs) ->
+           Enum.any?(subs, fn s ->
+             s = Repo.preload(s, :subscription_items)
+
+             case s.subscription_items do
+               [item | _] ->
+                 plans = Application.get_env(:ysc, :membership_plans, [])
+                 Enum.any?(plans, fn p -> p.stripe_price_id == item.stripe_price_id and p.id == :family end)
+
+               _ ->
+                 false
+             end
+           end)
+
+         _ ->
+           false
+       end)
+  end
+
+  defp count_spouses(primary_user) do
+    from(u in User,
+      where: u.primary_user_id == ^primary_user.id and u.family_relationship == "spouse"
+    )
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp do_admin_link_user(primary_user, user_to_link, relationship) do
+    Repo.transaction(fn ->
+      updated_user =
+        user_to_link
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary_user.id,
+          family_relationship: relationship
+        })
+        |> Repo.update!()
+
+      %UserEvent{}
+      |> UserEvent.new_user_event_changeset(%{
+        user_id: updated_user.id,
+        updated_by_user_id: primary_user.id,
+        type: :family_added,
+        from: "none",
+        to: "#{primary_user.id}"
+      })
+      |> Repo.insert!()
+
+      MembershipCache.invalidate_user(updated_user.id)
+      updated_user
+    end)
+  end
+
+  @doc """
+  Lets a family member (sub-account) leave their family membership from their own dashboard.
+
+  The user becomes independent and can purchase their own membership or join another family later.
+  Returns {:ok, updated_user} or {:error, :not_sub_account}.
+  """
+  def leave_family_membership(user) do
+    if sub_account?(user) do
+      primary_user_id = user.primary_user_id
+      primary_user = get_primary_user(user)
+
+      result =
+        Ecto.Multi.new()
+        |> Ecto.Multi.update(
+          :sub_account,
+          user
+          |> Ecto.Changeset.change(%{})
+          |> Ecto.Changeset.put_change(:primary_user_id, nil)
+          |> Ecto.Changeset.put_change(:family_relationship, nil)
+        )
+        |> Ecto.Multi.insert(
+          :user_event,
+          UserEvent.new_user_event_changeset(
+            %UserEvent{},
+            %{
+              user_id: user.id,
+              updated_by_user_id: user.id,
+              type: :family_removed,
+              from: "#{primary_user_id}",
+              to: "none"
+            }
+          )
+        )
+        |> Repo.transaction()
+
+      case result do
+        {:ok, %{sub_account: updated_sub_account}} ->
+          MembershipCache.invalidate_user(updated_sub_account.id)
+          if primary_user do
+            send_family_member_removed_email(updated_sub_account, primary_user)
+          end
+          {:ok, updated_sub_account}
+
+        {:error, _, changeset, _} ->
+          {:error, changeset}
+      end
+    else
+      {:error, :not_sub_account}
+    end
+  end
+
+  @doc """
   Removes a sub-account from a family group.
   This makes the sub-account independent (no longer associated with primary).
   """
   def remove_sub_account(sub_account, primary_user) do
     if sub_account.primary_user_id == primary_user.id do
-      Ecto.Multi.new()
-      |> Ecto.Multi.update(
-        :sub_account,
-        Ecto.Changeset.change(sub_account)
-        |> Ecto.Changeset.put_change(:primary_user_id, nil)
-      )
-      |> Ecto.Multi.insert(
-        :user_event,
-        UserEvent.new_user_event_changeset(
-          %UserEvent{},
-          %{
-            user_id: sub_account.id,
-            updated_by_user_id: primary_user.id,
-            type: :family_removed,
-            from: "#{primary_user.id}",
-            to: "none"
-          }
+      result =
+        Ecto.Multi.new()
+        |> Ecto.Multi.update(
+          :sub_account,
+          sub_account
+          |> Ecto.Changeset.change(%{})
+          |> Ecto.Changeset.put_change(:primary_user_id, nil)
+          |> Ecto.Changeset.put_change(:family_relationship, nil)
         )
-      )
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{sub_account: updated_sub_account}} -> {:ok, updated_sub_account}
-        {:error, _, changeset, _} -> {:error, changeset}
+        |> Ecto.Multi.insert(
+          :user_event,
+          UserEvent.new_user_event_changeset(
+            %UserEvent{},
+            %{
+              user_id: sub_account.id,
+              updated_by_user_id: primary_user.id,
+              type: :family_removed,
+              from: "#{primary_user.id}",
+              to: "none"
+            }
+          )
+        )
+        |> Repo.transaction()
+
+      case result do
+        {:ok, %{sub_account: updated_sub_account}} ->
+          MembershipCache.invalidate_user(updated_sub_account.id)
+          send_family_member_removed_email(updated_sub_account, primary_user)
+          {:ok, updated_sub_account}
+
+        {:error, _, changeset, _} ->
+          {:error, changeset}
       end
     else
       {:error, :unauthorized}
+    end
+  end
+
+  defp send_family_member_removed_email(removed_user, primary_user) do
+    first_name = removed_user.first_name || "there"
+    primary_name = primary_user.first_name || "the primary account holder"
+
+    email_vars = %{
+      first_name: first_name,
+      primary_user_name: primary_name
+    }
+
+    idempotency_key = "family_member_removed_#{removed_user.id}_#{primary_user.id}"
+
+    YscWeb.Emails.Notifier.schedule_email(
+      removed_user.email,
+      idempotency_key,
+      "Removed from Family Membership - YSC",
+      "family_member_removed",
+      email_vars,
+      """
+      ==============================
+
+      Hi #{first_name},
+
+      You have been removed from #{primary_name}'s family membership.
+
+      You will no longer have access to membership benefits through this family account, including cabin bookings and member event tickets.
+
+      If you would like to continue enjoying YSC membership benefits, you can purchase your own membership at any time.
+
+      ==============================
+      """,
+      removed_user.id
+    )
+  end
+
+  ## Memberships (admin view)
+
+  @doc """
+  Lists all active memberships for admin monitoring.
+
+  A "membership" is a primary user (not a sub-account) with active membership.
+  Each membership includes the primary user, type (single/family/lifetime), and
+  all associated users (family group).
+
+  ## Options
+  - `:type` - Filter by membership type (:single, :family, :lifetime)
+  - `:limit` - Max results (default: 100)
+  - `:offset` - Pagination offset (default: 0)
+
+  ## Returns
+  List of maps: `%{primary_user: user, type: atom, associated_users: [user], user_count: integer}`
+  """
+  def list_memberships(opts \\ []) do
+    type_filter = Keyword.get(opts, :type)
+    limit = Keyword.get(opts, :limit, 100)
+    offset = Keyword.get(opts, :offset, 0)
+
+    # Get all primary users (no primary_user_id) with active state
+    primary_users =
+      from(u in User,
+        where: is_nil(u.primary_user_id),
+        where: u.state == :active,
+        order_by: [asc: u.last_name, asc: u.first_name],
+        limit: ^limit,
+        offset: ^offset,
+        preload: [:sub_accounts, subscriptions: :subscription_items]
+      )
+      |> Repo.all()
+
+    # Filter to those with active membership and determine type
+    primary_users
+    |> Enum.filter(&has_active_membership?/1)
+    |> Enum.map(fn primary ->
+      type = get_membership_type_for_primary(primary)
+      associated = get_family_group(primary)
+      user_count = length(associated)
+
+      if type_filter && type != type_filter do
+        nil
+      else
+        %{
+          primary_user: primary,
+          type: type,
+          associated_users: associated,
+          user_count: user_count
+        }
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  @doc """
+  Returns membership counts by type for admin dashboard.
+
+  ## Returns
+  `%{total: integer, single: integer, family: integer, lifetime: integer}`
+  """
+  def get_membership_stats do
+    primary_users =
+      from(u in User,
+        where: is_nil(u.primary_user_id),
+        where: u.state == :active,
+        preload: [:sub_accounts, subscriptions: :subscription_items]
+      )
+      |> Repo.all()
+
+    # Filter to those with active membership
+    with_membership =
+      primary_users
+      |> Enum.filter(&has_active_membership?/1)
+
+    total = length(with_membership)
+
+    by_type =
+      with_membership
+      |> Enum.map(&get_membership_type_for_primary/1)
+      |> Enum.frequencies()
+
+    %{
+      total: total,
+      single: Map.get(by_type, :single, 0),
+      family: Map.get(by_type, :family, 0),
+      lifetime: Map.get(by_type, :lifetime, 0)
+    }
+  end
+
+  defp get_membership_type_for_primary(user) do
+    if has_lifetime_membership?(user) do
+      :lifetime
+    else
+      subscriptions =
+        case user.subscriptions do
+          %Ecto.Association.NotLoaded{} ->
+            Ysc.Subscriptions.list_subscriptions(user)
+
+          subscriptions when is_list(subscriptions) ->
+            subscriptions
+
+          _ ->
+            []
+        end
+
+      active =
+        subscriptions
+        |> Enum.filter(&Ysc.Subscriptions.valid?/1)
+
+      case active do
+        [] ->
+          :single
+
+        [sub | _] ->
+          membership_plans = Application.get_env(:ysc, :membership_plans, [])
+          price_to_type = Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
+          sub = Repo.preload(sub, :subscription_items)
+
+          case sub.subscription_items do
+            [item | _] ->
+              Map.get(price_to_type, item.stripe_price_id, :single)
+
+            _ ->
+              :single
+          end
+
+        multiple ->
+          membership_plans = Application.get_env(:ysc, :membership_plans, [])
+          price_to_type = Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
+
+          multiple
+          |> Enum.map(fn s ->
+            s = Repo.preload(s, :subscription_items)
+
+            case s.subscription_items do
+              [item | _] -> Map.get(price_to_type, item.stripe_price_id, :single)
+              _ -> :single
+            end
+          end)
+          |> Enum.max_by(fn t ->
+            case t do
+              :family -> 2
+              :lifetime -> 3
+              _ -> 1
+            end
+          end)
+      end
     end
   end
 

@@ -3,9 +3,7 @@ defmodule YscWeb.UserRegistrationLive do
   use YscWeb, :live_view
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.User
-  alias Ysc.Accounts.FamilyMember
-  alias Ysc.Accounts.SignupApplication
+  alias Ysc.Accounts.{FamilyInvites, FamilyMember, SignupApplication, User}
   alias YscWeb.Workers.CreateStripeCustomerWorker
 
   def render(assigns) do
@@ -442,7 +440,7 @@ defmodule YscWeb.UserRegistrationLive do
     """
   end
 
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     connect_params =
       case get_connect_params(socket) do
         nil -> %{}
@@ -459,20 +457,24 @@ defmodule YscWeb.UserRegistrationLive do
       |> DateTime.to_date()
       |> Date.to_iso8601()
 
-    application_changeset =
-      SignupApplication.application_changeset(
-        %SignupApplication{},
+    # Check for family invite link (from logout-required flow)
+    family_invite = get_family_invite_from_params(params)
+    initial_attrs =
+      if family_invite do
+        %{
+          "email" => family_invite.email,
+          "registration_form" => %{"family_invite_id" => family_invite.id}
+        }
+      else
         %{}
-      )
+      end
 
-    changeset =
-      Accounts.change_user_registration(%User{
-        registration_form: application_changeset
-      })
+    changeset = Accounts.change_user_registration(%User{}, initial_attrs)
 
     socket =
       socket
       |> assign(:page_title, "Become a Member")
+      |> assign(:family_invite, family_invite)
       |> assign(:current_step, 0)
       |> assign(:step_0_invalid, false)
       |> assign(:step_1_invalid, false)
@@ -519,9 +521,16 @@ defmodule YscWeb.UserRegistrationLive do
           String.trim(birth_date) != ""
       end)
 
+    reg_form_with_invite =
+      if family_invite = socket.assigns[:family_invite] do
+        Map.put(reg_form_updated, "family_invite_id", family_invite.id)
+      else
+        reg_form_updated
+      end
+
     updated_user_params =
       user_params
-      |> Map.replace("registration_form", reg_form_updated)
+      |> Map.replace("registration_form", reg_form_with_invite)
       |> Map.put("family_members", filtered_family_members)
       |> Map.put(
         "most_connected_country",
@@ -949,4 +958,23 @@ defmodule YscWeb.UserRegistrationLive do
   end
 
   defp map_to_string_keys(value), do: value
+
+  defp get_family_invite_from_params(params) do
+    case params["invite"] do
+      nil ->
+        nil
+
+      token when is_binary(token) and token != "" ->
+        invite = FamilyInvites.get_invite_by_token(token)
+
+        if invite && Ysc.Accounts.FamilyInvite.valid?(invite) do
+          invite
+        else
+          nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 end

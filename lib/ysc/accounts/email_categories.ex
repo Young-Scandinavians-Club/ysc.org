@@ -8,9 +8,12 @@ defmodule Ysc.Accounts.EmailCategories do
   # Templates that should have reply-to set to memberships@ysc.org
   @membership_reply_to_templates MapSet.new([
                                    "application_approved",
+                                   "application_approved_family_linked",
                                    "application_rejected",
                                    "application_submitted",
                                    "family_invite",
+                                   "family_invite_cancelled",
+                                   "family_member_removed",
                                    "membership_payment_confirmation",
                                    "membership_payment_failure",
                                    "membership_payment_reminder_7day",
@@ -31,6 +34,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "email_changed" => :account,
     "application_submitted" => :account,
     "application_approved" => :account,
+    "application_approved_family_linked" => :account,
     "application_rejected" => :account,
     "conduct_violation_confirmation" => :account,
     "volunteer_confirmation" => :account,
@@ -57,7 +61,10 @@ defmodule Ysc.Accounts.EmailCategories do
     "booking_confirmation" => :account,
     "booking_refund_processed" => :account,
     "booking_refund_pending" => :account,
-    "account_setup_verification" => :account
+    "account_setup_verification" => :account,
+    "family_invite" => :account,
+    "family_invite_cancelled" => :account,
+    "family_member_removed" => :account
     # Newsletter notifications (can be disabled)
     # Note: Newsletter emails are handled by the in-house newsletter system (Ysc.Newsletter), not through this system
   }

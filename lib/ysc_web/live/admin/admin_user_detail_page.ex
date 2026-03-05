@@ -9,7 +9,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     statics: YscWeb.static_paths()
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.MembershipCache
+  alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Bookings
   alias Ysc.ExpenseReports
   alias Ysc.Ledgers
@@ -856,6 +856,171 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :membership} class="max-w-lg py-8 px-2">
           <div class="space-y-6">
+            <%!-- Associated Users (family/lifetime only) --%>
+            <div
+              :if={(@has_lifetime_membership || @active_subscription != nil) && @primary_user == nil && (@sub_accounts != [] || @pending_invites != [] || @can_manage_family)}
+              class="border border-zinc-200 rounded-lg p-6"
+            >
+              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                Associated Users
+              </h3>
+              <p class="text-sm text-zinc-600 mb-4">
+                Users linked to this membership. Family and lifetime members can have additional users (spouse, children) who share membership benefits.
+              </p>
+              <div class="space-y-3">
+                <div class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg">
+                  <.user_avatar_image
+                    email={@selected_user.email}
+                    user_id={@selected_user.id}
+                    country={@selected_user.most_connected_country}
+                    class="w-10 h-10 rounded-full"
+                  />
+                  <div class="flex-1">
+                    <span class="font-semibold text-zinc-900">
+                      {@selected_user.first_name} {@selected_user.last_name}
+                    </span>
+                    <span class="text-zinc-500 text-sm ml-2">(Primary)</span>
+                    <div class="text-sm text-zinc-600">{@selected_user.email}</div>
+                  </div>
+                </div>
+                <%= for sub_account <- @sub_accounts do %>
+                  <div class="flex items-center justify-between gap-4 p-4 bg-zinc-50 rounded-lg">
+                    <div class="flex items-center gap-4 flex-1">
+                      <.user_avatar_image
+                        email={sub_account.email}
+                        user_id={sub_account.id}
+                        country={sub_account.most_connected_country}
+                        class="w-10 h-10 rounded-full"
+                      />
+                      <div>
+                        <span class="font-semibold text-zinc-900">
+                          {sub_account.first_name} {sub_account.last_name}
+                        </span>
+                        <.badge type="sky" class="ml-2 text-xs">
+                          {format_family_relationship(sub_account.family_relationship)}
+                        </.badge>
+                        <div class="text-sm text-zinc-600">{sub_account.email}</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <.link
+                        navigate={~p"/admin/users/#{sub_account.id}/details"}
+                        class="text-sm text-blue-600 hover:underline"
+                      >
+                        View
+                      </.link>
+                      <button
+                        phx-click="admin_remove_family_user"
+                        phx-value-user_id={sub_account.id}
+                        phx-disable-with="Removing..."
+                        data-confirm="Remove this user from the family membership? They will lose access to membership benefits and receive an email notification."
+                        class="text-sm text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+              <div :if={@can_manage_family && @pending_invites != []} class="mt-6 pt-6 border-t border-zinc-200">
+                <h4 class="text-sm font-semibold text-zinc-800 mb-3">Pending invites</h4>
+                <div class="space-y-2">
+                  <%= for invite <- @pending_invites do %>
+                    <div class="flex items-center justify-between gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div>
+                        <span class="text-sm font-medium text-zinc-900">{invite.email}</span>
+                        <.badge type="sky" class="ml-2 text-xs">
+                          {format_family_relationship(invite.relationship)}
+                        </.badge>
+                        <span class="text-xs text-zinc-500 ml-2">
+                          Expires {Calendar.strftime(invite.expires_at, "%b %d, %Y")}
+                        </span>
+                      </div>
+                      <button
+                        phx-click="admin_cancel_family_invite"
+                        phx-value-invite_id={invite.id}
+                        phx-disable-with="Cancelling..."
+                        data-confirm="Cancel this invite? The invitee will receive an email notification."
+                        class="text-sm text-red-600 hover:underline"
+                      >
+                        Cancel invite
+                      </button>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+              <div :if={@can_manage_family} class="mt-6 pt-6 border-t border-zinc-200">
+                <h4 class="text-sm font-semibold text-zinc-800 mb-3">Add user to membership</h4>
+                <p class="text-xs text-zinc-500 mb-3">
+                  Search by email. Link an existing user or invite a new one.
+                </p>
+                <form phx-change="search_add_family_user" phx-debounce="200" class="space-y-3">
+                  <div class="relative">
+                    <input
+                      type="text"
+                      name="query"
+                      value={@add_family_user_search}
+                      placeholder="Search by email..."
+                      autocomplete="off"
+                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-0"
+                    />
+                    <div
+                      :if={@add_family_user_search != ""}
+                      class="absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg overflow-hidden"
+                      phx-click-away="clear_add_family_user_search"
+                    >
+                      <%= for user <- @add_family_user_results do %>
+                        <button
+                          type="button"
+                          phx-click="admin_link_family_user"
+                          phx-value-user_id={user.id}
+                          phx-value-relationship={@add_family_user_relationship}
+                          phx-disable-with="Linking..."
+                          class="w-full px-3 py-2.5 text-left hover:bg-zinc-50 flex items-center gap-2 border-b border-zinc-100 last:border-b-0"
+                        >
+                          <.icon name="hero-user-plus" class="w-4 h-4 text-blue-600 shrink-0" />
+                          <div>
+                            <span class="text-sm font-medium text-zinc-900">
+                              {user.first_name} {user.last_name}
+                            </span>
+                            <span class="text-xs text-zinc-500 ml-1">({user.email})</span>
+                            <span class="text-xs text-blue-600 ml-1">— Invite (will receive email)</span>
+                          </div>
+                        </button>
+                      <% end %>
+                      <button
+                        :if={@add_family_user_results == []}
+                        type="button"
+                        phx-click="admin_invite_family_user"
+                        phx-value-email={@add_family_user_search}
+                        phx-value-relationship={@add_family_user_relationship}
+                        phx-disable-with="Sending invite..."
+                        class="w-full px-3 py-2.5 text-left hover:bg-zinc-50 flex items-center gap-2"
+                      >
+                        <.icon name="hero-envelope" class="w-4 h-4 text-amber-600 shrink-0" />
+                        <div>
+                          <span class="text-sm font-medium text-zinc-900">
+                            Invite {@add_family_user_search}
+                          </span>
+                          <span class="text-xs text-amber-600 ml-1">— New user will receive email</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-zinc-700 mb-1">Relationship</label>
+                    <select
+                      name="relationship"
+                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-0"
+                    >
+                      <option value="child" selected={@add_family_user_relationship == "child"}>Child</option>
+                      <option value="spouse" selected={@add_family_user_relationship == "spouse"}>Spouse</option>
+                    </select>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             <div
               :if={@has_lifetime_membership}
               class="bg-blue-50 border border-blue-200 rounded-lg p-4"
@@ -1930,6 +2095,11 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> assign(:primary_user, nil)
      |> assign(:sub_accounts, [])
      |> assign(:family_members, [])
+     |> assign(:pending_invites, [])
+     |> assign(:can_manage_family, false)
+     |> assign(:add_family_user_search, "")
+     |> assign(:add_family_user_results, [])
+     |> assign(:add_family_user_relationship, "child")
      |> assign(:user_notes, [])
      |> assign(:rejection_notes, [])
      |> assign(
@@ -1958,6 +2128,9 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         :family ->
           load_family_data(socket, user_id)
+
+        :membership ->
+          load_family_data_for_membership(socket, user_id)
 
         :logs ->
           load_user_notes(socket, user_id)
@@ -2666,6 +2839,220 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
+  def handle_event("search_add_family_user", %{"query" => query, "relationship" => relationship}, socket) do
+    query = String.trim(query)
+    relationship = relationship || "child"
+
+    results =
+      if String.length(query) >= 2 do
+        primary_user = socket.assigns.selected_user
+        sub_ids = [primary_user.id | Enum.map(socket.assigns.sub_accounts, & &1.id)]
+
+        Accounts.search_users(query, limit: 8)
+        |> Enum.reject(fn u -> u.id in sub_ids end)
+      else
+        []
+      end
+
+    {:noreply,
+     socket
+     |> assign(:add_family_user_search, query)
+     |> assign(:add_family_user_results, results)
+     |> assign(:add_family_user_relationship, relationship)}
+  end
+
+  def handle_event("search_add_family_user", %{"query" => query}, socket) do
+    handle_event("search_add_family_user", %{"query" => query, "relationship" => "child"}, socket)
+  end
+
+  def handle_event("clear_add_family_user_search", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:add_family_user_search, "")
+     |> assign(:add_family_user_results, [])}
+  end
+
+  def handle_event("admin_link_family_user", %{"user_id" => user_id} = params, socket) do
+    primary_user = socket.assigns.selected_user
+    relationship = Map.get(params, "relationship", "child")
+    rel = if relationship == "spouse", do: :spouse, else: :child
+
+    user_to_link =
+      try do
+        Accounts.get_user!(user_id)
+      rescue
+        Ecto.NoResultsError ->
+          nil
+      end
+
+    if is_nil(user_to_link) do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:error, "User not found.", title: "Invite User")}
+    else
+      cond do
+        user_to_link.id == primary_user.id ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "Cannot invite the primary user to themselves.", title: "Invite User")}
+
+        Ysc.Accounts.sub_account?(user_to_link) ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "That user is already linked to another family membership.", title: "Invite User")}
+
+        true ->
+          # Create invite and send email so user receives invitation to join
+          case FamilyInvites.create_invite(primary_user, user_to_link.email, relationship: rel) do
+            {:ok, _invite} ->
+              {:noreply,
+               socket
+               |> then(&load_family_data_for_membership(&1, primary_user.id))
+               |> assign(:add_family_user_search, "")
+               |> assign(:add_family_user_results, [])
+               |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{user_to_link.email}. They can join from the email link.", title: "Invite User")}
+
+            {:error, :user_not_active} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Primary user must be active to send invites.", title: "Invite User")}
+
+            {:error, :invalid_membership_type} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Primary user must have family or lifetime membership.", title: "Invite User")}
+
+            {:error, :max_spouses_reached} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Cannot add another spouse. Maximum 1 spouse per family.", title: "Invite User")}
+
+            {:error, :max_sub_accounts_reached} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Maximum number of family members (10) reached.", title: "Invite User")}
+
+            {:error, :pending_invite_exists} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "A pending invite already exists for that email.", title: "Invite User")}
+
+            {:error, %Ecto.Changeset{} = changeset} ->
+              msg = format_changeset_errors(changeset)
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Failed to send invite: #{msg}", title: "Invite User")}
+
+            {:error, _} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Failed to send invite.", title: "Invite User")}
+          end
+      end
+    end
+  end
+
+  def handle_event("admin_invite_family_user", %{"email" => email} = params, socket) do
+    primary_user = socket.assigns.selected_user
+    email = String.trim(email)
+    relationship = Map.get(params, "relationship", "child")
+    rel = if relationship == "spouse", do: :spouse, else: :child
+
+    cond do
+      email == "" ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Please enter an email address.", title: "Invite User")}
+
+      not String.match?(email, ~r/^[^\s]+@[^\s]+$/) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Please enter a valid email address.", title: "Invite User")}
+
+      true ->
+        case FamilyInvites.create_invite(primary_user, email, relationship: rel) do
+          {:ok, _invite} ->
+            {:noreply,
+             socket
+             |> assign(:add_family_user_search, "")
+             |> assign(:add_family_user_results, [])
+             |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}.", title: "Invite User")}
+
+          {:error, :pending_invite_exists} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "A pending invite already exists for that email.", title: "Invite User")}
+
+          {:error, :max_spouses_reached} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Cannot add another spouse. Maximum 1 spouse per family.", title: "Invite User")}
+
+          {:error, :max_sub_accounts_reached} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Maximum number of family members (10) reached.", title: "Invite User")}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            msg = format_changeset_errors(changeset)
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Failed to send invite: #{msg}", title: "Invite User")}
+
+          {:error, reason} when is_atom(reason) ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Failed to send invite.", title: "Invite User")}
+        end
+    end
+  end
+
+  def handle_event("admin_cancel_family_invite", %{"invite_id" => invite_id}, socket) do
+    primary_user = socket.assigns.selected_user
+
+    case FamilyInvites.revoke_invite(invite_id, primary_user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> YscWeb.Flash.put_toast(:info, "Invite cancelled. Invitee will be notified by email.", title: "Cancel Invite")}
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Invite not found.", title: "Cancel Invite")}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Not authorized to cancel this invite.", title: "Cancel Invite")}
+
+      {:error, :already_accepted} ->
+        {:noreply,
+         socket
+         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> YscWeb.Flash.put_toast(:error, "Invite was already accepted.", title: "Cancel Invite")}
+    end
+  end
+
+  def handle_event("admin_remove_family_user", %{"user_id" => user_id}, socket) do
+    primary_user = socket.assigns.selected_user
+    sub_account = Accounts.get_user!(user_id)
+
+    case Accounts.remove_sub_account(sub_account, primary_user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> YscWeb.Flash.put_toast(:info, "User removed from membership.", title: "Remove User")}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Failed to remove user.", title: "Remove User")}
+    end
+  end
+
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     form = to_form(changeset, as: "user")
 
@@ -2699,6 +3086,11 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
+  defp format_family_relationship(nil), do: "Child"
+  defp format_family_relationship("spouse"), do: "Spouse"
+  defp format_family_relationship("child"), do: "Child"
+  defp format_family_relationship(_), do: "Child"
+
   defp format_datetime_for_display(nil), do: "N/A"
 
   defp format_datetime_for_display(%DateTime{} = datetime) do
@@ -2729,6 +3121,52 @@ defmodule YscWeb.AdminUserDetailsLive do
     else
       socket
     end
+  end
+
+  defp load_family_data_for_membership(socket, user_id) do
+    selected_user = socket.assigns.selected_user
+
+    # Only load family group if this user is a primary with family/lifetime
+    if Accounts.primary_user?(selected_user) and
+         (Accounts.has_lifetime_membership?(selected_user) or
+            has_family_subscription?(selected_user)) do
+      socket
+      |> load_family_data(user_id)
+      |> assign(:can_manage_family, true)
+      |> assign(:add_family_user_search, "")
+      |> assign(:add_family_user_results, [])
+      |> assign(:add_family_user_relationship, "child")
+    else
+      socket
+      |> assign(:can_manage_family, false)
+      |> assign(:add_family_user_search, "")
+      |> assign(:add_family_user_results, [])
+      |> assign(:add_family_user_relationship, "child")
+    end
+  end
+
+  defp has_family_subscription?(user) do
+    subs =
+      case user.subscriptions do
+        %Ecto.Association.NotLoaded{} -> Ysc.Subscriptions.list_subscriptions(user)
+        s when is_list(s) -> s
+        _ -> []
+      end
+
+    subs
+    |> Enum.filter(&Ysc.Subscriptions.valid?/1)
+    |> Enum.any?(fn s ->
+      s = Repo.preload(s, :subscription_items)
+
+      case s.subscription_items do
+        [item | _] ->
+          plans = Application.get_env(:ysc, :membership_plans, [])
+          Enum.any?(plans, fn p -> p.stripe_price_id == item.stripe_price_id and p.id == :family end)
+
+        _ ->
+          false
+      end
+    end)
   end
 
   defp load_family_data(socket, user_id) do
@@ -2775,10 +3213,16 @@ defmodule YscWeb.AdminUserDetailsLive do
         end
       end
 
+    primary_for_invites = primary_user || selected_user
+    pending_invites =
+      FamilyInvites.list_invites(primary_for_invites)
+      |> Enum.filter(&is_nil(&1.accepted_at))
+
     socket
     |> assign(:primary_user, primary_user)
     |> assign(:sub_accounts, sub_accounts)
     |> assign(:family_members, family_members)
+    |> assign(:pending_invites, pending_invites)
   end
 
   defp load_user_notes(socket, user_id) do

@@ -986,44 +986,72 @@ defmodule YscWeb.AdminUsersLive do
            application,
            current_user
          ) do
-      :ok ->
-        YscWeb.Emails.Notifier.schedule_email(
-          user.email,
-          "#{user.id}",
-          "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)",
-          "application_approved",
-          %{first_name: user.first_name},
-          """
-          ==============================
+      {:ok, approved_application} ->
+        if approved_application.family_invite_id do
+          YscWeb.Emails.Notifier.schedule_email(
+            user.email,
+            "#{user.id}",
+            "Velkommen! You're officially a Young Scandinavian 🎉",
+            "application_approved_family_linked",
+            %{first_name: user.first_name},
+            """
+            ==============================
 
-          Hi #{user.email},
+            Hi #{user.email},
 
-          Your application has been approved! 🎉
+            Your application has been approved! 🎉
 
-          To complete your membership, please pay your membership dues by visiting the link below:
+            Because you were invited to join a family membership, your membership is immediately active—no payment required.
 
-          #{YscWeb.Endpoint.url()}/users/membership
+            If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
 
-          If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
+            Velkommen!
+
+            Young Scandinavians Club
+
+            ==============================
+            """,
+            user.id
+          )
+        else
+          YscWeb.Emails.Notifier.schedule_email(
+            user.email,
+            "#{user.id}",
+            "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)",
+            "application_approved",
+            %{first_name: user.first_name},
+            """
+            ==============================
+
+            Hi #{user.email},
+
+            Your application has been approved! 🎉
+
+            To complete your membership, please pay your membership dues by visiting the link below:
+
+            #{YscWeb.Endpoint.url()}/users/membership
+
+            If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
 
 
-          Velkommen!
+            Velkommen!
 
-          Young Scandinavians Club
+            Young Scandinavians Club
 
-          ==============================
-          """,
-          user.id
-        )
+            ==============================
+            """,
+            user.id
+          )
 
-        # Schedule reminder emails if user hasn't paid
-        YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
-          user.id
-        )
+          # Schedule reminder emails if user hasn't paid
+          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
+            user.id
+          )
 
-        YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
-          user.id
-        )
+          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
+            user.id
+          )
+        end
 
         {:noreply,
          socket

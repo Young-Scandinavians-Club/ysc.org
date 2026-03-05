@@ -18,6 +18,8 @@ defmodule YscWeb.Emails.Notifier do
     "account_setup_verification" => YscWeb.Emails.AccountSetupVerification,
     "application_rejected" => YscWeb.Emails.ApplicationRejected,
     "application_approved" => YscWeb.Emails.ApplicationApproved,
+    "application_approved_family_linked" =>
+      YscWeb.Emails.ApplicationApprovedFamilyLinked,
     "application_submitted" => YscWeb.Emails.ApplicationSubmitted,
     "confirm_email" => YscWeb.Emails.ConfirmEmail,
     "reset_password" => YscWeb.Emails.ResetPassword,
@@ -52,6 +54,8 @@ defmodule YscWeb.Emails.Notifier do
       YscWeb.Emails.MembershipRenewalPaymentMethodReminder,
     "membership_renewal_reminder" => YscWeb.Emails.MembershipRenewalReminder,
     "family_invite" => YscWeb.Emails.FamilyInvite,
+    "family_invite_cancelled" => YscWeb.Emails.FamilyInviteCancelled,
+    "family_member_removed" => YscWeb.Emails.FamilyMemberRemoved,
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,
     "event_notification" => YscWeb.Emails.EventNotification,

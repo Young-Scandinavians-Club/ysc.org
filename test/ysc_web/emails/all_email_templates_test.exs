@@ -14,6 +14,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
   alias YscWeb.Emails.{
     ApplicationApproved,
+    ApplicationApprovedFamilyLinked,
     ApplicationRejected,
     ApplicationSubmitted,
     AdminApplicationSubmitted,
@@ -933,6 +934,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       template_mappings = %{
         "application_rejected" => ApplicationRejected,
         "application_approved" => ApplicationApproved,
+        "application_approved_family_linked" => ApplicationApprovedFamilyLinked,
         "application_submitted" => ApplicationSubmitted,
         "confirm_email" => ConfirmEmail,
         "reset_password" => ResetPassword,
