@@ -3042,7 +3042,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                socket
                |> YscWeb.Flash.put_toast(
                  :error,
-                 "Failed to send invite: #{msg}", title: "Invite User")}
+                 "Failed to send invite: #{msg}",
+                 title: "Invite User"
+               )}
 
             {:error, _} ->
               {:noreply,
@@ -3078,7 +3080,9 @@ defmodule YscWeb.AdminUserDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Please enter a valid email address.", title: "Invite User")}
+           "Please enter a valid email address.",
+           title: "Invite User"
+         )}
 
       true ->
         case FamilyInvites.create_invite(primary_user, email, relationship: rel) do
@@ -3167,7 +3171,9 @@ defmodule YscWeb.AdminUserDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Not authorized to cancel this invite.", title: "Cancel Invite")}
+           "Not authorized to cancel this invite.",
+           title: "Cancel Invite"
+         )}
 
       {:error, :already_accepted} ->
         {:noreply,
