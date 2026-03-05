@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
 
   setup %{conn: conn} do
     setup_stripe_mocks()
+    previous_stripe_client = Application.get_env(:ysc, :stripe_client)
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
     # Stub create_payment_intent for cases where it might be triggered
@@ -21,7 +22,11 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
     end)
 
     on_exit(fn ->
-      Application.delete_env(:ysc, :stripe_client)
+      if previous_stripe_client do
+        Application.put_env(:ysc, :stripe_client, previous_stripe_client)
+      else
+        Application.delete_env(:ysc, :stripe_client)
+      end
     end)
 
     user = user_with_membership(:lifetime)
