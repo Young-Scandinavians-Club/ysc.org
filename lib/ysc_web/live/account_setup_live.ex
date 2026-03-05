@@ -190,7 +190,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Verify Your Phone Number
             <:subtitle>
-              We sent a verification code to <strong><%= @user.phone_number %></strong>. Please enter it below to continue.
+              We sent a verification code to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@user.phone_number) || @user.phone_number %></strong>. Please enter it below to continue.
             </:subtitle>
           </.header>
 

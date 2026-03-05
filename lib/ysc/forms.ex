@@ -139,7 +139,10 @@ defmodule Ysc.Forms do
         first_name: report.first_name,
         last_name: report.last_name,
         email: report.email,
-        phone: report.phone,
+        phone:
+          report.phone &&
+            (Ysc.Extensions.PhoneNumber.format_for_display(report.phone) ||
+               report.phone),
         summary: report.summary,
         anonymous: report.anonymous,
         report_id: report.id,

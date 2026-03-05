@@ -125,7 +125,9 @@ defmodule YscWeb.ConductViolationReportLive do
                         Phone
                       </p>
                       <p class="text-zinc-900 font-medium">
-                        {@current_user.phone_number || "Not provided"}
+                        {Ysc.Extensions.PhoneNumber.format_for_display(
+                          @current_user.phone_number
+                        ) || "Not provided"}
                       </p>
                     </div>
                   </div>
