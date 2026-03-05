@@ -2165,8 +2165,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Indoor beds are set up in the cabin during winter months!
                     </p>
                     <p class="text-sm text-amber-800 leading-relaxed">
-                      <strong>Bring your own:</strong>
-                      Sheets, pillowcases, comforter or sleeping bag, and towels. We also recommend an extra wool blanket and indoor slippers to keep cozy in the Social Hall.
+                      Please bring your own linens: sheets, pillowcases, comforter or sleeping bag, and towels. We also recommend an extra wool blanket and indoor slippers to keep cozy in the Social Hall.
                     </p>
                   </div>
                 </section>
@@ -3658,7 +3657,7 @@ defmodule YscWeb.ClearLakeBookingLive do
          guests_count,
          active_tab,
          booking_mode,
-         info_tab \\ nil
+         info_tab
        ) do
     params = %{}
 
