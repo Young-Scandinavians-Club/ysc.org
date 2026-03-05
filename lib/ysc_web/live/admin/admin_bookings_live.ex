@@ -2290,6 +2290,7 @@ defmodule YscWeb.AdminBookingsLive do
                 on_change="change-reservation-search"
                 phx-submit="change-reservation-search"
                 phx-submit-disable
+                clear_event="clear-reservation-search"
               />
             </div>
             <div class="py-6 w-full overflow-x-auto">

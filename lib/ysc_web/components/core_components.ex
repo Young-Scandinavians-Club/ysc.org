@@ -2714,6 +2714,7 @@ defmodule YscWeb.CoreComponents do
   attr :placeholder, :string, default: "Search..."
   attr :on_change, :string, default: "change"
   attr :debounce, :string, default: "200"
+  attr :clear_event, :string, default: "clear-search"
   attr :rest, :global, include: ~w(phx-submit phx-submit-disable)
 
   def admin_search_bar(assigns) do
@@ -2743,7 +2744,7 @@ defmodule YscWeb.CoreComponents do
         value={@value}
         tabindex="0"
         phx-debounce={@debounce}
-        class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
+        class="block pt-3 pb-3 ps-10 pe-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-[box-shadow,border-color] duration-150"
       />
     </form>
     """

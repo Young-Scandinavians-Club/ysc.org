@@ -383,15 +383,6 @@ defmodule YscWeb.AdminEventsLive do
     do_clear_search(socket, input_id)
   end
 
-  defp do_clear_search(socket, input_id) do
-    new_params = Map.delete(socket.assigns[:params], "search")
-
-    {:noreply,
-     socket
-     |> assign(:focus_search_input, input_id)
-     |> push_patch(to: ~p"/admin/events?#{new_params}")}
-  end
-
   def handle_event("update-filter", params, socket) do
     date_from = Map.get(params, "date_from", "")
     date_to = Map.get(params, "date_to", "")
@@ -458,6 +449,15 @@ defmodule YscWeb.AdminEventsLive do
   end
 
   defp format_publish_at(_), do: nil
+
+  defp do_clear_search(socket, input_id) do
+    new_params = Map.delete(socket.assigns[:params], "search")
+
+    {:noreply,
+     socket
+     |> assign(:focus_search_input, input_id)
+     |> push_patch(to: ~p"/admin/events?#{new_params}")}
+  end
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")
