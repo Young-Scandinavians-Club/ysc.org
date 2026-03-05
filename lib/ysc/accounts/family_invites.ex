@@ -22,7 +22,8 @@ defmodule Ysc.Accounts.FamilyInvites do
   - Primary user has less than 10 sub-accounts
   - Max 1 spouse (when relationship is :spouse)
   - Email doesn't have a pending invite from this primary user
-  - If email is already registered, allows linking existing user (does not reject)
+  - Email is not already registered to another user (use Accounts.admin_link_user_to_family/3
+    for directly linking existing users without an invite)
 
   Returns {:ok, invite} or {:error, reason}
 
@@ -36,6 +37,7 @@ defmodule Ysc.Accounts.FamilyInvites do
 
     with :ok <- validate_primary_user_eligibility(primary_user),
          :ok <- validate_relationship_limits(primary_user, relationship),
+         :ok <- validate_email_not_registered(email, primary_user.id),
          :ok <- validate_no_pending_invite(email, primary_user.id) do
       token = FamilyInvite.build_token()
 
@@ -500,6 +502,16 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       true ->
         :ok
+    end
+  end
+
+  defp validate_email_not_registered(email, primary_user_id) do
+    normalized = String.downcase(String.trim(email))
+
+    case Ysc.Accounts.get_user_by_email(normalized) do
+      nil -> :ok
+      %{id: ^primary_user_id} -> :ok
+      _other -> {:error, :email_already_registered}
     end
   end
 
