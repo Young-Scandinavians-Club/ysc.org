@@ -340,7 +340,7 @@ defmodule YscWeb.UserTicketsLive do
         if ticket_order.status == :pending do
           # Redirect to event page with resume_order query parameter
           {:noreply,
-           redirect(socket,
+           push_navigate(socket,
              to: ~p"/events/#{ticket_order.event_id}?resume_order=#{order_id}"
            )}
         else
@@ -358,7 +358,7 @@ defmodule YscWeb.UserTicketsLive do
   @impl true
   def handle_event("view-tickets", %{"order-id" => order_id}, socket) do
     # Redirect to the order confirmation page
-    {:noreply, redirect(socket, to: ~p"/orders/#{order_id}/confirmation")}
+    {:noreply, push_navigate(socket, to: ~p"/orders/#{order_id}/confirmation")}
   end
 
   ## Helper Functions

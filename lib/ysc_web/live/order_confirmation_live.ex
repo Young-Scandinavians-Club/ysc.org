@@ -74,17 +74,19 @@ defmodule YscWeb.OrderConfirmationLive do
 
   @impl true
   def handle_event("close", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/events/#{socket.assigns.event.id}")}
+    {:noreply,
+     push_navigate(socket, to: ~p"/events/#{socket.assigns.event.id}")}
   end
 
   @impl true
   def handle_event("view-tickets", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/users/tickets")}
+    {:noreply, push_navigate(socket, to: ~p"/users/tickets")}
   end
 
   @impl true
   def handle_event("view-event", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/events/#{socket.assigns.event.id}")}
+    {:noreply,
+     push_navigate(socket, to: ~p"/events/#{socket.assigns.event.id}")}
   end
 
   @impl true

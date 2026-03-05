@@ -1030,7 +1030,7 @@ defmodule YscWeb.AdminUsersLive do
 
         {:noreply,
          socket
-         |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
+         |> push_navigate(to: ~p"/admin/users?#{socket.assigns[:params]}")
          |> YscWeb.Flash.put_toast(
            :info,
            "User was approved and is now a member!",
@@ -1134,7 +1134,7 @@ defmodule YscWeb.AdminUsersLive do
 
           {:noreply,
            socket
-           |> redirect(to: ~p"/admin/users?#{socket.assigns[:params]}")
+           |> push_navigate(to: ~p"/admin/users?#{socket.assigns[:params]}")
            |> YscWeb.Flash.put_toast(:info, "User application was rejected!",
              title: "Application"
            )}
