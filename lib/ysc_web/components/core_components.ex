@@ -2678,7 +2678,7 @@ defmodule YscWeb.CoreComponents do
     cleaned_email = String.downcase(email) |> String.trim()
 
     email_hash =
-      :crypto.hash(:sha256, cleaned_email) |> Base.encode16(case: :lower)
+      :crypto.hash(:md5, cleaned_email) |> Base.encode16(case: :lower)
 
     image_id =
       user_id |> String.replace(~r/[^\d]/, "") |> String.to_integer() |> rem(2)
