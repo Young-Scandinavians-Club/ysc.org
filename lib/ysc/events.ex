@@ -76,8 +76,9 @@ defmodule Ysc.Events do
     |> Flop.validate_and_run(params, for: Event)
   end
 
-  defp normalize_list_events_opts(search_term) when is_binary(search_term) or is_nil(search_term),
-    do: [search_term: search_term]
+  defp normalize_list_events_opts(search_term)
+       when is_binary(search_term) or is_nil(search_term),
+       do: [search_term: search_term]
 
   defp normalize_list_events_opts(opts) when is_list(opts), do: opts
 

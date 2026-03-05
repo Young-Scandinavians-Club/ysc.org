@@ -72,7 +72,9 @@ defmodule YscWeb.AdminUsersLive do
 
           <div class="flex flex-row justify-end w-full pt-8">
             <button
-              phx-click={JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")}
+              phx-click={
+                JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")
+              }
               class="rounded hover:bg-zinc-100 py-2 px-3 mr-4 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-600"
             >
               Cancel
@@ -657,7 +659,9 @@ defmodule YscWeb.AdminUsersLive do
                   </button>
                   <button
                     :if={user.state != :pending_approval}
-                    phx-click={JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")}
+                    phx-click={
+                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                    }
                     class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                   >
                     Edit

@@ -5449,7 +5449,11 @@ defmodule YscWeb.AdminBookingsLive do
      |> push_patch(to: "/admin/bookings?#{query_string}")}
   end
 
-  def handle_event("clear-reservation-search", %{"input-id" => input_id}, socket) do
+  def handle_event(
+        "clear-reservation-search",
+        %{"input-id" => input_id},
+        socket
+      ) do
     new_reservation_params =
       Map.delete(socket.assigns[:reservation_params] || %{}, "search")
 

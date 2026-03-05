@@ -88,6 +88,7 @@ defmodule Ysc.Posts do
         |> preload([author: o], author: o)
       else
         search_term = String.trim(search_term)
+
         fuzzy_search_posts(search_term)
         |> maybe_filter_posted_from(date_from)
         |> maybe_filter_posted_to(date_to)
@@ -97,8 +98,9 @@ defmodule Ysc.Posts do
     |> Flop.validate_and_run(params, for: Post)
   end
 
-  defp normalize_list_posts_opts(search_term) when is_binary(search_term) or is_nil(search_term),
-    do: [search_term: search_term]
+  defp normalize_list_posts_opts(search_term)
+       when is_binary(search_term) or is_nil(search_term),
+       do: [search_term: search_term]
 
   defp normalize_list_posts_opts(opts) when is_list(opts), do: opts
 
@@ -136,12 +138,17 @@ defmodule Ysc.Posts do
       as: :author,
       where:
         p.state not in [:deleted] and
-          (ilike(p.title, ^search_like) or ilike(coalesce(p.preview_text, ""), ^search_like) or
+          (ilike(p.title, ^search_like) or
+             ilike(coalesce(p.preview_text, ""), ^search_like) or
              (not is_nil(u.id) and
                 (ilike(coalesce(u.first_name, ""), ^search_like) or
                    ilike(coalesce(u.last_name, ""), ^search_like) or
                    ilike(
-                     fragment("coalesce(?, '') || ' ' || coalesce(?, '')", u.first_name, u.last_name),
+                     fragment(
+                       "coalesce(?, '') || ' ' || coalesce(?, '')",
+                       u.first_name,
+                       u.last_name
+                     ),
                      ^search_like
                    )))),
       preload: [author: u]

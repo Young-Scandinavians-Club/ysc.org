@@ -75,7 +75,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :orders &&
@@ -89,7 +91,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :bookings &&
@@ -103,7 +107,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/application?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/application?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :application &&
@@ -117,7 +123,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :membership &&
@@ -131,7 +139,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :notifications &&
@@ -145,7 +155,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li :if={@is_treasurer} class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :bank_accounts &&
@@ -159,7 +171,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/family?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/family?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :family &&
@@ -173,7 +187,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :logs && "text-blue-600 border-blue-600 active",
@@ -2000,7 +2016,10 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
-         |> redirect(to: ~p"/admin/users/#{updated_user.id}/details?#{socket.assigns.list_params}")}
+         |> redirect(
+           to:
+             ~p"/admin/users/#{updated_user.id}/details?#{socket.assigns.list_params}"
+         )}
 
       {:error, changeset} ->
         # Log the actual error for debugging
