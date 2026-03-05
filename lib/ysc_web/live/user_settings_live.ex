@@ -2457,7 +2457,11 @@ defmodule YscWeb.UserSettingsLive do
 
       case Accounts.update_user_profile(user, other_params) do
         {:ok, updated_user} ->
-          # Send verification code to new phone number
+          # Send verification code to new phone number.
+          # Use timestamp in suffix so idempotency key is unique per attempt (e.g. user
+          # switching back to the same number later can receive a new code).
+          timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
           phone_code =
             Accounts.generate_and_store_phone_verification_code(updated_user)
 
@@ -2465,7 +2469,7 @@ defmodule YscWeb.UserSettingsLive do
             Accounts.send_phone_verification_code(
               updated_user,
               phone_code,
-              "settings_change",
+              "settings_change_#{timestamp}",
               new_phone
             )
 
