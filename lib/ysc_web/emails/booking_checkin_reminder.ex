@@ -86,7 +86,13 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       OutageNotification.get_cabin_master_email(booking.property)
 
     cabin_master_phone =
-      if cabin_master, do: cabin_master.phone_number, else: nil
+      if cabin_master,
+        do:
+          Ysc.Extensions.PhoneNumber.format_for_display(
+            cabin_master.phone_number
+          ) ||
+            cabin_master.phone_number,
+        else: nil
 
     # Format dates
     checkin_date = format_date(booking.checkin_date)

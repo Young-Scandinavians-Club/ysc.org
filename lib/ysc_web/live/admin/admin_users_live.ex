@@ -613,7 +613,9 @@ defmodule YscWeb.AdminUsersLive do
                   <div :if={user.phone_number} class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">Phone:</span>
                     <span class="text-sm text-zinc-900">
-                      {format_phone_number(user.phone_number)}
+                      {Ysc.Extensions.PhoneNumber.format_for_display(
+                        user.phone_number
+                      ) || user.phone_number}
                     </span>
                   </div>
                   <div class="flex items-center gap-2">
@@ -732,7 +734,8 @@ defmodule YscWeb.AdminUsersLive do
                 </.link>
               </:col>
               <:col :let={{_, user}} label="Phone" field={:phone_number}>
-                {format_phone_number(user.phone_number)}
+                {Ysc.Extensions.PhoneNumber.format_for_display(user.phone_number) ||
+                  user.phone_number}
               </:col>
               <:col
                 :let={{_, user}}
@@ -1199,17 +1202,6 @@ defmodule YscWeb.AdminUsersLive do
 
     {:noreply,
      socket |> assign(:export_status, :failed) |> assign(:export_error, msg)}
-  end
-
-  defp format_phone_number(phone_number) do
-    case ExPhoneNumber.parse(phone_number, "") do
-      {:ok, parsed} ->
-        ExPhoneNumber.format(parsed, :international)
-
-      {:error, _} ->
-        # Return as-is if parsing fails
-        phone_number
-    end
   end
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
