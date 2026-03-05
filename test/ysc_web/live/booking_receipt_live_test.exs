@@ -218,7 +218,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:live_redirect, %{to: path}}} =
                render_click(view, "view-bookings")
 
       assert path == "/bookings/tahoe"
@@ -235,7 +235,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:live_redirect, %{to: path}}} =
                render_click(view, "view-bookings")
 
       assert path == "/bookings/clear-lake"
@@ -249,7 +249,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert {:error, {:redirect, %{to: path}}} = render_click(view, "go-home")
+      assert {:error, {:live_redirect, %{to: path}}} =
+               render_click(view, "go-home")
 
       assert path == "/"
     end

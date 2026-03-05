@@ -535,7 +535,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:live_redirect, %{to: path}}} =
                render_click(view, "view-tickets")
 
       assert path == "/users/tickets"
@@ -552,7 +552,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:live_redirect, %{to: path}}} =
                render_click(view, "view-event")
 
       assert path == "/events/#{event.id}"
