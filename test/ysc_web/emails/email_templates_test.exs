@@ -212,6 +212,23 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
                "New Conduct Violation Report - Immediate Board Review Required"
     end
 
+    test "ConductViolationBoardNotification renders formatted phone for display" do
+      assigns = %{
+        first_name: "Jane",
+        last_name: "Smith",
+        email: "reporter@example.com",
+        phone: "(415) 555-1234",
+        report_id: "RPT-456",
+        submitted_at: "2024-01-15 10:30:00",
+        summary: "Test violation summary",
+        anonymous: false
+      }
+
+      html = ConductViolationBoardNotification.render(assigns)
+      assert is_binary(html)
+      assert html =~ "(415) 555-1234"
+    end
+
     test "MembershipPaymentFailure renders without errors" do
       user = user_fixture()
 

@@ -53,7 +53,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
 
             <p class="text-sm text-zinc-600 mb-4">
-              We sent a verification code via text message to <strong><%= @pending_phone_number %></strong>.
+              We sent a verification code via text message to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@pending_phone_number) || @pending_phone_number %></strong>.
               Please enter it below to confirm your phone number.
             </p>
 

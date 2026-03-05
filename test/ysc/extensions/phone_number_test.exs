@@ -72,6 +72,31 @@ defmodule Ysc.Extensions.PhoneNumberTest do
     end
   end
 
+  describe "format_for_display/1" do
+    test "returns nil for nil" do
+      assert PhoneNumber.format_for_display(nil) == nil
+    end
+
+    test "returns nil for empty string" do
+      assert PhoneNumber.format_for_display("") == nil
+    end
+
+    test "formats valid US number in national format" do
+      formatted = PhoneNumber.format_for_display("+14155551234")
+      assert formatted == "(415) 555-1234"
+    end
+
+    test "formats E.164 US number with country code" do
+      formatted = PhoneNumber.format_for_display("+12065551234")
+      assert formatted == "(206) 555-1234"
+    end
+
+    test "returns raw string when parsing fails" do
+      raw = "not-a-phone"
+      assert PhoneNumber.format_for_display(raw) == raw
+    end
+  end
+
   describe "format_phone_number/2" do
     test "formats phone number in national format" do
       {:ok, phone_number} = PhoneNumber.parse_phone_number("+14155551234", "US")

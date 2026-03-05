@@ -179,7 +179,13 @@ defmodule Mix.Tasks.TestOutageEmail do
         end
 
       cabin_master_phone =
-        if cabin_master, do: cabin_master.phone_number, else: nil
+        if cabin_master,
+          do:
+            Ysc.Extensions.PhoneNumber.format_for_display(
+              cabin_master.phone_number
+            ) ||
+              cabin_master.phone_number,
+          else: nil
 
       cabin_master_email =
         OutageNotification.get_cabin_master_email(outage.property)
