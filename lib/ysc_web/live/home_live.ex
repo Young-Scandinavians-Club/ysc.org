@@ -249,7 +249,7 @@ defmodule YscWeb.HomeLive do
           <div class="mt-8 sm:mt-10 w-full max-w-sm sm:max-w-none flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
             <.link
               navigate={~p"/users/register"}
-              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] min-h-[48px]"
+              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl min-h-[48px]"
             >
               Apply for Membership
               <.icon
@@ -318,7 +318,7 @@ defmodule YscWeb.HomeLive do
             <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-black text-zinc-900 tracking-tighter leading-[0.95] break-words">
               A home for Nordic spirits in the Bay.
             </h2>
-            <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed">
+            <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed pr-0 sm:pr-4">
               The Young Scandinavians Club (YSC) is a vibrant community for Scandinavians and Scandinavian-Americans of all ages in the San Francisco Bay Area. We host a wide range of events across Northern California, offering members access to our scenic cabins in Clear Lake and Lake Tahoe.
             </p>
             <div class="mt-6 flex items-center gap-3 flex-wrap">
