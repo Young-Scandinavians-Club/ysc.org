@@ -33,6 +33,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     >
       <div class="flex flex-col justify-between py-6">
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
+        <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
 
         <div class="flex flex-row items-center justify-between pt-4">
           <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
@@ -62,6 +63,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             <ul class="flex flex-wrap -mb-px">
               <li class="me-2">
                 <.link
+                  navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
                   navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
@@ -570,6 +572,14 @@ defmodule YscWeb.AdminUserDetailsLive do
                   {Calendar.strftime(booking.inserted_at, "%b %d, %Y")}
                 </span>
               </:col>
+              <:action :let={{_, booking}} label="Action">
+                <.link
+                  navigate={~p"/admin/bookings/#{booking.id}"}
+                  class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                >
+                  View
+                </.link>
+              </:action>
             </Flop.Phoenix.table>
 
             <Flop.Phoenix.pagination
@@ -1413,9 +1423,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                             {notification.email}
                           <% else %>
                             <%= if notification.phone_number do %>
-                              {Ysc.Extensions.PhoneNumber.format_for_display(
-                                notification.phone_number
-                              ) || notification.phone_number}
+                              {notification.phone_number}
                             <% else %>
                               <span class="text-zinc-400">—</span>
                             <% end %>
@@ -1514,9 +1522,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         {@selected_notification.email}
                       <% else %>
                         <%= if @selected_notification.phone_number do %>
-                          {Ysc.Extensions.PhoneNumber.format_for_display(
-                            @selected_notification.phone_number
-                          ) || @selected_notification.phone_number}
+                          {@selected_notification.phone_number}
                         <% else %>
                           <span class="text-zinc-400">—</span>
                         <% end %>
@@ -1595,9 +1601,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       </div>
                       <%= if @primary_user.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          {Ysc.Extensions.PhoneNumber.format_for_display(
-                            @primary_user.phone_number
-                          ) || @primary_user.phone_number}
+                          {format_phone_number(@primary_user.phone_number)}
                         </div>
                       <% end %>
                     </div>
@@ -1638,9 +1642,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       </div>
                       <%= if sub_account.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          {Ysc.Extensions.PhoneNumber.format_for_display(
-                            sub_account.phone_number
-                          ) || sub_account.phone_number}
+                          {format_phone_number(sub_account.phone_number)}
                         </div>
                       <% end %>
                     </div>
@@ -1967,11 +1969,14 @@ defmodule YscWeb.AdminUserDetailsLive do
        to_form(note_changeset(%{category: "general"}), as: "note")
      )
      |> assign(:list_params, Map.drop(params, ["id"]))
+     |> assign(:list_params, Map.drop(params, ["id"]))
      |> assign(form: user_form)}
   end
 
   def handle_params(params, _uri, socket) do
     user_id = socket.assigns.user_id
+    list_params = Map.drop(params, ["id"])
+    socket = assign(socket, :list_params, list_params)
     list_params = Map.drop(params, ["id"])
     socket = assign(socket, :list_params, list_params)
 
@@ -2825,6 +2830,17 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp load_rejection_notes(socket, user_id) do
     rejection_notes = Accounts.list_user_notes_by_category(user_id, :rejection)
     assign(socket, :rejection_notes, rejection_notes)
+  end
+
+  defp format_phone_number(phone_number) do
+    case ExPhoneNumber.parse(phone_number, "") do
+      {:ok, parsed} ->
+        ExPhoneNumber.format(parsed, :international)
+
+      {:error, _} ->
+        # Return as-is if parsing fails
+        phone_number
+    end
   end
 
   defp user_state_to_badge_type(:active), do: "green"
