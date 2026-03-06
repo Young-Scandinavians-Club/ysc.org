@@ -492,7 +492,7 @@ defmodule YscWeb.AdminPostsLive do
 
     case result do
       {:ok, new_post} ->
-        {:noreply, socket |> redirect(to: ~p"/admin/posts/#{new_post.id}")}
+        {:noreply, socket |> push_navigate(to: ~p"/admin/posts/#{new_post.id}")}
 
       _ ->
         {:noreply,
@@ -577,7 +577,7 @@ defmodule YscWeb.AdminPostsLive do
 
     case result do
       {:ok, new_post} ->
-        {:noreply, socket |> redirect(to: ~p"/admin/posts/#{new_post.id}")}
+        {:noreply, socket |> push_navigate(to: ~p"/admin/posts/#{new_post.id}")}
 
       _ ->
         {:noreply,

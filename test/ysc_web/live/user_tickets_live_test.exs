@@ -83,7 +83,7 @@ defmodule YscWeb.UserTicketsLiveTest do
 
       fake_order_id = Ecto.ULID.generate()
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:live_redirect, %{to: path}}} =
                render_click(view, "view-tickets", %{"order-id" => fake_order_id})
 
       assert path == "/orders/#{fake_order_id}/confirmation"

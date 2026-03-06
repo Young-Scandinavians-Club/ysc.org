@@ -2011,7 +2011,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
-         |> redirect(to: ~p"/admin/users/#{updated_user.id}/details")}
+         |> push_navigate(to: ~p"/admin/users/#{updated_user.id}/details")}
 
       {:error, changeset} ->
         # Log the actual error for debugging
