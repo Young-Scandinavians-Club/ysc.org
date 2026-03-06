@@ -730,7 +730,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     case Events.create_event(event_changeset) do
       {:ok, event} ->
-        {:noreply, redirect(socket, to: "/admin/events/#{event.id}/edit")}
+        {:noreply, push_navigate(socket, to: "/admin/events/#{event.id}/edit")}
 
       {:error, changeset} ->
         {:noreply, assign_form(socket, changeset)}
