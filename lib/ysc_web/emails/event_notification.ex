@@ -15,12 +15,47 @@ defmodule YscWeb.Emails.EventNotification do
     "event_notification"
   end
 
+  @subjects_with_event [
+    "Will we see you at {title}?",
+    "Don't miss {title} 👀",
+    "{title} is on the calendar — are you in?",
+    "Just added: {title}",
+    "Have you heard about {title}?",
+    "You might like this → {title}"
+  ]
+
+  @subjects_save_the_date [
+    "Save the date: {title}",
+    "Mark your calendar — {title} is coming",
+    "{title} is coming soon — save your spot",
+    "Heads up: {title} is on the way"
+  ]
+
+  @subjects_without_event [
+    "New on the calendar",
+    "Something new just dropped",
+    "Fresh event alert",
+    "There's something happening soon"
+  ]
+
   def get_subject(event \\ nil) do
-    if event do
-      "Will we see you at #{event.title}?"
-    else
-      "New on the calendar"
-    end
+    subject =
+      cond do
+        is_nil(event) ->
+          Enum.random(@subjects_without_event)
+
+        event.tickets_tbd ->
+          @subjects_save_the_date
+          |> Enum.random()
+          |> String.replace("{title}", event.title)
+
+        true ->
+          @subjects_with_event
+          |> Enum.random()
+          |> String.replace("{title}", event.title)
+      end
+
+    "[YSC] " <> subject
   end
 
   def event_url(event_id) do

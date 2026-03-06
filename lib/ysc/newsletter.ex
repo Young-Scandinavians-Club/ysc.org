@@ -13,6 +13,7 @@ defmodule Ysc.Newsletter do
 
   alias Ysc.Repo
   alias Ysc.Newsletter.Subscriber
+  alias Ysc.Newsletter.Edition
 
   @doc """
   Subscribes an email to the newsletter.
@@ -257,5 +258,259 @@ defmodule Ysc.Newsletter do
 
   defp valid_email?(email) do
     is_binary(email) && String.trim(email) != "" && String.contains?(email, "@")
+  end
+
+  # ---------------------------------------------------------------------------
+  # Newsletter editions (curated content: cover, intro, posts, events)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Lists all newsletter editions, newest first.
+  """
+  def list_editions do
+    Edition
+    |> order_by([e], desc: e.inserted_at)
+    |> Repo.all()
+    |> Repo.preload([:cover_image, :creator])
+  end
+
+  @doc """
+  Lists newsletter editions with Flop pagination, sorting, and filtering.
+
+  Options:
+  - :date_from - filter by inserted_at >= date (YYYY-MM-DD)
+  - :date_to - filter by inserted_at <= date (YYYY-MM-DD)
+  """
+  def list_paginated_editions(params, opts \\ []) do
+    date_from = Keyword.get(opts, :date_from, "")
+    date_to = Keyword.get(opts, :date_to, "")
+
+    base_query =
+      Edition
+      |> preload([:cover_image, :creator])
+      |> Ecto.Query.exclude(:order_by)
+      |> maybe_filter_inserted_at_from(date_from)
+      |> maybe_filter_inserted_at_to(date_to)
+
+    case Flop.validate_and_run(base_query, params, for: Edition) do
+      {:ok, {editions, meta}} -> {:ok, {editions, meta}}
+      error -> error
+    end
+  end
+
+  defp maybe_filter_inserted_at_from(query, ""), do: query
+
+  defp maybe_filter_inserted_at_from(query, date_str) do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        datetime = DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+        where(query, [e], e.inserted_at >= ^datetime)
+
+      _ ->
+        query
+    end
+  end
+
+  defp maybe_filter_inserted_at_to(query, ""), do: query
+
+  defp maybe_filter_inserted_at_to(query, date_str) do
+    case Date.from_iso8601(date_str) do
+      {:ok, date} ->
+        datetime = DateTime.new!(date, ~T[23:59:59], "Etc/UTC")
+        where(query, [e], e.inserted_at <= ^datetime)
+
+      _ ->
+        query
+    end
+  end
+
+  @doc """
+  Returns a list of {display_name, creator_id} for all users who have created
+  at least one newsletter edition (for filter dropdowns).
+  """
+  def get_all_creators do
+    from(
+      e in Edition,
+      left_join: u in assoc(e, :creator),
+      distinct: e.creator_id,
+      select: %{
+        "creator_id" => e.creator_id,
+        "creator_first" => u.first_name,
+        "creator_last" => u.last_name,
+        "creator_email" => u.email
+      },
+      order_by: [asc: u.first_name, asc: u.last_name]
+    )
+    |> Repo.all()
+    |> format_creators()
+  end
+
+  defp format_creators(result) do
+    result
+    |> Enum.map(fn entry ->
+      name = creator_display_name(entry)
+      {name, entry["creator_id"]}
+    end)
+  end
+
+  defp creator_display_name(%{"creator_first" => first, "creator_last" => last})
+       when is_binary(first) and is_binary(last) do
+    "#{String.capitalize(first)} #{String.downcase(last)}"
+  end
+
+  defp creator_display_name(%{"creator_email" => email}) when is_binary(email),
+    do: email
+
+  defp creator_display_name(_), do: "Unknown"
+
+  @doc """
+  Gets a single edition by id. Raises if not found.
+  """
+  def get_edition!(id),
+    do: Repo.get!(Edition, id) |> Repo.preload([:cover_image, :creator])
+
+  @doc """
+  Creates a new newsletter edition (draft).
+
+  Options:
+  - :created_by_id - user id of the admin creating the edition (required to record creator)
+  """
+  def create_edition(attrs \\ %{}, opts \\ []) do
+    attrs = Map.put_new(attrs, "status", :draft)
+    creator_id = Keyword.get(opts, :created_by_id)
+
+    %Edition{}
+    |> Edition.changeset(attrs)
+    |> maybe_put_creator(creator_id)
+    |> Repo.insert()
+  end
+
+  defp maybe_put_creator(changeset, nil), do: changeset
+
+  defp maybe_put_creator(changeset, creator_id),
+    do: Ecto.Changeset.put_change(changeset, :creator_id, creator_id)
+
+  @doc """
+  Updates an edition.
+  """
+  def update_edition(%Edition{} = edition, attrs) do
+    edition
+    |> Edition.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes an edition.
+
+  Returns `{:error, :already_sent}` if the edition has already been sent — sent
+  editions are preserved as archive records and cannot be destroyed.
+  """
+  def delete_edition(%Edition{status: :sent}), do: {:error, :already_sent}
+
+  def delete_edition(%Edition{} = edition) do
+    Repo.delete(edition)
+  end
+
+  @doc """
+  Enqueues sending of the newsletter to all subscribed subscribers.
+
+  Works for both `:draft` and `:scheduled` editions. Sending a scheduled edition
+  cancels the intent of the existing scheduled Oban job — the previously queued
+  job will run but `NewsletterSender` checks for `:sent` status and skips it
+  safely.
+
+  Returns `{:error, :already_sent}` if the edition has already been sent.
+  """
+  def send_edition(%Edition{} = edition) do
+    if edition.status == :sent do
+      {:error, :already_sent}
+    else
+      case %{edition_id: edition.id}
+           |> YscWeb.Workers.NewsletterSender.new()
+           |> Oban.insert() do
+        {:ok, _job} -> :ok
+        {:error, _reason} = err -> err
+      end
+    end
+  end
+
+  @doc """
+  Sends a one-off test copy of the edition to `user`.
+
+  Renders the email using the user's first name and a placeholder unsubscribe
+  URL. Does not change the edition's status or sent_count.
+  """
+  def send_test_email(%Edition{} = edition, user) do
+    alias Ysc.Posts
+    alias Ysc.Events
+    alias Ysc.Mailer
+    alias YscWeb.Emails.NewsletterEdition
+
+    edition = Repo.preload(edition, :cover_image)
+
+    posts =
+      (edition.post_ids || [])
+      |> Enum.map(fn id -> Posts.get_post(id, [:featured_image]) end)
+      |> Enum.reject(&is_nil/1)
+
+    events =
+      (edition.event_ids || [])
+      |> Enum.map(&Events.get_event/1)
+      |> Enum.reject(&is_nil/1)
+      |> Repo.preload([:cover_image, :ticket_tiers])
+
+    fake_subscriber = %{
+      first_name: user.first_name || "there",
+      email: user.email,
+      subscription_token: nil
+    }
+
+    assigns =
+      NewsletterEdition.build_assigns(edition, fake_subscriber, posts, events)
+
+    html = NewsletterEdition.render(assigns)
+
+    email =
+      Swoosh.Email.new()
+      |> Swoosh.Email.to(user.email)
+      |> Swoosh.Email.from(
+        {Ysc.EmailConfig.from_name(), Ysc.EmailConfig.from_email()}
+      )
+      |> Swoosh.Email.subject(
+        "[YSC] [TEST] #{edition.subject || edition.title}"
+      )
+      |> Swoosh.Email.html_body(html)
+
+    case Mailer.deliver(email) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Schedules the edition to be sent at the given UTC datetime.
+
+  Persists `scheduled_at` and status `:scheduled`, then enqueues a
+  `NewsletterSender` Oban job with `scheduled_at` so Oban fires it at the
+  correct time automatically — no separate cron worker is required.
+  """
+  def schedule_edition(%Edition{} = edition, scheduled_at)
+      when is_struct(scheduled_at, DateTime) do
+    # Update the edition status first, then schedule the Oban job outside any
+    # transaction. This matches the production behaviour where the worker picks
+    # up the job after the transaction has committed and uses its own connection.
+    # It also prevents the Inline test engine from executing the sender while the
+    # transaction's connection is still held, which would deadlock task processes.
+    with {:ok, updated} <-
+           update_edition(edition, %{
+             scheduled_at: scheduled_at,
+             status: :scheduled
+           }) do
+      %{edition_id: updated.id}
+      |> YscWeb.Workers.NewsletterSender.new(scheduled_at: scheduled_at)
+      |> Oban.insert!()
+
+      {:ok, updated}
+    end
   end
 end

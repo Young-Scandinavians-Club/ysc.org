@@ -1,8 +1,8 @@
 import Trix from "../vendor/trix";
 
-function emitEditorUpdateEvent(source) {
-  const editorElement = document.getElementById("post[raw_body]");
-  source.pushEvent("editor-update", { raw_body: editorElement.value });
+function emitEditorUpdateEvent(source, el) {
+  if (!el) return;
+  source.pushEvent("editor-update", { field: el.name, value: el.value });
 }
 
 function uploadFileAttachment(attachment, postID) {
@@ -20,7 +20,9 @@ function uploadFileAttachment(attachment, postID) {
 function uploadFile(file, postID, progressCallback, successCallback) {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("post_id", postID);
+  if (postID) {
+    formData.append("post_id", postID);
+  }
   const csrfToken = document
     .querySelector("meta[name='csrf-token']")
     .getAttribute("content");
@@ -52,16 +54,18 @@ module.exports = {
     window.Trix = Trix;
 
     document.addEventListener("trix-change", () => {
-      emitEditorUpdateEvent(this);
+      emitEditorUpdateEvent(this, this.el);
     });
 
     document.addEventListener("trix-blur", () => {
-      emitEditorUpdateEvent(this);
+      emitEditorUpdateEvent(this, this.el);
     });
 
     document.addEventListener("trix-attachment-add", (event) => {
-      const postID = this.el.getAttribute("data-post-id");
-      uploadFileAttachment(event.attachment, postID);
+      if (event.attachment.file) {
+        const postID = this.el.getAttribute("data-post-id");
+        uploadFileAttachment(event.attachment, postID);
+      }
     });
   },
 

@@ -407,6 +407,8 @@ defmodule YscWeb.Router do
 
       # Newsletters
       live "/newsletters", AdminNewslettersLive, :index
+      live "/newsletters/new", AdminNewsletterEditorLive, :new
+      live "/newsletters/:id/edit", AdminNewsletterEditorLive, :edit
 
       # Website specific settings (such as socials etc)
       live "/settings", AdminSettingsLive, :index

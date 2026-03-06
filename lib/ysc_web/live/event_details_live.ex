@@ -5642,7 +5642,7 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp event_body(%Event{rendered_details: nil} = event),
-    do: Scrubber.scrub(event.raw_details, Scrubber.BasicHTML)
+    do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)
 
   defp event_body(%Event{} = event), do: event.rendered_details
 

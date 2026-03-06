@@ -32,19 +32,35 @@ defmodule YscWeb.Emails.EventNotificationTest do
   end
 
   describe "get_subject/1" do
-    test "returns subject with event title when event provided", %{event: event} do
+    test "prefixes subject with [YSC]", %{event: event} do
       subject = EventNotification.get_subject(event)
-      assert subject == "Will we see you at #{event.title}?"
+      assert String.starts_with?(subject, "[YSC] ")
     end
 
-    test "returns generic subject when event is nil" do
+    test "returns a subject containing the event title when event is provided",
+         %{event: event} do
+      subject = EventNotification.get_subject(event)
+      assert subject =~ event.title
+    end
+
+    test "returns a save-the-date subject containing the event title when tickets_tbd is true",
+         %{
+           organizer: organizer
+         } do
+      event = event_fixture(%{organizer_id: organizer.id, tickets_tbd: true})
+      subject = EventNotification.get_subject(event)
+      assert String.starts_with?(subject, "[YSC] ")
+      assert subject =~ event.title
+    end
+
+    test "returns a prefixed non-empty string when event is nil" do
       subject = EventNotification.get_subject(nil)
-      assert subject == "New on the calendar"
+      assert String.starts_with?(subject, "[YSC] ")
     end
 
-    test "returns generic subject when no argument provided" do
+    test "returns a prefixed non-empty string when no argument is provided" do
       subject = EventNotification.get_subject()
-      assert subject == "New on the calendar"
+      assert String.starts_with?(subject, "[YSC] ")
     end
   end
 
