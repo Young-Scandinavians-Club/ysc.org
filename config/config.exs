@@ -88,6 +88,8 @@ config :ysc, Oban,
   plugins: [
     # Maintain for 5 days
     {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 5},
+    # Rebuild indexes concurrently nightly to prevent bloat and fragmentation
+    Oban.Plugins.Reindexer,
     {Oban.Plugins.Cron,
      crontab: [
        {"0 * * * *", YscWeb.Workers.FileExportCleanUp},
