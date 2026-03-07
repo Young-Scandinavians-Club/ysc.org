@@ -82,6 +82,7 @@ defmodule YscWeb.UserBookingDetailLive do
                  "View the details of your cabin booking with Young Scandinavians Club."
                )}
 
+            {:error, _} ->
               {:ok,
                socket
                |> YscWeb.Flash.put_toast(
