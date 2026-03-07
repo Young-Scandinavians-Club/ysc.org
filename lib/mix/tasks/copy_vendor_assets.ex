@@ -17,8 +17,8 @@ defmodule Mix.Tasks.CopyVendorAssets do
     # Ensure destination directory exists
     File.mkdir_p!(dest_dir)
 
-    # Copy Sentry bundle
-    sentry_source = Path.join(vendor_dir, "bundle.tracing.replay.min.js")
+    # Copy Sentry bundle (tracing only — no Session Replay, avoids CSP sandbox conflicts)
+    sentry_source = Path.join(vendor_dir, "bundle.tracing.min.js")
     sentry_dest = Path.join(dest_dir, "sentry.min.js")
 
     case File.cp(sentry_source, sentry_dest) do
