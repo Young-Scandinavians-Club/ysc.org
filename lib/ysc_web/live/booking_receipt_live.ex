@@ -106,6 +106,10 @@ defmodule YscWeb.BookingReceiptLive do
             |> assign(:cancel_reason, "")
             |> assign(:show_confetti, show_confetti)
             |> assign(:page_title, "Booking Confirmation")
+            |> assign(
+              :meta_description,
+              "Your cabin booking confirmation from Young Scandinavians Club."
+            )
             # Placeholders for async-loaded data
             |> assign(:payment, nil)
             |> assign(:refund_info, nil)

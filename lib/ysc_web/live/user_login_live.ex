@@ -334,6 +334,10 @@ defmodule YscWeb.UserLoginLive do
     {:ok,
      assign(socket, form: form)
      |> assign(:page_title, "Sign in")
+     |> assign(
+       :meta_description,
+       "Sign in to your Young Scandinavians Club account."
+     )
      |> assign(:failed_login_attempts, failed_login_attempts)
      |> assign(:redirect_to, redirect_to)
      |> assign(:is_ios_mobile, false)

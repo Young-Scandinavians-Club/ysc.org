@@ -35,7 +35,11 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket, form: to_form(%{}, as: "user"))
-     |> assign(:page_title, "Resend Confirmation Instructions")}
+     |> assign(:page_title, "Resend Confirmation Instructions")
+     |> assign(
+       :meta_description,
+       "Resend the email confirmation instructions for your Young Scandinavians Club account."
+     )}
   end
 
   def handle_event(

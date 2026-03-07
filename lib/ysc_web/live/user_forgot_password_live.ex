@@ -47,6 +47,10 @@ defmodule YscWeb.UserForgotPasswordLive do
      socket
      |> assign(:form, to_form(%{}, as: "user"))
      |> assign(:page_title, "Forgot Password")
+     |> assign(
+       :meta_description,
+       "Reset your Young Scandinavians Club account password."
+     )
      |> assign(:remote_ip, remote_ip)}
   end
 

@@ -145,7 +145,10 @@ defmodule YscWeb.BookingCheckoutLive do
         other_family_members: other_family_members,
         guests_for_me: %{},
         selected_family_members_for_guests: %{},
-        show_price_details: false
+        show_price_details: false,
+        page_title: "Booking Checkout",
+        meta_description:
+          "Complete your cabin booking with Young Scandinavians Club."
       )
 
     if is_expired do

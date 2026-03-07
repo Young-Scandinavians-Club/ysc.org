@@ -3208,6 +3208,11 @@ defmodule YscWeb.EventDetailsLive do
 
     socket
     |> assign(:page_title, event.title)
+    |> assign(
+      :meta_description,
+      event.description ||
+        "View event details and purchase tickets on Young Scandinavians Club."
+    )
     |> assign(:event, event_with_pricing)
     # Async data - will be populated after connection
     |> assign(:agendas, [])
@@ -3242,8 +3247,6 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:tickets_for_me, %{})
     |> assign(:selected_family_members, %{})
     |> assign(:show_attendees_modal, false)
-    |> assign(:load_radar, true)
-    |> assign(:load_stripe, true)
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
     # Reservations - will be loaded async

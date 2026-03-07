@@ -1,6 +1,10 @@
 // Receipt Lightbox Hook - uses GLightbox for image previews in expense reports
+import { loadScript, loadStylesheet } from "./load_external_asset";
+
 const ReceiptLightbox = {
     mounted() {
+        loadStylesheet("glightbox-css", "https://unpkg.com/glightbox/dist/css/glightbox.min.css");
+        loadScript("glightbox-js", "https://unpkg.com/glightbox/dist/js/glightbox.min.js");
         this.initializeLightbox();
     },
 

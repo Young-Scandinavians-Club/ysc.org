@@ -37,8 +37,13 @@ defmodule YscWeb.UserConfirmationLive do
   def mount(%{"token" => token}, _session, socket) do
     form = to_form(%{"token" => token}, as: "user")
 
-    {:ok, assign(socket, form: form) |> assign(:page_title, "Confirm Email"),
-     temporary_assigns: [form: nil]}
+    {:ok,
+     assign(socket, form: form)
+     |> assign(:page_title, "Confirm Email")
+     |> assign(
+       :meta_description,
+       "Confirm your Young Scandinavians Club email address."
+     ), temporary_assigns: [form: nil]}
   end
 
   # Do not sign in the user after confirmation to avoid a

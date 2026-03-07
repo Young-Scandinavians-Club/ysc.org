@@ -273,6 +273,10 @@ defmodule YscWeb.UserTicketsLive do
     {:ok,
      socket
      |> assign(:page_title, "My Tickets")
+     |> assign(
+       :meta_description,
+       "View and manage your event tickets with Young Scandinavians Club."
+     )
      |> assign(:past_items, past_items)
      |> stream(:ticket_orders, upcoming_ticket_orders, limit: -50)}
   end

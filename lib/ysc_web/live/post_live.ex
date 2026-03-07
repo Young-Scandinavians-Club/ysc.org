@@ -242,6 +242,11 @@ defmodule YscWeb.PostLive do
           |> assign(:post_id, id)
           |> assign(:post, post)
           |> assign(:page_title, post.title)
+          |> assign(
+            :meta_description,
+            post.preview_text ||
+              "Read this article on the Young Scandinavians Club news feed."
+          )
           |> assign(:animate_insert, false)
           # Use cached comment_count from post for initial render
           |> assign(:n_comments, post.comment_count)

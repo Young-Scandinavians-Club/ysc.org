@@ -93,7 +93,7 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="Tell us about your connection to Scandinavia (select all that apply)*"
+                    label="Tell us about your connection to Scandinavia (select at least one)*"
                     options={SignupApplication.eligibility_options()}
                   />
                 </.inputs_for>
@@ -473,6 +473,10 @@ defmodule YscWeb.UserRegistrationLive do
     socket =
       socket
       |> assign(:page_title, "Become a Member")
+      |> assign(
+        :meta_description,
+        "Join the Young Scandinavians Club. Apply for membership and become part of our vibrant Scandinavian community in the Bay Area."
+      )
       |> assign(:current_step, 0)
       |> assign(:step_0_invalid, false)
       |> assign(:step_1_invalid, false)

@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
+    <meta
+      :if={assigns[:meta_description]}
+      name="description"
+      content={assigns[:meta_description]}
+    />
     <link rel="manifest" href="/site.webmanifest" />
     <.live_title suffix=" · Young Scandinavians Club">
       {assigns[:page_title] || "YSC"}
@@ -14,10 +19,14 @@
       href={~p"/assets/app.css"}
       nonce={@csp_nonce}
     />
-    <link
-      href="https://js.radar.com/v4.4.8/radar.css"
-      rel="stylesheet"
-      nonce={@csp_nonce}
+    <%!-- API keys as meta tags — always present, read by JS hooks on demand --%>
+    <meta
+      name="stripe-publishable-key"
+      content={Application.get_env(:stripity_stripe, :public_key)}
+    />
+    <meta
+      name="radar-public-key"
+      content={Application.get_env(:ysc, :radar)[:public_key]}
     />
     <%!-- Sentry monitoring - loaded first without defer to ensure window.Sentry is available --%>
     <script
@@ -36,29 +45,7 @@
       nonce={@csp_nonce}
     >
     </script>
-    <script
-      src="https://js.radar.com/v4.4.8/radar.min.js"
-      defer
-      nonce={@csp_nonce}
-    >
-    </script>
-    <script src="https://js.stripe.com/v3/" defer nonce={@csp_nonce}>
-    </script>
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/glightbox/dist/css/glightbox.min.css"
-      nonce={@csp_nonce}
-      defer
-    />
-    <script
-      src="https://unpkg.com/glightbox/dist/js/glightbox.min.js"
-      defer
-      nonce={@csp_nonce}
-    >
-    </script>
     <script nonce={@csp_nonce}>
-      window.stripePublishableKey = "<%= Application.get_env(:stripity_stripe, :public_key) %>";
-      window.radarPublicKey = "<%= Application.get_env(:ysc, :radar)[:public_key] %>";
       <%= if assigns[:current_user] do %>
       window.currentUser = {
         id: "<%= @current_user.id %>",

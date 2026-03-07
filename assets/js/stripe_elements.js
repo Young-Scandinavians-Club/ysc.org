@@ -1,4 +1,5 @@
 // Stripe Elements Hook for Phoenix LiveView
+import { loadScript } from "./load_external_asset";
 
 let stripePromise = null;
 
@@ -29,7 +30,8 @@ if (typeof window !== 'undefined' && !window.stripeErrorSuppressionInitialized) 
 
 const getStripe = () => {
     if (!stripePromise && window.Stripe) {
-        const publishableKey = window.stripePublishableKey;
+        const publishableKey = window.stripePublishableKey ||
+            document.querySelector("meta[name='stripe-publishable-key']")?.getAttribute("content");
         if (!publishableKey || publishableKey.trim() === '') {
             console.error('Stripe publishable key is not configured. Please set STRIPE_PUBLIC_KEY environment variable.');
             return null;
@@ -41,6 +43,7 @@ const getStripe = () => {
 
 const StripeElements = {
     mounted() {
+        loadScript("stripe-js", "https://js.stripe.com/v3/");
         this.isDestroyed = false;
         this.initializing = false;
         this.initializeStripe();

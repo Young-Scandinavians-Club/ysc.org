@@ -1,5 +1,15 @@
+import { loadScript, loadStylesheet } from "./load_external_asset";
+
 export default RadarMap = {
     mounted() {
+        loadStylesheet("radar-css", "https://js.radar.com/v4.4.8/radar.css");
+        loadScript("radar-js", "https://js.radar.com/v4.4.8/radar.min.js");
+
+        // Ensure radarPublicKey is set from the meta tag if not already present
+        if (!window.radarPublicKey) {
+            window.radarPublicKey = document.querySelector("meta[name='radar-public-key']")?.getAttribute("content");
+        }
+
         // Wait for Radar library to be available
         const initRadar = () => {
             if (typeof window.Radar === 'undefined' || !window.Radar) {
@@ -7,7 +17,9 @@ export default RadarMap = {
                 return;
             }
 
-            const radarKey = window.radarPublicKey || "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966";
+            const radarKey = window.radarPublicKey ||
+                document.querySelector("meta[name='radar-public-key']")?.getAttribute("content") ||
+                "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966";
             window.Radar.initialize(radarKey);
 
             let existingMarker = undefined;

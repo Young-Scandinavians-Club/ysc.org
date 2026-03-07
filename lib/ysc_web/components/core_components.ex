@@ -677,8 +677,10 @@ defmodule YscWeb.CoreComponents do
 
   def input(%{type: "checkgroup"} = assigns) do
     ~H"""
-    <div class="text-sm">
-      <.label for={@id}>{@label}</.label>
+    <fieldset class="text-sm">
+      <legend class="block text-sm font-semibold leading-6 text-zinc-800">
+        {@label}
+      </legend>
       <div class="w-full bg-white rounded text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         <div class="grid grid-cols-1 gap-1 text-sm items-baseline">
           <div :for={{label, value} <- @options} class="flex items-center">
@@ -701,7 +703,7 @@ defmodule YscWeb.CoreComponents do
         </div>
       </div>
       <.error :for={msg <- @errors}>{msg}</.error>
-    </div>
+    </fieldset>
     """
   end
 

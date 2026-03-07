@@ -70,6 +70,8 @@ defmodule YscWeb.HomeLive do
     # Logged-in user: show skeleton UI while data loads
     assign(socket,
       page_title: "Home",
+      meta_description:
+        "Young Scandinavians Club — a social club in the San Francisco Bay Area celebrating Scandinavian heritage through events, cabin trips, and community.",
       # Will be populated after async load
       is_sub_account: false,
       primary_user: nil,
@@ -112,6 +114,8 @@ defmodule YscWeb.HomeLive do
 
     assign(socket,
       page_title: "Home",
+      meta_description:
+        "Young Scandinavians Club — a social club in the San Francisco Bay Area celebrating Scandinavian heritage through events, cabin trips, and community.",
       upcoming_events: upcoming_events,
       latest_news: latest_news,
       hero_video: hero_video,

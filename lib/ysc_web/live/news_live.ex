@@ -289,6 +289,10 @@ defmodule YscWeb.NewsLive do
     socket =
       socket
       |> assign(:page_title, "News")
+      |> assign(
+        :meta_description,
+        "Stay up to date with the latest news, announcements, and stories from the Young Scandinavians Club."
+      )
       |> assign(:featured, nil)
       |> assign(:post_count, 0)
       |> assign(:posts, [])

@@ -76,9 +76,12 @@ defmodule YscWeb.UserBookingDetailLive do
                |> assign(:refund_info, refund_info)
                |> assign(:show_cancel_modal, false)
                |> assign(:cancel_reason, "")
-               |> assign(:page_title, "Booking Details")}
+               |> assign(:page_title, "Booking Details")
+               |> assign(
+                 :meta_description,
+                 "View the details of your cabin booking with Young Scandinavians Club."
+               )}
 
-            {:error, _reason} ->
               {:ok,
                socket
                |> YscWeb.Flash.put_toast(

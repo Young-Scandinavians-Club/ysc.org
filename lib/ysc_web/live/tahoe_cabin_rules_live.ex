@@ -14,6 +14,11 @@ defmodule YscWeb.TahoeCabinRulesLive do
       socket
       |> assign(:selected_category, selected_category)
       |> assign(:rules_json, rules_json)
+      |> assign(:page_title, "Cabin Rules")
+      |> assign(
+        :meta_description,
+        "Read the rules and guidelines for staying at the Young Scandinavians Club Lake Tahoe cabin."
+      )
 
     {:ok, socket}
   end

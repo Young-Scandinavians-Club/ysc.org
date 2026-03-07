@@ -63,18 +63,30 @@ defmodule YscWeb.PageController do
     conn
     |> assign(:past_presidents, past_presidents)
     |> assign(:page_title, "History")
+    |> assign(
+      :meta_description,
+      "Explore the rich history of the Young Scandinavians Club, founded in the San Francisco Bay Area with a proud tradition since 1951."
+    )
     |> render(:history)
   end
 
   def privacy_policy(conn, _params) do
     conn
     |> assign(:page_title, "Privacy Policy")
+    |> assign(
+      :meta_description,
+      "Read the Young Scandinavians Club privacy policy."
+    )
     |> render(:privacy_policy)
   end
 
   def terms_of_service(conn, _params) do
     conn
     |> assign(:page_title, "Terms of Service")
+    |> assign(
+      :meta_description,
+      "Read the Young Scandinavians Club terms of service."
+    )
     |> render(:terms_of_service)
   end
 
@@ -110,30 +122,50 @@ defmodule YscWeb.PageController do
     |> assign(:bod_members, bod_members)
     |> assign(:vacant_positions, vacant_positions)
     |> assign(:page_title, "Board of Directors")
+    |> assign(
+      :meta_description,
+      "Meet the Young Scandinavians Club board of directors and elected officers."
+    )
     |> render(:board)
   end
 
   def contact(conn, _params) do
     conn
     |> assign(:page_title, "Contact")
+    |> assign(
+      :meta_description,
+      "Contact the Young Scandinavians Club with questions or feedback."
+    )
     |> render(:contact)
   end
 
   def code_of_conduct(conn, _params) do
     conn
     |> assign(:page_title, "Non-Discrimination Code of Conduct")
+    |> assign(
+      :meta_description,
+      "Read the Young Scandinavians Club non-discrimination code of conduct policy."
+    )
     |> render(:code_of_conduct)
   end
 
   def bylaws(conn, _params) do
     conn
     |> assign(:page_title, "Bylaws")
+    |> assign(
+      :meta_description,
+      "Read the official bylaws of the Young Scandinavians Club."
+    )
     |> render(:bylaws)
   end
 
   def financials(conn, _params) do
     conn
     |> assign(:page_title, "Financials & Annual Meetings")
+    |> assign(
+      :meta_description,
+      "View the Young Scandinavians Club financials and annual meeting records."
+    )
     |> render(:financials)
   end
 

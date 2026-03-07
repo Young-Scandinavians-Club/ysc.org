@@ -19,6 +19,10 @@ defmodule YscWeb.UserSecurityLive do
     socket =
       socket
       |> assign(:page_title, "Security Settings")
+      |> assign(
+        :meta_description,
+        "Manage your Young Scandinavians Club account security, password, and passkeys."
+      )
       |> assign(:timezone, timezone)
       |> assign(:user, user)
       |> assign(:current_password, nil)

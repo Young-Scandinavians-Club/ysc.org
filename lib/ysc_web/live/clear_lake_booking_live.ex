@@ -147,6 +147,8 @@ defmodule YscWeb.ClearLakeBookingLive do
     socket =
       assign(socket,
         page_title: "Clear Lake Cabin",
+        meta_description:
+          "Book a stay at the Young Scandinavians Club Clear Lake cabin. Choose your dates and guests.",
         property: :clear_lake,
         user: user_with_subs,
         checkin_date: checkin_date,
@@ -347,6 +349,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket
         |> assign(
           page_title: "Clear Lake Cabin",
+          meta_description:
+            "Book a stay at the Young Scandinavians Club Clear Lake cabin. Choose your dates and guests.",
           checkin_date: checkin_date,
           checkout_date: checkout_date,
           today: today,

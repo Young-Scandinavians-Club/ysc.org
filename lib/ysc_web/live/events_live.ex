@@ -210,6 +210,10 @@ defmodule YscWeb.EventsLive do
     socket =
       socket
       |> assign(:page_title, "Events")
+      |> assign(
+        :meta_description,
+        "Browse upcoming and past events hosted by the Young Scandinavians Club. Parties, dances, outdoor adventures, and more."
+      )
       |> assign(:total_upcoming_count, 0)
       |> assign(:past_events_exist, false)
       |> assign(:past_events_limit, 10)

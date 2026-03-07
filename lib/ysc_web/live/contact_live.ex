@@ -267,6 +267,10 @@ defmodule YscWeb.ContactLive do
     {:ok,
      socket
      |> assign(:page_title, "Contact")
+     |> assign(
+       :meta_description,
+       "Get in touch with the Young Scandinavians Club. We'd love to hear from you."
+     )
      |> assign(:current_user, current_user)
      |> assign(:logged_in?, current_user != nil)
      |> assign(:remote_ip, remote_ip)
