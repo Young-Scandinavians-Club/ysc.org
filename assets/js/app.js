@@ -129,24 +129,11 @@ waitForSentry().then((available) => {
             }));
         }
 
-        // Add Replay if available (some bundles include this)
-        if (typeof window.Sentry.replayIntegration === 'function') {
-            integrations.push(window.Sentry.replayIntegration({
-                // Capture 10% of all sessions for replay
-                sessionSampleRate: 0.1,
-                // Capture 100% of sessions with errors for replay
-                errorSampleRate: 1.0,
-            }));
-        }
-
         window.Sentry.init({
             dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
             integrations: integrations,
             // Performance Monitoring - capture 10% of transactions
             tracesSampleRate: 0.1,
-            // Session Replay (if available in bundle)
-            replaysSessionSampleRate: 0.1,
-            replaysOnErrorSampleRate: 1.0,
         });
 
         // Set user context if user is logged in
