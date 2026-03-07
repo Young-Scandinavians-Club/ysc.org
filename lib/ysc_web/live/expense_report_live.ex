@@ -84,6 +84,10 @@ defmodule YscWeb.ExpenseReportLive do
   defp apply_action(socket, :new, params) do
     socket
     |> assign(:page_title, "New Expense Report")
+    |> assign(
+      :meta_description,
+      "Submit a new expense report to Young Scandinavians Club for reimbursement."
+    )
     |> assign(:expense_report, nil)
     |> handle_modal_params(params)
   end
@@ -91,6 +95,10 @@ defmodule YscWeb.ExpenseReportLive do
   defp apply_action(socket, :index, params) do
     socket
     |> assign(:page_title, "Expense Report")
+    |> assign(
+      :meta_description,
+      "Submit and manage your expense reports with Young Scandinavians Club."
+    )
     |> handle_modal_params(params)
   end
 
@@ -100,6 +108,10 @@ defmodule YscWeb.ExpenseReportLive do
 
     socket
     |> assign(:page_title, "My Expense Reports")
+    |> assign(
+      :meta_description,
+      "View all your expense reports submitted to Young Scandinavians Club."
+    )
     |> assign(:expense_reports, expense_reports)
   end
 
@@ -109,11 +121,14 @@ defmodule YscWeb.ExpenseReportLive do
     expense_report = ExpenseReports.get_expense_report!(id, user)
     totals = ExpenseReports.calculate_totals(expense_report)
 
-    # Show confetti only if confetti=true parameter is present (from form submission redirect)
     show_confetti = Map.get(params, "confetti") == "true"
 
     socket
     |> assign(:page_title, "Expense Report Submitted")
+    |> assign(
+      :meta_description,
+      "Your expense report has been submitted to Young Scandinavians Club."
+    )
     |> assign(:expense_report, expense_report)
     |> assign(:totals, totals)
     |> assign(:bank_accounts, ExpenseReports.list_bank_accounts(user))

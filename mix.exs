@@ -191,13 +191,17 @@ defmodule Ysc.MixProject do
         "copy_vendor_assets",
         "generate_video_posters",
         "tailwind default",
-        "esbuild default"
+        "tailwind admin",
+        "esbuild default",
+        "esbuild admin"
       ],
       "assets.deploy": [
         "copy_vendor_assets",
         "generate_video_posters",
         "tailwind default --minify",
+        "tailwind admin --minify",
         "esbuild default --minify",
+        "esbuild admin --minify",
         "phx.digest"
       ]
     ]

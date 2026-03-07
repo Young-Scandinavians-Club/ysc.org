@@ -70,6 +70,8 @@ defmodule YscWeb.HomeLive do
     # Logged-in user: show skeleton UI while data loads
     assign(socket,
       page_title: "Home",
+      meta_description:
+        "Young Scandinavians Club — a social club in the San Francisco Bay Area celebrating Scandinavian heritage through events, cabin trips, and community.",
       # Will be populated after async load
       is_sub_account: false,
       primary_user: nil,
@@ -93,10 +95,10 @@ defmodule YscWeb.HomeLive do
       case Season.for_date(:tahoe, Date.utc_today()) do
         %{name: "Summer"} ->
           {~p"/video/clear_lake_hero.mp4",
-           ~p"/images/clear_lake_hero_poster.jpg"}
+           ~p"/images/clear_lake_hero_poster.webp"}
 
         _ ->
-          {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.jpg"}
+          {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.webp"}
       end
 
     # Load events and news synchronously for SEO
@@ -112,6 +114,8 @@ defmodule YscWeb.HomeLive do
 
     assign(socket,
       page_title: "Home",
+      meta_description:
+        "Young Scandinavians Club — a social club in the San Francisco Bay Area celebrating Scandinavian heritage through events, cabin trips, and community.",
       upcoming_events: upcoming_events,
       latest_news: latest_news,
       hero_video: hero_video,
@@ -356,7 +360,7 @@ defmodule YscWeb.HomeLive do
           <div class="lg:col-span-7 relative mt-10 sm:mt-12 lg:mt-0">
             <div class="relative z-10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transform lg:rotate-2">
               <img
-                src={~p"/images/ysc_75th.jpg"}
+                src={~p"/images/ysc_75th.webp"}
                 alt="YSC 75th Anniversary"
                 class="w-full h-64 sm:h-80 lg:h-96 object-cover"
                 loading="lazy"
@@ -395,7 +399,7 @@ defmodule YscWeb.HomeLive do
           <div class="md:col-span-2 md:row-span-2 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
             <div class="relative h-full min-h-[280px] sm:min-h-[340px] md:min-h-[400px]">
               <img
-                src={~p"/images/clear_lake_midsummer.jpg"}
+                src={~p"/images/clear_lake_midsummer.webp"}
                 alt="Midsummer at Clear Lake"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
@@ -414,7 +418,7 @@ defmodule YscWeb.HomeLive do
           <div class="md:col-span-2 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
             <div class="relative aspect-[16/9]">
               <img
-                src={~p"/images/ysc_bonfire_2024.jpg"}
+                src={~p"/images/ysc_bonfire_2024.webp"}
                 alt="YSC Bonfire 2024"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
@@ -433,7 +437,7 @@ defmodule YscWeb.HomeLive do
           <div class="md:col-span-1 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
             <div class="relative aspect-square">
               <img
-                src={~p"/images/flags.jpg"}
+                src={~p"/images/flags.webp"}
                 alt="Nordic country flags"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />

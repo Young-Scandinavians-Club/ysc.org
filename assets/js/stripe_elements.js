@@ -1,4 +1,5 @@
 // Stripe Elements Hook for Phoenix LiveView
+import { loadScript } from "./load_external_asset";
 
 let stripePromise = null;
 
@@ -29,7 +30,8 @@ if (typeof window !== 'undefined' && !window.stripeErrorSuppressionInitialized) 
 
 const getStripe = () => {
     if (!stripePromise && window.Stripe) {
-        const publishableKey = window.stripePublishableKey;
+        const publishableKey = window.stripePublishableKey ||
+            document.querySelector("meta[name='stripe-publishable-key']")?.getAttribute("content");
         if (!publishableKey || publishableKey.trim() === '') {
             console.error('Stripe publishable key is not configured. Please set STRIPE_PUBLIC_KEY environment variable.');
             return null;
@@ -41,6 +43,7 @@ const getStripe = () => {
 
 const StripeElements = {
     mounted() {
+        this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
         this.isDestroyed = false;
         this.initializing = false;
         this.initializeStripe();
@@ -82,35 +85,27 @@ const StripeElements = {
                 return;
             }
 
-            // If we already have this client secret initialized, don't re-initialize
-            if (this.clientSecret === clientSecret && this.elements && this.paymentElement) {
-                // Just verify the element is still mounted
-                const paymentElementContainer = document.getElementById('payment-element');
-                if (paymentElementContainer && document.contains(paymentElementContainer)) {
-                    const hasStripeContent = paymentElementContainer.querySelector('.StripeElement') ||
-                        paymentElementContainer.querySelector('[data-testid]') ||
-                        paymentElementContainer.children.length > 0;
-                    if (hasStripeContent) {
-                        // Already initialized and mounted, nothing to do
-                        return;
-                    }
-                }
-            }
-
-            this.clientSecret = clientSecret;
-
-            // Wait for Stripe to be available
-            let attempts = 0;
-            while (!window.Stripe && attempts < 50) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                attempts++;
-            }
+            // Wait for the Stripe script to finish loading
+            await this.loadPromise;
 
             if (!window.Stripe) {
                 console.error('Stripe not available');
                 this.showMessage('Payment system not ready. Please refresh and try again.');
                 return;
             }
+
+            // If we already have this client secret initialized, don't re-initialize
+            if (this.clientSecret === clientSecret && this.elements && this.paymentElement) {
+                const paymentElementContainer = document.getElementById('payment-element');
+                if (paymentElementContainer && document.contains(paymentElementContainer)) {
+                    const hasStripeContent = paymentElementContainer.querySelector('.StripeElement') ||
+                        paymentElementContainer.querySelector('[data-testid]') ||
+                        paymentElementContainer.children.length > 0;
+                    if (hasStripeContent) return;
+                }
+            }
+
+            this.clientSecret = clientSecret;
 
             const stripe = getStripe();
 

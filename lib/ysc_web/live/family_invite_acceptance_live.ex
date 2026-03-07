@@ -58,7 +58,11 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> assign(:invite, invite)
          |> assign(:form, form)
-         |> assign(:page_title, "Accept Family Invitation")}
+         |> assign(:page_title, "Accept Family Invitation")
+         |> assign(
+           :meta_description,
+           "Accept your Young Scandinavians Club family account invitation."
+         )}
     end
   end
 

@@ -12,7 +12,7 @@ defmodule YscWeb.AccountSetupLive do
           navigate={~p"/"}
           class="p-8 hover:opacity-80 transition duration-200 ease-in-out"
         >
-          <.ysc_logo class="h-28" />
+          <.ysc_logo class="h-28" fetchpriority="high" />
         </.link>
       </div>
 
@@ -507,6 +507,10 @@ defmodule YscWeb.AccountSetupLive do
       socket =
         socket
         |> assign(:page_title, "Complete Your Account Setup")
+        |> assign(
+          :meta_description,
+          "Complete your Young Scandinavians Club membership account setup."
+        )
         |> assign(:user, user)
         |> assign(:display_email, display_email)
         |> assign(:current_step, current_step)
