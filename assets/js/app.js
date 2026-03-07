@@ -30,9 +30,7 @@ import StickyNavbar from "./sticky_navbar";
 import Uploaders from "./uploaders";
 import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
-import GrowingInput from "./growing_input_field";
 import DaterangeHover from "./daterange-hover";
-import CalendarHover from "./calendar_hover";
 import RadarMap from "./radar";
 import MoneyInput from "./money_input";
 import Turnstile from "./phoenix_turnstile";
@@ -41,31 +39,22 @@ import StripeElements from "./stripe_elements";
 import CheckoutTimer from "./checkout_timer";
 import HoldCountdown from "./hold_countdown";
 import CountdownColor from "./countdown_color";
-import PanelResizer from "./panel_resizer";
-import EmailPreview from "./email_preview";
-import AdminSearch from "./admin_search";
 import GLightboxHook from "./glightbox_hook";
 import LocalTime from "./local_time";
-import YearScrubber from "./year_scrubber";
-import ScrollPreserver from "./scroll_preserver";
 import ResendTimer from "./resend_timer";
 import BackToTop from "./back_to_top";
-import InfoNav from "./info_nav";
 import Confetti from "./confetti";
 import AutoConsumeUpload from "./auto_consume_upload";
 import ImageCarouselAutoplay from "./image_carousel_autoplay";
 import ReadingProgress from "./reading_progress";
 import TimelineFilter from "./timeline_filter";
 import PathTracker from "./path_tracker";
-import Autocomplete from "./autocomplete";
 import ReceiptLightbox from "./receipt_lightbox";
 import ScrollToSection from "./scroll_to_section";
 import PasskeyAuth from "./passkey_auth";
 import ConfirmCloseModal from "./confirm_close_modal";
-import ClipboardCopy from "./clipboard_copy";
 import DecadeIndicator from "./decade_indicator";
 import FooterRotator from "./footer_rotator";
-import ScrollMoreIndicator from "./scroll_more_indicator";
 import HeroVideoControls from "./hero_video_controls";
 import AdminFloatingButton from "./admin_floating_button";
 import { createLiveToastHook } from "../../deps/live_toast";
@@ -78,9 +67,7 @@ let Hooks = {
     StickyNavbar,
     BlurHashCanvas,
     BlurHashImage,
-    GrowingInput,
     DaterangeHover,
-    CalendarHover,
     RadarMap,
     MoneyInput,
     Turnstile,
@@ -89,31 +76,22 @@ let Hooks = {
     CheckoutTimer,
     HoldCountdown,
     CountdownColor,
-    PanelResizer,
-    EmailPreview,
-    AdminSearch,
     GLightboxHook,
     LocalTime,
-    YearScrubber,
-    ScrollPreserver,
     ResendTimer,
     BackToTop,
-    InfoNav,
     Confetti,
     AutoConsumeUpload,
     ImageCarouselAutoplay,
     ReadingProgress,
     TimelineFilter,
     PathTracker,
-    Autocomplete,
     ReceiptLightbox,
     ScrollToSection,
     PasskeyAuth,
     ConfirmCloseModal,
-    ClipboardCopy,
     DecadeIndicator,
     FooterRotator,
-    ScrollMoreIndicator,
     HeroVideoControls,
     AdminFloatingButton,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),

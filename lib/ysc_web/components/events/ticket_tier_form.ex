@@ -1,6 +1,8 @@
 defmodule YscWeb.AdminEventsLive.TicketTierForm do
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
+
   alias Ysc.Events.TicketTier
 
   @impl true
