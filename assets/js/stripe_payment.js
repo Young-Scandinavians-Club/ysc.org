@@ -2,20 +2,20 @@ import { loadScript } from "./load_external_asset";
 
 let StripeInput = {
     mounted() {
-        loadScript("stripe-js", "https://js.stripe.com/v3/");
+        this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
         this.initializeStripe();
     },
 
     async initializeStripe() {
-        // Wait for the Stripe script injected by loadScript to finish loading
-        let attempts = 0;
-        while (!window.Stripe && attempts < 50) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
+        try {
+            await this.loadPromise;
+        } catch (e) {
+            console.error("Stripe failed to load:", e);
+            return;
         }
 
         if (!window.Stripe) {
-            console.error("Stripe failed to load");
+            console.error("Stripe not available");
             return;
         }
 

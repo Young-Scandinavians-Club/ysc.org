@@ -2,10 +2,14 @@
 import { loadScript, loadStylesheet } from "./load_external_asset";
 
 const ReceiptLightbox = {
-    mounted() {
-        loadStylesheet("glightbox-css", "https://unpkg.com/glightbox/dist/css/glightbox.min.css");
-        loadScript("glightbox-js", "https://unpkg.com/glightbox/dist/js/glightbox.min.js");
-        this.initializeLightbox();
+    async mounted() {
+        loadStylesheet("glightbox-css", "https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css");
+        try {
+            await loadScript("glightbox-js", "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js");
+            this.initializeLightbox();
+        } catch (e) {
+            console.error("GLightbox failed to load:", e);
+        }
     },
 
     updated() {
@@ -14,12 +18,6 @@ const ReceiptLightbox = {
     },
 
     initializeLightbox() {
-        // Wait for GLightbox to be available (it's loaded with defer)
-        if (typeof GLightbox === 'undefined') {
-            setTimeout(() => this.initializeLightbox(), 100);
-            return;
-        }
-
         // Find the lightbox link within this element
         const link = this.el.querySelector('a[data-lightbox="receipt"]');
 

@@ -4,10 +4,14 @@ import { loadScript, loadStylesheet } from "./load_external_asset";
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|avif|svg)(\?|$)/i;
 
 const GLightboxHook = {
-    mounted() {
-        loadStylesheet("glightbox-css", "https://unpkg.com/glightbox/dist/css/glightbox.min.css");
-        loadScript("glightbox-js", "https://unpkg.com/glightbox/dist/js/glightbox.min.js");
-        this.initializeLightbox();
+    async mounted() {
+        loadStylesheet("glightbox-css", "https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css");
+        try {
+            await loadScript("glightbox-js", "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js");
+            this.initializeLightbox();
+        } catch (e) {
+            console.error("GLightbox failed to load:", e);
+        }
     },
 
     updated() {
@@ -15,11 +19,6 @@ const GLightboxHook = {
     },
 
     initializeLightbox() {
-        if (typeof GLightbox === 'undefined') {
-            setTimeout(() => this.initializeLightbox(), 100);
-            return;
-        }
-
         // Collect lightbox-ready elements from both Trix figures and plain image links
         const elements = [];
         const clickTargets = [];
