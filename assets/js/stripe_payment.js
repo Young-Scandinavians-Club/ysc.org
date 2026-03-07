@@ -1,7 +1,29 @@
+import { loadScript } from "./load_external_asset";
+
 let StripeInput = {
     mounted() {
+        this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
+        this.initializeStripe();
+    },
+
+    async initializeStripe() {
+        try {
+            await this.loadPromise;
+        } catch (e) {
+            console.error("Stripe failed to load:", e);
+            return;
+        }
+
+        if (!window.Stripe) {
+            console.error("Stripe not available");
+            return;
+        }
+
         const clientSecret = this.el.dataset.clientsecret;
-        const stripe = Stripe(this.el.dataset.publickey);
+        const publishableKey = this.el.dataset.publickey ||
+            document.querySelector("meta[name='stripe-publishable-key']")?.getAttribute("content");
+
+        const stripe = Stripe(publishableKey);
 
         const appearance = {};
         const options = { layout: "accordion" };
@@ -24,7 +46,7 @@ let StripeInput = {
             }
         });
 
-        this.el.addEventListener("submit", async(event) => {
+        this.el.addEventListener("submit", async (event) => {
             event.preventDefault();
 
             try {

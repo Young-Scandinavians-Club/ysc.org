@@ -313,6 +313,10 @@ defmodule YscWeb.ConductViolationReportLive do
     {:ok,
      socket
      |> assign(:page_title, "Report Conduct Violation")
+     |> assign(
+       :meta_description,
+       "Report a code of conduct violation to the Young Scandinavians Club. All reports are handled confidentially."
+     )
      |> assign(:logged_in?, current_user != nil)
      |> assign(:current_user, current_user)
      |> assign(:remote_ip, remote_ip)

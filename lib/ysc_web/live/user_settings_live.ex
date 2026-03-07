@@ -2091,6 +2091,10 @@ defmodule YscWeb.UserSettingsLive do
     socket =
       socket
       |> assign(:page_title, "User Settings")
+      |> assign(
+        :meta_description,
+        "Manage your Young Scandinavians Club account settings, profile, and preferences."
+      )
       |> assign(:timezone, timezone)
       |> assign(:today_max, today_max)
       |> assign(:user, user)

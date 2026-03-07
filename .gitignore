@@ -10,6 +10,8 @@ priv/static/assets/*.{gz,br,zst}
 
 .vscode/
 
+.unlighthouse/
+
 # PHOENIX
 
 # The directory Mix will write compiled artifacts to.

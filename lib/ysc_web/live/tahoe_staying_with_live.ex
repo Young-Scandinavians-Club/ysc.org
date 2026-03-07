@@ -86,6 +86,11 @@ defmodule YscWeb.TahoeStayingWithLive do
       # Default to calendar tab
       |> assign(:tab, "1")
       |> assign(:date_range_text, date_range_text)
+      |> assign(:page_title, "Who's Staying at Tahoe")
+      |> assign(
+        :meta_description,
+        "See who's staying at the Young Scandinavians Club Lake Tahoe cabin."
+      )
 
     {:ok, socket}
   end

@@ -73,15 +73,17 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     # 'unsafe-inline' is ignored when nonce is present but kept for older browsers
     # Allowlist for older browsers (ignored when strict-dynamic is present)
     # Allow inline scripts for older browsers that don't support strict-dynamic or nonce
+    # Stripe.js — wildcard covers performance-optimized sub-origins
     script_src =
       ([
          "'self'",
          "'nonce-#{nonce}'",
          "'strict-dynamic'",
          "'unsafe-inline'",
-         "https://js.stripe.com/v3/",
+         "https://js.stripe.com",
+         "https://*.js.stripe.com",
          "https://js.radar.com/v4.4.8/radar.min.js",
-         "https://unpkg.com/glightbox/dist/js/glightbox.min.js",
+         "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js",
          "https://challenges.cloudflare.com"
        ] ++
          if(is_dev,
@@ -100,7 +102,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         # Required for inline style attributes and <style> tags
         "'unsafe-inline'",
         "https://js.radar.com/v4.4.8/radar.css",
-        "https://unpkg.com/glightbox/dist/css/glightbox.min.css"
+        "https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css"
       ]
       |> Enum.join(" ")
 
@@ -115,7 +117,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
           "wss:",
           "http://localhost:*",
           "https://localhost:*",
-          "https://js.stripe.com",
+          # Stripe.js payment API calls
+          "https://api.stripe.com",
           "https://challenges.cloudflare.com",
           "https://api.radar.io",
           "https://*.ingest.sentry.io",
@@ -125,7 +128,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         [
           "'self'",
           "wss:",
-          "https://js.stripe.com",
+          # Stripe.js payment API calls
+          "https://api.stripe.com",
           "https://challenges.cloudflare.com",
           "https://api.radar.io",
           "https://*.ingest.sentry.io",
@@ -137,12 +141,14 @@ defmodule YscWeb.Plugs.SecurityHeaders do
 
     # Image sources - include S3 storage domains
     # Allow all HTTPS images (covers production S3)
+    # https://*.stripe.com required for Stripe Elements payment method icons
     img_src =
       ([
          "'self'",
          "data:",
          "blob:",
-         "https:"
+         "https:",
+         "https://*.stripe.com"
        ] ++ s3_image_sources)
       |> Enum.join(" ")
 
@@ -156,12 +162,13 @@ defmodule YscWeb.Plugs.SecurityHeaders do
       ]
       |> Enum.join(" ")
 
-    # Frame sources - allow Stripe, Cloudflare Turnstile, and localhost for dev tools
+    # Frame sources - allow Stripe (including sub-origins and hooks for 3DS redirects),
+    # Cloudflare Turnstile, and localhost for dev tools
     frame_src =
       if is_dev do
-        "'self' http://localhost:* https://localhost:* https://js.stripe.com https://challenges.cloudflare.com"
+        "'self' http://localhost:* https://localhost:* https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com"
       else
-        "'self' https://js.stripe.com https://challenges.cloudflare.com"
+        "'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com"
       end
 
     # Worker sources - allow blob: workers (Radar library creates workers from blob URLs)
@@ -173,8 +180,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     # Base URI
     base_uri = "'self'"
 
-    # Form action - allow self and Stripe
-    form_action = "'self' https://js.stripe.com"
+    # Form action - allow self only (Stripe forms submit via JS, not direct HTML form posts)
+    form_action = "'self'"
 
     # Frame ancestors - allow self for admin post preview, plus localhost in dev for dev inbox
     frame_ancestors = if is_dev, do: "'self' http://localhost:*", else: "'self'"
