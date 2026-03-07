@@ -31,10 +31,8 @@ import Uploaders from "./uploaders";
 import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
 import GrowingInput from "./growing_input_field";
-import TrixHook from "./trix_hook";
 import DaterangeHover from "./daterange-hover";
 import CalendarHover from "./calendar_hover";
-import Sortable from "./sortable";
 import RadarMap from "./radar";
 import MoneyInput from "./money_input";
 import Turnstile from "./phoenix_turnstile";
@@ -81,10 +79,8 @@ let Hooks = {
     BlurHashCanvas,
     BlurHashImage,
     GrowingInput,
-    TrixHook,
     DaterangeHover,
     CalendarHover,
-    Sortable,
     RadarMap,
     MoneyInput,
     Turnstile,
@@ -124,19 +120,18 @@ let Hooks = {
 };
 Hooks.LivePhone = LivePhone;
 
+// Merge any admin-only hooks registered by admin.js (loaded before this bundle on admin pages)
+Object.assign(Hooks, window.__adminHooks || {});
+
 // Helper function to wait for Sentry to be available with retries
 async function waitForSentry(maxAttempts = 5, delayMs = 50) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        console.log(`waitForSentry: Attempt ${attempt}/${maxAttempts}, window.Sentry =`, window.Sentry);
-        if (window.Sentry) {
-            console.log("waitForSentry: ✓ Sentry found!");
-            return true;
-        }
+        if (window.Sentry) return true;
         if (attempt < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, delayMs));
         }
     }
-    console.error("waitForSentry: ✗ Sentry not found after", maxAttempts, "attempts");
+    console.warn("waitForSentry: Sentry not found after", maxAttempts, "attempts — error monitoring disabled");
     return false;
 }
 
@@ -189,11 +184,6 @@ waitForSentry().then((available) => {
             window.Sentry.setUser(null);
         }
 
-        console.log("Sentry initialized successfully with available features:", {
-            tracing: typeof window.Sentry.browserTracingIntegration === 'function',
-            replay: typeof window.Sentry.replayIntegration === 'function',
-            user: !!window.currentUser,
-        });
     } else {
         console.warn("Sentry failed to load after multiple attempts - error monitoring will be disabled");
     }

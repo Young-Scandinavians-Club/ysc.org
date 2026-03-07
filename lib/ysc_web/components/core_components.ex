@@ -2527,6 +2527,7 @@ defmodule YscWeb.CoreComponents do
 
   attr :class, :string, default: nil
   attr :no_circle, :boolean, default: false
+  attr :fetchpriority, :string, default: nil
 
   def ysc_logo(assigns) do
     ~H"""
@@ -2535,12 +2536,14 @@ defmodule YscWeb.CoreComponents do
       class={@class}
       src="/images/ysc_logo.png"
       alt="The Young Scandinavian Club Logo"
+      fetchpriority={@fetchpriority}
     />
     <img
       :if={@no_circle}
       class={@class}
       src="/images/ysc_logo_no_circle.svg"
       alt="The Young Scandinavian Club Logo"
+      fetchpriority={@fetchpriority}
     />
     """
   end

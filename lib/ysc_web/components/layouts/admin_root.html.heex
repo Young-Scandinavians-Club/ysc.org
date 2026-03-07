@@ -18,16 +18,32 @@
       href={~p"/assets/app.css"}
       nonce={@csp_nonce}
     />
+    <link
+      phx-track-static
+      rel="stylesheet"
+      href={~p"/assets/admin.css"}
+      nonce={@csp_nonce}
+    />
     <%!-- API keys as meta tags — always present, read by JS hooks on demand --%>
     <meta
       name="radar-public-key"
       content={Application.get_env(:ysc, :radar)[:public_key]}
     />
-    <%!-- Sentry monitoring - loaded first without defer to ensure window.Sentry is available --%>
+    <%!-- Sentry monitoring — defer keeps it off the critical path; app.js waits for it via waitForSentry() --%>
     <script
+      defer
       phx-track-static
       type="text/javascript"
       src={~p"/assets/sentry.min.js"}
+      nonce={@csp_nonce}
+    >
+    </script>
+    <%!-- Admin hooks bundle - must be deferred before app.js so window.__adminHooks is set first --%>
+    <script
+      defer
+      phx-track-static
+      type="text/javascript"
+      src={~p"/assets/admin.js"}
       nonce={@csp_nonce}
     >
     </script>

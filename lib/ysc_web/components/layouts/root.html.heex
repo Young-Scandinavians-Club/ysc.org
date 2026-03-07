@@ -28,15 +28,16 @@
       name="radar-public-key"
       content={Application.get_env(:ysc, :radar)[:public_key]}
     />
-    <%!-- Sentry monitoring - loaded first without defer to ensure window.Sentry is available --%>
+    <%!-- Sentry monitoring — defer keeps it off the critical path; app.js waits for it via waitForSentry() --%>
     <script
+      defer
       phx-track-static
       type="text/javascript"
       src={~p"/assets/sentry.min.js"}
       nonce={@csp_nonce}
     >
     </script>
-    <%!-- Main application bundle - deferred but will run after Sentry since it comes after --%>
+    <%!-- Main application bundle — deferred; runs after sentry.min.js due to DOM order --%>
     <script
       defer
       phx-track-static
