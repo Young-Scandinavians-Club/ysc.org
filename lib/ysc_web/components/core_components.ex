@@ -1881,38 +1881,6 @@ defmodule YscWeb.CoreComponents do
                   </span>
                 </.link>
               </li>
-
-              <li>
-                <.link
-                  navigate="/admin/settings"
-                  class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :admin_settings,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :admin_settings}
-                >
-                  <.icon
-                    :if={@active_page == :admin_settings}
-                    name="hero-cog-6-tooth"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :admin_settings}
-                    name="hero-cog-6-tooth"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "ms-3",
-                    @active_page == :admin_settings && "font-semibold"
-                  ]}>
-                    Settings
-                  </span>
-                </.link>
-              </li>
             </ul>
           </div>
           <div

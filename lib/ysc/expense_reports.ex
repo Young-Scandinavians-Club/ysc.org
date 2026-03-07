@@ -479,7 +479,8 @@ defmodule Ysc.ExpenseReports do
 
       treasurer =
         from(u in User,
-          where: u.board_position == "treasurer" and u.state == :active
+          where: u.board_position == "treasurer" and u.state == :active,
+          limit: 1
         )
         |> Repo.one()
 
