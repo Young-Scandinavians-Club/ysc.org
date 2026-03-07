@@ -3214,7 +3214,8 @@ defmodule Ysc.Bookings do
             from(u in Ysc.Accounts.User,
               where:
                 u.board_position == ^cabin_master_position and
-                  u.state == :active
+                  u.state == :active,
+              limit: 1
             )
             |> Repo.one()
           else
@@ -3224,7 +3225,8 @@ defmodule Ysc.Bookings do
         # Get treasurer
         treasurer =
           from(u in Ysc.Accounts.User,
-            where: u.board_position == "treasurer" and u.state == :active
+            where: u.board_position == "treasurer" and u.state == :active,
+            limit: 1
           )
           |> Repo.one()
 

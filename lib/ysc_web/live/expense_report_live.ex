@@ -3639,7 +3639,8 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp get_treasurer do
     from(u in User,
-      where: u.board_position == "treasurer" and u.state == :active
+      where: u.board_position == "treasurer" and u.state == :active,
+      limit: 1
     )
     |> Repo.one()
   end
