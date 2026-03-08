@@ -23,7 +23,8 @@ defmodule YscWeb.Components.Image do
       <img
         src={image_url(@image, @preferred_type)}
         id={"image-#{@id}"}
-        loading="lazy"
+        loading={@loading}
+        fetchpriority={@fetchpriority}
         phx-hook="BlurHashImage"
         class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover"
         alt={
@@ -39,11 +40,15 @@ defmodule YscWeb.Components.Image do
 
     aspect_class = Map.get(assigns, :aspect_class, "aspect-video")
     preferred_type = Map.get(assigns, :preferred_type, nil)
+    loading = Map.get(assigns, :loading, "lazy")
+    fetchpriority = Map.get(assigns, :fetchpriority, nil)
 
     socket =
       socket
       |> assign(:aspect_class, aspect_class)
       |> assign(:preferred_type, preferred_type)
+      |> assign(:loading, loading)
+      |> assign(:fetchpriority, fetchpriority)
 
     # Use preloaded image if available (from batch loading), otherwise fetch
     image =
