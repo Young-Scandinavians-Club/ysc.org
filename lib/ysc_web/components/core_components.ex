@@ -2858,7 +2858,7 @@ defmodule YscWeb.CoreComponents do
         <source src={@video} type="video/mp4" />
         <track
           kind="captions"
-          src={@captions || ~p"/video/hero_captions.vtt"}
+          src={@captions || "/video/hero_captions.vtt"}
           srclang="en"
           label="English"
           default
