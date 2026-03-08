@@ -92,7 +92,7 @@ defmodule YscWeb.AdminComponents do
         <div class="flex-shrink-0 px-5 pt-8 pb-4">
           <.link navigate="/" class="items-center group ps-2.5 inline-block">
             <div class="flex items-center gap-2">
-              <.ysc_logo class="h-20 me-3" />
+              <.ysc_logo class="h-20 me-3" width={80} height={80} />
               <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded">
                 ADMIN
               </span>

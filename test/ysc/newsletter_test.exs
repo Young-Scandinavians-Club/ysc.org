@@ -148,27 +148,20 @@ defmodule Ysc.NewsletterTest do
     end
   end
 
-  describe "sync_user_preference/1" do
-    test "subscribes when user has newsletter_notifications true" do
-      user = user_fixture(%{newsletter_notifications: true})
-      Newsletter.sync_user_preference(user)
+  describe "sync_user_preference/2" do
+    test "subscribes when newsletter_subscribed: true" do
+      user = user_fixture()
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
       sub = Newsletter.get_subscriber_by_email(user.email)
       assert sub != nil
       assert sub.subscribed == true
       assert sub.user_id == user.id
     end
 
-    test "unsubscribes when user has newsletter_notifications false" do
+    test "unsubscribes when newsletter_subscribed: false" do
       user = user_fixture()
-      # User is subscribed by default from registration; set preference to false
-      {:ok, user} =
-        Accounts.update_notification_preferences(user, %{
-          "newsletter_notifications" => "false",
-          "account_notifications" => "true",
-          "event_notifications" => "true"
-        })
-
-      Newsletter.sync_user_preference(user)
+      # User is subscribed by default from registration
+      Newsletter.sync_user_preference(user, newsletter_subscribed: false)
       sub = Newsletter.get_subscriber_by_email(user.email)
       assert sub != nil
       assert sub.subscribed == false

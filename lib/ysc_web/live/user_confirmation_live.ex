@@ -10,7 +10,7 @@ defmodule YscWeb.UserConfirmationLive do
         navigate={~p"/"}
         class="flex items-center text-center justify-center py-8 hover:opacity-80 transition duration-200 ease-in-out"
       >
-        <.ysc_logo class="h-28" fetchpriority="high" />
+        <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
       </.link>
       <.header class="text-center">
         Confirm Email

@@ -56,7 +56,12 @@ defmodule YscWeb.ConductViolationReportLive do
           <div class="mb-8 text-center">
             <div class="flex justify-center mb-6">
               <.link navigate={~p"/"} class="inline-block">
-                <.ysc_logo no_circle={true} class="h-16 w-16 lg:h-20 lg:w-20" />
+                <.ysc_logo
+                  no_circle={true}
+                  class="h-16 w-16 lg:h-20 lg:w-20"
+                  width={80}
+                  height={80}
+                />
               </.link>
             </div>
             <h1 class="text-3xl lg:text-4xl font-bold text-zinc-900 mb-4">

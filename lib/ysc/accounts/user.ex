@@ -64,8 +64,8 @@ defmodule Ysc.Accounts.User do
     field :stripe_id, :string
     field :quickbooks_customer_id, :string
 
-    # Notification preferences (email)
-    field :newsletter_notifications, :boolean, default: true
+    # Notification preferences (email). Newsletter state lives in newsletter_subscribers; this is virtual for form only.
+    field :newsletter_notifications, :boolean, virtual: true
     field :event_notifications, :boolean, default: true
     field :account_notifications, :boolean, default: true
 

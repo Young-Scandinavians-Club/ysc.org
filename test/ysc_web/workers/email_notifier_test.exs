@@ -105,9 +105,9 @@ defmodule YscWeb.Workers.EmailNotifierTest do
           event_notifications_sms: true
           # We need to find where "bookings" preference is stored.
           # Looking at User schema, it has:
-          # newsletter_notifications
           # event_notifications
           # account_notifications
+          # (Newsletter state lives in newsletter_subscribers.)
           # It does NOT have "bookings" field.
           # But EmailCategories might map "booking_confirmation" to one of these.
         })

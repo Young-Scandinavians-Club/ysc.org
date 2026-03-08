@@ -59,10 +59,7 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
   describe "should_send_email?/2" do
     test "always sends account emails" do
       # Account emails ignore user preferences
-      user_disabled = %{
-        event_notifications: false,
-        newsletter_notifications: false
-      }
+      user_disabled = %{event_notifications: false}
 
       assert EmailCategories.should_send_email?(user_disabled, "confirm_email")
     end

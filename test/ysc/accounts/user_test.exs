@@ -22,6 +22,8 @@ defmodule Ysc.Accounts.UserTest do
   alias Ysc.Accounts.User
   alias Ysc.Repo
 
+  import Ysc.AccountsFixtures
+
   @valid_email "user@example.com"
   @valid_password "securepassword123"
   @valid_phone "+14155552671"
@@ -699,7 +701,7 @@ defmodule Ysc.Accounts.UserTest do
       changeset = User.notification_preferences_changeset(user, attrs)
 
       assert changeset.valid?
-      assert changeset.changes.newsletter_notifications == false
+      # newsletter_notifications is virtual (form-only); changes may contain it
       assert changeset.changes.event_notifications == false
     end
 
@@ -719,6 +721,121 @@ defmodule Ysc.Accounts.UserTest do
 
       refute changeset.valid?
       assert changeset.errors[:account_notifications] != nil
+    end
+
+    test "newsletter_notifications (virtual): casts boolean and appears in changes" do
+      user = %User{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        account_notifications: true
+      }
+
+      attrs = %{
+        newsletter_notifications: true,
+        account_notifications: true,
+        event_notifications: true,
+        event_notifications_sms: false,
+        account_notifications_sms: false
+      }
+
+      changeset = User.notification_preferences_changeset(user, attrs)
+
+      assert changeset.valid?
+      assert changeset.changes.newsletter_notifications == true
+    end
+
+    test "newsletter_notifications (virtual): casts false and appears in changes" do
+      user = %User{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        account_notifications: true
+      }
+
+      attrs = %{
+        newsletter_notifications: false,
+        account_notifications: true,
+        event_notifications: true,
+        event_notifications_sms: false,
+        account_notifications_sms: false
+      }
+
+      changeset = User.notification_preferences_changeset(user, attrs)
+
+      assert changeset.valid?
+      assert changeset.changes.newsletter_notifications == false
+    end
+
+    test "newsletter_notifications (virtual): casts form-style string \"true\" and \"false\"" do
+      user = %User{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        account_notifications: true
+      }
+
+      changeset_true =
+        User.notification_preferences_changeset(user, %{
+          "newsletter_notifications" => "true",
+          "account_notifications" => "true"
+        })
+
+      changeset_false =
+        User.notification_preferences_changeset(user, %{
+          "newsletter_notifications" => "false",
+          "account_notifications" => "true"
+        })
+
+      assert changeset_true.valid?
+      assert changeset_true.changes.newsletter_notifications == true
+
+      assert changeset_false.valid?
+      assert changeset_false.changes.newsletter_notifications == false
+    end
+
+    test "newsletter_notifications (virtual): is not persisted to the database" do
+      user = user_fixture(%{phone_number: @valid_phone})
+      assert user.id != nil
+
+      attrs = %{
+        "newsletter_notifications" => "false",
+        "account_notifications" => "true",
+        "event_notifications" => "true",
+        "event_notifications_sms" => "false",
+        "account_notifications_sms" => "false"
+      }
+
+      changeset = User.notification_preferences_changeset(user, attrs)
+      assert changeset.valid?
+      assert changeset.changes.newsletter_notifications == false
+
+      {:ok, updated} = Repo.update(changeset)
+      # In-memory struct has the change applied
+      assert updated.newsletter_notifications == false
+
+      # Reload from DB: virtual field is not stored, so it is nil
+      reloaded = Repo.get!(User, user.id)
+      assert reloaded.newsletter_notifications == nil
+    end
+
+    test "newsletter_notifications (virtual): apply_changes yields struct for form binding" do
+      user = %User{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        account_notifications: true
+      }
+
+      attrs = %{
+        "newsletter_notifications" => "true",
+        "account_notifications" => "true"
+      }
+
+      changeset = User.notification_preferences_changeset(user, attrs)
+      applied = Ecto.Changeset.apply_changes(changeset)
+
+      assert applied.newsletter_notifications == true
     end
   end
 
@@ -991,8 +1108,7 @@ defmodule Ysc.Accounts.UserTest do
         |> User.registration_changeset(attrs)
         |> Repo.insert()
 
-      # Email notifications default to true
-      assert user.newsletter_notifications == true
+      # Email notifications default to true (newsletter state lives in newsletter_subscribers)
       assert user.event_notifications == true
       assert user.account_notifications == true
 

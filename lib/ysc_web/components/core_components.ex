@@ -1695,7 +1695,7 @@ defmodule YscWeb.CoreComponents do
           class="flex items-center gap-3"
           phx-click={hide_mobile_menu(@toggle_id)}
         >
-          <.ysc_logo no_circle={true} class="h-14 w-14" />
+          <.ysc_logo no_circle={true} class="h-14 w-14" width={56} height={56} />
           <span class="text-lg font-bold text-zinc-900">YSC.org</span>
         </.link>
         <button
@@ -2066,6 +2066,8 @@ defmodule YscWeb.CoreComponents do
   attr :class, :string, default: nil
   attr :no_circle, :boolean, default: false
   attr :fetchpriority, :string, default: nil
+  attr :width, :integer, required: true
+  attr :height, :integer, required: true
 
   def ysc_logo(assigns) do
     ~H"""
@@ -2074,6 +2076,8 @@ defmodule YscWeb.CoreComponents do
       class={@class}
       src="/images/ysc_logo.png"
       alt="The Young Scandinavian Club Logo"
+      width={@width}
+      height={@height}
       fetchpriority={@fetchpriority}
     />
     <img
@@ -2081,6 +2085,8 @@ defmodule YscWeb.CoreComponents do
       class={@class}
       src="/images/ysc_logo_no_circle.svg"
       alt="The Young Scandinavian Club Logo"
+      width={@width}
+      height={@height}
       fetchpriority={@fetchpriority}
     />
     """
