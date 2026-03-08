@@ -1058,6 +1058,7 @@ defmodule YscWeb.HomeLive do
                   type="email"
                   id="newsletter-email"
                   name="email"
+                  autocomplete="email"
                   value={@newsletter_email}
                   class="flex-1 min-w-0 px-4 py-3 border border-zinc-300 rounded-lg text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Email address"
