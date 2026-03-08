@@ -1044,32 +1044,53 @@ defmodule YscWeb.HomeLive do
     >
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="max-w-2xl mx-auto text-center">
-          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 break-words">
+          <h2
+            id="newsletter-heading"
+            class="text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 break-words"
+          >
             Stay in the Loop
           </h2>
-          <p class="mt-3 sm:mt-4 text-base sm:text-lg text-zinc-600">
+          <p
+            id="newsletter-description"
+            class="mt-3 sm:mt-4 text-base sm:text-lg text-zinc-600"
+          >
             Sign up for our newsletter to receive updates about YSC and all the fun events we're arranging.
           </p>
 
-          <form phx-submit="subscribe_newsletter" class="mt-8">
+          <form
+            phx-submit="subscribe_newsletter"
+            class="mt-8"
+            aria-labelledby="newsletter-heading"
+            aria-describedby="newsletter-description"
+          >
             <div class="max-w-lg mx-auto space-y-4">
               <div class="flex flex-col sm:flex-row gap-4">
-                <input
-                  type="email"
-                  id="newsletter-email"
-                  name="email"
-                  autocomplete="email"
-                  value={@newsletter_email}
-                  class="flex-1 min-w-0 px-4 py-3 border border-zinc-300 rounded-lg text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Email address"
-                  required
-                  disabled={@newsletter_submitted}
-                />
+                <div class="flex-1 min-w-0">
+                  <label for="newsletter-email" class="sr-only">
+                    Email address for newsletter signup
+                  </label>
+                  <input
+                    type="email"
+                    id="newsletter-email"
+                    name="email"
+                    autocomplete="email"
+                    value={@newsletter_email}
+                    class="w-full px-4 py-3 border border-zinc-300 rounded-lg text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Email address"
+                    required
+                    disabled={@newsletter_submitted}
+                    aria-invalid={@newsletter_error != nil}
+                    aria-errormessage={
+                      if @newsletter_error != nil, do: "newsletter-error", else: nil
+                    }
+                  />
+                </div>
                 <.button
                   :if={!@newsletter_submitted}
                   type="submit"
                   phx-disable-with="Subscribing..."
                   class="px-6 py-3 shrink-0"
+                  aria-label="Subscribe to newsletter"
                 >
                   Subscribe
                 </.button>
@@ -1077,7 +1098,12 @@ defmodule YscWeb.HomeLive do
               <%!-- Invisible Turnstile verification --%>
               <Turnstile.widget appearance="interaction-only" />
             </div>
-            <p :if={@newsletter_error} class="mt-3 text-sm text-red-600">
+            <p
+              :if={@newsletter_error}
+              id="newsletter-error"
+              class="mt-3 text-sm text-red-600"
+              role="alert"
+            >
               {@newsletter_error}
             </p>
             <div
