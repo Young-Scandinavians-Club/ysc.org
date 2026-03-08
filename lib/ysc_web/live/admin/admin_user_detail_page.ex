@@ -32,7 +32,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       board_position={@current_user.board_position}
     >
       <div class="flex flex-col justify-between py-6">
-        <.back navigate={~p"/admin/users"}>Back</.back>
+        <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
 
         <div class="flex flex-row items-center justify-between pt-4">
           <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
@@ -62,7 +62,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             <ul class="flex flex-wrap -mb-px">
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details"}
+                  navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :profile &&
@@ -76,7 +76,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/orders"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :orders &&
@@ -90,7 +92,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/bookings"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :bookings &&
@@ -104,7 +108,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/application"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/application?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :application &&
@@ -118,7 +124,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/membership"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :membership &&
@@ -132,7 +140,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/notifications"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :notifications &&
@@ -146,7 +156,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li :if={@is_treasurer} class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/bank-accounts"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :bank_accounts &&
@@ -160,7 +172,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/family"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/family?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :family &&
@@ -174,7 +188,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               </li>
               <li class="me-2">
                 <.link
-                  navigate={~p"/admin/users/#{@user_id}/details/logs"}
+                  navigate={
+                    ~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"
+                  }
                   class={[
                     "inline-block p-4 border-b-2 rounded-t-lg",
                     @live_action == :logs && "text-blue-600 border-blue-600 active",
@@ -1791,7 +1807,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     """
   end
 
-  def mount(%{"id" => id} = _params, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
     # Timezone from browser for date inputs (date of birth max = today in user TZ)
@@ -1950,11 +1966,14 @@ defmodule YscWeb.AdminUserDetailsLive do
        :note_form,
        to_form(note_changeset(%{category: "general"}), as: "note")
      )
+     |> assign(:list_params, Map.drop(params, ["id"]))
      |> assign(form: user_form)}
   end
 
   def handle_params(params, _uri, socket) do
     user_id = socket.assigns.user_id
+    list_params = Map.drop(params, ["id"])
+    socket = assign(socket, :list_params, list_params)
 
     socket =
       case socket.assigns.live_action do

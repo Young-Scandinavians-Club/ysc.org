@@ -73,17 +73,36 @@ defmodule Ysc.Posts do
   end
 
   def list_posts_paginated(params, opts \\ []) do
+    opts = normalize_list_posts_opts(opts)
     date_from = Keyword.get(opts, :date_from, "")
     date_to = Keyword.get(opts, :date_to, "")
+    search_term = Keyword.get(opts, :search_term)
 
-    Post
-    |> where([p], p.state not in [:deleted])
-    |> maybe_filter_posted_from(date_from)
-    |> maybe_filter_posted_to(date_to)
-    |> join(:left, [p], u in assoc(p, :author), as: :author)
-    |> preload([author: p], author: p)
+    query =
+      if search_term in [nil, ""] do
+        Post
+        |> where([p], p.state not in [:deleted])
+        |> maybe_filter_posted_from(date_from)
+        |> maybe_filter_posted_to(date_to)
+        |> join(:left, [p], u in assoc(p, :author), as: :author)
+        |> preload([author: o], author: o)
+      else
+        search_term = String.trim(search_term)
+
+        fuzzy_search_posts(search_term)
+        |> maybe_filter_posted_from(date_from)
+        |> maybe_filter_posted_to(date_to)
+      end
+
+    query
     |> Flop.validate_and_run(params, for: Post)
   end
+
+  defp normalize_list_posts_opts(search_term)
+       when is_binary(search_term) or is_nil(search_term),
+       do: [search_term: search_term]
+
+  defp normalize_list_posts_opts(opts) when is_list(opts), do: opts
 
   defp maybe_filter_posted_from(query, ""), do: query
 
@@ -109,6 +128,31 @@ defmodule Ysc.Posts do
       _ ->
         query
     end
+  end
+
+  defp fuzzy_search_posts(search_term) do
+    search_like = "%#{search_term}%"
+
+    from(p in Post,
+      left_join: u in assoc(p, :author),
+      as: :author,
+      where:
+        p.state not in [:deleted] and
+          (ilike(p.title, ^search_like) or
+             ilike(coalesce(p.preview_text, ""), ^search_like) or
+             (not is_nil(u.id) and
+                (ilike(coalesce(u.first_name, ""), ^search_like) or
+                   ilike(coalesce(u.last_name, ""), ^search_like) or
+                   ilike(
+                     fragment(
+                       "coalesce(?, '') || ' ' || coalesce(?, '')",
+                       u.first_name,
+                       u.last_name
+                     ),
+                     ^search_like
+                   )))),
+      preload: [author: u]
+    )
   end
 
   def update_post(post, params, %User{} = current_user, opts \\ []) do

@@ -47,7 +47,6 @@ defmodule YscWeb.AdminEventsLive do
             phx-submit="search"
           />
         </div>
-
         <div class="py-6 w-full">
           <div id="admin-event-filters" class="pb-4 flex">
             <.dropdown id="filter-events-dropdown" class="group hover:bg-zinc-100">
@@ -370,7 +369,18 @@ defmodule YscWeb.AdminEventsLive do
         if date_to != "", do: Map.put(p, "date_to", date_to), else: p
       end)
 
-    {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
+    {:noreply,
+     socket
+     |> assign(:focus_search_input, nil)
+     |> push_patch(to: ~p"/admin/events?#{new_params}")}
+  end
+
+  def handle_event("clear-search", %{"input-id" => input_id}, socket) do
+    do_clear_search(socket, input_id)
+  end
+
+  def handle_event("clear-search", %{"input_id" => input_id}, socket) do
+    do_clear_search(socket, input_id)
   end
 
   def handle_event("update-filter", params, socket) do
@@ -439,6 +449,15 @@ defmodule YscWeb.AdminEventsLive do
   end
 
   defp format_publish_at(_), do: nil
+
+  defp do_clear_search(socket, input_id) do
+    new_params = Map.delete(socket.assigns[:params], "search")
+
+    {:noreply,
+     socket
+     |> assign(:focus_search_input, input_id)
+     |> push_patch(to: ~p"/admin/events?#{new_params}")}
+  end
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")

@@ -13,6 +13,7 @@ import ScrollPreserver from "./scroll_preserver";
 import Autocomplete from "./autocomplete";
 import ClipboardCopy from "./clipboard_copy";
 import GrowingInput from "./growing_input_field";
+import FocusSearchInput from "./focus_search_input";
 
 window.__adminHooks = {
     TrixHook,
@@ -27,4 +28,23 @@ window.__adminHooks = {
     Autocomplete,
     ClipboardCopy,
     GrowingInput,
+    FocusSearchInput,
 };
+
+window.addEventListener("phx:focus-search", (e) => {
+    const targetId = e.detail?.id;
+    if (!targetId) return;
+    const tryFocus = (attempt = 0) => {
+        const el = document.getElementById(targetId);
+        if (el) {
+            el.focus();
+            return;
+        }
+        if (attempt < 20) {
+            setTimeout(() => tryFocus(attempt + 1), 50);
+        }
+    };
+    requestAnimationFrame(() => {
+        setTimeout(() => tryFocus(0), 50);
+    });
+});
