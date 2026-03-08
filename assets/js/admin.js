@@ -14,6 +14,7 @@ import Autocomplete from "./autocomplete";
 import ClipboardCopy from "./clipboard_copy";
 import GrowingInput from "./growing_input_field";
 import FocusSearchInput from "./focus_search_input";
+import ScheduleTimezone from "./schedule_timezone";
 
 window.__adminHooks = {
     TrixHook,
@@ -29,6 +30,7 @@ window.__adminHooks = {
     ClipboardCopy,
     GrowingInput,
     FocusSearchInput,
+    ScheduleTimezone,
 };
 
 window.addEventListener("phx:focus-search", (e) => {
