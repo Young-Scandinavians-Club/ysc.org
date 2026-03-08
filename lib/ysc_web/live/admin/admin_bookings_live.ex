@@ -501,12 +501,13 @@ defmodule YscWeb.AdminBookingsLive do
         id="booking-modal"
         on_cancel={JS.push("close-booking-modal")}
         show
+        max_width="max-w-3xl"
       >
         <.header>
-          <div class="flex items-start justify-between w-full">
-            <div>
-              <div class="flex items-center gap-3">
-                <span>Booking Details</span>
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between w-full min-w-0">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <span class="font-semibold">Booking Details</span>
                 <% badge_type =
                   case @booking.status do
                     :complete -> "green"
@@ -527,9 +528,12 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
         </.header>
 
-        <div :if={@booking} class="mt-6 space-y-6">
-          <div class="grid grid-cols-3 gap-x-4 gap-y-5">
-            <div class="col-span-2">
+        <div
+          :if={@booking}
+          class="mt-6 space-y-6 max-h-[70vh] sm:max-h-[75vh] overflow-y-auto overscroll-contain pr-1 -mr-1"
+        >
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-5">
+            <div class="sm:col-span-2 min-w-0">
               <label class="block text-sm font-semibold text-zinc-700 mb-2">
                 Guest Details
               </label>
@@ -618,7 +622,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
             </div>
 
-            <div class="bg-zinc-50/50 rounded-lg p-3 border border-zinc-200 space-y-4">
+            <div class="bg-zinc-50/50 rounded-lg p-3 border border-zinc-200 space-y-4 min-w-0">
               <div>
                 <label class="block text-sm font-semibold text-zinc-700 mb-2">
                   Property
@@ -637,8 +641,8 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
             </div>
 
-            <div class="col-span-2 bg-zinc-50 rounded-lg p-3 border border-zinc-200 mt-3">
-              <div class="grid grid-cols-3 gap-4">
+            <div class="sm:col-span-2 bg-zinc-50 rounded-lg p-3 border border-zinc-200 mt-3 min-w-0">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label class="block text-xs font-semibold text-zinc-600 mb-1">
                     Check-in
@@ -657,7 +661,7 @@ defmodule YscWeb.AdminBookingsLive do
                   </p>
                 </div>
 
-                <div>
+                <div class="col-span-2 sm:col-span-1">
                   <label class="block text-xs font-semibold text-zinc-600 mb-1">
                     Nights
                   </label>
@@ -668,22 +672,25 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
             </div>
 
-            <div class="col-span-1"></div>
+            <div class="hidden sm:block sm:col-span-1" aria-hidden="true"></div>
 
             <div
               :if={Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0}
-              class="col-span-2 mt-3"
+              class="sm:col-span-2 mt-3 min-w-0"
             >
               <label class="block text-sm font-semibold text-zinc-700 mb-2">
                 {if length(@booking.rooms) == 1, do: "Room", else: "Rooms"}
               </label>
-              <div class="flex flex-wrap gap-2">
+              <div class="flex flex-wrap gap-2 min-w-0">
                 <%= for room <- @booking.rooms do %>
-                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-200">
-                    <span class="text-sm font-semibold text-zinc-900">
+                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-200 min-w-0 max-w-full">
+                    <span class="text-sm font-semibold text-zinc-900 truncate">
                       {room.name}
                     </span>
-                    <span :if={room.room_category} class="text-xs text-zinc-600">
+                    <span
+                      :if={room.room_category}
+                      class="text-xs text-zinc-600 flex-shrink-0"
+                    >
                       {atom_to_readable(room.room_category.name)}
                     </span>
                   </div>
@@ -703,26 +710,28 @@ defmodule YscWeb.AdminBookingsLive do
                     :failed -> "red"
                     _ -> "dark"
                   end %>
-                <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200">
-                  <div class="flex justify-between items-start">
-                    <div class="flex-1 space-y-2">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-zinc-900 font-mono">
+                <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200 min-w-0">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start">
+                    <div class="flex-1 min-w-0 space-y-2">
+                      <div class="flex flex-wrap items-center gap-2 min-w-0">
+                        <span class="text-sm font-medium text-zinc-900 font-mono break-all min-w-0">
                           {payment.reference_id}
                         </span>
-                        <button
-                          type="button"
-                          phx-hook="ClipboardCopy"
-                          id={"copy-payment-ref-#{payment.id}"}
-                          data-copy={payment.reference_id}
-                          class="text-zinc-400 hover:text-zinc-600 transition-colors"
-                          title="Copy reference ID"
-                        >
-                          <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
-                        </button>
-                        <.badge type={payment_status_type}>
-                          {String.capitalize(to_string(payment.status))}
-                        </.badge>
+                        <span class="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            phx-hook="ClipboardCopy"
+                            id={"copy-payment-ref-#{payment.id}"}
+                            data-copy={payment.reference_id}
+                            class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                            title="Copy reference ID"
+                          >
+                            <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
+                          </button>
+                          <.badge type={payment_status_type}>
+                            {String.capitalize(to_string(payment.status))}
+                          </.badge>
+                        </span>
                       </div>
                       <p class="text-sm font-semibold text-zinc-900">
                         {MoneyHelper.format_money!(payment.amount)}
@@ -732,13 +741,13 @@ defmodule YscWeb.AdminBookingsLive do
                       </p>
                       <div
                         :if={payment.external_payment_id}
-                        class="flex items-center gap-2"
+                        class="flex flex-wrap items-center gap-2 min-w-0"
                       >
                         <a
                           href={"https://dashboard.stripe.com/payments/#{payment.external_payment_id}"}
                           target="_blank"
                           rel="noopener noreferrer"
-                          class="text-xs text-zinc-400 hover:text-blue-600 font-mono transition-colors underline decoration-dotted"
+                          class="text-xs text-zinc-400 hover:text-blue-600 font-mono transition-colors underline decoration-dotted break-all min-w-0"
                           title="View in Stripe Dashboard"
                         >
                           {payment.external_payment_id}
@@ -748,7 +757,7 @@ defmodule YscWeb.AdminBookingsLive do
                           phx-hook="ClipboardCopy"
                           id={"copy-stripe-payment-#{payment.id}"}
                           data-copy={payment.external_payment_id}
-                          class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                          class="text-zinc-400 hover:text-zinc-600 transition-colors flex-shrink-0"
                           title="Copy Stripe ID"
                         >
                           <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
@@ -786,31 +795,36 @@ defmodule YscWeb.AdminBookingsLive do
                     :failed -> "red"
                     _ -> "dark"
                   end %>
-                <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200">
-                  <div class="flex justify-between items-start">
-                    <div class="flex-1 space-y-2">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-zinc-900 font-mono">
+                <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200 min-w-0">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start">
+                    <div class="flex-1 min-w-0 space-y-2">
+                      <div class="flex flex-wrap items-center gap-2 min-w-0">
+                        <span class="text-sm font-medium text-zinc-900 font-mono break-all min-w-0">
                           {refund.reference_id}
                         </span>
-                        <button
-                          type="button"
-                          phx-hook="ClipboardCopy"
-                          id={"copy-refund-ref-#{refund.id}"}
-                          data-copy={refund.reference_id}
-                          class="text-zinc-400 hover:text-zinc-600 transition-colors"
-                          title="Copy reference ID"
-                        >
-                          <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
-                        </button>
-                        <.badge type={refund_status_type}>
-                          {String.capitalize(to_string(refund.status))}
-                        </.badge>
+                        <span class="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            phx-hook="ClipboardCopy"
+                            id={"copy-refund-ref-#{refund.id}"}
+                            data-copy={refund.reference_id}
+                            class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                            title="Copy reference ID"
+                          >
+                            <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
+                          </button>
+                          <.badge type={refund_status_type}>
+                            {String.capitalize(to_string(refund.status))}
+                          </.badge>
+                        </span>
                       </div>
                       <p class="text-sm font-semibold text-zinc-900">
                         {MoneyHelper.format_money!(refund.amount)}
                       </p>
-                      <p :if={refund.reason} class="text-xs text-zinc-600">
+                      <p
+                        :if={refund.reason}
+                        class="text-xs text-zinc-600 break-words"
+                      >
                         Reason: {refund.reason}
                       </p>
                       <p :if={refund.inserted_at} class="text-xs text-zinc-500">
@@ -818,13 +832,13 @@ defmodule YscWeb.AdminBookingsLive do
                       </p>
                       <div
                         :if={refund.external_refund_id}
-                        class="flex items-center gap-2"
+                        class="flex flex-wrap items-center gap-2 min-w-0"
                       >
                         <a
                           href={"https://dashboard.stripe.com/refunds/#{refund.external_refund_id}"}
                           target="_blank"
                           rel="noopener noreferrer"
-                          class="text-xs text-zinc-400 hover:text-blue-600 font-mono transition-colors underline decoration-dotted"
+                          class="text-xs text-zinc-400 hover:text-blue-600 font-mono transition-colors underline decoration-dotted break-all min-w-0"
                           title="View in Stripe Dashboard"
                         >
                           {refund.external_refund_id}
@@ -834,10 +848,10 @@ defmodule YscWeb.AdminBookingsLive do
                           phx-hook="ClipboardCopy"
                           id={"copy-stripe-refund-#{refund.id}"}
                           data-copy={refund.external_refund_id}
-                          class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                          class="text-zinc-400 hover:text-zinc-600 transition-colors flex-shrink-0"
                           title="Copy Stripe refund ID"
                         >
-                          <.icon name="hero-clipboard" class="w-4.0 h-4.0 -mt-1" />
+                          <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
                         </button>
                       </div>
                       <p
@@ -927,33 +941,36 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
         </div>
 
-        <div class="flex justify-between items-center mt-6 pt-4 border-t border-zinc-200">
-          <div class="flex gap-2">
+        <div class="flex flex-col-reverse gap-3 mt-6 pt-4 border-t border-zinc-200 sm:flex-row sm:justify-between sm:items-center">
+          <div class="flex gap-2 w-full sm:w-auto justify-end sm:justify-start">
             <.button
               :if={@primary_payment && length(@booking_refunds) == 0}
               phx-click="show-booking-refund-modal"
               phx-disable-with="Loading..."
               data-confirm="Are you sure you want to process a refund for this booking? This action will initiate a refund through Stripe."
-              class="bg-red-600 hover:bg-red-700 text-white"
+              class="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
             >
               <.icon name="hero-arrow-uturn-left" class="w-4 h-4 -mt-0.5" />
               <span class="ms-1">Process Refund</span>
             </.button>
           </div>
-          <div class="flex gap-2">
-            <.button phx-click={
-              query_params = %{
-                "property" => Atom.to_string(@selected_property),
-                "from_date" => Date.to_string(@calendar_start_date),
-                "to_date" => Date.to_string(@calendar_end_date)
+          <div class="flex flex-col gap-2 sm:flex-row sm:gap-2 w-full sm:w-auto">
+            <.button
+              phx-click={
+                query_params = %{
+                  "property" => Atom.to_string(@selected_property),
+                  "from_date" => Date.to_string(@calendar_start_date),
+                  "to_date" => Date.to_string(@calendar_end_date)
+                }
+
+                query_string = URI.encode_query(query_params)
+
+                JS.navigate(
+                  "/admin/bookings/bookings/#{@booking.id}/edit?#{query_string}"
+                )
               }
-
-              query_string = URI.encode_query(query_params)
-
-              JS.navigate(
-                "/admin/bookings/bookings/#{@booking.id}/edit?#{query_string}"
-              )
-            }>
+              class="w-full sm:w-auto"
+            >
               <.icon name="hero-pencil" class="w-4 h-4 -mt-0.5" />
               <span class="ms-1">Edit</span>
             </.button>
@@ -973,6 +990,7 @@ defmodule YscWeb.AdminBookingsLive do
                 query_string = URI.encode_query(flatten_query_params(query_params))
                 JS.navigate("/admin/bookings?#{query_string}")
               }
+              class="w-full sm:w-auto"
             >
               <.icon name="hero-x-mark" class="w-4 h-4 -mt-0.5" />
               <span class="ms-1">Done</span>
@@ -1935,7 +1953,7 @@ defmodule YscWeb.AdminBookingsLive do
               <div class="flex gap-2">
                 <.button
                   phx-click="prev-month"
-                  title="Previous month"
+                  title="Previous 30 days"
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <.icon name="hero-arrow-left" class="w-5 h-5" />
@@ -1950,7 +1968,7 @@ defmodule YscWeb.AdminBookingsLive do
                 </.button>
                 <.button
                   phx-click="next-month"
-                  title="Next month"
+                  title="Next 30 days"
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <.icon name="hero-arrow-right" class="w-5 h-5" />
@@ -3274,10 +3292,10 @@ defmodule YscWeb.AdminBookingsLive do
           {start, ending}
         rescue
           _ ->
-            {Date.beginning_of_month(today), Date.end_of_month(today)}
+            default_date_range()
         end
       else
-        {Date.beginning_of_month(today), Date.end_of_month(today)}
+        default_date_range()
       end
 
     form_data = %{
@@ -3816,10 +3834,7 @@ defmodule YscWeb.AdminBookingsLive do
            socket.assigns[:calendar_end_date] do
         socket
       else
-        # Fallback to current month if dates aren't set
-        today = Date.utc_today()
-        start_date = Date.beginning_of_month(today)
-        end_date = Date.end_of_month(today)
+        {start_date, end_date} = default_date_range()
 
         socket
         |> assign(:calendar_start_date, start_date)
@@ -3857,10 +3872,7 @@ defmodule YscWeb.AdminBookingsLive do
            socket.assigns[:calendar_end_date] do
         socket
       else
-        # Fallback to current month if dates aren't set
-        today = Date.utc_today()
-        start_date = Date.beginning_of_month(today)
-        end_date = Date.end_of_month(today)
+        {start_date, end_date} = default_date_range()
 
         socket
         |> assign(:calendar_start_date, start_date)
@@ -5055,18 +5067,10 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   def handle_event("prev-month", _, socket) do
-    current_date = socket.assigns.calendar_start_date
+    shift = calendar_shift_days()
+    new_start = Date.add(socket.assigns.calendar_start_date, -shift)
+    new_end = Date.add(socket.assigns.calendar_end_date, -shift)
 
-    new_start =
-      if current_date.month == 1 do
-        Date.new!(current_date.year - 1, 12, 1)
-      else
-        Date.new!(current_date.year, current_date.month - 1, 1)
-      end
-
-    new_end = Date.end_of_month(new_start)
-
-    # Update URL to preserve date range
     query_params = %{
       property: socket.assigns.selected_property,
       from_date: Date.to_string(new_start),
@@ -5082,18 +5086,10 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   def handle_event("next-month", _, socket) do
-    current_date = socket.assigns.calendar_start_date
+    shift = calendar_shift_days()
+    new_start = Date.add(socket.assigns.calendar_start_date, shift)
+    new_end = Date.add(socket.assigns.calendar_end_date, shift)
 
-    new_start =
-      if current_date.month == 12 do
-        Date.new!(current_date.year + 1, 1, 1)
-      else
-        Date.new!(current_date.year, current_date.month + 1, 1)
-      end
-
-    new_end = Date.end_of_month(new_start)
-
-    # Update URL to preserve date range
     query_params = %{
       property: socket.assigns.selected_property,
       from_date: Date.to_string(new_start),
@@ -5109,9 +5105,7 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   def handle_event("today", _, socket) do
-    today = Date.utc_today()
-    calendar_start = Date.beginning_of_month(today)
-    calendar_end = Date.end_of_month(today)
+    {calendar_start, calendar_end} = default_date_range()
 
     # Update URL to preserve date range
     query_params = %{
@@ -6695,13 +6689,16 @@ defmodule YscWeb.AdminBookingsLive do
     |> Enum.to_list()
   end
 
-  # Default date range: today - 2 days to today + 2 weeks
+  # Default date range: today - 3 days to today + 30 days (current bookings visible with minimal scrolling)
   defp default_date_range do
     today = Date.utc_today()
-    start_date = Date.add(today, -2)
-    end_date = Date.add(today, 14)
+    start_date = Date.add(today, -3)
+    end_date = Date.add(today, 30)
     {start_date, end_date}
   end
+
+  # Step size for prev/next calendar navigation (shift window by this many days)
+  defp calendar_shift_days, do: 30
 
   # Get date from column index (0-based)
   # Each day has 2 columns, so day_index = col_idx / 2
