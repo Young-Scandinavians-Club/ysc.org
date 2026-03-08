@@ -77,6 +77,9 @@ defmodule YscWeb.Workers.ImageProcessor do
             optimized_output_path
           )
 
+        # Strip EXIF/metadata from raw and overwrite on S3 so the raw URL also serves clean bytes
+        strip_and_replace_raw_on_s3(image, tmp_output_file)
+
         Ysc.Logging.info(
           "Image processing completed successfully for: #{image.id}"
         )
@@ -131,9 +134,71 @@ defmodule YscWeb.Workers.ImageProcessor do
         cleanup_file(tmp_output_file)
         cleanup_file_with_extensions("#{tmp_output_file}_optimized")
         cleanup_file_with_extensions("#{tmp_output_file}_thumb")
+        cleanup_file_with_extensions("#{tmp_output_file}.stripped")
       end
     end
   end
+
+  # Strip EXIF/metadata from the raw file and upload to S3 at the same key (overwrite).
+  # So the raw URL serves metadata-free bytes and load times/privacy improve.
+  defp strip_and_replace_raw_on_s3(image, raw_path) do
+    with raw_key when is_binary(raw_key) <- raw_key_from_image(image),
+         ext when ext != "" <- Path.extname(raw_path),
+         stripped_path <- raw_path <> ".stripped" <> ext,
+         {:ok, parsed} <- Image.open(raw_path),
+         # Remove EXIF, IPTC, XMP only; keep color profile (ICC)
+         {:ok, stripped} <- Image.remove_metadata(parsed, [:exif, :iptc, :xmp]),
+         :ok <- write_stripped_image(stripped, stripped_path, ext),
+         _ <- Media.upload_file_to_s3(stripped_path, raw_key) do
+      Ysc.Logging.info(
+        "Replaced raw S3 object with metadata-stripped version: #{image.id}"
+      )
+    else
+      nil ->
+        Ysc.Logging.debug(
+          "No S3 key for image #{image.id}, skipping raw replace"
+        )
+
+      "" ->
+        Ysc.Logging.debug("No extension for raw path, skipping raw replace")
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Could not strip/replace raw on S3 for image #{image.id}: #{inspect(reason)}"
+        )
+    end
+  end
+
+  defp write_stripped_image(stripped, path, ext) do
+    opts =
+      case String.downcase(ext) do
+        ".jpg" -> [quality: 90]
+        ".jpeg" -> [quality: 90]
+        ".webp" -> [quality: 90]
+        _ -> []
+      end
+
+    case Image.write(stripped, path, opts) do
+      :ok -> :ok
+      other -> other
+    end
+  end
+
+  defp raw_key_from_image(image) do
+    case image.upload_data do
+      %{key: k} when is_binary(k) -> k
+      %{"key" => k} when is_binary(k) -> k
+      _ -> key_from_object_url(image.raw_image_path)
+    end
+  end
+
+  defp key_from_object_url(url) when is_binary(url) do
+    path = URI.parse(url).path || ""
+    key = path |> String.trim_leading("/") |> URI.decode()
+    if key != "", do: key, else: nil
+  end
+
+  defp key_from_object_url(_), do: nil
 
   # Find file with any image extension
   defp find_file_with_pattern(base_path) do

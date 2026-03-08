@@ -238,7 +238,10 @@ defmodule Ysc.Media do
         optimized_output_path
       ) do
     {:ok, parsed_image} = Image.open(path)
-    {:ok, meta_free_image} = Image.remove_metadata(parsed_image)
+
+    # Remove EXIF, IPTC, XMP only; keep color profile (ICC) for correct rendering
+    {:ok, meta_free_image} =
+      Image.remove_metadata(parsed_image, [:exif, :iptc, :xmp])
 
     # Get original dimensions
     original_width = Image.width(parsed_image)
@@ -368,14 +371,20 @@ defmodule Ysc.Media do
     [quality: quality]
   end
 
-  def upload_file_to_s3(path) do
-    file_name = Path.basename(path)
+  def upload_file_to_s3(path), do: upload_file_to_s3(path, Path.basename(path))
+
+  @doc """
+  Uploads a file to S3 at the given key (e.g. to overwrite an existing object).
+  Use this to replace the raw upload with a metadata-stripped version.
+  """
+  def upload_file_to_s3(path, key) when is_binary(key) do
     bucket_name = S3Config.bucket_name()
+    key = String.trim_leading(key, "/")
 
     result =
       path
       |> ExAws.S3.Upload.stream_file()
-      |> ExAws.S3.upload(bucket_name, file_name,
+      |> ExAws.S3.upload(bucket_name, key,
         cache_control: "public, max-age=86400"
       )
       |> ExAws.request!()
@@ -385,8 +394,8 @@ defmodule Ysc.Media do
       case result[:body][:location] do
         "" ->
           # Location is empty (Tigris behavior), construct URL from key
-          key = result[:body][:key] || file_name
-          S3Config.object_url(key)
+          result_key = result[:body][:key] || key
+          S3Config.object_url(result_key)
 
         loc when is_binary(loc) and loc != "" ->
           # Location is provided (AWS S3 behavior)
@@ -394,8 +403,8 @@ defmodule Ysc.Media do
 
         _ ->
           # Fallback: construct from key
-          key = result[:body][:key] || file_name
-          S3Config.object_url(key)
+          result_key = result[:body][:key] || key
+          S3Config.object_url(result_key)
       end
 
     # Return result with location in body for compatibility
