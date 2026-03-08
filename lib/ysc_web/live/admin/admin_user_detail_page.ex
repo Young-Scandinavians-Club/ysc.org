@@ -570,14 +570,6 @@ defmodule YscWeb.AdminUserDetailsLive do
                   {Calendar.strftime(booking.inserted_at, "%b %d, %Y")}
                 </span>
               </:col>
-              <:action :let={{_, booking}} label="Action">
-                <.link
-                  navigate={~p"/admin/bookings/#{booking.id}"}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                >
-                  View
-                </.link>
-              </:action>
             </Flop.Phoenix.table>
 
             <Flop.Phoenix.pagination
@@ -1421,7 +1413,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                             {notification.email}
                           <% else %>
                             <%= if notification.phone_number do %>
-                              {notification.phone_number}
+                              {Ysc.Extensions.PhoneNumber.format_for_display(
+                                notification.phone_number
+                              ) || notification.phone_number}
                             <% else %>
                               <span class="text-zinc-400">—</span>
                             <% end %>
@@ -1520,7 +1514,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                         {@selected_notification.email}
                       <% else %>
                         <%= if @selected_notification.phone_number do %>
-                          {@selected_notification.phone_number}
+                          {Ysc.Extensions.PhoneNumber.format_for_display(
+                            @selected_notification.phone_number
+                          ) || @selected_notification.phone_number}
                         <% else %>
                           <span class="text-zinc-400">—</span>
                         <% end %>
@@ -1599,7 +1595,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                       </div>
                       <%= if @primary_user.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          {format_phone_number(@primary_user.phone_number)}
+                          {Ysc.Extensions.PhoneNumber.format_for_display(
+                            @primary_user.phone_number
+                          ) || @primary_user.phone_number}
                         </div>
                       <% end %>
                     </div>
@@ -1640,7 +1638,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                       </div>
                       <%= if sub_account.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          {format_phone_number(sub_account.phone_number)}
+                          {Ysc.Extensions.PhoneNumber.format_for_display(
+                            sub_account.phone_number
+                          ) || sub_account.phone_number}
                         </div>
                       <% end %>
                     </div>
@@ -2030,10 +2030,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
-         |> redirect(
-           to:
-             ~p"/admin/users/#{updated_user.id}/details?#{socket.assigns.list_params}"
-         )}
+         |> push_navigate(to: ~p"/admin/users/#{updated_user.id}/details")}
 
       {:error, changeset} ->
         # Log the actual error for debugging
@@ -2825,17 +2822,6 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp load_rejection_notes(socket, user_id) do
     rejection_notes = Accounts.list_user_notes_by_category(user_id, :rejection)
     assign(socket, :rejection_notes, rejection_notes)
-  end
-
-  defp format_phone_number(phone_number) do
-    case ExPhoneNumber.parse(phone_number, "") do
-      {:ok, parsed} ->
-        ExPhoneNumber.format(parsed, :international)
-
-      {:error, _} ->
-        # Return as-is if parsing fails
-        phone_number
-    end
   end
 
   defp user_state_to_badge_type(:active), do: "green"
