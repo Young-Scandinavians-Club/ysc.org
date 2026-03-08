@@ -56,11 +56,8 @@ defmodule YscWeb.CoreComponents do
       data-cancel={JS.exec(@on_cancel, "phx-remove")}
       class={"relative #{@z_index} hidden"}
     >
-      <div
-        id={"#{@id}-bg"}
-        class="fixed inset-0 transition-opacity bg-zinc-50/90"
-        aria-hidden="true"
-      />
+      <%!-- No aria-hidden on backdrop: dialog has aria-modal="true"; avoids blocking focus/hidden violation --%>
+      <div id={"#{@id}-bg"} class="fixed inset-0 transition-opacity bg-zinc-50/90" />
       <div
         class="fixed inset-0 overflow-y-auto"
         aria-labelledby={"#{@id}-title"}
@@ -2073,7 +2070,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <img
       :if={!@no_circle}
-      class={@class}
+      class={["object-contain", @class]}
       src="/images/ysc_logo.png"
       alt="The Young Scandinavian Club Logo"
       width={@width}
@@ -2082,7 +2079,7 @@ defmodule YscWeb.CoreComponents do
     />
     <img
       :if={@no_circle}
-      class={@class}
+      class={["object-contain", @class]}
       src="/images/ysc_logo_no_circle.svg"
       alt="The Young Scandinavian Club Logo"
       width={@width}

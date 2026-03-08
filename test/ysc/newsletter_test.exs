@@ -1,7 +1,6 @@
 defmodule Ysc.NewsletterTest do
   use Ysc.DataCase
 
-  alias Ysc.Accounts
   alias Ysc.Newsletter
   alias Ysc.Newsletter.Subscriber
 

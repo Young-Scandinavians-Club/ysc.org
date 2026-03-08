@@ -190,6 +190,7 @@ defmodule Ysc.MixProject do
       "assets.build": [
         "copy_vendor_assets",
         "generate_video_posters",
+        "strip_static_image_metadata",
         "tailwind default",
         "tailwind admin",
         "esbuild default",
@@ -198,6 +199,7 @@ defmodule Ysc.MixProject do
       "assets.deploy": [
         "copy_vendor_assets",
         "generate_video_posters",
+        "strip_static_image_metadata",
         "tailwind default --minify",
         "tailwind admin --minify",
         "esbuild default --minify",
