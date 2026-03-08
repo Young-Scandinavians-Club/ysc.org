@@ -2018,7 +2018,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     """
   end
 
-  def mount(%{"id" => id} = params, _session, socket) do
+  def mount(%{"id" => id} = _params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
     connect_params = get_connect_params(socket) || %{}
