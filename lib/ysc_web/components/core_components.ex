@@ -1745,6 +1745,7 @@ defmodule YscWeb.CoreComponents do
       @type == "yellow" && "bg-yellow-100 text-yellow-800",
       @type == "red" && "bg-red-100 text-red-800",
       @type == "dark" && "bg-zinc-100 text-zinc-800",
+      @type == "zinc" && "bg-zinc-100 text-zinc-800",
       @type == "default" && "bg-blue-100 text-blue-800"
     ]}>
       {render_slot(@inner_block)}
