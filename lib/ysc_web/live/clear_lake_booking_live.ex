@@ -563,13 +563,13 @@ defmodule YscWeb.ClearLakeBookingLive do
           </div>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
               <%= if Accounts.sub_account?(@user) || Accounts.primary_user?(@user) do %>
                 Family Active Bookings
               <% else %>
                 Your Active Bookings
               <% end %>
-            </h3>
+            </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <%= for booking <- @active_bookings do %>
                 <div class="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
@@ -2512,9 +2512,9 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">⚓</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     Private Dock Access
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     Swim, boat, and unwind at our private dock. Perfect for mooring your boat, enjoying morning coffee over the water, or taking a refreshing dip in California's largest natural lake.
                   </p>
@@ -2525,9 +2525,9 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🌅</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     Year-Round Access
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     <strong class="text-amber-700">Summer (May–Sept):</strong>
                     Legendary dock parties, community meals, and boat tie-ups. Sleep under the stars on our outdoor sleeping lawn with mattresses provided (bring sleeping bags).
@@ -2541,9 +2541,9 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🤝</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     A Community Treasure
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     Owned and operated by our members since 1963. <strong class="text-purple-700">Your cabin, your getaway</strong>. Low rates and authentic experiences made possible through our cooperative spirit.
                   </p>
@@ -2554,9 +2554,9 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🏞️</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     California's Oldest Lake
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     Clear Lake is <strong class="text-green-700">2.5 million years old</strong>—the oldest natural lake in North America. Experience a unique ecosystem perfect for bird watching, fishing, and connecting with nature year-round.
                   </p>
@@ -2568,9 +2568,9 @@ defmodule YscWeb.ClearLakeBookingLive do
             <div class="p-8 rounded-2xl bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-2xl">
               <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div class="flex-1 text-center md:text-left">
-                  <h4 class="text-2xl font-black mb-2">
+                  <h2 class="text-2xl font-black mb-2">
                     Ready to Experience Clear Lake?
-                  </h4>
+                  </h2>
                   <p class="text-teal-100">{raw(@booking_disabled_reason)}</p>
                 </div>
                 <.link

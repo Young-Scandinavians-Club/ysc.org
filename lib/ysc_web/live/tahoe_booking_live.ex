@@ -736,6 +736,8 @@ defmodule YscWeb.TahoeBookingLive do
             src={~p"/images/tahoe/tahoe_cabin_main.webp"}
             alt="Tahoe Cabin Exterior"
             class="h-full w-full object-cover"
+            fetchpriority="high"
+            loading="eager"
           />
           <div
             class="absolute inset-0 z-[5] bg-black/30 pointer-events-none"
@@ -768,6 +770,8 @@ defmodule YscWeb.TahoeBookingLive do
             src={~p"/images/tahoe/tahoe_cabin_main.webp"}
             alt="Tahoe Cabin Exterior"
             class="h-full w-full object-cover"
+            fetchpriority="high"
+            loading="eager"
           />
           <div
             class="absolute inset-0 z-[5] bg-black/30 pointer-events-none"
@@ -838,13 +842,13 @@ defmodule YscWeb.TahoeBookingLive do
           </div>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
               <%= if Accounts.sub_account?(@user) || Accounts.primary_user?(@user) do %>
                 Family Active Bookings
               <% else %>
                 Your Active Bookings
               <% end %>
-            </h3>
+            </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <%= for booking <- @active_bookings do %>
                 <div class="bg-white border-2 border-blue-100 rounded-xl p-5 shadow-sm">
@@ -4354,9 +4358,9 @@ defmodule YscWeb.TahoeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🔥</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     Traditional Sauna and Wood-Fired Fireplace
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     Experience the authentic Scandinavian sauna and our wood-fired fireplace. This traditional feature brings the Nordic wellness culture to the mountains, perfect for unwinding after a day on the slopes or trails.
                   </p>
@@ -4368,9 +4372,9 @@ defmodule YscWeb.TahoeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🎿</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     Ski Proximity
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     <strong class="text-blue-700">20 minutes</strong>
                     to Palisades Tahoe (site of the 1960 Winter Olympics) and Alpine Meadows. And about
@@ -4385,9 +4389,9 @@ defmodule YscWeb.TahoeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🌲</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     West Shore Magic
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     Escape the tourist traps. Our cabin offers quiet, forested living on Tahoe's pristine west shore. Experience the authentic mountain lifestyle away from the crowds.
                   </p>
@@ -4399,9 +4403,9 @@ defmodule YscWeb.TahoeBookingLive do
               <div class="flex items-start gap-4">
                 <div class="text-4xl flex-shrink-0">🤝</div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-black text-zinc-900 mb-2">
+                  <h2 class="text-xl font-black text-zinc-900 mb-2">
                     The Dugnad Spirit
-                  </h3>
+                  </h2>
                   <p class="text-zinc-700 leading-relaxed">
                     <% season_id =
                       if @checkin_date do
@@ -4424,9 +4428,9 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="p-8 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-2xl">
               <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div class="flex-1 text-center md:text-left">
-                  <h4 class="text-2xl font-black mb-2">
+                  <h2 class="text-2xl font-black mb-2">
                     Ready to Experience Tahoe?
-                  </h4>
+                  </h2>
                   <p class="text-blue-100">
                     {raw(@booking_disabled_reason)}
                   </p>

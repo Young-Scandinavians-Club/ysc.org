@@ -260,6 +260,8 @@ defmodule YscWeb.Components.ImageCarousel do
               <img
                 src={image[:src] || image["src"]}
                 alt={image[:alt] || image["alt"] || "Cabin image #{index + 1}"}
+                loading={if index == 0, do: "eager", else: "lazy"}
+                fetchpriority={if index == 0, do: "high", else: "low"}
               />
             </div>
           <% end %>
