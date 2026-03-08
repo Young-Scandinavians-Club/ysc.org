@@ -294,6 +294,38 @@ defmodule YscWeb.AdminComponents do
                 </.link>
               </li>
 
+              <li>
+                <.link
+                  navigate="/admin/memberships"
+                  class={[
+                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    if(@active_page == :memberships,
+                      do:
+                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                    )
+                  ]}
+                  aria-current={@active_page == :memberships}
+                >
+                  <.icon
+                    :if={@active_page == :memberships}
+                    name="hero-identification"
+                    class="w-5 h-5 transition duration-75 text-blue-400"
+                  />
+                  <.icon
+                    :if={@active_page != :memberships}
+                    name="hero-identification"
+                    class="w-5 h-5 transition duration-75 text-blue-500"
+                  />
+                  <span class={[
+                    "ms-3",
+                    @active_page == :memberships && "font-semibold"
+                  ]}>
+                    Memberships
+                  </span>
+                </.link>
+              </li>
+
               <li :if={@board_position == :treasurer}>
                 <.link
                   navigate="/admin/money"
