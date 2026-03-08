@@ -22,6 +22,8 @@ defmodule YscWeb.VolunteerLive do
             src="/images/ysc_group_photo.jpg"
             alt="Group of YSC Members and Volunteers"
             class="w-full h-full object-cover rounded-2xl aspect-video flex items-center justify-center"
+            fetchpriority="high"
+            loading="eager"
           />
         </div>
       </div>

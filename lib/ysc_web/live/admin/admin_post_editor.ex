@@ -143,7 +143,10 @@ defmodule YscWeb.AdminPostEditorLive do
                       @post.featured_image.raw_image_path
                   }
                   class="w-64 object-cover rounded border border-1 border-zinc-200"
-                  alt={@post.featured_image.alt_text}
+                  alt={
+                    @post.featured_image.alt_text || @post.featured_image.title ||
+                      "Post featured image"
+                  }
                   loading="lazy"
                 />
               </div>
@@ -168,7 +171,7 @@ defmodule YscWeb.AdminPostEditorLive do
                           image.thumbnail_path || image.optimized_image_path ||
                             image.raw_image_path
                         }
-                        alt={image.alt_text}
+                        alt={image.alt_text || image.title || "Image"}
                         loading="lazy"
                       />
                     </button>
