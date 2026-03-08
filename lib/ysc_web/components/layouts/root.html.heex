@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
+    <meta
+      :if={assigns[:meta_description]}
+      name="description"
+      content={assigns[:meta_description]}
+    />
     <link rel="manifest" href="/site.webmanifest" />
     <.live_title suffix=" · Young Scandinavians Club">
       {assigns[:page_title] || "YSC"}
@@ -14,20 +19,25 @@
       href={~p"/assets/app.css"}
       nonce={@csp_nonce}
     />
-    <link
-      href="https://js.radar.com/v4.4.8/radar.css"
-      rel="stylesheet"
-      nonce={@csp_nonce}
+    <%!-- API keys as meta tags — always present, read by JS hooks on demand --%>
+    <meta
+      name="stripe-publishable-key"
+      content={Application.get_env(:stripity_stripe, :public_key)}
     />
-    <%!-- Sentry monitoring - loaded first without defer to ensure window.Sentry is available --%>
+    <meta
+      name="radar-public-key"
+      content={Application.get_env(:ysc, :radar)[:public_key]}
+    />
+    <%!-- Sentry monitoring — defer keeps it off the critical path; app.js waits for it via waitForSentry() --%>
     <script
+      defer
       phx-track-static
       type="text/javascript"
       src={~p"/assets/sentry.min.js"}
       nonce={@csp_nonce}
     >
     </script>
-    <%!-- Main application bundle - deferred but will run after Sentry since it comes after --%>
+    <%!-- Main application bundle — deferred; runs after sentry.min.js due to DOM order --%>
     <script
       defer
       phx-track-static
@@ -36,29 +46,7 @@
       nonce={@csp_nonce}
     >
     </script>
-    <script
-      src="https://js.radar.com/v4.4.8/radar.min.js"
-      defer
-      nonce={@csp_nonce}
-    >
-    </script>
-    <script src="https://js.stripe.com/v3/" defer nonce={@csp_nonce}>
-    </script>
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/glightbox/dist/css/glightbox.min.css"
-      nonce={@csp_nonce}
-      defer
-    />
-    <script
-      src="https://unpkg.com/glightbox/dist/js/glightbox.min.js"
-      defer
-      nonce={@csp_nonce}
-    >
-    </script>
     <script nonce={@csp_nonce}>
-      window.stripePublishableKey = "<%= Application.get_env(:stripity_stripe, :public_key) %>";
-      window.radarPublicKey = "<%= Application.get_env(:ysc, :radar)[:public_key] %>";
       <%= if assigns[:current_user] do %>
       window.currentUser = {
         id: "<%= @current_user.id %>",
@@ -91,19 +79,22 @@
           @current_user && @current_user.role == :admin &&
             !assigns[:impersonating?]
         }
-        class="fixed bottom-6 right-6 z-[60] group print:hidden"
+        id="admin-floating-button-wrap"
+        phx-hook="AdminFloatingButton"
+        phx-update="ignore"
+        class="fixed bottom-4 left-4 z-[60] group print:hidden"
       >
         <.link
           navigate={~p"/admin"}
-          class="flex items-center gap-0 group-hover:gap-3 bg-zinc-900/95 backdrop-blur-md px-3 py-3 group-hover:px-4 rounded-full shadow-2xl border border-white/10 hover:bg-zinc-800 transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
+          class="flex items-center gap-0 group-hover:gap-3 group-[.corner-right]:flex-row-reverse bg-zinc-800/80 backdrop-blur-sm px-2 py-2 group-hover:px-3 rounded-full shadow-lg border border-white/10 hover:bg-zinc-700/90 transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden opacity-90 hover:opacity-100"
         >
-          <div class="bg-blue-500 rounded-full p-1.5 shadow-lg flex-shrink-0">
+          <div class="bg-blue-500 rounded-full p-1.5 shadow flex-shrink-0">
             <.icon
               name="hero-cog"
-              class="w-8 h-8 text-white group-hover:animate-[spin_10s_linear_infinite] transition-transform duration-300"
+              class="w-6 h-6 text-white group-hover:animate-[spin_10s_linear_infinite] transition-transform duration-300"
             />
           </div>
-          <span class="font-bold tracking-tight max-w-0 group-hover:max-w-[200px] group-hover:pr-1 overflow-hidden opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap text-white">
+          <span class="font-bold tracking-tight max-w-0 group-hover:max-w-[200px] group-hover:pr-1 group-[.corner-right]:group-hover:pl-1 group-[.corner-right]:group-hover:pr-0 overflow-hidden opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap text-white text-sm">
             Admin Dashboard
           </span>
         </.link>

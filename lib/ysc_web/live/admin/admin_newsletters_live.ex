@@ -1,8 +1,6 @@
 defmodule YscWeb.AdminNewslettersLive do
   use YscWeb, :admin_live_view
 
-  import YscWeb.CoreComponents
-
   use Phoenix.VerifiedRoutes,
     endpoint: YscWeb.Endpoint,
     router: YscWeb.Router,

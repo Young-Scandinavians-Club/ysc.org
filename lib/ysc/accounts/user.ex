@@ -282,7 +282,7 @@ defmodule Ysc.Accounts.User do
     |> validate_length(:first_name, min: 1, max: 150)
     |> validate_length(:last_name, min: 1, max: 150)
     |> validate_required([:first_name, :last_name])
-    |> validate_phone(opts)
+    |> validate_phone_optional(opts)
     |> validate_date_of_birth()
   end
 

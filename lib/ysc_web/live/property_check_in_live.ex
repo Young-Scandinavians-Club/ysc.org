@@ -25,7 +25,12 @@ defmodule YscWeb.PropertyCheckInLive do
      |> assign(:rules_form, rules_form)
      |> assign(:rules_agreed, false)
      |> assign(:confirm_button_style, build_confirm_button_style())
-     |> assign(:confirm_button_disabled, true)}
+     |> assign(:confirm_button_disabled, true)
+     |> assign(:page_title, "Property Check-In")
+     |> assign(
+       :meta_description,
+       "Check in to your Young Scandinavians Club cabin stay."
+     )}
   end
 
   @impl true

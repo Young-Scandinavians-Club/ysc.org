@@ -32,6 +32,11 @@ defmodule YscWeb.FamilyManagementLive do
        |> assign(:is_primary_user, false)
        |> assign(:primary_user, primary_user)
        |> assign(:other_family_members, other_family_members)
+       |> assign(:page_title, "Family")
+       |> assign(
+         :meta_description,
+         "Manage your family members and sub-accounts in Young Scandinavians Club."
+       )
        |> assign(:live_action, :family)}
     else
       # For primary users, show management interface
@@ -64,6 +69,11 @@ defmodule YscWeb.FamilyManagementLive do
        |> assign(:family_members, family_members)
        |> assign(:invite_form, invite_form)
        |> assign(:can_send_invite, Accounts.can_send_family_invite?(user))
+       |> assign(:page_title, "Family")
+       |> assign(
+         :meta_description,
+         "Manage your family members and sub-accounts in Young Scandinavians Club."
+       )
        |> assign(:live_action, :family)}
     end
   end

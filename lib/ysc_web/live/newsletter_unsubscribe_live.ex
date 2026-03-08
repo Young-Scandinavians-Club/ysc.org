@@ -19,6 +19,10 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
     socket =
       socket
       |> assign(:page_title, "Unsubscribe from Newsletter")
+      |> assign(
+        :meta_description,
+        "Unsubscribe from the Young Scandinavians Club newsletter."
+      )
       |> assign(:token, token || "")
       |> assign(:subscriber, subscriber)
       |> assign(:unsubscribed, unsubscribed)

@@ -82,6 +82,8 @@ defmodule YscWeb.PasskeyRegistrationLive do
       {:ok,
        assign(socket,
          page_title: "Add Passkey",
+         meta_description:
+           "Register a passkey for secure, passwordless sign-in to Young Scandinavians Club.",
          passkey_supported: false,
          error: nil,
          success: false,

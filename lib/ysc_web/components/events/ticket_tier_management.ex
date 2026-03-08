@@ -871,7 +871,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       purchaser_first_name = ticket.user.first_name || ""
       purchaser_last_name = ticket.user.last_name || ""
       purchaser_email = ticket.user.email || ""
-      phone = ticket.user.phone_number || ""
+
+      phone =
+        (ticket.user.phone_number &&
+           Ysc.Extensions.PhoneNumber.format_for_display(
+             ticket.user.phone_number
+           )) ||
+          ""
 
       # Attendee information (from ticket_detail if registration was required)
       {attendee_first_name, attendee_last_name, attendee_email} =

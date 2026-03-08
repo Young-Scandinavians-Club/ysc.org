@@ -55,4 +55,23 @@ defmodule Ysc.Extensions.PhoneNumber do
   def format_phone_number(phone_number, opts) do
     ExPhoneNumber.format(phone_number, opts)
   end
+
+  @doc """
+  Formats a phone number for display in the UI (e.g. (206) 555-1234).
+
+  Returns `nil` for `nil` or empty string so callers can use a fallback like "Not provided" or "—".
+  For invalid numbers, returns the raw string.
+  """
+  def format_for_display(nil), do: nil
+  def format_for_display(""), do: nil
+
+  def format_for_display(phone_number) when is_binary(phone_number) do
+    case ExPhoneNumber.parse(phone_number, "") do
+      {:ok, parsed} ->
+        ExPhoneNumber.format(parsed, :national)
+
+      {:error, _} ->
+        phone_number
+    end
+  end
 end

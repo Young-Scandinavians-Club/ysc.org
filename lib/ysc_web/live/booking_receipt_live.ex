@@ -106,6 +106,10 @@ defmodule YscWeb.BookingReceiptLive do
             |> assign(:cancel_reason, "")
             |> assign(:show_confetti, show_confetti)
             |> assign(:page_title, "Booking Confirmation")
+            |> assign(
+              :meta_description,
+              "Your cabin booking confirmation from Young Scandinavians Club."
+            )
             # Placeholders for async-loaded data
             |> assign(:payment, nil)
             |> assign(:refund_info, nil)
@@ -133,12 +137,12 @@ defmodule YscWeb.BookingReceiptLive do
         do: ~p"/bookings/tahoe",
         else: ~p"/bookings/clear-lake"
 
-    {:noreply, redirect(socket, to: path)}
+    {:noreply, push_navigate(socket, to: path)}
   end
 
   @impl true
   def handle_event("go-home", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/")}
+    {:noreply, push_navigate(socket, to: ~p"/")}
   end
 
   @impl true
@@ -189,7 +193,7 @@ defmodule YscWeb.BookingReceiptLive do
          socket
          |> assign(:show_cancel_modal, false)
          |> YscWeb.Flash.put_toast(:info, refund_message, title: "Booking")
-         |> redirect(to: ~p"/bookings/#{booking.id}/receipt")}
+         |> push_navigate(to: ~p"/bookings/#{booking.id}/receipt")}
 
       {:error, reason} ->
         error_message =

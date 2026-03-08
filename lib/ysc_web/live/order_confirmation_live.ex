@@ -58,6 +58,10 @@ defmodule YscWeb.OrderConfirmationLive do
             |> assign(:user_first_name, user.first_name || "Member")
             |> assign(:show_confetti, show_confetti)
             |> assign(:page_title, "Order Confirmation")
+            |> assign(
+              :meta_description,
+              "Your ticket order confirmation from Young Scandinavians Club."
+            )
             # Placeholder for async-loaded data
             |> assign(:refund_data, nil)
             |> assign(:async_data_loaded, false)
@@ -74,17 +78,19 @@ defmodule YscWeb.OrderConfirmationLive do
 
   @impl true
   def handle_event("close", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/events/#{socket.assigns.event.id}")}
+    {:noreply,
+     push_navigate(socket, to: ~p"/events/#{socket.assigns.event.id}")}
   end
 
   @impl true
   def handle_event("view-tickets", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/users/tickets")}
+    {:noreply, push_navigate(socket, to: ~p"/users/tickets")}
   end
 
   @impl true
   def handle_event("view-event", _params, socket) do
-    {:noreply, redirect(socket, to: ~p"/events/#{socket.assigns.event.id}")}
+    {:noreply,
+     push_navigate(socket, to: ~p"/events/#{socket.assigns.event.id}")}
   end
 
   @impl true

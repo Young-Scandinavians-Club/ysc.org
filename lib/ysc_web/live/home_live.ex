@@ -70,6 +70,8 @@ defmodule YscWeb.HomeLive do
     # Logged-in user: show skeleton UI while data loads
     assign(socket,
       page_title: "Home",
+      meta_description:
+        "Young Scandinavians Club — a social club in the San Francisco Bay Area celebrating Scandinavian heritage through events, cabin trips, and community.",
       # Will be populated after async load
       is_sub_account: false,
       primary_user: nil,
@@ -94,10 +96,10 @@ defmodule YscWeb.HomeLive do
       case Season.for_date(:tahoe, Date.utc_today()) do
         %{name: "Summer"} ->
           {~p"/video/clear_lake_hero.mp4",
-           ~p"/images/clear_lake_hero_poster.jpg"}
+           ~p"/images/clear_lake_hero_poster.webp"}
 
         _ ->
-          {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.jpg"}
+          {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.webp"}
       end
 
     # Load events and news synchronously for SEO
@@ -113,6 +115,8 @@ defmodule YscWeb.HomeLive do
 
     assign(socket,
       page_title: "Home",
+      meta_description:
+        "Young Scandinavians Club — a social club in the San Francisco Bay Area celebrating Scandinavian heritage through events, cabin trips, and community.",
       upcoming_events: upcoming_events,
       latest_news: latest_news,
       hero_video: hero_video,
@@ -275,7 +279,7 @@ defmodule YscWeb.HomeLive do
           <div class="mt-8 sm:mt-10 w-full max-w-sm sm:max-w-none flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
             <.link
               navigate={~p"/users/register"}
-              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] min-h-[48px]"
+              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl min-h-[48px]"
             >
               Apply for Membership
               <.icon
@@ -344,7 +348,7 @@ defmodule YscWeb.HomeLive do
             <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-black text-zinc-900 tracking-tighter leading-[0.95] break-words">
               A home for Nordic spirits in the Bay.
             </h2>
-            <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed">
+            <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed pr-0 sm:pr-4">
               The Young Scandinavians Club (YSC) is a vibrant community for Scandinavians and Scandinavian-Americans of all ages in the San Francisco Bay Area. We host a wide range of events across Northern California, offering members access to our scenic cabins in Clear Lake and Lake Tahoe.
             </p>
             <div class="mt-6 flex items-center gap-3 flex-wrap">
@@ -382,7 +386,7 @@ defmodule YscWeb.HomeLive do
           <div class="lg:col-span-7 relative mt-10 sm:mt-12 lg:mt-0">
             <div class="relative z-10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transform lg:rotate-2">
               <img
-                src={~p"/images/ysc_75th.jpg"}
+                src={~p"/images/ysc_75th.webp"}
                 alt="YSC 75th Anniversary"
                 class="w-full h-64 sm:h-80 lg:h-96 object-cover"
                 loading="lazy"
@@ -421,7 +425,7 @@ defmodule YscWeb.HomeLive do
           <div class="md:col-span-2 md:row-span-2 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
             <div class="relative h-full min-h-[280px] sm:min-h-[340px] md:min-h-[400px]">
               <img
-                src={~p"/images/clear_lake_midsummer.jpg"}
+                src={~p"/images/clear_lake_midsummer.webp"}
                 alt="Midsummer at Clear Lake"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
@@ -440,7 +444,7 @@ defmodule YscWeb.HomeLive do
           <div class="md:col-span-2 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
             <div class="relative aspect-[16/9]">
               <img
-                src={~p"/images/ysc_bonfire_2024.jpg"}
+                src={~p"/images/ysc_bonfire_2024.webp"}
                 alt="YSC Bonfire 2024"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
@@ -459,7 +463,7 @@ defmodule YscWeb.HomeLive do
           <div class="md:col-span-1 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
             <div class="relative aspect-square">
               <img
-                src={~p"/images/flags.jpg"}
+                src={~p"/images/flags.webp"}
                 alt="Nordic country flags"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />

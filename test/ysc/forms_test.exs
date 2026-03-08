@@ -143,6 +143,34 @@ defmodule Ysc.FormsTest do
 
       refute changeset.valid?
     end
+
+    test "schedules board notification email with formatted phone number" do
+      attrs = %{
+        first_name: "Jane",
+        last_name: "Smith",
+        email: "reporter@example.com",
+        phone: "+14155551234",
+        summary: "Test violation report"
+      }
+
+      changeset =
+        Ysc.Forms.ConductViolationReport.changeset(
+          %Ysc.Forms.ConductViolationReport{},
+          attrs
+        )
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _report} = Forms.create_conduct_violation_report(changeset)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "conduct_violation_board_notification",
+            "params" => %{phone: "(415) 555-1234"}
+          }
+        )
+      end)
+    end
   end
 
   describe "create_contact_form/1" do

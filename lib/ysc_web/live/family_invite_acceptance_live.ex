@@ -79,7 +79,11 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            |> assign(:form, form)
            |> assign(:existing_user, existing_user)
            |> assign(:can_link_existing, can_link_existing)
-           |> assign(:page_title, "Accept Family Invitation")}
+           |> assign(:page_title, "Accept Family Invitation")
+           |> assign(
+           :meta_description,
+           "Accept your Young Scandinavians Club family account invitation."
+         )}
         end
     end
   end

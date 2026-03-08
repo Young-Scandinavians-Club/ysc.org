@@ -53,7 +53,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
 
             <p class="text-sm text-zinc-600 mb-4">
-              We sent a verification code via text message to <strong><%= @pending_phone_number %></strong>.
+              We sent a verification code via text message to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@pending_phone_number) || @pending_phone_number %></strong>.
               Please enter it below to confirm your phone number.
             </p>
 
@@ -588,12 +588,16 @@ defmodule YscWeb.UserSettingsLive do
                 />
                 <div>
                   <p class="text-sm text-zinc-600">
-                    Your profile picture is synced via Gravatar. Update it on your <a
+                    Your profile picture is synced via Gravatar. Update it on your
+                    <a
                       class="text-blue-600 hover:underline"
-                      href={"https://gravatar.com/#{:crypto.hash(:sha256, String.downcase(String.trim(@user.email))) |> Base.encode16(case: :lower)}"}
+                      href="https://gravatar.com/connect"
                       target="_blank"
-                      noreferrer
-                    >Gravatar Profile</a>.
+                      rel="noreferrer"
+                    >
+                      Gravatar profile
+                    </a>
+                    (sign in with the email for this account).
                   </p>
                 </div>
               </div>
@@ -2252,6 +2256,10 @@ defmodule YscWeb.UserSettingsLive do
     socket =
       socket
       |> assign(:page_title, "User Settings")
+      |> assign(
+        :meta_description,
+        "Manage your Young Scandinavians Club account settings, profile, and preferences."
+      )
       |> assign(:timezone, timezone)
       |> assign(:today_max, today_max)
       |> assign(:user, user)
@@ -2623,7 +2631,11 @@ defmodule YscWeb.UserSettingsLive do
 
       case Accounts.update_user_profile(user, other_params) do
         {:ok, updated_user} ->
-          # Send verification code to new phone number
+          # Send verification code to new phone number.
+          # Use timestamp in suffix so idempotency key is unique per attempt (e.g. user
+          # switching back to the same number later can receive a new code).
+          timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
           phone_code =
             Accounts.generate_and_store_phone_verification_code(updated_user)
 
@@ -2631,7 +2643,7 @@ defmodule YscWeb.UserSettingsLive do
             Accounts.send_phone_verification_code(
               updated_user,
               phone_code,
-              "settings_change",
+              "settings_change_#{timestamp}",
               new_phone
             )
 
@@ -3343,7 +3355,7 @@ defmodule YscWeb.UserSettingsLive do
                    "Membership activated successfully!",
                    title: "Membership"
                  )
-                 |> redirect(to: ~p"/users/membership")}
+                 |> push_navigate(to: ~p"/users/membership")}
 
               {:error, reason} ->
                 require Ysc.Logging
@@ -3370,7 +3382,7 @@ defmodule YscWeb.UserSettingsLive do
                    "Membership activated successfully!",
                    title: "Membership"
                  )
-                 |> redirect(to: ~p"/users/membership")}
+                 |> push_navigate(to: ~p"/users/membership")}
             end
 
           {:error, :sub_accounts_cannot_create_subscriptions} ->
@@ -3519,7 +3531,7 @@ defmodule YscWeb.UserSettingsLive do
                      title: "Payment",
                      icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
                    )
-                   |> redirect(to: ~p"/users/membership")}
+                   |> push_patch(to: ~p"/users/membership")}
 
                 {:error, stripe_error} ->
                   {:noreply,
@@ -3843,7 +3855,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(socket, :info, "Membership cancelled.",
              title: "Membership"
            )
-           |> redirect(to: ~p"/users/membership")}
+           |> push_navigate(to: ~p"/users/membership")}
 
         {:error, reason} when is_binary(reason) ->
           {:noreply,
@@ -3873,14 +3885,14 @@ defmodule YscWeb.UserSettingsLive do
            "Scheduled downgrade cancelled. Your membership will stay at its current level.",
            title: "Membership"
          )
-         |> redirect(to: ~p"/users/membership")}
+         |> push_navigate(to: ~p"/users/membership")}
 
       {:error, :no_scheduled_downgrade} ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, "No scheduled downgrade found.",
            title: "Membership"
          )
-         |> redirect(to: ~p"/users/membership")}
+         |> push_navigate(to: ~p"/users/membership")}
 
       {:error, reason} when is_binary(reason) ->
         {:noreply,
@@ -3927,7 +3939,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
              title: "Membership"
            )
-           |> redirect(to: ~p"/users/membership")}
+           |> push_navigate(to: ~p"/users/membership")}
 
         _subscription ->
           # Cache invalidation is handled in Subscriptions.resume (via update_subscription)
@@ -3942,7 +3954,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
              title: "Membership"
            )
-           |> redirect(to: ~p"/users/membership")}
+           |> push_navigate(to: ~p"/users/membership")}
       end
     end
   end
@@ -4470,7 +4482,7 @@ defmodule YscWeb.UserSettingsLive do
        to_form(%{"membership_type" => Atom.to_string(new_atom)})
      )
      |> YscWeb.Flash.put_toast(:info, success_message, title: "Membership")
-     |> redirect(to: ~p"/users/membership")}
+     |> push_navigate(to: ~p"/users/membership")}
   end
 
   defp handle_membership_change_scheduled(socket, user, _direction) do
@@ -4484,7 +4496,7 @@ defmodule YscWeb.UserSettingsLive do
        title: "Membership",
        icon: &YscWeb.CoreComponents.flash_toast_icon_clock/1
      )
-     |> redirect(to: ~p"/users/membership")}
+     |> push_navigate(to: ~p"/users/membership")}
   end
 
   defp handle_membership_change_error(socket, reason) do
@@ -5597,7 +5609,7 @@ defmodule YscWeb.UserSettingsLive do
              title: "Invoice",
              icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
            )
-           |> redirect(to: ~p"/users/membership")}
+           |> push_navigate(to: ~p"/users/membership")}
 
         {:error, :invoice_not_found} ->
           {:noreply,

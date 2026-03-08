@@ -376,6 +376,10 @@ defmodule YscWeb.VolunteerLive do
     {:ok,
      socket
      |> assign(:page_title, "Volunteer")
+     |> assign(
+       :meta_description,
+       "Volunteer with the Young Scandinavians Club. Help organize events, assist at cabin trips, and give back to our community."
+     )
      |> assign(:logged_in?, current_user != nil)
      |> assign(:current_user, current_user)
      |> assign(:remote_ip, remote_ip)

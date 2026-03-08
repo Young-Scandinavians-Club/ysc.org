@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
 
   setup %{conn: conn} do
     setup_stripe_mocks()
+    previous_stripe_client = Application.get_env(:ysc, :stripe_client)
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
     # Stub create_payment_intent for cases where it might be triggered
@@ -20,8 +21,17 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       {:ok, build_payment_intent(%{amount: params.amount})}
     end)
 
+    # Required when LiveView restores checkout from URL with order_id and order has payment_intent_id
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      {:ok, build_payment_intent(%{id: id, status: "requires_payment_method"})}
+    end)
+
     on_exit(fn ->
-      Application.delete_env(:ysc, :stripe_client)
+      if previous_stripe_client do
+        Application.put_env(:ysc, :stripe_client, previous_stripe_client)
+      else
+        Application.delete_env(:ysc, :stripe_client)
+      end
     end)
 
     user = user_with_membership(:lifetime)

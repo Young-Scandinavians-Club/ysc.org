@@ -92,6 +92,7 @@ defmodule Ysc.MixProject do
       {:ecto_sql, "~> 3.13"},
       {:ecto_ulid, "~> 0.3"},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
+      {:exgravatar, "~> 2.0"},
       {:ex_aws_s3, "~> 2.0"},
       {:ex_aws, "~> 2.1"},
       {:ex_cldr_calendars, "~> 2.4"},
@@ -190,13 +191,17 @@ defmodule Ysc.MixProject do
         "copy_vendor_assets",
         "generate_video_posters",
         "tailwind default",
-        "esbuild default"
+        "tailwind admin",
+        "esbuild default",
+        "esbuild admin"
       ],
       "assets.deploy": [
         "copy_vendor_assets",
         "generate_video_posters",
         "tailwind default --minify",
+        "tailwind admin --minify",
         "esbuild default --minify",
+        "esbuild admin --minify",
         "phx.digest"
       ]
     ]

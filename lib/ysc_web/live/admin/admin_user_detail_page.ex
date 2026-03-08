@@ -2,6 +2,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
+  alias Phoenix.LiveView.JS
 
   use Phoenix.VerifiedRoutes,
     endpoint: YscWeb.Endpoint,
@@ -356,6 +357,13 @@ defmodule YscWeb.AdminUserDetailsLive do
               items={@streams.ticket_orders}
               meta={@ticket_orders_meta}
               path={~p"/admin/users/#{@user_id}/details/orders"}
+              row_click={
+                fn {_id, order} ->
+                  order.event_id &&
+                    JS.navigate(~p"/admin/events/#{order.event_id}/tickets")
+                end
+              }
+              opts={[tbody_tr_attrs: [class: "hover:bg-zinc-50 cursor-pointer"]]}
             >
               <:col :let={{_, order}} label="Order ID" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
@@ -457,6 +465,12 @@ defmodule YscWeb.AdminUserDetailsLive do
               items={@streams.bookings}
               meta={@bookings_meta}
               path={~p"/admin/users/#{@user_id}/details/bookings"}
+              row_click={
+                fn {_id, booking} ->
+                  JS.navigate(~p"/admin/bookings/#{booking.id}")
+                end
+              }
+              opts={[tbody_tr_attrs: [class: "hover:bg-zinc-50 cursor-pointer"]]}
             >
               <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
@@ -552,14 +566,6 @@ defmodule YscWeb.AdminUserDetailsLive do
                   {Calendar.strftime(booking.inserted_at, "%b %d, %Y")}
                 </span>
               </:col>
-              <:action :let={{_, booking}} label="Action">
-                <.link
-                  navigate={~p"/admin/bookings/#{booking.id}"}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                >
-                  View
-                </.link>
-              </:action>
             </Flop.Phoenix.table>
 
             <Flop.Phoenix.pagination
@@ -1446,7 +1452,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                             {notification.email}
                           <% else %>
                             <%= if notification.phone_number do %>
-                              {notification.phone_number}
+                              {Ysc.Extensions.PhoneNumber.format_for_display(
+                                notification.phone_number
+                              ) || notification.phone_number}
                             <% else %>
                               <span class="text-zinc-400">—</span>
                             <% end %>
@@ -1545,7 +1553,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                         {@selected_notification.email}
                       <% else %>
                         <%= if @selected_notification.phone_number do %>
-                          {@selected_notification.phone_number}
+                          {Ysc.Extensions.PhoneNumber.format_for_display(
+                            @selected_notification.phone_number
+                          ) || @selected_notification.phone_number}
                         <% else %>
                           <span class="text-zinc-400">—</span>
                         <% end %>
@@ -1625,7 +1635,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                       <div class="text-sm text-zinc-600">{@primary_user.email}</div>
                       <%= if @primary_user.phone_number do %>
                         <div class="text-sm text-zinc-500">
-                          {format_phone_number(@primary_user.phone_number)}
+                          {Ysc.Extensions.PhoneNumber.format_for_display(
+                            @primary_user.phone_number
+                          ) || @primary_user.phone_number}
                         </div>
                       <% end %>
                     </div>
@@ -2335,7 +2347,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
-         |> redirect(to: ~p"/admin/users/#{updated_user.id}/details")}
+         |> push_navigate(to: ~p"/admin/users/#{updated_user.id}/details")}
 
       {:error, changeset} ->
         # Log the actual error for debugging
@@ -3581,17 +3593,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:sub_accounts, sub_accounts)
     |> assign(:family_members, family_members)
     |> assign(:pending_invites, pending_invites)
-  end
-
-  defp format_phone_number(phone_number) do
-    case ExPhoneNumber.parse(phone_number, "") do
-      {:ok, parsed} ->
-        ExPhoneNumber.format(parsed, :international)
-
-      {:error, _} ->
-        # Return as-is if parsing fails
-        phone_number
-    end
   end
 
   defp user_state_to_badge_type(:active), do: "green"

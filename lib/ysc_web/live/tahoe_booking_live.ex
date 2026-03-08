@@ -207,6 +207,8 @@ defmodule YscWeb.TahoeBookingLive do
     socket =
       assign(socket,
         page_title: "Tahoe Cabin",
+        meta_description:
+          "Book a stay at the Young Scandinavians Club Lake Tahoe cabin. Choose your dates, rooms, and guests.",
         property: :tahoe,
         user: user_with_subs,
         checkin_date: checkin_date,
@@ -539,6 +541,8 @@ defmodule YscWeb.TahoeBookingLive do
     socket
     |> assign(
       page_title: "Tahoe Cabin",
+      meta_description:
+        "Book a stay at the Young Scandinavians Club Lake Tahoe cabin. Choose your dates, rooms, and guests.",
       checkin_date: parsed_params.checkin_date,
       checkout_date: parsed_params.checkout_date,
       guests_count: parsed_params.guests_count,

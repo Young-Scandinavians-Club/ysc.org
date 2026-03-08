@@ -36,7 +36,10 @@ config :ysc, YscWeb.Endpoint,
   watchers: [
     esbuild:
       {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
+    esbuild_admin:
+      {Esbuild, :install_and_run, [:admin, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]},
+    tailwind_admin: {Tailwind, :install_and_run, [:admin, ~w(--watch)]}
   ],
   live_reload: [
     web_console_logger: true,

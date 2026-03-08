@@ -9,7 +9,7 @@ defmodule YscWeb.UserLoginLive do
         navigate={~p"/"}
         class="flex items-center text-center justify-center py-8 hover:opacity-80 transition duration-200 ease-in-out"
       >
-        <.ysc_logo class="h-28" />
+        <.ysc_logo class="h-28" fetchpriority="high" />
       </.link>
       <.header class="text-center">
         Sign in to your YSC account
@@ -334,6 +334,10 @@ defmodule YscWeb.UserLoginLive do
     {:ok,
      assign(socket, form: form)
      |> assign(:page_title, "Sign in")
+     |> assign(
+       :meta_description,
+       "Sign in to your Young Scandinavians Club account."
+     )
      |> assign(:failed_login_attempts, failed_login_attempts)
      |> assign(:redirect_to, redirect_to)
      |> assign(:is_ios_mobile, false)
