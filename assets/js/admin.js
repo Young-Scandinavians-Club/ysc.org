@@ -30,3 +30,21 @@ window.__adminHooks = {
     GrowingInput,
     FocusSearchInput,
 };
+
+window.addEventListener("phx:focus-search", (e) => {
+    const targetId = e.detail?.id;
+    if (!targetId) return;
+    const tryFocus = (attempt = 0) => {
+        const el = document.getElementById(targetId);
+        if (el) {
+            el.focus();
+            return;
+        }
+        if (attempt < 20) {
+            setTimeout(() => tryFocus(attempt + 1), 50);
+        }
+    };
+    requestAnimationFrame(() => {
+        setTimeout(() => tryFocus(0), 50);
+    });
+});
