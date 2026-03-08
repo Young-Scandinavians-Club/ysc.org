@@ -569,8 +569,12 @@ defmodule YscWeb.AdminPostEditorLive do
     handle_event("post-update", req, socket)
   end
 
-  def handle_event("editor-update", params, socket) do
-    handle_event("post-update", %{"post" => params}, socket)
+  def handle_event(
+        "editor-update",
+        %{"field" => _field, "value" => value},
+        socket
+      ) do
+    handle_event("post-update", %{"post" => %{"raw_body" => value}}, socket)
   end
 
   def handle_event("publish-post", _params, socket) do

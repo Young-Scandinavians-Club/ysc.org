@@ -470,6 +470,7 @@ trix-editor .attachment__metadata .attachment__size {
 */
 
 #admin_events_list,
+#admin_newsletters_list,
 #admin_posts_list,
 #admin_users_list,
 #admin_reservations_list,
@@ -481,6 +482,7 @@ trix-editor .attachment__metadata .attachment__size {
 }
 
 #admin_events_list thead,
+#admin_newsletters_list thead,
 #admin_posts_list thead,
 #admin_users_list thead,
 #admin_reservations_list thead,
@@ -494,6 +496,7 @@ trix-editor .attachment__metadata .attachment__size {
 }
 
 #admin_events_list th,
+#admin_newsletters_list th,
 #admin_posts_list th,
 #admin_users_list th,
 #admin_reservations_list th,
@@ -506,6 +509,7 @@ trix-editor .attachment__metadata .attachment__size {
 }
 
 #admin_events_list tr,
+#admin_newsletters_list tr,
 #admin_posts_list tr,
 #admin_users_list tr,
 #admin_reservations_list tr,
@@ -517,6 +521,7 @@ trix-editor .attachment__metadata .attachment__size {
 }
 
 #admin_events_list tbody tr,
+#admin_newsletters_list tbody tr,
 #admin_posts_list tbody tr,
 #admin_users_list tbody tr,
 #admin_reservations_list tbody tr,
@@ -526,6 +531,7 @@ trix-editor .attachment__metadata .attachment__size {
 }
 
 #admin_events_list tr:hover,
+#admin_newsletters_list tr:hover,
 #admin_posts_list tr:hover,
 #admin_users_list tr:hover,
 #admin_reservations_list tr:hover,
@@ -535,6 +541,7 @@ trix-editor .attachment__metadata .attachment__size {
 }
 
 #admin_events_list td,
+#admin_newsletters_list td,
 #admin_posts_list td,
 #admin_users_list td,
 #admin_reservations_list td,

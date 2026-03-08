@@ -1387,7 +1387,6 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div class="flex flex-row flex-nowrap items-stretch gap-0">
             <div
               id="resizable-left-panel"
-              phx-update="ignore"
               class={[
                 "resizable-left flex-1 flex-auto overflow-auto",
                 if(@selected_notification,
@@ -2202,8 +2201,10 @@ defmodule YscWeb.AdminUserDetailsLive do
           end)
 
         :notifications ->
+          user_email = socket.assigns.selected_user.email
+
           start_async(socket, :load_notifications, fn ->
-            Messages.list_user_messages(user_id, limit: 100)
+            Messages.list_user_messages(user_id, limit: 100, email: user_email)
           end)
 
         :bank_accounts ->
@@ -2295,7 +2296,9 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply, assign(socket, :notifications, notifications)}
   end
 
-  def handle_async(:load_notifications, {:exit, _}, socket) do
+  def handle_async(:load_notifications, {:exit, reason}, socket) do
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to load notifications", error: inspect(reason))
     {:noreply, socket}
   end
 

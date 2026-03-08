@@ -400,6 +400,27 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Fetch upcoming events as full Event structs with given preloads.
+
+  Use for admin pickers (e.g. newsletter) where full structs and cover_image are needed.
+  Single query + preload, no N+1.
+  """
+  def list_upcoming_events_with_preload(limit \\ 36, preloads \\ [:cover_image]) do
+    from(e in Event,
+      where: e.start_date > ^DateTime.utc_now(),
+      where: e.state in [:published, :cancelled],
+      order_by: [
+        asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
+        asc: e.start_date,
+        asc: e.start_time
+      ],
+      limit: ^limit
+    )
+    |> Repo.all()
+    |> Repo.preload(preloads)
+  end
+
+  @doc """
   Fetch past events (events that have already occurred), optionally limited.
   Optimized to batch load ticket tiers and ticket counts to avoid N+1 queries.
   """
@@ -696,6 +717,49 @@ defmodule Ysc.Events do
   end
 
   defp format_price(_), do: "$0.00"
+
+  @doc """
+  Returns a short display string for event pricing (e.g. "FREE", "From $10", "Tickets coming soon").
+  Use for newsletters and other places that need a single line. Event can have ticket_tiers preloaded
+  or they will be loaded.
+  """
+  def event_pricing_display_string(%Event{} = event) do
+    event = ensure_ticket_tiers_loaded(event)
+
+    if Map.get(event, :tickets_tbd) do
+      "Tickets coming soon"
+    else
+      tiers = event.ticket_tiers || []
+      pricing = calculate_event_pricing(tiers)
+      pricing.display_text
+    end
+  end
+
+  @doc """
+  Returns the earliest datetime when any ticket tier goes on sale, or nil.
+  Use for newsletters (e.g. "Tickets on sale Jan 15"). Event can have ticket_tiers preloaded.
+  """
+  def event_earliest_tickets_sale_date(%Event{} = event) do
+    event = ensure_ticket_tiers_loaded(event)
+
+    dates =
+      (event.ticket_tiers || [])
+      |> Enum.map(& &1.start_date)
+      |> Enum.reject(&is_nil/1)
+
+    case dates do
+      [] -> nil
+      list -> Enum.min(list)
+    end
+  end
+
+  defp ensure_ticket_tiers_loaded(%Event{} = event) do
+    if Ecto.assoc_loaded?(event.ticket_tiers) do
+      event
+    else
+      Repo.preload(event, :ticket_tiers)
+    end
+  end
 
   @doc """
   Publish an event by updating its state and setting `published_at`.

@@ -350,14 +350,23 @@ defmodule Ysc.Messages do
   def list_user_messages(user_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     offset = Keyword.get(opts, :offset, 0)
+    email = Keyword.get(opts, :email)
 
-    from(m in MessageIdempotency,
-      where: m.user_id == ^user_id,
-      order_by: [desc: m.id],
-      limit: ^limit,
-      offset: ^offset
-    )
-    |> Repo.all()
+    base =
+      from(m in MessageIdempotency,
+        order_by: [desc: m.id],
+        limit: ^limit,
+        offset: ^offset
+      )
+
+    query =
+      if is_binary(email) do
+        from(m in base, where: m.user_id == ^user_id or m.email == ^email)
+      else
+        from(m in base, where: m.user_id == ^user_id)
+      end
+
+    Repo.all(query)
   end
 
   @doc """

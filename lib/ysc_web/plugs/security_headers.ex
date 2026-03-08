@@ -102,7 +102,10 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         # Required for inline style attributes and <style> tags
         "'unsafe-inline'",
         "https://js.radar.com/v4.4.8/radar.css",
-        "https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css"
+        "https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css",
+        # MJML NIF injects Ubuntu font from Google Fonts into compiled email HTML;
+        # the admin email preview iframe loads this stylesheet.
+        "https://fonts.googleapis.com"
       ]
       |> Enum.join(" ")
 
@@ -158,7 +161,9 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         "'self'",
         "data:",
         # Radar library loads fonts from radar.com
-        "https://radar.com"
+        "https://radar.com",
+        # MJML NIF uses Ubuntu font; Google Fonts serves font files from gstatic.com
+        "https://fonts.gstatic.com"
       ]
       |> Enum.join(" ")
 

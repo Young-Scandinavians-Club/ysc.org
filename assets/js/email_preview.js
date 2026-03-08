@@ -1,36 +1,83 @@
 const EmailPreview = {
-    mounted() {
-        const iframe = this.el;
-        if (!iframe) return;
-
-        // Set up iframe to display email content
-        // The srcdoc attribute is already set in the template
-        // We can adjust height based on content if needed
-        iframe.onload = () => {
-            try {
-                // Try to get the content height and adjust iframe
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                if (iframeDoc && iframeDoc.body) {
-                    const height = Math.max(
-                        iframeDoc.body.scrollHeight,
-                        iframeDoc.body.offsetHeight,
-                        iframeDoc.documentElement.clientHeight,
-                        iframeDoc.documentElement.scrollHeight,
-                        iframeDoc.documentElement.offsetHeight
-                    );
-                    // Set a reasonable max height but allow scrolling
-                    iframe.style.height = `${Math.min(height + 20, 800)}px`;
-                }
-            } catch (e) {
-                // Cross-origin or other security restrictions - use default height
-                console.log("EmailPreview: Could not access iframe content", e);
-            }
-        };
+    scrollContainer() {
+        return document.getElementById("preview-scroll-container");
     },
 
-    updated() {
-        // Re-run mounted logic if the iframe content changes
-        this.mounted();
+    resize(minHeight = 0) {
+        try {
+            const doc =
+                this.el.contentDocument || this.el.contentWindow.document;
+            if (!doc || !doc.body) return;
+            const measured = Math.max(
+                doc.body.scrollHeight,
+                doc.body.offsetHeight
+            );
+            const height = Math.max(measured, minHeight);
+            if (height > 0) this.el.style.height = `${height}px`;
+        } catch (_e) {}
+    },
+
+    waitForImages(doc) {
+        const pending = Array.from(doc.getElementsByTagName("img")).filter(
+            (img) => !img.complete
+        );
+        if (pending.length === 0) return Promise.resolve();
+        return Promise.all(
+            pending.map(
+                (img) =>
+                    new Promise((resolve) => {
+                        img.addEventListener("load", resolve, { once: true });
+                        img.addEventListener("error", resolve, { once: true });
+                    })
+            )
+        );
+    },
+
+    writeToIframe(html) {
+        try {
+            const doc =
+                this.el.contentDocument || this.el.contentWindow.document;
+            doc.open();
+            doc.write(html);
+            doc.close();
+        } catch (_e) {}
+    },
+
+    async renderPreview(html) {
+        const container = this.scrollContainer();
+        const scrollPos = container ? container.scrollTop : 0;
+        const lockedHeight = this.el.offsetHeight;
+
+        this.el.style.transition = "opacity 0.1s ease";
+        this.el.style.opacity = "0.4";
+
+        this.writeToIframe(html);
+        this.resize(lockedHeight);
+
+        if (container && scrollPos > 0) {
+            container.scrollTop = scrollPos;
+        }
+
+        try {
+            const doc =
+                this.el.contentDocument || this.el.contentWindow.document;
+            await this.waitForImages(doc);
+        } catch (_e) {}
+
+        this.resize();
+
+        if (container && scrollPos > 0) {
+            container.scrollTop = scrollPos;
+        }
+
+        this.el.style.transition = "opacity 0.15s ease";
+        this.el.style.opacity = "1";
+    },
+
+    mounted() {
+        this.handleEvent("preview-html", ({ html }) => {
+            if (html) this.renderPreview(html);
+        });
     },
 };
 

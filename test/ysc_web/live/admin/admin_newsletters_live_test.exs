@@ -1,0 +1,216 @@
+defmodule YscWeb.AdminNewslettersLiveTest do
+  use YscWeb.ConnCase, async: true
+
+  import Phoenix.LiveViewTest
+  import Ysc.AccountsFixtures
+
+  alias Ysc.Newsletter
+
+  # ---------------------------------------------------------------------------
+  # Helpers
+  # ---------------------------------------------------------------------------
+
+  defp create_admin(%{conn: conn}) do
+    user = user_fixture(%{role: "admin"})
+    %{conn: log_in_user(conn, user), admin: user}
+  end
+
+  defp edition_fixture(user, attrs \\ %{}) do
+    {:ok, edition} =
+      Newsletter.create_edition(
+        Map.merge(%{"title" => "Test Edition", "subject" => "Hello"}, attrs),
+        created_by_id: user.id
+      )
+
+    edition
+  end
+
+  # ---------------------------------------------------------------------------
+  # Access control
+  # ---------------------------------------------------------------------------
+
+  describe "access control" do
+    test "redirects unauthenticated visitors", %{conn: conn} do
+      {:error, {:redirect, %{to: path}}} = live(conn, ~p"/admin/newsletters")
+      assert path =~ "/log-in"
+    end
+
+    test "redirects non-admin users", %{conn: conn} do
+      member = user_fixture(%{role: "member"})
+      conn = log_in_user(conn, member)
+      {:error, {:redirect, _}} = live(conn, ~p"/admin/newsletters")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Listing editions
+  # ---------------------------------------------------------------------------
+
+  describe "listing editions" do
+    setup [:create_admin]
+
+    test "renders the newsletters page with subscriber count", %{conn: conn} do
+      Newsletter.subscribe("sub@example.com", source: "test")
+
+      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+
+      assert html =~ "Newsletters"
+      assert html =~ "subscriber"
+    end
+
+    test "lists existing editions", %{conn: conn, admin: admin} do
+      edition_fixture(admin, %{"title" => "Spring Update"})
+
+      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+
+      assert html =~ "Spring Update"
+    end
+
+    test "shows a New Newsletter button", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+      assert html =~ "New Newsletter"
+    end
+
+    test "shows correct status badge for draft edition", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition_fixture(admin, %{"title" => "Draft Ed"})
+
+      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+
+      assert html =~ "Draft"
+    end
+
+    test "shows correct status badge for sent edition", %{
+      conn: conn,
+      admin: admin
+    } do
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Sent Ed", "subject" => "Subj", "status" => :sent},
+          created_by_id: admin.id
+        )
+
+      {:ok, _} =
+        Newsletter.update_edition(edition, %{"sent_at" => DateTime.utc_now()})
+
+      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+
+      assert html =~ "Sent"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Search
+  # ---------------------------------------------------------------------------
+
+  describe "search" do
+    setup [:create_admin]
+
+    test "filters editions by title", %{conn: conn, admin: admin} do
+      edition_fixture(admin, %{"title" => "Searchable Title"})
+      edition_fixture(admin, %{"title" => "Other Title"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+
+      html =
+        view
+        |> form("#newsletters-search-form", %{q: "Searchable"})
+        |> render_submit()
+
+      assert html =~ "Searchable Title"
+      refute html =~ "Other Title"
+    end
+
+    test "shows all editions when search is cleared", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition_fixture(admin, %{"title" => "Alpha"})
+      edition_fixture(admin, %{"title" => "Beta"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+
+      view |> form("#newsletters-search-form", %{q: "Alpha"}) |> render_submit()
+
+      html =
+        view |> form("#newsletters-search-form", %{q: ""}) |> render_submit()
+
+      assert html =~ "Alpha"
+      assert html =~ "Beta"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Delete
+  # ---------------------------------------------------------------------------
+
+  describe "delete edition" do
+    setup [:create_admin]
+
+    test "removes the edition from the list", %{conn: conn, admin: admin} do
+      edition = edition_fixture(admin, %{"title" => "To Delete"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+
+      assert has_element?(view, "#edition-#{edition.id}")
+
+      view
+      |> element(
+        "#admin_newsletters_list [phx-value-id='#{edition.id}'][phx-click='delete-edition']"
+      )
+      |> render_click()
+
+      refute has_element?(view, "#edition-#{edition.id}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Send now
+  # ---------------------------------------------------------------------------
+
+  describe "send now" do
+    setup [:create_admin]
+
+    test "sends the newsletter and marks it as sent", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+
+      # Two send-now buttons exist (mobile card + desktop table); target desktop via title attr
+      view
+      |> element(
+        "[phx-click='send-now'][phx-value-id='#{edition.id}'][title='Send now']"
+      )
+      |> render_click()
+
+      # In inline Oban mode the sender fires synchronously; edition is :sent
+      reloaded = Newsletter.get_edition!(edition.id)
+      assert reloaded.status == :sent
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Navigation
+  # ---------------------------------------------------------------------------
+
+  describe "navigation" do
+    setup [:create_admin]
+
+    test "new newsletter link navigates to editor", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+
+      {:ok, _editor_view, html} =
+        view
+        |> element("a", "New Newsletter")
+        |> render_click()
+        |> follow_redirect(conn, ~p"/admin/newsletters/new")
+
+      assert html =~ "Newsletter"
+    end
+  end
+end

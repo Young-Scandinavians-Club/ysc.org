@@ -9,14 +9,13 @@ defmodule YscWeb.TrixUploadsController do
   @temp_dir "/tmp/image_processor"
 
   # sobelow_skip ["XSS.SendResp"]
-  def create(conn, %{"post_id" => post_id} = params) do
+  def create(conn, params) do
     current_user = conn.assigns[:current_user]
     updated_image = upload_file(params, current_user)
 
-    post = Posts.get_post(post_id)
-
-    if post != nil do
-      set_cover_photo(post, updated_image.id, current_user)
+    if post_id = params["post_id"] do
+      post = Posts.get_post(post_id)
+      if post != nil, do: set_cover_photo(post, updated_image.id, current_user)
     end
 
     send_resp(conn, 201, get_return_url(updated_image))

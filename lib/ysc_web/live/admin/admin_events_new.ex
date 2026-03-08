@@ -14,6 +14,8 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
 
+  alias HtmlSanitizeEx.Scrubber
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -782,17 +784,23 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:end_time, event_params["end_time"])}
   end
 
-  def handle_event("editor-update", %{"raw_body" => raw_body}, socket) do
+  def handle_event(
+        "editor-update",
+        %{"field" => _field, "value" => raw_body},
+        socket
+      ) do
     # Reload event to get latest lock_version
     current_event = Events.get_event!(socket.assigns[:event].id)
-    changeset = Event.changeset(current_event, %{"raw_details" => raw_body})
+    rendered = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+    update_attrs = %{"raw_details" => raw_body, "rendered_details" => rendered}
+    changeset = Event.changeset(current_event, update_attrs)
 
     {updated_event, updated_changeset} =
       if changeset.valid? do
-        case Events.update_event(current_event, %{"raw_details" => raw_body}) do
+        case Events.update_event(current_event, update_attrs) do
           {:ok, updated_event} ->
             updated_changeset =
-              Event.changeset(updated_event, %{"raw_details" => raw_body})
+              Event.changeset(updated_event, update_attrs)
 
             {updated_event, updated_changeset}
 
