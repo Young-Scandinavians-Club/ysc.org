@@ -256,6 +256,23 @@ defmodule Ysc.Newsletter do
     end
   end
 
+  @doc """
+  Lists subscribers with Flop pagination, sorting, and filtering.
+
+  Params are passed through to Flop (page, limit, order, filters).
+  Filterable: email, subscribed. Sortable: email, inserted_at, subscribed_at.
+  """
+  def list_paginated_subscribers(params) do
+    base_query =
+      Subscriber
+      |> Ecto.Query.exclude(:order_by)
+
+    case Flop.validate_and_run(base_query, params, for: Subscriber) do
+      {:ok, {subscribers, meta}} -> {:ok, {subscribers, meta}}
+      error -> error
+    end
+  end
+
   defp valid_email?(email) do
     is_binary(email) && String.trim(email) != "" && String.contains?(email, "@")
   end

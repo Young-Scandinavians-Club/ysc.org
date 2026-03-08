@@ -10,6 +10,15 @@ defmodule Ysc.Newsletter.Subscriber do
 
   alias Ysc.Accounts.User
 
+  @derive {
+    Flop.Schema,
+    filterable: [:email, :subscribed],
+    sortable: [:email, :subscribed_at, :source, :first_name, :last_name],
+    default_limit: 20,
+    max_limit: 100,
+    default_order: %{order_by: [:subscribed_at], order_directions: [:desc]}
+  }
+
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
   @timestamps_opts [type: :utc_datetime]
