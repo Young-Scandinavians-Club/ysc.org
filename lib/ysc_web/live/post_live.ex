@@ -101,7 +101,8 @@ defmodule YscWeb.PostLive do
         <img
           src={featured_image_url(@post.featured_image)}
           id={"image-#{@post.image_id}"}
-          loading="lazy"
+          loading="eager"
+          fetchpriority="high"
           class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover"
           phx-hook="BlurHashImage"
           alt={

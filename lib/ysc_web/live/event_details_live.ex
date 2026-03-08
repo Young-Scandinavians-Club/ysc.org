@@ -29,6 +29,8 @@ defmodule YscWeb.EventDetailsLive do
               image_id={@event.image_id}
               preferred_type={:optimized}
               class="w-full h-[50vh] lg:h-[60vh] object-cover"
+              loading="eager"
+              fetchpriority="high"
             />
             <%!-- Gradient overlay for better text readability --%>
             <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/90 via-zinc-900/40 to-transparent pointer-events-none">

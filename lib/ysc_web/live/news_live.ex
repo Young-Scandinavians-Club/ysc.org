@@ -83,6 +83,7 @@ defmodule YscWeb.NewsLive do
                   phx-hook="BlurHashImage"
                   class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-105 transition-transform duration-700"
                   loading="eager"
+                  fetchpriority="high"
                   alt={
                     if @featured.featured_image,
                       do:

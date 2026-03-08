@@ -2802,6 +2802,11 @@ defmodule YscWeb.CoreComponents do
     default: nil,
     doc: "Path to the poster image shown while video is loading"
 
+  attr :captions, :string,
+    default: nil,
+    doc:
+      "URL to WebVTT captions file (kind=captions). Defaults to shared hero captions when video is set."
+
   attr :height, :string,
     default: "70vh",
     doc: "Height of the hero section (e.g., '100vh', '500px')"
@@ -2851,6 +2856,12 @@ defmodule YscWeb.CoreComponents do
         class="absolute inset-0 w-full h-full object-cover"
       >
         <source src={@video} type="video/mp4" />
+        <track
+          kind="captions"
+          src={@captions || "/video/hero_captions.vtt"}
+          srclang="en"
+          label="English"
+        />
       </video>
 
       <%!-- Pause/play control: visible on hover (or always on touch) for performance --%>
