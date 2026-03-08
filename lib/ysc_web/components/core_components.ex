@@ -2861,7 +2861,6 @@ defmodule YscWeb.CoreComponents do
           src={@captions || "/video/hero_captions.vtt"}
           srclang="en"
           label="English"
-          default
         />
       </video>
 
