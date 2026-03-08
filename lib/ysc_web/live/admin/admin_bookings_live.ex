@@ -2290,6 +2290,7 @@ defmodule YscWeb.AdminBookingsLive do
                 on_change="change-reservation-search"
                 phx-submit="change-reservation-search"
                 phx-submit-disable
+                clear_event="clear-reservation-search"
               />
             </div>
             <div class="py-6 w-full overflow-x-auto">
@@ -3336,6 +3337,7 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:date_selection_room_id, nil)
       |> assign(:date_selection_hover_end, nil)
       |> assign(:reservation_params, %{})
+      |> assign(:focus_search_input, nil)
       |> assign(:reservation_meta, nil)
       |> assign(:reservation_empty, false)
       |> assign(:reservation_filter_start_date, nil)
@@ -5407,6 +5409,7 @@ defmodule YscWeb.AdminBookingsLive do
     {:noreply,
      socket
      |> assign(:reservation_params, new_reservation_params)
+     |> assign(:focus_search_input, nil)
      |> assign(
        :reservations_path,
        build_reservations_path(socket, updated_params)
@@ -5439,6 +5442,31 @@ defmodule YscWeb.AdminBookingsLive do
     {:noreply,
      socket
      |> assign(:reservation_params, new_reservation_params)
+     |> assign(:focus_search_input, nil)
+     |> assign(
+       :reservations_path,
+       build_reservations_path(socket, updated_params)
+     )
+     |> push_patch(to: "/admin/bookings?#{query_string}")}
+  end
+
+  def handle_event(
+        "clear-reservation-search",
+        %{"input-id" => input_id},
+        socket
+      ) do
+    new_reservation_params =
+      Map.delete(socket.assigns[:reservation_params] || %{}, "search")
+
+    updated_params =
+      build_reservation_query_params(socket, new_reservation_params)
+
+    query_string = URI.encode_query(updated_params)
+
+    {:noreply,
+     socket
+     |> assign(:reservation_params, new_reservation_params)
+     |> assign(:focus_search_input, input_id)
      |> assign(
        :reservations_path,
        build_reservations_path(socket, updated_params)
@@ -5499,6 +5527,7 @@ defmodule YscWeb.AdminBookingsLive do
     {:noreply,
      socket
      |> assign(:reservation_params, new_params)
+     |> assign(:focus_search_input, nil)
      |> assign(:reservation_filter_start_date, filter_start_date)
      |> assign(:reservation_filter_end_date, filter_end_date)
      |> assign(
@@ -5515,6 +5544,7 @@ defmodule YscWeb.AdminBookingsLive do
     {:noreply,
      socket
      |> assign(:reservation_params, %{})
+     |> assign(:focus_search_input, nil)
      |> assign(:reservation_filter_start_date, nil)
      |> assign(:reservation_filter_end_date, nil)
      |> assign(
@@ -6763,6 +6793,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:ok, {reservations, meta}} ->
         socket
         |> assign(:reservation_params, params)
+        |> assign(:focus_search_input, nil)
         |> assign(:reservation_meta, meta)
         |> assign(:reservation_empty, no_results?(reservations))
         |> assign(:reservation_filter_start_date, filter_start_date)
@@ -6773,6 +6804,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:error, _meta} ->
         socket
         |> assign(:reservation_params, params)
+        |> assign(:focus_search_input, nil)
         |> assign(:reservation_meta, nil)
         |> assign(:reservation_empty, true)
         |> assign(:reservation_filter_start_date, filter_start_date)

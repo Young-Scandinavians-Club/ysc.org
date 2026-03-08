@@ -430,6 +430,10 @@ defmodule YscWeb.AdminPostsLive do
     {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
   end
 
+  def handle_event("clear-search", %{"input-id" => _input_id}, socket) do
+    handle_event("search", %{"q" => ""}, socket)
+  end
+
   def handle_event("update-filter", params, socket) do
     date_from = Map.get(params, "date_from", "")
     date_to = Map.get(params, "date_to", "")

@@ -585,6 +585,7 @@ defmodule YscWeb.AdminComponents do
   attr :placeholder, :string, default: "Search..."
   attr :on_change, :string, default: "change"
   attr :debounce, :string, default: "200"
+  attr :clear_event, :string, default: nil
   attr :rest, :global, include: ~w(phx-submit phx-submit-disable)
 
   def admin_search_bar(assigns) do
@@ -616,6 +617,16 @@ defmodule YscWeb.AdminComponents do
         phx-debounce={@debounce}
         class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
       />
+      <button
+        :if={@clear_event && @value != ""}
+        type="button"
+        phx-click={@clear_event}
+        phx-value-input-id={@input_id}
+        class="absolute inset-y-0 end-0 flex items-center pe-3 text-zinc-400 hover:text-zinc-600"
+        aria-label="Clear search"
+      >
+        <.icon name="hero-x-mark" class="w-4 h-4" />
+      </button>
     </form>
     """
   end

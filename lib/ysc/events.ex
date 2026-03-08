@@ -53,17 +53,34 @@ defmodule Ysc.Events do
   end
 
   def list_events_paginated(params, opts \\ []) do
+    opts = normalize_list_events_opts(opts)
     date_from = Keyword.get(opts, :date_from, "")
     date_to = Keyword.get(opts, :date_to, "")
+    search_term = Keyword.get(opts, :search_term)
 
-    Event
-    |> where([e], e.state not in ["deleted"])
-    |> maybe_filter_start_date_from(date_from)
-    |> maybe_filter_start_date_to(date_to)
-    |> join(:left, [p], u in assoc(p, :organizer), as: :organizer)
-    |> preload([organizer: p], organizer: p)
+    query =
+      if search_term in [nil, ""] do
+        Event
+        |> where([e], e.state not in ["deleted"])
+        |> maybe_filter_start_date_from(date_from)
+        |> maybe_filter_start_date_to(date_to)
+        |> join(:left, [e], u in assoc(e, :organizer), as: :organizer)
+        |> preload([organizer: o], organizer: o)
+      else
+        fuzzy_search_event(search_term)
+        |> maybe_filter_start_date_from(date_from)
+        |> maybe_filter_start_date_to(date_to)
+      end
+
+    query
     |> Flop.validate_and_run(params, for: Event)
   end
+
+  defp normalize_list_events_opts(search_term)
+       when is_binary(search_term) or is_nil(search_term),
+       do: [search_term: search_term]
+
+  defp normalize_list_events_opts(opts) when is_list(opts), do: opts
 
   defp maybe_filter_start_date_from(query, ""), do: query
 
@@ -89,6 +106,27 @@ defmodule Ysc.Events do
       _ ->
         query
     end
+  end
+
+  defp fuzzy_search_event(search_term) do
+    search_like = "%#{search_term}%"
+
+    from(e in Event,
+      left_join: u in assoc(e, :organizer),
+      as: :organizer,
+      where:
+        e.state not in ["deleted"] and
+          (fragment("SIMILARITY(?, ?) > 0.2", e.title, ^search_term) or
+             ilike(e.title, ^search_like) or
+             ilike(coalesce(e.description, ""), ^search_like) or
+             ilike(coalesce(e.reference_id, ""), ^search_like) or
+             (not is_nil(u.id) and
+                (fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
+                   fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
+                   ilike(u.first_name, ^search_like) or
+                   ilike(u.last_name, ^search_like)))),
+      preload: [organizer: u]
+    )
   end
 
   @doc """
