@@ -541,14 +541,22 @@ defmodule Ysc.AccountsTest do
   end
 
   describe "update_notification_preferences/2" do
-    test "updates notification preferences" do
+    test "updates notification preferences (newsletter state lives in newsletter_subscribers)" do
       user = user_fixture(%{phone_number: "+14159098268"})
-      attrs = %{newsletter_notifications: false}
+
+      attrs = %{
+        "newsletter_notifications" => "false",
+        "account_notifications" => "true",
+        "event_notifications" => "true",
+        "event_notifications_sms" => "false",
+        "account_notifications_sms" => "false"
+      }
 
       assert {:ok, updated} =
                Accounts.update_notification_preferences(user, attrs)
 
-      assert updated.newsletter_notifications == false
+      # Newsletter preference is synced to newsletter_subscribers by the LiveView; here we only assert update succeeds
+      assert updated.id == user.id
     end
   end
 

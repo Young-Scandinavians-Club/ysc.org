@@ -656,11 +656,18 @@ defmodule Ysc.Accounts do
 
   @doc """
   Updates newsletter subscription when user changes email.
-  Unsubscribes the old email. Subscribes the new email only if user has
-  newsletter_notifications enabled.
+  Unsubscribes the old email. Subscribes the new email only if the old email
+  was subscribed (per newsletter_subscribers table).
   """
   def update_newsletter_on_email_change(user, old_email, new_email) do
     require Ysc.Logging
+
+    # Check if old email was subscribed before we unsubscribe (source of truth: newsletter_subscribers)
+    was_subscribed =
+      case Newsletter.get_subscriber_by_email(old_email) do
+        nil -> false
+        sub -> sub.subscribed
+      end
 
     case Newsletter.unsubscribe(old_email) do
       {:ok, _} ->
@@ -679,7 +686,7 @@ defmodule Ysc.Accounts do
         )
     end
 
-    if user.newsletter_notifications do
+    if was_subscribed do
       metadata = %{
         "user_id" => user.id,
         "email_changed_date" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -712,7 +719,7 @@ defmodule Ysc.Accounts do
       end
     else
       Ysc.Logging.debug(
-        "Skipping newsletter subscription for new email (notifications disabled)",
+        "Skipping newsletter subscription for new email (old email was not subscribed)",
         user_id: user.id,
         new_email: new_email
       )

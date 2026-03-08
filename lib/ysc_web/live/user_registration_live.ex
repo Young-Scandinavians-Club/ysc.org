@@ -14,7 +14,7 @@ defmodule YscWeb.UserRegistrationLive do
           navigate={~p"/"}
           class="p-8 hover:opacity-80 transition duration-200 ease-in-out"
         >
-          <.ysc_logo class="h-28" fetchpriority="high" />
+          <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
         </.link>
       </div>
       <div class="w-full px-2">

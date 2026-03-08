@@ -3,6 +3,8 @@ defmodule Ysc.Accounts.EmailCategories do
   Maps email templates to notification categories for user preference checking.
   """
 
+  alias Ysc.Newsletter
+
   @type category :: :account | :event | :newsletter
 
   # Templates that should have reply-to set to memberships@ysc.org
@@ -134,8 +136,12 @@ defmodule Ysc.Accounts.EmailCategories do
         Map.get(user, :event_notifications, true)
 
       :newsletter ->
-        # Check if user has newsletter notifications enabled
-        Map.get(user, :newsletter_notifications, true)
+        # Newsletter preference lives in newsletter_subscribers
+        case user && user.email &&
+               Newsletter.get_subscriber_by_email(user.email) do
+          nil -> false
+          subscriber -> subscriber.subscribed
+        end
     end
   end
 

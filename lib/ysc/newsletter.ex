@@ -194,13 +194,18 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
-  Syncs the newsletter_subscribers table with the user's newsletter_notifications preference.
+  Syncs the newsletter_subscribers table with the given newsletter preference.
 
-  If the user has newsletter_notifications enabled, subscribes their email (or links
-  existing subscription). If disabled, unsubscribes their email.
+  If `newsletter_subscribed` is true, subscribes the user's email (or links
+  existing subscription). If false, unsubscribes their email.
+
+  Options:
+  - :newsletter_subscribed - boolean, whether the user wants to receive the newsletter
   """
-  def sync_user_preference(user) do
-    if user.newsletter_notifications do
+  def sync_user_preference(user, opts) do
+    subscribed = Keyword.fetch!(opts, :newsletter_subscribed)
+
+    if subscribed do
       case subscribe(user.email,
              user_id: user.id,
              first_name: user.first_name,

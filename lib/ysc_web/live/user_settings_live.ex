@@ -2247,7 +2247,18 @@ defmodule YscWeb.UserSettingsLive do
     # Basic changesets that don't require DB queries (use existing user data)
     email_changeset = Accounts.change_user_email(user)
     profile_changeset = Accounts.change_user_profile(user)
-    notification_changeset = Accounts.change_notification_preferences(user)
+
+    # Newsletter checkbox reads from newsletter_subscribers (single source of truth)
+    effective_newsletter =
+      case Newsletter.get_subscriber_by_email(user.email) do
+        nil -> false
+        subscriber -> subscriber.subscribed
+      end
+
+    notification_changeset =
+      Accounts.change_notification_preferences(user, %{
+        "newsletter_notifications" => effective_newsletter
+      })
 
     pending_family_invites =
       FamilyInvites.list_pending_invites_for_email(user.email)
@@ -3229,7 +3240,12 @@ defmodule YscWeb.UserSettingsLive do
 
     case Accounts.update_notification_preferences(user, user_params) do
       {:ok, updated_user} ->
-        Newsletter.sync_user_preference(updated_user)
+        newsletter_subscribed =
+          parse_newsletter_param(user_params["newsletter_notifications"])
+
+        Newsletter.sync_user_preference(updated_user,
+          newsletter_subscribed: newsletter_subscribed
+        )
 
         notification_form =
           Accounts.change_notification_preferences(updated_user, user_params)
@@ -4560,6 +4576,9 @@ defmodule YscWeb.UserSettingsLive do
 
   defp email_resend_seconds_remaining(assigns),
     do: Ysc.ResendRateLimiter.resend_seconds_remaining(assigns, :email)
+
+  defp parse_newsletter_param(value) when value in [true, "true", "1"], do: true
+  defp parse_newsletter_param(_), do: false
 
   # Helper function to check if we're in dev/sandbox mode
   defp dev_or_sandbox? do
