@@ -91,15 +91,17 @@ defmodule YscWeb.HomeLive do
   # Guest user: load data synchronously for SEO-friendly initial render
   # Search engines and social media crawlers need to see actual content
   defp mount_guest_with_data(socket) do
-    # Determine hero video based on season (no DB query)
-    {hero_video, hero_poster} =
+    # Determine hero video and captions based on season (no DB query)
+    {hero_video, hero_poster, hero_captions} =
       case Season.for_date(:tahoe, Date.utc_today()) do
         %{name: "Summer"} ->
           {~p"/video/clear_lake_hero.mp4",
-           ~p"/images/clear_lake_hero_poster.webp"}
+           ~p"/images/clear_lake_hero_poster.webp",
+           ~p"/video/clear_lake_hero_captions.vtt"}
 
         _ ->
-          {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.webp"}
+          {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.webp",
+           ~p"/video/tahoe_hero_captions.vtt"}
       end
 
     # Load events and news synchronously for SEO
@@ -121,6 +123,7 @@ defmodule YscWeb.HomeLive do
       latest_news: latest_news,
       hero_video: hero_video,
       hero_poster: hero_poster,
+      hero_captions: hero_captions,
       newsletter_email: "",
       newsletter_first_name: "",
       newsletter_last_name: "",
@@ -252,6 +255,7 @@ defmodule YscWeb.HomeLive do
       <.hero
         video={@hero_video}
         poster={@hero_poster}
+        captions={@hero_captions}
         height="90vh"
         overlay_opacity="bg-black/40"
       >
