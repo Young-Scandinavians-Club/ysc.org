@@ -65,7 +65,7 @@ defmodule YscWeb.AdminDashboardLive do
           </div>
         </div>
         <!-- Tiered Stats Row -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
           <!-- Applications Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
@@ -219,7 +219,50 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
             </div>
           </div>
-          <!-- Active Now Card -->
+          <!-- Memberships Card -->
+          <.link
+            navigate={~p"/admin/memberships"}
+            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
+          >
+            <div>
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+                Memberships
+              </p>
+              <div class="flex items-baseline gap-2">
+                <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+                  {@membership_stats.total}
+                </p>
+                <span class="text-xs font-bold text-zinc-500">
+                  active
+                </span>
+              </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
+                <p class="text-sm font-black text-zinc-700">
+                  {@membership_stats.single}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
+                <p class="text-sm font-black text-zinc-700">
+                  {@membership_stats.family}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
+                <p class="text-sm font-black text-zinc-700">
+                  {@membership_stats.lifetime}
+                </p>
+              </div>
+            </div>
+            <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+              View all memberships →
+            </p>
+          </.link>
+          
+    <!-- Active Now Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
               <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
@@ -508,6 +551,12 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:revenue_mix_membership_percent, 0)
       |> assign(:active_guests_count, 0)
       |> assign(:active_guests_sample, [])
+      |> assign(:membership_stats, %{
+        total: 0,
+        single: 0,
+        family: 0,
+        lifetime: 0
+      })
 
     # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do
@@ -539,6 +588,7 @@ defmodule YscWeb.AdminDashboardLive do
       get_application_statistics()
 
     {active_guests_count, active_guests_sample} = get_active_guests()
+    membership_stats = Accounts.get_membership_stats()
 
     {:noreply,
      socket
@@ -566,7 +616,8 @@ defmodule YscWeb.AdminDashboardLive do
      |> assign(:revenue_mix_events_percent, revenue_mix_events_percent)
      |> assign(:revenue_mix_membership_percent, revenue_mix_membership_percent)
      |> assign(:active_guests_count, active_guests_count)
-     |> assign(:active_guests_sample, active_guests_sample)}
+     |> assign(:active_guests_sample, active_guests_sample)
+     |> assign(:membership_stats, membership_stats)}
   end
 
   defp get_next_event_date(events_with_tickets) do

@@ -5,7 +5,7 @@ defmodule YscWeb.UserSettingsLive do
   @phone_verification_token_max_age 3600
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.MembershipCache
+  alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Accounts.UserNotifier
   alias Ysc.Customers
   alias Ysc.Ledgers
@@ -812,11 +812,58 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
               </div>
+              <div class="mt-4 pt-4 border-t border-zinc-200">
+                <p class="text-sm text-zinc-600 mb-2">
+                  You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
+                </p>
+                <.button
+                  phx-click="leave-family-membership"
+                  phx-disable-with="Leaving..."
+                  color="red"
+                  variant="outline"
+                  data-confirm="Are you sure you want to leave this family membership? You will lose access to membership benefits until you purchase your own membership or join another family."
+                >
+                  Leave family membership
+                </.button>
+              </div>
               <.membership_status
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
+              <div
+                :if={@pending_family_invites != []}
+                class="mt-6 border-t border-zinc-100 pt-4"
+              >
+                <h3 class="text-sm font-semibold text-zinc-900">
+                  Pending Family Invitations
+                </h3>
+                <p class="text-xs text-zinc-500 mt-1">
+                  You have been invited to join a family membership. Accepting will link your account to the inviter's membership.
+                </p>
+                <div class="mt-3 space-y-2">
+                  <%= for invite <- @pending_family_invites do %>
+                    <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                      <div class="text-sm">
+                        <p class="font-medium text-zinc-900">
+                          Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
+                        </p>
+                        <p class="text-xs text-zinc-500">
+                          Sent to {@user.email}
+                        </p>
+                      </div>
+                      <.button
+                        phx-click="accept-family-invite"
+                        phx-value-token={invite.token}
+                        phx-disable-with="Accepting..."
+                        class="text-xs"
+                      >
+                        Accept invitation
+                      </.button>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
             </div>
 
             <%!-- Lifetime membership: special case --%>
@@ -830,6 +877,46 @@ defmodule YscWeb.UserSettingsLive do
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
+              <.link
+                navigate={~p"/users/settings/family"}
+                class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                <.icon name="hero-user-group" class="w-4 h-4" />
+                Add family members to your membership
+              </.link>
+              <div
+                :if={@pending_family_invites != []}
+                class="mt-6 border-t border-zinc-100 pt-4"
+              >
+                <h3 class="text-sm font-semibold text-zinc-900">
+                  Pending Family Invitations
+                </h3>
+                <p class="text-xs text-zinc-500 mt-1">
+                  You have been invited to join a family membership. Accepting will link your account to the inviter's membership.
+                </p>
+                <div class="mt-3 space-y-2">
+                  <%= for invite <- @pending_family_invites do %>
+                    <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                      <div class="text-sm">
+                        <p class="font-medium text-zinc-900">
+                          Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
+                        </p>
+                        <p class="text-xs text-zinc-500">
+                          Sent to {@user.email}
+                        </p>
+                      </div>
+                      <.button
+                        phx-click="accept-family-invite"
+                        phx-value-token={invite.token}
+                        phx-disable-with="Accepting..."
+                        class="text-xs"
+                      >
+                        Accept invitation
+                      </.button>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
             </div>
 
             <%!-- No active membership: 3-step purchase flow --%>
@@ -844,6 +931,38 @@ defmodule YscWeb.UserSettingsLive do
                 <p class="text-zinc-500 mt-1">
                   Access exclusive events, cabin access, and all membership benefits.
                 </p>
+              </div>
+
+              <div :if={@pending_family_invites != []} class="mb-6">
+                <h3 class="text-sm font-semibold text-zinc-900">
+                  Pending Family Invitations
+                </h3>
+                <p class="text-xs text-zinc-500 mt-1">
+                  You have been invited to join a family membership. Accepting an invitation will
+                  link your account to the inviter's membership.
+                </p>
+                <div class="mt-3 space-y-2">
+                  <%= for invite <- @pending_family_invites do %>
+                    <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                      <div class="text-sm">
+                        <p class="font-medium text-zinc-900">
+                          Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
+                        </p>
+                        <p class="text-xs text-zinc-500">
+                          Sent to {@user.email}
+                        </p>
+                      </div>
+                      <.button
+                        phx-click="accept-family-invite"
+                        phx-value-token={invite.token}
+                        phx-disable-with="Accepting..."
+                        class="text-xs"
+                      >
+                        Accept invitation
+                      </.button>
+                    </div>
+                  <% end %>
+                </div>
               </div>
 
               <div
@@ -1124,6 +1243,49 @@ defmodule YscWeb.UserSettingsLive do
                   primary_user={@primary_user}
                   is_sub_account={@is_sub_account}
                 />
+
+                <.link
+                  :if={@active_plan_type == :family}
+                  navigate={~p"/users/settings/family"}
+                  class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                >
+                  <.icon name="hero-user-group" class="w-4 h-4" />
+                  Add family members to your membership
+                </.link>
+
+                <div
+                  :if={@pending_family_invites != []}
+                  class="mt-6 border-t border-zinc-100 pt-4"
+                >
+                  <h3 class="text-sm font-semibold text-zinc-900">
+                    Pending Family Invitations
+                  </h3>
+                  <p class="text-xs text-zinc-500 mt-1">
+                    You have been invited to join a family membership. Accepting will link your account to the inviter's membership.
+                  </p>
+                  <div class="mt-3 space-y-2">
+                    <%= for invite <- @pending_family_invites do %>
+                      <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                        <div class="text-sm">
+                          <p class="font-medium text-zinc-900">
+                            Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
+                          </p>
+                          <p class="text-xs text-zinc-500">
+                            Sent to {@user.email}
+                          </p>
+                        </div>
+                        <.button
+                          phx-click="accept-family-invite"
+                          phx-value-token={invite.token}
+                          phx-disable-with="Accepting..."
+                          class="text-xs"
+                        >
+                          Accept invitation
+                        </.button>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
 
                 <div
                   :if={@scheduled_downgrade_info}
@@ -2087,6 +2249,9 @@ defmodule YscWeb.UserSettingsLive do
     profile_changeset = Accounts.change_user_profile(user)
     notification_changeset = Accounts.change_notification_preferences(user)
 
+    pending_family_invites =
+      FamilyInvites.list_pending_invites_for_email(user.email)
+
     # Base socket assigns that don't require expensive queries
     socket =
       socket
@@ -2126,6 +2291,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:email_form, to_form(email_changeset))
       |> assign(:profile_form, to_form(profile_changeset))
       |> assign(:notification_form, to_form(notification_changeset))
+      |> assign(:pending_family_invites, pending_family_invites)
       # Address form with placeholder - will be populated when connected
       |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
       |> assign(
@@ -3551,6 +3717,117 @@ defmodule YscWeb.UserSettingsLive do
     handle_retry_invoice_payment(socket, invoice_id)
   end
 
+  def handle_event("leave-family-membership", _params, socket) do
+    user = socket.assigns.user
+
+    case Accounts.leave_family_membership(user) do
+      {:ok, _updated_user} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "You have left the family membership. You can purchase your own membership or join another family from this page.",
+           title: "Membership"
+         )
+         |> redirect(to: ~p"/users/membership")}
+
+      {:error, :not_sub_account} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "You are not linked to a family membership.",
+           title: "Membership"
+         )}
+
+      {:error, %Ecto.Changeset{}} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not leave the family membership. Please try again.",
+           title: "Membership"
+         )}
+    end
+  end
+
+  def handle_event("accept-family-invite", %{"token" => token}, socket) do
+    user = socket.assigns.user
+
+    case FamilyInvites.link_existing_user(token, user) do
+      {:ok, updated_user} ->
+        MembershipCache.invalidate_user(user.id)
+
+        socket =
+          socket
+          |> assign(:user, updated_user)
+          |> assign(:is_sub_account, true)
+          |> assign(:primary_user, Accounts.get_primary_user(updated_user))
+          |> reload_membership_data()
+          |> assign(
+            :pending_family_invites,
+            FamilyInvites.list_pending_invites_for_email(updated_user.email)
+          )
+
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :info,
+           "Invitation accepted. Your account is now linked to the family membership.",
+           title: "Membership"
+         )}
+
+      {:error, :invite_not_found} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Invitation not found.",
+           title: "Membership"
+         )}
+
+      {:error, :invite_expired_or_used} ->
+        {:noreply,
+         socket
+         |> assign(
+           :pending_family_invites,
+           FamilyInvites.list_pending_invites_for_email(user.email)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This invitation has expired or has already been used.",
+           title: "Membership"
+         )}
+
+      {:error, :email_mismatch} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "This invitation was sent to a different email address.",
+           title: "Membership"
+         )}
+
+      {:error, :already_linked_to_family} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "You can only be linked to one family membership at a time. Leave your current family membership first if you want to join another (use \"Leave family membership\" below).",
+           title: "Membership"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not accept this invitation. Please try again.",
+           title: "Membership"
+         )}
+    end
+  end
+
   def handle_event("cancel-membership", _params, socket) do
     user = socket.assigns.user
 
@@ -3814,11 +4091,15 @@ defmodule YscWeb.UserSettingsLive do
         membership -> Subscriptions.get_scheduled_downgrade_info(membership)
       end
 
+    pending_family_invites =
+      FamilyInvites.list_pending_invites_for_email(user.email)
+
     socket
     |> assign(:user, user)
     |> assign(:current_membership, current_membership)
     |> assign(:active_plan_type, active_plan)
     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
+    |> assign(:pending_family_invites, pending_family_invites)
     |> assign(:change_membership_button, false)
     |> assign(:membership_change_info, nil)
     |> assign(

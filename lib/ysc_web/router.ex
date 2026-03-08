@@ -286,6 +286,7 @@ defmodule YscWeb.Router do
     pipe_through [:browser]
 
     delete "/users/log-out", UserSessionController, :delete
+    post "/users/log-out", UserSessionController, :delete_with_redirect
 
     live_session :current_user,
       on_mount: [
@@ -297,6 +298,11 @@ defmodule YscWeb.Router do
       live "/users/confirm/:token", UserConfirmationLive, :edit
       live "/users/confirm", UserConfirmationInstructionsLive, :new
       live "/family-invite/:token/accept", FamilyInviteAcceptanceLive, :index
+
+      live "/family-invite/:token/logout-required",
+           FamilyInviteLogoutRequiredLive,
+           :index
+
       live "/payment/success", PaymentSuccessLive, :index
     end
   end
@@ -328,6 +334,9 @@ defmodule YscWeb.Router do
 
       # User management
       live "/users", AdminUsersLive, :index
+
+      # Membership monitoring
+      live "/memberships", AdminMembershipsLive, :index
       live "/users/:id", AdminUsersLive, :edit
       live "/users/:id/review", AdminUsersLive, :review
       live "/users/:id/details", AdminUserDetailsLive, :profile

@@ -43,7 +43,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         family_member_name: "Jane",
         primary_user_name: "#{user.first_name} #{user.last_name}",
         invite_url: "https://example.com/invite/abc123",
-        expires_in_days: 7
+        expires_in_days: 7,
+        invite_button_text: "Accept Invitation"
       }
 
       html = FamilyInvite.render(assigns)
@@ -61,7 +62,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         family_member_name: nil,
         primary_user_name: "John Doe",
         invite_url: "https://example.com/invite/abc123",
-        expires_in_days: 7
+        expires_in_days: 7,
+        invite_button_text: "Create account and join membership"
       }
 
       html = FamilyInvite.render(assigns)

@@ -21,6 +21,7 @@ defmodule Ysc.Accounts.FamilyInvite do
     field :token, :string
     field :expires_at, :utc_datetime
     field :accepted_at, :utc_datetime
+    field :relationship, FamilyMemberType
 
     belongs_to :primary_user, User, foreign_key: :primary_user_id
     belongs_to :created_by_user, User, foreign_key: :created_by_user_id
@@ -41,7 +42,13 @@ defmodule Ysc.Accounts.FamilyInvite do
   """
   def changeset(invite, attrs) do
     invite
-    |> cast(attrs, [:email, :token, :primary_user_id, :created_by_user_id])
+    |> cast(attrs, [
+      :email,
+      :token,
+      :primary_user_id,
+      :created_by_user_id,
+      :relationship
+    ])
     |> validate_required([
       :email,
       :token,

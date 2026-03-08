@@ -54,7 +54,10 @@ defmodule YscWeb.FamilyManagementLive do
       invites = FamilyInvites.list_invites(user)
 
       invite_form =
-        to_form(%{"email" => "", "family_member_id" => ""}, as: "invite")
+        to_form(
+          %{"email" => "", "family_member_id" => "", "relationship" => "child"},
+          as: "invite"
+        )
 
       {:ok,
        socket
@@ -81,6 +84,7 @@ defmodule YscWeb.FamilyManagementLive do
       %{}
       |> Map.put("email", invite_params["email"] || "")
       |> Map.put("family_member_id", invite_params["family_member_id"] || "")
+      |> Map.put("relationship", invite_params["relationship"] || "child")
       |> to_form(as: "invite")
 
     {:noreply, assign(socket, invite_form: changeset)}
@@ -91,19 +95,37 @@ defmodule YscWeb.FamilyManagementLive do
     email = invite_params["email"]
     family_member_id = invite_params["family_member_id"]
 
-    # If a family member is selected, include it in the invite
+    relationship =
+      case invite_params["relationship"] do
+        "spouse" -> :spouse
+        _ -> :child
+      end
+
+    opts = [relationship: relationship]
+
     opts =
       if family_member_id && family_member_id != "",
-        do: [family_member_id: family_member_id],
-        else: []
+        do: Keyword.put(opts, :family_member_id, family_member_id),
+        else: opts
 
     case FamilyInvites.create_invite(user, email, opts) do
       {:ok, _invite} ->
         invites = FamilyInvites.list_invites(user)
 
+        cleared_form =
+          to_form(
+            %{
+              "email" => "",
+              "family_member_id" => family_member_id || "",
+              "relationship" => invite_params["relationship"] || "child"
+            },
+            as: "invite"
+          )
+
         {:noreply,
          socket
          |> assign(:invites, invites)
+         |> assign(:invite_form, cleared_form)
          |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}",
            title: "Family"
          )}
@@ -131,16 +153,16 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You have reached the maximum number of sub-accounts (10).",
+           "You have reached the maximum number of family members (10).",
            title: "Family"
          )}
 
-      {:error, :email_already_registered} ->
+      {:error, :max_spouses_reached} ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This email is already registered.",
+           "You can only have one spouse on your family membership.",
            title: "Family"
          )}
 
@@ -238,6 +260,40 @@ defmodule YscWeb.FamilyManagementLive do
          "Sub-account not found or unauthorized.",
          title: "Family"
        )}
+    end
+  end
+
+  def handle_event("leave-family-membership", _params, socket) do
+    user = socket.assigns.user
+
+    case Accounts.leave_family_membership(user) do
+      {:ok, _updated_user} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "You have left the family membership. You can purchase your own membership or join another family from your Membership page.",
+           title: "Family"
+         )
+         |> redirect(to: ~p"/users/membership")}
+
+      {:error, :not_sub_account} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "You are not linked to a family membership.",
+           title: "Family"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not leave the family membership. Please try again.",
+           title: "Family"
+         )}
     end
   end
 
@@ -409,6 +465,24 @@ defmodule YscWeb.FamilyManagementLive do
                   </div>
                 <% end %>
               </div>
+              <!-- Leave family membership -->
+              <div class="rounded border border-zinc-100 py-4 px-4 space-y-4 mt-6">
+                <h2 class="text-zinc-900 font-bold text-xl">
+                  Leave family membership
+                </h2>
+                <p class="text-sm text-zinc-600">
+                  You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
+                </p>
+                <.button
+                  phx-click="leave-family-membership"
+                  phx-disable-with="Leaving..."
+                  color="red"
+                  variant="outline"
+                  data-confirm="Are you sure you want to leave this family membership? You will lose access to membership benefits until you purchase your own membership or join another family."
+                >
+                  Leave family membership
+                </.button>
+              </div>
             <% else %>
               <!-- Primary User View: Full Management Interface -->
               <!-- Family Management Overview -->
@@ -439,6 +513,16 @@ defmodule YscWeb.FamilyManagementLive do
                   phx-submit="send_invite"
                   phx-change="validate_invite"
                 >
+                  <.input
+                    field={@invite_form[:relationship]}
+                    type="select"
+                    label="Relationship"
+                    options={[{"Spouse", "spouse"}, {"Child", "child"}]}
+                    disabled={not @can_send_invite}
+                  />
+                  <p class="text-sm text-zinc-600 mt-1">
+                    You can have up to 1 spouse and up to 9 children on your family membership.
+                  </p>
                   <% valid_family_members =
                     Enum.filter(@family_members, fn fm ->
                       not is_nil(fm.first_name) && String.trim(fm.first_name) != "" &&
@@ -502,6 +586,9 @@ defmodule YscWeb.FamilyManagementLive do
                             Email
                           </th>
                           <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            Relationship
+                          </th>
+                          <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -514,12 +601,15 @@ defmodule YscWeb.FamilyManagementLive do
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
                             {sub_account.email}
                           </td>
+                          <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
+                            {format_relationship(sub_account.family_relationship)}
+                          </td>
                           <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <button
                               phx-click="remove_sub_account"
                               phx-value-user_id={sub_account.id}
                               phx-disable-with="Removing..."
-                              data-confirm="Are you sure you want to remove this sub-account? They will lose access to membership benefits."
+                              data-confirm="Are you sure you want to remove this sub-account? They will lose access to membership benefits and receive an email notification."
                               class="text-red-600 hover:text-red-800"
                             >
                               Remove
@@ -533,10 +623,13 @@ defmodule YscWeb.FamilyManagementLive do
               </div>
               <!-- Pending Invitations Section -->
               <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
-                <h2 class="text-zinc-900 font-bold text-xl">Invitations</h2>
+                <h2 class="text-zinc-900 font-bold text-xl">Pending Invitations</h2>
+                <p class="text-sm text-zinc-600">
+                  Invitations awaiting acceptance. Includes invites to both new and existing users. You can cancel any pending invite.
+                </p>
 
-                <%= if @invites == [] do %>
-                  <p class="text-zinc-600 text-sm">No family invitations.</p>
+                <%= if Enum.filter(@invites, &is_nil(&1.accepted_at)) == [] do %>
+                  <p class="text-zinc-600 text-sm">No pending invitations.</p>
                 <% else %>
                   <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-zinc-200">
@@ -546,7 +639,7 @@ defmodule YscWeb.FamilyManagementLive do
                             Email
                           </th>
                           <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                            Status
+                            Relationship
                           </th>
                           <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                             Expires
@@ -557,38 +650,28 @@ defmodule YscWeb.FamilyManagementLive do
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-zinc-200">
-                        <tr :for={invite <- @invites}>
+                        <tr :for={
+                          invite <- Enum.filter(@invites, &is_nil(&1.accepted_at))
+                        }>
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                             {invite.email}
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
-                            <%= if invite.accepted_at do %>
-                              <span class="text-green-600">Accepted</span>
-                            <% else %>
-                              <span class="text-amber-600">Pending</span>
-                            <% end %>
+                            {format_relationship(invite.relationship)}
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
-                            <%= if invite.accepted_at do %>
-                              Accepted {Calendar.strftime(
-                                invite.accepted_at,
-                                "%B %d, %Y"
-                              )}
-                            <% else %>
-                              {Calendar.strftime(invite.expires_at, "%B %d, %Y")}
-                            <% end %>
+                            {Calendar.strftime(invite.expires_at, "%B %d, %Y")}
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <%= if is_nil(invite.accepted_at) do %>
-                              <button
-                                phx-click="revoke_invite"
-                                phx-value-invite_id={invite.id}
-                                phx-disable-with="Revoking..."
-                                class="text-red-600 hover:text-red-800"
-                              >
-                                Revoke
-                              </button>
-                            <% end %>
+                            <button
+                              phx-click="revoke_invite"
+                              phx-value-invite_id={invite.id}
+                              phx-disable-with="Cancelling..."
+                              data-confirm="Cancel this invite? The invitee will receive an email notification."
+                              class="text-red-600 hover:text-red-800"
+                            >
+                              Cancel invite
+                            </button>
                           </td>
                         </tr>
                       </tbody>
@@ -603,4 +686,11 @@ defmodule YscWeb.FamilyManagementLive do
     </div>
     """
   end
+
+  defp format_relationship(nil), do: "Child"
+  defp format_relationship("spouse"), do: "Spouse"
+  defp format_relationship("child"), do: "Child"
+  defp format_relationship(:spouse), do: "Spouse"
+  defp format_relationship(:child), do: "Child"
+  defp format_relationship(_), do: "Child"
 end

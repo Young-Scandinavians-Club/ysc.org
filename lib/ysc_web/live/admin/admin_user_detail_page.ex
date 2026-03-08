@@ -10,7 +10,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     statics: YscWeb.static_paths()
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.MembershipCache
+  alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Bookings
   alias Ysc.ExpenseReports
   alias Ysc.Ledgers
@@ -361,7 +361,13 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :orders} class="max-w-full py-8 px-2">
           <h2 class="text-xl font-semibold text-zinc-800 mb-4">Ticket Orders</h2>
-          <div class="w-full">
+          <div
+            :if={@ticket_orders_meta == nil}
+            class="text-zinc-400 text-sm py-8 text-center"
+          >
+            Loading...
+          </div>
+          <div :if={@ticket_orders_meta != nil} class="w-full">
             <Flop.Phoenix.table
               id="user_ticket_orders_list"
               items={@streams.ticket_orders}
@@ -463,7 +469,13 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :bookings} class="max-w-full py-8 px-2">
           <h2 class="text-xl font-semibold text-zinc-800 mb-4">Bookings</h2>
-          <div class="w-full">
+          <div
+            :if={@bookings_meta == nil}
+            class="text-zinc-400 text-sm py-8 text-center"
+          >
+            Loading...
+          </div>
+          <div :if={@bookings_meta != nil} class="w-full">
             <Flop.Phoenix.table
               id="user_bookings_list"
               items={@streams.bookings}
@@ -878,6 +890,46 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :membership} class="max-w-lg py-8 px-2">
           <div class="space-y-6">
+            <%!-- Sub-account: membership via primary user --%>
+            <div
+              :if={@primary_user != nil}
+              class="border border-zinc-200 rounded-lg p-6"
+            >
+              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+                Membership via Primary Account
+              </h3>
+              <p class="text-sm text-zinc-500 mb-4">
+                This user shares membership benefits through their primary account holder's plan.
+              </p>
+              <div class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg">
+                <.user_avatar_image
+                  email={@primary_user.email}
+                  user_id={@primary_user.id}
+                  country={@primary_user.most_connected_country}
+                  class="w-10 h-10 rounded-full"
+                />
+                <div class="flex-1">
+                  <div class="font-semibold text-zinc-900">
+                    {@primary_user.first_name} {@primary_user.last_name}
+                  </div>
+                  <div class="text-sm text-zinc-600">{@primary_user.email}</div>
+                  <%= if @selected_user.family_relationship do %>
+                    <.badge type="sky" class="mt-1 text-xs">
+                      {format_family_relationship(
+                        @selected_user.family_relationship
+                      )}
+                    </.badge>
+                  <% end %>
+                </div>
+                <.link
+                  navigate={~p"/admin/users/#{@primary_user.id}/details/membership"}
+                  class="text-sm text-blue-600 hover:underline shrink-0"
+                >
+                  View membership
+                </.link>
+              </div>
+            </div>
+
             <div
               :if={@has_lifetime_membership}
               class="bg-blue-50 border border-blue-200 rounded-lg p-4"
@@ -909,7 +961,10 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
 
             <div
-              :if={@active_subscription == nil && !@has_lifetime_membership}
+              :if={
+                @active_subscription == nil && !@has_lifetime_membership &&
+                  @primary_user == nil
+              }
               class="space-y-4"
             >
               <div class="bg-zinc-50 border border-zinc-200 rounded-lg p-4">
@@ -1565,34 +1620,35 @@ defmodule YscWeb.AdminUserDetailsLive do
           </div>
         </div>
 
-        <div :if={@live_action == :family} class="max-w-full py-8 px-2">
-          <h2 class="text-xl font-semibold text-zinc-800 mb-4">Family Members</h2>
-
+        <div :if={@live_action == :family} class="max-w-lg py-8 px-2">
           <div class="space-y-6">
-            <!-- Primary User (Parent Account) -->
-            <div :if={@primary_user} class="border border-zinc-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
-                Primary Account
+            <%!-- Associated Users (unified for both primary and sub-account views) --%>
+            <div class="border border-zinc-200 rounded-lg p-6">
+              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+                Associated Users
               </h3>
+              <p class="text-sm text-zinc-500 mb-4">
+                Users linked to this membership. Family and lifetime members can have additional users (spouse, children) who share membership benefits.
+              </p>
               <div class="space-y-3">
-                <.link
-                  navigate={~p"/admin/users/#{@primary_user.id}/details"}
-                  class="block p-4 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
-                >
-                  <div class="flex items-center gap-4">
+                <%!-- Primary user row --%>
+                <%= if @primary_user do %>
+                  <.link
+                    navigate={~p"/admin/users/#{@primary_user.id}/details"}
+                    class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
+                  >
                     <.user_avatar_image
                       email={@primary_user.email}
                       user_id={@primary_user.id}
                       country={@primary_user.most_connected_country}
-                      class="w-12 h-12 rounded-full"
+                      class="w-10 h-10 rounded-full"
                     />
                     <div class="flex-1">
-                      <div class="font-semibold text-zinc-900">
-                        {"#{@primary_user.first_name} #{@primary_user.last_name}"}
-                      </div>
-                      <div class="text-sm text-zinc-600">
-                        {@primary_user.email}
-                      </div>
+                      <span class="font-semibold text-zinc-900">
+                        {@primary_user.first_name} {@primary_user.last_name}
+                      </span>
+                      <span class="text-zinc-500 text-sm ml-2">(Primary)</span>
+                      <div class="text-sm text-zinc-600">{@primary_user.email}</div>
                       <%= if @primary_user.phone_number do %>
                         <div class="text-sm text-zinc-500">
                           {Ysc.Extensions.PhoneNumber.format_for_display(
@@ -1604,54 +1660,209 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <.badge type={user_state_to_badge_type(@primary_user.state)}>
                       {user_state_to_readable(@primary_user.state)}
                     </.badge>
-                  </div>
-                </.link>
-              </div>
-            </div>
-            <!-- Sub Accounts -->
-            <div
-              :if={length(@sub_accounts) > 0}
-              class="border border-zinc-200 rounded-lg p-6"
-            >
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
-                Sub Accounts ({length(@sub_accounts)})
-              </h3>
-              <div class="space-y-3">
-                <.link
-                  :for={sub_account <- @sub_accounts}
-                  navigate={~p"/admin/users/#{sub_account.id}/details"}
-                  class="block p-4 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
-                >
-                  <div class="flex items-center gap-4">
+                  </.link>
+                <% else %>
+                  <div class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg">
                     <.user_avatar_image
-                      email={sub_account.email}
-                      user_id={sub_account.id}
-                      country={sub_account.most_connected_country}
-                      class="w-12 h-12 rounded-full"
+                      email={@selected_user.email}
+                      user_id={@selected_user.id}
+                      country={@selected_user.most_connected_country}
+                      class="w-10 h-10 rounded-full"
                     />
                     <div class="flex-1">
-                      <div class="font-semibold text-zinc-900">
-                        {"#{sub_account.first_name} #{sub_account.last_name}"}
-                      </div>
+                      <span class="font-semibold text-zinc-900">
+                        {@selected_user.first_name} {@selected_user.last_name}
+                      </span>
+                      <span class="text-zinc-500 text-sm ml-2">(Primary)</span>
                       <div class="text-sm text-zinc-600">
-                        {sub_account.email}
+                        {@selected_user.email}
                       </div>
-                      <%= if sub_account.phone_number do %>
-                        <div class="text-sm text-zinc-500">
-                          {Ysc.Extensions.PhoneNumber.format_for_display(
-                            sub_account.phone_number
-                          ) || sub_account.phone_number}
-                        </div>
-                      <% end %>
                     </div>
-                    <.badge type={user_state_to_badge_type(sub_account.state)}>
-                      {user_state_to_readable(sub_account.state)}
-                    </.badge>
                   </div>
-                </.link>
+                <% end %>
+                <%!-- Sub-accounts (children/spouse) --%>
+                <%= for sub_account <- @sub_accounts do %>
+                  <div class="flex items-center justify-between gap-4 p-4 bg-zinc-50 rounded-lg">
+                    <div class="flex items-center gap-4 flex-1">
+                      <.user_avatar_image
+                        email={sub_account.email}
+                        user_id={sub_account.id}
+                        country={sub_account.most_connected_country}
+                        class="w-10 h-10 rounded-full"
+                      />
+                      <div>
+                        <span class="font-semibold text-zinc-900">
+                          {sub_account.first_name} {sub_account.last_name}
+                        </span>
+                        <.badge type="sky" class="ml-2 text-xs">
+                          {format_family_relationship(
+                            sub_account.family_relationship
+                          )}
+                        </.badge>
+                        <div class="text-sm text-zinc-600">{sub_account.email}</div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <.link
+                        navigate={~p"/admin/users/#{sub_account.id}/details"}
+                        class="text-sm text-blue-600 hover:underline"
+                      >
+                        View
+                      </.link>
+                      <button
+                        phx-click="admin_remove_family_user"
+                        phx-value-user_id={sub_account.id}
+                        phx-disable-with="Removing..."
+                        data-confirm="Remove this user from the family membership? They will lose access to membership benefits and receive an email notification."
+                        class="text-sm text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+              <%!-- Pending invites --%>
+              <div
+                :if={@can_manage_family && @pending_invites != []}
+                class="mt-6 pt-6 border-t border-zinc-200"
+              >
+                <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+                  Pending invites
+                </h4>
+                <div class="space-y-2">
+                  <%= for invite <- @pending_invites do %>
+                    <div class="flex items-center justify-between gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div>
+                        <span class="text-sm font-medium text-zinc-900">
+                          {invite.email}
+                        </span>
+                        <.badge type="sky" class="ml-2 text-xs">
+                          {format_family_relationship(invite.relationship)}
+                        </.badge>
+                        <span class="text-xs text-zinc-500 ml-2">
+                          Expires {Calendar.strftime(invite.expires_at, "%b %d, %Y")}
+                        </span>
+                      </div>
+                      <button
+                        phx-click="admin_cancel_family_invite"
+                        phx-value-invite_id={invite.id}
+                        phx-disable-with="Cancelling..."
+                        data-confirm="Cancel this invite? The invitee will receive an email notification."
+                        class="text-sm text-red-600 hover:underline"
+                      >
+                        Cancel invite
+                      </button>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+              <%!-- Add user form --%>
+              <div
+                :if={@can_manage_family}
+                class="mt-6 pt-6 border-t border-zinc-200"
+              >
+                <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+                  Add user to membership
+                </h4>
+                <p class="text-xs text-zinc-500 mb-3">
+                  Search by email. Link an existing user or invite a new one.
+                </p>
+                <form
+                  phx-change="search_add_family_user"
+                  phx-debounce="200"
+                  class="space-y-3"
+                >
+                  <div class="relative">
+                    <input
+                      type="text"
+                      name="query"
+                      value={@add_family_user_search}
+                      placeholder="Search by email..."
+                      autocomplete="off"
+                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-0"
+                    />
+                    <div
+                      :if={@add_family_user_search != ""}
+                      class="absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg overflow-hidden"
+                      phx-click-away="clear_add_family_user_search"
+                    >
+                      <%= for user <- @add_family_user_results do %>
+                        <button
+                          type="button"
+                          phx-click="admin_link_family_user"
+                          phx-value-user_id={user.id}
+                          phx-value-relationship={@add_family_user_relationship}
+                          phx-disable-with="Linking..."
+                          class="w-full px-3 py-2.5 text-left hover:bg-zinc-50 flex items-center gap-2 border-b border-zinc-100 last:border-b-0"
+                        >
+                          <.icon
+                            name="hero-user-plus"
+                            class="w-4 h-4 text-blue-600 shrink-0"
+                          />
+                          <div>
+                            <span class="text-sm font-medium text-zinc-900">
+                              {user.first_name} {user.last_name}
+                            </span>
+                            <span class="text-xs text-zinc-500 ml-1">
+                              ({user.email})
+                            </span>
+                            <span class="text-xs text-blue-600 ml-1">
+                              — Link directly
+                            </span>
+                          </div>
+                        </button>
+                      <% end %>
+                      <button
+                        :if={@add_family_user_results == []}
+                        type="button"
+                        phx-click="admin_invite_family_user"
+                        phx-value-email={@add_family_user_search}
+                        phx-value-relationship={@add_family_user_relationship}
+                        phx-disable-with="Sending invite..."
+                        class="w-full px-3 py-2.5 text-left hover:bg-zinc-50 flex items-center gap-2"
+                      >
+                        <.icon
+                          name="hero-envelope"
+                          class="w-4 h-4 text-amber-600 shrink-0"
+                        />
+                        <div>
+                          <span class="text-sm font-medium text-zinc-900">
+                            Invite {@add_family_user_search}
+                          </span>
+                          <span class="text-xs text-amber-600 ml-1">
+                            — New user will receive email
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-zinc-700 mb-1">
+                      Relationship
+                    </label>
+                    <select
+                      name="relationship"
+                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-0"
+                    >
+                      <option
+                        value="child"
+                        selected={@add_family_user_relationship == "child"}
+                      >
+                        Child
+                      </option>
+                      <option
+                        value="spouse"
+                        selected={@add_family_user_relationship == "spouse"}
+                      >
+                        Spouse
+                      </option>
+                    </select>
+                  </div>
+                </form>
               </div>
             </div>
-            <!-- Family Members (Non-User Entities) -->
+            <%!-- Family Members (non-user entities) --%>
             <div
               :if={length(@family_members) > 0}
               class="border border-zinc-200 rounded-lg p-6"
@@ -1665,16 +1876,16 @@ defmodule YscWeb.AdminUserDetailsLive do
                   class="p-4 bg-zinc-50 rounded-lg"
                 >
                   <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span class="text-blue-600 font-semibold text-lg">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <span class="text-blue-600 font-semibold">
                         {String.first(family_member.first_name)}
                       </span>
                     </div>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
-                        <div class="font-semibold text-zinc-900">
+                        <span class="font-semibold text-zinc-900">
                           {"#{family_member.first_name} #{family_member.last_name}"}
-                        </div>
+                        </span>
                         <.badge type="sky" class="text-xs">
                           {String.capitalize("#{family_member.type}")}
                         </.badge>
@@ -1692,15 +1903,15 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </div>
               </div>
             </div>
-            <!-- Empty State -->
+            <%!-- Empty state: no sub-accounts and no family members --%>
             <div
               :if={
-                !@primary_user && length(@sub_accounts) == 0 &&
-                  length(@family_members) == 0
+                @sub_accounts == [] && length(@family_members) == 0 &&
+                  !@primary_user
               }
-              class="text-center py-12 border border-zinc-200 rounded-lg"
+              class="mt-4 text-center py-8 border border-zinc-200 rounded-lg"
             >
-              <p class="text-zinc-500">No family members found for this user.</p>
+              <p class="text-zinc-500">No family members linked yet.</p>
             </div>
           </div>
         </div>
@@ -1807,10 +2018,9 @@ defmodule YscWeb.AdminUserDetailsLive do
     """
   end
 
-  def mount(%{"id" => id} = params, _session, socket) do
+  def mount(%{"id" => id} = _params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    # Timezone from browser for date inputs (date of birth max = today in user TZ)
     connect_params = get_connect_params(socket) || %{}
     timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
 
@@ -1828,146 +2038,146 @@ defmodule YscWeb.AdminUserDetailsLive do
         :sub_accounts
       ])
 
-    # Note: We don't pre-create billing_address here. cast_assoc will handle creating new records when billing_address is nil
-
-    application =
-      try do
-        Accounts.get_signup_application_from_user_id!(id, current_user, [
-          :reviewed_by
-        ])
-      rescue
-        Ecto.NoResultsError -> nil
-      end
-
     user_changeset =
       Accounts.User.update_user_with_address_changeset(selected_user, %{})
 
     user_form = to_form(user_changeset, as: "user")
-
-    # Extract original data after form is created to ensure consistent formatting
     original_form_data = extract_form_data(user_form)
 
-    # Load active subscription
-    active_subscription = Subscriptions.get_active_subscription(selected_user)
-
-    # Preload subscription items if subscription exists
-    active_subscription =
-      if active_subscription do
-        Repo.preload(active_subscription, :subscription_items)
-      else
-        nil
-      end
-
-    # Load subscription payments if subscription exists
-    subscription_payments =
-      if active_subscription do
-        Ledgers.get_payments_for_subscription(active_subscription.id)
-      else
-        []
-      end
-
-    # Fetch scheduled downgrade info from Stripe (if subscription has a schedule)
-    scheduled_downgrade_info =
-      if active_subscription do
-        Subscriptions.get_scheduled_downgrade_info(active_subscription)
-      else
-        nil
-      end
-
-    # Check for lifetime membership
-    has_lifetime = Accounts.has_lifetime_membership?(selected_user)
-
-    # Check if current user is treasurer
     is_treasurer =
       current_user.board_position == :treasurer && current_user.state == :active
 
-    # Load bank accounts if treasurer
-    bank_accounts =
-      if is_treasurer,
-        do: ExpenseReports.list_bank_accounts(selected_user),
-        else: []
+    socket =
+      socket
+      |> assign(:user_id, id)
+      |> assign(:first_name, selected_user.first_name)
+      |> assign(:last_name, selected_user.last_name)
+      |> assign(:role, selected_user.role)
+      |> assign(:page_title, "Users")
+      |> assign(:active_page, :members)
+      |> assign(:selected_user, selected_user)
+      |> assign(:selected_user_application, nil)
+      |> assign(:active_subscription, nil)
+      |> assign(:subscription_payments, [])
+      |> assign(:scheduled_downgrade_info, nil)
+      |> assign(:has_lifetime_membership, false)
+      |> assign(
+        :membership_form,
+        to_form(membership_changeset(%{period_end_date: nil}), as: "membership")
+      )
+      |> assign(
+        :membership_type_form,
+        to_form(membership_type_changeset(%{membership_type: nil}),
+          as: "membership_type"
+        )
+      )
+      |> assign(
+        :lifetime_form,
+        to_form(
+          lifetime_membership_changeset(%{
+            has_lifetime: false,
+            awarded_at: DateTime.utc_now()
+          }),
+          as: "lifetime"
+        )
+      )
+      |> assign(
+        :create_paid_membership_form,
+        to_form(create_paid_membership_changeset(%{plan_id: "single"}),
+          as: "create_paid_membership"
+        )
+      )
+      |> assign(:ticket_orders_meta, nil)
+      |> assign(:bookings_meta, nil)
+      |> assign(:notifications, [])
+      |> assign(:selected_notification, nil)
+      |> assign(:panel_width, nil)
+      |> assign(:is_treasurer, is_treasurer)
+      |> assign(:bank_accounts, [])
+      |> assign(:unsealed_account_id, nil)
+      |> assign(:unsealed_account, nil)
+      |> assign(:original_form_data, original_form_data)
+      |> assign(:timezone, timezone)
+      |> assign(:today_max, today_max)
+      |> assign(:primary_user, nil)
+      |> assign(:sub_accounts, [])
+      |> assign(:family_members, [])
+      |> assign(:pending_invites, [])
+      |> assign(:can_manage_family, false)
+      |> assign(:add_family_user_search, "")
+      |> assign(:add_family_user_results, [])
+      |> assign(:add_family_user_relationship, "child")
+      |> assign(:user_notes, [])
+      |> assign(:rejection_notes, [])
+      |> assign(
+        :note_form,
+        to_form(note_changeset(%{category: "general"}), as: "note")
+      )
+      |> assign(form: user_form)
 
-    # Create membership form changeset
-    membership_changeset =
-      %{
-        period_end_date:
-          active_subscription && active_subscription.current_period_end
-      }
-      |> membership_changeset()
+    socket =
+      if connected?(socket) do
+        [sub_result, has_lifetime, application] =
+          Task.await_many(
+            [
+              Task.async(fn -> fetch_subscription_data(selected_user) end),
+              Task.async(fn ->
+                Accounts.has_lifetime_membership?(selected_user)
+              end),
+              Task.async(fn -> fetch_application(id, current_user) end)
+            ],
+            :infinity
+          )
 
-    # Create lifetime membership form changeset
-    lifetime_changeset =
-      %{
-        has_lifetime: has_lifetime,
-        awarded_at:
-          selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
-      }
-      |> lifetime_membership_changeset()
+        {active_subscription, subscription_payments} = sub_result
 
-    # Create membership type form changeset
-    current_membership_type =
-      get_current_membership_type_from_subscription(active_subscription)
+        membership_cs =
+          %{
+            period_end_date:
+              active_subscription && active_subscription.current_period_end
+          }
+          |> membership_changeset()
 
-    membership_type_changeset =
-      %{
-        membership_type: current_membership_type
-      }
-      |> membership_type_changeset()
+        lifetime_cs =
+          %{
+            has_lifetime: has_lifetime,
+            awarded_at:
+              selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
+          }
+          |> lifetime_membership_changeset()
 
-    create_paid_membership_changeset =
-      %{plan_id: "single"}
-      |> create_paid_membership_changeset()
+        membership_type_cs =
+          %{
+            membership_type:
+              get_current_membership_type_from_subscription(active_subscription)
+          }
+          |> membership_type_changeset()
 
-    {:ok,
-     socket
-     |> assign(:user_id, id)
-     |> assign(:first_name, selected_user.first_name)
-     |> assign(:last_name, selected_user.last_name)
-     |> assign(:role, selected_user.role)
-     |> assign(:page_title, "Users")
-     |> assign(:active_page, :members)
-     |> assign(:selected_user, selected_user)
-     |> assign(:selected_user_application, application)
-     |> assign(:active_subscription, active_subscription)
-     |> assign(:subscription_payments, subscription_payments)
-     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
-     |> assign(:has_lifetime_membership, has_lifetime)
-     |> assign(
-       :membership_form,
-       to_form(membership_changeset, as: "membership")
-     )
-     |> assign(
-       :membership_type_form,
-       to_form(membership_type_changeset, as: "membership_type")
-     )
-     |> assign(:lifetime_form, to_form(lifetime_changeset, as: "lifetime"))
-     |> assign(
-       :create_paid_membership_form,
-       to_form(create_paid_membership_changeset, as: "create_paid_membership")
-     )
-     |> assign(:ticket_orders_meta, nil)
-     |> assign(:bookings_meta, nil)
-     |> assign(:notifications, [])
-     |> assign(:selected_notification, nil)
-     |> assign(:panel_width, nil)
-     |> assign(:is_treasurer, is_treasurer)
-     |> assign(:bank_accounts, bank_accounts)
-     |> assign(:unsealed_account_id, nil)
-     |> assign(:unsealed_account, nil)
-     |> assign(:original_form_data, original_form_data)
-     |> assign(:timezone, timezone)
-     |> assign(:today_max, today_max)
-     |> assign(:primary_user, nil)
-     |> assign(:sub_accounts, [])
-     |> assign(:family_members, [])
-     |> assign(:user_notes, [])
-     |> assign(:rejection_notes, [])
-     |> assign(
-       :note_form,
-       to_form(note_changeset(%{category: "general"}), as: "note")
-     )
-     |> assign(:list_params, Map.drop(params, ["id"]))
-     |> assign(form: user_form)}
+        socket =
+          socket
+          |> assign(:selected_user_application, application)
+          |> assign(:active_subscription, active_subscription)
+          |> assign(:subscription_payments, subscription_payments)
+          |> assign(:has_lifetime_membership, has_lifetime)
+          |> assign(:membership_form, to_form(membership_cs, as: "membership"))
+          |> assign(
+            :membership_type_form,
+            to_form(membership_type_cs, as: "membership_type")
+          )
+          |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
+
+        if active_subscription do
+          start_async(socket, :load_downgrade_info, fn ->
+            Subscriptions.get_scheduled_downgrade_info(active_subscription)
+          end)
+        else
+          socket
+        end
+      else
+        socket
+      end
+
+    {:ok, socket}
   end
 
   def handle_params(params, _uri, socket) do
@@ -1978,30 +2188,155 @@ defmodule YscWeb.AdminUserDetailsLive do
     socket =
       case socket.assigns.live_action do
         :orders ->
-          load_ticket_orders(socket, user_id, params)
+          socket
+          |> stream(:ticket_orders, [], reset: true)
+          |> start_async(:load_ticket_orders, fn ->
+            Tickets.list_user_ticket_orders_paginated(user_id, params)
+          end)
 
         :bookings ->
-          load_bookings(socket, user_id, params)
+          socket
+          |> stream(:bookings, [], reset: true)
+          |> start_async(:load_bookings, fn ->
+            Bookings.list_user_bookings_paginated(user_id, params)
+          end)
 
         :notifications ->
-          load_notifications(socket, user_id)
+          start_async(socket, :load_notifications, fn ->
+            Messages.list_user_messages(user_id, limit: 100)
+          end)
 
         :bank_accounts ->
-          load_bank_accounts(socket, user_id)
+          if socket.assigns.is_treasurer do
+            start_async(socket, :load_bank_accounts, fn ->
+              user = Accounts.get_user!(user_id)
+              ExpenseReports.list_bank_accounts(user)
+            end)
+          else
+            socket
+          end
 
         :family ->
-          load_family_data(socket, user_id)
+          selected_user = socket.assigns.selected_user
+
+          start_async(socket, :load_family, fn ->
+            fetch_family_assigns(selected_user)
+          end)
+
+        :membership ->
+          selected_user = socket.assigns.selected_user
+
+          start_async(socket, :load_family, fn ->
+            fetch_family_assigns(selected_user)
+          end)
 
         :logs ->
-          load_user_notes(socket, user_id)
+          start_async(socket, :load_user_notes, fn ->
+            Accounts.list_user_notes(user_id)
+          end)
 
         :application ->
-          load_rejection_notes(socket, user_id)
+          start_async(socket, :load_rejection_notes, fn ->
+            Accounts.list_user_notes_by_category(user_id, :rejection)
+          end)
 
         _ ->
           socket
       end
 
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_downgrade_info, {:ok, info}, socket) do
+    {:noreply, assign(socket, :scheduled_downgrade_info, info)}
+  end
+
+  def handle_async(:load_downgrade_info, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_ticket_orders, {:ok, {:ok, {orders, meta}}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:ticket_orders_meta, meta)
+     |> stream(:ticket_orders, orders, reset: true)}
+  end
+
+  def handle_async(:load_ticket_orders, {:ok, {:error, meta}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:ticket_orders_meta, meta)
+     |> stream(:ticket_orders, [], reset: true)}
+  end
+
+  def handle_async(:load_ticket_orders, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_bookings, {:ok, {:ok, {bookings, meta}}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:bookings_meta, meta)
+     |> stream(:bookings, bookings, reset: true)}
+  end
+
+  def handle_async(:load_bookings, {:ok, {:error, meta}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:bookings_meta, meta)
+     |> stream(:bookings, [], reset: true)}
+  end
+
+  def handle_async(:load_bookings, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_notifications, {:ok, notifications}, socket) do
+    {:noreply, assign(socket, :notifications, notifications)}
+  end
+
+  def handle_async(:load_notifications, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_bank_accounts, {:ok, bank_accounts}, socket) do
+    {:noreply, assign(socket, :bank_accounts, bank_accounts)}
+  end
+
+  def handle_async(:load_bank_accounts, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_family, {:ok, assigns}, socket) do
+    {:noreply,
+     socket
+     |> assign(:primary_user, assigns.primary_user)
+     |> assign(:sub_accounts, assigns.sub_accounts)
+     |> assign(:family_members, assigns.family_members)
+     |> assign(:pending_invites, assigns.pending_invites)
+     |> assign(:can_manage_family, assigns.can_manage_family)
+     |> assign(:add_family_user_search, "")
+     |> assign(:add_family_user_results, [])
+     |> assign(:add_family_user_relationship, "child")}
+  end
+
+  def handle_async(:load_family, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_user_notes, {:ok, notes}, socket) do
+    {:noreply, assign(socket, :user_notes, notes)}
+  end
+
+  def handle_async(:load_user_notes, {:exit, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_rejection_notes, {:ok, notes}, socket) do
+    {:noreply, assign(socket, :rejection_notes, notes)}
+  end
+
+  def handle_async(:load_rejection_notes, {:exit, _}, socket) do
     {:noreply, socket}
   end
 
@@ -2699,6 +3034,301 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
+  def handle_event(
+        "search_add_family_user",
+        %{"query" => query, "relationship" => relationship},
+        socket
+      ) do
+    query = String.trim(query)
+    relationship = relationship || "child"
+
+    results =
+      if String.length(query) >= 2 do
+        primary_user =
+          socket.assigns.primary_user || socket.assigns.selected_user
+
+        sub_ids = [
+          primary_user.id | Enum.map(socket.assigns.sub_accounts, & &1.id)
+        ]
+
+        Accounts.search_users(query, limit: 8)
+        |> Enum.reject(fn u -> u.id in sub_ids end)
+      else
+        []
+      end
+
+    {:noreply,
+     socket
+     |> assign(:add_family_user_search, query)
+     |> assign(:add_family_user_results, results)
+     |> assign(:add_family_user_relationship, relationship)}
+  end
+
+  def handle_event("search_add_family_user", %{"query" => query}, socket) do
+    handle_event(
+      "search_add_family_user",
+      %{"query" => query, "relationship" => "child"},
+      socket
+    )
+  end
+
+  def handle_event("clear_add_family_user_search", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:add_family_user_search, "")
+     |> assign(:add_family_user_results, [])}
+  end
+
+  def handle_event(
+        "admin_link_family_user",
+        %{"user_id" => user_id} = params,
+        socket
+      ) do
+    primary_user = socket.assigns.primary_user || socket.assigns.selected_user
+    relationship = Map.get(params, "relationship", "child")
+    rel = if relationship == "spouse", do: :spouse, else: :child
+
+    user_to_link =
+      try do
+        Accounts.get_user!(user_id)
+      rescue
+        Ecto.NoResultsError -> nil
+      end
+
+    if is_nil(user_to_link) do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:error, "User not found.", title: "Link User")}
+    else
+      case Accounts.admin_link_user_to_family(primary_user, user_to_link,
+             relationship: rel
+           ) do
+        {:ok, _user} ->
+          {:noreply,
+           socket
+           |> then(&load_family_data_for_membership(&1, primary_user.id))
+           |> assign(:add_family_user_search, "")
+           |> assign(:add_family_user_results, [])
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "#{user_to_link.first_name} #{user_to_link.last_name} has been added to the family membership.",
+             title: "Link User"
+           )}
+
+        {:error, :cannot_link_self} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Cannot link the primary user to themselves.",
+             title: "Link User"
+           )}
+
+        {:error, :already_linked_to_family} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "That user is already linked to another family membership.",
+             title: "Link User"
+           )}
+
+        {:error, :not_primary_user} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Primary user must not be a sub-account.",
+             title: "Link User"
+           )}
+
+        {:error, :primary_must_have_family_or_lifetime} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Primary user must have family or lifetime membership.",
+             title: "Link User"
+           )}
+
+        {:error, :max_spouses_reached} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Cannot add another spouse. Maximum 1 spouse per family.",
+             title: "Link User"
+           )}
+
+        {:error, :max_sub_accounts_reached} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Maximum number of family members (10) reached.",
+             title: "Link User"
+           )}
+
+        {:error, _} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "Failed to link user.",
+             title: "Link User"
+           )}
+      end
+    end
+  end
+
+  def handle_event(
+        "admin_invite_family_user",
+        %{"email" => email} = params,
+        socket
+      ) do
+    primary_user = socket.assigns.primary_user || socket.assigns.selected_user
+    email = String.trim(email)
+    relationship = Map.get(params, "relationship", "child")
+    rel = if relationship == "spouse", do: :spouse, else: :child
+
+    cond do
+      email == "" ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Please enter an email address.",
+           title: "Invite User"
+         )}
+
+      not String.match?(email, ~r/^[^\s]+@[^\s]+$/) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Please enter a valid email address.",
+           title: "Invite User"
+         )}
+
+      true ->
+        case FamilyInvites.create_invite(primary_user, email, relationship: rel) do
+          {:ok, _invite} ->
+            {:noreply,
+             socket
+             |> assign(:add_family_user_search, "")
+             |> assign(:add_family_user_results, [])
+             |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}.",
+               title: "Invite User"
+             )}
+
+          {:error, :pending_invite_exists} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "A pending invite already exists for that email.",
+               title: "Invite User"
+             )}
+
+          {:error, :max_spouses_reached} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Cannot add another spouse. Maximum 1 spouse per family.",
+               title: "Invite User"
+             )}
+
+          {:error, :max_sub_accounts_reached} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Maximum number of family members (10) reached.",
+               title: "Invite User"
+             )}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            msg = format_changeset_errors(changeset)
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Failed to send invite: #{msg}",
+               title: "Invite User"
+             )}
+
+          {:error, reason} when is_atom(reason) ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Failed to send invite.",
+               title: "Invite User"
+             )}
+        end
+    end
+  end
+
+  def handle_event(
+        "admin_cancel_family_invite",
+        %{"invite_id" => invite_id},
+        socket
+      ) do
+    primary_user = socket.assigns.primary_user || socket.assigns.selected_user
+
+    case FamilyInvites.revoke_invite(invite_id, primary_user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Invite cancelled. Invitee will be notified by email.",
+           title: "Cancel Invite"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Invite not found.",
+           title: "Cancel Invite"
+         )}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Not authorized to cancel this invite.",
+           title: "Cancel Invite"
+         )}
+
+      {:error, :already_accepted} ->
+        {:noreply,
+         socket
+         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> YscWeb.Flash.put_toast(:error, "Invite was already accepted.",
+           title: "Cancel Invite"
+         )}
+    end
+  end
+
+  def handle_event("admin_remove_family_user", %{"user_id" => user_id}, socket) do
+    primary_user = socket.assigns.primary_user || socket.assigns.selected_user
+    sub_account = Accounts.get_user!(user_id)
+
+    case Accounts.remove_sub_account(sub_account, primary_user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> YscWeb.Flash.put_toast(:info, "User removed from membership.",
+           title: "Remove User"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Failed to remove user.",
+           title: "Remove User"
+         )}
+    end
+  end
+
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     form = to_form(changeset, as: "user")
 
@@ -2732,6 +3362,11 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
+  defp format_family_relationship(nil), do: "Child"
+  defp format_family_relationship("spouse"), do: "Spouse"
+  defp format_family_relationship("child"), do: "Child"
+  defp format_family_relationship(_), do: "Child"
+
   defp format_datetime_for_display(nil), do: "N/A"
 
   defp format_datetime_for_display(%DateTime{} = datetime) do
@@ -2754,14 +3389,171 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp format_datetime_local(nil), do: ""
   defp format_datetime_local(datetime) when is_binary(datetime), do: datetime
 
-  defp load_bank_accounts(socket, user_id) do
-    if socket.assigns.is_treasurer do
-      selected_user = Accounts.get_user!(user_id)
-      bank_accounts = ExpenseReports.list_bank_accounts(selected_user)
-      assign(socket, :bank_accounts, bank_accounts)
-    else
-      socket
+  defp fetch_subscription_data(user) do
+    case Subscriptions.get_active_subscription(user) do
+      nil ->
+        {nil, []}
+
+      sub ->
+        sub = Repo.preload(sub, :subscription_items)
+        payments = Ledgers.get_payments_for_subscription(sub.id)
+        {sub, payments}
     end
+  end
+
+  defp fetch_application(user_id, current_user) do
+    try do
+      Accounts.get_signup_application_from_user_id!(user_id, current_user, [
+        :reviewed_by
+      ])
+    rescue
+      Ecto.NoResultsError -> nil
+    end
+  end
+
+  defp fetch_family_assigns(selected_user) do
+    if Accounts.primary_user?(selected_user) and
+         (Accounts.has_lifetime_membership?(selected_user) or
+            has_family_subscription?(selected_user)) do
+      user =
+        Accounts.get_user!(selected_user.id, [
+          :family_members,
+          :primary_user,
+          :sub_accounts
+        ])
+
+      primary_user = Accounts.get_primary_user(user)
+
+      sub_accounts =
+        if primary_user, do: [], else: Accounts.get_sub_accounts(user)
+
+      family_members =
+        if primary_user do
+          case Accounts.get_user!(primary_user.id, [:family_members]).family_members do
+            %Ecto.Association.NotLoaded{} -> []
+            members when is_list(members) -> members
+            _ -> []
+          end
+        else
+          case user.family_members do
+            %Ecto.Association.NotLoaded{} -> []
+            members when is_list(members) -> members
+            _ -> []
+          end
+        end
+
+      primary_for_invites = primary_user || user
+
+      pending_invites =
+        FamilyInvites.list_invites(primary_for_invites)
+        |> Enum.filter(&is_nil(&1.accepted_at))
+
+      %{
+        primary_user: primary_user,
+        sub_accounts: sub_accounts,
+        family_members: family_members,
+        pending_invites: pending_invites,
+        can_manage_family: true
+      }
+    else
+      primary_user = Accounts.get_primary_user(selected_user)
+
+      if primary_user do
+        primary_with_data =
+          Accounts.get_user!(primary_user.id, [:family_members, :sub_accounts])
+
+        all_sub_accounts = Accounts.get_sub_accounts(primary_with_data)
+        siblings = Enum.reject(all_sub_accounts, &(&1.id == selected_user.id))
+
+        family_members =
+          case primary_with_data.family_members do
+            %Ecto.Association.NotLoaded{} -> []
+            members when is_list(members) -> members
+            _ -> []
+          end
+
+        pending_invites =
+          FamilyInvites.list_invites(primary_user)
+          |> Enum.filter(&is_nil(&1.accepted_at))
+
+        can_manage =
+          Accounts.has_lifetime_membership?(primary_with_data) or
+            has_family_subscription?(primary_with_data)
+
+        %{
+          primary_user: primary_user,
+          sub_accounts: siblings,
+          family_members: family_members,
+          pending_invites: pending_invites,
+          can_manage_family: can_manage
+        }
+      else
+        %{
+          primary_user: nil,
+          sub_accounts: [],
+          family_members: [],
+          pending_invites: [],
+          can_manage_family: false
+        }
+      end
+    end
+  end
+
+  defp load_family_data_for_membership(socket, user_id) do
+    selected_user = socket.assigns.selected_user
+
+    # Only load family group if this user is a primary with family/lifetime
+    if Accounts.primary_user?(selected_user) and
+         (Accounts.has_lifetime_membership?(selected_user) or
+            has_family_subscription?(selected_user)) do
+      socket
+      |> load_family_data(user_id)
+      |> assign(:can_manage_family, true)
+      |> assign(:add_family_user_search, "")
+      |> assign(:add_family_user_results, [])
+      |> assign(:add_family_user_relationship, "child")
+    else
+      primary_user = Accounts.get_primary_user(selected_user)
+
+      socket
+      |> assign(:primary_user, primary_user)
+      |> assign(:can_manage_family, false)
+      |> assign(:add_family_user_search, "")
+      |> assign(:add_family_user_results, [])
+      |> assign(:add_family_user_relationship, "child")
+    end
+  end
+
+  defp has_family_subscription?(user) do
+    subs =
+      case user.subscriptions do
+        %Ecto.Association.NotLoaded{} ->
+          Ysc.Subscriptions.list_subscriptions(user)
+
+        s when is_list(s) ->
+          s
+
+        _ ->
+          []
+      end
+
+    subs
+    |> Enum.filter(&Ysc.Subscriptions.valid?/1)
+    |> Enum.any?(fn s ->
+      s = Repo.preload(s, :subscription_items)
+
+      case s.subscription_items do
+        [item | _] ->
+          plans = Application.get_env(:ysc, :membership_plans, [])
+
+          Enum.any?(plans, fn p ->
+            p.stripe_price_id == item.stripe_price_id and p.id == :family
+          end)
+
+        _ ->
+          false
+      end
+    end)
   end
 
   defp load_family_data(socket, user_id) do
@@ -2808,20 +3600,17 @@ defmodule YscWeb.AdminUserDetailsLive do
         end
       end
 
+    primary_for_invites = primary_user || selected_user
+
+    pending_invites =
+      FamilyInvites.list_invites(primary_for_invites)
+      |> Enum.filter(&is_nil(&1.accepted_at))
+
     socket
     |> assign(:primary_user, primary_user)
     |> assign(:sub_accounts, sub_accounts)
     |> assign(:family_members, family_members)
-  end
-
-  defp load_user_notes(socket, user_id) do
-    user_notes = Accounts.list_user_notes(user_id)
-    assign(socket, :user_notes, user_notes)
-  end
-
-  defp load_rejection_notes(socket, user_id) do
-    rejection_notes = Accounts.list_user_notes_by_category(user_id, :rejection)
-    assign(socket, :rejection_notes, rejection_notes)
+    |> assign(:pending_invites, pending_invites)
   end
 
   defp user_state_to_badge_type(:active), do: "green"
@@ -2902,39 +3691,6 @@ defmodule YscWeb.AdminUserDetailsLive do
       value = Atom.to_string(plan.id)
       {label, value}
     end)
-  end
-
-  defp load_ticket_orders(socket, user_id, params) do
-    case Tickets.list_user_ticket_orders_paginated(user_id, params) do
-      {:ok, {orders, meta}} ->
-        socket
-        |> assign(:ticket_orders_meta, meta)
-        |> stream(:ticket_orders, orders, reset: true)
-
-      {:error, meta} ->
-        socket
-        |> assign(:ticket_orders_meta, meta)
-        |> stream(:ticket_orders, [], reset: true)
-    end
-  end
-
-  defp load_bookings(socket, user_id, params) do
-    case Bookings.list_user_bookings_paginated(user_id, params) do
-      {:ok, {bookings, meta}} ->
-        socket
-        |> assign(:bookings_meta, meta)
-        |> stream(:bookings, bookings, reset: true)
-
-      {:error, meta} ->
-        socket
-        |> assign(:bookings_meta, meta)
-        |> stream(:bookings, [], reset: true)
-    end
-  end
-
-  defp load_notifications(socket, user_id) do
-    notifications = Messages.list_user_messages(user_id, limit: 100)
-    assign(socket, :notifications, notifications)
   end
 
   defp extract_form_data(form) do

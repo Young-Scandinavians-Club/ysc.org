@@ -215,17 +215,34 @@ defmodule YscWeb.UserSessionController do
     end
   end
 
-  def delete(conn, _params) do
-    # Log sign-out event if user is authenticated
+  def delete_with_redirect(conn, params) do
+    # Same as delete but supports redirect_to for post-logout navigation (e.g. to registration with invite)
     if current_user = conn.assigns[:current_user] do
       AuthService.log_logout(current_user, conn)
     end
+
+    redirect_to = params["redirect_to"] || conn.query_params["redirect_to"]
 
     conn
     |> YscWeb.Flash.put_toast(:info, "Signed out successfully.",
       title: "Logout"
     )
-    |> UserAuth.log_out_user()
+    |> UserAuth.log_out_user(redirect_to)
+  end
+
+  def delete(conn, params) do
+    # Log sign-out event if user is authenticated
+    if current_user = conn.assigns[:current_user] do
+      AuthService.log_logout(current_user, conn)
+    end
+
+    redirect_to = params["redirect_to"] || conn.query_params["redirect_to"]
+
+    conn
+    |> YscWeb.Flash.put_toast(:info, "Signed out successfully.",
+      title: "Logout"
+    )
+    |> UserAuth.log_out_user(redirect_to)
   end
 
   def reset_attempts(conn, _params) do
