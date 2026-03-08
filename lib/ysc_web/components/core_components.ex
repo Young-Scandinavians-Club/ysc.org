@@ -2073,7 +2073,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <img
       :if={!@no_circle}
-      class={@class}
+      class={["object-contain", @class]}
       src="/images/ysc_logo.png"
       alt="The Young Scandinavian Club Logo"
       width={@width}
@@ -2082,7 +2082,7 @@ defmodule YscWeb.CoreComponents do
     />
     <img
       :if={@no_circle}
-      class={@class}
+      class={["object-contain", @class]}
       src="/images/ysc_logo_no_circle.svg"
       alt="The Young Scandinavian Club Logo"
       width={@width}
