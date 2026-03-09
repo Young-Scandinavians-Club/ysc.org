@@ -220,9 +220,10 @@ defmodule Ysc.Bookings.BookingLockerTest do
         {:ok, %Booking{} = booking} ->
           booking = Ysc.Repo.preload(booking, :rooms)
           assert length(booking.rooms) == 2
-          # 2 rooms * 2 guests * 2 nights * $100 = $800
-          expected_min = Money.new(:USD, 2 * 2 * nights * 100 - 1)
-          assert Money.compare(booking.total_price, expected_min) in [:gt, :eq]
+          # Price is per-person-per-night, independent of room count:
+          # 2 guests * 2 nights * $100 = $400 (NOT multiplied by 2 rooms)
+          expected = Money.new(:USD, guests * nights * 100)
+          assert Money.compare(booking.total_price, expected) == :eq
           assert booking.booking_mode == :room
           assert booking.status == :hold
 

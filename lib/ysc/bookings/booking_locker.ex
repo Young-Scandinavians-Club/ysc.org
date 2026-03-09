@@ -678,11 +678,6 @@ defmodule Ysc.Bookings.BookingLocker do
 
       {:error, _reason} ->
         {nil, nil}
-
-      nil ->
-        # Handle case where calculate_multi_room_price returns nil
-        # (e.g., when no pricing rules are found)
-        {nil, nil}
     end
   end
 
@@ -713,7 +708,12 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  # Helper to calculate price for multiple rooms
+  # Helper to calculate price for multiple rooms.
+  # Per-person-per-night pricing is independent of room count — only total guest
+  # count matters. We therefore calculate once using the first room, which matches
+  # exactly what the checkout page charges. The old approach called
+  # calculate_booking_price once per room with the full guests_count and summed
+  # the results, incorrectly multiplying the price by the number of rooms.
   defp calculate_multi_room_price(
          rooms,
          checkin_date,
@@ -723,127 +723,33 @@ defmodule Ysc.Bookings.BookingLocker do
        ) do
     nights = Date.diff(checkout_date, checkin_date)
     property = rooms |> List.first() |> Map.get(:property)
+    first_room = List.first(rooms)
 
-    results =
-      Enum.reduce(rooms, {:ok, Money.new(:USD, 0), []}, fn room, acc ->
-        process_room_pricing(
-          acc,
-          room,
-          property,
-          checkin_date,
-          checkout_date,
-          guests_count,
-          children_count,
-          nights
-        )
-      end)
-
-    case results do
-      {:ok, _total, _items} ->
-        build_combined_pricing_items(
-          results,
-          nights,
-          guests_count,
-          children_count
-        )
-
-      error ->
-        error
-    end
-  end
-
-  defp process_room_pricing(
-         acc,
-         room,
-         property,
-         checkin_date,
-         checkout_date,
-         guests_count,
-         children_count,
-         nights
-       ) do
-    case acc do
-      {:ok, total_acc, items_acc} ->
-        actual_total_acc = normalize_money_struct(total_acc)
-
-        case Bookings.calculate_booking_price(
-               property,
-               checkin_date,
-               checkout_date,
-               :room,
-               room_id: room.id,
-               guests_count: guests_count,
-               children_count: children_count
-             ) do
-          {:ok, room_total, breakdown} ->
-            add_room_to_pricing(
-              actual_total_acc,
-              items_acc,
+    case Bookings.calculate_booking_price(
+           property,
+           checkin_date,
+           checkout_date,
+           :room,
+           room_id: first_room.id,
+           guests_count: guests_count,
+           children_count: children_count
+         ) do
+      {:ok, total, breakdown} ->
+        room_items =
+          Enum.map(rooms, fn room ->
+            build_room_pricing_items(
               room,
-              room_total,
-              breakdown,
+              total,
               nights,
               guests_count,
-              children_count
+              children_count,
+              breakdown
             )
+          end)
 
-          error ->
-            error
-        end
-
-      error ->
-        error
-    end
-  end
-
-  defp normalize_money_struct(total_acc) do
-    case total_acc do
-      {:ok, money} when is_struct(money, Money) -> money
-      %Money{} = money -> money
-      _ -> Money.new(:USD, 0)
-    end
-  end
-
-  defp add_room_to_pricing(
-         actual_total_acc,
-         items_acc,
-         room,
-         room_total,
-         breakdown,
-         nights,
-         guests_count,
-         children_count
-       ) do
-    room_items =
-      build_room_pricing_items(
-        room,
-        room_total,
-        nights,
-        guests_count,
-        children_count,
-        breakdown
-      )
-
-    case Money.add(actual_total_acc, room_total) do
-      {:ok, new_total} ->
-        {:ok, new_total, [room_items | items_acc]}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp build_combined_pricing_items(
-         results,
-         nights,
-         guests_count,
-         children_count
-       ) do
-    case results do
-      {:ok, total, items} ->
         combined_items = %{
           "type" => "room",
-          "rooms" => Enum.reverse(items),
+          "rooms" => room_items,
           "nights" => nights,
           "guests_count" => guests_count,
           "children_count" => children_count,
@@ -855,8 +761,8 @@ defmodule Ysc.Bookings.BookingLocker do
 
         {:ok, total, combined_items}
 
-      error ->
-        error
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

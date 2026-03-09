@@ -95,7 +95,7 @@ defmodule Ysc.Application do
   end
 
   defp maybe_start_geo_ip_loader do
-    if Ysc.GeoIP.configured?() do
+    if Ysc.GeoIP.configured?() and Code.ensure_loaded?(:locus) do
       :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
     end
   end
