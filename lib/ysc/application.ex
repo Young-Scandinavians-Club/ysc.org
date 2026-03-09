@@ -14,6 +14,8 @@ defmodule Ysc.Application do
       config: %{metadata: [:file, :line]}
     })
 
+    maybe_start_geo_ip_loader()
+
     # Add shutdown task for sandbox environment only
     base_children = [
       # Start the Vault for encryption
@@ -90,6 +92,12 @@ defmodule Ysc.Application do
   defp sandbox_environment? do
     System.get_env("ENVIRONMENT", "development") |> String.downcase() ==
       "sandbox"
+  end
+
+  defp maybe_start_geo_ip_loader do
+    if Ysc.GeoIP.configured?() do
+      :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
+    end
   end
 
   # Shuts down the application if no active HTTP connections are found.

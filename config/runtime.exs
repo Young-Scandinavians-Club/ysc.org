@@ -452,3 +452,13 @@ if config_env() == :prod do
     # Optional: QuickBooks Customer ID for payments with no user (avoids :user_not_found on payouts)
     system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")
 end
+
+# ## MaxMind GeoIP configuration
+#
+# Set MAXMIND_LICENSE_KEY to enable IP geolocation for auth events.
+# When not set, geolocation is silently disabled and auth events will
+# be stored without location data.
+if license_key = System.get_env("MAXMIND_LICENSE_KEY") do
+  config :locus,
+    license_key: license_key
+end

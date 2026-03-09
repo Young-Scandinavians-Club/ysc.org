@@ -757,4 +757,98 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_data.metadata.auth_method == "email_password"
     end
   end
+
+  describe "geo-IP enrichment in extract_auth_data/2" do
+    test "returns auth data without geo fields when GeoIP is not configured" do
+      # GeoIP.configured?/0 returns false in the test env (no MAXMIND_LICENSE_KEY).
+      # The resulting map must still be valid and contain all expected base keys.
+      conn = mock_conn()
+      auth_data = AuthService.extract_auth_data(conn)
+
+      assert Map.has_key?(auth_data, :ip_address)
+      assert Map.has_key?(auth_data, :user_agent)
+      assert Map.has_key?(auth_data, :metadata)
+      # No geo keys should be injected when GeoIP is disabled.
+      refute Map.has_key?(auth_data, :country)
+      refute Map.has_key?(auth_data, :region)
+      refute Map.has_key?(auth_data, :city)
+      refute Map.has_key?(auth_data, :latitude)
+      refute Map.has_key?(auth_data, :longitude)
+    end
+
+    test "auth event is persisted without geo fields when GeoIP is not configured" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+
+      # Fields are nullable – they should be nil, not missing, after the DB round-trip.
+      assert auth_event.country == nil
+      assert auth_event.region == nil
+      assert auth_event.city == nil
+      assert auth_event.latitude == nil
+      assert auth_event.longitude == nil
+    end
+
+    test "auth event preserves all other fields correctly when geo is absent" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+
+      assert auth_event.event_type == "login_success"
+      assert auth_event.success == true
+      assert auth_event.ip_address == "203.0.113.1"
+      assert auth_event.user_id == user.id
+    end
+
+    test "geo fields in auth_event accept valid country/region/city values" do
+      # Verify the changeset accepts geo data (as locus would provide).
+      attrs = %{
+        event_type: "login_success",
+        success: true,
+        ip_address: "93.184.216.34",
+        country: "US",
+        region: "Massachusetts",
+        city: "Norwell",
+        latitude: 42.16,
+        longitude: -70.81
+      }
+
+      user = user_fixture()
+
+      changeset =
+        Ysc.Accounts.AuthEvent.login_success_changeset(user, attrs)
+
+      assert changeset.valid?
+      assert Ecto.Changeset.get_field(changeset, :country) == "US"
+      assert Ecto.Changeset.get_field(changeset, :region) == "Massachusetts"
+      assert Ecto.Changeset.get_field(changeset, :city) == "Norwell"
+      assert Ecto.Changeset.get_field(changeset, :latitude) == 42.16
+      assert Ecto.Changeset.get_field(changeset, :longitude) == -70.81
+    end
+
+    test "geo fields are persisted when provided directly" do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        Ysc.Accounts.AuthEvent.login_success_changeset(user, %{
+          event_type: "login_success",
+          success: true,
+          ip_address: "93.184.216.34",
+          country: "US",
+          region: "Massachusetts",
+          city: "Norwell",
+          latitude: 42.16,
+          longitude: -70.81
+        })
+        |> Repo.insert()
+
+      assert auth_event.country == "US"
+      assert auth_event.region == "Massachusetts"
+      assert auth_event.city == "Norwell"
+      assert auth_event.latitude == 42.16
+      assert auth_event.longitude == -70.81
+    end
+  end
 end
