@@ -3,6 +3,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
   Email template for newsletter editions (curated: cover, intro, posts, events).
   """
   alias Ysc.Events
+  alias HtmlSanitizeEx
 
   use MjmlEEx,
     mjml_template: "templates/newsletter_edition.mjml.eex",
@@ -201,7 +202,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
   defp event_render_map(event) do
     %{
       title: event.title,
-      description: event.description,
+      description:
+        event.description && HtmlSanitizeEx.strip_tags(event.description),
       short_description: short_description(event.description),
       date_str: format_event_date(event),
       save_the_date: Map.get(event, :tickets_tbd, false),
@@ -218,7 +220,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
   defp short_description(""), do: nil
 
   defp short_description(desc) when is_binary(desc) do
-    desc = String.trim(desc)
+    desc = desc |> HtmlSanitizeEx.strip_tags() |> String.trim()
 
     if String.length(desc) <= 140,
       do: desc,

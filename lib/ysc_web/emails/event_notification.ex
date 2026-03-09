@@ -10,6 +10,7 @@ defmodule YscWeb.Emails.EventNotification do
 
   alias Ysc.Repo
   alias Ysc.Events.Event
+  alias HtmlSanitizeEx
 
   def get_template_name() do
     "event_notification"
@@ -113,7 +114,8 @@ defmodule YscWeb.Emails.EventNotification do
     event_map = %{
       id: event.id,
       title: event.title,
-      description: event.description,
+      description:
+        event.description && HtmlSanitizeEx.strip_tags(event.description),
       start_date: event.start_date,
       start_time: event.start_time,
       end_date: event.end_date,

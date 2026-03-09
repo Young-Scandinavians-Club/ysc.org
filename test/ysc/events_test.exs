@@ -1282,4 +1282,94 @@ defmodule Ysc.EventsTest do
       assert updated.partiful_link == nil
     end
   end
+
+  describe "event description HTML stripping" do
+    test "strips HTML tags from description on create", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "HTML Test Event",
+          description: "<div>We had <strong>great</strong> weather</div>",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert event.description == "We had great weather"
+    end
+
+    test "strips HTML tags from description on update", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "HTML Test Event",
+          description: "Plain description",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, updated} =
+        Events.update_event(event, %{
+          description:
+            "<p>Updated <em>description</em> with <a href=\"#\">a link</a></p>"
+        })
+
+      assert updated.description == "Updated description with a link"
+    end
+
+    test "preserves plain text description unchanged", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Plain Text Event",
+          description: "A simple plain text description",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert event.description == "A simple plain text description"
+    end
+
+    test "accepts nil description without error", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "No Description Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert event.description == nil
+    end
+
+    test "strips HTML entities and nested tags", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Nested HTML Event",
+          description:
+            "<div>We had stunning weather and a nice turnout for the 3rd annual Brewery Crawl. The Rake &amp; Admiral Maltings did a fine job.</div>",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      refute event.description =~ "<"
+      refute event.description =~ ">"
+      assert event.description =~ "Brewery Crawl"
+    end
+  end
 end
