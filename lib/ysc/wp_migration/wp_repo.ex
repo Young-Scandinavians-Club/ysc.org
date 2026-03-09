@@ -1,4 +1,5 @@
 defmodule Ysc.WpMigration.WpRepo do
+  @compile {:no_warn_undefined, Duckdbex}
   @moduledoc """
   Read-only access to WordPress backup data via DuckDB.
 
@@ -209,8 +210,7 @@ defmodule Ysc.WpMigration.WpRepo do
     placeholders =
       booking_ids
       |> Enum.with_index(1)
-      |> Enum.map(fn {_id, i} -> "$#{i}" end)
-      |> Enum.join(", ")
+      |> Enum.map_join(", ", fn {_id, i} -> "$#{i}" end)
 
     sql = """
     SELECT post_id, meta_key, meta_value
@@ -235,8 +235,7 @@ defmodule Ysc.WpMigration.WpRepo do
     placeholders =
       booking_ids
       |> Enum.with_index(1)
-      |> Enum.map(fn {_id, i} -> "$#{i}" end)
-      |> Enum.join(", ")
+      |> Enum.map_join(", ", fn {_id, i} -> "$#{i}" end)
 
     sql = """
     SELECT

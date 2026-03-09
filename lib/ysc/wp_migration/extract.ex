@@ -5,7 +5,7 @@ defmodule Ysc.WpMigration.Extract do
   """
 
   require Ysc.Logging
-  alias Ysc.WpMigration.{WpRepo, PhpDeserialize}
+  alias Ysc.WpMigration.{WpRepo, PhpDeserialize, HtmlTransformer}
 
   @doc """
   Runs the extract: opens the DuckDB file, writes users.json, applications.json,
@@ -462,9 +462,8 @@ defmodule Ysc.WpMigration.Extract do
   defp to_int(n) when is_integer(n), do: n
   defp to_int(s) when is_binary(s), do: String.to_integer(s)
 
-  defp extract_attachment_ids_from_content(_content) do
-    # TODO: parse HTML for wp-image-<id> or uploads URLs and extract attachment IDs
-    []
+  defp extract_attachment_ids_from_content(content) do
+    HtmlTransformer.extract_attachment_ids(content)
   end
 
   defp build_stripe_customer_lookup(repo) do

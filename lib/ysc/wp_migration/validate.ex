@@ -1,4 +1,5 @@
 defmodule Ysc.WpMigration.Validate do
+  @compile {:no_warn_undefined, Duckdbex}
   @moduledoc """
   Validates migration data counts across two phases:
 

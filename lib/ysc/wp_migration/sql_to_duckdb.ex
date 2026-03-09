@@ -1,4 +1,5 @@
 defmodule Ysc.WpMigration.SqlToDuckdb do
+  @compile {:no_warn_undefined, Duckdbex}
   @moduledoc """
   Streams a WordPress MySQL dump file and loads it directly into a persistent
   DuckDB database file — no intermediate CSV step.

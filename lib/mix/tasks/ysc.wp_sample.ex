@@ -1,4 +1,5 @@
 defmodule Mix.Tasks.Ysc.WpSample do
+  @compile {:no_warn_undefined, Duckdbex}
   @moduledoc """
   Prints sample rows from each migration entity for visual validation.
 

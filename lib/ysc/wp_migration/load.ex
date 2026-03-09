@@ -17,6 +17,7 @@ defmodule Ysc.WpMigration.Load do
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Payments
   alias YscWeb.Workers.ImageProcessor
+  alias Ysc.WpMigration.HtmlTransformer
 
   @doc """
   Runs the load. Reads export_dir (users.json, applications.json, posts.json, media/, stripe_customer_lookup.json)
@@ -32,16 +33,16 @@ defmodule Ysc.WpMigration.Load do
     dry_run = opts[:dry_run] || opts["dry_run"] || false
     upload_media = Keyword.get(opts, :upload_media, true)
 
-    if not export_dir do
-      {:error, "Missing :export_dir"}
-    else
+    if export_dir do
       export_dir = Path.expand(export_dir)
 
-      if not File.dir?(export_dir) do
-        {:error, "Export directory not found: #{export_dir}"}
-      else
+      if File.dir?(export_dir) do
         do_run(export_dir, dry_run, upload_media)
+      else
+        {:error, "Export directory not found: #{export_dir}"}
       end
+    else
+      {:error, "Missing :export_dir"}
     end
   end
 
@@ -202,9 +203,7 @@ defmodule Ysc.WpMigration.Load do
       user_id =
         user_map[row["wp_user_id"]] || (email && get_user_id_by_email(email))
 
-      if not user_id do
-        {:cont, {:ok, :done}}
-      else
+      if user_id do
         birth_date = parse_date(row["birth_date"])
 
         attrs = %{
@@ -247,6 +246,8 @@ defmodule Ysc.WpMigration.Load do
           {:ok, _} -> {:cont, {:ok, :done}}
           {:error, cs} -> {:halt, {:error, cs}}
         end
+      else
+        {:cont, {:ok, :done}}
       end
     end)
   end
@@ -325,7 +326,7 @@ defmodule Ysc.WpMigration.Load do
             )
 
           if existing do
-            {:cont, {:ok, Map.put(acc, att_id, existing.id)}}
+            {:cont, {:ok, Map.put(acc, att_id, existing)}}
           else
             key = "migration/#{att_id}/#{Path.basename(file_path)}"
 
@@ -348,7 +349,7 @@ defmodule Ysc.WpMigration.Load do
                   {:ok, img} ->
                     # Kick off image processing to generate optimized/thumbnail
                     ImageProcessor.new(%{id: img.id}) |> Oban.insert()
-                    {:cont, {:ok, Map.put(acc, att_id, img.id)}}
+                    {:cont, {:ok, Map.put(acc, att_id, img)}}
 
                   {:error, _} ->
                     {:cont, {:ok, acc}}
@@ -368,26 +369,38 @@ defmodule Ysc.WpMigration.Load do
       Repo.one(from u in User, where: u.role == ^:admin, limit: 1) ||
         Repo.one(User)
 
+    # Build url_map: wp_attachment_id → new S3 URL, for HTML transformation
+    url_map =
+      Map.new(image_map, fn {att_id, img} -> {att_id, img.raw_image_path} end)
+
     Enum.reduce_while(posts_data, {:ok, :done}, fn row, {:ok, _} ->
       author_id =
         user_map[row["wp_author_id"]] || (author_fallback && author_fallback.id)
 
       if not author_id, do: {:cont, {:ok, :done}}
 
+      featured_att_id = get_in(row, ["featured_image", "wp_attachment_id"])
+
       image_id =
-        row["wp_featured_attachment_id"] &&
-          image_map[row["wp_featured_attachment_id"]]
+        featured_att_id &&
+          (image_map_image_id(image_map, featured_att_id) ||
+             db_image_id_for_wp_attachment(featured_att_id))
 
       url_name = row["post_name"] || slugify(row["title"])
       published_on = parse_datetime(row["post_date"])
+
+      raw_body = HtmlTransformer.wp_to_trix(row["post_content"], url_map)
+      rendered_body = HtmlSanitizeEx.Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+      preview_text = generate_preview_text(rendered_body)
 
       attrs = %{
         user_id: author_id,
         state: "published",
         title: row["title"],
         url_name: url_name,
-        raw_body: row["post_content"],
-        rendered_body: row["post_content"],
+        raw_body: raw_body,
+        rendered_body: rendered_body,
+        preview_text: preview_text,
         published_on: published_on,
         image_id: image_id
       }
@@ -429,6 +442,40 @@ defmodule Ysc.WpMigration.Load do
         {:error, cs} -> {:halt, {:error, cs}}
       end
     end)
+  end
+
+  # Generates a plain-text preview from scrubbed HTML body.
+  # Strips all remaining tags, collapses whitespace, and trims to 200 characters.
+  defp generate_preview_text(nil), do: nil
+  defp generate_preview_text(""), do: nil
+
+  defp generate_preview_text(html) do
+    text =
+      html
+      |> HtmlSanitizeEx.strip_tags()
+      |> String.replace(~r/\s+/, " ")
+      |> String.trim()
+
+    if text == "", do: nil, else: String.slice(text, 0, 200)
+  end
+
+  # Returns the new Image id from the in-memory image_map (populated this run).
+  defp image_map_image_id(image_map, att_id) do
+    case image_map[att_id] do
+      %Image{id: id} -> id
+      _ -> nil
+    end
+  end
+
+  # Fallback DB lookup for the Image created in a previous migration run.
+  # Used when --no-upload-media is passed or when media was loaded separately.
+  defp db_image_id_for_wp_attachment(att_id) do
+    Repo.one(
+      from i in Image,
+        where: fragment("(upload_data->>'wp_attachment_id') = ?", ^att_id),
+        select: i.id,
+        limit: 1
+    )
   end
 
   defp slugify(s) when is_binary(s),

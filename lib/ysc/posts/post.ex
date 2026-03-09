@@ -93,6 +93,7 @@ defmodule Ysc.Posts.Post do
     ])
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
+    |> foreign_key_constraint(:image_id)
     |> maybe_validate_unique_url_name(opts)
   end
 
@@ -114,6 +115,7 @@ defmodule Ysc.Posts.Post do
     ])
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
+    |> foreign_key_constraint(:image_id)
     |> maybe_validate_unique_url_name(opts)
   end
 
