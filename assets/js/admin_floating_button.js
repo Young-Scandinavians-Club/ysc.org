@@ -56,11 +56,18 @@ const AdminFloatingButton = {
     this.handleMousemove = this.handleMousemove.bind(this);
     this.handleMouseup = this.handleMouseup.bind(this);
     this.handleClick = this.handleClick.bind(this);
+    this.handleTouchstart = this.handleTouchstart.bind(this);
+    this.handleTouchmove = this.handleTouchmove.bind(this);
+    this.handleTouchend = this.handleTouchend.bind(this);
 
     wrapper.addEventListener("mousedown", this.handleMousedown);
     document.addEventListener("mousemove", this.handleMousemove);
     document.addEventListener("mouseup", this.handleMouseup);
     link.addEventListener("click", this.handleClick, true);
+
+    wrapper.addEventListener("touchstart", this.handleTouchstart, { passive: true });
+    document.addEventListener("touchmove", this.handleTouchmove, { passive: false });
+    document.addEventListener("touchend", this.handleTouchend);
   },
 
   destroyed() {
@@ -68,9 +75,12 @@ const AdminFloatingButton = {
     const link = wrapper?.querySelector('a[href*="/admin"]');
     if (wrapper) {
       wrapper.removeEventListener("mousedown", this.handleMousedown);
+      wrapper.removeEventListener("touchstart", this.handleTouchstart);
     }
     document.removeEventListener("mousemove", this.handleMousemove);
     document.removeEventListener("mouseup", this.handleMouseup);
+    document.removeEventListener("touchmove", this.handleTouchmove);
+    document.removeEventListener("touchend", this.handleTouchend);
     if (link) {
       link.removeEventListener("click", this.handleClick, true);
     }
@@ -149,6 +159,76 @@ const AdminFloatingButton = {
       event.preventDefault();
       event.stopPropagation();
     }
+  },
+
+  handleTouchstart(event) {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const wrapper = this.el;
+    const rect = wrapper.getBoundingClientRect();
+    this.dragStart = {
+      x: touch.clientX,
+      y: touch.clientY,
+      offsetX: touch.clientX - rect.left,
+      offsetY: touch.clientY - rect.top,
+    };
+    this.isDragging = false;
+  },
+
+  handleTouchmove(event) {
+    if (this.dragStart == null || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const wrapper = this.el;
+    const dx = touch.clientX - this.dragStart.x;
+    const dy = touch.clientY - this.dragStart.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (!this.isDragging && distance >= DRAG_THRESHOLD_PX) {
+      this.isDragging = true;
+      wrapper.style.transition = "none";
+      wrapper.style.right = "auto";
+      wrapper.style.bottom = "auto";
+      wrapper.style.left = `${touch.clientX - this.dragStart.offsetX}px`;
+      wrapper.style.top = `${touch.clientY - this.dragStart.offsetY}px`;
+    }
+
+    if (this.isDragging) {
+      event.preventDefault();
+      wrapper.style.left = `${touch.clientX - this.dragStart.offsetX}px`;
+      wrapper.style.top = `${touch.clientY - this.dragStart.offsetY}px`;
+    }
+  },
+
+  handleTouchend(event) {
+    if (this.dragStart == null) return;
+    const wrapper = this.el;
+
+    if (this.isDragging) {
+      const changedTouch = event.changedTouches[0];
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const corner = cornerFromPoint(
+        changedTouch.clientX,
+        changedTouch.clientY,
+        viewportWidth,
+        viewportHeight
+      );
+      applyCorner(wrapper, corner);
+      saveCorner(corner);
+      wrapper.style.left = "";
+      wrapper.style.top = "";
+      wrapper.style.right = "";
+      wrapper.style.bottom = "";
+      wrapper.style.transition = "";
+      this.justDragged = true;
+      const self = this;
+      setTimeout(() => {
+        self.justDragged = false;
+      }, 300);
+    }
+
+    this.dragStart = null;
+    this.isDragging = false;
   },
 };
 
