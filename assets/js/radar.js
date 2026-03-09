@@ -8,6 +8,38 @@ export default RadarMap = {
             window.radarPublicKey = document.querySelector("meta[name='radar-public-key']")?.getAttribute("content");
         }
 
+        const elementID = this.el.getAttribute("id");
+
+        let existingMarker = undefined;
+        let locked = false;
+        let pendingMarker = null;
+        let map = null;
+
+        // Register handleEvent BEFORE async script load so we never miss the
+        // initial push_event("add-marker") that fires during component mount.
+        // If the map isn't ready yet we store the data in pendingMarker and
+        // apply it once the map "load" event fires.
+        this.handleEvent("add-marker", ({ lat, lon, locked: isLocked }) => {
+            locked = isLocked || false;
+
+            if (!map) {
+                // Map not initialised yet — store for later
+                pendingMarker = { lat, lon };
+                return;
+            }
+
+            if (locked) {
+                pendingMarker = { lat, lon };
+                addMarkerWithRetry();
+            } else {
+                setMarker(lat, lon);
+            }
+        });
+
+        this.handleEvent("position", () => {
+            if (map) map.fitToMarkers({ maxZoom: 14, padding: 80 });
+        });
+
         try {
             await loadScript("radar-js", "https://js.radar.com/v4.4.8/radar.min.js");
         } catch (e) {
@@ -18,11 +50,7 @@ export default RadarMap = {
         const radarKey = window.radarPublicKey || "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966";
         window.Radar.initialize(radarKey);
 
-        let existingMarker = undefined;
-        let locked = false;
-        let pendingMarker = null;
-        const elementID = this.el.getAttribute("id");
-        const map = Radar.ui.map({
+        map = Radar.ui.map({
             container: elementID,
         });
 
@@ -57,6 +85,23 @@ export default RadarMap = {
             }
         };
 
+        const addMarkerWithRetry = (attempts = 0) => {
+            if (attempts > 20) {
+                console.warn("Map marker retry limit reached. Marker may not be visible.");
+                return;
+            }
+
+            if (pendingMarker && isMapReady()) {
+                const success = setMarker(pendingMarker.lat, pendingMarker.lon);
+                if (success && verifyMarker(existingMarker)) {
+                    pendingMarker = null;
+                    return;
+                }
+            }
+
+            setTimeout(() => addMarkerWithRetry(attempts + 1), 500);
+        };
+
         map.on("load", () => {
             if (pendingMarker) {
                 const { lat, lon } = pendingMarker;
@@ -69,35 +114,6 @@ export default RadarMap = {
                 } else {
                     map.fitToMarkers({ maxZoom: 14, padding: 80 });
                 }
-            }
-        });
-
-        this.handleEvent("add-marker", ({ lat, lon, locked: isLocked }) => {
-            locked = isLocked || false;
-
-            if (locked) {
-                pendingMarker = { lat, lon };
-
-                const addMarkerWithRetry = (attempts = 0) => {
-                    if (attempts > 20) {
-                        console.warn("Map marker retry limit reached. Marker may not be visible.");
-                        return;
-                    }
-
-                    if (isMapReady()) {
-                        const success = setMarker(lat, lon);
-                        if (success && verifyMarker(existingMarker)) {
-                            pendingMarker = null;
-                            return;
-                        }
-                    }
-
-                    setTimeout(() => addMarkerWithRetry(attempts + 1), 500);
-                };
-
-                addMarkerWithRetry();
-            } else {
-                setMarker(lat, lon);
             }
         });
 
@@ -126,10 +142,6 @@ export default RadarMap = {
             } catch (error) {
                 console.error("Error creating marker on click:", error);
             }
-        });
-
-        this.handleEvent("position", () => {
-            map.fitToMarkers({ maxZoom: 14, padding: 80 });
         });
     },
 };
