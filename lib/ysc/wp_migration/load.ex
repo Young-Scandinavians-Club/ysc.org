@@ -11,7 +11,12 @@ defmodule Ysc.WpMigration.Load do
   alias Ysc.Media
   alias Ysc.Media.Image
   alias Ysc.Posts.Post
+  alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, Room, BookingGuest}
+  alias Ysc.Subscriptions
+  alias Ysc.Subscriptions.Subscription
+  alias Ysc.Payments
+  alias YscWeb.Workers.ImageProcessor
 
   @doc """
   Runs the load. Reads export_dir (users.json, applications.json, posts.json, media/, stripe_customer_lookup.json)
@@ -77,6 +82,8 @@ defmodule Ysc.WpMigration.Load do
       if stripe_data && stripe_data != [],
         do: load_stripe(stripe_data, user_map)
 
+      load_subscriptions(users_data, user_map)
+
       if bookings_data && bookings_data != [],
         do: load_bookings(bookings_data, user_map)
 
@@ -108,7 +115,25 @@ defmodule Ysc.WpMigration.Load do
 
       case Ysc.Accounts.get_user_by_email(email) do
         existing when not is_nil(existing) ->
-          {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
+          # Idempotent: update profile from export when re-running
+          update_attrs = %{
+            "first_name" =>
+              row["first_name"] || row["display_name"] || "Unknown",
+            "last_name" => row["last_name"] || "User",
+            "phone_number" => row["phone_number"],
+            "most_connected_country" =>
+              row["nordic_country_connected"] || row["Country"]
+          }
+
+          case existing
+               |> User.update_user_changeset(update_attrs)
+               |> Repo.update() do
+            {:ok, _} ->
+              {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
+
+            {:error, _} ->
+              {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
+          end
 
         nil ->
           state = map_account_status(row["account_status"])
@@ -180,27 +205,45 @@ defmodule Ysc.WpMigration.Load do
       if not user_id do
         {:cont, {:ok, :done}}
       else
-        if Repo.get_by(SignupApplication, user_id: user_id),
-          do: {:cont, {:ok, :done}}
-
         birth_date = parse_date(row["birth_date"])
 
         attrs = %{
           user_id: user_id,
           membership_type: (row["membership_type"] || "single") |> to_string(),
           birth_date: birth_date,
-          address: row["Address"],
-          city: row["City"],
-          region: row["State"],
-          postal_code: row["Zip code"],
-          country: row["Country"],
+          address: row["address"] || row["Address"],
+          city: row["city"] || row["City"],
+          region: row["region"] || row["State"],
+          postal_code: row["postal_code"] || row["Zip code"],
+          country: row["country"] || row["Country"],
           citizenship: row["citizenship"],
-          most_connected_nordic_country: row["nordic_country_connected"]
+          most_connected_nordic_country:
+            row["most_connected_nordic_country"] ||
+              row["nordic_country_connected"],
+          place_of_birth: row["place_of_birth"],
+          occupation: row["occupation"],
+          link_to_scandinavia: row["link_to_scandinavia"],
+          lived_in_scandinavia: row["lived_in_scandinavia"],
+          spoken_languages: row["spoken_languages"],
+          hear_about_the_club: row["hear_about_the_club"],
+          agreed_to_bylaws: row["agreed_to_bylaws"] || false,
+          membership_eligibility: row["membership_eligibility"] || []
         }
 
-        case %SignupApplication{}
-             |> SignupApplication.application_changeset(attrs)
-             |> Repo.insert() do
+        existing = Repo.get_by(SignupApplication, user_id: user_id)
+
+        result =
+          if existing do
+            existing
+            |> SignupApplication.application_changeset(attrs)
+            |> Repo.update()
+          else
+            %SignupApplication{}
+            |> SignupApplication.application_changeset(attrs)
+            |> Repo.insert()
+          end
+
+        case result do
           {:ok, _} -> {:cont, {:ok, :done}}
           {:error, cs} -> {:halt, {:error, cs}}
         end
@@ -273,25 +316,47 @@ defmodule Ysc.WpMigration.Load do
               do: File.read!(meta_path) |> Jason.decode!(),
               else: %{}
 
-          key = "migration/#{att_id}/#{Path.basename(file_path)}"
+          # Idempotent: use existing Image if we already loaded this attachment
+          existing =
+            Repo.one(
+              from i in Image,
+                where:
+                  fragment("(upload_data->>'wp_attachment_id') = ?", ^att_id)
+            )
 
-          case Media.upload_file_to_s3(file_path, key) do
-            %{body: %{location: location}} when is_binary(location) ->
-              attrs = %{
-                raw_image_path: URI.encode(location),
-                user_id: uploader.id,
-                title: meta["title"]
-              }
+          if existing do
+            {:cont, {:ok, Map.put(acc, att_id, existing.id)}}
+          else
+            key = "migration/#{att_id}/#{Path.basename(file_path)}"
 
-              case %Image{}
-                   |> Image.add_image_changeset(attrs)
-                   |> Repo.insert() do
-                {:ok, img} -> {:cont, {:ok, Map.put(acc, att_id, img.id)}}
-                {:error, _} -> {:cont, {:ok, acc}}
-              end
+            case Media.upload_file_to_s3(file_path, key) do
+              %{body: %{location: location}} when is_binary(location) ->
+                attrs = %{
+                  raw_image_path: URI.encode(location),
+                  user_id: uploader.id,
+                  title: meta["title"],
+                  alt_text: meta["alt_text"],
+                  upload_data: %{
+                    "wp_attachment_id" => att_id,
+                    "created" => meta["created"]
+                  }
+                }
 
-            _ ->
-              {:cont, {:ok, acc}}
+                case %Image{}
+                     |> Image.add_image_changeset(attrs)
+                     |> Repo.insert() do
+                  {:ok, img} ->
+                    # Kick off image processing to generate optimized/thumbnail
+                    ImageProcessor.new(%{id: img.id}) |> Oban.insert()
+                    {:cont, {:ok, Map.put(acc, att_id, img.id)}}
+
+                  {:error, _} ->
+                    {:cont, {:ok, acc}}
+                end
+
+              _ ->
+                {:cont, {:ok, acc}}
+            end
           end
         end
       end)
@@ -327,26 +392,41 @@ defmodule Ysc.WpMigration.Load do
         image_id: image_id
       }
 
-      case %Post{}
-           |> Post.new_post_changeset(attrs, validate_url_name: false)
-           |> Repo.insert() do
-        {:ok, _} ->
-          {:cont, {:ok, :done}}
+      existing = Repo.get_by(Post, url_name: url_name)
 
-        {:error, cs} ->
-          if Keyword.get(cs.errors, :url_name) do
-            attrs =
-              Map.put(attrs, :url_name, url_name <> "-" <> row["wp_post_id"])
+      result =
+        if existing do
+          existing
+          |> Post.update_post_changeset(attrs, validate_url_name: false)
+          |> Repo.update()
+        else
+          case %Post{}
+               |> Post.new_post_changeset(attrs, validate_url_name: false)
+               |> Repo.insert() do
+            {:error, cs} when is_list(cs.errors) ->
+              if Keyword.get(cs.errors, :url_name) do
+                attrs =
+                  Map.put(
+                    attrs,
+                    :url_name,
+                    url_name <> "-" <> row["wp_post_id"]
+                  )
 
-            case %Post{}
-                 |> Post.new_post_changeset(attrs, validate_url_name: false)
-                 |> Repo.insert() do
-              {:ok, _} -> {:cont, {:ok, :done}}
-              {:error, _} -> {:halt, {:error, cs}}
-            end
-          else
-            {:halt, {:error, cs}}
+                %Post{}
+                |> Post.new_post_changeset(attrs, validate_url_name: false)
+                |> Repo.insert()
+              else
+                {:error, cs}
+              end
+
+            other ->
+              other
           end
+        end
+
+      case result do
+        {:ok, _} -> {:cont, {:ok, :done}}
+        {:error, cs} -> {:halt, {:error, cs}}
       end
     end)
   end
@@ -376,6 +456,7 @@ defmodule Ysc.WpMigration.Load do
     for row <- stripe_data do
       user_id = user_map[row["wp_user_id"]]
       cus_id = row["stripe_customer_id"]
+      pm_id = row["stripe_payment_method_id"]
 
       if user_id && cus_id && cus_id != "" do
         user = Repo.get!(User, user_id)
@@ -387,12 +468,114 @@ defmodule Ysc.WpMigration.Load do
           |> Repo.update()
         end
 
-        # TODO: list payment methods, persist; create subscription for single/family approved
+        # Set default payment method when we have one (idempotent: upsert from Stripe)
+        if pm_id && pm_id != "" do
+          user = Repo.get!(User, user_id)
+
+          case Stripe.PaymentMethod.retrieve(pm_id) do
+            {:ok, stripe_pm} ->
+              case Payments.upsert_and_set_default_payment_method_from_stripe(
+                     user,
+                     stripe_pm
+                   ) do
+                {:ok, _} ->
+                  :ok
+
+                {:error, reason} ->
+                  Ysc.Logging.warning("Failed to set default payment method",
+                    user_id: user_id,
+                    stripe_payment_method_id: pm_id,
+                    error: inspect(reason)
+                  )
+              end
+
+            {:error, _} ->
+              Ysc.Logging.warning("Could not retrieve Stripe payment method",
+                stripe_payment_method_id: pm_id
+              )
+          end
+        end
       end
     end
 
     :ok
   end
+
+  defp load_subscriptions(users_data, user_map) do
+    for row <- users_data do
+      user_id = user_map[row["wp_user_id"]]
+
+      if user_id && active_membership?(row) do
+        renewal_dt =
+          parse_subscription_datetime(
+            row["sub_next_payment_date"] || row["wcm_end_date"]
+          )
+
+        start_dt =
+          parse_subscription_datetime(
+            row["sub_original_start_date"] || row["sub_start_date"] ||
+              row["wcm_start_date"]
+          )
+
+        if is_nil(renewal_dt) do
+          Ysc.Logging.warning("Skipping subscription for user: no renewal date",
+            wp_user_id: row["wp_user_id"]
+          )
+        else
+          migrated_stripe_id = "migrated_#{user_id}"
+
+          existing =
+            Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
+
+          attrs = %{
+            user_id: user_id,
+            name: "Membership Subscription",
+            stripe_id: migrated_stripe_id,
+            stripe_status: "active",
+            current_period_end: renewal_dt,
+            start_date: start_dt || renewal_dt
+          }
+
+          if existing do
+            existing
+            |> Subscription.changeset(attrs)
+            |> Repo.update()
+          else
+            Subscriptions.create_subscription(attrs)
+          end
+        end
+      end
+    end
+
+    :ok
+  end
+
+  defp active_membership?(row) do
+    sub = row["sub_status"]
+    wcm = row["wcm_status"]
+
+    (is_binary(sub) and sub in ["wc-active", "wc-on-hold"]) or
+      (is_binary(wcm) and wcm == "wcm-active")
+  end
+
+  defp parse_subscription_datetime(nil), do: nil
+  defp parse_subscription_datetime(""), do: nil
+
+  defp parse_subscription_datetime(str) when is_binary(str) do
+    str = String.trim(str)
+
+    normalized =
+      if String.contains?(str, " "),
+        do: String.replace(str, " ", "T"),
+        else: str
+
+    case NaiveDateTime.from_iso8601(normalized) do
+      {:ok, ndt} -> DateTime.from_naive!(ndt, "Etc/UTC")
+      _ -> nil
+    end
+  end
+
+  defp parse_subscription_datetime(_), do: nil
 
   defp load_bookings(bookings_data, user_map) do
     for row <- bookings_data do
@@ -465,42 +648,49 @@ defmodule Ysc.WpMigration.Load do
               :ok
 
             checkout_date ->
-              total_price = parse_booking_money(row["total_price"])
+              ref_id = "MIG-WP-#{row["wp_booking_id"]}"
 
-              attrs = %{
-                checkin_date: checkin_date,
-                checkout_date: checkout_date,
-                guests_count: row["guests_count"] || 0,
-                children_count: row["children_count"] || 0,
-                property: :tahoe,
-                booking_mode: :room,
-                status: :complete,
-                total_price: total_price,
-                user_id: user_id
-              }
+              if Bookings.get_booking_by_reference_id(ref_id) do
+                :ok
+              else
+                total_price = parse_booking_money(row["total_price"])
 
-              case Booking.changeset(%Booking{}, attrs, rooms: room_structs)
-                   |> Repo.insert() do
-                {:ok, booking} ->
-                  %BookingGuest{}
-                  |> BookingGuest.changeset(%{
-                    booking_id: booking.id,
-                    first_name: row["guest_first_name"] || "Guest",
-                    last_name: row["guest_last_name"] || "Guest",
-                    is_booking_user: true,
-                    order_index: 0
-                  })
-                  |> Repo.insert()
+                attrs = %{
+                  reference_id: ref_id,
+                  checkin_date: checkin_date,
+                  checkout_date: checkout_date,
+                  guests_count: row["guests_count"] || 0,
+                  children_count: row["children_count"] || 0,
+                  property: :tahoe,
+                  booking_mode: :room,
+                  status: :complete,
+                  total_price: total_price,
+                  user_id: user_id
+                }
 
-                  :ok
+                case Booking.changeset(%Booking{}, attrs, rooms: room_structs)
+                     |> Repo.insert() do
+                  {:ok, booking} ->
+                    %BookingGuest{}
+                    |> BookingGuest.changeset(%{
+                      booking_id: booking.id,
+                      first_name: row["guest_first_name"] || "Guest",
+                      last_name: row["guest_last_name"] || "Guest",
+                      is_booking_user: true,
+                      order_index: 0
+                    })
+                    |> Repo.insert()
 
-                {:error, changeset} ->
-                  Ysc.Logging.warning("Failed to insert migrated booking",
-                    wp_booking_id: row["wp_booking_id"],
-                    errors: inspect(changeset.errors)
-                  )
+                    :ok
 
-                  :ok
+                  {:error, changeset} ->
+                    Ysc.Logging.warning("Failed to insert migrated booking",
+                      wp_booking_id: row["wp_booking_id"],
+                      errors: inspect(changeset.errors)
+                    )
+
+                    :ok
+                end
               end
           end
       end
