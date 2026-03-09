@@ -12,9 +12,9 @@ defmodule YscWeb.Components.MapComponent do
       style="overflow: hidden"
       class="border border-zinc-300 rounded w-full h-80"
       phx-update="ignore"
-      id="mapComponent"
+      id={"#{@id}-container"}
     >
-      <div class="w-full h-80" id="map" phx-hook="RadarMap"></div>
+      <div class="w-full h-80" id={@id} phx-hook="RadarMap"></div>
     </div>
     """
   end
@@ -22,6 +22,7 @@ defmodule YscWeb.Components.MapComponent do
   def update(assigns, socket) do
     {:ok,
      socket
+     |> assign(:id, assigns.id)
      |> assign(:latitude, assigns[:latitude])
      |> assign(:longitude, assigns[:longitude])
      |> Phoenix.LiveView.push_event("add-marker", %{

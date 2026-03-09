@@ -2265,7 +2265,7 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
                 <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
                   <.icon name="hero-lock-closed" class="w-3 h-3" />
-                  Encrypted SSL Secure Payment
+                  Secure Payments via Stripe
                 </p>
               </div>
             </div>
