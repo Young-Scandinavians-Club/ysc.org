@@ -119,6 +119,7 @@ defmodule Ysc.MixProject do
       {:iso, ">= 0.0.0"},
       {:jason, "~> 1.4"},
       {:let_me, "~> 1.2.3"},
+      {:locus, "~> 2.3"},
       {:live_toast, "~> 0.8.0"},
       {:live_view_native_live_form, "~> 0.4.0-rc.1"},
       {:live_view_native_stylesheet, "~> 0.4.0-rc.1"},

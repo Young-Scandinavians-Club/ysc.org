@@ -16,10 +16,10 @@ defmodule YscWeb.Components.MapComponentTest do
 
       html = render_component(MapComponent, assigns)
 
-      assert html =~ "id=\"mapComponent\""
-      assert html =~ "id=\"map\""
-      assert html =~ "phx-hook=\"RadarMap\""
-      assert html =~ "phx-update=\"ignore\""
+      assert html =~ ~s(id="test-map-container")
+      assert html =~ ~s(id="test-map")
+      assert html =~ ~s(phx-hook="RadarMap")
+      assert html =~ ~s(phx-update="ignore")
     end
 
     test "applies correct styling classes" do
@@ -206,13 +206,13 @@ defmodule YscWeb.Components.MapComponentTest do
 
       html = render_component(MapComponent, assigns)
 
-      # Map div should have id="map" for the hook to find it
-      assert html =~ ~s(id="map")
+      # Inner map div uses the component id so the JS hook can find it
+      assert html =~ ~s(id="test-map")
     end
   end
 
   describe "container structure" do
-    test "has outer container with mapComponent id" do
+    test "has outer container with derived id" do
       assigns = %{
         id: "test-map",
         latitude: 38.9072,
@@ -222,7 +222,7 @@ defmodule YscWeb.Components.MapComponentTest do
 
       html = render_component(MapComponent, assigns)
 
-      assert html =~ ~s(id="mapComponent")
+      assert html =~ ~s(id="test-map-container")
     end
 
     test "has inner map div for rendering" do
@@ -235,9 +235,9 @@ defmodule YscWeb.Components.MapComponentTest do
 
       html = render_component(MapComponent, assigns)
 
-      # Should have nested structure
+      # Should have nested structure with component id on the inner div
       assert html =~ ~s(<div)
-      assert html =~ ~s(id="map")
+      assert html =~ ~s(id="test-map")
     end
   end
 

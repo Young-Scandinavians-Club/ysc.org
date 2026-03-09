@@ -165,6 +165,7 @@ defmodule Ysc.Accounts.AuthService do
       metadata: base_metadata
     }
     |> Map.merge(parse_user_agent_data(conn))
+    |> enrich_with_geo_data()
   end
 
   @doc """
@@ -412,6 +413,13 @@ defmodule Ysc.Accounts.AuthService do
   end
 
   # Private helper functions
+
+  defp enrich_with_geo_data(%{ip_address: ip} = auth_data) when is_binary(ip) do
+    geo = Ysc.GeoIP.lookup(ip)
+    Map.merge(auth_data, geo)
+  end
+
+  defp enrich_with_geo_data(auth_data), do: auth_data
 
   defp get_client_ip(conn_or_socket) do
     case conn_or_socket do
