@@ -170,7 +170,7 @@ defmodule YscWeb.AdminNewslettersLive do
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
     >
-      <div class="pb-6">
+      <div class="py-6">
         <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
           Newsletters
         </h1>

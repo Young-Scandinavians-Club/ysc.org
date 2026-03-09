@@ -87,6 +87,7 @@ defmodule YscWeb.Router do
 
     plug :fetch_current_user
     plug :mount_site_settings
+    plug YscWeb.Plugs.AdminSidebarState
   end
 
   pipeline :api do
@@ -323,7 +324,8 @@ defmodule YscWeb.Router do
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.UserAuth, :ensure_admin},
-        {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings}
+        {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
+        {YscWeb.Plugs.AdminSidebarState, :mount_sidebar_state}
       ] do
       live "/", AdminDashboardLive, :index
 

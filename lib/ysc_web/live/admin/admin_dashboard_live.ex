@@ -67,13 +67,16 @@ defmodule YscWeb.AdminDashboardLive do
         <!-- Tiered Stats Row -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
           <!-- Applications Card -->
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
+          <.link
+            navigate="/admin/users?filters[0][_persistent_id]=0&filters[0][field]=state&filters[0][op]=in&filters[0][value][]=pending_approval"
+            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
+          >
             <div>
               <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
                 Applications
               </p>
               <div class="flex items-baseline gap-2">
-                <p class="text-3xl font-black text-zinc-900">
+                <p class="text-3xl font-black text-zinc-900 group-hover:text-amber-600 transition-colors">
                   {@pending_reviews_count}
                 </p>
                 <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded italic">
@@ -123,7 +126,52 @@ defmodule YscWeb.AdminDashboardLive do
                 </p>
               </div>
             </div>
-          </div>
+            <p class="text-xs text-amber-600 font-medium mt-3 group-hover:underline">
+              Review applications →
+            </p>
+          </.link>
+          <!-- Memberships Card -->
+          <.link
+            navigate={~p"/admin/memberships"}
+            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
+          >
+            <div>
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+                Memberships
+              </p>
+              <div class="flex items-baseline gap-2">
+                <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+                  {@membership_stats.total}
+                </p>
+                <span class="text-xs font-bold text-zinc-500">
+                  active
+                </span>
+              </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
+                <p class="text-sm font-black text-zinc-700">
+                  {@membership_stats.single}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
+                <p class="text-sm font-black text-zinc-700">
+                  {@membership_stats.family}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
+                <p class="text-sm font-black text-zinc-700">
+                  {@membership_stats.lifetime}
+                </p>
+              </div>
+            </div>
+            <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+              View all memberships →
+            </p>
+          </.link>
           <!-- Total Revenue Card -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
             <div>
@@ -219,56 +267,16 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
             </div>
           </div>
-          <!-- Memberships Card -->
+          <!-- Active Now Card -->
           <.link
-            navigate={~p"/admin/memberships"}
+            navigate={~p"/admin/bookings"}
             class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
           >
             <div>
               <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Memberships
+                Staying Now
               </p>
-              <div class="flex items-baseline gap-2">
-                <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
-                  {@membership_stats.total}
-                </p>
-                <span class="text-xs font-bold text-zinc-500">
-                  active
-                </span>
-              </div>
-            </div>
-            <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@membership_stats.single}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@membership_stats.family}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@membership_stats.lifetime}
-                </p>
-              </div>
-            </div>
-            <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-              View all memberships →
-            </p>
-          </.link>
-          
-    <!-- Active Now Card -->
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
-            <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Active Now
-              </p>
-              <p class="text-3xl font-black text-zinc-900">
+              <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
                 {@active_guests_count}
               </p>
               <p class="text-xs text-zinc-500 mt-1 font-medium">
@@ -291,7 +299,10 @@ defmodule YscWeb.AdminDashboardLive do
                 +{@active_guests_count - length(@active_guests_sample)}
               </div>
             </div>
-          </div>
+            <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+              View all bookings →
+            </p>
+          </.link>
         </div>
         <!-- Priority Dashboard Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
@@ -1165,10 +1176,11 @@ defmodule YscWeb.AdminDashboardLive do
     today = Date.utc_today()
     checkout_time = ~T[11:00:00]
 
-    # Get all active bookings (checkout_date >= today and status = complete)
+    # Get all active bookings: checked in on or before today, and not yet checked out
     query =
       from(b in Bookings.Booking,
         where: b.status == :complete,
+        where: b.checkin_date <= ^today,
         where: b.checkout_date >= ^today,
         preload: [:user]
       )

@@ -16,6 +16,20 @@ import GrowingInput from "./growing_input_field";
 import FocusSearchInput from "./focus_search_input";
 import ScheduleTimezone from "./schedule_timezone";
 
+const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
+const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
+
+// Called by the sidebar toggle button via JS.dispatch("admin:toggle-sidebar").
+// Updates localStorage (for the inline-script no-flash on hard reload), sets a
+// plain cookie so the server can render the correct class on each LiveView
+// navigation, and immediately toggles the class for instant visual feedback.
+document.addEventListener("admin:toggle-sidebar", () => {
+    const isCollapsed = !document.documentElement.classList.contains("sidebar-collapsed");
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, isCollapsed ? "true" : "false");
+    document.cookie = `${SIDEBAR_COOKIE_NAME}=${isCollapsed ? "1" : "0"}; path=/; max-age=31536000; SameSite=Lax`;
+    document.documentElement.classList.toggle("sidebar-collapsed", isCollapsed);
+});
+
 window.__adminHooks = {
     TrixHook,
     Sortable,

@@ -9,6 +9,8 @@ defmodule YscWeb.AdminComponents do
   use Phoenix.Component
   use Gettext, backend: YscWeb.Gettext
 
+  alias Phoenix.LiveView.JS
+
   import Flop.Phoenix
   import YscWeb.CoreComponents
 
@@ -83,24 +85,51 @@ defmodule YscWeb.AdminComponents do
 
     <aside
       id="admin-navigation"
-      class="fixed top-0 left-0 z-40 w-72 h-screen transition-transform -translate-x-full lg:translate-x-0"
+      class="fixed top-0 left-0 z-40 w-72 h-screen overflow-hidden transition-transform -translate-x-full lg:translate-x-0"
       aria-label="Sidebar"
       phx-click-away={hide_sidebar("#admin-navigation")}
     >
       <div class="h-full flex flex-col bg-zinc-900">
         <%!-- Fixed top: logo always visible --%>
-        <div class="flex-shrink-0 px-5 pt-8 pb-4">
-          <.link navigate="/" class="items-center group ps-2.5 inline-block">
-            <div class="flex items-center gap-2">
-              <.ysc_logo class="h-20 me-3" width={80} height={80} />
-              <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded">
-                ADMIN
+        <div id="admin-nav-header" class="flex-shrink-0 px-5 pt-8 pb-4 relative">
+          <%!-- Expanded logo --%>
+          <div id="admin-nav-logo-expanded">
+            <.link navigate="/" class="items-center group ps-2.5 inline-block">
+              <div class="flex items-center gap-2">
+                <.ysc_logo class="h-20 me-3" width={80} height={80} />
+                <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded">
+                  ADMIN
+                </span>
+              </div>
+              <span class="block group-hover:underline text-sm font-bold text-zinc-400 py-4">
+                Go to site <.icon name="hero-arrow-right" class="h-4 w-4" />
               </span>
-            </div>
-            <span class="block group-hover:underline text-sm font-bold text-zinc-400 py-4">
-              Go to site <.icon name="hero-arrow-right" class="h-4 w-4" />
-            </span>
-          </.link>
+            </.link>
+          </div>
+
+          <%!-- Collapsed logo (hidden by default, shown via CSS when sidebar-collapsed) --%>
+          <div
+            id="admin-nav-logo-collapsed"
+            class="hidden flex-col items-center justify-center pt-2 pb-1 gap-1"
+          >
+            <.link navigate="/" aria-label="Go to site">
+              <.ysc_logo width={36} height={36} />
+            </.link>
+          </div>
+
+          <%!-- Collapse toggle button (desktop only) — placed after logos so it flows below in collapsed mode --%>
+          <button
+            type="button"
+            class="hidden lg:flex absolute right-3 top-3 items-center justify-center w-7 h-7 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded transition-colors"
+            phx-click={toggle_sidebar_collapse()}
+            aria-label="Toggle sidebar width"
+          >
+            <.icon
+              id="admin-collapse-chevron"
+              name="hero-chevron-left"
+              class="w-4 h-4"
+            />
+          </button>
         </div>
 
         <%!-- Scrollable: menu items only --%>
@@ -114,8 +143,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin"
+                  title="Overview"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :dashboard,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -127,15 +157,15 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :dashboard}
                     name="hero-chart-pie"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :dashboard}
                     name="hero-chart-pie"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
                   <span class={[
-                    "ms-3",
+                    "admin-nav-label ms-3",
                     @active_page == :dashboard && "font-semibold"
                   ]}>
                     Overview
@@ -146,8 +176,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/posts"
+                  title="Posts"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :news,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -159,14 +190,17 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :news}
                     name="hero-document-text"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :news}
                     name="hero-document-text"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
-                  <span class={["ms-3", @active_page == :news && "font-semibold"]}>
+                  <span class={[
+                    "admin-nav-label ms-3",
+                    @active_page == :news && "font-semibold"
+                  ]}>
                     Posts
                   </span>
                 </.link>
@@ -175,8 +209,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/events"
+                  title="Events"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :events,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -188,14 +223,17 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :events}
                     name="hero-calendar"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :events}
                     name="hero-calendar"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
-                  <span class={["ms-3", @active_page == :events && "font-semibold"]}>
+                  <span class={[
+                    "admin-nav-label ms-3",
+                    @active_page == :events && "font-semibold"
+                  ]}>
                     Events
                   </span>
                 </.link>
@@ -204,8 +242,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/newsletters"
+                  title="Newsletters"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :newsletters,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -217,15 +256,15 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :newsletters}
                     name="hero-envelope"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :newsletters}
                     name="hero-envelope"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
                   <span class={[
-                    "ms-3",
+                    "admin-nav-label ms-3",
                     @active_page == :newsletters && "font-semibold"
                   ]}>
                     Newsletters
@@ -236,8 +275,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/bookings"
+                  title="Bookings"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :bookings,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -249,15 +289,15 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :bookings}
                     name="hero-home"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :bookings}
                     name="hero-home"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
                   <span class={[
-                    "ms-3",
+                    "admin-nav-label ms-3",
                     @active_page == :bookings && "font-semibold"
                   ]}>
                     Bookings
@@ -268,8 +308,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/users"
+                  title="Users"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :members,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -281,14 +322,17 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :members}
                     name="hero-users"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :members}
                     name="hero-users"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
-                  <span class={["ms-3", @active_page == :members && "font-semibold"]}>
+                  <span class={[
+                    "admin-nav-label ms-3",
+                    @active_page == :members && "font-semibold"
+                  ]}>
                     Users
                   </span>
                 </.link>
@@ -297,8 +341,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/memberships"
+                  title="Memberships"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :memberships,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -310,15 +355,15 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :memberships}
                     name="hero-identification"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :memberships}
                     name="hero-identification"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
                   <span class={[
-                    "ms-3",
+                    "admin-nav-label ms-3",
                     @active_page == :memberships && "font-semibold"
                   ]}>
                     Memberships
@@ -329,8 +374,9 @@ defmodule YscWeb.AdminComponents do
               <li :if={@board_position == :treasurer}>
                 <.link
                   navigate="/admin/money"
+                  title="Money"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :money,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -342,14 +388,17 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :money}
                     name="hero-wallet"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :money}
                     name="hero-wallet"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
-                  <span class={["ms-3", @active_page == :money && "font-semibold"]}>
+                  <span class={[
+                    "admin-nav-label ms-3",
+                    @active_page == :money && "font-semibold"
+                  ]}>
                     Money
                   </span>
                 </.link>
@@ -358,8 +407,9 @@ defmodule YscWeb.AdminComponents do
               <li>
                 <.link
                   navigate="/admin/media"
+                  title="Media"
                   class={[
-                    "flex items-center px-3 py-4 rounded group transition-colors",
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
                     if(@active_page == :media,
                       do:
                         "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
@@ -371,14 +421,17 @@ defmodule YscWeb.AdminComponents do
                   <.icon
                     :if={@active_page == :media}
                     name="hero-photo"
-                    class="w-5 h-5 transition duration-75 text-blue-400"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
                   />
                   <.icon
                     :if={@active_page != :media}
                     name="hero-photo"
-                    class="w-5 h-5 transition duration-75 text-blue-500"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
                   />
-                  <span class={["ms-3", @active_page == :media && "font-semibold"]}>
+                  <span class={[
+                    "admin-nav-label ms-3",
+                    @active_page == :media && "font-semibold"
+                  ]}>
                     Media
                   </span>
                 </.link>
@@ -393,8 +446,11 @@ defmodule YscWeb.AdminComponents do
           </div>
         </div>
 
-        <%!-- Fixed bottom user card --%>
-        <div class="flex-shrink-0 px-4 py-4 border-t border-zinc-700 bg-zinc-900">
+        <%!-- Fixed bottom user card (expanded) --%>
+        <div
+          id="admin-nav-user-full"
+          class="flex-shrink-0 px-4 py-4 border-t border-zinc-700 bg-zinc-900"
+        >
           <.user_card
             email={@email}
             user_id={@user_id}
@@ -404,10 +460,23 @@ defmodule YscWeb.AdminComponents do
             class="[&_.text-zinc-800]:text-zinc-300 [&_.text-zinc-500]:text-zinc-400"
           />
         </div>
+
+        <%!-- Fixed bottom user avatar (collapsed, hidden by default) --%>
+        <div
+          id="admin-nav-user-collapsed"
+          class="hidden flex-shrink-0 py-4 border-t border-zinc-700 bg-zinc-900 items-center justify-center"
+        >
+          <.user_avatar_image
+            email={@email}
+            user_id={@user_id}
+            country={@most_connected_country}
+            class="w-8 h-8 rounded-full ring-2 ring-zinc-600"
+          />
+        </div>
       </div>
     </aside>
 
-    <main class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen">
+    <main id="admin-main" class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen">
       {render_slot(@inner_block)}
     </main>
 
@@ -418,6 +487,11 @@ defmodule YscWeb.AdminComponents do
     >
     </div>
     """
+  end
+
+  defp toggle_sidebar_collapse(js \\ %JS{}) do
+    js
+    |> JS.dispatch("admin:toggle-sidebar")
   end
 
   # ---------------------------------------------------------------------------

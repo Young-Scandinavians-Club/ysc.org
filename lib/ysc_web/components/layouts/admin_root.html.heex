@@ -1,8 +1,22 @@
 <!DOCTYPE html>
-<html lang="en" class="[scrollbar-gutter:stable]">
+<html
+  lang="en"
+  class={[
+    "[scrollbar-gutter:stable]",
+    assigns[:sidebar_collapsed] && "sidebar-collapsed"
+  ]}
+>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <%!-- Apply sidebar collapsed state before first paint to avoid layout flash --%>
+    <script nonce={@csp_nonce}>
+      try {
+        if (localStorage.getItem("admin-sidebar-collapsed") === "true") {
+          document.documentElement.classList.add("sidebar-collapsed");
+        }
+      } catch (_) {}
+    </script>
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta
       :if={assigns[:meta_description]}
