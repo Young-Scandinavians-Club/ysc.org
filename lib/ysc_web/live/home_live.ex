@@ -810,7 +810,7 @@ defmodule YscWeb.HomeLive do
                 </.link>
                 <%= if event.description do %>
                   <p class="text-zinc-400 mt-3 sm:mt-4 line-clamp-2 text-sm leading-relaxed">
-                    {event.description}
+                    {HtmlSanitizeEx.strip_tags(event.description)}
                   </p>
                 <% end %>
 

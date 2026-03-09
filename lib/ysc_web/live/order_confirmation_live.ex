@@ -6,6 +6,7 @@ defmodule YscWeb.OrderConfirmationLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   import Ecto.Query
+  alias HtmlSanitizeEx
 
   @impl true
   def mount(%{"order_id" => order_id} = params, _session, socket) do
@@ -203,7 +204,9 @@ defmodule YscWeb.OrderConfirmationLive do
               <div>
                 <p class="text-xs font-bold text-zinc-400 uppercase mb-1">Event</p>
                 <p class="text-xl font-bold text-zinc-900">{@event.title}</p>
-                <p class="text-sm text-zinc-500">{@event.description}</p>
+                <p class="text-sm text-zinc-500">
+                  {HtmlSanitizeEx.strip_tags(@event.description || "")}
+                </p>
               </div>
               <div>
                 <p class="text-xs font-bold text-zinc-400 uppercase mb-1">

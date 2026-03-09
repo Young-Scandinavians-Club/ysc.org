@@ -165,6 +165,7 @@ defmodule Ysc.Events.Event do
     ])
     |> validate_length(:title, max: 100)
     |> validate_length(:description, max: 200)
+    |> strip_description_html()
     |> handle_unlimited_capacity()
     |> put_reference_id()
     |> unique_constraint(:reference_id)
@@ -277,6 +278,20 @@ defmodule Ysc.Events.Event do
 
       _ ->
         changeset
+    end
+  end
+
+  defp strip_description_html(changeset) do
+    case get_change(changeset, :description) do
+      nil ->
+        changeset
+
+      description ->
+        put_change(
+          changeset,
+          :description,
+          HtmlSanitizeEx.strip_tags(description)
+        )
     end
   end
 

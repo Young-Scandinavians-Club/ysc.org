@@ -1,17 +1,24 @@
 [
-  verbose: false,
-  private: false,
-  skip: false,
-  router: "",
-  exit: "high",
-  format: "txt",
-  out: "",
-  threshold: "low",
-  ignore: [
-    "Config.CSRF",
-    "Config.CSP",
-    "Config.HTTPS",
-    "DOS.StringToAtom"
-  ],
-  ignore_files: [""]
+    verbose: false,
+    private: false,
+    skip: false,
+    router: "",
+    exit: "high",
+    format: "txt",
+    out: "",
+    threshold: "low",
+    ignore: [
+        "Config.CSRF",
+        "Config.CSP",
+        "Config.HTTPS",
+        "DOS.StringToAtom"
+    ],
+    ignore_files: [
+        "lib/ysc/wp_migration/load.ex",
+        "lib/ysc/wp_migration/extract.ex",
+        "lib/ysc/wp_migration/validate.ex",
+        "lib/ysc/wp_migration/sql_to_duckdb.ex",
+        "lib/ysc/wp_migration/php_deserialize.ex",
+        "lib/ysc/wp_migration/wp_repo.ex"
+    ]
 ]

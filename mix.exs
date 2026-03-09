@@ -87,6 +87,7 @@ defmodule Ysc.MixProject do
       {:csv, "~> 3.2"},
       {:debouncer, "~> 0.1"},
       {:dns_cluster, "~> 0.2"},
+      {:duckdbex, "~> 0.3.21", only: [:dev], runtime: false},
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.6"},
       {:ecto_sql, "~> 3.13"},

@@ -8,9 +8,14 @@ priv/static/exports/*.csv
 
 priv/static/assets/*.{gz,br,zst}
 
+.claude/
 .vscode/
-
+.opencode/
+.elixir_ls/
 .unlighthouse/
+
+# migration backups
+wp_backup/
 
 # PHOENIX
 
@@ -111,7 +116,7 @@ $RECYCLE.BIN/
 # LINUX
 *~
 
-# temporary files which can be created if a process still has a handle open of a deleted file
+# temporary files which can be created if a process still has a handle open of a dted file
 .fuse_hidden*
 
 # KDE directory preferences
