@@ -40,7 +40,7 @@ defmodule Ysc.GeoIP do
   # Private
 
   defp do_lookup(ip_address) do
-    case :locus.lookup(@loader_name, String.to_charlist(ip_address)) do
+    case apply(:locus, :lookup, [@loader_name, String.to_charlist(ip_address)]) do
       {:ok, entry} ->
         parse_entry(entry)
 

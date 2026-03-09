@@ -159,12 +159,13 @@ let csrfToken = document
     .getAttribute("content");
 
 let liveSocket = new LiveSocket("/live", Socket, {
-    params: {
+    params: () => ({
         _csrf_token: csrfToken,
         locale: Intl.NumberFormat().resolvedOptions().locale,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         timezone_offset: -(new Date().getTimezoneOffset() / 60),
-    },
+        sidebar_collapsed: localStorage.getItem("admin-sidebar-collapsed") === "true",
+    }),
     hooks: Hooks,
     uploaders: Uploaders,
     // Delay before showing "Attempting to reconnect" so short connection blips don't flash the message.

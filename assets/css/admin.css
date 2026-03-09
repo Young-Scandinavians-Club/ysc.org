@@ -1,4 +1,163 @@
 /*
+=== ADMIN SIDEBAR COLLAPSED STATE ===
+The sidebar-collapsed class is toggled on <html> so it survives LiveView DOM morphing.
+Transitions use opacity + max-height instead of display:none so everything can animate.
+*/
+
+/* Chevron rotation */
+#admin-collapse-chevron {
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.sidebar-collapsed #admin-collapse-chevron {
+    transform: rotate(180deg);
+}
+
+@media (min-width: 1024px) {
+    /* --- Sidebar & main content width transition --- */
+    #admin-navigation {
+        transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #admin-main {
+        transition: margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- Logo crossfade ---
+       Override Tailwind's 'hidden' (display:none) on the collapsed logo so both
+       logos are always in flow on desktop — opacity & max-height do the hiding. */
+    #admin-nav-logo-collapsed {
+        display: flex !important;
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+        pointer-events: none;
+        transition: opacity 200ms ease 40ms, max-height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #admin-nav-logo-expanded {
+        max-height: 200px;
+        overflow: hidden;
+        transition: opacity 180ms ease, max-height 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- Nav label fade + shrink --- */
+    .admin-nav-label {
+        overflow: hidden;
+        max-width: 160px;
+        white-space: nowrap;
+        transition:
+            max-width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+            opacity 200ms ease,
+            margin-inline-start 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- Nav link padding slides --- */
+    .admin-nav-link {
+        transition:
+            padding-left 280ms cubic-bezier(0.4, 0, 0.2, 1),
+            padding-right 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- Menu scroll area padding slides --- */
+    #admin-sidebar-menu-scroll {
+        transition:
+            padding-left 280ms cubic-bezier(0.4, 0, 0.2, 1),
+            padding-right 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- User card crossfade ---
+       Same trick: override 'hidden' so collapsed card is always in flow on desktop. */
+    #admin-nav-user-collapsed {
+        display: flex !important;
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+        pointer-events: none;
+        transition: opacity 200ms ease 40ms, max-height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #admin-nav-user-full {
+        max-height: 200px;
+        overflow: hidden;
+        transition: opacity 180ms ease, max-height 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ============================
+       COLLAPSED STATE
+       ============================ */
+
+    html.sidebar-collapsed #admin-navigation {
+        width: 4rem;
+    }
+
+    html.sidebar-collapsed #admin-main {
+        margin-left: 4rem;
+    }
+
+    /* Logo swap */
+    html.sidebar-collapsed #admin-nav-logo-expanded {
+        opacity: 0;
+        max-height: 0;
+        pointer-events: none;
+    }
+
+    html.sidebar-collapsed #admin-nav-logo-collapsed {
+        opacity: 1;
+        max-height: 80px;
+        pointer-events: auto;
+    }
+
+    /* Header becomes a centred column */
+    html.sidebar-collapsed #admin-nav-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.75rem 0.25rem 0.5rem;
+    }
+
+    /* Take the collapse button out of absolute positioning so it stacks below the logo */
+    html.sidebar-collapsed #admin-nav-header > button {
+        position: static;
+        width: 1.75rem;
+        height: 1.75rem;
+        margin-top: 0.25rem;
+    }
+
+    html.sidebar-collapsed #admin-sidebar-menu-scroll {
+        padding-left: 0.375rem;
+        padding-right: 0.375rem;
+    }
+
+    /* Labels vanish */
+    html.sidebar-collapsed .admin-nav-label {
+        max-width: 0;
+        opacity: 0;
+        margin-inline-start: 0 !important;
+    }
+
+    /* Icons centre inside the now-narrow link */
+    html.sidebar-collapsed .admin-nav-link {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    /* User card swap */
+    html.sidebar-collapsed #admin-nav-user-full {
+        opacity: 0;
+        max-height: 0;
+        pointer-events: none;
+    }
+
+    html.sidebar-collapsed #admin-nav-user-collapsed {
+        opacity: 1;
+        max-height: 80px;
+        pointer-events: auto;
+    }
+}
+
+/*
 === TRIX ===
 */
 
