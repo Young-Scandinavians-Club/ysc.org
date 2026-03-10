@@ -46,7 +46,7 @@ defmodule YscWeb.AdminBookingsLive do
             )
 
           query_string = URI.encode_query(flatten_query_params(query_params))
-          JS.navigate("/admin/bookings?#{query_string}")
+          JS.patch("/admin/bookings?#{query_string}")
         }
         show
       >
@@ -107,7 +107,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button phx-click={
-                  JS.navigate(
+                  JS.patch(
                     ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
                   )
                 }>
@@ -143,7 +143,7 @@ defmodule YscWeb.AdminBookingsLive do
             )
 
           query_string = URI.encode_query(flatten_query_params(query_params))
-          JS.navigate("/admin/bookings?#{query_string}")
+          JS.patch("/admin/bookings?#{query_string}")
         }
         show
       >
@@ -243,7 +243,7 @@ defmodule YscWeb.AdminBookingsLive do
 
           <:actions>
             <.button phx-click={
-              JS.navigate(
+              JS.patch(
                 ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
               )
             }>
@@ -267,7 +267,7 @@ defmodule YscWeb.AdminBookingsLive do
         :if={@live_action == :edit_season}
         id="season-modal"
         on_cancel={
-          JS.navigate(
+          JS.patch(
             ~p"/admin/bookings?property=#{@selected_property}&section=config"
           )
         }
@@ -362,7 +362,7 @@ defmodule YscWeb.AdminBookingsLive do
               <div></div>
               <div class="flex gap-2">
                 <.button phx-click={
-                  JS.navigate(
+                  JS.patch(
                     ~p"/admin/bookings?property=#{@selected_property}&section=config"
                   )
                 }>
@@ -965,7 +965,7 @@ defmodule YscWeb.AdminBookingsLive do
 
                 query_string = URI.encode_query(query_params)
 
-                JS.navigate(
+                JS.patch(
                   "/admin/bookings/bookings/#{@booking.id}/edit?#{query_string}"
                 )
               }
@@ -988,7 +988,7 @@ defmodule YscWeb.AdminBookingsLive do
                   )
 
                 query_string = URI.encode_query(flatten_query_params(query_params))
-                JS.navigate("/admin/bookings?#{query_string}")
+                JS.patch("/admin/bookings?#{query_string}")
               }
               class="w-full sm:w-auto"
             >
@@ -1087,7 +1087,7 @@ defmodule YscWeb.AdminBookingsLive do
             )
 
           query_string = URI.encode_query(flatten_query_params(query_params))
-          JS.navigate("/admin/bookings?#{query_string}")
+          JS.patch("/admin/bookings?#{query_string}")
         }
         show
       >
@@ -1148,7 +1148,7 @@ defmodule YscWeb.AdminBookingsLive do
 
           <:actions>
             <.button phx-click={
-              JS.navigate(
+              JS.patch(
                 ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
               )
             }>
@@ -1184,7 +1184,7 @@ defmodule YscWeb.AdminBookingsLive do
             )
 
           query_string = URI.encode_query(flatten_query_params(query_params))
-          JS.navigate("/admin/bookings?#{query_string}")
+          JS.patch("/admin/bookings?#{query_string}")
         }
         show
       >
@@ -1316,7 +1316,7 @@ defmodule YscWeb.AdminBookingsLive do
                 )
 
               query_string = URI.encode_query(flatten_query_params(query_params))
-              JS.navigate("/admin/bookings?#{query_string}")
+              JS.patch("/admin/bookings?#{query_string}")
             }>
               Close
             </.button>
@@ -1338,7 +1338,7 @@ defmodule YscWeb.AdminBookingsLive do
             )
 
           query_string = URI.encode_query(flatten_query_params(query_params))
-          JS.navigate("/admin/bookings?#{query_string}")
+          JS.patch("/admin/bookings?#{query_string}")
         }
         show
       >
@@ -1478,7 +1478,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button phx-click={
-                  JS.navigate(
+                  JS.patch(
                     ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
                   )
                 }>
@@ -1516,7 +1516,7 @@ defmodule YscWeb.AdminBookingsLive do
             )
 
           query_string = URI.encode_query(flatten_query_params(query_params))
-          JS.navigate("/admin/bookings?#{query_string}")
+          JS.patch("/admin/bookings?#{query_string}")
         }
         show
         max_width="max-w-4xl"
@@ -1777,7 +1777,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button phx-click={
-                  JS.navigate(
+                  JS.patch(
                     ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
                   )
                 }>
@@ -1812,7 +1812,7 @@ defmodule YscWeb.AdminBookingsLive do
             badge_color="red"
           >
             <button
-              phx-click={JS.navigate(~p"/admin/bookings?property=tahoe")}
+              phx-click={JS.patch(~p"/admin/bookings?property=tahoe")}
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@selected_property == :tahoe,
@@ -1830,7 +1830,7 @@ defmodule YscWeb.AdminBookingsLive do
             badge_color="red"
           >
             <button
-              phx-click={JS.navigate(~p"/admin/bookings?property=clear_lake")}
+              phx-click={JS.patch(~p"/admin/bookings?property=clear_lake")}
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@selected_property == :clear_lake,
@@ -2479,7 +2479,7 @@ defmodule YscWeb.AdminBookingsLive do
 
                         query_string = URI.encode_query(query_params)
 
-                        JS.navigate(
+                        JS.patch(
                           "/admin/bookings/bookings/#{booking.id}/edit?#{query_string}"
                         )
                       }
@@ -2882,7 +2882,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3">
                     <button
                       phx-click={
-                        JS.navigate(
+                        JS.patch(
                           ~p"/admin/bookings/seasons/#{season.id}/edit?property=#{@selected_property}&section=config"
                         )
                       }
@@ -2906,7 +2906,7 @@ defmodule YscWeb.AdminBookingsLive do
               </p>
             </div>
             <.button phx-click={
-              JS.navigate(
+              JS.patch(
                 ~p"/admin/bookings/pricing-rules/new?property=#{@selected_property}&section=#{@current_section}"
               )
             }>
@@ -2982,7 +2982,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3">
                     <button
                       phx-click={
-                        JS.navigate(
+                        JS.patch(
                           ~p"/admin/bookings/pricing-rules/#{rule.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                         )
                       }
@@ -3006,7 +3006,7 @@ defmodule YscWeb.AdminBookingsLive do
               </p>
             </div>
             <.button phx-click={
-              JS.navigate(
+              JS.patch(
                 ~p"/admin/bookings/refund-policies/new?property=#{@selected_property}&section=#{@current_section}"
               )
             }>
@@ -3070,7 +3070,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <div class="flex gap-2">
                       <button
                         phx-click={
-                          JS.navigate(
+                          JS.patch(
                             ~p"/admin/bookings/refund-policies/#{policy.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                           )
                         }
@@ -3080,7 +3080,7 @@ defmodule YscWeb.AdminBookingsLive do
                       </button>
                       <button
                         phx-click={
-                          JS.navigate(
+                          JS.patch(
                             ~p"/admin/bookings/refund-policies/#{policy.id}/rules?property=#{@selected_property}&section=#{@current_section}"
                           )
                         }
@@ -3111,7 +3111,7 @@ defmodule YscWeb.AdminBookingsLive do
               </p>
             </div>
             <.button phx-click={
-              JS.navigate(
+              JS.patch(
                 ~p"/admin/bookings/rooms/new?property=#{@selected_property}&section=#{@current_section}"
               )
             }>
@@ -3230,7 +3230,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3">
                     <button
                       phx-click={
-                        JS.navigate(
+                        JS.patch(
                           ~p"/admin/bookings/rooms/#{room.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                         )
                       }
@@ -4275,7 +4275,7 @@ defmodule YscWeb.AdminBookingsLive do
          |> YscWeb.Flash.put_toast(:info, "Blackout saved successfully",
            title: "Blackout"
          )
-         |> push_navigate(
+         |> push_patch(
            to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
          )
          |> update_calendar_view(socket.assigns.selected_property)}
@@ -4309,7 +4309,7 @@ defmodule YscWeb.AdminBookingsLive do
      |> YscWeb.Flash.put_toast(:info, "Blackout deleted successfully",
        title: "Blackout"
      )
-     |> push_navigate(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
+     |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
      |> update_calendar_view(socket.assigns.selected_property)}
   end
 
@@ -4338,9 +4338,7 @@ defmodule YscWeb.AdminBookingsLive do
           end
 
         socket
-        |> push_navigate(
-          to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
-        )
+        |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
         |> update_calendar_view(socket.assigns.selected_property)
       end
 
@@ -4437,7 +4435,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Combine path and query string for navigation
     full_path = "#{base_path}?#{query_string}"
 
-    {:noreply, push_navigate(socket, to: full_path)}
+    {:noreply, push_patch(socket, to: full_path)}
   end
 
   def handle_event("view-blackout", %{"blackout-id" => blackout_id}, socket) do
@@ -4461,7 +4459,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Combine path and query string for navigation
     full_path = "#{base_path}?#{query_string}"
 
-    {:noreply, push_navigate(socket, to: full_path)}
+    {:noreply, push_patch(socket, to: full_path)}
   end
 
   def handle_event("select-date-blackout", %{"date" => date_str}, socket) do
@@ -4498,7 +4496,7 @@ defmodule YscWeb.AdminBookingsLive do
        socket
        |> assign(:date_selection_type, nil)
        |> assign(:date_selection_start, nil)
-       |> push_navigate(
+       |> push_patch(
          to: ~p"/admin/bookings/blackouts/new?#{URI.encode_query(query_params)}"
        )}
     else
@@ -4547,7 +4545,7 @@ defmodule YscWeb.AdminBookingsLive do
        |> assign(:date_selection_type, nil)
        |> assign(:date_selection_start, nil)
        |> assign(:date_selection_hover_end, nil)
-       |> push_navigate(
+       |> push_patch(
          to: ~p"/admin/bookings/bookings/new?#{URI.encode_query(query_params)}"
        )}
     else
@@ -4603,7 +4601,7 @@ defmodule YscWeb.AdminBookingsLive do
        |> assign(:date_selection_start, nil)
        |> assign(:date_selection_room_id, nil)
        |> assign(:date_selection_hover_end, nil)
-       |> push_navigate(
+       |> push_patch(
          to: ~p"/admin/bookings/bookings/new?#{URI.encode_query(query_params)}"
        )}
     else
@@ -4931,7 +4929,7 @@ defmodule YscWeb.AdminBookingsLive do
         )
 
       query_string = URI.encode_query(flatten_query_params(query_params))
-      {:noreply, push_navigate(socket, to: ~p"/admin/bookings?#{query_string}")}
+      {:noreply, push_patch(socket, to: ~p"/admin/bookings?#{query_string}")}
     end
   end
 
@@ -5012,7 +5010,7 @@ defmodule YscWeb.AdminBookingsLive do
              title: "Refund"
            )
            |> assign(:show_refund_modal, false)
-           |> push_navigate(
+           |> push_patch(
              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
            )
            |> update_calendar_view(socket.assigns.selected_property)}
@@ -5367,7 +5365,7 @@ defmodule YscWeb.AdminBookingsLive do
            :info,
            "Booking #{action_word} successfully. Confirmation email sent to user."
          )
-         |> push_navigate(
+         |> push_patch(
            to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
          )
          |> update_calendar_view(socket.assigns.selected_property)}
@@ -5626,7 +5624,7 @@ defmodule YscWeb.AdminBookingsLive do
          |> YscWeb.Flash.put_toast(:info, "Pricing rule saved successfully",
            title: "Pricing"
          )
-         |> push_navigate(
+         |> push_patch(
            to:
              ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
          )}
@@ -5752,7 +5750,7 @@ defmodule YscWeb.AdminBookingsLive do
            socket.assigns.pricing_rules,
            socket.assigns.refund_policies
          )
-         |> push_navigate(
+         |> push_patch(
            to:
              ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=config"
          )}
@@ -5827,7 +5825,7 @@ defmodule YscWeb.AdminBookingsLive do
            socket.assigns.pricing_rules,
            refund_policies
          )
-         |> push_navigate(
+         |> push_patch(
            to:
              ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
          )}
@@ -6080,7 +6078,7 @@ defmodule YscWeb.AdminBookingsLive do
            socket.assigns.pricing_rules,
            socket.assigns.refund_policies
          )
-         |> push_navigate(
+         |> push_patch(
            to:
              ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
          )}
@@ -6109,7 +6107,7 @@ defmodule YscWeb.AdminBookingsLive do
        socket.assigns.pricing_rules,
        socket.assigns.refund_policies
      )
-     |> push_navigate(
+     |> push_patch(
        to:
          ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
      )}

@@ -112,7 +112,7 @@ defmodule YscWeb.AdminEventsLive do
               <div class="px-4 py-4">
                 <button
                   class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                  phx-click={JS.navigate(~p"/admin/events")}
+                  phx-click={JS.patch(~p"/admin/events")}
                 >
                   <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
                 </button>
@@ -324,7 +324,7 @@ defmodule YscWeb.AdminEventsLive do
          |> stream(:events, events, reset: true)}
 
       {:error, _meta} ->
-        {:noreply, push_navigate(socket, to: ~p"/admin/events")}
+        {:noreply, push_patch(socket, to: ~p"/admin/events")}
     end
   end
 
@@ -340,7 +340,7 @@ defmodule YscWeb.AdminEventsLive do
         {:noreply,
          socket
          |> put_flash(:error, "Failed to copy event")
-         |> push_navigate(to: ~p"/admin/events")}
+         |> push_patch(to: ~p"/admin/events")}
     end
   end
 

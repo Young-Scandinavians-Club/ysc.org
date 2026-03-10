@@ -63,7 +63,13 @@ defmodule Ysc.TrixScrubber do
     "title"
   ])
 
-  Meta.allow_tag_with_these_attributes("figure", ["class"])
+  Meta.allow_tag_with_these_attributes("figure", [
+    "class",
+    "data-trix-attachment",
+    "data-trix-content-type",
+    "data-trix-attributes"
+  ])
+
   Meta.allow_tag_with_these_attributes("figcaption", ["class"])
 
   Meta.strip_everything_not_covered()

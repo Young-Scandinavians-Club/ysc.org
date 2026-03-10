@@ -27,7 +27,7 @@ defmodule YscWeb.AdminPostsLive do
       <.modal
         :if={@live_action == :new}
         id="new-post-modal"
-        on_cancel={JS.navigate(~p"/admin/posts")}
+        on_cancel={JS.patch(~p"/admin/posts")}
         show
       >
         <.header>
@@ -48,7 +48,7 @@ defmodule YscWeb.AdminPostsLive do
 
           <div class="flex flex-row justify-end w-full pt-8">
             <button
-              phx-click={JS.navigate(~p"/admin/posts")}
+              phx-click={JS.patch(~p"/admin/posts")}
               class="rounded hover:bg-zinc-100 py-2 px-3 mr-4 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-600"
             >
               Cancel
@@ -65,7 +65,7 @@ defmodule YscWeb.AdminPostsLive do
           Posts
         </h1>
 
-        <.button phx-click={JS.navigate(~p"/admin/posts/new")}>
+        <.button phx-click={JS.patch(~p"/admin/posts/new")}>
           <.icon name="hero-document-plus" class="w-5 h-5 -mt-1" />
           <span class="ms-1">
             New Post
@@ -149,7 +149,7 @@ defmodule YscWeb.AdminPostsLive do
               <div class="px-4 py-4">
                 <button
                   class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                  phx-click={JS.navigate(~p"/admin/posts")}
+                  phx-click={JS.patch(~p"/admin/posts")}
                 >
                   <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
                 </button>
@@ -398,7 +398,7 @@ defmodule YscWeb.AdminPostsLive do
          |> stream(:posts, posts, reset: true)}
 
       {:error, _meta} ->
-        {:noreply, push_navigate(socket, to: ~p"/admin/posts")}
+        {:noreply, push_patch(socket, to: ~p"/admin/posts")}
     end
   end
 

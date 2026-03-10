@@ -602,7 +602,7 @@ defmodule YscWeb.AdminEventsNewLive do
         organizer_id: socket.assigns.current_user.id
       })
 
-    {:ok, push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
+    {:ok, push_patch(socket, to: "/admin/events/#{inserted_event.id}/edit")}
   end
 
   @impl true
@@ -612,7 +612,7 @@ defmodule YscWeb.AdminEventsNewLive do
     case Events.copy_event(event) do
       {:ok, new_event} ->
         {:noreply,
-         push_navigate(socket, to: ~p"/admin/events/#{new_event.id}/edit")}
+         push_patch(socket, to: ~p"/admin/events/#{new_event.id}/edit")}
 
       {:error, _reason} ->
         {:noreply,
@@ -685,7 +685,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.",
        title: "Event"
      )
-     |> push_navigate(to: "/admin/events/#{socket.assigns.event.id}/edit")}
+     |> push_patch(to: "/admin/events/#{socket.assigns.event.id}/edit")}
   end
 
   @impl true
@@ -732,7 +732,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     case Events.create_event(event_changeset) do
       {:ok, event} ->
-        {:noreply, push_navigate(socket, to: "/admin/events/#{event.id}/edit")}
+        {:noreply, push_patch(socket, to: "/admin/events/#{event.id}/edit")}
 
       {:error, changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -1161,7 +1161,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> YscWeb.Flash.put_toast(:info, "Ticket reservation created successfully",
        title: "Tickets"
      )
-     |> push_navigate(to: ~p"/admin/events/#{event_id}/tickets")}
+     |> push_patch(to: ~p"/admin/events/#{event_id}/tickets")}
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do

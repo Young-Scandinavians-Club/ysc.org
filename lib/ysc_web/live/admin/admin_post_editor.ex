@@ -35,7 +35,7 @@ defmodule YscWeb.AdminPostEditorLive do
         show={true}
         fullscreen={true}
         id="admin-post-preview-modal"
-        on_cancel={JS.navigate(~p"/admin/posts/#{@post_id}")}
+        on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
       >
         <div class="flex flex-col h-[86vh]">
           <ul class="flex flex-wrap items-center justify-center pb-4">
@@ -121,7 +121,7 @@ defmodule YscWeb.AdminPostEditorLive do
         show={true}
         fullscreen={false}
         id="admin-post-settings-modal"
-        on_cancel={JS.navigate(~p"/admin/posts/#{@post_id}")}
+        on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
       >
         <div class="flex flex-col">
           <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
@@ -353,7 +353,7 @@ defmodule YscWeb.AdminPostEditorLive do
             <button
               type="button"
               class="hidden lg:block flex-none rounded hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded text-zinc-800 mr-3"
-              phx-click={JS.navigate(~p"/admin/posts/#{@post_id}/preview")}
+              phx-click={JS.patch(~p"/admin/posts/#{@post_id}/preview")}
             >
               <.icon name="hero-computer-desktop" class="w-5 h-5 -mt-1" />
               <span class="sr-only">Preview post</span>
@@ -591,7 +591,7 @@ defmodule YscWeb.AdminPostEditorLive do
          "Please set a featured image before publishing.",
          title: "Featured image required"
        )
-       |> push_navigate(to: ~p"/admin/posts/#{post.id}/settings")}
+       |> push_patch(to: ~p"/admin/posts/#{post.id}/settings")}
     else
       res =
         Posts.update_post(

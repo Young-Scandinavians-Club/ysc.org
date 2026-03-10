@@ -31,7 +31,7 @@ defmodule YscWeb.AdminMediaLive do
       <.modal
         :if={@live_action == :edit}
         id="update-image-modal"
-        on_cancel={JS.navigate(build_media_url_with_state(assigns))}
+        on_cancel={JS.patch(build_media_url_with_state(assigns))}
         show
       >
         <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
@@ -225,7 +225,7 @@ defmodule YscWeb.AdminMediaLive do
           <div class="flex justify-end">
             <button
               class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80 mr-2"
-              phx-click={JS.navigate(build_media_url_with_state(assigns))}
+              phx-click={JS.patch(build_media_url_with_state(assigns))}
             >
               Cancel
             </button>
@@ -239,7 +239,7 @@ defmodule YscWeb.AdminMediaLive do
       <.modal
         :if={@live_action == :upload}
         id="add-images-modal"
-        on_cancel={JS.navigate(build_media_url_with_state(assigns))}
+        on_cancel={JS.patch(build_media_url_with_state(assigns))}
         show
       >
         <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
@@ -345,7 +345,7 @@ defmodule YscWeb.AdminMediaLive do
         </div>
 
         <div class="flex items-center gap-4">
-          <.button phx-click={JS.navigate(~p"/admin/media/upload")}>
+          <.button phx-click={JS.patch(~p"/admin/media/upload")}>
             <.icon name="hero-photo" class="w-5 h-5 -mt-1" />
             <span class="ms-1">
               New Image
@@ -417,7 +417,7 @@ defmodule YscWeb.AdminMediaLive do
             <p class="text-sm text-zinc-500 mb-6">
               Upload your first image to get started
             </p>
-            <.button phx-click={JS.navigate(~p"/admin/media/upload")}>
+            <.button phx-click={JS.patch(~p"/admin/media/upload")}>
               <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-1" />
               <span class="ms-1">
                 Upload Image
@@ -428,37 +428,6 @@ defmodule YscWeb.AdminMediaLive do
       </section>
     </.side_menu>
     """
-  end
-
-  @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    image = Media.fetch_image(id)
-    image_uploader = Ysc.Accounts.get_user!(image.user_id)
-    form = to_form(Media.Image.edit_image_changeset(image, %{}), as: "image")
-    media_count = Media.count_images()
-    timeline = Media.get_timeline_indices()
-    available_years = Enum.map(timeline, & &1.year)
-
-    {:ok,
-     socket
-     |> assign(:media_count, media_count)
-     |> assign(:page_title, "Media")
-     |> assign(:timeline, timeline)
-     |> assign(:available_years, available_years)
-     |> assign(:selected_year, nil)
-     |> assign(:per_page, 30)
-     |> assign(:end_of_timeline?, false)
-     |> assign(:stream_initialized?, false)
-     |> assign(:last_image_date, nil)
-     |> assign(:years_set, MapSet.new())
-     |> assign(:years_list, [])
-     |> assign(form: form)
-     |> assign(:active_image, image)
-     |> assign(:image_uploader, image_uploader)
-     |> assign(:selected_image_version, :optimized)
-     |> assign(:active_page, :media)
-     |> stream(:images, [], dom_id: &get_dom_id/1),
-     temporary_assigns: [form: nil]}
   end
 
   @impl true
@@ -482,12 +451,16 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:years_set, MapSet.new())
      |> assign(:years_list, [])
      |> assign(:uploaded_files, [])
+     |> assign(:active_image, nil)
+     |> assign(:image_uploader, nil)
+     |> assign(:selected_image_version, :optimized)
+     |> assign(form: nil)
      |> stream(:images, [], dom_id: &get_dom_id/1)
      |> allow_upload(:media_uploads,
        accept: ~w(.jpg .jpeg .png .gif .webp),
        max_entries: 10,
        external: &presign_upload/2
-     )}
+     ), temporary_assigns: [form: nil]}
   end
 
   @impl true
@@ -497,6 +470,26 @@ defmodule YscWeb.AdminMediaLive do
     Ysc.Logging.debug(
       "handle_params called with params: #{inspect(params)}, uri: #{inspect(uri)}"
     )
+
+    # Load edit-modal data when opening an image — no remount needed.
+    socket =
+      case socket.assigns.live_action do
+        :edit ->
+          image = Media.fetch_image(params["id"])
+          image_uploader = Ysc.Accounts.get_user!(image.user_id)
+
+          form =
+            to_form(Media.Image.edit_image_changeset(image, %{}), as: "image")
+
+          socket
+          |> assign(:active_image, image)
+          |> assign(:image_uploader, image_uploader)
+          |> assign(:selected_image_version, :optimized)
+          |> assign(form: form)
+
+        _ ->
+          socket
+      end
 
     # Parse query parameters from URI to get year param
     query_params = parse_query_params_from_uri(params, uri)
@@ -695,7 +688,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:years_set, years_set)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-     |> push_navigate(to: ~p"/admin/media")}
+     |> push_patch(to: ~p"/admin/media")}
   end
 
   def handle_event("validate-edit", %{"image" => image_params}, socket) do
@@ -734,7 +727,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:years_set, years_set)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-     |> push_navigate(to: build_media_url_with_state(socket))}
+     |> push_patch(to: build_media_url_with_state(socket))}
   end
 
   def handle_event("select-image-version", %{"version" => version}, socket) do
@@ -1118,9 +1111,7 @@ defmodule YscWeb.AdminMediaLive do
         <%!-- RENDER IMAGE --%>
         <%= if match?(%Media.Image{}, item) do %>
           <button
-            phx-click={
-              JS.navigate(build_image_edit_url_with_state(assigns, item.id))
-            }
+            phx-click={JS.patch(build_image_edit_url_with_state(assigns, item.id))}
             id={id}
             class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-zinc-400 hover:shadow-md transition-all duration-200 overflow-hidden"
           >

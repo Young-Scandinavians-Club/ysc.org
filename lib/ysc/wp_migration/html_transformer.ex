@@ -111,7 +111,8 @@ defmodule Ysc.WpMigration.HtmlTransformer do
     end)
   end
 
-  # Expands [gallery ids="123,456,789"] into a sequence of Trix figure blocks.
+  # Expands [gallery ids="123,456,789"] into a sequence of plain img tags that
+  # the Floki transform_node pass will then wrap into Trix figures.
   # IDs not present in url_map are silently skipped.
   defp expand_gallery_shortcodes(html, url_map) do
     Regex.replace(~r/\[gallery([^\]]*)\]/, html, fn _full, attrs ->
@@ -128,11 +129,8 @@ defmodule Ysc.WpMigration.HtmlTransformer do
 
       Enum.map_join(ids, "\n", fn id ->
         case Map.get(url_map, id) do
-          nil ->
-            ""
-
-          url ->
-            ~s(<figure class="attachment attachment--preview"><img src="#{url}"></figure>)
+          nil -> ""
+          url -> ~s(<img src="#{url}" data-wp-gallery-id="#{id}">)
         end
       end)
     end)
@@ -152,55 +150,37 @@ defmodule Ysc.WpMigration.HtmlTransformer do
     Enum.flat_map(nodes, &transform_node(&1, url_map))
   end
 
-  # Gutenberg wp-block-image figure wrapper: unwrap and process children
-  # (the img inside will be wrapped in its own figure by the img handler)
+  # Gutenberg wp-block-image figure: unwrap so the inner img handler creates
+  # the Trix figure. Other figures (e.g. from caption shortcodes) are inspected
+  # for an img child so we can fold them into a single Trix figure rather than
+  # nesting figure > figure.
   defp transform_node({"figure", attrs, children}, url_map) do
     if String.contains?(get_class(attrs), "wp-block-image") do
       transform_nodes(children, url_map)
     else
-      safe_class = trix_figure_class(get_class(attrs))
-      [{"figure", [{"class", safe_class}], transform_nodes(children, url_map)}]
+      case extract_figure_img_and_caption(children) do
+        {img_attrs, caption} ->
+          build_trix_figure(img_attrs, caption, url_map)
+
+        nil ->
+          [
+            {"figure", [{"class", "attachment attachment--preview"}],
+             transform_nodes(children, url_map)}
+          ]
+      end
     end
   end
 
-  # Transform <img> into a Trix <figure><img></figure> with the new S3 src.
-  # Lookup order:
-  #   1. wp-image-{id} CSS class → att_id key in url_map
-  #   2. Normalize the src filename (strip WP size suffix, lowercase) → filename key in url_map
-  #   3. Fall back to the original src unchanged
+  # Standalone <img>: wrap in a full Trix figure.
+  # Lookup order for the new URL:
+  #   1. wp-image-{id} CSS class  → att_id key in url_map
+  #   2. Normalize src filename   → filename key in url_map
+  #   3. Original src unchanged
   defp transform_node({"img", attrs, _}, url_map) do
-    src = get_attr(attrs, "src")
-    att_id = extract_wp_image_id(get_class(attrs))
-
-    new_src =
-      (att_id && Map.get(url_map, att_id)) ||
-        lookup_by_src_filename(src, url_map) ||
-        src
-
-    if new_src && new_src != "" do
-      img_attrs =
-        [{"src", new_src}]
-        |> maybe_add(get_attr(attrs, "alt"), "alt")
-        |> maybe_add(get_attr(attrs, "width"), "width")
-        |> maybe_add(get_attr(attrs, "height"), "height")
-
-      [
-        {"figure", [{"class", "attachment attachment--preview"}],
-         [{"img", img_attrs, []}]}
-      ]
-    else
-      []
-    end
+    build_trix_figure(attrs, nil, url_map)
   end
 
-  # figcaption: keep its class, recurse into children
-  defp transform_node({"figcaption", attrs, children}, url_map) do
-    safe_attrs = Enum.filter(attrs, fn {k, _} -> k == "class" end)
-    [{"figcaption", safe_attrs, transform_nodes(children, url_map)}]
-  end
-
-  # Paragraph containing only figures (common in WP classic editor):
-  # unwrap to avoid the invalid <p><figure>...</figure></p> nesting.
+  # Paragraph containing only figures: unwrap to avoid invalid nesting.
   defp transform_node({"p", _attrs, children}, url_map) do
     transformed = transform_nodes(children, url_map)
     non_ws = Enum.reject(transformed, &whitespace_text?/1)
@@ -213,13 +193,106 @@ defmodule Ysc.WpMigration.HtmlTransformer do
   end
 
   # All other elements: strip WP-specific attributes, recurse into children.
-  # The TrixScrubber applied downstream provides the final allow-list.
   defp transform_node({tag, attrs, children}, url_map) do
     [{tag, strip_wp_attrs(attrs), transform_nodes(children, url_map)}]
   end
 
   # Text nodes and other Floki leaf values pass through unchanged.
   defp transform_node(node, _url_map), do: [node]
+
+  # ---------------------------------------------------------------------------
+  # Trix figure builder
+  # ---------------------------------------------------------------------------
+
+  # Builds a Trix-compatible <figure> from WP img attrs + optional caption.
+  # Emits the data-trix-attachment JSON, correct class with extension suffix,
+  # and an <a> wrapper so the lightbox can open the full image.
+  defp build_trix_figure(img_attrs, caption, url_map) do
+    src = get_attr(img_attrs, "src")
+    att_id = extract_wp_image_id(get_class(img_attrs))
+
+    new_url =
+      (att_id && Map.get(url_map, att_id)) ||
+        lookup_by_src_filename(src, url_map) ||
+        src
+
+    if new_url && new_url != "" do
+      content_type = derive_content_type(new_url)
+      ext = content_type_ext(content_type)
+
+      width = get_attr(img_attrs, "width")
+      height = get_attr(img_attrs, "height")
+
+      attachment_data =
+        %{"contentType" => content_type, "url" => new_url}
+        |> then(fn m ->
+          if width && width != "", do: Map.put(m, "width", width), else: m
+        end)
+        |> then(fn m ->
+          if height && height != "", do: Map.put(m, "height", height), else: m
+        end)
+
+      attachment_json = Jason.encode!(attachment_data)
+
+      figure_attrs = [
+        {"class", "attachment attachment--preview attachment--#{ext}"},
+        {"data-trix-attachment", attachment_json},
+        {"data-trix-content-type", content_type}
+      ]
+
+      img_node_attrs =
+        [{"src", new_url}]
+        |> maybe_add(get_attr(img_attrs, "alt"), "alt")
+        |> maybe_add(width, "width")
+        |> maybe_add(height, "height")
+
+      link_children =
+        [{"img", img_node_attrs, []}]
+        |> append_trix_figcaption(caption)
+
+      href = "#{new_url}?content-disposition=attachment"
+
+      [{"figure", figure_attrs, [{"a", [{"href", href}], link_children}]}]
+    else
+      []
+    end
+  end
+
+  # If there's a caption string, append a Trix-styled figcaption inside the <a>.
+  defp append_trix_figcaption(children, caption)
+       when caption in [nil, ""],
+       do: children
+
+  defp append_trix_figcaption(children, caption) do
+    figcaption =
+      {"figcaption",
+       [{"class", "attachment__caption attachment__caption--edited"}],
+       [caption]}
+
+    children ++ [figcaption]
+  end
+
+  # Searches a figure's direct children for an img (or img nested in <a>).
+  # Returns `{img_attrs, caption_text_or_nil}` or `nil` if no img found.
+  defp extract_figure_img_and_caption(children) do
+    case Floki.find(children, "img") do
+      [{"img", img_attrs, _} | _] ->
+        caption =
+          case Floki.find(children, "figcaption") do
+            [figcaption_node | _] ->
+              text = Floki.text(figcaption_node) |> String.trim()
+              if text == "", do: nil, else: text
+
+            _ ->
+              nil
+          end
+
+        {img_attrs, caption}
+
+      _ ->
+        nil
+    end
+  end
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -263,21 +336,33 @@ defmodule Ysc.WpMigration.HtmlTransformer do
     end
   end
 
+  defp derive_content_type(url) do
+    case url
+         |> URI.parse()
+         |> Map.get(:path, "")
+         |> Path.extname()
+         |> String.downcase() do
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".png" -> "image/png"
+      ".gif" -> "image/gif"
+      ".webp" -> "image/webp"
+      _ -> "image/jpeg"
+    end
+  end
+
+  defp content_type_ext("image/jpeg"), do: "jpg"
+  defp content_type_ext("image/png"), do: "png"
+  defp content_type_ext("image/gif"), do: "gif"
+  defp content_type_ext("image/webp"), do: "webp"
+  defp content_type_ext(_), do: "jpg"
+
   defp maybe_add(attrs, nil, _name), do: attrs
   defp maybe_add(attrs, "", _name), do: attrs
   defp maybe_add(attrs, val, name), do: attrs ++ [{name, val}]
 
   defp whitespace_text?(node) when is_binary(node), do: String.trim(node) == ""
   defp whitespace_text?(_), do: false
-
-  # Preserve trix class names; replace WP-specific classes with trix default.
-  defp trix_figure_class(""), do: "attachment attachment--preview"
-
-  defp trix_figure_class(cls) do
-    if String.contains?(cls, "attachment"),
-      do: cls,
-      else: "attachment attachment--preview"
-  end
 
   # Remove class, style, data-* attributes and JS event handlers from elements.
   # href, src, alt, width, height, etc. are kept for the TrixScrubber to filter.

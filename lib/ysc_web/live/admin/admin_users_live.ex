@@ -25,7 +25,7 @@ defmodule YscWeb.AdminUsersLive do
       <.modal
         :if={@live_action == :edit}
         id="edit-user-modal"
-        on_cancel={JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")}
+        on_cancel={JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
         <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
@@ -73,7 +73,7 @@ defmodule YscWeb.AdminUsersLive do
           <div class="flex flex-row justify-end w-full pt-8">
             <button
               phx-click={
-                JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")
+                JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")
               }
               class="rounded hover:bg-zinc-100 py-2 px-3 mr-4 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-600"
             >
@@ -90,7 +90,7 @@ defmodule YscWeb.AdminUsersLive do
       <.modal
         :if={@live_action == :review}
         id="review-user-modal"
-        on_cancel={JS.navigate(~p"/admin/users?#{list_params_for_back(@params)}")}
+        on_cancel={JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
         <div class="max-w-2xl mx-auto">
@@ -581,7 +581,7 @@ defmodule YscWeb.AdminUsersLive do
               <div class="px-4 py-4">
                 <button
                   class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                  phx-click={JS.navigate(~p"/admin/users")}
+                  phx-click={JS.patch(~p"/admin/users")}
                 >
                   <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
                 </button>
@@ -653,7 +653,7 @@ defmodule YscWeb.AdminUsersLive do
                   <button
                     :if={user.state == :pending_approval}
                     phx-click={
-                      JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}")
+                      JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
                     }
                     class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                   >
@@ -681,7 +681,7 @@ defmodule YscWeb.AdminUsersLive do
               <div class="px-4 py-4 flex items-center align-center justify-center">
                 <button
                   class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
-                  phx-click={JS.navigate(~p"/admin/users")}
+                  phx-click={JS.patch(~p"/admin/users")}
                 >
                   <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
                 </button>
@@ -783,7 +783,7 @@ defmodule YscWeb.AdminUsersLive do
                 <button
                   :if={user.state == :pending_approval}
                   phx-click={
-                    JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}")
+                    JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
                   }
                   class="text-blue-600 font-semibold hover:underline cursor-pointer"
                 >
@@ -808,7 +808,7 @@ defmodule YscWeb.AdminUsersLive do
               <div class="px-4 py-4 flex items-center align-center justify-center">
                 <button
                   class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
-                  phx-click={JS.navigate(~p"/admin/users")}
+                  phx-click={JS.patch(~p"/admin/users")}
                 >
                   <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
                 </button>
@@ -931,7 +931,7 @@ defmodule YscWeb.AdminUsersLive do
          |> stream(:users, users, reset: true)}
 
       {:error, _meta} ->
-        {:noreply, push_navigate(socket, to: ~p"/admin/users")}
+        {:noreply, push_patch(socket, to: ~p"/admin/users")}
     end
   end
 
@@ -1102,7 +1102,7 @@ defmodule YscWeb.AdminUsersLive do
 
         {:noreply,
          socket
-         |> push_navigate(to: ~p"/admin/users?#{socket.assigns[:params]}")
+         |> push_patch(to: ~p"/admin/users?#{socket.assigns[:params]}")
          |> YscWeb.Flash.put_toast(
            :info,
            "User was approved and is now a member!",
@@ -1206,7 +1206,7 @@ defmodule YscWeb.AdminUsersLive do
 
           {:noreply,
            socket
-           |> push_navigate(to: ~p"/admin/users?#{socket.assigns[:params]}")
+           |> push_patch(to: ~p"/admin/users?#{socket.assigns[:params]}")
            |> YscWeb.Flash.put_toast(:info, "User application was rejected!",
              title: "Application"
            )}
