@@ -49,4 +49,19 @@ defmodule Ysc.Accounts.Address do
       country: signup_application.country
     })
   end
+
+  @doc """
+  Lenient changeset for WP migration. Only requires address and country
+  since many WP records are missing city or postal_code.
+  """
+  def migration_changeset(address, attrs) do
+    address
+    |> cast(attrs, [:address, :city, :region, :postal_code, :country, :user_id])
+    |> validate_required([:address, :country])
+    |> validate_length(:address, max: 255)
+    |> validate_length(:city, max: 100)
+    |> validate_length(:region, max: 100)
+    |> validate_length(:postal_code, max: 20)
+    |> validate_length(:country, max: 100)
+  end
 end

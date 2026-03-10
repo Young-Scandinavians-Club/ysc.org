@@ -143,6 +143,43 @@ defmodule Ysc.Accounts.SignupApplication do
     |> validate_membership_eligibility()
   end
 
+  @doc """
+  Changeset for migrating existing WP application data.
+
+  Uses the same field list as `application_changeset/2` but skips validations
+  that are only meaningful for new signups: required fields (old members often
+  have incomplete records), `agreed_to_bylaws` (they agreed under a previous
+  system), and `validate_membership_eligibility` (eligibility strings may not
+  map cleanly to current enum values).
+  """
+  def migration_changeset(application, attrs) do
+    application
+    |> cast(attrs, [
+      :user_id,
+      :membership_type,
+      :membership_eligibility,
+      :occupation,
+      :birth_date,
+      :address,
+      :country,
+      :city,
+      :region,
+      :postal_code,
+      :place_of_birth,
+      :citizenship,
+      :most_connected_nordic_country,
+      :link_to_scandinavia,
+      :lived_in_scandinavia,
+      :spoken_languages,
+      :hear_about_the_club,
+      :agreed_to_bylaws,
+      :started,
+      :completed,
+      :agreed_to_bylaws_at
+    ])
+    |> validate_birth_date()
+  end
+
   def review_outcome_changeset(application, attrs, _opts \\ []) do
     application
     |> cast(attrs, [

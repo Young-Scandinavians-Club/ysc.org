@@ -156,7 +156,8 @@ defmodule YscWeb.Workers.UserExporter do
     end
 
     # Get membership info for this user
-    {membership_type, renewal_date} = get_membership_info(row)
+    {membership_type, {renewal_date, renewal_time, renewal_tz}} =
+      get_membership_info(row)
 
     # Build result with standard fields
     # Fields come in as atoms from AdminUsersLive
@@ -176,6 +177,8 @@ defmodule YscWeb.Workers.UserExporter do
     result
     |> Map.put(:membership_type, membership_type)
     |> Map.put(:membership_renewal_date, renewal_date)
+    |> Map.put(:membership_renewal_time, renewal_time)
+    |> Map.put(:membership_renewal_tz, renewal_tz)
     |> Map.put(
       :membership_inherited,
       get_membership_inherited_status(row, membership_type)
@@ -212,7 +215,7 @@ defmodule YscWeb.Workers.UserExporter do
 
     # Check for lifetime membership first
     if Accounts.has_lifetime_membership?(user_to_check) do
-      {"Lifetime", "Never"}
+      {"Lifetime", {"Never", nil, nil}}
     else
       # Use preloaded subscriptions if available, otherwise query
       subscriptions =
@@ -236,7 +239,7 @@ defmodule YscWeb.Workers.UserExporter do
 
       case active_subscription do
         nil ->
-          {nil, nil}
+          {nil, {nil, nil, nil}}
 
         subscription ->
           # Ensure subscription items are loaded
@@ -270,13 +273,14 @@ defmodule YscWeb.Workers.UserExporter do
     end
   end
 
-  defp format_renewal_date(nil), do: nil
+  defp format_renewal_date(nil), do: {nil, nil, nil}
 
   defp format_renewal_date(%DateTime{} = datetime) do
-    # Format in America/Los_Angeles timezone for display
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Timex.format!("%Y-%m-%d %I:%M %p %Z", :strftime)
+    local = DateTime.shift_zone!(datetime, "America/Los_Angeles")
+    date = Timex.format!(local, "%Y-%m-%d", :strftime)
+    time = Timex.format!(local, "%I:%M %p", :strftime)
+    tz = local.zone_abbr
+    {date, time, tz}
   end
 
   defp get_membership_inherited_status(user, membership_type) do

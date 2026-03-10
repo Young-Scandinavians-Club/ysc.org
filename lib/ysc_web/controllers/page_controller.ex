@@ -95,8 +95,8 @@ defmodule YscWeb.PageController do
       Ysc.Accounts.list_bod_members()
       |> Enum.map(fn member ->
         Map.merge(member, %{
-          first_name: String.capitalize(member.first_name || ""),
-          last_name: String.capitalize(member.last_name || "")
+          first_name: Ysc.title_case(member.first_name || ""),
+          last_name: Ysc.title_case(member.last_name || "")
         })
       end)
 

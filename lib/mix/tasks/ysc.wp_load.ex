@@ -8,7 +8,13 @@ defmodule Mix.Tasks.Ysc.WpLoad do
   and Stripe customer IDs.
 
   Usage:
-    mix ysc.wp_load --export-dir wp_migration_export [--dry-run] [--no-upload-media]
+    mix ysc.wp_load --export-dir wp_migration_export [--dry-run] [--no-upload-media] [--create-stripe-subscriptions]
+
+  Options:
+    --create-stripe-subscriptions  Creates real Stripe customers and subscriptions in the
+                                   connected Stripe account (sandbox/dev). Each subscription
+                                   is created with trial_end set to the WP renewal date so
+                                   no immediate charge fires. Useful for local testing.
   """
 
   use Mix.Task
@@ -19,7 +25,8 @@ defmodule Mix.Tasks.Ysc.WpLoad do
   @switches [
     export_dir: :string,
     dry_run: :boolean,
-    no_upload_media: :boolean
+    no_upload_media: :boolean,
+    create_stripe_subscriptions: :boolean
   ]
 
   def run(args) do
@@ -31,6 +38,7 @@ defmodule Mix.Tasks.Ysc.WpLoad do
     export_dir = opts[:export_dir]
     dry_run = opts[:dry_run] || false
     upload_media = not (opts[:no_upload_media] || false)
+    create_stripe_subscriptions = opts[:create_stripe_subscriptions] || false
 
     if is_nil(export_dir) or export_dir == "" do
       Mix.raise("""
@@ -40,19 +48,22 @@ defmodule Mix.Tasks.Ysc.WpLoad do
         mix ysc.wp_load --export-dir wp_migration_export
         mix ysc.wp_load --export-dir wp_migration_export --dry-run
         mix ysc.wp_load --export-dir wp_migration_export --no-upload-media
+        mix ysc.wp_load --export-dir wp_migration_export --create-stripe-subscriptions
       """)
     end
 
     Ysc.Logging.info("Starting WP load",
       export_dir: export_dir,
       dry_run: dry_run,
-      upload_media: upload_media
+      upload_media: upload_media,
+      create_stripe_subscriptions: create_stripe_subscriptions
     )
 
     case Ysc.WpMigration.Load.run(
            export_dir: export_dir,
            dry_run: dry_run,
-           upload_media: upload_media
+           upload_media: upload_media,
+           create_stripe_subscriptions: create_stripe_subscriptions
          ) do
       {:ok, result} ->
         if dry_run do

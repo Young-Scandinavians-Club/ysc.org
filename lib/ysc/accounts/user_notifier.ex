@@ -16,7 +16,7 @@ defmodule Ysc.Accounts.UserNotifier do
       "#{user.id}",
       "Confirm Your YSC Account",
       "confirm_email",
-      %{first_name: String.capitalize(user.first_name), url: url},
+      %{first_name: Ysc.title_case(user.first_name), url: url},
       """
       ==============================
 
@@ -45,7 +45,7 @@ defmodule Ysc.Accounts.UserNotifier do
       UUID.uuid4(),
       "Reset Your YSC Password",
       "reset_password",
-      %{first_name: String.capitalize(user.first_name), url: url},
+      %{first_name: Ysc.title_case(user.first_name), url: url},
       """
       ==============================
 
@@ -74,7 +74,7 @@ defmodule Ysc.Accounts.UserNotifier do
       UUID.uuid4(),
       "Change Your YSC Email",
       "change_email",
-      %{first_name: String.capitalize(user.first_name), url: url},
+      %{first_name: Ysc.title_case(user.first_name), url: url},
       """
       ==============================
 
@@ -103,7 +103,7 @@ defmodule Ysc.Accounts.UserNotifier do
       UUID.uuid4(),
       "Your YSC Password Has Been Changed",
       "password_changed",
-      %{first_name: String.capitalize(user.first_name)},
+      %{first_name: Ysc.title_case(user.first_name)},
       """
       ==============================
 
@@ -133,11 +133,11 @@ defmodule Ysc.Accounts.UserNotifier do
       UUID.uuid4(),
       "Your YSC Email Has Been Changed",
       "email_changed",
-      %{first_name: String.capitalize(user.first_name), new_email: new_email},
+      %{first_name: Ysc.title_case(user.first_name), new_email: new_email},
       """
       ==============================
 
-      Hi #{String.capitalize(user.first_name)},
+      Hi #{Ysc.title_case(user.first_name)},
 
       This is to confirm that the email address for your Young Scandinavians Club account has been successfully changed from #{old_email} to #{new_email}.
 
@@ -163,13 +163,13 @@ defmodule Ysc.Accounts.UserNotifier do
       "New Passkey Added to Your YSC Account",
       "passkey_added",
       %{
-        first_name: String.capitalize(user.first_name),
+        first_name: Ysc.title_case(user.first_name),
         device_name: passkey_nickname
       },
       """
       ==============================
 
-      Hi #{String.capitalize(user.first_name)},
+      Hi #{Ysc.title_case(user.first_name)},
 
       This is to confirm that a new passkey has been added to your Young Scandinavians Club account.
 

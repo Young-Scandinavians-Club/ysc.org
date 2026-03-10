@@ -210,7 +210,7 @@ defmodule YscWeb.AdminMediaLive do
         </div>
 
         <p class="leading-6 text-sm text-zinc-600 mt-2">
-          Uploaded by {"#{String.capitalize(@image_uploader.first_name)} #{String.capitalize(@image_uploader.last_name)} (#{@image_uploader.email}) on #{Timex.format!(@image_uploader.inserted_at, "%Y-%m-%d", :strftime)}"}
+          Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} (#{@image_uploader.email}) on #{Timex.format!(@image_uploader.inserted_at, "%Y-%m-%d", :strftime)}"}
         </p>
 
         <.simple_form
@@ -358,26 +358,43 @@ defmodule YscWeb.AdminMediaLive do
         <div
           :if={@media_count > 0}
           id="media-gallery"
-          phx-update="stream"
-          phx-viewport-bottom={!@end_of_timeline? && "load-more"}
           phx-hook="ScrollPreserver"
-          class="space-y-8 pr-12"
+          class="pr-12"
         >
           {render_images_by_year(assigns)}
         </div>
-        <!-- Year Scrubber -->
+        <%!-- Year Scrubber --%>
         <div
           :if={@media_count > 0 and length(@timeline) > 1}
           id="year-scrubber"
           phx-hook="YearScrubber"
           class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
         >
+          <%!-- All / reset button --%>
+          <button
+            phx-click="show-all-years"
+            class={[
+              "w-9 h-9 flex items-center justify-center rounded transition-all duration-150 relative group",
+              if(is_nil(@selected_year),
+                do: "bg-zinc-800 text-white opacity-100",
+                else:
+                  "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 opacity-60 hover:opacity-100"
+              )
+            ]}
+            title="Show all years"
+          >
+            <.icon name="hero-squares-2x2" class="w-4 h-4" />
+            <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+              All years
+            </span>
+          </button>
+          <div class="w-5 h-px bg-zinc-200 my-0.5"></div>
           <%= for item <- @timeline do %>
             <button
               data-year-item={item.year}
               phx-click="jump-to-year"
               phx-value-year={item.year}
-              class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
+              class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
               title={"#{item.year} (#{item.count} images)"}
             >
               <span class="group-hover:hidden flex items-center justify-center w-full h-full">
@@ -422,8 +439,6 @@ defmodule YscWeb.AdminMediaLive do
     timeline = Media.get_timeline_indices()
     available_years = Enum.map(timeline, & &1.year)
 
-    # Don't load images in mount for edit route - handle_params will load them with correct year
-    # This prevents the page from scrolling to top when opening the modal
     {:ok,
      socket
      |> assign(:media_count, media_count)
@@ -433,6 +448,8 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_year, nil)
      |> assign(:per_page, 30)
      |> assign(:end_of_timeline?, false)
+     |> assign(:stream_initialized?, false)
+     |> assign(:last_image_date, nil)
      |> assign(:years_set, MapSet.new())
      |> assign(:years_list, [])
      |> assign(form: form)
@@ -450,8 +467,6 @@ defmodule YscWeb.AdminMediaLive do
     timeline = Media.get_timeline_indices()
     available_years = Enum.map(timeline, & &1.year)
 
-    # Load default images initially - handle_params will update if year param is present
-    # We use an empty stream initially to avoid showing wrong images before handle_params runs
     {:ok,
      socket
      |> assign(:media_count, media_count)
@@ -462,6 +477,8 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_year, nil)
      |> assign(:per_page, 30)
      |> assign(:end_of_timeline?, false)
+     |> assign(:stream_initialized?, false)
+     |> assign(:last_image_date, nil)
      |> assign(:years_set, MapSet.new())
      |> assign(:years_list, [])
      |> assign(:uploaded_files, [])
@@ -503,11 +520,10 @@ defmodule YscWeb.AdminMediaLive do
           "Processing year: #{year}, current: #{socket.assigns.selected_year}"
         )
 
-        # Only reload if year changed OR if stream is empty (e.g., on edit route mount)
-        stream_empty = Enum.empty?(socket.assigns.streams.images.inserts)
         year_changed = year != socket.assigns.selected_year
+        not_initialized = not socket.assigns.stream_initialized?
 
-        if year_changed || stream_empty do
+        if year_changed || not_initialized do
           start_date =
             DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
 
@@ -525,47 +541,37 @@ defmodule YscWeb.AdminMediaLive do
 
           Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
 
+          {years_set, years_list} = years_from_images(images)
           stream_items = Timeline.inject_date_headers(images)
-
-          new_years =
-            Enum.map(images, fn image -> image.inserted_at.year end)
-            |> MapSet.new()
-
-          years_list = new_years |> MapSet.to_list() |> Enum.sort(:desc)
 
           socket
           |> assign(:selected_year, year)
           |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-          |> assign(:years_set, new_years)
+          |> assign(:stream_initialized?, true)
+          |> assign(:last_image_date, images |> List.last() |> last_date())
+          |> assign(:years_set, years_set)
           |> assign(:years_list, years_list)
           |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-          |> update_years_from_stream()
         else
           socket
         end
       else
-        # If no year param, load default images (all images, most recent first)
-        # Check if we already have images loaded (to avoid reloading unnecessarily)
-        stream_empty = Enum.empty?(socket.assigns.streams.images.inserts)
         has_year_filter = not is_nil(socket.assigns.selected_year)
+        not_initialized = not socket.assigns.stream_initialized?
 
-        if has_year_filter || stream_empty do
+        if has_year_filter || not_initialized do
           images = Media.list_images_cursor(limit: socket.assigns.per_page)
+          {years_set, years_list} = years_from_images(images)
           stream_items = Timeline.inject_date_headers(images)
-
-          new_years =
-            Enum.map(images, fn image -> image.inserted_at.year end)
-            |> MapSet.new()
-
-          years_list = new_years |> MapSet.to_list() |> Enum.sort(:desc)
 
           socket
           |> assign(:selected_year, nil)
           |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-          |> assign(:years_set, new_years)
+          |> assign(:stream_initialized?, true)
+          |> assign(:last_image_date, images |> List.last() |> last_date())
+          |> assign(:years_set, years_set)
           |> assign(:years_list, years_list)
           |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-          |> update_years_from_stream()
         else
           socket
         end
@@ -670,11 +676,11 @@ defmodule YscWeb.AdminMediaLive do
         {:ok, new_image}
       end)
 
-    # Reload images after upload
     media_count = Media.count_images()
     timeline = Media.get_timeline_indices()
     available_years = Enum.map(timeline, & &1.year)
     images = Media.list_images_cursor(limit: socket.assigns.per_page)
+    {years_set, years_list} = years_from_images(images)
     stream_items = Timeline.inject_date_headers(images)
 
     {:noreply,
@@ -684,10 +690,11 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:timeline, timeline)
      |> assign(:available_years, available_years)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-     |> assign(:years_set, MapSet.new())
-     |> assign(:years_list, [])
+     |> assign(:stream_initialized?, true)
+     |> assign(:last_image_date, images |> List.last() |> last_date())
+     |> assign(:years_set, years_set)
+     |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-     |> update_years_from_stream()
      |> push_navigate(to: ~p"/admin/media")}
   end
 
@@ -711,10 +718,10 @@ defmodule YscWeb.AdminMediaLive do
 
     Media.update_image(active_image, image_params, current_user)
 
-    # Reload images after update
     timeline = Media.get_timeline_indices()
     available_years = Enum.map(timeline, & &1.year)
     images = Media.list_images_cursor(limit: socket.assigns.per_page)
+    {years_set, years_list} = years_from_images(images)
     stream_items = Timeline.inject_date_headers(images)
 
     {:noreply,
@@ -722,10 +729,11 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:timeline, timeline)
      |> assign(:available_years, available_years)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-     |> assign(:years_set, MapSet.new())
-     |> assign(:years_list, [])
+     |> assign(:stream_initialized?, true)
+     |> assign(:last_image_date, images |> List.last() |> last_date())
+     |> assign(:years_set, years_set)
+     |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-     |> update_years_from_stream()
      |> push_navigate(to: build_media_url_with_state(socket))}
   end
 
@@ -792,156 +800,90 @@ defmodule YscWeb.AdminMediaLive do
   def handle_event("load-more", _params, socket) do
     require Ysc.Logging
 
-    # Safety check: ensure we have images in the stream before trying to load more
-    current_count = Enum.count(socket.assigns.streams.images.inserts)
+    last_image_date = socket.assigns.last_image_date
 
-    Ysc.Logging.debug(
-      "Load-more: current stream count: #{current_count}, end_of_timeline: #{socket.assigns.end_of_timeline?}"
-    )
-
-    if not socket.assigns.end_of_timeline? and current_count > 0 do
-      # Get the last image's inserted_at as cursor (skip headers)
-      last_image_date =
-        socket.assigns.streams.images.inserts
-        |> Enum.filter(fn {_id, _at, item, _meta} ->
-          match?(%Media.Image{}, item)
-        end)
-        |> List.last()
-        |> case do
-          nil -> nil
-          {_id, _at, image, _meta} -> image.inserted_at
-        end
-
-      Ysc.Logging.debug(
-        "Load-more: last_image_date=#{inspect(last_image_date)}, selected_year=#{inspect(socket.assigns.selected_year)}"
-      )
-
+    if not socket.assigns.end_of_timeline? and not is_nil(last_image_date) do
       new_images =
-        if last_image_date do
-          # If a year filter is active, load images from that year only
-          if socket.assigns.selected_year do
-            year = socket.assigns.selected_year
+        if socket.assigns.selected_year do
+          year = socket.assigns.selected_year
 
-            start_date =
-              DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
+          start_date =
+            DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
 
-            end_date =
-              DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
+          end_date =
+            DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
 
-            images =
-              Repo.all(
-                from i in Media.Image,
-                  where:
-                    i.inserted_at >= ^start_date and i.inserted_at <= ^end_date and
-                      i.inserted_at < ^last_image_date,
-                  order_by: [desc: i.inserted_at, desc: i.id],
-                  limit: ^socket.assigns.per_page
-              )
-
-            Ysc.Logging.debug(
-              "Load-more: loaded #{length(images)} images for year #{year}"
-            )
-
-            images
-          else
-            images =
-              Media.list_images_cursor(
-                before_date: last_image_date,
-                limit: socket.assigns.per_page
-              )
-
-            Ysc.Logging.debug(
-              "Load-more: loaded #{length(images)} images (no year filter)"
-            )
-
-            images
-          end
-        else
-          Ysc.Logging.warning(
-            "Load-more: no last_image_date found, cannot load more"
+          Repo.all(
+            from i in Media.Image,
+              where:
+                i.inserted_at >= ^start_date and i.inserted_at <= ^end_date and
+                  i.inserted_at < ^last_image_date,
+              order_by: [desc: i.inserted_at, desc: i.id],
+              limit: ^socket.assigns.per_page
           )
-
-          []
+        else
+          Media.list_images_cursor(
+            before_date: last_image_date,
+            limit: socket.assigns.per_page
+          )
         end
+
+      Ysc.Logging.debug("Load-more: loaded #{length(new_images)} images")
 
       case new_images do
         [] ->
-          Ysc.Logging.debug("Load-more: no new images, marking end_of_timeline")
           {:noreply, assign(socket, :end_of_timeline?, true)}
 
-        [_ | _] = new_images ->
-          # Get the last image (not header) to determine if we need a new header
-          last_existing_image_date =
-            socket.assigns.streams.images.inserts
-            |> Enum.filter(fn {_id, _at, item, _meta} ->
-              match?(%Media.Image{}, item)
-            end)
-            |> List.last()
-            |> case do
-              nil -> nil
-              {_id, _at, image, _meta} -> image.inserted_at
-            end
-
-          # Only inject headers if we're starting a new month
-          # Check if the first new image is in a different month than the last image
+        [_ | _] ->
           first_new_image_date = List.first(new_images).inserted_at
 
           needs_header =
-            case last_existing_image_date do
-              nil ->
-                true
+            last_image_date.year != first_new_image_date.year ||
+              last_image_date.month != first_new_image_date.month
 
-              last_date ->
-                last_date.year != first_new_image_date.year ||
-                  last_date.month != first_new_image_date.month
-            end
+          stream_items =
+            if needs_header,
+              do: Timeline.inject_date_headers(new_images),
+              else: new_images
 
-          # Only proceed if we have items to add
-          if Enum.any?(new_images) do
-            stream_items =
-              if needs_header do
-                Timeline.inject_date_headers(new_images)
-              else
-                # No header needed, just add the images
-                new_images
-              end
+          {new_years_set, _} = years_from_images(new_images)
+          updated_years = MapSet.union(socket.assigns.years_set, new_years_set)
+          years_list = updated_years |> MapSet.to_list() |> Enum.sort(:desc)
 
-            Ysc.Logging.debug(
-              "Load-more: adding #{length(stream_items)} items to stream (needs_header: #{needs_header})"
-            )
-
-            # Extract years from new images and update
-            new_years =
-              Enum.map(new_images, fn image -> image.inserted_at.year end)
-              |> MapSet.new()
-
-            existing_years = Map.get(socket.assigns, :years_set, MapSet.new())
-            updated_years = MapSet.union(existing_years, new_years)
-
-            # Make sure we're appending, not resetting
-            # Use dom_id to ensure proper stream tracking
-            # Only stream if we have items
-            {:noreply,
-             socket
-             |> assign(
-               :end_of_timeline?,
-               length(new_images) < socket.assigns.per_page
-             )
-             |> assign(:years_set, updated_years)
-             |> update_years_from_stream()
-             |> stream(:images, stream_items, at: -1, dom_id: &get_dom_id/1)}
-          else
-            Ysc.Logging.warning(
-              "Load-more: new_images list is empty, marking end_of_timeline"
-            )
-
-            {:noreply, assign(socket, :end_of_timeline?, true)}
-          end
+          {:noreply,
+           socket
+           |> assign(
+             :end_of_timeline?,
+             length(new_images) < socket.assigns.per_page
+           )
+           |> assign(:last_image_date, new_images |> List.last() |> last_date())
+           |> assign(:years_set, updated_years)
+           |> assign(:years_list, years_list)
+           |> stream(:images, stream_items, at: -1, dom_id: &get_dom_id/1)}
       end
     else
-      Ysc.Logging.debug("Load-more: end_of_timeline is true, ignoring")
       {:noreply, socket}
     end
+  end
+
+  def handle_event("show-all-years", _params, socket) do
+    images = Media.list_images_cursor(limit: socket.assigns.per_page)
+    {years_set, years_list} = years_from_images(images)
+    stream_items = Timeline.inject_date_headers(images)
+
+    socket =
+      socket
+      |> assign(:selected_year, nil)
+      |> assign(:url_year_param, nil)
+      |> assign(:years_set, years_set)
+      |> assign(:years_list, years_list)
+      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+      |> assign(:stream_initialized?, true)
+      |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+      |> push_patch(to: ~p"/admin/media")
+
+    {:noreply, socket}
   end
 
   def handle_event("jump-to-year", %{"year" => year}, socket) do
@@ -954,25 +896,19 @@ defmodule YscWeb.AdminMediaLive do
         limit: socket.assigns.per_page
       )
 
+    {years_set, years_list} = years_from_images(images)
     stream_items = Timeline.inject_date_headers(images)
 
-    # Extract years from loaded images
-    new_years =
-      Enum.map(images, fn image -> image.inserted_at.year end) |> MapSet.new()
-
-    years_list = new_years |> MapSet.to_list() |> Enum.sort(:desc)
-
-    # Update URL with year parameter
     socket =
       socket
-      # Set the selected year to maintain filter state
       |> assign(:selected_year, year_int)
       |> assign(:url_year_param, to_string(year_int))
-      |> assign(:years_set, new_years)
+      |> assign(:years_set, years_set)
       |> assign(:years_list, years_list)
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+      |> assign(:stream_initialized?, true)
+      |> assign(:last_image_date, images |> List.last() |> last_date())
       |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-      |> update_years_from_stream()
 
     # Build URL with year parameter
     url = build_media_url_with_state(socket)
@@ -1146,39 +1082,27 @@ defmodule YscWeb.AdminMediaLive do
     end
   end
 
-  # Update years from stream
-  defp update_years_from_stream(socket) do
-    years =
-      socket.assigns.streams.images.inserts
-      |> Enum.filter(fn {_id, _at, item, _meta} ->
-        match?(%Media.Image{}, item)
-      end)
-      |> Enum.map(fn {_id, _at, image, _meta} -> image.inserted_at.year end)
+  defp years_from_images(images) do
+    years_set =
+      images
+      |> Enum.map(& &1.inserted_at.year)
       |> MapSet.new()
-      |> MapSet.to_list()
-      |> Enum.sort(:desc)
 
-    socket
-    |> assign(:years_set, MapSet.new(years))
-    |> assign(:years_list, years)
+    years_list = years_set |> MapSet.to_list() |> Enum.sort(:desc)
+    {years_set, years_list}
   end
 
-  # Render images with date headers from stream
+  defp last_date(nil), do: nil
+  defp last_date(%{inserted_at: inserted_at}), do: inserted_at
+
   defp render_images_by_year(assigns) do
-    # Extract unique years from streamed images (excluding headers)
-    years =
-      assigns.streams.images.inserts
-      |> Enum.filter(fn {_id, _at, item, _meta} ->
-        match?(%Media.Image{}, item)
-      end)
-      |> Enum.map(fn {_id, _at, image, _meta} -> image.inserted_at.year end)
-      |> Enum.uniq()
-      |> Enum.sort(:desc)
-
-    assigns = assign(assigns, :years, years)
-
     ~H"""
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9 gap-3 md:gap-4">
+    <div
+      id="images-grid"
+      phx-update="stream"
+      phx-viewport-bottom={!@end_of_timeline? && "load-more"}
+      class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9 gap-3 md:gap-4"
+    >
       <%= for {id, item} <- @streams.images do %>
         <%!-- RENDER HEADER --%>
         <%= if match?(%Timeline.Header{}, item) do %>

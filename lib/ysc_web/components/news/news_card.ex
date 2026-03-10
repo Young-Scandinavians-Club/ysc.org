@@ -68,7 +68,9 @@ defmodule YscWeb.Components.News.NewsCard do
       <div class="px-4 pb-4 flex flex-col flex-1">
         <div class="flex items-center gap-3 mb-4">
           <span class="text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
-            {Timex.format!(@post.published_on, "{Mshort} {D}")}
+            {if @post.published_on,
+              do: Timex.format!(@post.published_on, "{Mshort} {D}"),
+              else: ""}
           </span>
           <span class="h-3 w-px bg-zinc-200"></span>
           <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
@@ -97,8 +99,8 @@ defmodule YscWeb.Components.News.NewsCard do
             />
             <div>
               <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
-                {String.capitalize(@post.author.first_name || "")}
-                {String.capitalize(@post.author.last_name || "")}
+                {Ysc.title_case(@post.author.first_name || "")}
+                {Ysc.title_case(@post.author.last_name || "")}
               </p>
               <p
                 :if={@post.board_position_at_publish}

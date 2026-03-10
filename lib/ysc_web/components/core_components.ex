@@ -1544,8 +1544,8 @@ defmodule YscWeb.CoreComponents do
 
     assigns = assign(assigns, :subtitle, subtitle)
 
-    first_name = String.capitalize(assigns[:first_name] || "")
-    last_name = String.capitalize(assigns[:last_name] || "")
+    first_name = Ysc.title_case(assigns[:first_name] || "")
+    last_name = Ysc.title_case(assigns[:last_name] || "")
 
     full_name =
       cond do

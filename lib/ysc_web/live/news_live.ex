@@ -138,8 +138,8 @@ defmodule YscWeb.NewsLive do
                     />
                     <div>
                       <p class="text-xs sm:text-sm font-black text-zinc-900 sm:text-white leading-tight">
-                        {String.capitalize(@featured.author.first_name || "")}
-                        {String.capitalize(@featured.author.last_name || "")}
+                        {Ysc.title_case(@featured.author.first_name || "")}
+                        {Ysc.title_case(@featured.author.last_name || "")}
                       </p>
                       <p
                         :if={@featured.board_position_at_publish}
@@ -231,7 +231,7 @@ defmodule YscWeb.NewsLive do
             <div class="px-4 pb-4 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
-                  {Timex.format!(post.published_on, "{Mshort} {D}")}
+                  {format_post_date(post.published_on)}
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
                 <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
@@ -260,8 +260,8 @@ defmodule YscWeb.NewsLive do
                   />
                   <div>
                     <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
-                      {String.capitalize(post.author.first_name || "")}
-                      {String.capitalize(post.author.last_name || "")}
+                      {Ysc.title_case(post.author.first_name || "")}
+                      {Ysc.title_case(post.author.last_name || "")}
                     </p>
                     <p
                       :if={post.board_position_at_publish}
@@ -425,6 +425,9 @@ defmodule YscWeb.NewsLive do
 
   # Calculate reading time based on word count (average 225 words per minute)
   # Uses rendered_body if available, otherwise falls back to raw_body
+  defp format_post_date(nil), do: ""
+  defp format_post_date(dt), do: Timex.format!(dt, "{Mshort} {D}")
+
   defp reading_time(%Post{} = post) do
     cond do
       post.rendered_body && post.rendered_body != "" ->

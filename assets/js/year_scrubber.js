@@ -28,11 +28,16 @@ let YearScrubber = {
     },
 
     updated() {
-        // Update year sections when content changes
         this.updateYearSections();
+
+        // Re-apply the current highlight immediately — LiveView may have re-rendered
+        // the scrubber buttons with their static base classes, wiping the hook's state.
+        if (this.currentYear !== null) {
+            this.updateHighlight();
+        }
+
         this.handleScroll();
 
-        // If there's a pending scroll, try to execute it now that DOM is updated
         if (this.pendingScrollYear) {
             setTimeout(() => {
                 this.updateYearSections();
@@ -63,31 +68,20 @@ let YearScrubber = {
     },
 
     updateYearSections() {
-        // Find all year section headings in the document
         this.yearSections = Array.from(
             document.querySelectorAll('[data-year-section]')
-        ).map(section => {
-            const year = section.getAttribute('data-year-section');
-            const heading = section.querySelector('h2');
-            return {
-                year: parseInt(year),
-                element: section,
-                heading: heading
-            };
-        });
+        ).map(section => ({
+            year: parseInt(section.getAttribute('data-year-section')),
+            element: section
+        }));
 
-        // Sort by year descending
         this.yearSections.sort((a, b) => b.year - a.year);
     },
 
     handleScroll() {
-        // Skip if we're programmatically scrolling
         if (this.isScrolling) return;
 
-        // Debounce scroll events
-        if (this.scrollTimeout) {
-            clearTimeout(this.scrollTimeout);
-        }
+        if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
 
         this.scrollTimeout = setTimeout(() => {
             if (this.yearSections.length === 0) {
@@ -95,30 +89,33 @@ let YearScrubber = {
                 if (this.yearSections.length === 0) return;
             }
 
-            const scrollTop = window.scrollY || document.documentElement.scrollTop;
-            const viewportHeight = window.innerHeight;
-            const scrollPosition = scrollTop + viewportHeight * 0.2; // Highlight when 20% from top
+            // The section headers are `position: sticky`, so getBoundingClientRect().top
+            // is always 0 once stuck — useless for determining scroll position.
+            // Instead, use offsetTop (distance to offsetParent = the grid) which is
+            // the natural layout position, unaffected by stickiness.
+            const grid = document.getElementById('images-grid');
+            if (!grid) return;
 
-            // Find the current year section
+            const scrollY = window.scrollY || document.documentElement.scrollTop;
+            // Document-level top of the grid (stable; not affected by sticky children).
+            const gridDocumentTop = grid.getBoundingClientRect().top + scrollY;
+            const scrollPosition = scrollY + window.innerHeight * 0.2;
+
             let activeYear = null;
             for (let i = 0; i < this.yearSections.length; i++) {
                 const section = this.yearSections[i];
-                const rect = section.element.getBoundingClientRect();
-                const elementTop = rect.top + scrollTop;
-
-                if (scrollPosition >= elementTop) {
+                const naturalTop = gridDocumentTop + section.element.offsetTop;
+                if (scrollPosition >= naturalTop) {
                     activeYear = section.year;
                     break;
                 }
             }
 
-            // If no section found, use the last one (oldest year)
             if (activeYear === null && this.yearSections.length > 0) {
                 activeYear = this.yearSections[this.yearSections.length - 1].year;
             }
 
-            // Update highlight if year changed
-            if (activeYear !== null && activeYear !== this.currentYear) {
+            if (activeYear !== null) {
                 this.currentYear = activeYear;
                 this.updateHighlight();
             }
@@ -126,21 +123,19 @@ let YearScrubber = {
     },
 
     updateHighlight() {
-        // Remove highlight from all items
         const items = this.scrubber.querySelectorAll('[data-year-item]');
         items.forEach(item => {
-            item.classList.remove('active', 'bg-blue-500', 'text-white', 'opacity-100');
-            item.classList.add('opacity-60');
+            item.classList.remove('bg-zinc-800', 'text-white', 'opacity-100');
+            item.classList.add('text-zinc-600', 'opacity-60');
         });
 
-        // Add highlight to current year
         if (this.currentYear !== null) {
             const activeItem = this.scrubber.querySelector(
                 `[data-year-item="${this.currentYear}"]`
             );
             if (activeItem) {
-                activeItem.classList.add('active', 'bg-blue-500', 'text-white', 'opacity-100');
-                activeItem.classList.remove('opacity-60');
+                activeItem.classList.remove('text-zinc-600', 'opacity-60');
+                activeItem.classList.add('bg-zinc-800', 'text-white', 'opacity-100');
             }
         }
     },
@@ -180,10 +175,12 @@ let YearScrubber = {
             behavior: 'smooth'
         });
 
-        // Reset scrolling flag after animation
+        // Reset scrolling flag after animation completes (~500ms) then force a
+        // scroll detection so the highlight reflects the final resting position.
         setTimeout(() => {
             this.isScrolling = false;
-        }, 1000);
+            this.handleScroll();
+        }, 600);
     }
 };
 

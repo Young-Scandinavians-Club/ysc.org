@@ -889,7 +889,7 @@ defmodule Ysc.Accounts do
       """
       ==============================
 
-      Hi #{String.capitalize(user.first_name)},
+      Hi #{Ysc.title_case(user.first_name)},
 
       Your verification code is: #{code}
 
@@ -1623,11 +1623,11 @@ defmodule Ysc.Accounts do
       "#{user.id}",
       "Your Young Scandinavians Club application is in! 🎉",
       "application_submitted",
-      %{first_name: String.capitalize(user.first_name)},
+      %{first_name: Ysc.title_case(user.first_name)},
       """
       ==============================
 
-      Hi #{String.capitalize(user.first_name)},
+      Hi #{Ysc.title_case(user.first_name)},
 
       Your application has been submitted! 🎉
 
