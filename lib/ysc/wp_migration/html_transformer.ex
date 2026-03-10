@@ -164,12 +164,18 @@ defmodule Ysc.WpMigration.HtmlTransformer do
   end
 
   # Transform <img> into a Trix <figure><img></figure> with the new S3 src.
-  # Looks up the attachment ID from the wp-image-{id} class first; falls back
-  # to the original src if no mapping is found.
+  # Lookup order:
+  #   1. wp-image-{id} CSS class → att_id key in url_map
+  #   2. Normalize the src filename (strip WP size suffix, lowercase) → filename key in url_map
+  #   3. Fall back to the original src unchanged
   defp transform_node({"img", attrs, _}, url_map) do
     src = get_attr(attrs, "src")
     att_id = extract_wp_image_id(get_class(attrs))
-    new_src = (att_id && Map.get(url_map, att_id)) || src
+
+    new_src =
+      (att_id && Map.get(url_map, att_id)) ||
+        lookup_by_src_filename(src, url_map) ||
+        src
 
     if new_src && new_src != "" do
       img_attrs =
@@ -232,6 +238,28 @@ defmodule Ysc.WpMigration.HtmlTransformer do
     case Regex.run(~r/\bwp-image-(\d+)\b/, class_str) do
       [_, id] -> id
       _ -> nil
+    end
+  end
+
+  # Tries to find a new URL for a WP image src by normalizing its filename and
+  # looking it up in url_map (which also contains filename-keyed entries built
+  # by load_media from each attachment's original_filename in meta.json).
+  # Handles WP resized variants like "IMG_5613-841x1024.jpg" → "img_5613.jpg".
+  defp lookup_by_src_filename(nil, _url_map), do: nil
+
+  defp lookup_by_src_filename(src, url_map) do
+    case URI.parse(src) do
+      %URI{path: path} when is_binary(path) ->
+        normalized =
+          path
+          |> Path.basename()
+          |> String.replace(~r/-\d+x\d+(\.[^.]+)$/, "\\1")
+          |> String.downcase()
+
+        Map.get(url_map, normalized)
+
+      _ ->
+        nil
     end
   end
 

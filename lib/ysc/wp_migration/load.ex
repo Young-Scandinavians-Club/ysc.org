@@ -78,12 +78,12 @@ defmodule Ysc.WpMigration.Load do
       {:ok, user_map} = load_users(users_data)
       {:ok, _} = load_applications(applications_data, user_map)
 
-      {:ok, image_map} =
+      {:ok, image_map, filename_map} =
         if upload_media and File.dir?(media_dir),
           do: load_media(media_dir, uploader),
-          else: {:ok, %{}}
+          else: {:ok, %{}, %{}}
 
-      {:ok, _} = load_posts(posts_data, user_map, image_map)
+      {:ok, _} = load_posts(posts_data, user_map, image_map, filename_map)
 
       if stripe_data && stripe_data != [],
         do: load_stripe(stripe_data, user_map)
@@ -718,7 +718,8 @@ defmodule Ysc.WpMigration.Load do
   defp normalize_country(""), do: nil
 
   defp normalize_country(raw) when is_binary(raw) do
-    normalized = raw |> String.trim() |> String.upcase()
+    trimmed = String.trim(raw)
+    normalized = String.upcase(trimmed)
 
     cond do
       # Already a valid 2-letter code — accept as-is
@@ -727,10 +728,10 @@ defmodule Ysc.WpMigration.Load do
         normalized
 
       true ->
-        key = raw |> String.trim() |> String.downcase()
+        key = String.downcase(trimmed)
 
-        case Map.get(@country_lookup, key) do
-          nil -> fuzzy_match_country(key)
+        case Map.get(@country_lookup, key) || fuzzy_match_country(key) do
+          nil -> trimmed
           code -> code
         end
     end
@@ -989,7 +990,7 @@ defmodule Ysc.WpMigration.Load do
   defp load_media(media_dir, uploader) do
     if is_nil(uploader) do
       Ysc.Logging.warning("No uploader user for media; skipping media load")
-      {:ok, %{}}
+      {:ok, %{}, %{}}
     else
       subdirs =
         media_dir
@@ -999,7 +1000,8 @@ defmodule Ysc.WpMigration.Load do
           File.dir?(full) and name != "." and name != ".."
         end)
 
-      Enum.reduce_while(subdirs, {:ok, %{}}, fn att_id, {:ok, acc} ->
+      Enum.reduce_while(subdirs, {:ok, %{}, %{}}, fn att_id,
+                                                     {:ok, img_acc, fname_acc} ->
         subdir = Path.join(media_dir, att_id)
         meta_path = Path.join(subdir, "meta.json")
 
@@ -1019,7 +1021,7 @@ defmodule Ysc.WpMigration.Load do
         file_path = image_file && Path.join(subdir, image_file)
 
         if is_nil(file_path) or not File.exists?(file_path) do
-          {:cont, {:ok, acc}}
+          {:cont, {:ok, img_acc, fname_acc}}
         else
           meta =
             if File.exists?(meta_path),
@@ -1035,14 +1037,23 @@ defmodule Ysc.WpMigration.Load do
             )
 
           if existing do
-            {:cont, {:ok, Map.put(acc, att_id, existing)}}
+            fname_acc =
+              add_filename_entry(
+                fname_acc,
+                meta["original_filename"],
+                existing.raw_image_path
+              )
+
+            {:cont, {:ok, Map.put(img_acc, att_id, existing), fname_acc}}
           else
             key = "migration/#{att_id}/#{Path.basename(file_path)}"
 
             case Media.upload_file_to_s3(file_path, key) do
               %{body: %{location: location}} when is_binary(location) ->
+                raw_image_path = URI.encode(location)
+
                 attrs = %{
-                  raw_image_path: URI.encode(location),
+                  raw_image_path: raw_image_path,
                   user_id: uploader.id,
                   title: meta["title"],
                   alt_text: meta["alt_text"],
@@ -1061,14 +1072,22 @@ defmodule Ysc.WpMigration.Load do
                   {:ok, img} ->
                     # Kick off image processing to generate optimized/thumbnail
                     ImageProcessor.new(%{id: img.id}) |> Oban.insert()
-                    {:cont, {:ok, Map.put(acc, att_id, img)}}
+
+                    fname_acc =
+                      add_filename_entry(
+                        fname_acc,
+                        meta["original_filename"],
+                        raw_image_path
+                      )
+
+                    {:cont, {:ok, Map.put(img_acc, att_id, img), fname_acc}}
 
                   {:error, _} ->
-                    {:cont, {:ok, acc}}
+                    {:cont, {:ok, img_acc, fname_acc}}
                 end
 
               _ ->
-                {:cont, {:ok, acc}}
+                {:cont, {:ok, img_acc, fname_acc}}
             end
           end
         end
@@ -1076,14 +1095,35 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp load_posts(posts_data, user_map, image_map) do
+  # Adds a normalized-filename → url entry to fname_acc.
+  # Normalizes by stripping the WP dimension suffix (e.g. "-841x1024") and
+  # lowercasing, so "IMG_5613-841x1024.jpg" maps the same as "IMG_5613.jpg".
+  defp add_filename_entry(acc, nil, _url), do: acc
+  defp add_filename_entry(acc, "", _url), do: acc
+
+  defp add_filename_entry(acc, original_filename, url) do
+    normalized = normalize_wp_image_filename(original_filename)
+    Map.put_new(acc, normalized, url)
+  end
+
+  defp normalize_wp_image_filename(filename) do
+    filename
+    |> String.replace(~r/-\d+x\d+(\.[^.]+)$/, "\\1")
+    |> String.downcase()
+  end
+
+  defp load_posts(posts_data, user_map, image_map, filename_map) do
     author_fallback =
       Repo.one(from u in User, where: u.role == ^:admin, limit: 1) ||
         Repo.one(User)
 
-    # Build url_map: wp_attachment_id → new S3 URL, for HTML transformation
+    # Build url_map: wp_attachment_id → new S3 URL for class-based lookups,
+    # merged with normalized_filename → new S3 URL for src-based fallback.
+    # filename_map keys are already normalized (lowercase, no WP size suffix).
     url_map =
-      Map.new(image_map, fn {att_id, img} -> {att_id, img.raw_image_path} end)
+      image_map
+      |> Map.new(fn {att_id, img} -> {att_id, img.raw_image_path} end)
+      |> Map.merge(filename_map)
 
     Enum.reduce_while(posts_data, {:ok, :done}, fn row, {:ok, _} ->
       author_id =
@@ -1108,6 +1148,14 @@ defmodule Ysc.WpMigration.Load do
           HtmlSanitizeEx.Scrubber.scrub(raw_body, Ysc.TrixScrubber)
 
         preview_text = generate_preview_text(rendered_body)
+
+        # If no WP featured image, fall back to the first image found in the
+        # post body: try by wp-image-{id} att_ids extracted at export time first,
+        # then scan the transformed raw_body for the first <img src> as a last resort.
+        image_id =
+          image_id ||
+            first_body_image_id(row["wp_attachment_ids_in_content"], image_map) ||
+            first_body_image_id_from_src(raw_body)
 
         attrs = %{
           user_id: author_id,
@@ -1240,6 +1288,47 @@ defmodule Ysc.WpMigration.Load do
         select: i.id,
         limit: 1
     )
+  end
+
+  # Returns the Image id for the first att_id in the list that resolves to a
+  # known Image (via image_map then DB). Used as featured image fallback when
+  # the WP post has no explicit thumbnail set.
+  defp first_body_image_id(nil, _image_map), do: nil
+  defp first_body_image_id([], _image_map), do: nil
+
+  defp first_body_image_id([att_id | rest], image_map) do
+    case image_map_image_id(image_map, att_id) ||
+           db_image_id_for_wp_attachment(att_id) do
+      nil -> first_body_image_id(rest, image_map)
+      id -> id
+    end
+  end
+
+  # Last-resort fallback: parse the transformed post body for the first <img>
+  # and look up the Image record by its raw_image_path.
+  defp first_body_image_id_from_src(nil), do: nil
+  defp first_body_image_id_from_src(""), do: nil
+
+  defp first_body_image_id_from_src(html) do
+    src =
+      html
+      |> Floki.parse_fragment!()
+      |> Floki.find("img")
+      |> Enum.find_value(fn img ->
+        case Floki.attribute(img, "src") do
+          [s | _] when s != "" -> s
+          _ -> nil
+        end
+      end)
+
+    if src do
+      Repo.one(
+        from i in Image,
+          where: i.raw_image_path == ^src,
+          select: i.id,
+          limit: 1
+      )
+    end
   end
 
   defp slugify(s) when is_binary(s),
