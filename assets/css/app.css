@@ -27,10 +27,8 @@ html {
     scroll-margin-top: 6rem;
 }
 
-body {
-    /* Prevent layout shifts when navbar becomes fixed */
-    transition: padding-top 0.1s ease-out;
-}
+/* No transition on body padding — it must snap in sync with the nav
+   becoming fixed so there is zero layout shift. */
 
 
 /* Archival Artifact Styling for History Page */
@@ -178,14 +176,98 @@ body {
 }
 
 
-/* Improve navbar fixed positioning */
+/* =============================================
+   STICKY NAVBAR
+   ============================================= */
 
-#rootNavbar.fixed {
+/* Transitions for the navbar */
+
+#rootNavbar {
+    /* Shadow animates smoothly so the nav "lifts up" on scroll and
+       "sits down" when the user returns to the top.
+       Transform handles the mobile slide-in/out. */
+    transition: background-color 0.2s ease-out,
+                border-color 0.2s ease-out,
+                box-shadow 0.25s ease-out,
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---- Sticky state ---- */
+
+#rootNavbar.nav-sticky {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 50;
+    z-index: 100;
+    background-color: white;
+    border-bottom: 1px solid #f4f4f5; /* zinc-100 */
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ---- Mobile: hide on scroll-down, reveal on scroll-up ---- */
+
+@media (max-width: 1023px) {
+    #rootNavbar.nav-mobile-hidden {
+        transform: translateY(-100%);
+    }
+}
+
+/* =============================================
+   HERO MODE — override transparent styles when sticky
+   ============================================= */
+
+#site-header.hero-mode #rootNavbar.nav-sticky {
+    background-color: white;
+    background-image: none;
+    border-color: #f4f4f5;
+}
+
+/* Nav links back to dark */
+#site-header.hero-mode #rootNavbar.nav-sticky .nav-link,
+#site-header.hero-mode #rootNavbar.nav-sticky button.nav-link {
+    color: #18181b; /* zinc-900 */
+    text-shadow: none;
+}
+
+#site-header.hero-mode #rootNavbar.nav-sticky .nav-link:hover,
+#site-header.hero-mode #rootNavbar.nav-sticky button.nav-link:hover {
+    background-color: #f4f4f5;
+    color: #18181b;
+}
+
+/* Hamburger icon back to dark */
+#site-header.hero-mode #rootNavbar.nav-sticky .nav-icon span {
+    background: #18181b;
+}
+
+/* Hamburger button label back to dark */
+#site-header.hero-mode #rootNavbar.nav-sticky .menu-label,
+#site-header.hero-mode #rootNavbar.nav-sticky .hamburger-btn {
+    color: #18181b;
+    text-shadow: none;
+}
+
+#site-header.hero-mode #rootNavbar.nav-sticky .hamburger-btn:hover {
+    background-color: #f4f4f5;
+}
+
+/* Avatar back to dark */
+#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link {
+    color: #18181b;
+    text-shadow: none;
+}
+
+#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link:hover {
+    background-color: #f4f4f5 !important;
+}
+
+#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link .text-zinc-800 {
+    color: #27272a !important;
+}
+
+#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link .text-zinc-500 {
+    color: #71717a !important;
 }
 
 

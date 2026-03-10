@@ -11,6 +11,17 @@ defmodule Ysc.Bookings.BookingLockerTest do
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
     user = user_fixture()
+
+    stub(Stripe.PaymentIntentMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/payment_intents"
+       }}
+    end)
+
     %{user: user}
   end
 

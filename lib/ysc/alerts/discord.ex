@@ -531,26 +531,20 @@ defmodule Ysc.Alerts.Discord do
 
   defp get_color(color) when is_integer(color), do: color
 
+  defp http_client do
+    Application.get_env(
+      :ysc,
+      :discord_http_client,
+      Ysc.Alerts.DiscordHttpClient
+    )
+  end
+
   defp send_webhook(payload) do
     url = webhook_url()
     body = Jason.encode!(payload)
     headers = [{"content-type", "application/json"}]
 
-    request = Finch.build(:post, url, headers, body)
-
-    case Finch.request(request, Ysc.Finch) do
-      {:ok, %Finch.Response{status: status}} when status in 200..299 ->
-        {:ok, :sent}
-
-      {:ok, %Finch.Response{status: status, body: response_body}} ->
-        {:error, {:bad_status, status, response_body}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  rescue
-    error ->
-      {:error, error}
+    http_client().send_webhook(url, body, headers)
   end
 
   defp build_reconciliation_fields(report) do

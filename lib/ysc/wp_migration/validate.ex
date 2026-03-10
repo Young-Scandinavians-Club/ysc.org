@@ -114,7 +114,14 @@ defmodule Ysc.WpMigration.Validate do
       published_posts:
         count(
           conn,
-          "SELECT COUNT(*) FROM #{@prefix}_posts WHERE post_type = 'post' AND post_status = 'publish'"
+          """
+          SELECT COUNT(*) FROM #{@prefix}_posts
+          WHERE post_type = 'post'
+            AND (
+              post_status = 'publish'
+              OR (post_status = 'future' AND post_date <= CURRENT_TIMESTAMP)
+            )
+          """
         ),
       attachments:
         count(
@@ -230,7 +237,12 @@ defmodule Ysc.WpMigration.Validate do
 
     print_row("Users with Stripe customer", source.users_with_stripe)
     print_row("Orders total", source.orders_total)
-    print_row("Published posts", source.published_posts)
+
+    print_row(
+      "Published posts (incl. past-due scheduled)",
+      source.published_posts
+    )
+
     print_row("Attachments (in wp_posts)", source.attachments)
     print_row("Future bookings (mphb confirmed)", source.future_mphb_bookings)
     print_row("Usermeta rows", source.usermeta_rows)

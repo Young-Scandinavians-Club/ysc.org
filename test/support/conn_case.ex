@@ -28,6 +28,7 @@ defmodule YscWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import YscWeb.ConnCase
+      import Mox
     end
   end
 
@@ -35,6 +36,7 @@ defmodule YscWeb.ConnCase do
     Ysc.DataCase.setup_sandbox(tags)
     # Ensure basic site settings exist
     Ysc.Settings.ensure_settings_exist()
+    Ysc.DataCase.stub_default_external_mocks()
 
     secret_key_base =
       Application.get_env(:ysc, YscWeb.Endpoint)[:secret_key_base] ||

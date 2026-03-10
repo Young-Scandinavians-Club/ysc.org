@@ -7,6 +7,10 @@ Mox.defmock(Ysc.StripeMock, for: Ysc.StripeBehaviour)
 Mox.defmock(Stripe.PaymentMethodMock, for: Ysc.Stripe.PaymentMethodBehaviour)
 Mox.defmock(Stripe.SetupIntentMock, for: Ysc.Stripe.SetupIntentBehaviour)
 Mox.defmock(Stripe.PaymentIntentMock, for: Ysc.Stripe.PaymentIntentBehaviour)
+Mox.defmock(Stripe.InvoiceMock, for: Ysc.Stripe.InvoiceBehaviour)
+
+# Discord HTTP mock to avoid real network calls in tests
+Mox.defmock(Ysc.Alerts.DiscordHttpMock, for: Ysc.Alerts.DiscordHttpBehaviour)
 
 # Internal service mocks for controller testing
 Mox.defmock(Ysc.CustomersMock, for: Ysc.Customers.Behaviour)

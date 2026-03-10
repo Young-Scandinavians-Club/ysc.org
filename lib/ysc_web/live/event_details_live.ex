@@ -599,7 +599,7 @@ defmodule YscWeb.EventDetailsLive do
             <%!-- Desktop: Sticky sidebar --%>
             <div
               :if={@event.state != :cancelled}
-              class="hidden lg:block sticky top-24 space-y-8"
+              class="hidden lg:block sticky top-28 space-y-8"
             >
               <div class="bg-white rounded-xl shadow-2xl border border-zinc-100 overflow-hidden">
                 <%= if event_in_past?(@event) do %>

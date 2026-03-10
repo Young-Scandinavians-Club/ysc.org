@@ -410,9 +410,17 @@ defmodule Ysc.Subscriptions do
     end
   end
 
+  defp stripe_subscription_retriever do
+    Application.get_env(
+      :ysc,
+      :stripe_subscription_retriever,
+      Stripe.Subscription
+    )
+  end
+
   defp do_get_scheduled_downgrade_info(%Subscription{} = subscription) do
     with {:ok, stripe_sub} <-
-           Stripe.Subscription.retrieve(subscription.stripe_id),
+           stripe_subscription_retriever().retrieve(subscription.stripe_id),
          schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
          {:ok, schedule} <- Stripe.SubscriptionSchedule.retrieve(schedule_id),
          phases when is_list(phases) and length(phases) >= 2 <- schedule.phases,
@@ -473,7 +481,7 @@ defmodule Ysc.Subscriptions do
 
   defp do_cancel_scheduled_downgrade(%Subscription{} = subscription) do
     with {:ok, stripe_sub} <-
-           Stripe.Subscription.retrieve(subscription.stripe_id),
+           stripe_subscription_retriever().retrieve(subscription.stripe_id),
          schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
          {:ok, _} <- Stripe.SubscriptionSchedule.release(schedule_id) do
       if subscription.user_id do

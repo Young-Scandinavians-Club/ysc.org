@@ -1625,6 +1625,14 @@ defmodule Ysc.Bookings.BookingLocker do
     end)
   end
 
+  defp stripe_payment_intent_module do
+    Application.get_env(
+      :ysc,
+      :stripe_payment_intent_module,
+      Stripe.PaymentIntent
+    )
+  end
+
   # Helper function to cancel PaymentIntent for a booking by searching Stripe metadata
   # Note: This searches recent PaymentIntents since bookings don't store payment_intent_id.
   # For better performance, consider storing payment_intent_id in the booking schema.
@@ -1633,7 +1641,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     # Search for recent PaymentIntents (last 100) with this booking_id in metadata
     # Since bookings expire after 30 minutes, we only need to check recent PaymentIntents
-    case Stripe.PaymentIntent.list(%{
+    case stripe_payment_intent_module().list(%{
            limit: 100,
            expand: ["data.metadata"]
          }) do

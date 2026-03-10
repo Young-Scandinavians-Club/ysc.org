@@ -15,6 +15,7 @@ defmodule Ysc.DataCase do
   """
 
   use ExUnit.CaseTemplate
+  import Mox
 
   using do
     quote do
@@ -40,7 +41,59 @@ defmodule Ysc.DataCase do
       end
     end
 
+    stub_default_external_mocks()
+
     {:ok, sandbox_owner: owner}
+  end
+
+  @doc """
+  Stubs external service mocks with safe no-op defaults so tests that indirectly
+  trigger external calls don't fail with UnexpectedCallError or make real API calls.
+  Individual tests can override these stubs with their own expectations.
+  """
+  def stub_default_external_mocks do
+    # Discord HTTP: return ok without making real HTTP calls
+    stub(Ysc.Alerts.DiscordHttpMock, :send_webhook, fn _url, _body, _headers ->
+      {:ok, :sent}
+    end)
+
+    # Stripe PaymentIntent list: return empty list so cancel_booking_payment_intent
+    # skips gracefully without making real Stripe API calls
+    stub(Stripe.PaymentIntentMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/payment_intents"
+       }}
+    end)
+
+    # Stripe PaymentMethod: return a generic mock payment method
+    stub(Stripe.PaymentMethodMock, :retrieve, fn _id ->
+      {:ok, %Stripe.PaymentMethod{id: "pm_stub", type: "card"}}
+    end)
+
+    stub(Stripe.PaymentMethodMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/payment_methods"
+       }}
+    end)
+
+    # Stripe Invoice: return empty list
+    stub(Stripe.InvoiceMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/invoices"
+       }}
+    end)
   end
 
   @doc """

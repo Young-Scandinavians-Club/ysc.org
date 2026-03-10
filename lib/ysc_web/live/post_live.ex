@@ -26,7 +26,7 @@ defmodule YscWeb.PostLive do
     <%!-- Reading Progress Bar --%>
     <div
       id="reading-progress-container"
-      class="fixed top-0 left-0 w-full h-1 z-50 pointer-events-none"
+      class="fixed top-0 left-0 w-full h-1 z-[110] pointer-events-none"
       phx-hook="ReadingProgress"
     >
       <div

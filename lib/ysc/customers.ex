@@ -298,7 +298,7 @@ defmodule Ysc.Customers do
         nil
 
       payment_method ->
-        case Stripe.PaymentMethod.retrieve(payment_method.provider_id) do
+        case stripe_payment_method_module().retrieve(payment_method.provider_id) do
           {:ok, stripe_payment_method} -> stripe_payment_method
           {:error, _} -> nil
         end
@@ -315,7 +315,10 @@ defmodule Ysc.Customers do
 
   """
   def payment_methods(%User{} = user) do
-    case Stripe.PaymentMethod.list(%{customer: user.stripe_id, type: "card"}) do
+    case stripe_payment_method_module().list(%{
+           customer: user.stripe_id,
+           type: "card"
+         }) do
       {:ok, %{data: payment_methods}} -> payment_methods
       {:error, _} -> []
     end
@@ -372,13 +375,25 @@ defmodule Ysc.Customers do
 
   """
   def invoices(%User{} = user) do
-    case Stripe.Invoice.list(%{customer: user.stripe_id}) do
+    case stripe_invoice_module().list(%{customer: user.stripe_id}) do
       {:ok, %{data: invoices}} -> invoices
       {:error, _} -> []
     end
   end
 
   # Helper functions
+
+  defp stripe_payment_method_module do
+    Application.get_env(
+      :ysc,
+      :stripe_payment_method_module,
+      Stripe.PaymentMethod
+    )
+  end
+
+  defp stripe_invoice_module do
+    Application.get_env(:ysc, :stripe_invoice_module, Stripe.Invoice)
+  end
 
   defp ensure_stripe_customer(%User{stripe_id: nil} = user) do
     case create_stripe_customer(user) do

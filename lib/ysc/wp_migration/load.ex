@@ -16,6 +16,7 @@ defmodule Ysc.WpMigration.Load do
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Payments
+  alias Ysc.Customers
   alias YscWeb.Workers.ImageProcessor
   alias Ysc.WpMigration.HtmlTransformer
 
@@ -29,8 +30,8 @@ defmodule Ysc.WpMigration.Load do
   - :upload_media - if true, upload media folder to S3 and create Images (default: true)
   """
   def run(opts \\ []) do
-    export_dir = opts[:export_dir] || opts["export_dir"]
-    dry_run = opts[:dry_run] || opts["dry_run"] || false
+    export_dir = opts[:export_dir]
+    dry_run = opts[:dry_run] || false
     upload_media = Keyword.get(opts, :upload_media, true)
 
     if export_dir do
@@ -507,15 +508,11 @@ defmodule Ysc.WpMigration.Load do
 
       if user_id && cus_id && cus_id != "" do
         user = Repo.get!(User, user_id)
-        user = Repo.preload(user, [])
+        ensure_stripe_customer(user, cus_id)
 
-        if user.stripe_id != cus_id do
-          user
-          |> User.update_user_changeset(%{stripe_id: cus_id})
-          |> Repo.update()
-        end
-
-        # Set default payment method when we have one (idempotent: upsert from Stripe)
+        # Payment methods are environment-specific and cannot be migrated
+        # cross-environment (prod → sandbox). Only attempt when the PM ID
+        # actually exists in the connected Stripe account.
         if pm_id && pm_id != "" do
           user = Repo.get!(User, user_id)
 
@@ -536,9 +533,16 @@ defmodule Ysc.WpMigration.Load do
                   )
               end
 
-            {:error, _} ->
-              Ysc.Logging.warning("Could not retrieve Stripe payment method",
+            {:error, %Stripe.Error{code: :resource_missing}} ->
+              Ysc.Logging.info(
+                "Stripe payment method not found in this environment, skipping",
                 stripe_payment_method_id: pm_id
+              )
+
+            {:error, reason} ->
+              Ysc.Logging.warning("Could not retrieve Stripe payment method",
+                stripe_payment_method_id: pm_id,
+                error: inspect(reason)
               )
           end
         end
@@ -546,6 +550,45 @@ defmodule Ysc.WpMigration.Load do
     end
 
     :ok
+  end
+
+  # Ensures the user has a valid Stripe customer in the connected Stripe account.
+  #
+  # If the WP customer ID exists in the current Stripe environment (production
+  # loading into production), it is reused. If the ID belongs to a different
+  # environment (e.g. loading a production backup into a sandbox/dev Stripe
+  # account), the lookup will return a :resource_missing error and we create a
+  # fresh Stripe customer instead, overwriting the stale production ID.
+  defp ensure_stripe_customer(user, wp_cus_id) do
+    case Stripe.Customer.retrieve(wp_cus_id) do
+      {:ok, _customer} ->
+        if user.stripe_id != wp_cus_id do
+          user
+          |> User.update_user_changeset(%{stripe_id: wp_cus_id})
+          |> Repo.update()
+        end
+
+      {:error, %Stripe.Error{code: :resource_missing}} ->
+        if is_nil(user.stripe_id) do
+          case Customers.create_stripe_customer(user) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Ysc.Logging.warning("Failed to create Stripe customer",
+                user_id: user.id,
+                error: inspect(reason)
+              )
+          end
+        end
+
+      {:error, reason} ->
+        Ysc.Logging.warning("Could not verify Stripe customer",
+          user_id: user.id,
+          stripe_customer_id: wp_cus_id,
+          error: inspect(reason)
+        )
+    end
   end
 
   defp load_subscriptions(users_data, user_map) do
