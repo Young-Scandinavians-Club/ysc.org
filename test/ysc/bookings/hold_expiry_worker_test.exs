@@ -24,6 +24,16 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
       |> Ecto.Changeset.change(state: :active)
       |> Repo.update!()
 
+    stub(Stripe.PaymentIntentMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/payment_intents"
+       }}
+    end)
+
     %{user: user}
   end
 

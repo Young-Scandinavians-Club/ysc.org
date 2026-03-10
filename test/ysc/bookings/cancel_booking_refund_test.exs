@@ -29,6 +29,16 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
     user = user_fixture()
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
+    stub(Stripe.PaymentIntentMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/payment_intents"
+       }}
+    end)
+
     # Stub so any cancel_booking test that triggers create_stripe_refund is covered
     stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
       charge = %Stripe.Charge{id: "ch_#{id}"}

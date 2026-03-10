@@ -25,11 +25,13 @@
   >
     <nav
       id="rootNavbar"
+      phx-hook="StickyNavbar"
+      data-hero-mode={is_hero_mode}
       class={[
-        "top-0 z-[100] w-full start-0 transition-colors duration-300",
+        "top-0 z-[100] w-full start-0",
         if(is_hero_mode,
           do: "bg-transparent border-transparent text-white",
-          else: "bg-white border-b border-zinc-100"
+          else: "bg-white"
         )
       ]}
     >

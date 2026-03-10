@@ -10,6 +10,12 @@ defmodule Ysc.CustomersTest do
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
+
+    # Override default stub to return a specific payment method for assertions
+    stub(Stripe.PaymentMethodMock, :retrieve, fn _id ->
+      {:ok, %Stripe.PaymentMethod{id: "pm_test123", type: "card"}}
+    end)
+
     :ok
   end
 
@@ -101,12 +107,10 @@ defmodule Ysc.CustomersTest do
           is_default: true
         })
 
-      # default_payment_method calls Stripe.PaymentMethod.retrieve which will fail in tests
-      # The function returns nil on Stripe API errors, which is expected behavior
       method = Customers.default_payment_method(user)
 
-      # Verify function doesn't crash - returns nil when Stripe API fails (expected in tests)
-      assert method == nil
+      assert method != nil
+      assert method.id == "pm_test123"
     end
 
     test "returns nil when user has no default payment method" do

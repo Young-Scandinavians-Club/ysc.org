@@ -41,6 +41,16 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          }}
       end)
 
+      stub(Stripe.PaymentIntentMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_intents"
+         }}
+      end)
+
       %{conn: log_in_user(conn, user), user: user, booking: booking}
     end
 

@@ -9,4 +9,7 @@ defmodule Ysc.Stripe.PaymentMethodBehaviour do
 
   @callback retrieve(payment_method_id :: String.t(), opts :: Keyword.t()) ::
               {:ok, Stripe.PaymentMethod.t()} | {:error, Stripe.Error.t()}
+
+  @callback list(params :: map()) ::
+              {:ok, Stripe.List.t()} | {:error, Stripe.Error.t()}
 end

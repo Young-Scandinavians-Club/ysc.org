@@ -146,12 +146,27 @@ defmodule Ysc.WpMigration.WpRepo do
     Map.new(rows, fn row -> {row["meta_key"], row["meta_value"]} end)
   end
 
-  @doc "Returns published posts sorted descending by post_date."
+  @doc """
+  Returns published posts sorted descending by post_date.
+
+  Includes both `publish` posts and any `future` (scheduled) posts whose
+  `post_date` has already passed. The latter occurs when a WP backup is taken
+  while posts are still in the scheduler queue — by migration time those posts
+  should be live, and excluding them would silently drop content.
+  """
   def list_published_posts(%__MODULE__{conn: conn}) do
     {:ok, rows} =
       query_maps(
         conn,
-        "SELECT * FROM #{@table_prefix}_posts WHERE post_type = 'post' AND post_status = 'publish' ORDER BY post_date DESC"
+        """
+        SELECT * FROM #{@table_prefix}_posts
+        WHERE post_type = 'post'
+          AND (
+            post_status = 'publish'
+            OR (post_status = 'future' AND post_date <= CURRENT_TIMESTAMP)
+          )
+        ORDER BY post_date DESC
+        """
       )
 
     rows

@@ -23,6 +23,7 @@ config :ysc,
   stripe_setup_intent_module: Stripe.SetupIntentMock,
   stripe_payment_intent_module: Stripe.PaymentIntentMock,
   stripe_customer_module: Stripe.CustomerMock,
+  stripe_invoice_module: Stripe.InvoiceMock,
   customers_module: Ysc.CustomersMock,
   payments_module: Ysc.PaymentsMock
 
@@ -93,11 +94,12 @@ config :ysc, :stripe_subscription_retriever, Ysc.StripeSubscriptionRetrieverMock
 config :ysc, :accounts_module, Ysc.AccountsMock
 
 # Discord alerts configuration for testing.
-# Use a localhost URL that immediately refuses connections so tests that
-# exercise the HTTP path fail fast without any network I/O.
+# The HTTP client is mocked so no real network I/O occurs.
 config :ysc, Ysc.Alerts.Discord,
-  webhook_url: "http://localhost:1",
+  webhook_url: "https://discord.com/api/webhooks/test/token",
   enabled: true
+
+config :ysc, :discord_http_client, Ysc.Alerts.DiscordHttpMock
 
 config :ysc,
   expense_reports_s3_bucket: "expense-reports",
