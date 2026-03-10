@@ -34,17 +34,16 @@ defmodule YscWeb.Flash do
   def put_toast(socket, kind, msg, opts) do
     opts = default_icon_opts(kind, opts)
 
-    # Store custom title in flash so it survives redirect; toasts_sync assign is lost on redirect
-    # and the new page would otherwise render from flash only (title becomes "Info"/"Error", no icon).
-    socket =
-      if opts[:title] do
-        key = "#{kind}_toast_title"
-        Phoenix.LiveView.put_flash(socket, key, opts[:title])
-      else
-        socket
-      end
+    # Only use put_flash — the layout's promote_flash_to_toasts mechanism builds
+    # a full toast (with icon/title) from flash data. Calling LiveToast.put_toast
+    # here would create a second internal toast that duplicates the promoted one.
+    socket = Phoenix.LiveView.put_flash(socket, kind, msg)
 
-    LiveToast.put_toast(socket, kind, msg, opts)
+    if opts[:title] do
+      Phoenix.LiveView.put_flash(socket, "#{kind}_toast_title", opts[:title])
+    else
+      socket
+    end
   end
 
   @doc """
@@ -79,8 +78,7 @@ defmodule YscWeb.Flash do
       end
 
     opts
-    |> maybe_put(:icon, icon, Keyword.has_key?(opts, :icon))
-    # LiveToast only renders the icon inside the title block; without a title the icon is never shown.
+    |> maybe_put(:icon, icon, icon != nil && !Keyword.has_key?(opts, :icon))
     |> maybe_put(
       :title,
       default_title,
