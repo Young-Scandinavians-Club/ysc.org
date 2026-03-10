@@ -262,7 +262,7 @@ defmodule Ysc.WpMigration.Load do
     postal_code =
       row["zip"] || row["postal_code"] || row["Zip code"] || row["postal"]
 
-    unless is_nil_or_empty(address_str) or is_nil_or_empty(country) do
+    unless nil_or_empty?(address_str) or nil_or_empty?(country) do
       attrs = %{
         user_id: user_id,
         address: address_str,
@@ -294,9 +294,9 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp is_nil_or_empty(nil), do: true
-  defp is_nil_or_empty(""), do: true
-  defp is_nil_or_empty(_), do: false
+  defp nil_or_empty?(nil), do: true
+  defp nil_or_empty?(""), do: true
+  defp nil_or_empty?(_), do: false
 
   # Set of all valid ISO 3166-1 alpha-2 codes (used for fast 2-letter lookups).
   @country_code_set Map.new(
@@ -1429,24 +1429,13 @@ defmodule Ysc.WpMigration.Load do
   defp load_subscription_via_stripe(row, user_id, renewal_dt, start_dt) do
     user = Ysc.Accounts.get_user!(user_id)
 
-    unless user.stripe_id do
-      Ysc.Logging.warning(
-        "Skipping Stripe subscription: user has no stripe_id (ensure_stripe_customer may have failed)",
-        user_id: user_id
-      )
-    else
+    if user.stripe_id do
       membership_type =
         row["membership_type"] || row["sub_product_name"] || "single"
 
       price_id = resolve_stripe_price_id(membership_type)
 
-      unless price_id do
-        Ysc.Logging.warning(
-          "Skipping Stripe subscription: no configured Stripe price ID for membership type",
-          user_id: user_id,
-          membership_type: membership_type
-        )
-      else
+      if price_id do
         trial_end = DateTime.to_unix(renewal_dt)
 
         migrated_stripe_id = "migrated_#{user_id}"
@@ -1502,7 +1491,18 @@ defmodule Ysc.WpMigration.Load do
               )
           end
         end
+      else
+        Ysc.Logging.warning(
+          "Skipping Stripe subscription: no configured Stripe price ID for membership type",
+          user_id: user_id,
+          membership_type: membership_type
+        )
       end
+    else
+      Ysc.Logging.warning(
+        "Skipping Stripe subscription: user has no stripe_id (ensure_stripe_customer may have failed)",
+        user_id: user_id
+      )
     end
   end
 
