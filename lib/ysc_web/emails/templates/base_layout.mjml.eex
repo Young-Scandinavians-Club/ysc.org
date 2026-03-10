@@ -170,6 +170,16 @@
       color: #DC2626;
       font-weight: bold;
       }
+      .post-thumb img {
+      height: 160px;
+      object-fit: cover;
+      width: 100%;
+      }
+      .event-cover img {
+      height: 220px;
+      object-fit: cover;
+      width: 100%;
+      }
     </mj-style>
   </mj-head>
   <mj-body background-color="#eee">
