@@ -275,7 +275,7 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}/settings")
 
       assert html =~ "Featured Image"
-      assert html =~ "No featured image set"
+      assert html =~ "Choose from library"
     end
   end
 

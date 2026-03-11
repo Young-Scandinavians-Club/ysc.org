@@ -140,6 +140,61 @@ defmodule Ysc.MediaTest do
       images = Media.list_images_cursor(start_at_year: current_year, limit: 10)
       assert is_list(images)
     end
+
+    test "filters by search on title", %{user: user} do
+      {:ok, _img} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/a.jpg",
+          processing_state: :unprocessed,
+          title: "Sunset at beach"
+        }
+        |> Repo.insert()
+
+      {:ok, _img} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/b.jpg",
+          processing_state: :unprocessed,
+          title: "Mountain view"
+        }
+        |> Repo.insert()
+
+      results = Media.list_images_cursor(search: "sunset", limit: 50)
+      assert results != []
+
+      assert Enum.all?(
+               results,
+               &String.contains?(String.downcase(&1.title || ""), "sunset")
+             )
+    end
+
+    test "filters by search on alt_text", %{user: user} do
+      {:ok, _img} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/c.jpg",
+          processing_state: :unprocessed,
+          alt_text: "A golden retriever playing"
+        }
+        |> Repo.insert()
+
+      results = Media.list_images_cursor(search: "golden", limit: 50)
+      assert results != []
+    end
+
+    test "search returns empty list for non-matching term" do
+      results =
+        Media.list_images_cursor(search: "zzz_nonexistent_xyz", limit: 50)
+
+      assert results == []
+    end
+
+    test "search with empty string returns all images" do
+      all = Media.list_images_cursor(limit: 50)
+      with_empty_search = Media.list_images_cursor(search: "", limit: 50)
+      assert length(all) == length(with_empty_search)
+    end
   end
 
   describe "list_images_grouped_by_year/1" do

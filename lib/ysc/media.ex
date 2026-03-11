@@ -93,11 +93,13 @@ defmodule Ysc.Media do
   - :before_date - Only return images before this date
   - :start_at_year - Start from the beginning of this year
   - :limit - Number of images to return (default: 30)
+  - :search - Case-insensitive search on title and alt_text
   """
   def list_images_cursor(opts \\ []) do
     limit = Keyword.get(opts, :limit, 30)
     before_date = Keyword.get(opts, :before_date)
     start_at_year = Keyword.get(opts, :start_at_year)
+    search = Keyword.get(opts, :search)
 
     query =
       from i in Media.Image,
@@ -123,6 +125,16 @@ defmodule Ysc.Media do
 
         true ->
           query
+      end
+
+    query =
+      if search && search != "" do
+        pattern = "%#{search}%"
+
+        from i in query,
+          where: ilike(i.title, ^pattern) or ilike(i.alt_text, ^pattern)
+      else
+        query
       end
 
     Repo.all(query)
