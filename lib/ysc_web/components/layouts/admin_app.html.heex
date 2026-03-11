@@ -9,8 +9,8 @@
   />
   <%!-- Screen-reader mirror of flash; keeps flash text in the DOM so tests and assistive technology can detect it --%>
   <div id="flash-mirror" aria-live="polite" class="sr-only">
-    <span :if={@flash[:info]}>{@flash[:info]}</span>
-    <span :if={@flash[:error]}>{@flash[:error]}</span>
+    <span :if={@flash["info"]}>{@flash["info"]}</span>
+    <span :if={@flash["error"]}>{@flash["error"]}</span>
   </div>
 
   <main class="flex-1 w-full">
