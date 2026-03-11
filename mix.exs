@@ -49,7 +49,13 @@ defmodule Ysc.MixProject do
           YscWeb.TahoeCabinRulesLive,
           YscWeb.TahoeCabinRulesLive.SwiftUI,
           YscWeb.TahoeStayingWithLive,
-          YscWeb.TahoeStayingWithLive.SwiftUI
+          YscWeb.TahoeStayingWithLive.SwiftUI,
+          Ysc.WpMigration.Load,
+          Ysc.WpMigration.Extract,
+          Ysc.WpMigration.Validate,
+          Ysc.WpMigration.SqlToDuckdb,
+          Ysc.WpMigration.PhpDeserialize,
+          Ysc.WpMigration.WpRepo
         ]
       ]
     ]
