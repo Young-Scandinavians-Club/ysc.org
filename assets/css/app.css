@@ -688,8 +688,26 @@ body.overflow-hidden {
 /* Trix-authored content rendering — used on public post/event pages and in the admin editor preview */
 
 .trix-content {
+    line-height: 1.5;
     overflow-wrap: break-word;
     word-break: break-word;
+}
+
+.trix-content * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.trix-content h1 {
+    font-size: 1.2em;
+    line-height: 1.2;
+}
+
+.trix-content hr {
+    border: 0;
+    border-top: 1px solid #d4d4d8;
+    margin: 1.5em 0;
 }
 
 .trix-content blockquote {

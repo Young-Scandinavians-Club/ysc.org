@@ -500,6 +500,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                   phx-hook="TrixHook"
                   phx-debounce="800"
                 />
+                <.live_component
+                  module={YscWeb.TrixImagePickerComponent}
+                  id={:newsletter_intro_image_picker}
+                  target_input_id="edition_intro_text"
+                  disabled?={@readonly?}
+                />
                 <div
                   id="newsletter-intro-richtext"
                   class="relative"
@@ -1391,5 +1397,17 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(form: to_form(changeset, as: "edition"))
      |> assign_preview_data()
      |> schedule_auto_save()}
+  end
+
+  def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
+    url = image.optimized_image_path || image.raw_image_path
+
+    {:noreply,
+     push_event(socket, "insert-trix-image", %{
+       url: url,
+       href: "#{url}?content-disposition=attachment",
+       alt: image.alt_text || image.title || "",
+       target_input_id: "edition_intro_text"
+     })}
   end
 end

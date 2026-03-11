@@ -49,6 +49,54 @@ function uploadFile(file, postID, progressCallback, successCallback) {
   xhr.send(formData);
 }
 
+function addCustomToolbarButtons(editorEl, hookEl) {
+  const toolbarId = editorEl.getAttribute("toolbar");
+  const toolbar = document.getElementById(toolbarId);
+  if (!toolbar) return;
+
+  const fileTools = toolbar.querySelector(
+    "[data-trix-button-group='file-tools']",
+  );
+  if (!fileTools) return;
+
+  if (!fileTools.querySelector(".trix-button--icon-library")) {
+    const libraryBtn = document.createElement("button");
+    libraryBtn.type = "button";
+    libraryBtn.className =
+      "trix-button trix-button--icon trix-button--icon-library";
+    libraryBtn.title = "Insert from library";
+    libraryBtn.tabIndex = -1;
+    libraryBtn.textContent = "Library";
+    libraryBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const trigger = document.querySelector(
+        `[data-trix-library-trigger="${hookEl.id}"]`,
+      );
+      if (trigger) trigger.click();
+    });
+    fileTools.appendChild(libraryBtn);
+  }
+
+  if (!fileTools.querySelector(".trix-button--icon-horizontal-rule")) {
+    const hrBtn = document.createElement("button");
+    hrBtn.type = "button";
+    hrBtn.className =
+      "trix-button trix-button--icon trix-button--icon-horizontal-rule";
+    hrBtn.title = "Divider";
+    hrBtn.tabIndex = -1;
+    hrBtn.textContent = "Divider";
+    hrBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const attachment = new Trix.Attachment({
+        content: "<hr>",
+        contentType: "application/vnd.trix.horizontal-rule.html",
+      });
+      editorEl.editor.insertAttachment(attachment);
+    });
+    fileTools.appendChild(hrBtn);
+  }
+}
+
 module.exports = {
   mounted() {
     window.Trix = Trix;
@@ -67,7 +115,36 @@ module.exports = {
         uploadFileAttachment(event.attachment, postID);
       }
     });
+
+    this.handleEvent("insert-trix-image", ({ url, href, alt, target_input_id }) => {
+      if (this.el.id !== target_input_id) return;
+      const editorEl = document.querySelector(
+        `trix-editor[input="${target_input_id}"]`,
+      );
+      if (!editorEl) return;
+      const attachment = new Trix.Attachment({
+        url,
+        href,
+        alt,
+        contentType: "image",
+      });
+      editorEl.editor.insertAttachment(attachment);
+    });
+
+    const editorEl = document.querySelector(
+      `trix-editor[input="${this.el.id}"]`,
+    );
+    if (editorEl && editorEl.editor) {
+      addCustomToolbarButtons(editorEl, this.el);
+    }
+
+    const hookEl = this.el;
+    document.addEventListener("trix-initialize", (event) => {
+      if (event.target.getAttribute("input") === hookEl.id) {
+        addCustomToolbarButtons(event.target, hookEl);
+      }
+    });
   },
 
-  updated() { },
+  updated() {},
 };
