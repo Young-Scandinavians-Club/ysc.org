@@ -225,7 +225,7 @@ defmodule YscWeb.UserSessionController do
 
     conn
     |> YscWeb.Flash.put_toast(:info, "Signed out successfully.",
-      title: "Logout"
+      title: "Signed out"
     )
     |> UserAuth.log_out_user(redirect_to)
   end
@@ -240,7 +240,7 @@ defmodule YscWeb.UserSessionController do
 
     conn
     |> YscWeb.Flash.put_toast(:info, "Signed out successfully.",
-      title: "Logout"
+      title: "Signed out"
     )
     |> UserAuth.log_out_user(redirect_to)
   end

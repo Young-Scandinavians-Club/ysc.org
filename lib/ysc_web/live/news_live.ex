@@ -193,12 +193,13 @@ defmodule YscWeb.NewsLive do
           :if={@async_data_loaded && @post_count > 0}
           id="news-grid"
           class="grid grid-cols-1 md:grid-cols-2 py-4 gap-8"
+          phx-update="stream"
           phx-viewport-top={@page > 1 && "prev-page"}
           phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         >
           <div
-            :for={post <- @posts}
-            id={"post-#{post.id}"}
+            :for={{dom_id, post} <- @streams.posts}
+            id={dom_id}
             class="group flex flex-col bg-white rounded-xl p-4 ring-1 ring-zinc-100 shadow-sm hover:shadow-xl hover:ring-blue-500/30 transition-all duration-500"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
@@ -296,7 +297,7 @@ defmodule YscWeb.NewsLive do
       )
       |> assign(:featured, nil)
       |> assign(:post_count, 0)
-      |> assign(:posts, [])
+      |> stream(:posts, [])
       |> assign(:page, 1)
       |> assign(:per_page, 10)
       |> assign(:end_of_timeline?, false)
@@ -344,9 +345,9 @@ defmodule YscWeb.NewsLive do
      socket
      |> assign(:featured, featured)
      |> assign(:post_count, post_count)
-     |> assign(:posts, posts)
      |> assign(:end_of_timeline?, length(posts) < socket.assigns.per_page)
-     |> assign(:async_data_loaded, true)}
+     |> assign(:async_data_loaded, true)
+     |> stream(:posts, posts)}
   end
 
   def handle_async(:load_news_data, {:exit, reason}, socket) do
@@ -375,8 +376,6 @@ defmodule YscWeb.NewsLive do
   defp paginate_posts(socket, new_page) when new_page >= 1 do
     %{per_page: per_page, page: cur_page} = socket.assigns
 
-    # Posts.list_posts already preloads :author and :featured_image
-    # Ecto will batch load these associations automatically
     new_posts = Posts.list_posts((new_page - 1) * per_page, per_page)
 
     case new_posts do
@@ -386,21 +385,10 @@ defmodule YscWeb.NewsLive do
         |> assign(:page, new_page)
 
       [_ | _] = new_posts ->
-        # Get existing posts
-        existing_posts = Map.get(socket.assigns, :posts, [])
-
-        # Combine posts, avoiding duplicates by ID
-        all_posts = existing_posts ++ new_posts
-        unique_posts = Enum.uniq_by(all_posts, & &1.id)
-
-        # Sort by published_on descending to maintain chronological order
-        sorted_posts =
-          Enum.sort_by(unique_posts, & &1.published_on, {:desc, DateTime})
-
         socket
         |> assign(:end_of_timeline?, length(new_posts) < per_page)
         |> assign(:page, new_page)
-        |> assign(:posts, sorted_posts)
+        |> stream(:posts, new_posts, at: -1)
     end
   end
 

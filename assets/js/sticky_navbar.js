@@ -5,6 +5,20 @@ export default StickyNavbar = {
         this.rafPending = false;
         this.lastScrollY = window.scrollY;
 
+        this.initState();
+
+        // Apply sticky immediately if already scrolled (e.g. hook re-mounted
+        // mid-scroll after a LiveView reconnect). Accessing offsetHeight forces
+        // a synchronous layout so the measurement is accurate even though the
+        // element was just inserted.
+        if (window.scrollY >= this.stickyThreshold) {
+            if (!this.isHeroMode) {
+                document.body.style.paddingTop = this.el.offsetHeight + "px";
+            }
+            this.el.classList.add("nav-sticky");
+            this.isSticky = true;
+        }
+
         this.scrollHandler = () => {
             if (!this.rafPending) {
                 this.rafPending = true;
@@ -14,20 +28,17 @@ export default StickyNavbar = {
 
         window.addEventListener("scroll", this.scrollHandler, { passive: true });
 
-        // Defer the initial check so the browser has finished layout and
-        // offsetHeight / getBoundingClientRect() are accurate.
-        requestAnimationFrame(() => {
-            this.initState();
-            this.update();
-        });
+        requestAnimationFrame(() => this.update());
     },
 
-    // Called by LiveView when the element's attributes are patched (SPA navigation).
-    // The closure in mounted() is stale after navigation, so we re-read hero mode here.
+    // Called by LiveView after DOM-patching this element's attributes.
+    // The patch overwrites the class attribute with the server-rendered value,
+    // which strips any classes we added client-side (nav-sticky, nav-mobile-hidden).
+    // We must restore them synchronously — before the browser paints — to avoid
+    // a flash of the unsticky nav.
     updated() {
         const newHeroMode = this.el.dataset.heroMode === "true";
         if (newHeroMode !== this.isHeroMode) {
-            // Hero mode changed — fully reset before re-initialising.
             this.el.classList.remove("nav-sticky", "nav-mobile-hidden");
             document.body.style.paddingTop = "0px";
             this.isSticky = false;
@@ -37,6 +48,16 @@ export default StickyNavbar = {
                 this.initState();
                 this.update();
             });
+        } else if (this.isSticky) {
+            if (!this.el.classList.contains("nav-sticky")) {
+                this.el.classList.add("nav-sticky");
+            }
+            if (this.isMobileHidden && !this.el.classList.contains("nav-mobile-hidden")) {
+                this.el.classList.add("nav-mobile-hidden");
+            }
+            if (!this.isHeroMode) {
+                document.body.style.paddingTop = this.el.offsetHeight + "px";
+            }
         }
     },
 

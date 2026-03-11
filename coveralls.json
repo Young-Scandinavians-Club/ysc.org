@@ -46,7 +46,8 @@
         "ysc/stripe_behaviour\\.ex",
         "ysc/stripe/.*_behaviour\\.ex",
         "ysc/release.ex",
-        "dev/ysc/credo/*.ex",
-        "mix/tasks/shell_lint.ex"
+        "dev/ysc/credo/\\.ex",
+        "mix/tasks/\\.ex",
+        "lib/ysc/wp_migration/\\.ex"
     ]
 }
