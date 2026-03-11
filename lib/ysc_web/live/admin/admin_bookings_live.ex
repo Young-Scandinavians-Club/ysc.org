@@ -1626,138 +1626,24 @@ defmodule YscWeb.AdminBookingsLive do
               Inactive rooms won't appear in booking options
             </p>
           </.input>
-          <!-- Image Selection -->
+          <%!-- Image Selection --%>
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-zinc-700">
               Display Image
             </label>
-            <div :if={@selected_room_image} class="mb-4">
-              <div class="relative inline-block">
-                <img
-                  src={
-                    @selected_room_image.thumbnail_path ||
-                      @selected_room_image.optimized_image_path ||
-                      @selected_room_image.raw_image_path
-                  }
-                  alt={@selected_room_image.title || "Selected image"}
-                  class="w-32 h-32 rounded-lg object-cover border border-zinc-200"
-                />
-                <button
-                  type="button"
-                  phx-click="clear-room-image"
-                  class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700"
-                  title="Remove image"
-                >
-                  <.icon name="hero-x-mark" class="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div :if={!@selected_room_image} class="mb-4">
-              <p class="text-sm text-zinc-500 italic">No image selected</p>
-            </div>
-            <button
-              type="button"
-              phx-click="open-image-gallery"
-              class="rounded bg-zinc-100 hover:bg-zinc-200 py-2 px-4 transition duration-200 text-sm font-semibold text-zinc-800"
-            >
-              <.icon name="hero-photo" class="w-4 h-4 -mt-0.5" />
-              <span class="ms-1">Select from Image Library</span>
-            </button>
+            <.live_component
+              module={YscWeb.MediaPickerComponent}
+              id={:room_image}
+              user_id={@current_user.id}
+              image_id={
+                if @selected_room_image, do: @selected_room_image.id, else: nil
+              }
+            />
             <input
               type="hidden"
               name="room[image_id]"
               value={if @selected_room_image, do: @selected_room_image.id, else: ""}
             />
-          </div>
-          <!-- Image Gallery Modal -->
-          <div
-            :if={@show_image_gallery}
-            class="fixed inset-0 z-50 overflow-y-auto bg-black/50"
-            phx-click="close-image-gallery"
-            phx-click-away="close-image-gallery"
-          >
-            <div
-              class="flex min-h-full items-center justify-center p-4"
-              phx-click="close-image-gallery"
-            >
-              <div
-                class="relative bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
-                phx-click-away="close-image-gallery"
-              >
-                <div class="flex items-center justify-between p-6 border-b border-zinc-200">
-                  <h3 class="text-lg font-semibold text-zinc-800">Select Image</h3>
-                  <button
-                    type="button"
-                    phx-click="close-image-gallery"
-                    class="text-zinc-400 hover:text-zinc-600"
-                  >
-                    <.icon name="hero-x-mark" class="w-6 h-6" />
-                  </button>
-                </div>
-                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                    <%= for image <- @image_gallery do %>
-                      <button
-                        type="button"
-                        phx-click="select-room-image"
-                        phx-value-image-id={image.id}
-                        class="group relative w-full rounded-lg aspect-square border-2 border-zinc-200 cursor-pointer hover:border-blue-500 transition-all duration-200 overflow-hidden"
-                      >
-                        <img
-                          src={
-                            image.thumbnail_path || image.optimized_image_path ||
-                              image.raw_image_path
-                          }
-                          alt={image.title || "Image"}
-                          class="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div
-                          :if={image.title || image.alt_text}
-                          class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
-                        >
-                          <p
-                            :if={image.title}
-                            class="text-xs font-medium text-white truncate"
-                            title={image.title}
-                          >
-                            {image.title}
-                          </p>
-                        </div>
-                      </button>
-                    <% end %>
-                  </div>
-                  <div :if={@image_gallery == []} class="text-center py-12">
-                    <p class="text-zinc-500">No images available</p>
-                  </div>
-                </div>
-                <div class="flex justify-between items-center p-6 border-t border-zinc-200">
-                  <div class="flex gap-2">
-                    <.button
-                      :if={@image_gallery_page > 1}
-                      phx-click="prev-image-gallery-page"
-                      type="button"
-                    >
-                      Previous
-                    </.button>
-                    <.button
-                      :if={!@image_gallery_end?}
-                      phx-click="next-image-gallery-page"
-                      type="button"
-                    >
-                      Next
-                    </.button>
-                  </div>
-                  <button
-                    type="button"
-                    phx-click="close-image-gallery"
-                    class="rounded bg-zinc-100 hover:bg-zinc-200 py-2 px-4 transition duration-200 text-sm font-semibold text-zinc-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
           <:actions>
@@ -3391,10 +3277,6 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:room, nil)
       |> assign(:room_form, nil)
       |> assign(:selected_room_image, nil)
-      |> assign(:show_image_gallery, false)
-      |> assign(:image_gallery, [])
-      |> assign(:image_gallery_page, 1)
-      |> assign(:image_gallery_end?, false)
       |> assign(:daily_availability, %{})
       |> assign(
         :reservations_path,
@@ -3411,6 +3293,38 @@ defmodule YscWeb.AdminBookingsLive do
     end
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_info({YscWeb.MediaPickerComponent, :room_image, :cleared}, socket) do
+    current_params = socket.assigns.room_form.source.params || %{}
+    updated_params = Map.put(current_params, "image_id", nil)
+
+    changeset =
+      (socket.assigns.room || %Ysc.Bookings.Room{})
+      |> Ysc.Bookings.Room.changeset(updated_params)
+
+    {:noreply,
+     socket
+     |> assign(:selected_room_image, nil)
+     |> assign(:room_form, to_form(changeset, as: "room"))}
+  end
+
+  @impl true
+  def handle_info({YscWeb.MediaPickerComponent, :room_image, image_id}, socket) do
+    image = Ysc.Media.fetch_image(image_id)
+
+    current_params = socket.assigns.room_form.source.params || %{}
+    updated_params = Map.put(current_params, "image_id", image_id)
+
+    changeset =
+      (socket.assigns.room || %Ysc.Bookings.Room{})
+      |> Ysc.Bookings.Room.changeset(updated_params)
+
+    {:noreply,
+     socket
+     |> assign(:selected_room_image, image)
+     |> assign(:room_form, to_form(changeset, as: "room"))}
   end
 
   @impl true
@@ -4106,11 +4020,6 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp apply_action(socket, :new_room, _params) do
-    alias Ysc.Media
-
-    # Load initial image gallery page
-    images = Media.list_images(0, 20)
-
     form =
       %Ysc.Bookings.Room{}
       |> Ysc.Bookings.Room.changeset(%{
@@ -4126,21 +4035,11 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:room, nil)
     |> assign(:room_form, form)
     |> assign(:selected_room_image, nil)
-    |> assign(:show_image_gallery, false)
-    |> assign(:image_gallery, images)
-    |> assign(:image_gallery_page, 1)
-    |> assign(:image_gallery_end?, length(images) < 20)
   end
 
   defp apply_action(socket, :edit_room, %{"id" => id}) do
-    alias Ysc.Media
-
     room = Bookings.get_room!(id)
 
-    # Load initial image gallery page
-    images = Media.list_images(0, 20)
-
-    # Use preloaded image from room (already loaded by get_room!)
     selected_image = room.image
 
     form =
@@ -4148,7 +4047,6 @@ defmodule YscWeb.AdminBookingsLive do
       |> Ysc.Bookings.Room.changeset(%{})
       |> to_form(as: "room")
 
-    # Ensure selected_property matches the room's property
     socket =
       if socket.assigns.selected_property != room.property do
         assign(socket, :selected_property, room.property)
@@ -4161,10 +4059,6 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:room, room)
     |> assign(:room_form, form)
     |> assign(:selected_room_image, selected_image)
-    |> assign(:show_image_gallery, false)
-    |> assign(:image_gallery, images)
-    |> assign(:image_gallery_page, 1)
-    |> assign(:image_gallery_end?, length(images) < 20)
   end
 
   defp apply_action(socket, :index, _params) do
@@ -4194,10 +4088,6 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:room, nil)
     |> assign(:room_form, nil)
     |> assign(:selected_room_image, nil)
-    |> assign(:show_image_gallery, false)
-    |> assign(:image_gallery, [])
-    |> assign(:image_gallery_page, 1)
-    |> assign(:image_gallery_end?, false)
   end
 
   @impl true
@@ -6111,88 +6001,6 @@ defmodule YscWeb.AdminBookingsLive do
        to:
          ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
      )}
-  end
-
-  # Image gallery handlers
-  def handle_event("open-image-gallery", _params, socket) do
-    alias Ysc.Media
-
-    # Load first page of images
-    images = Media.list_images(0, 20)
-
-    {:noreply,
-     socket
-     |> assign(:show_image_gallery, true)
-     |> assign(:image_gallery, images)
-     |> assign(:image_gallery_page, 1)
-     |> assign(:image_gallery_end?, length(images) < 20)}
-  end
-
-  def handle_event("close-image-gallery", _params, socket) do
-    {:noreply, assign(socket, :show_image_gallery, false)}
-  end
-
-  def handle_event("select-room-image", %{"image-id" => image_id}, socket) do
-    alias Ysc.Media
-
-    image = Media.fetch_image(image_id)
-
-    # Update the form changeset with the new image_id
-    current_params = socket.assigns.room_form.source.params || %{}
-    updated_params = Map.put(current_params, "image_id", image_id)
-
-    changeset =
-      (socket.assigns.room || %Ysc.Bookings.Room{})
-      |> Ysc.Bookings.Room.changeset(updated_params)
-
-    {:noreply,
-     socket
-     |> assign(:selected_room_image, image)
-     |> assign(:show_image_gallery, false)
-     |> assign(:room_form, to_form(changeset, as: "room"))}
-  end
-
-  def handle_event("clear-room-image", _params, socket) do
-    # Update the form changeset to clear the image_id
-    current_params = socket.assigns.room_form.source.params || %{}
-    updated_params = Map.put(current_params, "image_id", nil)
-
-    changeset =
-      (socket.assigns.room || %Ysc.Bookings.Room{})
-      |> Ysc.Bookings.Room.changeset(updated_params)
-
-    {:noreply,
-     socket
-     |> assign(:selected_room_image, nil)
-     |> assign(:room_form, to_form(changeset, as: "room"))}
-  end
-
-  def handle_event("next-image-gallery-page", _params, socket) do
-    alias Ysc.Media
-
-    next_page = socket.assigns.image_gallery_page + 1
-    per_page = 20
-    images = Media.list_images((next_page - 1) * per_page, per_page)
-
-    {:noreply,
-     socket
-     |> assign(:image_gallery, images)
-     |> assign(:image_gallery_page, next_page)
-     |> assign(:image_gallery_end?, length(images) < per_page)}
-  end
-
-  def handle_event("prev-image-gallery-page", _params, socket) do
-    alias Ysc.Media
-
-    prev_page = max(1, socket.assigns.image_gallery_page - 1)
-    per_page = 20
-    images = Media.list_images((prev_page - 1) * per_page, per_page)
-
-    {:noreply,
-     socket
-     |> assign(:image_gallery, images)
-     |> assign(:image_gallery_page, prev_page)
-     |> assign(:image_gallery_end?, length(images) < per_page)}
   end
 
   defp translate_errors(changeset) do
