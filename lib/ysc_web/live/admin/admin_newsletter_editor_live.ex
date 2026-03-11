@@ -413,51 +413,28 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       >
         <%!-- Left: Editor --%>
         <div id="editor-panel" class="space-y-6 pb-24">
-          <%!-- Cover photo outside main form: UploadComponent renders its own form; nested forms are invalid HTML and break the parent form's phx-change for title/subject --%>
           <div class="border border-zinc-200 rounded-lg p-4 bg-white">
             <h2 class="text-lg font-semibold text-zinc-800 mb-4">Cover photo</h2>
-            <div :if={has_cover_image?(@preview_cover_image_id)} class="mb-4">
-              <%!-- Readonly: plain image, no clear button --%>
-              <div :if={@readonly?}>
+            <div :if={@readonly?}>
+              <%= if has_cover_image?(@preview_cover_image_id) do %>
                 <.live_component
                   module={YscWeb.Components.Image}
                   id="newsletter-cover-preview"
                   image_id={@preview_cover_image_id}
                   preferred_type={:optimized}
                 />
-              </div>
-              <button
-                :if={!@readonly?}
-                type="button"
-                class="block w-full text-left"
-                phx-click="clear-cover"
-              >
-                <div class="relative group">
-                  <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/30 rounded-lg z-10">
-                    <.icon name="hero-x-circle" class="w-12 h-12 text-white" />
-                  </div>
-                  <.live_component
-                    module={YscWeb.Components.Image}
-                    id="newsletter-cover-preview-edit"
-                    image_id={@preview_cover_image_id}
-                    preferred_type={:optimized}
-                  />
-                </div>
-              </button>
+              <% else %>
+                <p class="text-sm text-zinc-400 italic">No cover photo</p>
+              <% end %>
             </div>
-            <div :if={!has_cover_image?(@preview_cover_image_id) && !@readonly?}>
+            <div :if={!@readonly?}>
               <.live_component
-                module={YscWeb.UploadComponent}
+                module={YscWeb.MediaPickerComponent}
                 id={:newsletter_cover}
                 user_id={@current_user.id}
+                image_id={@preview_cover_image_id}
               />
             </div>
-            <p
-              :if={!has_cover_image?(@preview_cover_image_id) && @readonly?}
-              class="text-sm text-zinc-400 italic"
-            >
-              No cover photo
-            </p>
           </div>
 
           <.form
@@ -1102,27 +1079,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> schedule_auto_save()}
   end
 
-  def handle_event(
-        "clear-cover",
-        _params,
-        %{assigns: %{readonly?: true}} = socket
-      ),
-      do: {:noreply, socket}
-
   def handle_event("clear-cover", _params, socket) do
-    params =
-      socket.assigns.form.params
-      |> Map.put("cover_image_id", nil)
-
-    edition = socket.assigns.edition || %Edition{}
-    changeset = Edition.changeset(edition, params)
-
-    {:noreply,
-     socket
-     |> assign(form: to_form(changeset, as: "edition"))
-     |> assign(:preview_cover_image_id, nil)
-     |> assign_preview_data()
-     |> schedule_auto_save()}
+    {:noreply, socket}
   end
 
   def handle_event("send-test-email", _params, socket) do
@@ -1396,8 +1354,30 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   @impl true
-  def handle_info({YscWeb.UploadComponent, _component_id, payload}, socket) do
-    image_id = normalize_upload_payload(payload)
+  def handle_info(
+        {YscWeb.MediaPickerComponent, _component_id, :cleared},
+        socket
+      ) do
+    params =
+      socket.assigns.form.params
+      |> Map.put("cover_image_id", nil)
+
+    edition = socket.assigns.edition || %Edition{}
+    changeset = Edition.changeset(edition, params)
+
+    {:noreply,
+     socket
+     |> assign(form: to_form(changeset, as: "edition"))
+     |> assign(:preview_cover_image_id, nil)
+     |> assign_preview_data()
+     |> schedule_auto_save()}
+  end
+
+  def handle_info(
+        {YscWeb.MediaPickerComponent, _component_id, image_id},
+        socket
+      ) do
+    image_id = normalize_upload_payload(image_id)
 
     params =
       socket.assigns.form.params
