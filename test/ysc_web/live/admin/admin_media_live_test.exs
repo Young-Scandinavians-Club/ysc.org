@@ -24,7 +24,7 @@ defmodule YscWeb.AdminMediaLiveTest do
       |> element("button", "New Image")
       |> render_click()
 
-      assert_redirected(view, ~p"/admin/media/upload")
+      assert_patched(view, ~p"/admin/media/upload")
     end
   end
 end

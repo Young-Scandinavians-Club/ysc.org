@@ -229,8 +229,8 @@ defmodule YscWeb.UserSettingsLiveTest do
         |> element("[data-testid=\"scheduled-downgrade-notice\"] button")
         |> render_click()
 
-        flash = assert_redirect(view, ~p"/users/membership")
-        assert flash["info"] =~ "Scheduled downgrade cancelled"
+        assert_patched(view, ~p"/users/membership")
+        assert render(view) =~ "Scheduled downgrade cancelled"
       after
         Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
         Application.delete_env(:ysc, :cancel_scheduled_downgrade_callback)

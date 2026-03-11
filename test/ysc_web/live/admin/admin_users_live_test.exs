@@ -55,7 +55,7 @@ defmodule YscWeb.AdminUsersLiveTest do
       |> element("button", "Approve")
       |> render_click()
 
-      assert_redirected(view, "/admin/users?id=#{pending_user.id}")
+      assert_patched(view, "/admin/users?id=#{pending_user.id}")
 
       # Verify user state in DB
       updated_user = Ysc.Accounts.get_user!(pending_user.id)
@@ -83,7 +83,7 @@ defmodule YscWeb.AdminUsersLiveTest do
       |> element("#reject-application-form")
       |> render_submit(%{"reject" => %{"note" => ""}})
 
-      assert_redirected(view, "/admin/users?id=#{pending_user.id}")
+      assert_patched(view, "/admin/users?id=#{pending_user.id}")
 
       # Verify user state in DB
       updated_user = Ysc.Accounts.get_user!(pending_user.id)
