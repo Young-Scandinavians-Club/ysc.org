@@ -1,24 +1,21 @@
-defmodule YscWeb.MediaPickerComponent do
+defmodule YscWeb.TrixImagePickerComponent do
   @moduledoc """
-  A self-contained LiveComponent for selecting or uploading cover images.
+  A LiveComponent that provides an "Insert from library" button for Trix editors.
 
-  Provides three states:
-  - Empty: shows an upload zone + "Choose from library" button
-  - Filled: shows the selected image + "Clear" and "Change" buttons
-  - Modal open: shows a searchable/filterable media library grid
+  Opens a searchable/filterable media library modal and sends the selected
+  `%Media.Image{}` struct back to the parent LiveView so it can push a JS event
+  to insert the image into the Trix editor body.
 
   ## Usage
 
       <.live_component
-        module={YscWeb.MediaPickerComponent}
-        id={:cover_image}
-        user_id={@current_user.id}
-        image_id={@image_id}
+        module={YscWeb.TrixImagePickerComponent}
+        id={:post_body_image_picker}
+        target_input_id="post[raw_body]"
       />
 
-  The component sends messages to the parent LiveView:
-  - `{YscWeb.MediaPickerComponent, id, image_id}` when an image is selected/uploaded
-  - `{YscWeb.MediaPickerComponent, id, :cleared}` when the image is cleared
+  The component sends `{YscWeb.TrixImagePickerComponent, id, %Media.Image{}}` to
+  the parent LiveView when an image is selected.
   """
   use YscWeb, :live_component
 
@@ -35,156 +32,44 @@ defmodule YscWeb.MediaPickerComponent do
      |> assign(:selected_year, nil)
      |> assign(:available_years, [])
      |> assign(:end_of_timeline?, false)
-     |> assign(:last_image_date, nil)
-     |> allow_upload(:media_picker_file,
-       accept: ~w(.jpg .jpeg .png .gif .webp),
-       max_entries: 1,
-       auto_upload: true
-     )}
+     |> assign(:last_image_date, nil)}
   end
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns)}
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign_new(:disabled?, fn -> false end)
+
+    {:ok, socket}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={"media-picker-#{@id}"} class="not-prose">
-      <%= if has_image?(@image_id) do %>
-        <div class="relative group">
-          <div class="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition bg-black/30 rounded-lg z-10">
-            <button
-              type="button"
-              phx-click="clear-image"
-              phx-target={@myself}
-              class="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 hover:bg-white shadow-md"
-              aria-label="Remove image"
-            >
-              <.icon name="hero-x-mark" class="w-5 h-5 text-red-600" />
-            </button>
-            <button
-              type="button"
-              phx-click="open-picker"
-              phx-target={@myself}
-              class="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 hover:bg-white shadow-md"
-              aria-label="Change image"
-            >
-              <.icon name="hero-arrows-right-left" class="w-5 h-5 text-zinc-700" />
-            </button>
-          </div>
-          <.live_component
-            module={YscWeb.Components.Image}
-            id={"media-picker-preview-#{@id}"}
-            image_id={@image_id}
-            preferred_type={:optimized}
-          />
-        </div>
-      <% else %>
-        <div class="space-y-3">
-          <form
-            id={"#{@id}-upload-form"}
-            class="upload-component"
-            action="#"
-            phx-change="validate-upload"
-            phx-drop-target={@uploads.media_picker_file.ref}
-            phx-submit="save-upload"
-            phx-target={@myself}
-          >
-            <label
-              phx-drop-target={@uploads.media_picker_file.ref}
-              class="flex p-6 flex-col items-center justify-center w-full min-h-52 border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100"
-            >
-              <.live_file_input upload={@uploads.media_picker_file} class="hidden" />
-
-              <div class="flex flex-row flex-wrap gap-2">
-                <%= for entry <- @uploads.media_picker_file.entries do %>
-                  <article class="upload-entry">
-                    <figure class="group relative">
-                      <button
-                        type="button"
-                        aria-label="cancel"
-                        phx-click="cancel-upload"
-                        phx-target={@myself}
-                        phx-value-ref={entry.ref}
-                        class="upload-entry__cancel w-full"
-                      >
-                        <div class="hidden group-hover:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-red-500 z-10">
-                          <.icon name="hero-x-circle" class="w-10 h-10" />
-                        </div>
-                        <.live_img_preview
-                          entry={entry}
-                          class="group-hover:blur h-60 w-full rounded-lg"
-                        />
-                      </button>
-                    </figure>
-
-                    <%= for err <- upload_errors(@uploads.media_picker_file, entry) do %>
-                      <p class="text-sm text-red-600 font-semibold mt-1">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="-mt-0.5 h-5 w-5"
-                        /> {error_to_string(err)}
-                      </p>
-                    <% end %>
-                  </article>
-                <% end %>
-              </div>
-
-              <%= for err <- upload_errors(@uploads.media_picker_file) do %>
-                <p class="text-sm text-red-600 font-semibold mt-1">
-                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
-                    err
-                  )}
-                </p>
-              <% end %>
-
-              <div
-                :if={length(@uploads.media_picker_file.entries) == 0}
-                class="flex flex-col items-center justify-center pt-3 pb-4"
-              >
-                <.icon
-                  name="hero-cloud-arrow-up"
-                  class="w-8 h-10 mb-3 text-zinc-500"
-                />
-                <p class="mb-1 text-sm text-zinc-500">
-                  <span class="font-semibold">Click to upload</span>
-                  or drag and drop
-                </p>
-                <p class="text-xs text-zinc-500">PNG, JPG, JPEG, GIF or WebP</p>
-              </div>
-            </label>
-
-            <div
-              :if={length(@uploads.media_picker_file.entries) > 0}
-              class="flex justify-end mt-3"
-            >
-              <.button type="submit">Upload</.button>
-            </div>
-          </form>
-
-          <button
-            type="button"
-            phx-click="open-picker"
-            phx-target={@myself}
-            class="w-full flex items-center justify-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-lg py-2 px-3 hover:bg-zinc-50 transition"
-          >
-            <.icon name="hero-photo" class="w-4 h-4" /> Choose from library
-          </button>
-        </div>
-      <% end %>
+    <div id={"trix-image-picker-#{@id}"} class="not-prose">
+      <button
+        :if={!@disabled?}
+        type="button"
+        phx-click="open-picker"
+        phx-target={@myself}
+        data-trix-library-trigger={@target_input_id}
+        class="hidden"
+      >
+        Insert from library
+      </button>
 
       <.modal
         :if={@show_modal?}
-        id={"media-picker-modal-#{@id}"}
+        id={"trix-image-picker-modal-#{@id}"}
         show
         on_cancel={JS.push("close-picker", target: @myself)}
         max_width="max-w-5xl"
       >
         <div class="space-y-4">
           <h2 class="text-lg font-semibold text-zinc-800">
-            Media library
+            Insert image from library
           </h2>
 
           <div class="flex flex-col sm:flex-row gap-3">
@@ -235,7 +120,7 @@ defmodule YscWeb.MediaPickerComponent do
           </div>
 
           <div
-            id={"media-picker-grid-#{@id}"}
+            id={"trix-image-picker-grid-#{@id}"}
             phx-update="stream"
             phx-viewport-bottom="load-more-media"
             phx-target={@myself}
@@ -275,34 +160,6 @@ defmodule YscWeb.MediaPickerComponent do
   end
 
   # --- Events ---
-
-  @impl true
-  def handle_event("validate-upload", _params, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("cancel-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :media_picker_file, ref)}
-  end
-
-  @impl true
-  def handle_event("save-upload", _params, socket) do
-    case YscWeb.Uploads.consume_entries(socket, :media_picker_file) do
-      [] ->
-        {:noreply, socket}
-
-      [image_id] ->
-        send(self(), {__MODULE__, socket.assigns.id, image_id})
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("clear-image", _params, socket) do
-    send(self(), {__MODULE__, socket.assigns.id, :cleared})
-    {:noreply, socket}
-  end
 
   @impl true
   def handle_event("open-picker", _params, socket) do
@@ -399,14 +256,12 @@ defmodule YscWeb.MediaPickerComponent do
 
   @impl true
   def handle_event("select-image", %{"image-id" => image_id}, socket) do
-    send(self(), {__MODULE__, socket.assigns.id, image_id})
+    image = Media.get_image!(image_id)
+    send(self(), {__MODULE__, socket.assigns.id, image})
     {:noreply, assign(socket, :show_modal?, false)}
   end
 
   # --- Helpers ---
-
-  defp has_image?(id) when is_binary(id) and id != "", do: true
-  defp has_image?(_), do: false
 
   defp last_date([]), do: nil
   defp last_date(images), do: List.last(images).inserted_at
@@ -429,11 +284,4 @@ defmodule YscWeb.MediaPickerComponent do
        when is_binary(path) and path != "", do: path
 
   defp thumbnail_url(_), do: "/images/ysc_logo.png"
-
-  defp error_to_string(:too_large), do: "Too large"
-
-  defp error_to_string(:not_accepted),
-    do: "You have selected an unacceptable file type"
-
-  defp error_to_string(:too_many_files), do: "You have selected too many files"
 end

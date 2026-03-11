@@ -66,6 +66,10 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% end %>
 
+                <div :if={@event.tickets_tbd && @event.state != :cancelled}>
+                  <.badge>Save the Date</.badge>
+                </div>
+
                 <div :if={
                   @event.state != :cancelled && @async_data_loaded &&
                     @event_at_capacity

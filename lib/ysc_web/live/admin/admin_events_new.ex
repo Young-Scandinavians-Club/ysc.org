@@ -381,6 +381,11 @@ defmodule YscWeb.AdminEventsNewLive do
                   phx-hook="TrixHook"
                   phx-debounce={200}
                 />
+                <.live_component
+                  module={YscWeb.TrixImagePickerComponent}
+                  id={:event_body_image_picker}
+                  target_input_id="post[raw_body]"
+                />
                 <div id="richtext" phx-update="ignore">
                   <trix-editor
                     input="post[raw_body]"
@@ -1078,6 +1083,18 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      socket |> assign_form(changeset) |> assign(:event, updated_event)}
+  end
+
+  def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
+    url = image.optimized_image_path || image.raw_image_path
+
+    {:noreply,
+     push_event(socket, "insert-trix-image", %{
+       url: url,
+       href: "#{url}?content-disposition=attachment",
+       alt: image.alt_text || image.title || "",
+       target_input_id: "post[raw_body]"
+     })}
   end
 
   @impl true
