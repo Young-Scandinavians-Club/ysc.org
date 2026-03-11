@@ -43,7 +43,7 @@ defmodule YscWeb.AdminPostsLiveTest do
       |> element("button", "New Post")
       |> render_click()
 
-      assert_redirected(view, ~p"/admin/posts/new")
+      assert_patched(view, ~p"/admin/posts/new")
     end
 
     test "creates a new post", %{conn: conn} do

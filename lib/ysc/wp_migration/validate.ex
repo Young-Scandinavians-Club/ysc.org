@@ -119,7 +119,7 @@ defmodule Ysc.WpMigration.Validate do
           WHERE post_type = 'post'
             AND (
               post_status = 'publish'
-              OR (post_status = 'future' AND post_date <= CURRENT_TIMESTAMP)
+              OR (post_status = 'future' AND CAST(post_date AS TIMESTAMP) <= CURRENT_TIMESTAMP)
             )
           """
         ),

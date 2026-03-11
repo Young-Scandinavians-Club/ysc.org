@@ -23,21 +23,22 @@
     <% end %>
   </mj-column>
 </mj-section>
+<mj-spacer height="16px"></mj-spacer>
 <%= if @posts && length(@posts) > 0 do %>
-<mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px">
+<mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px 8px 0 0">
   <mj-column padding="0">
     <mj-text align="left" font-size="24px" font-weight="bold" color="#0f172a" padding-bottom="12px">Club Updates</mj-text>
     <mj-divider border-width="1px" border-color="#e2e8f0" padding-bottom="16px"></mj-divider>
   </mj-column>
 </mj-section>
 <%= for post <- @posts do %>
-<mj-section background-color="#fff" padding="8px 48px 24px 48px" border-radius="8px">
+<mj-section background-color="#fff" padding="8px 48px 24px 48px" border-radius="0">
   <mj-group>
     <mj-column width="40%" vertical-align="middle" padding="0">
       <%= if post[:image_url] do %>
-      <mj-image src="<%= post[:image_url] %>" alt="" border-radius="8px" padding="0"></mj-image>
+      <mj-image src="<%= post[:image_url] %>" alt="" border-radius="8px" padding="0" height="160px" css-class="post-thumb"></mj-image>
       <% else %>
-      <mj-spacer height="120px"></mj-spacer>
+      <mj-spacer height="160px"></mj-spacer>
       <% end %>
     </mj-column>
     <mj-column width="60%" vertical-align="middle" padding-left="24px">
@@ -50,31 +51,67 @@
   </mj-group>
 </mj-section>
 <% end %>
-<mj-spacer height="24px"></mj-spacer>
+<mj-section background-color="#fff" padding="0 0 8px 0" border-radius="0 0 8px 8px">
+  <mj-column padding="0">
+  </mj-column>
+</mj-section>
+<mj-spacer height="16px"></mj-spacer>
 <% end %>
 <%= if @events && length(@events) > 0 do %>
-<mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px">
+<mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px 8px 0 0">
   <mj-column padding="0">
     <mj-text align="left" font-size="24px" font-weight="bold" color="#0f172a" padding-bottom="12px">Upcoming events</mj-text>
     <mj-divider border-width="1px" border-color="#e2e8f0" padding-bottom="20px"></mj-divider>
   </mj-column>
 </mj-section>
 <%= for event <- @events do %>
-<mj-section background-color="#f8fafc" border-radius="8px" padding="0 48px 24px 48px" css-class="event-card">
+<mj-section background-color="#fff" border-radius="0" padding="0 48px 24px 48px" css-class="event-card">
   <mj-column width="100%" padding="0">
     <%= if event[:image_url] do %>
-    <mj-image src="<%= event[:image_url] %>" alt="" padding="0" width="100%" border-radius="8px 8px 0 0"></mj-image>
+      <%= if event[:save_the_date] || event[:selling_fast] do %>
+    <mj-text padding="0" css-class="event-cover">
+      <!--[if mso]>
+      <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:504px;height:220px;">
+        <v:fill type="frame" src="<%= event[:image_url] %>" color="#e2e8f0" />
+        <v:textbox inset="0,0,0,0" style="mso-fit-shape-to-text:false">
+      <![endif]-->
+      <div style="background-image:url('<%= event[:image_url] %>');background-size:cover;background-position:center;border-radius:8px;height:220px;width:100%;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="height:220px;">
+          <tr>
+            <td align="right" valign="top" style="padding:12px;">
+              <%= if event[:save_the_date] do %>
+              <span style="background-color:#1447e6;color:#ffffff;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:inline-block;line-height:1;">SAVE THE DATE</span>
+              <% end %>
+              <%= if event[:selling_fast] do %>
+              <span style="background-color:#059669;color:#ffffff;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:inline-block;line-height:1;<%= if event[:save_the_date], do: "margin-left:6px;", else: "" %>">GOING FAST!</span>
+              <% end %>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <!--[if mso]>
+        </v:textbox>
+      </v:rect>
+      <![endif]-->
+    </mj-text>
+      <% else %>
+    <mj-image src="<%= event[:image_url] %>" alt="" padding="0" width="100%" border-radius="8px" height="220px" css-class="event-cover"></mj-image>
+      <% end %>
     <% else %>
-    <mj-spacer height="180px" padding="0"></mj-spacer>
+    <mj-spacer height="220px" padding="0"></mj-spacer>
+      <%= if event[:save_the_date] || event[:selling_fast] do %>
+    <mj-text align="left" padding="8px 20px 0 20px">
+        <%= if event[:save_the_date] do %>
+        <span style="background-color:#1447e6;color:#ffffff;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:inline-block;line-height:1;">SAVE THE DATE</span>
+        <% end %>
+        <%= if event[:selling_fast] do %>
+        <span style="background-color:#059669;color:#ffffff;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;display:inline-block;line-height:1;<%= if event[:save_the_date], do: "margin-left:6px;", else: "" %>">GOING FAST!</span>
+        <% end %>
+    </mj-text>
+      <% end %>
     <% end %>
     <mj-text align="left" font-weight="bold" font-size="18px" color="#0f172a" padding="20px 20px 6px 20px" line-height="1.3"><%= event[:title] %></mj-text>
     <mj-text align="left" font-size="14px" color="#475569" padding="0 20px 6px 20px"><%= event[:date_str] %></mj-text>
-    <%= if event[:save_the_date] do %>
-    <mj-text align="left" font-size="12px" color="#1447e6" font-weight="bold" padding="0 20px 6px 20px">Save the date</mj-text>
-    <% end %>
-    <%= if event[:selling_fast] do %>
-    <mj-text align="left" font-size="12px" color="#059669" font-weight="bold" padding="0 20px 6px 20px">Selling fast</mj-text>
-    <% end %>
     <%= if event[:pricing_str] do %>
     <mj-text align="left" font-size="13px" color="#64748b" padding="0 20px 6px 20px"><%= event[:pricing_str] %><%= if event[:tickets_on_sale_str] do %> · <%= event[:tickets_on_sale_str] %><% end %></mj-text>
     <% end %>
@@ -90,7 +127,11 @@
   </mj-column>
 </mj-section>
 <% end %>
-<mj-spacer height="24px"></mj-spacer>
+<mj-section background-color="#fff" padding="0 0 8px 0" border-radius="0 0 8px 8px">
+  <mj-column padding="0">
+  </mj-column>
+</mj-section>
+<mj-spacer height="16px"></mj-spacer>
 <% end %>
 <%= if YscWeb.Emails.NewsletterEdition.present_unsubscribe_url?(@unsubscribe_url) do %>
 <mj-section padding="24px 48px 48px 48px">

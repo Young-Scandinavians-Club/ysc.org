@@ -283,7 +283,7 @@ defmodule YscWeb.UserSettingsLive do
         <.modal
           :if={@live_action == :payment_method}
           id="update-payment-method-modal"
-          on_cancel={JS.navigate(~p"/users/membership")}
+          on_cancel={JS.patch(~p"/users/membership")}
           show
         >
           <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
@@ -470,7 +470,7 @@ defmodule YscWeb.UserSettingsLive do
           <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
             <button
               type="button"
-              phx-click={JS.navigate(~p"/users/membership")}
+              phx-click={JS.patch(~p"/users/membership")}
               class="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 bg-white hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Close
@@ -1333,7 +1333,7 @@ defmodule YscWeb.UserSettingsLive do
 
                 <div class="flex flex-wrap gap-3 pt-2 border-t border-zinc-100">
                   <.button
-                    phx-click={JS.navigate(~p"/users/membership/payment-method")}
+                    phx-click={JS.patch(~p"/users/membership/payment-method")}
                     variant="outline"
                   >
                     <.icon name="hero-credit-card" class="w-4 h-4 mr-1.5" />
@@ -2213,7 +2213,7 @@ defmodule YscWeb.UserSettingsLive do
           )
       end
 
-    {:ok, push_navigate(socket, to: ~p"/users/settings")}
+    {:ok, push_patch(socket, to: ~p"/users/settings")}
   end
 
   @impl true
@@ -3180,7 +3180,7 @@ defmodule YscWeb.UserSettingsLive do
        })}
     else
       # No pending email, just navigate away
-      {:noreply, push_navigate(socket, to: ~p"/users/settings")}
+      {:noreply, push_patch(socket, to: ~p"/users/settings")}
     end
   end
 
@@ -3189,7 +3189,7 @@ defmodule YscWeb.UserSettingsLive do
     {:noreply,
      socket
      |> assign(:email_verification_code_state, %{})
-     |> push_navigate(to: ~p"/users/settings")}
+     |> push_patch(to: ~p"/users/settings")}
   end
 
   def handle_event("confirm_cancel_phone_verification", _params, socket) do
@@ -3207,7 +3207,7 @@ defmodule YscWeb.UserSettingsLive do
        })}
     else
       # No pending phone, just navigate away
-      {:noreply, push_navigate(socket, to: ~p"/users/settings")}
+      {:noreply, push_patch(socket, to: ~p"/users/settings")}
     end
   end
 
@@ -3216,7 +3216,7 @@ defmodule YscWeb.UserSettingsLive do
     {:noreply,
      socket
      |> assign(:phone_verification_code_state, %{})
-     |> push_navigate(to: ~p"/users/settings")}
+     |> push_patch(to: ~p"/users/settings")}
   end
 
   def handle_event("validate_notifications", params, socket) do
@@ -3371,7 +3371,7 @@ defmodule YscWeb.UserSettingsLive do
                    "Membership activated successfully!",
                    title: "Membership"
                  )
-                 |> push_navigate(to: ~p"/users/membership")}
+                 |> push_patch(to: ~p"/users/membership")}
 
               {:error, reason} ->
                 require Ysc.Logging
@@ -3398,7 +3398,7 @@ defmodule YscWeb.UserSettingsLive do
                    "Membership activated successfully!",
                    title: "Membership"
                  )
-                 |> push_navigate(to: ~p"/users/membership")}
+                 |> push_patch(to: ~p"/users/membership")}
             end
 
           {:error, :sub_accounts_cannot_create_subscriptions} ->
@@ -3871,7 +3871,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(socket, :info, "Membership cancelled.",
              title: "Membership"
            )
-           |> push_navigate(to: ~p"/users/membership")}
+           |> push_patch(to: ~p"/users/membership")}
 
         {:error, reason} when is_binary(reason) ->
           {:noreply,
@@ -3901,14 +3901,14 @@ defmodule YscWeb.UserSettingsLive do
            "Scheduled downgrade cancelled. Your membership will stay at its current level.",
            title: "Membership"
          )
-         |> push_navigate(to: ~p"/users/membership")}
+         |> push_patch(to: ~p"/users/membership")}
 
       {:error, :no_scheduled_downgrade} ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, "No scheduled downgrade found.",
            title: "Membership"
          )
-         |> push_navigate(to: ~p"/users/membership")}
+         |> push_patch(to: ~p"/users/membership")}
 
       {:error, reason} when is_binary(reason) ->
         {:noreply,
@@ -3955,7 +3955,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
              title: "Membership"
            )
-           |> push_navigate(to: ~p"/users/membership")}
+           |> push_patch(to: ~p"/users/membership")}
 
         _subscription ->
           # Cache invalidation is handled in Subscriptions.resume (via update_subscription)
@@ -3970,7 +3970,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
              title: "Membership"
            )
-           |> push_navigate(to: ~p"/users/membership")}
+           |> push_patch(to: ~p"/users/membership")}
       end
     end
   end
@@ -4498,7 +4498,7 @@ defmodule YscWeb.UserSettingsLive do
        to_form(%{"membership_type" => Atom.to_string(new_atom)})
      )
      |> YscWeb.Flash.put_toast(:info, success_message, title: "Membership")
-     |> push_navigate(to: ~p"/users/membership")}
+     |> push_patch(to: ~p"/users/membership")}
   end
 
   defp handle_membership_change_scheduled(socket, user, _direction) do
@@ -4512,7 +4512,7 @@ defmodule YscWeb.UserSettingsLive do
        title: "Membership",
        icon: &YscWeb.CoreComponents.flash_toast_icon_clock/1
      )
-     |> push_navigate(to: ~p"/users/membership")}
+     |> push_patch(to: ~p"/users/membership")}
   end
 
   defp handle_membership_change_error(socket, reason) do
@@ -5628,7 +5628,7 @@ defmodule YscWeb.UserSettingsLive do
              title: "Invoice",
              icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
            )
-           |> push_navigate(to: ~p"/users/membership")}
+           |> push_patch(to: ~p"/users/membership")}
 
         {:error, :invoice_not_found} ->
           {:noreply,

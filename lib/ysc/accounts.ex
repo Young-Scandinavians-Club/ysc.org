@@ -889,7 +889,7 @@ defmodule Ysc.Accounts do
       """
       ==============================
 
-      Hi #{String.capitalize(user.first_name)},
+      Hi #{Ysc.title_case(user.first_name)},
 
       Your verification code is: #{code}
 
@@ -1159,9 +1159,9 @@ defmodule Ysc.Accounts do
     from(u in User,
       where:
         u.state != :deleted and
-          (fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
-             fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
-             fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
+          (fragment("SIMILARITY(?, ?) > 0.3", u.email, ^search_term) or
+             fragment("SIMILARITY(?, ?) > 0.3", u.first_name, ^search_term) or
+             fragment("SIMILARITY(?, ?) > 0.3", u.last_name, ^search_term) or
              ilike(u.phone_number, ^phone_like))
     )
   end
@@ -1196,11 +1196,52 @@ defmodule Ysc.Accounts do
         sorted_users =
           apply_membership_sorting(users_with_subscriptions, membership_sort)
 
-        {:ok, {sorted_users, meta}}
+        # Sort by relevance when no explicit user-chosen sort is active
+        final_users =
+          if explicit_sort?(other_params),
+            do: sorted_users,
+            else: sort_by_relevance(sorted_users, search_term)
+
+        {:ok, {final_users, meta}}
 
       error ->
         error
     end
+  end
+
+  # Returns true when the URL params carry an explicit order_by chosen by the user.
+  defp explicit_sort?(%{"order_by" => [_ | _]}), do: true
+  defp explicit_sort?(_), do: false
+
+  # Ranks users on the current page by how closely they match the search term.
+  # Tiers (lower = better):
+  #   0 – exact match on first or last name
+  #   1 – name starts with the search term
+  #   2 – name or email contains the search term
+  #   3 – similarity-only match (no simple substring)
+  defp sort_by_relevance(users, search_term) do
+    term = String.downcase(search_term)
+
+    Enum.sort_by(users, fn user ->
+      first = String.downcase(user.first_name || "")
+      last = String.downcase(user.last_name || "")
+      email = String.downcase(user.email || "")
+
+      cond do
+        first == term or last == term ->
+          0
+
+        String.starts_with?(first, term) or String.starts_with?(last, term) ->
+          1
+
+        String.contains?(first, term) or String.contains?(last, term) or
+            String.contains?(email, term) ->
+          2
+
+        true ->
+          3
+      end
+    end)
   end
 
   def update_user(user, params, %User{} = current_user) do
@@ -1623,11 +1664,11 @@ defmodule Ysc.Accounts do
       "#{user.id}",
       "Your Young Scandinavians Club application is in! 🎉",
       "application_submitted",
-      %{first_name: String.capitalize(user.first_name)},
+      %{first_name: Ysc.title_case(user.first_name)},
       """
       ==============================
 
-      Hi #{String.capitalize(user.first_name)},
+      Hi #{Ysc.title_case(user.first_name)},
 
       Your application has been submitted! 🎉
 

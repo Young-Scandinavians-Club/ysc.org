@@ -222,7 +222,7 @@ defmodule YscWeb.AdminMoneyLive do
     else
       socket
       |> YscWeb.Flash.put_toast(:error, "Payment not found", title: "Payment")
-      |> push_navigate(to: build_money_path(socket))
+      |> push_patch(to: build_money_path(socket))
     end
   end
 
@@ -276,7 +276,7 @@ defmodule YscWeb.AdminMoneyLive do
     else
       socket
       |> YscWeb.Flash.put_toast(:error, "Payment not found", title: "Payment")
-      |> push_navigate(to: build_money_path(socket))
+      |> push_patch(to: build_money_path(socket))
     end
   end
 
@@ -297,7 +297,7 @@ defmodule YscWeb.AdminMoneyLive do
     else
       socket
       |> YscWeb.Flash.put_toast(:error, "Payout not found", title: "Payout")
-      |> push_navigate(to: build_money_path(socket))
+      |> push_patch(to: build_money_path(socket))
     end
   end
 
@@ -335,7 +335,7 @@ defmodule YscWeb.AdminMoneyLive do
   @impl true
   def handle_event("show_refund_modal", %{"payment_id" => payment_id}, socket) do
     path = build_money_path(socket, "/payments/#{payment_id}/refund")
-    {:noreply, push_navigate(socket, to: path)}
+    {:noreply, push_patch(socket, to: path)}
   end
 
   @impl true
@@ -351,7 +351,7 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def handle_event("close_refund_modal", _params, socket) do
-    {:noreply, push_navigate(socket, to: build_money_path(socket))}
+    {:noreply, push_patch(socket, to: build_money_path(socket))}
   end
 
   @impl true
@@ -393,7 +393,7 @@ defmodule YscWeb.AdminMoneyLive do
 
     if payout do
       path = build_money_path(socket, "/payouts/#{payout.id}")
-      {:noreply, push_navigate(socket, to: path)}
+      {:noreply, push_patch(socket, to: path)}
     else
       {:noreply,
        socket
@@ -405,7 +405,7 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def handle_event("close_payout_modal", _params, socket) do
-    {:noreply, push_navigate(socket, to: build_money_path(socket))}
+    {:noreply, push_patch(socket, to: build_money_path(socket))}
   end
 
   @impl true
@@ -440,12 +440,12 @@ defmodule YscWeb.AdminMoneyLive do
   @impl true
   def handle_event("show_payment_modal", %{"payment_id" => payment_id}, socket) do
     path = build_money_path(socket, "/payments/#{payment_id}")
-    {:noreply, push_navigate(socket, to: path)}
+    {:noreply, push_patch(socket, to: path)}
   end
 
   @impl true
   def handle_event("close_payment_modal", _params, socket) do
-    {:noreply, push_navigate(socket, to: build_money_path(socket))}
+    {:noreply, push_patch(socket, to: build_money_path(socket))}
   end
 
   @impl true
@@ -497,7 +497,7 @@ defmodule YscWeb.AdminMoneyLive do
                |> paginate_payments(1)
                |> paginate_ledger_entries(1)
                |> paginate_webhooks(1)
-               |> push_navigate(to: payment_path)}
+               |> push_patch(to: payment_path)}
 
             {:error, _changeset} ->
               {:noreply,
@@ -587,7 +587,7 @@ defmodule YscWeb.AdminMoneyLive do
                |> paginate_payments(1)
                |> paginate_ledger_entries(1)
                |> paginate_webhooks(1)
-               |> push_navigate(to: payment_path)}
+               |> push_patch(to: payment_path)}
 
             {:error, _changeset} ->
               {:noreply,

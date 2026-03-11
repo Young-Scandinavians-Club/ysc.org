@@ -73,8 +73,8 @@ defmodule YscWeb.PostLive do
                 Post By
               </p>
               <p class="text-sm font-medium text-zinc-500">
-                {String.capitalize(@post.author.first_name || "")}
-                {String.capitalize(@post.author.last_name || "")}
+                {Ysc.title_case(@post.author.first_name || "")}
+                {Ysc.title_case(@post.author.last_name || "")}
                 <%= if @post.board_position_at_publish do %>
                   , YSC {format_board_position(@post.board_position_at_publish)}
                 <% end %>
@@ -196,7 +196,7 @@ defmodule YscWeb.PostLive do
                 :for={{id, comment} <- @streams.comments}
                 id={id}
                 text={comment.text}
-                author={"#{String.capitalize(comment.author.first_name)} #{String.capitalize(comment.author.last_name)}"}
+                author={"#{Ysc.title_case(comment.author.first_name)} #{Ysc.title_case(comment.author.last_name)}"}
                 author_email={comment.author.email}
                 author_most_connected={comment.author.most_connected_country}
                 author_id={comment.author.id}

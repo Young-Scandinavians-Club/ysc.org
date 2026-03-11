@@ -87,7 +87,7 @@ defmodule YscWeb.AdminNewslettersLive do
             |> stream(:editions, editions, reset: true)
 
           {:error, _meta} ->
-            push_navigate(socket, to: ~p"/admin/newsletters")
+            push_patch(socket, to: ~p"/admin/newsletters")
         end
       end
 
@@ -305,7 +305,7 @@ defmodule YscWeb.AdminNewslettersLive do
                   <div class="px-4 py-4">
                     <button
                       class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                      phx-click={JS.navigate(~p"/admin/newsletters")}
+                      phx-click={JS.patch(~p"/admin/newsletters")}
                     >
                       <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" />
                       Clear filters
@@ -406,21 +406,32 @@ defmodule YscWeb.AdminNewslettersLive do
               <Flop.Phoenix.pagination
                 meta={@meta}
                 path={~p"/admin/newsletters"}
-                class="flex items-center justify-center py-4"
+                class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
-                  class: "flex gap-0 order-2 justify-center items-center"
+                  class: "flex gap-1 order-2 justify-center items-center"
+                ]}
+                page_list_item_attrs={[class: "list-none"]}
+                page_link_attrs={[
+                  class:
+                    "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                ]}
+                current_page_link_attrs={[
+                  class:
+                    "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded pointer-events-none"
                 ]}
                 page_links={3}
               >
                 <:previous attrs={[
                   class:
-                    "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                    "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
                 ]}>
+                  <.icon name="hero-chevron-left" class="w-4 h-4" />
                 </:previous>
                 <:next attrs={[
                   class:
-                    "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                    "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
                 ]}>
+                  <.icon name="hero-chevron-right" class="w-4 h-4" />
                 </:next>
               </Flop.Phoenix.pagination>
             </div>
@@ -531,21 +542,32 @@ defmodule YscWeb.AdminNewslettersLive do
               :if={@meta}
               meta={@meta}
               path={~p"/admin/newsletters"}
-              class="flex items-center justify-center py-10 h-10 text-base"
+              class="flex items-center justify-center py-10 text-base"
               page_list_attrs={[
-                class: "flex gap-0 order-2 justify-center items-center"
+                class: "flex gap-1 order-2 justify-center items-center"
+              ]}
+              page_list_item_attrs={[class: "list-none"]}
+              page_link_attrs={[
+                class:
+                  "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+              ]}
+              current_page_link_attrs={[
+                class:
+                  "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded pointer-events-none"
               ]}
               page_links={5}
             >
               <:previous attrs={[
                 class:
-                  "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                  "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
               ]}>
+                <.icon name="hero-chevron-left" class="w-4 h-4" />
               </:previous>
               <:next attrs={[
                 class:
-                  "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                  "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
               ]}>
+                <.icon name="hero-chevron-right" class="w-4 h-4" />
               </:next>
             </Flop.Phoenix.pagination>
           </div>
@@ -738,21 +760,32 @@ defmodule YscWeb.AdminNewslettersLive do
                 <Flop.Phoenix.pagination
                   meta={@sub_meta}
                   path={subscribers_list_path(@params)}
-                  class="flex items-center justify-center py-4"
+                  class="flex items-center justify-center py-4 text-base"
                   page_list_attrs={[
-                    class: "flex gap-0 order-2 justify-center items-center"
+                    class: "flex gap-1 order-2 justify-center items-center"
+                  ]}
+                  page_list_item_attrs={[class: "list-none"]}
+                  page_link_attrs={[
+                    class:
+                      "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                  ]}
+                  current_page_link_attrs={[
+                    class:
+                      "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded pointer-events-none"
                   ]}
                   page_links={3}
                 >
                   <:previous attrs={[
                     class:
-                      "order-1 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                      "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
                   ]}>
+                    <.icon name="hero-chevron-left" class="w-4 h-4" />
                   </:previous>
                   <:next attrs={[
                     class:
-                      "order-3 flex justify-center items-center px-3 py-2 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                      "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
                   ]}>
+                    <.icon name="hero-chevron-right" class="w-4 h-4" />
                   </:next>
                 </Flop.Phoenix.pagination>
               </div>
@@ -833,21 +866,32 @@ defmodule YscWeb.AdminNewslettersLive do
                 :if={@sub_meta}
                 meta={@sub_meta}
                 path={subscribers_list_path(@params)}
-                class="flex items-center justify-center py-10 h-10 text-base"
+                class="flex items-center justify-center py-10 text-base"
                 page_list_attrs={[
-                  class: "flex gap-0 order-2 justify-center items-center"
+                  class: "flex gap-1 order-2 justify-center items-center"
+                ]}
+                page_list_item_attrs={[class: "list-none"]}
+                page_link_attrs={[
+                  class:
+                    "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                ]}
+                current_page_link_attrs={[
+                  class:
+                    "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded pointer-events-none"
                 ]}
                 page_links={5}
               >
                 <:previous attrs={[
                   class:
-                    "order-1 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                    "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
                 ]}>
+                  <.icon name="hero-chevron-left" class="w-4 h-4" />
                 </:previous>
                 <:next attrs={[
                   class:
-                    "order-3 flex justify-center items-center px-3 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100"
+                    "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
                 ]}>
+                  <.icon name="hero-chevron-right" class="w-4 h-4" />
                 </:next>
               </Flop.Phoenix.pagination>
             </div>
@@ -868,7 +912,7 @@ defmodule YscWeb.AdminNewslettersLive do
          |> YscWeb.Flash.put_toast(:info, "Newsletter send queued.",
            title: "Newsletter"
          )
-         |> push_navigate(to: ~p"/admin/newsletters")}
+         |> push_patch(to: ~p"/admin/newsletters")}
 
       {:error, :already_sent} ->
         {:noreply,

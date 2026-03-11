@@ -16,18 +16,15 @@ defmodule YscWeb.Layouts do
     flash = assigns[:flash] || %{}
     flash = normalize_flash_keys(flash)
 
-    # Build sync toasts from flash (with title/icon). Pass full flash so:
-    # - when not connected, flash_group has something to show
-    # - when connected, LiveToast matches sync_toast.msg to flash[kind] and clears it (one toast, no duplicate)
     info_msg = flash["info"]
 
-    toasts_sync =
+    {toasts_sync, flash} =
       if info_msg && is_binary(info_msg) &&
            String.contains?(info_msg, "Welcome back") do
-        [welcome_toast(info_msg) | base]
+        {[welcome_toast(info_msg) | base], Map.delete(flash, "info")}
       else
         promoted = promote_flash_to_toasts(flash)
-        promoted ++ base
+        {promoted ++ base, strip_promoted_keys(flash, promoted)}
       end
 
     {toasts_sync, flash}
@@ -66,6 +63,18 @@ defmodule YscWeb.Layouts do
       else
         []
       end
+    end)
+  end
+
+  defp strip_promoted_keys(flash, []), do: flash
+
+  defp strip_promoted_keys(flash, promoted) do
+    Enum.reduce(promoted, flash, fn %LiveToast{kind: kind}, acc ->
+      key = to_string(kind)
+
+      acc
+      |> Map.delete(key)
+      |> Map.delete("#{key}_toast_title")
     end)
   end
 

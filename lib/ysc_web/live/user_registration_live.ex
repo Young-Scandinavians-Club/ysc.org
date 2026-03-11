@@ -557,7 +557,7 @@ defmodule YscWeb.UserRegistrationLive do
           "admin_application_submitted",
           %{
             applicant_name:
-              "#{String.capitalize(user.first_name)} #{String.capitalize(user.last_name)}",
+              "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
             submission_date:
               Timex.format!(
                 Timex.now("America/Los_Angeles"),

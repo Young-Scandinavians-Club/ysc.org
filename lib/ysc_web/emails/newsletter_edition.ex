@@ -188,10 +188,20 @@ defmodule YscWeb.Emails.NewsletterEdition do
     %{
       title: post.title,
       preview_text:
-        post.preview_text || String.slice(post.raw_body || "", 0, 200),
+        clean_preview_text(post.preview_text || post.raw_body || ""),
       url: YscWeb.Endpoint.url() <> "/posts/#{post.url_name}",
       image_url: post_image_url(post.featured_image)
     }
+  end
+
+  defp clean_preview_text(""), do: ""
+
+  defp clean_preview_text(text) do
+    text
+    |> HtmlSanitizeEx.strip_tags()
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+    |> String.slice(0, 200)
   end
 
   defp post_image_url(nil), do: nil
@@ -220,7 +230,11 @@ defmodule YscWeb.Emails.NewsletterEdition do
   defp short_description(""), do: nil
 
   defp short_description(desc) when is_binary(desc) do
-    desc = desc |> HtmlSanitizeEx.strip_tags() |> String.trim()
+    desc =
+      desc
+      |> HtmlSanitizeEx.strip_tags()
+      |> String.replace(~r/\s+/, " ")
+      |> String.trim()
 
     if String.length(desc) <= 140,
       do: desc,

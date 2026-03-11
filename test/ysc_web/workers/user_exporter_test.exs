@@ -7,104 +7,198 @@ defmodule YscWeb.Workers.UserExporterTest do
   import Ysc.AccountsFixtures
 
   alias YscWeb.Workers.UserExporter
+  alias Ysc.Subscriptions
+  alias Ysc.Repo
 
-  setup do
-    # Create test users
-    user1 = user_fixture()
-    user2 = user_fixture()
+  # A fixed future datetime in January (PST = UTC-8, no DST ambiguity).
+  # 2030-01-15 20:30:00 UTC → 2030-01-15 12:30:00 PST
+  @renewal_utc ~U[2030-01-15 20:30:00Z]
+  @expected_renewal_date "2030-01-15"
+  @expected_renewal_time "12:30 PM"
+  @expected_renewal_tz "PST"
 
-    # Create a channel for testing
-    channel = "user_export:test_#{System.unique_integer()}"
-
-    %{user1: user1, user2: user2, channel: channel}
+  defp oban_job(channel, fields, only_subscribed) do
+    %Oban.Job{
+      id: System.unique_integer([:positive]),
+      args: %{
+        "channel" => channel,
+        "fields" => fields,
+        "only_subscribed" => only_subscribed
+      },
+      worker: "YscWeb.Workers.UserExporter",
+      queue: "exports",
+      state: "available",
+      attempt: 1
+    }
   end
 
-  describe "perform/1" do
-    test "exports users to CSV with all fields", %{channel: channel} do
-      fields = ["id", "email", "first_name", "last_name"]
-      only_subscribed = false
+  defp run_export(channel, job) do
+    YscWeb.Endpoint.subscribe(channel)
+    :ok = UserExporter.perform(job)
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "channel" => channel,
-          "fields" => fields,
-          "only_subscribed" => only_subscribed
-        },
-        worker: "YscWeb.Workers.UserExporter",
-        queue: "exports",
-        state: "available",
-        attempt: 1
-      }
+    receive do
+      %Phoenix.Socket.Broadcast{event: "user_export:complete", payload: path} ->
+        path
 
-      # This test requires a live channel connection, so we'll test the structure
-      # In a real scenario, you'd set up a Phoenix channel test
-      try do
-        result = UserExporter.perform(job)
-        # Should complete or return error
-        assert result == :ok or match?({:error, _}, result)
-      rescue
-        _ ->
-          # May fail without proper channel setup
-          :ok
-      end
+      %Phoenix.Socket.Broadcast{event: "user_export:failed", payload: msg} ->
+        flunk("Export failed: #{inspect(msg)}")
+    after
+      15_000 ->
+        flunk("No export:complete broadcast received within 15s")
+    end
+  end
+
+  defp parse_csv(relative_path) do
+    full_path = "#{:code.priv_dir(:ysc)}/static#{relative_path}"
+
+    on_exit(fn -> File.rm(full_path) end)
+
+    full_path
+    |> File.stream!()
+    |> CSV.decode(headers: true)
+    |> Enum.map(fn {:ok, row} -> row end)
+  end
+
+  defp create_active_subscription(user, current_period_end) do
+    {:ok, sub} =
+      Subscriptions.create_subscription(%{
+        name: "Test Subscription",
+        stripe_id: "sub_test_#{System.unique_integer([:positive])}",
+        stripe_status: "active",
+        user_id: user.id,
+        current_period_end: current_period_end
+      })
+
+    sub
+  end
+
+  setup do
+    %{channel: "exporter:test_#{System.unique_integer([:positive])}"}
+  end
+
+  describe "CSV columns" do
+    test "includes membership_renewal_date, _time, and _tz as separate columns",
+         %{
+           channel: channel
+         } do
+      user = user_fixture()
+      create_active_subscription(user, @renewal_utc)
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      [row | _] = parse_csv(path)
+
+      assert Map.has_key?(row, "membership_renewal_date")
+      assert Map.has_key?(row, "membership_renewal_time")
+      assert Map.has_key?(row, "membership_renewal_tz")
     end
 
-    test "exports only subscribed users when only_subscribed is true", %{
+    test "does not include the old combined membership_renewal_date column with datetime",
+         %{
+           channel: channel
+         } do
+      user = user_fixture()
+      create_active_subscription(user, @renewal_utc)
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      [row | _] = parse_csv(path)
+
+      # The date column should be just a date string, not a combined datetime+tz string
+      date_val = Map.get(row, "membership_renewal_date")
+      refute String.contains?(date_val || "", " ")
+    end
+  end
+
+  describe "renewal date values" do
+    test "splits renewal datetime into correct date, time, and tz for active subscription",
+         %{
+           channel: channel
+         } do
+      user = user_fixture()
+      create_active_subscription(user, @renewal_utc)
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      [row | _] = parse_csv(path)
+
+      assert Map.get(row, "membership_renewal_date") == @expected_renewal_date
+      assert Map.get(row, "membership_renewal_time") == @expected_renewal_time
+      assert Map.get(row, "membership_renewal_tz") == @expected_renewal_tz
+    end
+
+    test "renewal columns are empty for users without a subscription", %{
       channel: channel
     } do
-      fields = ["id", "email"]
-      only_subscribed = true
+      _user = user_fixture()
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "channel" => channel,
-          "fields" => fields,
-          "only_subscribed" => only_subscribed
-        },
-        worker: "YscWeb.Workers.UserExporter",
-        queue: "exports",
-        state: "available",
-        attempt: 1
-      }
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      [row | _] = parse_csv(path)
 
-      try do
-        result = UserExporter.perform(job)
-        assert result == :ok or match?({:error, _}, result)
-      rescue
-        _ ->
-          :ok
-      end
+      assert Map.get(row, "membership_renewal_date") in [nil, ""]
+      assert Map.get(row, "membership_renewal_time") in [nil, ""]
+      assert Map.get(row, "membership_renewal_tz") in [nil, ""]
     end
 
-    test "handles export errors gracefully", %{channel: channel} do
-      # Invalid fields to cause an error
-      fields = ["invalid_field"]
-      only_subscribed = false
+    test "lifetime membership shows 'Never' for date and empty time/tz", %{
+      channel: channel
+    } do
+      user = user_fixture()
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "channel" => channel,
-          "fields" => fields,
-          "only_subscribed" => only_subscribed
-        },
-        worker: "YscWeb.Workers.UserExporter",
-        queue: "exports",
-        state: "available",
-        attempt: 1
-      }
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update()
 
-      try do
-        result = UserExporter.perform(job)
-        # Should handle error gracefully
-        assert match?({:error, _}, result) or result == :ok
-      rescue
-        _ ->
-          # Expected for invalid fields
-          :ok
-      end
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == user.id))
+
+      assert Map.get(row, "membership_renewal_date") == "Never"
+      assert Map.get(row, "membership_renewal_time") in [nil, ""]
+      assert Map.get(row, "membership_renewal_tz") in [nil, ""]
+    end
+  end
+
+  describe "only_subscribed filter" do
+    test "excludes users without active subscriptions when only_subscribed is true",
+         %{
+           channel: channel
+         } do
+      subscribed_user = user_fixture()
+      create_active_subscription(subscribed_user, @renewal_utc)
+      unsubscribed_user = user_fixture()
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], true))
+      rows = parse_csv(path)
+      exported_ids = Enum.map(rows, & &1["id"])
+
+      assert subscribed_user.id in exported_ids
+      refute unsubscribed_user.id in exported_ids
+    end
+  end
+
+  describe "selected fields" do
+    test "only exports requested fields plus the fixed membership columns", %{
+      channel: channel
+    } do
+      _user = user_fixture()
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      [row | _] = parse_csv(path)
+
+      assert Map.has_key?(row, "id")
+      assert Map.has_key?(row, "email")
+      assert Map.has_key?(row, "membership_type")
+      assert Map.has_key?(row, "membership_renewal_date")
+      assert Map.has_key?(row, "membership_renewal_time")
+      assert Map.has_key?(row, "membership_renewal_tz")
+      assert Map.has_key?(row, "membership_inherited")
+      assert Map.has_key?(row, "primary_user_email")
+      assert Map.has_key?(row, "primary_user_id")
+      refute Map.has_key?(row, "first_name")
+      refute Map.has_key?(row, "last_name")
     end
   end
 end

@@ -27,7 +27,7 @@ defmodule YscWeb.AdminDashboardLive do
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
           <div>
             <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
-              Welcome back, {String.capitalize(@current_user.first_name)} 👋
+              Welcome back, {Ysc.title_case(@current_user.first_name)} 👋
             </h1>
             <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
               <span class="relative inline-flex w-2 h-2">

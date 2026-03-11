@@ -28,17 +28,21 @@ defmodule Ysc.WpMigration.Load do
   - :export_dir - path to export directory (required)
   - :dry_run - if true, do not write to DB or S3
   - :upload_media - if true, upload media folder to S3 and create Images (default: true)
+  - :create_stripe_subscriptions - if true, create real Stripe customers and subscriptions
+      in the connected Stripe account (useful for sandbox/dev testing). Each subscription
+      uses trial_end set to the WP renewal date so no charge fires immediately.
   """
   def run(opts \\ []) do
     export_dir = opts[:export_dir]
     dry_run = opts[:dry_run] || false
     upload_media = Keyword.get(opts, :upload_media, true)
+    create_stripe_subscriptions = opts[:create_stripe_subscriptions] || false
 
     if export_dir do
       export_dir = Path.expand(export_dir)
 
       if File.dir?(export_dir) do
-        do_run(export_dir, dry_run, upload_media)
+        do_run(export_dir, dry_run, upload_media, create_stripe_subscriptions)
       else
         {:error, "Export directory not found: #{export_dir}"}
       end
@@ -47,7 +51,7 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp do_run(export_dir, dry_run, upload_media) do
+  defp do_run(export_dir, dry_run, upload_media, create_stripe_subscriptions) do
     users_json = Path.join(export_dir, "users.json")
     applications_json = Path.join(export_dir, "applications.json")
     posts_json = Path.join(export_dir, "posts.json")
@@ -74,17 +78,17 @@ defmodule Ysc.WpMigration.Load do
       {:ok, user_map} = load_users(users_data)
       {:ok, _} = load_applications(applications_data, user_map)
 
-      {:ok, image_map} =
+      {:ok, image_map, filename_map} =
         if upload_media and File.dir?(media_dir),
           do: load_media(media_dir, uploader),
-          else: {:ok, %{}}
+          else: {:ok, %{}, %{}}
 
-      {:ok, _} = load_posts(posts_data, user_map, image_map)
+      {:ok, _} = load_posts(posts_data, user_map, image_map, filename_map)
 
       if stripe_data && stripe_data != [],
         do: load_stripe(stripe_data, user_map)
 
-      load_subscriptions(users_data, user_map)
+      load_subscriptions(users_data, user_map, create_stripe_subscriptions)
 
       if bookings_data && bookings_data != [],
         do: load_bookings(bookings_data, user_map)
@@ -118,22 +122,31 @@ defmodule Ysc.WpMigration.Load do
       case Ysc.Accounts.get_user_by_email(email) do
         existing when not is_nil(existing) ->
           # Idempotent: update profile from export when re-running
-          update_attrs = %{
-            "first_name" =>
-              row["first_name"] || row["display_name"] || "Unknown",
-            "last_name" => row["last_name"] || "User",
-            "phone_number" => row["phone_number"],
-            "most_connected_country" =>
-              row["nordic_country_connected"] || row["Country"]
-          }
+          update_attrs =
+            %{
+              "first_name" =>
+                row["first_name"] || row["display_name"] || "Unknown",
+              "last_name" => row["last_name"] || "User",
+              "phone_number" => normalize_phone(row["phone_number"]),
+              "most_connected_country" =>
+                normalize_country(
+                  row["most_connected_country"] ||
+                    row["nordic_country_connected"] ||
+                    row["Country"]
+                )
+            }
+            |> maybe_put_date_of_birth(row)
 
           case existing
                |> User.update_user_changeset(update_attrs)
+               |> backdate_timestamp(row["user_registered"])
                |> Repo.update() do
             {:ok, _} ->
+              upsert_address(existing.id, row)
               {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
 
             {:error, _} ->
+              upsert_address(existing.id, row)
               {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
           end
 
@@ -141,17 +154,23 @@ defmodule Ysc.WpMigration.Load do
           state = map_account_status(row["account_status"])
           role = map_role(row["role"])
 
-          attrs = %{
-            "email" => email,
-            "first_name" =>
-              row["first_name"] || row["display_name"] || "Unknown",
-            "last_name" => row["last_name"] || "User",
-            "phone_number" => row["phone_number"],
-            "state" => state,
-            "role" => role,
-            "most_connected_country" =>
-              row["nordic_country_connected"] || row["Country"]
-          }
+          attrs =
+            %{
+              "email" => email,
+              "first_name" =>
+                row["first_name"] || row["display_name"] || "Unknown",
+              "last_name" => row["last_name"] || "User",
+              "phone_number" => normalize_phone(row["phone_number"]),
+              "state" => state,
+              "role" => role,
+              "most_connected_country" =>
+                normalize_country(
+                  row["most_connected_country"] ||
+                    row["nordic_country_connected"] ||
+                    row["Country"]
+                )
+            }
+            |> maybe_put_date_of_birth(row)
 
           changeset =
             %User{}
@@ -160,23 +179,11 @@ defmodule Ysc.WpMigration.Load do
               validate_email: false,
               hash_password: false
             )
+            |> backdate_timestamp(row["user_registered"])
 
           case Repo.insert(changeset) do
             {:ok, user} ->
-              # Address
-              if row["Address"] && row["Country"] do
-                %Address{}
-                |> Address.changeset(%{
-                  user_id: user.id,
-                  address: row["Address"],
-                  city: row["City"],
-                  region: row["State"],
-                  postal_code: row["Zip code"],
-                  country: row["Country"]
-                })
-                |> Repo.insert()
-              end
-
+              upsert_address(user.id, row)
               {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
 
             {:error, changeset} ->
@@ -185,10 +192,692 @@ defmodule Ysc.WpMigration.Load do
                 errors: inspect(changeset.errors)
               )
 
-              {:halt, {:error, changeset}}
+              # Skip users that fail validation rather than halting the entire
+              # migration. The user can be corrected and re-imported on a re-run.
+              {:cont, {:ok, acc}}
           end
       end
     end)
+  end
+
+  # Normalises WP phone numbers to E.164 format for storage.
+  #
+  # WP members entered numbers in many formats: "415-555-1234", "(415) 555-1234",
+  # "4155551234", "+1 415 555 1234", international numbers with or without "+", etc.
+  # ExPhoneNumber needs a region hint to parse numbers that lack a country code prefix;
+  # "US" is used as the default since the membership is SF Bay Area based.
+  #
+  # Returns nil for nil/empty input and for numbers that cannot be parsed or are
+  # not valid, so callers receive nil rather than an invalid string.
+  defp normalize_phone(nil), do: nil
+  defp normalize_phone(""), do: nil
+
+  defp normalize_phone(raw) when is_binary(raw) do
+    trimmed = String.trim(raw)
+
+    if trimmed == "" do
+      nil
+    else
+      case ExPhoneNumber.parse(trimmed, "US") do
+        {:ok, phone} ->
+          if ExPhoneNumber.is_valid_number?(phone),
+            do: ExPhoneNumber.format(phone, :e164),
+            else: nil
+
+        {:error, _} ->
+          nil
+      end
+    end
+  end
+
+  # Adds "date_of_birth" to the attrs map if we have a parseable date from WP.
+  # Falls back through birth_date → application birth_date → nil.
+  # Only sets the key when a valid date is found so we never overwrite an
+  # existing date_of_birth with nil on re-runs.
+  defp maybe_put_date_of_birth(attrs, row) do
+    raw = row["birth_date"] || row["Birth Date"] || row["birthdate"]
+
+    case parse_date(raw) do
+      nil -> attrs
+      date -> Map.put(attrs, "date_of_birth", date)
+    end
+  end
+
+  defp upsert_address(user_id, row) do
+    # The extract writes lowercase keys to users.json; some older code paths
+    # used capitalised versions — check both to be safe.
+    address_str =
+      row["address"] || row["Address"] ||
+        row["billing_address_1"]
+
+    country =
+      normalize_country(row["country"] || row["Country"])
+
+    city =
+      row["city"] || row["City"]
+
+    region =
+      row["state"] || row["State"] || row["region"] || row["Region"]
+
+    postal_code =
+      row["zip"] || row["postal_code"] || row["Zip code"] || row["postal"]
+
+    unless nil_or_empty?(address_str) or nil_or_empty?(country) do
+      attrs = %{
+        user_id: user_id,
+        address: address_str,
+        city: city,
+        region: region,
+        postal_code: postal_code,
+        country: country
+      }
+
+      existing = Repo.get_by(Address, user_id: user_id)
+
+      result =
+        if existing do
+          existing |> Address.migration_changeset(attrs) |> Repo.update()
+        else
+          %Address{} |> Address.migration_changeset(attrs) |> Repo.insert()
+        end
+
+      case result do
+        {:ok, _} ->
+          :ok
+
+        {:error, cs} ->
+          Ysc.Logging.warning("Failed to upsert address",
+            user_id: user_id,
+            errors: inspect(cs.errors)
+          )
+      end
+    end
+  end
+
+  defp nil_or_empty?(nil), do: true
+  defp nil_or_empty?(""), do: true
+  defp nil_or_empty?(_), do: false
+
+  # Set of all valid ISO 3166-1 alpha-2 codes (used for fast 2-letter lookups).
+  @country_code_set Map.new(
+                      [
+                        "AD",
+                        "AE",
+                        "AF",
+                        "AG",
+                        "AI",
+                        "AL",
+                        "AM",
+                        "AO",
+                        "AR",
+                        "AT",
+                        "AU",
+                        "AW",
+                        "AZ",
+                        "BA",
+                        "BB",
+                        "BD",
+                        "BE",
+                        "BF",
+                        "BG",
+                        "BH",
+                        "BI",
+                        "BJ",
+                        "BM",
+                        "BN",
+                        "BO",
+                        "BR",
+                        "BS",
+                        "BT",
+                        "BW",
+                        "BY",
+                        "BZ",
+                        "CA",
+                        "CD",
+                        "CF",
+                        "CG",
+                        "CH",
+                        "CI",
+                        "CK",
+                        "CL",
+                        "CM",
+                        "CN",
+                        "CO",
+                        "CR",
+                        "CU",
+                        "CV",
+                        "CY",
+                        "CZ",
+                        "DE",
+                        "DJ",
+                        "DK",
+                        "DM",
+                        "DO",
+                        "DZ",
+                        "EC",
+                        "EE",
+                        "EG",
+                        "ER",
+                        "ES",
+                        "ET",
+                        "FI",
+                        "FJ",
+                        "FM",
+                        "FR",
+                        "GA",
+                        "GB",
+                        "GD",
+                        "GE",
+                        "GH",
+                        "GM",
+                        "GN",
+                        "GQ",
+                        "GR",
+                        "GT",
+                        "GW",
+                        "GY",
+                        "HN",
+                        "HR",
+                        "HT",
+                        "HU",
+                        "ID",
+                        "IE",
+                        "IL",
+                        "IN",
+                        "IQ",
+                        "IR",
+                        "IS",
+                        "IT",
+                        "JM",
+                        "JO",
+                        "JP",
+                        "KE",
+                        "KG",
+                        "KH",
+                        "KI",
+                        "KM",
+                        "KN",
+                        "KP",
+                        "KR",
+                        "KW",
+                        "KY",
+                        "KZ",
+                        "LA",
+                        "LB",
+                        "LC",
+                        "LI",
+                        "LK",
+                        "LR",
+                        "LS",
+                        "LT",
+                        "LU",
+                        "LV",
+                        "LY",
+                        "MA",
+                        "MC",
+                        "MD",
+                        "ME",
+                        "MG",
+                        "MH",
+                        "MK",
+                        "ML",
+                        "MM",
+                        "MN",
+                        "MR",
+                        "MT",
+                        "MU",
+                        "MV",
+                        "MW",
+                        "MX",
+                        "MY",
+                        "MZ",
+                        "NA",
+                        "NE",
+                        "NG",
+                        "NI",
+                        "NL",
+                        "NO",
+                        "NP",
+                        "NR",
+                        "NZ",
+                        "OM",
+                        "PA",
+                        "PE",
+                        "PG",
+                        "PH",
+                        "PK",
+                        "PL",
+                        "PT",
+                        "PW",
+                        "PY",
+                        "QA",
+                        "RO",
+                        "RS",
+                        "RU",
+                        "RW",
+                        "SA",
+                        "SB",
+                        "SC",
+                        "SD",
+                        "SE",
+                        "SG",
+                        "SI",
+                        "SK",
+                        "SL",
+                        "SM",
+                        "SN",
+                        "SO",
+                        "SR",
+                        "SS",
+                        "ST",
+                        "SV",
+                        "SY",
+                        "SZ",
+                        "TD",
+                        "TG",
+                        "TH",
+                        "TJ",
+                        "TL",
+                        "TM",
+                        "TN",
+                        "TO",
+                        "TR",
+                        "TT",
+                        "TV",
+                        "TZ",
+                        "UA",
+                        "UG",
+                        "US",
+                        "UY",
+                        "UZ",
+                        "VA",
+                        "VC",
+                        "VE",
+                        "VN",
+                        "VU",
+                        "WS",
+                        "YE",
+                        "ZA",
+                        "ZM",
+                        "ZW"
+                      ],
+                      fn code -> {code, true} end
+                    )
+
+  # Comprehensive name → ISO 2-letter lookup.
+  # Keys are downcased; values are uppercase ISO codes.
+  @country_lookup %{
+    # ── Nordic / Scandinavian (priority) ──────────────────────────────────────
+    "norway" => "NO",
+    "norge" => "NO",
+    "norsk" => "NO",
+    "nor" => "NO",
+    "norwegian" => "NO",
+    "sweden" => "SE",
+    "sverige" => "SE",
+    "svensk" => "SE",
+    "swe" => "SE",
+    "swedish" => "SE",
+    "denmark" => "DK",
+    "danmark" => "DK",
+    "dansk" => "DK",
+    "dnk" => "DK",
+    "danish" => "DK",
+    "finland" => "FI",
+    "suomi" => "FI",
+    "finska" => "FI",
+    "fin" => "FI",
+    "finnish" => "FI",
+    "iceland" => "IS",
+    "island" => "IS",
+    "ísland" => "IS",
+    "isl" => "IS",
+    "icelandic" => "IS",
+    # ── Other European ────────────────────────────────────────────────────────
+    "united kingdom" => "GB",
+    "uk" => "GB",
+    "england" => "GB",
+    "great britain" => "GB",
+    "britain" => "GB",
+    "gbr" => "GB",
+    "scotland" => "GB",
+    "wales" => "GB",
+    "germany" => "DE",
+    "deutschland" => "DE",
+    "deu" => "DE",
+    "france" => "FR",
+    "fra" => "FR",
+    "italy" => "IT",
+    "italia" => "IT",
+    "ita" => "IT",
+    "spain" => "ES",
+    "españa" => "ES",
+    "esp" => "ES",
+    "netherlands" => "NL",
+    "holland" => "NL",
+    "nld" => "NL",
+    "switzerland" => "CH",
+    "schweiz" => "CH",
+    "che" => "CH",
+    "austria" => "AT",
+    "österreich" => "AT",
+    "aut" => "AT",
+    "belgium" => "BE",
+    "belgique" => "BE",
+    "bel" => "BE",
+    "portugal" => "PT",
+    "prt" => "PT",
+    "poland" => "PL",
+    "polska" => "PL",
+    "pol" => "PL",
+    "czech republic" => "CZ",
+    "czechia" => "CZ",
+    "cze" => "CZ",
+    "hungary" => "HU",
+    "hun" => "HU",
+    "romania" => "RO",
+    "rou" => "RO",
+    "greece" => "GR",
+    "grc" => "GR",
+    "russia" => "RU",
+    "rus" => "RU",
+    "ukraine" => "UA",
+    "ukr" => "UA",
+    "ireland" => "IE",
+    "ire" => "IE",
+    "luxembourg" => "LU",
+    "lux" => "LU",
+    "estonia" => "EE",
+    "est" => "EE",
+    "latvia" => "LV",
+    "lva" => "LV",
+    "lithuania" => "LT",
+    "ltu" => "LT",
+    "croatia" => "HR",
+    "hrv" => "HR",
+    "serbia" => "RS",
+    "srb" => "RS",
+    "slovakia" => "SK",
+    "svk" => "SK",
+    "slovenia" => "SI",
+    "svn" => "SI",
+    "bulgaria" => "BG",
+    "bgr" => "BG",
+    "albania" => "AL",
+    "alb" => "AL",
+    "north macedonia" => "MK",
+    "macedonia" => "MK",
+    "bosnia" => "BA",
+    "bih" => "BA",
+    "montenegro" => "ME",
+    "mne" => "ME",
+    "cyprus" => "CY",
+    "cyp" => "CY",
+    "malta" => "MT",
+    "mlt" => "MT",
+    "liechtenstein" => "LI",
+    "lie" => "LI",
+    "monaco" => "MC",
+    "mco" => "MC",
+    "san marino" => "SM",
+    "smr" => "SM",
+    "andorra" => "AD",
+    "and" => "AD",
+    "moldova" => "MD",
+    "mda" => "MD",
+    # ── Americas ──────────────────────────────────────────────────────────────
+    "united states" => "US",
+    "usa" => "US",
+    "u.s.a." => "US",
+    "u.s." => "US",
+    "america" => "US",
+    "us" => "US",
+    "canada" => "CA",
+    "can" => "CA",
+    "mexico" => "MX",
+    "méxico" => "MX",
+    "mex" => "MX",
+    "brazil" => "BR",
+    "brasil" => "BR",
+    "bra" => "BR",
+    "argentina" => "AR",
+    "arg" => "AR",
+    "chile" => "CL",
+    "chl" => "CL",
+    "colombia" => "CO",
+    "col" => "CO",
+    "peru" => "PE",
+    "per" => "PE",
+    "venezuela" => "VE",
+    "ven" => "VE",
+    "ecuador" => "EC",
+    "ecu" => "EC",
+    "costa rica" => "CR",
+    "cri" => "CR",
+    "panama" => "PA",
+    "pan" => "PA",
+    # ── Asia-Pacific ──────────────────────────────────────────────────────────
+    "australia" => "AU",
+    "aus" => "AU",
+    "new zealand" => "NZ",
+    "nzl" => "NZ",
+    "japan" => "JP",
+    "jpn" => "JP",
+    "china" => "CN",
+    "chn" => "CN",
+    "india" => "IN",
+    "ind" => "IN",
+    "south korea" => "KR",
+    "korea" => "KR",
+    "kor" => "KR",
+    "singapore" => "SG",
+    "sgp" => "SG",
+    "hong kong" => "HK",
+    "hkg" => "HK",
+    "taiwan" => "TW",
+    "twn" => "TW",
+    "indonesia" => "ID",
+    "idn" => "ID",
+    "malaysia" => "MY",
+    "mys" => "MY",
+    "thailand" => "TH",
+    "tha" => "TH",
+    "vietnam" => "VN",
+    "vnm" => "VN",
+    "philippines" => "PH",
+    "phl" => "PH",
+    # ── Middle East / Africa ──────────────────────────────────────────────────
+    "israel" => "IL",
+    "isr" => "IL",
+    "turkey" => "TR",
+    "türkiye" => "TR",
+    "tur" => "TR",
+    "south africa" => "ZA",
+    "zaf" => "ZA",
+    "egypt" => "EG",
+    "egy" => "EG",
+    "nigeria" => "NG",
+    "nga" => "NG",
+    "kenya" => "KE",
+    "ken" => "KE",
+    "ghana" => "GH",
+    "gha" => "GH",
+    "ethiopia" => "ET",
+    "eth" => "ET",
+    "united arab emirates" => "AE",
+    "uae" => "AE",
+    "are" => "AE"
+  }
+
+  # Normalizes a country string to an ISO 3166-1 alpha-2 code (e.g. "NO", "SE").
+  # Handles: already-correct codes, 3-letter ISO codes, full English names,
+  # native names, common abbreviations/typos, and slight misspellings via
+  # Jaro-Winkler similarity.  Returns nil for unrecognised values so we never
+  # silently store garbage.
+  defp normalize_country(nil), do: nil
+  defp normalize_country(""), do: nil
+
+  defp normalize_country(raw) when is_binary(raw) do
+    trimmed = String.trim(raw)
+    normalized = String.upcase(trimmed)
+
+    cond do
+      # Already a valid 2-letter code — accept as-is
+      String.length(normalized) == 2 and
+          Map.has_key?(@country_code_set, normalized) ->
+        normalized
+
+      true ->
+        key = String.downcase(trimmed)
+
+        case Map.get(@country_lookup, key) || fuzzy_match_country(key) do
+          nil -> trimmed
+          code -> code
+        end
+    end
+  end
+
+  defp normalize_country(_), do: nil
+
+  # Fuzzy-matches a downcased string against all names in @country_lookup using
+  # Jaro-Winkler similarity.  Only considers lookup keys >= 4 chars to prevent
+  # short abbreviations ("fin", "nor", "swe") from distorting results.
+  # Requires a score >= 0.90 to accept the match.
+  @fuzzy_country_candidates Enum.filter(
+                              Map.keys(%{
+                                "norway" => nil,
+                                "norge" => nil,
+                                "norsk" => nil,
+                                "norwegian" => nil,
+                                "sweden" => nil,
+                                "sverige" => nil,
+                                "svensk" => nil,
+                                "swedish" => nil,
+                                "denmark" => nil,
+                                "danmark" => nil,
+                                "dansk" => nil,
+                                "danish" => nil,
+                                "finland" => nil,
+                                "suomi" => nil,
+                                "finska" => nil,
+                                "finnish" => nil,
+                                "iceland" => nil,
+                                "island" => nil,
+                                "icelandic" => nil,
+                                "united kingdom" => nil,
+                                "england" => nil,
+                                "great britain" => nil,
+                                "britain" => nil,
+                                "scotland" => nil,
+                                "wales" => nil,
+                                "germany" => nil,
+                                "deutschland" => nil,
+                                "france" => nil,
+                                "italy" => nil,
+                                "italia" => nil,
+                                "spain" => nil,
+                                "españa" => nil,
+                                "netherlands" => nil,
+                                "holland" => nil,
+                                "switzerland" => nil,
+                                "austria" => nil,
+                                "belgium" => nil,
+                                "portugal" => nil,
+                                "poland" => nil,
+                                "polska" => nil,
+                                "czech republic" => nil,
+                                "czechia" => nil,
+                                "hungary" => nil,
+                                "romania" => nil,
+                                "greece" => nil,
+                                "russia" => nil,
+                                "ukraine" => nil,
+                                "ireland" => nil,
+                                "luxembourg" => nil,
+                                "estonia" => nil,
+                                "latvia" => nil,
+                                "lithuania" => nil,
+                                "croatia" => nil,
+                                "serbia" => nil,
+                                "slovakia" => nil,
+                                "slovenia" => nil,
+                                "bulgaria" => nil,
+                                "albania" => nil,
+                                "north macedonia" => nil,
+                                "macedonia" => nil,
+                                "bosnia" => nil,
+                                "montenegro" => nil,
+                                "cyprus" => nil,
+                                "malta" => nil,
+                                "liechtenstein" => nil,
+                                "monaco" => nil,
+                                "moldova" => nil,
+                                "united states" => nil,
+                                "america" => nil,
+                                "canada" => nil,
+                                "mexico" => nil,
+                                "brazil" => nil,
+                                "argentina" => nil,
+                                "chile" => nil,
+                                "colombia" => nil,
+                                "peru" => nil,
+                                "venezuela" => nil,
+                                "ecuador" => nil,
+                                "costa rica" => nil,
+                                "panama" => nil,
+                                "australia" => nil,
+                                "new zealand" => nil,
+                                "japan" => nil,
+                                "china" => nil,
+                                "india" => nil,
+                                "south korea" => nil,
+                                "korea" => nil,
+                                "singapore" => nil,
+                                "hong kong" => nil,
+                                "taiwan" => nil,
+                                "indonesia" => nil,
+                                "malaysia" => nil,
+                                "thailand" => nil,
+                                "vietnam" => nil,
+                                "philippines" => nil,
+                                "israel" => nil,
+                                "turkey" => nil,
+                                "south africa" => nil,
+                                "egypt" => nil,
+                                "nigeria" => nil,
+                                "kenya" => nil,
+                                "ghana" => nil,
+                                "ethiopia" => nil,
+                                "united arab emirates" => nil
+                              }),
+                              &(byte_size(&1) >= 4)
+                            )
+
+  defp fuzzy_match_country(key) when byte_size(key) < 4, do: nil
+
+  defp fuzzy_match_country(key) do
+    {best_code, best_score} =
+      Enum.reduce(@fuzzy_country_candidates, {nil, 0.0}, fn name,
+                                                            {best_code,
+                                                             best_score} ->
+        score = String.jaro_distance(key, name)
+
+        if score > best_score,
+          do: {Map.get(@country_lookup, name), score},
+          else: {best_code, best_score}
+      end)
+
+    if best_score >= 0.88 do
+      Ysc.Logging.info("Fuzzy-matched country name",
+        input: key,
+        matched_code: best_code,
+        score: Float.round(best_score, 3)
+      )
+
+      best_code
+    else
+      nil
+    end
   end
 
   defp map_account_status("approved"), do: "active"
@@ -204,8 +893,9 @@ defmodule Ysc.WpMigration.Load do
       user_id =
         user_map[row["wp_user_id"]] || (email && get_user_id_by_email(email))
 
-      if user_id do
+      if user_id && row["has_submitted_application"] do
         birth_date = parse_date(row["birth_date"])
+        submitted_dt = parse_datetime(row["submitted_date"])
 
         attrs = %{
           user_id: user_id,
@@ -215,19 +905,24 @@ defmodule Ysc.WpMigration.Load do
           city: row["city"] || row["City"],
           region: row["region"] || row["State"],
           postal_code: row["postal_code"] || row["Zip code"],
-          country: row["country"] || row["Country"],
-          citizenship: row["citizenship"],
+          country: normalize_country(row["country"] || row["Country"]),
+          citizenship: normalize_country(row["citizenship"]),
           most_connected_nordic_country:
-            row["most_connected_nordic_country"] ||
-              row["nordic_country_connected"],
-          place_of_birth: row["place_of_birth"],
+            normalize_country(
+              row["most_connected_nordic_country"] ||
+                row["nordic_country_connected"]
+            ),
+          place_of_birth: normalize_country(row["place_of_birth"]),
           occupation: row["occupation"],
           link_to_scandinavia: row["link_to_scandinavia"],
           lived_in_scandinavia: row["lived_in_scandinavia"],
           spoken_languages: row["spoken_languages"],
           hear_about_the_club: row["hear_about_the_club"],
           agreed_to_bylaws: row["agreed_to_bylaws"] || false,
-          membership_eligibility: row["membership_eligibility"] || []
+          agreed_to_bylaws_at: (row["agreed_to_bylaws"] && submitted_dt) || nil,
+          membership_eligibility: row["membership_eligibility"] || [],
+          started: submitted_dt,
+          completed: submitted_dt
         }
 
         existing = Repo.get_by(SignupApplication, user_id: user_id)
@@ -235,17 +930,31 @@ defmodule Ysc.WpMigration.Load do
         result =
           if existing do
             existing
-            |> SignupApplication.application_changeset(attrs)
+            |> SignupApplication.migration_changeset(attrs)
+            |> backdate_timestamp(row["submitted_date"])
             |> Repo.update()
           else
             %SignupApplication{}
-            |> SignupApplication.application_changeset(attrs)
+            |> SignupApplication.migration_changeset(attrs)
+            |> backdate_timestamp(row["submitted_date"])
             |> Repo.insert()
           end
 
         case result do
-          {:ok, _} -> {:cont, {:ok, :done}}
-          {:error, cs} -> {:halt, {:error, cs}}
+          {:ok, _} ->
+            # Use the application's address data to fill in the user's billing
+            # address — this is often the most complete source since the form
+            # required it at submission time.
+            upsert_address(user_id, row)
+            {:cont, {:ok, :done}}
+
+          {:error, cs} ->
+            Ysc.Logging.warning("Failed to insert application",
+              user_id: user_id,
+              errors: inspect(cs.errors)
+            )
+
+            {:cont, {:ok, :done}}
         end
       else
         {:cont, {:ok, :done}}
@@ -281,7 +990,7 @@ defmodule Ysc.WpMigration.Load do
   defp load_media(media_dir, uploader) do
     if is_nil(uploader) do
       Ysc.Logging.warning("No uploader user for media; skipping media load")
-      {:ok, %{}}
+      {:ok, %{}, %{}}
     else
       subdirs =
         media_dir
@@ -291,7 +1000,8 @@ defmodule Ysc.WpMigration.Load do
           File.dir?(full) and name != "." and name != ".."
         end)
 
-      Enum.reduce_while(subdirs, {:ok, %{}}, fn att_id, {:ok, acc} ->
+      Enum.reduce_while(subdirs, {:ok, %{}, %{}}, fn att_id,
+                                                     {:ok, img_acc, fname_acc} ->
         subdir = Path.join(media_dir, att_id)
         meta_path = Path.join(subdir, "meta.json")
 
@@ -310,8 +1020,8 @@ defmodule Ysc.WpMigration.Load do
 
         file_path = image_file && Path.join(subdir, image_file)
 
-        if not file_path or not File.exists?(file_path) do
-          {:cont, {:ok, acc}}
+        if is_nil(file_path) or not File.exists?(file_path) do
+          {:cont, {:ok, img_acc, fname_acc}}
         else
           meta =
             if File.exists?(meta_path),
@@ -327,14 +1037,23 @@ defmodule Ysc.WpMigration.Load do
             )
 
           if existing do
-            {:cont, {:ok, Map.put(acc, att_id, existing)}}
+            fname_acc =
+              add_filename_entry(
+                fname_acc,
+                meta["original_filename"],
+                existing.raw_image_path
+              )
+
+            {:cont, {:ok, Map.put(img_acc, att_id, existing), fname_acc}}
           else
             key = "migration/#{att_id}/#{Path.basename(file_path)}"
 
             case Media.upload_file_to_s3(file_path, key) do
               %{body: %{location: location}} when is_binary(location) ->
+                raw_image_path = URI.encode(location)
+
                 attrs = %{
-                  raw_image_path: URI.encode(location),
+                  raw_image_path: raw_image_path,
                   user_id: uploader.id,
                   title: meta["title"],
                   alt_text: meta["alt_text"],
@@ -344,20 +1063,31 @@ defmodule Ysc.WpMigration.Load do
                   }
                 }
 
-                case %Image{}
-                     |> Image.add_image_changeset(attrs)
-                     |> Repo.insert() do
+                changeset =
+                  %Image{}
+                  |> Image.add_image_changeset(attrs)
+                  |> backdate_timestamp(meta["created"])
+
+                case Repo.insert(changeset) do
                   {:ok, img} ->
                     # Kick off image processing to generate optimized/thumbnail
                     ImageProcessor.new(%{id: img.id}) |> Oban.insert()
-                    {:cont, {:ok, Map.put(acc, att_id, img)}}
+
+                    fname_acc =
+                      add_filename_entry(
+                        fname_acc,
+                        meta["original_filename"],
+                        raw_image_path
+                      )
+
+                    {:cont, {:ok, Map.put(img_acc, att_id, img), fname_acc}}
 
                   {:error, _} ->
-                    {:cont, {:ok, acc}}
+                    {:cont, {:ok, img_acc, fname_acc}}
                 end
 
               _ ->
-                {:cont, {:ok, acc}}
+                {:cont, {:ok, img_acc, fname_acc}}
             end
           end
         end
@@ -365,84 +1095,165 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp load_posts(posts_data, user_map, image_map) do
+  # Adds a normalized-filename → url entry to fname_acc.
+  # Normalizes by stripping the WP dimension suffix (e.g. "-841x1024") and
+  # lowercasing, so "IMG_5613-841x1024.jpg" maps the same as "IMG_5613.jpg".
+  defp add_filename_entry(acc, nil, _url), do: acc
+  defp add_filename_entry(acc, "", _url), do: acc
+
+  defp add_filename_entry(acc, original_filename, url) do
+    normalized = normalize_wp_image_filename(original_filename)
+    Map.put_new(acc, normalized, url)
+  end
+
+  defp normalize_wp_image_filename(filename) do
+    filename
+    |> String.replace(~r/-\d+x\d+(\.[^.]+)$/, "\\1")
+    |> String.downcase()
+  end
+
+  defp load_posts(posts_data, user_map, image_map, filename_map) do
     author_fallback =
       Repo.one(from u in User, where: u.role == ^:admin, limit: 1) ||
         Repo.one(User)
 
-    # Build url_map: wp_attachment_id → new S3 URL, for HTML transformation
+    # Build url_map: wp_attachment_id → new S3 URL for class-based lookups,
+    # merged with normalized_filename → new S3 URL for src-based fallback.
+    # filename_map keys are already normalized (lowercase, no WP size suffix).
     url_map =
-      Map.new(image_map, fn {att_id, img} -> {att_id, img.raw_image_path} end)
+      image_map
+      |> Map.new(fn {att_id, img} -> {att_id, img.raw_image_path} end)
+      |> Map.merge(filename_map)
 
     Enum.reduce_while(posts_data, {:ok, :done}, fn row, {:ok, _} ->
       author_id =
         user_map[row["wp_author_id"]] || (author_fallback && author_fallback.id)
 
-      if not author_id, do: {:cont, {:ok, :done}}
+      if is_nil(author_id) do
+        {:cont, {:ok, :done}}
+      else
+        featured_att_id = get_in(row, ["featured_image", "wp_attachment_id"])
 
-      featured_att_id = get_in(row, ["featured_image", "wp_attachment_id"])
+        image_id =
+          featured_att_id &&
+            (image_map_image_id(image_map, featured_att_id) ||
+               db_image_id_for_wp_attachment(featured_att_id))
 
-      image_id =
-        featured_att_id &&
-          (image_map_image_id(image_map, featured_att_id) ||
-             db_image_id_for_wp_attachment(featured_att_id))
+        url_name = row["post_name"] || slugify(row["title"])
+        published_on = parse_datetime(row["post_date"])
 
-      url_name = row["post_name"] || slugify(row["title"])
-      published_on = parse_datetime(row["post_date"])
+        raw_body = HtmlTransformer.wp_to_trix(row["post_content"], url_map)
 
-      raw_body = HtmlTransformer.wp_to_trix(row["post_content"], url_map)
-      rendered_body = HtmlSanitizeEx.Scrubber.scrub(raw_body, Ysc.TrixScrubber)
-      preview_text = generate_preview_text(rendered_body)
+        rendered_body =
+          HtmlSanitizeEx.Scrubber.scrub(raw_body, Ysc.TrixScrubber)
 
-      attrs = %{
-        user_id: author_id,
-        state: "published",
-        title: row["title"],
-        url_name: url_name,
-        raw_body: raw_body,
-        rendered_body: rendered_body,
-        preview_text: preview_text,
-        published_on: published_on,
-        image_id: image_id
-      }
+        preview_text = generate_preview_text(rendered_body)
 
-      existing = Repo.get_by(Post, url_name: url_name)
+        # If no WP featured image, fall back to the first image found in the
+        # post body: try by wp-image-{id} att_ids extracted at export time first,
+        # then scan the transformed raw_body for the first <img src> as a last resort.
+        image_id =
+          image_id ||
+            first_body_image_id(row["wp_attachment_ids_in_content"], image_map) ||
+            first_body_image_id_from_src(raw_body)
 
-      result =
-        if existing do
-          existing
-          |> Post.update_post_changeset(attrs, validate_url_name: false)
-          |> Repo.update()
-        else
-          case %Post{}
-               |> Post.new_post_changeset(attrs, validate_url_name: false)
-               |> Repo.insert() do
-            {:error, cs} when is_list(cs.errors) ->
-              if Keyword.get(cs.errors, :url_name) do
-                attrs =
-                  Map.put(
-                    attrs,
-                    :url_name,
-                    url_name <> "-" <> row["wp_post_id"]
-                  )
+        attrs = %{
+          user_id: author_id,
+          state: "published",
+          title: row["title"],
+          url_name: url_name,
+          raw_body: raw_body,
+          rendered_body: rendered_body,
+          preview_text: preview_text,
+          published_on: published_on,
+          image_id: image_id
+        }
 
-                %Post{}
-                |> Post.new_post_changeset(attrs, validate_url_name: false)
-                |> Repo.insert()
-              else
-                {:error, cs}
-              end
+        existing = Repo.get_by(Post, url_name: url_name)
 
-            other ->
-              other
+        result =
+          if existing do
+            existing
+            |> Post.update_post_changeset(attrs, validate_url_name: false)
+            |> backdate_timestamp(row["post_date"])
+            |> Repo.update()
+          else
+            case %Post{}
+                 |> Post.new_post_changeset(attrs, validate_url_name: false)
+                 |> backdate_timestamp(row["post_date"])
+                 |> Repo.insert() do
+              {:error, cs} when is_list(cs.errors) ->
+                if Keyword.get(cs.errors, :url_name) do
+                  attrs =
+                    Map.put(
+                      attrs,
+                      :url_name,
+                      url_name <> "-" <> row["wp_post_id"]
+                    )
+
+                  %Post{}
+                  |> Post.new_post_changeset(attrs, validate_url_name: false)
+                  |> backdate_timestamp(row["post_date"])
+                  |> Repo.insert()
+                else
+                  {:error, cs}
+                end
+
+              other ->
+                other
+            end
           end
-        end
 
-      case result do
-        {:ok, _} -> {:cont, {:ok, :done}}
-        {:error, cs} -> {:halt, {:error, cs}}
+        case result do
+          {:ok, _} ->
+            {:cont, {:ok, :done}}
+
+          {:error, cs} ->
+            Ysc.Logging.warning("Failed to insert post",
+              url_name: url_name,
+              errors: inspect(cs.errors)
+            )
+
+            {:cont, {:ok, :done}}
+        end
       end
     end)
+  end
+
+  # Sets inserted_at (and updated_at) to the original WP upload datetime so
+  # the Image record reflects when the file was actually added to WordPress,
+  # not when the migration ran. Falls through unchanged if the date is absent
+  # or unparseable.
+  defp backdate_timestamp(changeset, nil), do: changeset
+  defp backdate_timestamp(changeset, ""), do: changeset
+
+  defp backdate_timestamp(changeset, created) when is_binary(created) do
+    case DateTime.from_iso8601(created) do
+      {:ok, dt, _} ->
+        changeset
+        |> Ecto.Changeset.force_change(
+          :inserted_at,
+          DateTime.truncate(dt, :second)
+        )
+        |> Ecto.Changeset.force_change(
+          :updated_at,
+          DateTime.truncate(dt, :second)
+        )
+
+      {:error, _} ->
+        case NaiveDateTime.from_iso8601(created) do
+          {:ok, ndt} ->
+            dt =
+              DateTime.from_naive!(ndt, "Etc/UTC") |> DateTime.truncate(:second)
+
+            changeset
+            |> Ecto.Changeset.force_change(:inserted_at, dt)
+            |> Ecto.Changeset.force_change(:updated_at, dt)
+
+          {:error, _} ->
+            changeset
+        end
+    end
   end
 
   # Generates a plain-text preview from scrubbed HTML body.
@@ -479,6 +1290,47 @@ defmodule Ysc.WpMigration.Load do
     )
   end
 
+  # Returns the Image id for the first att_id in the list that resolves to a
+  # known Image (via image_map then DB). Used as featured image fallback when
+  # the WP post has no explicit thumbnail set.
+  defp first_body_image_id(nil, _image_map), do: nil
+  defp first_body_image_id([], _image_map), do: nil
+
+  defp first_body_image_id([att_id | rest], image_map) do
+    case image_map_image_id(image_map, att_id) ||
+           db_image_id_for_wp_attachment(att_id) do
+      nil -> first_body_image_id(rest, image_map)
+      id -> id
+    end
+  end
+
+  # Last-resort fallback: parse the transformed post body for the first <img>
+  # and look up the Image record by its raw_image_path.
+  defp first_body_image_id_from_src(nil), do: nil
+  defp first_body_image_id_from_src(""), do: nil
+
+  defp first_body_image_id_from_src(html) do
+    src =
+      html
+      |> Floki.parse_fragment!()
+      |> Floki.find("img")
+      |> Enum.find_value(fn img ->
+        case Floki.attribute(img, "src") do
+          [s | _] when s != "" -> s
+          _ -> nil
+        end
+      end)
+
+    if src do
+      Repo.one(
+        from i in Image,
+          where: i.raw_image_path == ^src,
+          select: i.id,
+          limit: 1
+      )
+    end
+  end
+
   defp slugify(s) when is_binary(s),
     do:
       s
@@ -492,9 +1344,25 @@ defmodule Ysc.WpMigration.Load do
   defp parse_datetime(nil), do: nil
 
   defp parse_datetime(str) when is_binary(str) do
-    case NaiveDateTime.from_iso8601(str <> " 00:00:00") do
-      {:ok, ndt} -> DateTime.from_naive!(ndt, "Etc/UTC")
-      _ -> nil
+    str = String.trim(str)
+
+    cond do
+      # Already a full ISO 8601 datetime with T separator (from normalize_datetime)
+      String.contains?(str, "T") ->
+        case NaiveDateTime.from_iso8601(str) do
+          {:ok, ndt} -> DateTime.from_naive!(ndt, "Etc/UTC")
+          _ -> nil
+        end
+
+      # Date-only string "YYYY-MM-DD"
+      Regex.match?(~r/^\d{4}-\d{2}-\d{2}$/, str) ->
+        case NaiveDateTime.from_iso8601(str <> "T00:00:00") do
+          {:ok, ndt} -> DateTime.from_naive!(ndt, "Etc/UTC")
+          _ -> nil
+        end
+
+      true ->
+        nil
     end
   end
 
@@ -591,7 +1459,7 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp load_subscriptions(users_data, user_map) do
+  defp load_subscriptions(users_data, user_map, create_stripe_subscriptions) do
     for row <- users_data do
       user_id = user_map[row["wp_user_id"]]
 
@@ -612,32 +1480,134 @@ defmodule Ysc.WpMigration.Load do
             wp_user_id: row["wp_user_id"]
           )
         else
-          migrated_stripe_id = "migrated_#{user_id}"
-
-          existing =
-            Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
-
-          attrs = %{
-            user_id: user_id,
-            name: "Membership Subscription",
-            stripe_id: migrated_stripe_id,
-            stripe_status: "active",
-            current_period_end: renewal_dt,
-            start_date: start_dt || renewal_dt
-          }
-
-          if existing do
-            existing
-            |> Subscription.changeset(attrs)
-            |> Repo.update()
+          if create_stripe_subscriptions do
+            load_subscription_via_stripe(row, user_id, renewal_dt, start_dt)
           else
-            Subscriptions.create_subscription(attrs)
+            load_subscription_locally(row, user_id, renewal_dt, start_dt)
           end
         end
       end
     end
 
     :ok
+  end
+
+  defp load_subscription_locally(_row, user_id, renewal_dt, start_dt) do
+    migrated_stripe_id = "migrated_#{user_id}"
+
+    existing = Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
+
+    attrs = %{
+      user_id: user_id,
+      name: "Membership Subscription",
+      stripe_id: migrated_stripe_id,
+      stripe_status: "active",
+      current_period_end: renewal_dt,
+      start_date: start_dt || renewal_dt
+    }
+
+    if existing do
+      existing
+      |> Subscription.changeset(attrs)
+      |> Repo.update()
+    else
+      Subscriptions.create_subscription(attrs)
+    end
+  end
+
+  defp load_subscription_via_stripe(row, user_id, renewal_dt, start_dt) do
+    user = Ysc.Accounts.get_user!(user_id)
+
+    if user.stripe_id do
+      membership_type =
+        row["membership_type"] || row["sub_product_name"] || "single"
+
+      price_id = resolve_stripe_price_id(membership_type)
+
+      if price_id do
+        trial_end = DateTime.to_unix(renewal_dt)
+
+        migrated_stripe_id = "migrated_#{user_id}"
+
+        existing =
+          Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
+
+        if existing && existing.stripe_id != migrated_stripe_id do
+          Ysc.Logging.info(
+            "Stripe subscription already exists for user, skipping",
+            user_id: user_id,
+            stripe_subscription_id: existing.stripe_id
+          )
+        else
+          Ysc.Logging.info("Creating Stripe subscription for migrated user",
+            user_id: user_id,
+            stripe_customer_id: user.stripe_id,
+            price_id: price_id,
+            trial_end: trial_end
+          )
+
+          case Stripe.Subscription.create(%{
+                 customer: user.stripe_id,
+                 items: [%{price: price_id}],
+                 trial_end: trial_end,
+                 trial_settings: %{
+                   end_behavior: %{missing_payment_method: "pause"}
+                 }
+               }) do
+            {:ok, stripe_sub} ->
+              attrs = %{
+                user_id: user_id,
+                name: "Membership Subscription",
+                stripe_id: stripe_sub.id,
+                stripe_status: stripe_sub.status,
+                current_period_end: renewal_dt,
+                start_date: start_dt || renewal_dt
+              }
+
+              if existing do
+                existing
+                |> Subscription.changeset(attrs)
+                |> Repo.update()
+              else
+                Subscriptions.create_subscription(attrs)
+              end
+
+            {:error, %Stripe.Error{} = err} ->
+              Ysc.Logging.warning("Failed to create Stripe subscription",
+                user_id: user_id,
+                stripe_customer_id: user.stripe_id,
+                error: err.message
+              )
+          end
+        end
+      else
+        Ysc.Logging.warning(
+          "Skipping Stripe subscription: no configured Stripe price ID for membership type",
+          user_id: user_id,
+          membership_type: membership_type
+        )
+      end
+    else
+      Ysc.Logging.warning(
+        "Skipping Stripe subscription: user has no stripe_id (ensure_stripe_customer may have failed)",
+        user_id: user_id
+      )
+    end
+  end
+
+  defp resolve_stripe_price_id(membership_type) do
+    plan_id =
+      cond do
+        membership_type in ["family", "Family", "wc-family"] -> :family
+        true -> :single
+      end
+
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case Enum.find(plans, &(&1.id == plan_id)) do
+      %{stripe_price_id: id} when is_binary(id) and id != "" -> id
+      _ -> nil
+    end
   end
 
   defp active_membership?(row) do

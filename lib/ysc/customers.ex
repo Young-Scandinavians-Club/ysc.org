@@ -36,7 +36,7 @@ defmodule Ysc.Customers do
       customer_params = %{
         email: user.email,
         name:
-          "#{String.capitalize(user.first_name)} #{String.capitalize(user.last_name)}",
+          "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
         phone: user.phone_number,
         description: "User ID: #{user.id}",
         metadata: %{
@@ -137,7 +137,7 @@ defmodule Ysc.Customers do
         customer_params = %{
           email: user.email,
           name:
-            "#{String.capitalize(user.first_name)} #{String.capitalize(user.last_name)}",
+            "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
           phone: user.phone_number,
           description: "User ID: #{user.id}",
           metadata: %{

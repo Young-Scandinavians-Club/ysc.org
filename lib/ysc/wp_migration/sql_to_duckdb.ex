@@ -181,7 +181,10 @@ defmodule Ysc.WpMigration.SqlToDuckdb do
 
       count =
         Enum.reduce(rows, 0, fn row_fields, acc ->
-          padded = pad_or_trim(row_fields, length(cols))
+          padded =
+            row_fields
+            |> sanitize_row_utf8()
+            |> pad_or_trim(length(cols))
 
           case Duckdbex.appender_add_row(state.appender, padded) do
             :ok -> acc + 1
@@ -353,13 +356,13 @@ defmodule Ysc.WpMigration.SqlToDuckdb do
     do: do_extract_paren(rest, depth + 1, [acc, "("])
 
   defp do_extract_paren(<<?', rest::binary>>, depth, acc) do
-    {content, rest2} = scan_quoted(rest, ?')
-    do_extract_paren(rest2, depth, [acc, ?', content, ?'])
+    {raw, rest2} = scan_raw_quoted(rest, ?')
+    do_extract_paren(rest2, depth, [acc, ?', raw, ?'])
   end
 
   defp do_extract_paren(<<?", rest::binary>>, depth, acc) do
-    {content, rest2} = scan_quoted(rest, ?")
-    do_extract_paren(rest2, depth, [acc, ?", content, ?"])
+    {raw, rest2} = scan_raw_quoted(rest, ?")
+    do_extract_paren(rest2, depth, [acc, ?", raw, ?"])
   end
 
   defp do_extract_paren(<<c, rest::binary>>, depth, acc),
@@ -396,6 +399,53 @@ defmodule Ysc.WpMigration.SqlToDuckdb do
 
   defp skip_sep(<<?,, rest::binary>>), do: String.trim_leading(rest)
   defp skip_sep(str), do: String.trim_leading(str)
+
+  # Replace invalid UTF-8 byte sequences in string fields so DuckDB does not
+  # reject the row with "Invalid unicode" errors.
+  defp sanitize_row_utf8(fields) when is_list(fields),
+    do: Enum.map(fields, &sanitize_field_utf8/1)
+
+  defp sanitize_field_utf8(s) when is_binary(s), do: fix_utf8(s, <<>>)
+  defp sanitize_field_utf8(v), do: v
+
+  defp fix_utf8(<<>>, acc), do: acc
+
+  defp fix_utf8(str, acc) do
+    case :unicode.characters_to_binary(str, :utf8) do
+      binary when is_binary(binary) ->
+        acc <> binary
+
+      {:error, good, <<_, rest::binary>>} ->
+        fix_utf8(rest, acc <> good)
+
+      {:incomplete, good, _} ->
+        acc <> good
+    end
+  end
+
+  # Passes raw bytes through a quoted string WITHOUT resolving escape sequences.
+  # Used by do_extract_paren so that the inner row binary retains original SQL
+  # escaping; do_parse_fields → scan_quoted then resolves escapes exactly once.
+  defp scan_raw_quoted(str, q), do: do_scan_raw_quoted(str, q, [])
+
+  defp do_scan_raw_quoted(<<>>, _q, acc), do: {Enum.reverse(acc), ""}
+
+  defp do_scan_raw_quoted(<<q, rest::binary>>, q, acc),
+    do: {Enum.reverse(acc), rest}
+
+  # Keep the backslash + quote so the closing-quote detector above is never
+  # triggered by an escaped quote inside the field value.
+  # NOTE: acc is built in reverse (Enum.reverse at the end), so the element
+  # that should appear FIRST in the output must be prepended LAST.
+  # For `\'` we want output bytes [.., '\', '\''], so we prepend quote then backslash.
+  defp do_scan_raw_quoted(<<?\\, q, rest::binary>>, q, acc),
+    do: do_scan_raw_quoted(rest, q, [q, ?\\ | acc])
+
+  defp do_scan_raw_quoted(<<?\\, c, rest::binary>>, q, acc),
+    do: do_scan_raw_quoted(rest, q, [c, ?\\ | acc])
+
+  defp do_scan_raw_quoted(<<c, rest::binary>>, q, acc),
+    do: do_scan_raw_quoted(rest, q, [c | acc])
 
   defp scan_quoted(str, quote), do: do_scan_quoted(str, quote, [])
 

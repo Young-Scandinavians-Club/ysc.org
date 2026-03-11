@@ -987,7 +987,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
          |> assign_preview_data()
          |> then(fn s ->
            if is_nil(s.assigns[:edition]) || s.assigns.edition.id != edition.id do
-             push_navigate(s, to: ~p"/admin/newsletters/#{edition.id}/edit")
+             push_patch(s, to: ~p"/admin/newsletters/#{edition.id}/edit")
            else
              s
            end
@@ -1328,7 +1328,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         if was_new do
           # New edition: redirect to edit URL; the new page load will set the form from the edition.
           {:noreply,
-           push_navigate(socket, to: ~p"/admin/newsletters/#{edition.id}/edit")}
+           push_patch(socket, to: ~p"/admin/newsletters/#{edition.id}/edit")}
         else
           {:noreply, socket}
         end
@@ -1409,7 +1409,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     {:noreply,
      socket
      |> assign(form: to_form(changeset, as: "edition"))
-     |> assign(:preview_cover_image_id, present_cover_image_id(image_id))
      |> assign_preview_data()
      |> schedule_auto_save()}
   end

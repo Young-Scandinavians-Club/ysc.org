@@ -44,7 +44,7 @@
           <.ysc_logo no_circle={true} class="h-12 w-12" width={48} height={48} />
         </.link>
 
-        <div class="flex flex-1 items-center justify-end lg:justify-between py-0 lg:py-6">
+        <div class="flex flex-1 items-center justify-end lg:justify-between py-0 lg:py-4">
           <.hamburger_menu
             toggle_id="navbar-dropdown"
             current_user={@current_user}
@@ -338,14 +338,14 @@
                   email={@current_user.email}
                   user_id={@current_user.id}
                   most_connected_country={@current_user.most_connected_country}
-                  first_name={String.capitalize(@current_user.first_name)}
-                  last_name={String.capitalize(@current_user.last_name)}
+                  first_name={Ysc.title_case(@current_user.first_name)}
+                  last_name={Ysc.title_case(@current_user.last_name)}
                 >
                   <div class="z-10 w-64 bg-white divide-y divide-zinc-100 rounded shadow">
                     <div class="px-4 py-3 text-sm text-zinc-900">
                       <p>
-                        {String.capitalize(@current_user.first_name) <>
-                          " " <> String.capitalize(@current_user.last_name)}
+                        {Ysc.title_case(@current_user.first_name) <>
+                          " " <> Ysc.title_case(@current_user.last_name)}
                       </p>
                       <div class="font-medium truncate">
                         {@current_user.email}
@@ -830,4 +830,9 @@
     toasts_sync={toasts_sync}
     group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
   />
+  <%!-- Screen-reader mirror of flash; keeps flash text in the DOM so tests and assistive technology can detect it --%>
+  <div id="flash-mirror" aria-live="polite" class="sr-only">
+    <span :if={@flash["info"]}>{@flash["info"]}</span>
+    <span :if={@flash["error"]}>{@flash["error"]}</span>
+  </div>
 </div>
