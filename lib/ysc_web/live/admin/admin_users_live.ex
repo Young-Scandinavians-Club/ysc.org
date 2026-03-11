@@ -1276,6 +1276,8 @@ defmodule YscWeb.AdminUsersLive do
      socket |> assign(:export_status, :failed) |> assign(:export_error, msg)}
   end
 
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")
 
