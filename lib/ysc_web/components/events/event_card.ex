@@ -36,7 +36,7 @@ defmodule YscWeb.Components.Events.EventCard do
 
     ~H"""
     <div class={[
-      "group flex flex-col rounded-xl border shadow-sm hover:shadow-2xl ring-offset-0 hover:ring-2 hover:ring-blue-500/20 transition-all duration-300 overflow-hidden relative",
+      "group flex flex-col rounded-xl border transition-all duration-300 overflow-hidden relative",
       if(@variant == "dark",
         do: "bg-zinc-800 border-zinc-700",
         else: "bg-white border-zinc-100"
@@ -59,7 +59,7 @@ defmodule YscWeb.Components.Events.EventCard do
             src={event_image_url(@event.image)}
             id={"image-card-#{@event.id}"}
             phx-hook="BlurHashImage"
-            class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-110 transition-transform duration-700"
+            class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
             loading="lazy"
             alt={
               if @event.image,
@@ -73,7 +73,7 @@ defmodule YscWeb.Components.Events.EventCard do
         <div class="absolute top-4 left-4 flex gap-2 z-[2] flex-wrap pointer-events-none">
           <%= for badge <- @badges do %>
             <span class={[
-              "px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest shadow-lg pointer-events-auto",
+              "px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest pointer-events-auto",
               badge_class(badge),
               if(badge.text == "Going Fast!",
                 do: "animate-badge-shine-emerald",
@@ -94,7 +94,7 @@ defmodule YscWeb.Components.Events.EventCard do
       <div class="p-8 flex flex-col flex-1">
         <div class="flex items-center gap-2 mb-4">
           <span class={[
-            "text-xs font-black px-2.5 py-1 rounded uppercase tracking-[0.2em]",
+            "text-sm font-black px-2.5 py-1 rounded uppercase tracking-[0.2em]",
             if(@variant == "dark",
               do: "text-zinc-300 bg-zinc-800",
               else: "text-zinc-900 bg-zinc-100"
@@ -105,7 +105,7 @@ defmodule YscWeb.Components.Events.EventCard do
           <span
             :if={@event.start_time && @event.start_time != ""}
             class={[
-              "text-xs font-bold uppercase tracking-widest",
+              "text-sm font-bold uppercase tracking-widest",
               if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
             ]}
           >
@@ -114,7 +114,7 @@ defmodule YscWeb.Components.Events.EventCard do
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
           <h3 class={[
-            "text-2xl font-black tracking-tighter leading-tight mb-4 group-hover:text-blue-600 transition-colors line-clamp-2 min-h-[4rem]",
+            "text-2xl font-black tracking-tighter leading-tight mb-4 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-[4rem]",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")
           ]}>
             {@event.title}
@@ -131,38 +131,38 @@ defmodule YscWeb.Components.Events.EventCard do
         </p>
 
         <div class={[
-          "mt-auto pt-6 border-t flex items-center justify-between",
-          if(@variant == "dark", do: "border-zinc-700", else: "border-zinc-50")
+          "mt-auto pt-5 border-t space-y-3",
+          if(@variant == "dark", do: "border-zinc-700", else: "border-zinc-100")
         ]}>
-          <div class="flex items-center gap-4 flex-1">
-            <span
-              :if={@event.location_name}
-              class={[
-                "text-sm font-bold flex items-center gap-1.5",
-                if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
-              ]}
-            >
-              <.icon name="hero-map-pin" class="w-5 h-5" />
-              {@event.location_name}
-            </span>
+          <div
+            :if={@event.location_name}
+            class={[
+              "flex items-center gap-1.5 text-sm",
+              if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-400")
+            ]}
+          >
+            <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+            <span class="truncate">{@event.location_name}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
             <span class={[
-              "backdrop-blur-md px-4 py-2 rounded-xl text-sm font-black shadow-sm ring-1",
+              "px-3 py-1.5 rounded text-sm font-black border",
               if(@variant == "dark",
-                do: "bg-zinc-900/90 text-white ring-white/10",
-                else: "bg-white/90 text-zinc-900 ring-black/5"
+                do: "bg-zinc-900 text-zinc-100 border-zinc-700",
+                else: "bg-zinc-50 text-zinc-900 border-zinc-200"
               ),
               @sold_out && "line-through opacity-60"
             ]}>
               {@event.pricing_info.display_text}
             </span>
+            <.icon
+              name="hero-arrow-right"
+              class={[
+                "w-5 h-5 group-hover:text-blue-600 group-hover:translate-x-1 transition-all flex-shrink-0",
+                if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-300")
+              ]}
+            />
           </div>
-          <.icon
-            name="hero-arrow-right"
-            class={[
-              "w-5 h-5 group-hover:text-blue-600 group-hover:translate-x-1 transition-all flex-shrink-0",
-              if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-200")
-            ]}
-          />
         </div>
       </div>
     </div>

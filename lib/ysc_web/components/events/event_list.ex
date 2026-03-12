@@ -17,8 +17,8 @@ defmodule YscWeb.EventsListLive do
         <%!-- Events grid skeleton --%>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <%= for _i <- 1..4 do %>
-            <div class="bg-white rounded-xl p-4 ring-1 ring-zinc-100 shadow-sm animate-pulse">
-              <div class="aspect-[16/10] rounded-lg mb-6 bg-zinc-200"></div>
+            <div class="bg-white rounded-xl p-4 border border-zinc-100 animate-pulse">
+              <div class="aspect-[16/10] rounded-xl mb-6 bg-zinc-200"></div>
               <div class="space-y-3">
                 <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
                 <div class="h-6 bg-zinc-200 rounded w-3/4"></div>
@@ -37,9 +37,9 @@ defmodule YscWeb.EventsListLive do
         <div id="hero-event" class="group">
           <.link
             navigate={~p"/events/#{@hero_event.id}"}
-            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl transition-all duration-300 hover:shadow-2xl sm:border-0 sm:bg-transparent sm:shadow-none"
+            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent"
           >
-            <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden sm:shadow-2xl">
+            <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden sm:border sm:border-zinc-100">
               <%!-- Image container --%>
               <div class={[
                 "relative aspect-[16/9] w-full overflow-hidden sm:absolute sm:inset-0 sm:aspect-auto sm:h-full",
@@ -62,7 +62,7 @@ defmodule YscWeb.EventsListLive do
                   src={event_image_url(@hero_event.image)}
                   id={"image-hero-#{@hero_event.id}"}
                   phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-105 transition-transform duration-700"
+                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
                   loading="eager"
                   alt={
                     if @hero_event.image,
@@ -80,10 +80,11 @@ defmodule YscWeb.EventsListLive do
               </div>
 
               <%!-- Content (stacked on mobile, overlaid on sm+) --%>
-              <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-500">
+              <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-300">
                 <div class="max-w-3xl">
-                  <div class="flex flex-wrap items-center gap-2 mb-4 grayscale-0">
-                    <span class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate">
+                  <%!-- Status badges (both mobile and desktop) --%>
+                  <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <span class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate">
                       <.icon
                         name="hero-calendar-solid"
                         class="w-3.5 h-3.5 inline me-0.5 relative z-10"
@@ -91,7 +92,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <%= for badge <- get_hero_event_badges(@hero_event) do %>
                       <span class={[
-                        "px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg",
+                        "px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded",
                         badge_class_mobile(badge),
                         badge_class_desktop_responsive(badge),
                         if(badge.text == "Going Fast!",
@@ -109,22 +110,30 @@ defmodule YscWeb.EventsListLive do
                     <% end %>
                   </div>
 
+                  <%!-- Date/time pill — mobile only, matches event_card --%>
+                  <div class="flex items-center gap-2 mb-4 sm:hidden">
+                    <span class="text-sm font-black px-2.5 py-1 rounded bg-zinc-100 text-zinc-900 uppercase tracking-[0.2em]">
+                      {format_event_date_time(@hero_event)}
+                    </span>
+                  </div>
+
                   <h2 class="text-3xl font-black leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow">
                     {@hero_event.title}
                   </h2>
 
-                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
-                    <span class="text-xs sm:text-sm font-black uppercase tracking-[0.1em]">
+                  <%!-- Date + location inline row — desktop overlay only --%>
+                  <div class="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-white/80">
+                    <span class="text-sm font-black uppercase tracking-[0.1em]">
                       {format_event_date_time(@hero_event)}
                     </span>
                     <span
                       :if={@hero_event.location_name}
-                      class="h-3 w-px bg-zinc-300 sm:bg-white/40"
+                      class="h-3 w-px bg-white/40"
                     >
                     </span>
                     <span
                       :if={@hero_event.location_name}
-                      class="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-1"
+                      class="text-sm font-bold uppercase tracking-widest flex items-center gap-1"
                     >
                       <.icon name="hero-map-pin" class="w-4 h-4" />
                       {@hero_event.location_name}
@@ -138,11 +147,32 @@ defmodule YscWeb.EventsListLive do
                     {@hero_event.description}
                   </p>
 
-                  <div class="flex items-center gap-4 pt-4 border-t border-zinc-100 sm:border-white/20">
-                    <span class="text-xs sm:text-sm font-black text-zinc-900 sm:text-white rounded-xl border border-zinc-200 px-4 py-2">
+                  <%!-- Footer — mobile only, matches event_card footer --%>
+                  <div class="sm:hidden pt-5 border-t border-zinc-100 space-y-3">
+                    <div
+                      :if={@hero_event.location_name}
+                      class="flex items-center gap-1.5 text-sm text-zinc-400"
+                    >
+                      <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+                      <span class="truncate">{@hero_event.location_name}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                      <span class="px-3 py-1.5 rounded text-sm font-black border bg-zinc-50 text-zinc-900 border-zinc-200">
+                        {@hero_event.pricing_info.display_text}
+                      </span>
+                      <.icon
+                        name="hero-arrow-right"
+                        class="w-5 h-5 text-zinc-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all flex-shrink-0"
+                      />
+                    </div>
+                  </div>
+
+                  <%!-- Footer — desktop overlay only --%>
+                  <div class="hidden sm:flex items-center gap-4 pt-4 border-t border-white/20">
+                    <span class="text-sm font-black text-white rounded border border-white/30 px-3 py-1.5">
                       {@hero_event.pricing_info.display_text}
                     </span>
-                    <span class="hidden sm:inline-flex items-center gap-1 text-sm font-bold text-white/90 hover:text-white transition-colors">
+                    <span class="inline-flex items-center gap-1 text-sm font-bold text-white/90 hover:text-white transition-colors">
                       View Details <.icon name="hero-arrow-right" class="w-4 h-4" />
                     </span>
                   </div>
@@ -171,8 +201,8 @@ defmodule YscWeb.EventsListLive do
         :if={!@defer_load && @total_event_count == 0}
         class="flex flex-col items-center justify-center py-10 md:py-20 px-0 md:px-6 flex-grow"
       >
-        <div class="flex flex-col items-center justify-center w-full border-2 border-dashed border-zinc-100 rounded-3xl bg-gradient-to-br from-zinc-50/50 via-white to-zinc-50/30 backdrop-blur-sm p-6 md:p-12 shadow-sm">
-          <div class="p-4 bg-white rounded-2xl shadow-sm mb-6 ring-1 ring-zinc-100">
+        <div class="flex flex-col items-center justify-center w-full border border-dashed border-zinc-200 rounded-xl bg-zinc-50/50 p-6 md:p-12">
+          <div class="p-4 bg-white rounded-xl mb-6 border border-zinc-100">
             <.icon
               name="hero-calendar-days"
               class="w-10 h-10 md:w-12 md:h-12 text-zinc-300"
@@ -187,13 +217,13 @@ defmodule YscWeb.EventsListLive do
           <div class="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto">
             <.link
               navigate={~p"/news"}
-              class="inline-flex items-center justify-center px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg hover:scale-105 active:scale-95 text-sm md:text-base"
+              class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-zinc-800 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
             >
               Read Latest News <.icon name="hero-newspaper" class="w-5 h-5 ml-2" />
             </.link>
             <.link
               navigate={~p"/contact"}
-              class="inline-flex items-center justify-center px-6 py-3 bg-white border border-zinc-200 text-zinc-600 rounded-xl font-bold hover:bg-zinc-50 transition-all shadow-sm text-sm md:text-base"
+              class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-white border border-zinc-200 text-zinc-600 rounded-md font-bold hover:bg-zinc-50 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2"
             >
               Suggest an Event
               <.icon name="hero-light-bulb-solid" class="w-5 h-5 ml-2" />

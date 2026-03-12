@@ -40,7 +40,7 @@ defmodule YscWeb.NewsLive do
           <div class="relative aspect-[16/10] rounded-xl overflow-hidden bg-zinc-200">
             <div class="absolute inset-0 flex flex-col justify-end p-8 lg:p-12">
               <div class="max-w-3xl space-y-4">
-                <div class="w-24 h-6 bg-zinc-300 rounded-lg"></div>
+                <div class="w-24 h-6 bg-zinc-300 rounded"></div>
                 <div class="w-32 h-4 bg-zinc-300 rounded"></div>
                 <div class="w-3/4 h-12 bg-zinc-300 rounded"></div>
                 <div class="w-full h-6 bg-zinc-300 rounded"></div>
@@ -65,9 +65,9 @@ defmodule YscWeb.NewsLive do
         <div id="featured" class="group">
           <.link
             navigate={~p"/posts/#{@featured.url_name}"}
-            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl transition-all duration-300 hover:shadow-2xl sm:border-0 sm:bg-transparent sm:shadow-none"
+            class="block overflow-hidden rounded-xl border border-zinc-100 bg-white transition-colors duration-150 hover:border-zinc-200 sm:border-0 sm:bg-transparent"
           >
-            <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden sm:shadow-2xl">
+            <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden">
               <%!-- Image container --%>
               <div class="relative aspect-[16/9] w-full overflow-hidden sm:absolute sm:inset-0 sm:aspect-auto sm:h-full">
                 <canvas
@@ -81,7 +81,7 @@ defmodule YscWeb.NewsLive do
                   src={featured_image_url(@featured.featured_image)}
                   id={"image-#{@featured.id}"}
                   phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-105 transition-transform duration-700"
+                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
                   loading="eager"
                   fetchpriority="high"
                   alt={
@@ -100,23 +100,23 @@ defmodule YscWeb.NewsLive do
               </div>
 
               <%!-- Content (stacked on mobile, overlaid on sm+) --%>
-              <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-500">
+              <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-300">
                 <div class="max-w-3xl">
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-sm sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
+                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded shadow-sm sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
                       <.icon name="hero-star-solid" class="w-3 h-3 inline me-1" />Pinned News
                     </span>
                   </div>
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
-                    <span class="text-xs sm:text-sm font-black uppercase tracking-[0.1em]">
+                    <span class="text-sm font-black uppercase tracking-[0.1em]">
                       {Timex.format!(
                         @featured.published_on,
                         "{Mshort} {D}, {YYYY}"
                       )}
                     </span>
                     <span class="h-3 w-px bg-zinc-300 sm:bg-white/40"></span>
-                    <span class="text-xs sm:text-sm font-bold uppercase tracking-widest">
+                    <span class="text-sm font-bold uppercase tracking-widest">
                       {reading_time(@featured)} min read
                     </span>
                   </div>
@@ -137,13 +137,13 @@ defmodule YscWeb.NewsLive do
                       class="w-8 h-8 sm:w-10 sm:h-10 rounded-full ring-2 ring-zinc-200 sm:ring-white/30"
                     />
                     <div>
-                      <p class="text-xs sm:text-sm font-black text-zinc-900 sm:text-white leading-tight">
+                      <p class="text-sm font-black text-zinc-900 sm:text-white leading-tight">
                         {Ysc.title_case(@featured.author.first_name || "")}
                         {Ysc.title_case(@featured.author.last_name || "")}
                       </p>
                       <p
                         :if={@featured.board_position_at_publish}
-                        class="text-xs sm:text-xs text-zinc-500 sm:text-white/80 font-medium mt-0.5"
+                        class="text-sm text-zinc-500 sm:text-white/80 font-medium mt-0.5"
                       >
                         YSC {format_board_position(
                           @featured.board_position_at_publish
@@ -167,7 +167,7 @@ defmodule YscWeb.NewsLive do
         >
           <%= for _i <- 1..4 do %>
             <div class="flex flex-col bg-white rounded-xl p-4 ring-1 ring-zinc-100 shadow-sm animate-pulse">
-              <div class="aspect-[16/10] rounded-lg mb-8 bg-zinc-200"></div>
+              <div class="aspect-[16/10] rounded-xl mb-8 bg-zinc-200"></div>
               <div class="px-4 pb-4 space-y-4">
                 <div class="flex items-center gap-3">
                   <div class="w-16 h-3 bg-zinc-200 rounded"></div>
@@ -200,10 +200,10 @@ defmodule YscWeb.NewsLive do
           <div
             :for={{dom_id, post} <- @streams.posts}
             id={dom_id}
-            class="group flex flex-col bg-white rounded-xl p-4 ring-1 ring-zinc-100 shadow-sm hover:shadow-xl hover:ring-blue-500/30 transition-all duration-500"
+            class="group flex flex-col bg-white rounded-xl p-4 border border-zinc-100 hover:border-zinc-200 transition-colors duration-150"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
-              <div class="relative aspect-[16/10] overflow-hidden rounded-lg mb-8">
+              <div class="relative aspect-[16/10] overflow-hidden rounded-xl mb-8">
                 <canvas
                   id={"blur-hash-image-#{post.id}"}
                   src={get_blur_hash(post.featured_image)}
@@ -216,7 +216,7 @@ defmodule YscWeb.NewsLive do
                   id={"image-#{post.id}"}
                   loading="lazy"
                   phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-500 group-hover:scale-[1.03]"
                   alt={
                     if post.featured_image,
                       do:
@@ -231,18 +231,18 @@ defmodule YscWeb.NewsLive do
 
             <div class="px-4 pb-4 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
-                <span class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
+                <span class="text-sm font-black text-blue-600 uppercase tracking-[0.2em]">
                   {format_post_date(post.published_on)}
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
-                <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                <span class="text-sm font-bold text-zinc-500 uppercase tracking-widest">
                   {reading_time(post)} min read
                 </span>
               </div>
 
               <.link
                 navigate={~p"/posts/#{post.url_name}"}
-                class="text-2xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-4 group-hover:text-blue-600 transition-colors"
+                class="text-2xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
               >
                 {post.title}
               </.link>
@@ -257,16 +257,16 @@ defmodule YscWeb.NewsLive do
                     email={post.author.email}
                     user_id={post.author.id}
                     country={post.author.most_connected_country}
-                    class="w-8 h-8 rounded-full grayscale group-hover:grayscale-0 transition-all"
+                    class="w-8 h-8 rounded-full"
                   />
                   <div>
-                    <p class="text-xs font-black text-zinc-400 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
+                    <p class="text-sm font-black text-zinc-500 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
                       {Ysc.title_case(post.author.first_name || "")}
                       {Ysc.title_case(post.author.last_name || "")}
                     </p>
                     <p
                       :if={post.board_position_at_publish}
-                      class="text-xs text-zinc-400 group-hover:text-zinc-600 font-medium mt-0.5"
+                      class="text-sm text-zinc-500 group-hover:text-zinc-600 font-medium mt-0.5"
                     >
                       YSC {format_board_position(post.board_position_at_publish)}
                     </p>

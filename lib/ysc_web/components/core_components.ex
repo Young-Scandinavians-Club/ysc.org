@@ -42,11 +42,11 @@ defmodule YscWeb.CoreComponents do
   attr :fullscreen, :boolean, default: false
   attr :max_width, :string, default: "max-w-3xl"
   attr :on_cancel, JS, default: %JS{}
-  attr :z_index, :string, default: "z-50"
+  attr :z_index, :string, default: "z-[200]"
   slot :inner_block, required: true
 
   def modal(assigns) do
-    assigns = assign_new(assigns, :z_index, fn -> "z-50" end)
+    assigns = assign_new(assigns, :z_index, fn -> "z-[200]" end)
 
     ~H"""
     <div
@@ -78,7 +78,7 @@ defmodule YscWeb.CoreComponents do
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
               class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1 p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
             >
-              <div class="absolute top-1 right-2 sm:top-0.5 sm:right-1 z-10">
+              <div class="absolute top-1 right-2 sm:top-0.5 sm:right-1 z-20">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
@@ -134,7 +134,7 @@ defmodule YscWeb.CoreComponents do
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
       class={[
-        "fixed top-2 right-2 w-80 sm:w-96 z-[110] rounded-lg p-3 ring-1",
+        "fixed top-2 right-2 w-80 sm:w-96 z-[110] rounded-xl p-3 ring-1",
         @class,
         @kind == :info &&
           "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
@@ -280,7 +280,7 @@ defmodule YscWeb.CoreComponents do
     color = assigns[:color] || "blue"
 
     base_classes =
-      "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6"
+      "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-150 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
 
     variant_classes =
       case variant do
@@ -333,8 +333,8 @@ defmodule YscWeb.CoreComponents do
     <button
       type={@type}
       class={[
-        "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80",
-        "text-sm font-semibold leading-6",
+        "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-150 ease-in-out disabled:cursor-not-allowed disabled:opacity-80",
+        "text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
         @color_classes,
         @class
       ]}
@@ -349,17 +349,17 @@ defmodule YscWeb.CoreComponents do
   defp button_solid_color_classes do
     %{
       "blue" =>
-        "bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80",
+        "bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none",
       "red" =>
-        "bg-red-700 hover:bg-red-800 text-zinc-100 active:text-zinc-100/80",
+        "bg-red-700 hover:bg-red-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none",
       "green" =>
-        "bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80",
+        "bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none",
       "amber" =>
-        "bg-amber-700 hover:bg-amber-800 text-zinc-100 active:text-zinc-100/80",
+        "bg-amber-700 hover:bg-amber-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none",
       "zinc" =>
-        "bg-zinc-700 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80",
+        "bg-zinc-700 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none",
       "teal" =>
-        "bg-teal-700 hover:bg-teal-800 text-zinc-100 active:text-zinc-100/80"
+        "bg-teal-700 hover:bg-teal-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
     }
   end
 
@@ -583,7 +583,7 @@ defmodule YscWeb.CoreComponents do
     />
     <label
       for={@id}
-      class="inline-flex items-center transition duration-150 ease-in-out justify-between w-full p-5 bg-white border rounded-lg cursor-pointer text-zinc-500 border-zinc-200 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-zinc-600 hover:bg-zinc-100 h-full"
+      class="inline-flex items-center transition duration-150 ease-in-out justify-between w-full p-5 bg-white border rounded cursor-pointer text-zinc-500 border-zinc-200 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-zinc-600 hover:bg-zinc-100 h-full"
     >
       <div class="flex flex-row">
         <div class="text-center items-center flex mr-4">
@@ -611,7 +611,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "block h-10 min-w-30 bg-white border rounded-md shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm",
+          "block h-10 min-w-30 bg-white border rounded shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm",
           if(@label != "", do: "mt-2", else: "")
         ]}
         multiple={@multiple}
@@ -632,7 +632,7 @@ defmodule YscWeb.CoreComponents do
       <select
         id={@id}
         name={@name}
-        class="block w-full mt-2 h-11 bg-white border rounded-md shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm text-zinc-800"
+        class="block w-full mt-2 h-11 bg-white border rounded shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm text-zinc-800"
         multiple={@multiple}
         {@rest}
       >
@@ -660,7 +660,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-800 focus:ring-0 sm:text-sm sm:leading-6 min-h-[6rem]",
+          "mt-2 block w-full rounded text-zinc-800 focus:ring-0 sm:text-sm sm:leading-6 min-h-[6rem]",
           @errors == [] && "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
@@ -817,7 +817,7 @@ defmodule YscWeb.CoreComponents do
             name={"#{@name}[#{i}]"}
             id={"#{@id}_#{i}"}
             maxlength="1"
-            class="block w-12 h-12 text-center border-zinc-200 rounded-md sm:text-sm focus:scale-110 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none"
+            class="block w-12 h-12 text-center border-zinc-200 rounded sm:text-sm focus:scale-110 focus:border-blue-600 focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none"
             data-otp-input-item=""
             {@rest}
           />
@@ -1453,7 +1453,7 @@ defmodule YscWeb.CoreComponents do
         </div>
         <.link
           href="/admin/stop-impersonation"
-          class="bg-white text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+          class="bg-white text-red-600 px-4 py-2 rounded font-semibold hover:bg-red-50 transition-colors"
         >
           Stop Impersonating
         </.link>
@@ -1697,7 +1697,7 @@ defmodule YscWeb.CoreComponents do
         </.link>
         <button
           type="button"
-          class="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+          class="p-2 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
           phx-click={hide_mobile_menu(@toggle_id)}
           aria-label="Close menu"
         >
@@ -1774,7 +1774,7 @@ defmodule YscWeb.CoreComponents do
         <span
           role="tooltip"
           class={[
-            "absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-4 py-2 block rounded tooltip group-hover:opacity-100 group-hover:pointer-events-auto whitespace-normal",
+            "absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-md shadow-sm px-4 py-2 block tooltip group-hover:opacity-100 group-hover:pointer-events-auto whitespace-normal",
             @max_width,
             @text_align
           ]}
@@ -1796,7 +1796,7 @@ defmodule YscWeb.CoreComponents do
       {render_slot(@inner_block)}
       <span
         role="tooltip"
-        class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-sm px-3 py-2 inline-block text-left rounded tooltip group-hover:opacity-100 group-hover:pointer-events-auto"
+        class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-md shadow-sm px-3 py-2 inline-block text-left tooltip group-hover:opacity-100 group-hover:pointer-events-auto"
       >
         {render_slot(@tooltip_body)}
       </span>
@@ -2208,7 +2208,7 @@ defmodule YscWeb.CoreComponents do
     <article
       id={@id}
       class={[
-        "p-6 bg-zinc-50/50 rounded-lg border border-zinc-100 mb-4 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300",
+        "p-6 bg-zinc-50/50 rounded-xl border border-zinc-100 mb-4 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300",
         @reply && "mb-3 ml-6"
       ]}
       phx-mounted={
@@ -2670,7 +2670,7 @@ defmodule YscWeb.CoreComponents do
       }
       class="space-y-4"
     >
-      <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+      <div class="flex items-center justify-between p-4 bg-red-50 rounded-xl border border-red-200">
         <div class="flex items-center">
           <div class="flex-shrink-0">
             <.icon name="hero-exclamation-triangle" class="w-8 h-8 text-red-600" />

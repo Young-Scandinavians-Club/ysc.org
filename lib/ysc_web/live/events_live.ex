@@ -13,7 +13,7 @@ defmodule YscWeb.EventsLive do
       <%!-- The "Masthead" Header --%>
       <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
         <div class="text-center py-8 md:py-12 border-y border-zinc-200">
-          <p class="text-xs font-black text-blue-400 uppercase tracking-[0.2em] mb-3 md:mb-4">
+          <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
             Events
           </p>
           <h1 class="text-4xl md:text-7xl font-black text-zinc-900">
@@ -41,7 +41,7 @@ defmodule YscWeb.EventsLive do
           <%!-- Sidebar --%>
           <aside class="lg:col-span-3 space-y-4 md:space-y-8">
             <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
                 Upcoming Events
               </h4>
               <p class="text-sm text-zinc-600 leading-relaxed">
@@ -49,8 +49,8 @@ defmodule YscWeb.EventsLive do
               </p>
             </div>
             <%!-- Get Involved - Always shown to encourage event hosting --%>
-            <div class="p-6 md:p-8 bg-gradient-to-br from-blue-50/50 to-slate-50/50 rounded-xl border-2 border-blue-200 backdrop-blur-sm lg:scale-105 shadow-md">
-              <h4 class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
+            <div class="p-6 md:p-8 bg-blue-50/40 rounded-xl border border-blue-200">
+              <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Get Involved
               </h4>
               <p class="text-sm text-zinc-700 leading-relaxed mb-4">
@@ -63,8 +63,8 @@ defmodule YscWeb.EventsLive do
                 Contact Us <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
               </.link>
             </div>
-            <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100 shadow-sm">
-              <h4 class="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
+            <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Stay Connected
               </h4>
               <p class="text-sm text-zinc-600 leading-relaxed mb-4">
@@ -73,13 +73,13 @@ defmodule YscWeb.EventsLive do
               <div class="space-y-3">
                 <.link
                   navigate={~p"/news"}
-                  class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-blue-600 transition-colors"
+                  class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                 >
                   Read Club News
                   <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
                 </.link>
                 <div class="border-t border-zinc-100 pt-3">
-                  <p class="text-xs text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
+                  <p class="text-sm text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
                     Community Chat
                   </p>
                   <div class="flex flex-col gap-2">
@@ -102,7 +102,7 @@ defmodule YscWeb.EventsLive do
                     >
                       <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
                       WhatsApp
-                      <span class="ml-2 text-xs text-zinc-400">(Coming Soon)</span>
+                      <span class="ml-2 text-sm text-zinc-400">(Coming Soon)</span>
                     </a>
                   </div>
                 </div>
@@ -121,7 +121,7 @@ defmodule YscWeb.EventsLive do
           <div class="h-8 w-48 bg-zinc-200 rounded mb-12 animate-pulse"></div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <%= for _i <- 1..4 do %>
-              <div class="aspect-video rounded-2xl bg-zinc-200 animate-pulse"></div>
+              <div class="aspect-video rounded-xl bg-zinc-200 animate-pulse"></div>
             <% end %>
           </div>
         </div>
@@ -143,7 +143,7 @@ defmodule YscWeb.EventsLive do
               <div
                 :for={{id, event} <- @streams.past_events}
                 id={id}
-                class="group relative aspect-video overflow-hidden rounded-2xl grayscale opacity-60 hover:opacity-100 hover:grayscale-0 transition-all duration-500 hover:scale-105 hover:rotate-1 ring-1 ring-zinc-200 shadow-sm hover:shadow-xl bg-white p-1"
+                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 transition-all duration-300 ring-1 ring-zinc-200 hover:ring-zinc-300 bg-white p-1"
               >
                 <.link
                   navigate={~p"/events/#{event.id}"}
@@ -161,7 +161,7 @@ defmodule YscWeb.EventsLive do
                       src={event_image_url(event.image)}
                       id={"image-past-#{event.id}"}
                       phx-hook="BlurHashImage"
-                      class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-110 transition-transform duration-700"
+                      class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
                       loading="lazy"
                       alt={
                         if event.image,
@@ -171,16 +171,16 @@ defmodule YscWeb.EventsLive do
                           else: "Past event"
                       }
                     />
-                    <%!-- Title overlay --%>
-                    <div class="absolute inset-0 z-[2] bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <%!-- Title overlay — always visible --%>
+                    <div class="absolute inset-0 z-[2] bg-gradient-to-t from-zinc-900/70 via-zinc-900/20 to-transparent">
                     </div>
-                    <div class="absolute bottom-0 left-0 right-0 z-[3] p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div class="absolute bottom-0 left-0 right-0 z-[3] p-3">
                       <h4 class="text-white text-sm font-black leading-tight line-clamp-2">
                         {event.title}
                       </h4>
                       <p
                         :if={event.start_date}
-                        class="text-white/80 text-xs font-medium mt-1"
+                        class="text-white/80 text-sm font-medium mt-1"
                       >
                         {Timex.format!(event.start_date, "{Mshort} {D}, {YYYY}")}
                       </p>
