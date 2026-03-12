@@ -47,7 +47,7 @@ defmodule YscWeb.EventDetailsLive do
             "lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:translate-y-1/2 lg:mx-0 lg:px-8 lg:mt-0"
           ]}>
             <div class={[
-              "bg-white rounded-xl shadow-2xl border p-6 lg:p-10 transform transition-transform duration-500",
+              "bg-white rounded-xl shadow-md border p-6 lg:p-10 transform transition-transform duration-500",
               if(@event.state == :cancelled,
                 do: "border-red-300",
                 else: "border-zinc-100"
@@ -55,7 +55,7 @@ defmodule YscWeb.EventDetailsLive do
             ]}>
               <div class="space-y-4">
                 <%= if @event.state == :cancelled do %>
-                  <div class="mb-4 p-4 bg-red-600 text-white rounded-lg shadow-lg">
+                  <div class="mb-4 p-4 bg-red-600 text-white rounded-xl shadow-lg">
                     <div class="flex items-center justify-center gap-3">
                       <.icon name="hero-x-circle-solid" class="w-5 h-5" />
                       <p class="font-black text-base uppercase tracking-widest">
@@ -166,7 +166,7 @@ defmodule YscWeb.EventDetailsLive do
                     do: group_tickets_by_tier(confirmed_tickets),
                     else: [] %>
                 <div class={[
-                  "rounded-xl p-10 shadow-2xl relative overflow-hidden border",
+                  "rounded-xl p-10 shadow-sm relative overflow-hidden border",
                   if(all_refunded,
                     do: "bg-red-900/90 border-red-800/50",
                     else: "bg-zinc-900 border-white/5"
@@ -177,7 +177,7 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex items-center justify-between mb-6">
                       <div class="flex items-center gap-2">
                         <span class={[
-                          "px-3 py-1 text-xs font-black uppercase tracking-widest rounded-lg border",
+                          "px-3 py-1 text-xs font-black uppercase tracking-widest rounded border",
                           if(all_refunded,
                             do: "bg-red-500/20 text-red-400 border-red-500/30",
                             else:
@@ -198,12 +198,12 @@ defmodule YscWeb.EventDetailsLive do
                           </span>
                         <% end %>
                         <%= if all_refunded do %>
-                          <span class="px-3 py-1 bg-red-500/20 text-red-300 text-xs font-black uppercase tracking-widest rounded-lg border border-red-500/30">
+                          <span class="px-3 py-1 bg-red-500/20 text-red-300 text-xs font-black uppercase tracking-widest rounded border border-red-500/30">
                             Fully Refunded
                           </span>
                         <% else %>
                           <%= if partial_refund do %>
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-black uppercase tracking-widest rounded-lg border border-amber-500/30">
+                            <span class="px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-black uppercase tracking-widest rounded border border-amber-500/30">
                               Partially Refunded
                             </span>
                           <% end %>
@@ -214,7 +214,7 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-8">
                       <div class="flex items-center gap-5">
                         <div class={[
-                          "w-14 h-14 rounded-2xl flex items-center justify-center ring-1",
+                          "w-14 h-14 rounded-xl flex items-center justify-center ring-1",
                           if(all_refunded,
                             do: "bg-red-500/10 ring-red-500/50",
                             else: "bg-emerald-500/10 ring-emerald-500/50"
@@ -311,11 +311,6 @@ defmodule YscWeb.EventDetailsLive do
                       </.link>
                     </div>
                   </div>
-                  <div class={[
-                    "absolute -right-12 -top-12 w-40 h-40 blur-[80px] rounded-full",
-                    if(all_refunded, do: "bg-red-500/10", else: "bg-emerald-500/10")
-                  ]}>
-                  </div>
                 </div>
               <% end %>
             </div>
@@ -323,7 +318,7 @@ defmodule YscWeb.EventDetailsLive do
             <%!-- Meta Info Row - Magazine Style --%>
             <% has_duration = @event.start_time != nil && @event.end_time != nil %>
             <div class={[
-              "grid gap-0 border border-zinc-100 rounded-xl overflow-hidden bg-white shadow-sm mb-12",
+              "grid gap-0 border border-zinc-100 rounded-xl overflow-hidden bg-white mb-12",
               if has_duration do
                 "grid-cols-1 md:grid-cols-3"
               else
@@ -485,7 +480,7 @@ defmodule YscWeb.EventDetailsLive do
 
                 <div
                   id="event-map"
-                  class="hidden bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden"
+                  class="hidden bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden"
                 >
                   <.live_component
                     id={"#{@event.id}-map"}
@@ -521,7 +516,7 @@ defmodule YscWeb.EventDetailsLive do
                         phx-click="set-active-agenda"
                         phx-value-id={agenda.id}
                         class={[
-                          "inline-flex items-center px-4 py-2 rounded-lg transition-colors",
+                          "inline-flex items-center px-4 py-2 rounded transition-colors",
                           agenda.id == @active_agenda && "text-white bg-blue-600",
                           agenda.id != @active_agenda &&
                             "text-zinc-600 bg-zinc-100 hover:bg-zinc-200 hover:text-zinc-800"
@@ -557,7 +552,7 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                       <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
                         <div class="w-36 flex-shrink-0">
-                          <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                          <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded uppercase tracking-widest whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors">
                             {format_start_end(
                               agenda_item.start_time,
                               agenda_item.end_time
@@ -605,7 +600,7 @@ defmodule YscWeb.EventDetailsLive do
               :if={@event.state != :cancelled}
               class="hidden lg:block sticky top-28 space-y-8"
             >
-              <div class="bg-white rounded-xl shadow-2xl border border-zinc-100 overflow-hidden">
+              <div class="bg-white rounded-xl border border-zinc-100 overflow-hidden">
                 <%= if event_in_past?(@event) do %>
                   <div class="p-8 text-center bg-zinc-50/50">
                     <div class="text-red-500 mb-4">
@@ -617,9 +612,9 @@ defmodule YscWeb.EventDetailsLive do
                     </p>
                   </div>
                 <% else %>
-                  <div class="p-8 text-center bg-zinc-50/50 shadow-[inset_0_-10px_20px_-15px_rgba(0,0,0,0.1)]">
+                  <div class="p-8 text-center bg-zinc-50/50 shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)]">
                     <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] mb-2">
-                      Admission
+                      Tickets
                     </p>
                     <p class={[
                       "text-4xl font-black text-zinc-900 tracking-tighter",
@@ -643,15 +638,11 @@ defmodule YscWeb.EventDetailsLive do
                 <%= if event_in_past?(@event) do %>
                   <!-- No additional content for past events -->
                 <% else %>
-                  <%!-- Ticket Perforation Line with Notch Cutouts --%>
-                  <div class="relative h-px border-t-2 border-dashed border-zinc-200 mx-4">
-                    <div class="absolute -left-11 -top-3 w-6 h-6 bg-white rounded-full border-r border-zinc-100 shadow-inner">
-                    </div>
-                    <div class="absolute -right-11 -top-3 w-6 h-6 bg-white rounded-full border-l border-zinc-100 shadow-inner">
-                    </div>
+                  <%!-- Ticket Perforation Line --%>
+                  <div class="relative h-px border-t border-dashed border-zinc-200 mx-4">
                   </div>
 
-                  <div class="p-8 space-y-6 shadow-[inset_0_10px_20px_-15px_rgba(0,0,0,0.05)]">
+                  <div class="p-8 space-y-6">
                     <%= if (@event_selling_fast || (@sold_percentage != nil && @sold_percentage >= 85)) && !@event_at_capacity do %>
                       <% available_capacity = @available_capacity %>
                       <% sold_percentage = @sold_percentage %>
@@ -802,7 +793,7 @@ defmodule YscWeb.EventDetailsLive do
                       :if={@current_user == nil && @has_ticket_tiers}
                       class="w-full space-y-4"
                     >
-                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-lg border border-orange-200 text-center">
+                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
                         <.icon
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-5 h-5 me-1 -mt-0.5"
@@ -828,7 +819,7 @@ defmodule YscWeb.EventDetailsLive do
                       }
                       class="w-full"
                     >
-                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-lg border border-orange-200 text-center">
+                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
                         <.icon
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-5 h-5 me-1 -mt-0.5"
@@ -931,7 +922,7 @@ defmodule YscWeb.EventDetailsLive do
             >
               <div class="h-8 bg-gradient-to-t from-white to-transparent"></div>
 
-              <div class="bg-white/95 backdrop-blur-md border-t border-zinc-100 px-6 py-5 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+              <div class="bg-white/95 backdrop-blur-md border-t border-zinc-100 px-6 py-5">
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
                   <%= if event_in_past?(@event) do %>
                     <div class="flex-1 text-center">
@@ -1098,7 +1089,7 @@ defmodule YscWeb.EventDetailsLive do
           </div>
 
           <%= if @event.tickets_tbd do %>
-            <div class="border border-blue-200 rounded-lg p-8 bg-blue-50 text-center">
+            <div class="border border-blue-200 rounded-xl p-8 bg-blue-50 text-center">
               <.icon
                 name="hero-ticket"
                 class="w-12 h-12 text-blue-600 mx-auto mb-4"
@@ -1146,7 +1137,7 @@ defmodule YscWeb.EventDetailsLive do
                   reservation_info.discount_percentage != nil &&
                     reservation_info.discount_percentage > 0 %>
                 <div class={[
-                  "border rounded-lg p-6 transition-all duration-200",
+                  "border rounded-xl p-6 transition-all duration-200",
                   cond do
                     is_sold_out -> "border-zinc-200 bg-zinc-50 opacity-60"
                     is_sale_ended -> "border-zinc-200 bg-zinc-50 opacity-60"
@@ -1269,7 +1260,7 @@ defmodule YscWeb.EventDetailsLive do
                           <label class="text font-semibold text-zinc-700 whitespace-nowrap">
                             Donation Amount:
                           </label>
-                          <div class="flex items-center border border-zinc-300 rounded-lg px-3 py-1 flex-1 sm:flex-initial bg-white">
+                          <div class="flex items-center border border-zinc-300 rounded px-3 py-1 flex-1 sm:flex-initial bg-white">
                             <span class="text-zinc-800">$</span>
                             <input
                               type="text"
@@ -1504,7 +1495,7 @@ defmodule YscWeb.EventDetailsLive do
               <h3 class="font-semibold mb-2">Order Summary</h3>
             </div>
 
-            <div class="bg-zinc-50 rounded-lg p-6 space-y-4 flex flex-col justify-between">
+            <div class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between">
               <%= if has_any_tickets_selected?(@selected_tickets) do %>
                 <% pricing =
                   calculate_pricing_with_discounts(
@@ -1932,7 +1923,7 @@ defmodule YscWeb.EventDetailsLive do
                         end
                     end %>
                   <div class={[
-                    "rounded-lg p-4 space-y-4 transition-all duration-200",
+                    "rounded-xl p-4 space-y-4 transition-all duration-200",
                     if(is_registration_complete,
                       do: "border-2 border-green-500 bg-green-50/30",
                       else: "border border-zinc-200"
@@ -2109,7 +2100,7 @@ defmodule YscWeb.EventDetailsLive do
                       (is_for_me || has_selected_family_member) && "block",
                       !is_for_me && !has_selected_family_member && "hidden"
                     ]}>
-                      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
                         <p class="text-sm text-blue-800">
                           <strong>
                             {form_data.first_name} {form_data.last_name}
@@ -2230,7 +2221,7 @@ defmodule YscWeb.EventDetailsLive do
               <div id="payment-message" class="hidden text-sm"></div>
             </div>
             <!-- Checkout Zone: Payment Action Area -->
-            <div class="mt-8 bg-zinc-50 -mx-6 px-6 py-6 border-t-4 border-blue-600 shadow-lg">
+            <div class="mt-8 border-t border-zinc-200 pt-6">
               <div class="max-w-md mx-auto space-y-4">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-zinc-600">Amount due:</span>
@@ -2247,7 +2238,7 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3">
                   <.button
-                    class="sm:flex-[2] w-full sm:w-auto py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="sm:flex-[2] w-full sm:w-auto py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] active:transition-none disabled:opacity-50"
                     id="submit-payment"
                     disabled={!all_registrations_complete}
                   >
@@ -2261,7 +2252,8 @@ defmodule YscWeb.EventDetailsLive do
                     )}
                   </.button>
                   <.button
-                    class="sm:flex-1 w-full sm:w-auto bg-transparent text-zinc-500 hover:text-zinc-700 py-4 rounded-lg font-medium transition-colors"
+                    variant="outline"
+                    class="sm:flex-1 w-full sm:w-auto py-4"
                     phx-click="close-payment-modal"
                   >
                     Cancel
@@ -2277,7 +2269,7 @@ defmodule YscWeb.EventDetailsLive do
           <!-- Right Panel: Order Summary (Sticky on large screens) -->
           <div class="lg:w-1/3 space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
             <div class="space-y-4">
-              <div class="w-full hidden lg:block max-h-32 overflow-hidden rounded-lg">
+              <div class="w-full hidden lg:block max-h-32 overflow-hidden rounded-xl">
                 <.live_component
                   id={"event-checkout-#{@event.id}"}
                   module={YscWeb.Components.Image}
@@ -2290,7 +2282,7 @@ defmodule YscWeb.EventDetailsLive do
                 <h3 class="font-semibold mb-2">Order Summary</h3>
               </div>
 
-              <div class="bg-zinc-50 rounded-lg p-6 space-y-4">
+              <div class="bg-zinc-50 rounded-xl p-6 space-y-4">
                 <%= if has_any_tickets_selected?(@selected_tickets) do %>
                   <% pricing =
                     calculate_pricing_with_discounts(
@@ -2443,7 +2435,7 @@ defmodule YscWeb.EventDetailsLive do
                   (ticket_detail && ticket_detail.email) || ""
                 )
             } %>
-            <div class="border border-zinc-200 rounded-lg p-6 space-y-4">
+            <div class="border border-zinc-200 rounded-xl p-6 space-y-4">
               <div class="flex items-center justify-between mb-4">
                 <div>
                   <h3 class="text-lg font-semibold text-zinc-900">
@@ -2540,7 +2532,7 @@ defmodule YscWeb.EventDetailsLive do
         </div>
 
         <%!-- Compact Order Summary (receipt-style) --%>
-        <div class="w-full bg-zinc-50 rounded-lg p-4 border border-zinc-200">
+        <div class="w-full bg-zinc-50 rounded-xl p-4 border border-zinc-200">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
               Order Summary
@@ -2647,7 +2639,7 @@ defmodule YscWeb.EventDetailsLive do
                     end
                 end %>
 
-              <div class="border border-zinc-200 rounded-lg p-4 space-y-4">
+              <div class="border border-zinc-200 rounded-xl p-4 space-y-4">
                 <div class="flex items-center justify-between mb-2">
                   <div>
                     <h4 class="text-sm font-semibold text-zinc-900">
@@ -2804,7 +2796,7 @@ defmodule YscWeb.EventDetailsLive do
                   (is_for_me || has_selected_family_member) && "block",
                   !is_for_me && !has_selected_family_member && "hidden"
                 ]}>
-                  <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
                     <p class="text-sm text-blue-800">
                       <strong>
                         {form_data.first_name} {form_data.last_name}
@@ -2854,7 +2846,7 @@ defmodule YscWeb.EventDetailsLive do
           </h2>
         </div>
         <!-- Order Details -->
-        <div class="w-full max-w-md bg-zinc-50 rounded-lg p-6">
+        <div class="w-full max-w-md bg-zinc-50 rounded-xl p-6">
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">Order Details</h3>
           <div class="space-y-3">
             <div class="flex justify-between">
@@ -2880,7 +2872,7 @@ defmodule YscWeb.EventDetailsLive do
           </div>
         </div>
         <!-- Tickets List -->
-        <div class="w-full max-w-md bg-white border rounded-lg p-6">
+        <div class="w-full max-w-md bg-white border rounded-xl p-6">
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">Your Tickets</h3>
           <div class="space-y-3">
             <%= for ticket <- @ticket_order.tickets do %>
@@ -3019,7 +3011,7 @@ defmodule YscWeb.EventDetailsLive do
           </div>
         </div>
         <!-- Email Notice -->
-        <div class="w-full max-w-md bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="w-full max-w-md bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div class="flex items-start">
             <.icon name="hero-envelope" class="w-5 h-5 text-blue-500 mt-0.5 mr-3" />
             <div>
@@ -3090,7 +3082,7 @@ defmodule YscWeb.EventDetailsLive do
                   do: attendee_name,
                   else: attendee.email || "Unknown" %>
               <% ticket_count = Map.get(@ticket_counts_per_user, attendee.id, 0) %>
-              <div class="flex items-center gap-3 p-3 bg-zinc-50 rounded-lg border border-zinc-200">
+              <div class="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
                 <.user_avatar_image
                   email={attendee.email}
                   user_id={attendee.id}

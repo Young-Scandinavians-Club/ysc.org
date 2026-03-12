@@ -10,7 +10,7 @@
       The YSC is always in need of talented, motivated members to serve on the board and/or the various committees. Annual elections take place at the beginning of each year. You can see the board in action by reviewing our
       <.link
         navigate={~p"/financials"}
-        class="hover:text-blue-700 transition ease-in-out"
+        class="hover:text-blue-600 transition-colors duration-150"
       >
         Financials & Annual Meetings
       </.link>
@@ -29,7 +29,7 @@
       <div class="not-prose">
         <div class="space-y-4">
           <%= for member <- @bod_members do %>
-            <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
               <.user_avatar_image
                 email={member.email}
                 user_id={member.id}
@@ -64,7 +64,7 @@
         </div>
         <div class="not-prose space-y-4">
           <%= for position <- @vacant_positions do %>
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-zinc-100 hover:border-blue-300 transition-all">
+            <div class="bg-white p-5 rounded-xl border border-zinc-100 hover:border-zinc-200 transition-colors duration-200">
               <div class="flex justify-between items-start gap-4">
                 <div class="flex-1">
                   <h3 class="font-semibold text-zinc-900 mb-1">
@@ -99,7 +99,7 @@
                   navigate={
                     ~p"/contact?subject=#{URI.encode(atom_to_readable(position))}"
                   }
-                  class="text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap flex-shrink-0 ml-4"
+                  class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0 ml-4 transition-colors duration-150"
                 >
                   Inquire<.icon
                     name="hero-arrow-right-solid"
@@ -122,7 +122,7 @@
       <div class="not-prose">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <%= for member <- @bod_members do %>
-            <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
               <.user_avatar_image
                 email={member.email}
                 user_id={member.id}

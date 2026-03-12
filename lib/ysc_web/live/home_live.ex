@@ -283,7 +283,7 @@ defmodule YscWeb.HomeLive do
           <div class="mt-8 sm:mt-10 w-full max-w-sm sm:max-w-none flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
             <.link
               navigate={~p"/users/register"}
-              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl min-h-[48px]"
+              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-md hover:bg-blue-50 transition-colors duration-150 min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
             >
               Apply for Membership
               <.icon
@@ -293,7 +293,7 @@ defmodule YscWeb.HomeLive do
             </.link>
             <.link
               navigate={~p"/events"}
-              class="flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-white border-2 border-white/80 rounded-xl hover:bg-white hover:text-zinc-900 transition-all duration-300 backdrop-blur-sm min-h-[48px]"
+              class="flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-white border-2 border-white/80 rounded-md hover:bg-white hover:text-zinc-900 transition-all duration-150 backdrop-blur-sm min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
             >
               Explore Our Events
             </.link>
@@ -346,7 +346,7 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-20 items-center">
           <div class="lg:col-span-5 min-w-0">
-            <span class="text-blue-600 font-black text-xs uppercase tracking-[0.3em]">
+            <span class="text-blue-600 font-black text-sm uppercase tracking-[0.3em]">
               Velkommen back
             </span>
             <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-black text-zinc-900 tracking-tighter leading-[0.95] break-words">
@@ -379,7 +379,7 @@ defmodule YscWeb.HomeLive do
             <div class="mt-6 sm:mt-8">
               <.link
                 navigate={~p"/users/register"}
-                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 text-base font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition duration-300 shadow-lg hover:shadow-xl"
+                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 text-base font-bold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
               >
                 Apply for Membership
                 <.icon name="hero-arrow-right" class="ml-2 w-5 h-5" />
@@ -426,12 +426,12 @@ defmodule YscWeb.HomeLive do
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
           <%!-- Large featured cabin image --%>
-          <div class="md:col-span-2 md:row-span-2 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+          <div class="md:col-span-2 md:row-span-2 bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group">
             <div class="relative h-full min-h-[280px] sm:min-h-[340px] md:min-h-[400px]">
               <img
                 src={~p"/images/clear_lake_midsummer.webp"}
                 alt="Midsummer at Clear Lake"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
               <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
                 <h3 class="text-xl sm:text-2xl font-bold text-white mb-1.5 sm:mb-2">
@@ -445,18 +445,18 @@ defmodule YscWeb.HomeLive do
           </div>
 
           <%!-- Events card --%>
-          <div class="md:col-span-2 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+          <div class="md:col-span-2 bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group">
             <div class="relative aspect-[16/9]">
               <img
                 src={~p"/images/ysc_bonfire_2024.webp"}
                 alt="YSC Bonfire 2024"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
               <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
                 <h3 class="text-lg sm:text-xl font-bold text-white mb-1.5 sm:mb-2">
                   Events Year-Round
                 </h3>
-                <p class="text-xs sm:text-sm text-zinc-200">
+                <p class="text-sm text-zinc-200">
                   From casual happy hours to formal dinners and holiday celebrations.
                 </p>
               </div>
@@ -464,18 +464,18 @@ defmodule YscWeb.HomeLive do
           </div>
 
           <%!-- Cultural connection card --%>
-          <div class="md:col-span-1 bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+          <div class="md:col-span-1 bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group">
             <div class="relative aspect-square">
               <img
                 src={~p"/images/flags.webp"}
                 alt="Nordic country flags"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
               <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-3 sm:p-4">
                 <h3 class="text-base sm:text-lg font-bold text-white mb-1">
                   Cultural Connection
                 </h3>
-                <p class="text-xs text-zinc-200">
+                <p class="text-sm text-zinc-200">
                   Stay connected to your roots through traditions like Midsummer, Nordic film screenings, and our annual heritage banquets.
                 </p>
               </div>
@@ -511,7 +511,7 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20">
           <div class="max-w-2xl min-w-0">
-            <span class="text-blue-600 font-black text-xs uppercase tracking-[0.3em]">
+            <span class="text-blue-600 font-black text-sm uppercase tracking-[0.3em]">
               Exclusive Retreats
             </span>
             <h2 class="mt-4 text-3xl sm:text-4xl lg:text-7xl font-black text-zinc-900 tracking-tighter break-words leading-tight">
@@ -558,17 +558,17 @@ defmodule YscWeb.HomeLive do
               </ul>
               <.link
                 navigate={~p"/bookings/tahoe"}
-                class="inline-flex items-center px-8 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-blue-600 transition-all shadow-lg"
+                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-blue-600 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
               >
                 Learn More About Tahoe
               </.link>
             </div>
             <div class="lg:col-span-7 order-1 lg:order-2">
-              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] shadow-2xl">
+              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
                 <img
                   src={~p"/images/tahoe/tahoe_cabin_main.webp"}
                   alt="Lake Tahoe Cabin"
-                  class="w-full aspect-[4/3] object-cover group-hover:scale-105 transition-transform duration-700"
+                  class="w-full aspect-[4/3] object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />
                 <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent">
                 </div>
@@ -579,11 +579,11 @@ defmodule YscWeb.HomeLive do
           <%!-- Clear Lake --%>
           <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
             <div class="lg:col-span-7">
-              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] shadow-2xl">
+              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
                 <img
                   src={~p"/images/clear_lake/clear_lake_dock.webp"}
                   alt="Clear Lake Cabin"
-                  class="w-full aspect-[4/3] object-cover group-hover:scale-105 transition-transform duration-700"
+                  class="w-full aspect-[4/3] object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />
                 <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent">
                 </div>
@@ -619,7 +619,7 @@ defmodule YscWeb.HomeLive do
               </ul>
               <.link
                 navigate={~p"/bookings/clear-lake"}
-                class="inline-flex items-center px-8 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-lg"
+                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-emerald-600 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
               >
                 Learn More About Clear Lake
               </.link>
@@ -702,7 +702,7 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6 relative z-10">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-10 sm:mb-16">
           <div class="min-w-0">
-            <span class="text-blue-400 font-black text-xs uppercase tracking-[0.3em]">
+            <span class="text-blue-300 font-black text-sm uppercase tracking-[0.3em]">
               Upcoming Events
             </span>
             <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-black text-white tracking-tighter leading-none break-words">
@@ -711,7 +711,7 @@ defmodule YscWeb.HomeLive do
           </div>
           <.link
             navigate={~p"/events"}
-            class="group flex items-center gap-2 text-white font-bold hover:text-blue-400 transition-all"
+            class="group flex items-center gap-2 text-white font-bold hover:text-blue-300 transition-colors duration-150"
           >
             View full calendar
             <.icon
@@ -760,7 +760,7 @@ defmodule YscWeb.HomeLive do
                   src={event_image_url(event.image)}
                   id={"image-event-#{event.id}"}
                   phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-110 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500 opacity-80 group-hover:opacity-100"
                   loading="lazy"
                   alt={
                     if event.image,
@@ -772,12 +772,12 @@ defmodule YscWeb.HomeLive do
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap">
                   <%= if days_since_inserted(event.inserted_at) <= 7 do %>
-                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-black uppercase tracking-widest rounded shadow-lg">
                       Just Added
                     </span>
                   <% end %>
                   <%= if event_sold_out?(event) do %>
-                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-black uppercase tracking-widest rounded-lg shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-black uppercase tracking-widest rounded shadow-lg">
                       Sold Out
                     </span>
                   <% end %>
@@ -793,18 +793,18 @@ defmodule YscWeb.HomeLive do
 
               <div class="p-6 sm:p-8 flex flex-col flex-1">
                 <div class="flex items-center gap-3 mb-3 sm:mb-4">
-                  <span class="text-blue-400 font-black text-xs tracking-widest uppercase">
+                  <span class="text-blue-300 font-black text-sm tracking-widest uppercase">
                     {format_event_date(event.start_date)}
                   </span>
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
                   <%= if event.start_time && event.start_time != "" do %>
-                    <span class="text-zinc-400 text-xs font-bold uppercase tracking-widest text-xs">
+                    <span class="text-zinc-300 text-sm font-bold uppercase tracking-widest">
                       {format_event_time(event.start_date, event.start_time)}
                     </span>
                   <% end %>
                 </div>
                 <.link navigate={~p"/events/#{event.id}"} class="block">
-                  <h3 class="text-xl sm:text-2xl font-black text-white tracking-tight group-hover:text-blue-400 transition-colors leading-tight">
+                  <h3 class="text-xl sm:text-2xl font-black text-white tracking-tight group-hover:text-blue-300 transition-colors leading-tight">
                     {event.title}
                   </h3>
                 </.link>
@@ -816,8 +816,8 @@ defmodule YscWeb.HomeLive do
 
                 <div class="mt-auto pt-6 sm:pt-8 flex justify-between items-center border-t border-white/5">
                   <%= if event.location_name do %>
-                    <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-2">
-                      <.icon name="hero-map-pin" class="w-4 h-4 text-blue-500" />
+                    <span class="text-sm font-bold text-zinc-400 flex items-center gap-2">
+                      <.icon name="hero-map-pin" class="w-4 h-4 text-blue-400" />
                       {event.location_name}
                     </span>
                   <% else %>
@@ -825,7 +825,7 @@ defmodule YscWeb.HomeLive do
                   <% end %>
                   <.icon
                     name="hero-arrow-right"
-                    class="w-5 h-5 text-zinc-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"
+                    class="w-5 h-5 text-zinc-500 group-hover:text-blue-300 group-hover:translate-x-1 transition-all duration-150"
                   />
                 </div>
               </div>
@@ -846,7 +846,7 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20 border-b border-zinc-200 pb-8 sm:pb-10">
           <div class="max-w-2xl min-w-0">
-            <span class="text-blue-600 font-black text-xs uppercase tracking-[0.3em]">
+            <span class="text-blue-600 font-black text-sm uppercase tracking-[0.3em]">
               Club News
             </span>
             <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-black text-zinc-900 tracking-tighter break-words">
@@ -889,7 +889,7 @@ defmodule YscWeb.HomeLive do
                 if(rem(index, 2) == 1, do: "md:mt-20", else: "")
               ]}
             >
-              <div class="relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] mb-6 sm:mb-8 aspect-square shadow-sm group-hover:shadow-2xl transition-all">
+              <div class="relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] mb-6 sm:mb-8 aspect-square border border-zinc-100">
                 <canvas
                   id={"blur-hash-news-#{post.id}"}
                   src={get_blur_hash(post.featured_image)}
@@ -947,7 +947,7 @@ defmodule YscWeb.HomeLive do
 
         <div class="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto">
           <%!-- Single Membership --%>
-          <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-xl">
+          <div class="bg-white rounded-xl p-6 sm:p-8 border border-zinc-100">
             <h3 class="text-xl font-bold text-zinc-900">Single Membership</h3>
             <div class="mt-4">
               <span class="text-4xl font-bold text-zinc-900">
@@ -980,7 +980,7 @@ defmodule YscWeb.HomeLive do
           </div>
 
           <%!-- Family Membership --%>
-          <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-xl">
+          <div class="bg-white rounded-xl p-6 sm:p-8 border border-zinc-100">
             <h3 class="text-xl font-bold text-zinc-900">Family Membership</h3>
             <div class="mt-4">
               <span class="text-4xl font-bold text-zinc-900">
@@ -1016,7 +1016,7 @@ defmodule YscWeb.HomeLive do
         <div class="text-center mt-12">
           <.link
             navigate={~p"/users/register"}
-            class="inline-flex items-center px-8 py-4 text-lg font-bold text-blue-600 bg-white rounded-lg hover:bg-blue-50 transition duration-300 shadow-lg hover:shadow-xl"
+            class="inline-flex items-center px-8 py-4 text-lg font-bold text-blue-600 bg-white rounded-md hover:bg-blue-50 transition-colors duration-150"
           >
             Check Eligibility & Apply
             <.icon name="hero-arrow-right" class="ml-2 w-5 h-5" />
@@ -1075,7 +1075,7 @@ defmodule YscWeb.HomeLive do
                     name="email"
                     autocomplete="email"
                     value={@newsletter_email}
-                    class="w-full px-4 py-3 border border-zinc-300 rounded-lg text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    class="w-full px-4 py-3 border border-zinc-300 rounded text-zinc-900 focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                     placeholder="Email address"
                     required
                     disabled={@newsletter_submitted}
@@ -1158,9 +1158,9 @@ defmodule YscWeb.HomeLive do
               </div>
 
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-blue-900 leading-none sm:leading-6">
+                <p class="text-sm font-semibold text-blue-900 leading-none sm:leading-6">
                   Sign in faster with Passkeys
-                </h3>
+                </p>
                 <p class="mt-1 text-sm text-blue-800/80 leading-snug max-w-xl">
                   Use FaceID, TouchID, or your device passcode instead of a password.
                 </p>
@@ -1177,7 +1177,7 @@ defmodule YscWeb.HomeLive do
 
               <button
                 phx-click="dismiss_passkey_prompt"
-                class="hidden md:block whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                class="hidden md:block whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
               >
                 Maybe later
               </button>
@@ -1239,55 +1239,55 @@ defmodule YscWeb.HomeLive do
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0">
           <.link
             navigate={~p"/bookings/tahoe"}
-            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-blue-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
+            class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
           >
-            <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div class="w-10 h-10 bg-blue-50 rounded-md flex items-center justify-center mb-4">
               <.icon name="hero-home" class="w-5 h-5 text-blue-600" />
             </div>
             <p class="font-bold text-zinc-900">Lake Tahoe</p>
-            <p class="text-xs text-zinc-500">Reserve Cabin</p>
+            <p class="text-sm text-zinc-500">Reserve Cabin</p>
           </.link>
           <.link
             navigate={~p"/bookings/clear-lake"}
-            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-emerald-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
+            class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
           >
-            <div class="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div class="w-10 h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-4">
               <.icon name="hero-home" class="w-5 h-5 text-emerald-600" />
             </div>
             <p class="font-bold text-zinc-900">Clear Lake</p>
-            <p class="text-xs text-zinc-500">Reserve Cabin</p>
+            <p class="text-sm text-zinc-500">Reserve Cabin</p>
           </.link>
           <.link
             navigate={~p"/users/settings"}
-            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-zinc-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
+            class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
           >
-            <div class="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div class="w-10 h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-4">
               <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-zinc-600" />
             </div>
             <p class="font-bold text-zinc-900">Settings</p>
-            <p class="text-xs text-zinc-500">Preferences</p>
+            <p class="text-sm text-zinc-500">Preferences</p>
           </.link>
           <%= if @current_user && @current_user.role == :admin do %>
             <.link
               navigate={~p"/expensereport"}
-              class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-orange-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
+              class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div class="w-10 h-10 bg-orange-50 rounded-md flex items-center justify-center mb-4">
                 <.icon name="hero-receipt-refund" class="w-5 h-5 text-orange-600" />
               </div>
               <p class="font-bold text-zinc-900">Expenses</p>
-              <p class="text-xs text-zinc-500">File Report</p>
+              <p class="text-sm text-zinc-500">File Report</p>
             </.link>
           <% else %>
             <.link
               navigate={~p"/events"}
-              class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 hover:border-purple-500 hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
+              class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div class="w-10 h-10 bg-purple-50 rounded-md flex items-center justify-center mb-4">
                 <.icon name="hero-calendar-days" class="w-5 h-5 text-purple-600" />
               </div>
               <p class="font-bold text-zinc-900">Events</p>
-              <p class="text-xs text-zinc-500">Browse Events</p>
+              <p class="text-sm text-zinc-500">Browse Events</p>
             </.link>
           <% end %>
         </div>
@@ -1298,9 +1298,9 @@ defmodule YscWeb.HomeLive do
             <%!-- Your Itinerary Section --%>
             <section>
               <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
                   <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
-                </h3>
+                </h2>
                 <.link
                   navigate={~p"/users/payments"}
                   class="text-xs font-bold text-blue-600 hover:underline"
@@ -1312,7 +1312,7 @@ defmodule YscWeb.HomeLive do
               <%!-- Loading skeleton for bookings --%>
               <div
                 :if={!@async_data_loaded}
-                class="bg-white rounded-lg shadow-sm border border-zinc-200 p-6 animate-pulse"
+                class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 animate-pulse"
               >
                 <div class="flex gap-4">
                   <div class="w-24 h-20 bg-zinc-200 rounded"></div>
@@ -1326,7 +1326,7 @@ defmodule YscWeb.HomeLive do
 
               <div
                 :if={@async_data_loaded && Enum.empty?(@future_bookings)}
-                class="bg-white rounded-lg shadow-sm border border-zinc-200 p-12 text-center"
+                class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
               >
                 <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
@@ -1340,13 +1340,13 @@ defmodule YscWeb.HomeLive do
                 <div class="flex flex-col sm:flex-row gap-3 justify-center">
                   <.link
                     navigate={~p"/bookings/tahoe"}
-                    class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors"
+                    class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded transition-colors"
                   >
                     Book Lake Tahoe
                   </.link>
                   <.link
                     navigate={~p"/bookings/clear-lake"}
-                    class="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors"
+                    class="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded transition-colors"
                   >
                     Book Clear Lake
                   </.link>
@@ -1364,7 +1364,7 @@ defmodule YscWeb.HomeLive do
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
                     class={[
-                      "relative bg-white rounded-lg overflow-hidden flex flex-col md:flex-row transition-all duration-300 group hover:-translate-y-1 shadow-sm hover:shadow-md border border-zinc-200",
+                      "relative bg-white rounded-xl overflow-hidden flex flex-col md:flex-row transition-colors duration-200 group border border-zinc-200 hover:border-zinc-300",
                       if is_active do
                         if booking.property == :tahoe do
                           "ring-1 ring-blue-500/10"
@@ -1439,7 +1439,7 @@ defmodule YscWeb.HomeLive do
                         <% end %>
                       </div>
                       <div class="flex justify-end">
-                        <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded-lg group-hover:bg-blue-600 transition-colors shadow-sm group-hover:shadow-blue-200">
+                        <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded group-hover:bg-blue-600 transition-colors duration-150">
                           View Details
                         </span>
                       </div>
@@ -1452,10 +1452,10 @@ defmodule YscWeb.HomeLive do
             <%!-- Event Tickets Section --%>
             <section>
               <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
                   <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
                   Event Tickets
-                </h3>
+                </h2>
                 <.link
                   navigate={~p"/events"}
                   class="text-xs font-bold text-blue-600 hover:underline"
@@ -1469,7 +1469,7 @@ defmodule YscWeb.HomeLive do
                 :if={!@async_data_loaded}
                 class="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
-                <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-lg p-8 animate-pulse">
+                <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8 animate-pulse">
                   <div class="flex justify-between items-start mb-4">
                     <div class="w-16 h-5 bg-zinc-200 rounded"></div>
                     <div class="w-8 h-8 bg-zinc-200 rounded"></div>
@@ -1482,7 +1482,7 @@ defmodule YscWeb.HomeLive do
 
               <div
                 :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
-                class="bg-white border-2 border-dashed border-zinc-200 rounded-lg shadow-sm p-12 text-center"
+                class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center"
               >
                 <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
@@ -1495,7 +1495,7 @@ defmodule YscWeb.HomeLive do
                 </p>
                 <.link
                   navigate={~p"/events"}
-                  class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded-lg transition-colors"
+                  class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded transition-colors"
                 >
                   Browse Events
                 </.link>
@@ -1515,7 +1515,7 @@ defmodule YscWeb.HomeLive do
                       _ ->
                         nil
                     end %>
-                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-lg p-8 hover:shadow-md transition-all">
+                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
                     <div class="flex justify-between items-start mb-4">
                       <span class={[
                         "px-2 py-1 text-xs font-bold rounded",
@@ -1535,9 +1535,9 @@ defmodule YscWeb.HomeLive do
                       <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                     </div>
                     <.link navigate={~p"/events/#{event.id}"} class="block group">
-                      <h4 class="font-black text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
+                      <h3 class="font-black text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
                         {event.title}
-                      </h4>
+                      </h3>
                     </.link>
                     <p class="text-xs text-zinc-500 flex items-center gap-1 mb-4">
                       <.icon name="hero-calendar" class="w-3 h-3" />
@@ -1579,7 +1579,7 @@ defmodule YscWeb.HomeLive do
           <aside class="space-y-10">
             <%!-- Membership Status Card --%>
             <div class={[
-              "relative overflow-hidden rounded-lg p-8 text-white shadow-sm",
+              "relative overflow-hidden rounded-xl p-8 text-white shadow-sm",
               if @active_membership? do
                 "bg-zinc-900"
               else
@@ -1606,7 +1606,7 @@ defmodule YscWeb.HomeLive do
 
               <div class="relative z-10">
                 <div class={[
-                  "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg backdrop-blur-md",
+                  "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md backdrop-blur-md",
                   if @active_membership? do
                     "bg-white/10"
                   else
@@ -1626,11 +1626,11 @@ defmodule YscWeb.HomeLive do
                   />
                 </div>
 
-                <h3 class="text-2xl font-black tracking-tight mb-2">
+                <h2 class="text-2xl font-black tracking-tight mb-2">
                   {YscWeb.UserAuth.get_membership_plan_display_name(
                     @current_membership
                   )}
-                </h3>
+                </h2>
                 <p class={[
                   "text-sm leading-relaxed mb-8",
                   if @active_membership? do
@@ -1660,7 +1660,7 @@ defmodule YscWeb.HomeLive do
                 <.link
                   navigate={~p"/users/membership"}
                   class={[
-                    "flex w-full items-center justify-center rounded-lg px-6 py-4 text-sm font-black transition-all hover:scale-[1.02] active:scale-[0.98]",
+                    "flex w-full items-center justify-center rounded-md px-6 py-4 text-sm font-black transition-colors duration-150",
                     if @active_membership? do
                       "bg-white text-zinc-900 hover:bg-blue-50"
                     else
@@ -1687,10 +1687,10 @@ defmodule YscWeb.HomeLive do
 
             <%!-- Your Family Section (family/lifetime members with linked users) --%>
             <section :if={@async_data_loaded && @other_family_members != []}>
-              <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+              <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
                 Your Family
-              </h3>
-              <div class="rounded-lg border border-zinc-200 bg-white p-4 space-y-3">
+              </h2>
+              <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
                 <%= for member <- @other_family_members do %>
                   <div class="flex items-center justify-between text-sm">
                     <span class="text-zinc-900 font-medium">
@@ -1703,7 +1703,7 @@ defmodule YscWeb.HomeLive do
                 <% end %>
                 <.link
                   navigate={~p"/users/settings/family"}
-                  class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
+                  class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
                 >
                   Manage family
                   <.icon name="hero-arrow-right" class="w-3.5 h-3.5" />
@@ -1713,16 +1713,16 @@ defmodule YscWeb.HomeLive do
 
             <%!-- Latest Updates Section --%>
             <section>
-              <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+              <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
                 Latest Updates
-              </h3>
+              </h2>
               <div class="space-y-6">
                 <%= for post <- Enum.take(@latest_news, 3) do %>
                   <.link
                     navigate={~p"/posts/#{post.url_name}"}
                     class="flex gap-4 group"
                   >
-                    <div class="w-16 h-16 rounded-lg bg-zinc-200 overflow-hidden flex-shrink-0">
+                    <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden flex-shrink-0">
                       <div class="relative w-full h-full">
                         <canvas
                           id={"blur-hash-sidebar-#{post.id}"}
@@ -1736,7 +1736,7 @@ defmodule YscWeb.HomeLive do
                           id={"image-sidebar-#{post.id}"}
                           loading="lazy"
                           phx-hook="BlurHashImage"
-                          class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover group-hover:scale-110 transition-transform"
+                          class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                           alt={
                             if post.featured_image,
                               do:
@@ -1753,9 +1753,9 @@ defmodule YscWeb.HomeLive do
                       <p class="text-xs font-bold text-blue-600 mb-1">
                         {format_post_date(post.published_on)}
                       </p>
-                      <h4 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
+                      <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
                         {post.title}
-                      </h4>
+                      </h3>
                       <p class="text-xs text-zinc-500 line-clamp-1">
                         {preview_text_plain(post)}
                       </p>
@@ -1772,10 +1772,10 @@ defmodule YscWeb.HomeLive do
           <%!-- Upcoming Events --%>
           <div>
             <div class="flex items-center justify-between mb-6">
-              <h3 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+              <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
                 <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
                 Upcoming Events
-              </h3>
+              </h2>
               <.link
                 navigate={~p"/events"}
                 class="text-xs font-bold text-blue-600 hover:underline"
@@ -1790,7 +1790,7 @@ defmodule YscWeb.HomeLive do
               class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
               <%= for _i <- 1..3 do %>
-                <div class="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
+                <div class="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
                   <div class="h-48 bg-zinc-200"></div>
                   <div class="p-6 space-y-3">
                     <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
@@ -1803,7 +1803,7 @@ defmodule YscWeb.HomeLive do
 
             <div
               :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
-              class="bg-white rounded-lg shadow-sm border border-zinc-200 p-12 text-center"
+              class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
             >
               <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
@@ -1816,7 +1816,7 @@ defmodule YscWeb.HomeLive do
               </p>
               <.link
                 navigate={~p"/events"}
-                class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded-lg transition-colors"
+                class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded transition-colors"
               >
                 Browse Events
               </.link>
