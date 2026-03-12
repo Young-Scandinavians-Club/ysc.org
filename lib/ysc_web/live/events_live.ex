@@ -143,7 +143,7 @@ defmodule YscWeb.EventsLive do
               <div
                 :for={{id, event} <- @streams.past_events}
                 id={id}
-                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 transition-all duration-300 ring-1 ring-zinc-200 hover:ring-zinc-300 bg-white p-1"
+                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-300 ring-1 ring-zinc-200 hover:ring-zinc-300 bg-white p-1"
               >
                 <.link
                   navigate={~p"/events/#{event.id}"}
