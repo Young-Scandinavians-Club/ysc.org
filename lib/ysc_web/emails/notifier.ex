@@ -59,6 +59,7 @@ defmodule YscWeb.Emails.Notifier do
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,
     "event_notification" => YscWeb.Emails.EventNotification,
+    "save_the_date_available" => YscWeb.Emails.SaveTheDateAvailable,
     "expense_report_confirmation" => YscWeb.Emails.ExpenseReportConfirmation,
     "expense_report_treasurer_notification" =>
       YscWeb.Emails.ExpenseReportTreasurerNotification,

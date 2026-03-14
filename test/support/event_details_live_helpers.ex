@@ -226,47 +226,19 @@ defmodule EventDetailsLiveHelpers do
   end
 
   @doc """
-  Waits for LiveView async operation to complete.
+  Waits for LiveView start_async/assign_async tasks to finish, then returns the view.
 
-  Uses render_async/2 to properly wait for start_async/assign_async tasks
-  rather than arbitrary time delays.
+  Use this to wait for async data loading (e.g. after `live/2`) before interacting
+  with elements that depend on async-loaded state.
 
   ## Examples
 
       wait_for_async(view)
-      wait_for_async(view, 500)
+      wait_for_async(view, 1000)
   """
   def wait_for_async(view, timeout \\ 200) do
     render_async(view, timeout)
     view
-  end
-
-  @doc """
-  Waits for an element to appear in the view (polls up to timeout ms).
-  Use instead of fixed :timer.sleep when waiting for async content.
-
-  ## Examples
-
-      wait_for_element(view, "[phx-click='increase-ticket-quantity']")
-      wait_for_element(view, "#payment-form", 1000)
-  """
-  def wait_for_element(view, selector, timeout \\ 500) do
-    deadline = System.monotonic_time(:millisecond) + timeout
-    wait_for_element_loop(view, selector, deadline)
-  end
-
-  defp wait_for_element_loop(view, selector, deadline) do
-    if has_element?(view, selector) do
-      view
-    else
-      if System.monotonic_time(:millisecond) > deadline do
-        view
-      else
-        # credo:disable-for-next-line Ysc.Credo.NoSleepInTests
-        :timer.sleep(20)
-        wait_for_element_loop(view, selector, deadline)
-      end
-    end
   end
 
   @doc """

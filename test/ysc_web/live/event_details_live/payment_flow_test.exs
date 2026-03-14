@@ -63,7 +63,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       # Select one ticket
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -97,7 +97,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       # Select 3 tickets
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -127,7 +127,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       # Select ticket
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
@@ -162,7 +162,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -190,7 +190,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -212,7 +212,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
 
@@ -234,7 +234,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -258,7 +258,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -285,7 +285,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -311,7 +311,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -339,7 +339,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{
         "tier-id" => free_tier.id
@@ -376,7 +376,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -403,7 +403,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       # Add 10 tickets
       Enum.each(1..10, fn _ ->
@@ -431,7 +431,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
@@ -450,7 +450,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       result = render_click(view, "close-payment-modal")
       assert is_binary(result)
@@ -462,7 +462,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       result = render_click(view, "close-order-completion")
       assert is_binary(result)
@@ -474,7 +474,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
       view =
-        wait_for_element(view, "[phx-click='increase-ticket-quantity']", 500)
+        wait_for_async(view)
 
       result = render_click(view, "checkout-expired")
       assert is_binary(result)

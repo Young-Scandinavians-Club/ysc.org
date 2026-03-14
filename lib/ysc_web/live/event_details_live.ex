@@ -703,6 +703,36 @@ defmodule YscWeb.EventDetailsLive do
                             <p class="text-xs text-blue-700 mt-1">
                               Check back for pricing and availability.
                             </p>
+                            <%= if @current_user == nil do %>
+                              <.link
+                                navigate={
+                                  ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
+                                }
+                                class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 underline underline-offset-2"
+                              >
+                                Sign in to get notified
+                              </.link>
+                            <% else %>
+                              <%= if @subscribed_to_save_the_date do %>
+                                <div class="mt-3 inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-green-100 border border-green-300 text-xs font-semibold text-green-800">
+                                  <.icon name="hero-check-circle" class="w-4 h-4" />
+                                  You'll be notified when tickets open
+                                </div>
+                                <button
+                                  phx-click="unsubscribe-save-the-date"
+                                  class="mt-1.5 text-xs text-blue-600 underline underline-offset-2"
+                                >
+                                  Remove notification
+                                </button>
+                              <% else %>
+                                <button
+                                  phx-click="subscribe-save-the-date"
+                                  class="mt-3 w-full px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                >
+                                  Notify me when tickets open
+                                </button>
+                              <% end %>
+                            <% end %>
                           </div>
                         <% else %>
                           <%!-- Loading skeleton for availability --%>
@@ -1058,6 +1088,33 @@ defmodule YscWeb.EventDetailsLive do
                             <span class="text-xs font-black text-green-700 uppercase tracking-widest">
                               No registration required
                             </span>
+                          <% else %>
+                            <%= if @current_user == nil do %>
+                              <.link
+                                navigate={
+                                  ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
+                                }
+                                class="flex-shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 underline underline-offset-2"
+                              >
+                                Sign in to get notified
+                              </.link>
+                            <% else %>
+                              <%= if @subscribed_to_save_the_date do %>
+                                <div class="flex items-center gap-1.5 text-xs font-semibold text-green-800 bg-green-100 border border-green-300 rounded-lg px-3 py-2">
+                                  <.icon
+                                    name="hero-check-circle"
+                                    class="w-4 h-4 flex-shrink-0"
+                                  /> You'll be notified
+                                </div>
+                              <% else %>
+                                <button
+                                  phx-click="subscribe-save-the-date"
+                                  class="flex-shrink-0 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                                >
+                                  Notify me when tickets open
+                                </button>
+                              <% end %>
+                            <% end %>
                           <% end %>
                         <% end %>
                       <% end %>
@@ -3252,6 +3309,15 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:reservations_by_tier, %{})
     # Track async loading state
     |> assign(:async_data_loaded, false)
+    # Save-the-date notification subscription state
+    |> assign(
+      :subscribed_to_save_the_date,
+      Events.subscribed_to_event_notification?(
+        event_with_pricing,
+        socket.assigns[:current_user] && socket.assigns.current_user.id,
+        "save_the_date"
+      )
+    )
   end
 
   # Load expensive data asynchronously after WebSocket connection
@@ -4090,7 +4156,18 @@ defmodule YscWeb.EventDetailsLive do
     if event.id == socket.assigns.event.id do
       event = Repo.preload(event, :ticket_tiers)
       event_with_pricing = add_pricing_info(event)
-      {:noreply, assign(socket, :event, event_with_pricing)}
+
+      subscribed =
+        Events.subscribed_to_event_notification?(
+          event_with_pricing,
+          socket.assigns[:current_user] && socket.assigns.current_user.id,
+          "save_the_date"
+        )
+
+      {:noreply,
+       socket
+       |> assign(:event, event_with_pricing)
+       |> assign(:subscribed_to_save_the_date, subscribed)}
     else
       {:noreply, socket}
     end
@@ -4739,6 +4816,45 @@ defmodule YscWeb.EventDetailsLive do
   @impl true
   def handle_event("login-redirect", _params, socket) do
     {:noreply, socket |> redirect(to: ~p"/users/log-in")}
+  end
+
+  @impl true
+  def handle_event("subscribe-save-the-date", _params, socket) do
+    case socket.assigns.current_user do
+      nil ->
+        {:noreply,
+         socket
+         |> redirect(
+           to:
+             ~p"/users/log-in?redirect_to=#{~p"/events/#{socket.assigns.event.id}"}"
+         )}
+
+      user ->
+        Events.subscribe_to_event_notification(
+          socket.assigns.event,
+          user.id,
+          "save_the_date"
+        )
+
+        {:noreply, assign(socket, :subscribed_to_save_the_date, true)}
+    end
+  end
+
+  @impl true
+  def handle_event("unsubscribe-save-the-date", _params, socket) do
+    case socket.assigns.current_user do
+      nil ->
+        {:noreply, socket}
+
+      user ->
+        Events.unsubscribe_from_event_notification(
+          socket.assigns.event,
+          user.id,
+          "save_the_date"
+        )
+
+        {:noreply, assign(socket, :subscribed_to_save_the_date, false)}
+    end
   end
 
   @impl true

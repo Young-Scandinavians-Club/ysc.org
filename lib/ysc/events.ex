@@ -16,6 +16,7 @@ defmodule Ysc.Events do
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketReservation
+  alias Ysc.Events.EventNotificationSubscription
 
   def subscribe() do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic())
@@ -1054,14 +1055,22 @@ defmodule Ysc.Events do
   @doc """
   Set or clear the tickets_tbd flag on an event.
   When true, the event shows "Tickets Coming Soon" until the first tier is added.
+  When cleared (false), schedules save-the-date notifications for all subscribers.
   """
   def set_tickets_tbd(%Event{} = event, tbd \\ true) do
+    was_tbd = event.tickets_tbd
+
     event
     |> Event.changeset(%{tickets_tbd: tbd})
     |> Repo.update()
     |> case do
       {:ok, updated_event} ->
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: updated_event})
+
+        if was_tbd and not tbd do
+          schedule_save_the_date_notifications(updated_event)
+        end
+
         {:ok, updated_event}
 
       {:error, changeset} ->
@@ -1744,6 +1753,115 @@ defmodule Ysc.Events do
     |> case do
       nil -> 0
       count -> count
+    end
+  end
+
+  @doc """
+  Subscribe a user to a notification type for an event.
+  Safe to call multiple times — duplicate subscriptions are silently ignored.
+  """
+  def subscribe_to_event_notification(
+        %Event{} = event,
+        user_id,
+        notification_type
+      ) do
+    %EventNotificationSubscription{}
+    |> EventNotificationSubscription.changeset(%{
+      event_id: event.id,
+      user_id: user_id,
+      notification_type: notification_type
+    })
+    |> Repo.insert(
+      on_conflict: :nothing,
+      conflict_target: [:event_id, :user_id, :notification_type]
+    )
+  end
+
+  @doc """
+  Unsubscribe a user from a notification type for an event.
+  """
+  def unsubscribe_from_event_notification(
+        %Event{} = event,
+        user_id,
+        notification_type
+      ) do
+    from(s in EventNotificationSubscription,
+      where: s.event_id == ^event.id,
+      where: s.user_id == ^user_id,
+      where: s.notification_type == ^notification_type
+    )
+    |> Repo.delete_all()
+
+    :ok
+  end
+
+  @doc """
+  Check if a user is subscribed to a notification type for an event.
+  Returns false if user_id is nil.
+  """
+  def subscribed_to_event_notification?(_event, nil, _notification_type),
+    do: false
+
+  def subscribed_to_event_notification?(
+        %Event{} = event,
+        user_id,
+        notification_type
+      ) do
+    from(s in EventNotificationSubscription,
+      where: s.event_id == ^event.id,
+      where: s.user_id == ^user_id,
+      where: s.notification_type == ^notification_type
+    )
+    |> Repo.exists?()
+  end
+
+  @doc """
+  Get all users subscribed to a notification type for an event.
+  """
+  def get_event_notification_subscribers(event_id, notification_type) do
+    from(s in EventNotificationSubscription,
+      join: u in assoc(s, :user),
+      where: s.event_id == ^event_id,
+      where: s.notification_type == ^notification_type,
+      select: u
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Delete all subscriptions for an event and notification type.
+  Called after notifications have been sent.
+  """
+  def delete_event_notification_subscriptions(event_id, notification_type) do
+    from(s in EventNotificationSubscription,
+      where: s.event_id == ^event_id,
+      where: s.notification_type == ^notification_type
+    )
+    |> Repo.delete_all()
+
+    :ok
+  end
+
+  defp schedule_save_the_date_notifications(%Event{} = event) do
+    require Ysc.Logging
+    scheduled_at = DateTime.add(DateTime.utc_now(), 3600, :second)
+
+    case %{"event_id" => event.id}
+         |> YscWeb.Workers.SaveTheDateNotificationWorker.new(
+           scheduled_at: scheduled_at
+         )
+         |> Oban.insert() do
+      {:ok, job} ->
+        Ysc.Logging.info("Scheduled save-the-date notifications",
+          event_id: event.id,
+          scheduled_at: job.scheduled_at
+        )
+
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to schedule save-the-date notifications",
+          event_id: event.id,
+          error: inspect(reason)
+        )
     end
   end
 
