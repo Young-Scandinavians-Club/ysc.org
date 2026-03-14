@@ -84,6 +84,24 @@ defmodule YscWeb.ConductViolationReportLive do
                 <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
               </.link>
             </p>
+
+            <%!-- Board member conflict notice --%>
+            <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-left max-w-xl mx-auto">
+              <div class="flex gap-3">
+                <.icon
+                  name="hero-exclamation-triangle"
+                  class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"
+                />
+                <div>
+                  <p class="text-sm font-semibold text-amber-900 mb-1">
+                    Is your report about a board member?
+                  </p>
+                  <p class="text-sm text-amber-800">
+                    Since reports are reviewed by the board, if your violation involves a current board member, we recommend reaching out directly to another board member you trust, or contacting the club president through a private channel to ensure your report is handled impartially.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <%!-- Form Card --%>
