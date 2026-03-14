@@ -1372,4 +1372,344 @@ defmodule Ysc.EventsTest do
       assert event.description =~ "Brewery Crawl"
     end
   end
+
+  describe "event notification subscriptions" do
+    test "subscribe_to_event_notification/3 creates a subscription", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert {:ok, sub} =
+               Events.subscribe_to_event_notification(
+                 event,
+                 user.id,
+                 "save_the_date"
+               )
+
+      assert sub.event_id == event.id
+      assert sub.user_id == user.id
+      assert sub.notification_type == "save_the_date"
+    end
+
+    test "subscribe_to_event_notification/3 is idempotent (no error on duplicate)",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert {:ok, _} =
+               Events.subscribe_to_event_notification(
+                 event,
+                 user.id,
+                 "save_the_date"
+               )
+
+      assert {:ok, _} =
+               Events.subscribe_to_event_notification(
+                 event,
+                 user.id,
+                 "save_the_date"
+               )
+    end
+
+    test "subscribed_to_event_notification?/3 returns true when subscribed", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      assert Events.subscribed_to_event_notification?(
+               event,
+               user.id,
+               "save_the_date"
+             ) == true
+    end
+
+    test "subscribed_to_event_notification?/3 returns false when not subscribed",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert Events.subscribed_to_event_notification?(
+               event,
+               user.id,
+               "save_the_date"
+             ) == false
+    end
+
+    test "subscribed_to_event_notification?/3 returns false for nil user_id", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert Events.subscribed_to_event_notification?(
+               event,
+               nil,
+               "save_the_date"
+             ) == false
+    end
+
+    test "unsubscribe_from_event_notification/3 removes the subscription", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      assert Events.subscribed_to_event_notification?(
+               event,
+               user.id,
+               "save_the_date"
+             ) == true
+
+      Events.unsubscribe_from_event_notification(
+        event,
+        user.id,
+        "save_the_date"
+      )
+
+      assert Events.subscribed_to_event_notification?(
+               event,
+               user.id,
+               "save_the_date"
+             ) == false
+    end
+
+    test "unsubscribe_from_event_notification/3 is safe when no subscription exists",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      assert :ok =
+               Events.unsubscribe_from_event_notification(
+                 event,
+                 user.id,
+                 "save_the_date"
+               )
+    end
+
+    test "get_event_notification_subscribers/2 returns subscribed users", %{
+      user: user
+    } do
+      other_user = user_fixture()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      Events.subscribe_to_event_notification(
+        event,
+        other_user.id,
+        "save_the_date"
+      )
+
+      subscribers =
+        Events.get_event_notification_subscribers(event.id, "save_the_date")
+
+      subscriber_ids = Enum.map(subscribers, & &1.id)
+
+      assert length(subscribers) == 2
+      assert user.id in subscriber_ids
+      assert other_user.id in subscriber_ids
+    end
+
+    test "get_event_notification_subscribers/2 returns only subscribers for the given type",
+         %{
+           user: user
+         } do
+      other_user = user_fixture()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      # other_user does NOT subscribe
+      _ = other_user
+
+      subscribers =
+        Events.get_event_notification_subscribers(event.id, "save_the_date")
+
+      assert length(subscribers) == 1
+      assert hd(subscribers).id == user.id
+    end
+
+    test "delete_event_notification_subscriptions/2 removes all subscriptions for an event + type",
+         %{user: user} do
+      other_user = user_fixture()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      Events.subscribe_to_event_notification(
+        event,
+        other_user.id,
+        "save_the_date"
+      )
+
+      Events.delete_event_notification_subscriptions(event.id, "save_the_date")
+
+      assert Events.get_event_notification_subscribers(
+               event.id,
+               "save_the_date"
+             ) == []
+    end
+
+    test "set_tickets_tbd/2 schedules save-the-date worker when clearing tbd flag",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      {:ok, updated} = Events.set_tickets_tbd(event, false)
+      assert updated.tickets_tbd == false
+
+      # With Oban :inline mode the worker runs immediately, which deletes subscriptions
+      assert Events.get_event_notification_subscribers(
+               event.id,
+               "save_the_date"
+             ) == []
+    end
+
+    test "set_tickets_tbd/2 does not schedule worker when setting tbd flag to true",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+      {:ok, _} = Events.set_tickets_tbd(event, true)
+
+      # Subscriptions should be untouched — worker was not triggered
+      assert length(
+               Events.get_event_notification_subscribers(
+                 event.id,
+                 "save_the_date"
+               )
+             ) == 1
+    end
+
+    test "set_tickets_tbd/2 does not schedule worker when flag was already false",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "No-op Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      Events.subscribe_to_event_notification(event, user.id, "save_the_date")
+
+      assert event.tickets_tbd == false
+      {:ok, _} = Events.set_tickets_tbd(event, false)
+
+      # Subscriptions untouched — no transition occurred
+      assert length(
+               Events.get_event_notification_subscribers(
+                 event.id,
+                 "save_the_date"
+               )
+             ) == 1
+    end
+  end
 end
