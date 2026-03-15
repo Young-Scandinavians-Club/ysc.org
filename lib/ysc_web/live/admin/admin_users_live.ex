@@ -468,6 +468,7 @@ defmodule YscWeb.AdminUsersLive do
                 class="flex gap-1 mt-1 text-sm leading-6"
                 href={@file_export_path}
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 <.icon
                   name="hero-document-check"
@@ -476,6 +477,7 @@ defmodule YscWeb.AdminUsersLive do
                 <span
                   href={@file_export_path}
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="text-blue-800 hover:underline"
                 >
                   Download file

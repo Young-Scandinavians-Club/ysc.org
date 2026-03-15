@@ -3242,6 +3242,7 @@ defmodule YscWeb.AdminMoneyLive do
                         <a
                           href={ExpenseReports.receipt_url(item.receipt_s3_path)}
                           target="_blank"
+                          rel="noopener noreferrer"
                           class="text-blue-600 hover:text-blue-800 text-xs"
                         >
                           View Receipt
@@ -3300,6 +3301,7 @@ defmodule YscWeb.AdminMoneyLive do
                         <a
                           href={ExpenseReports.receipt_url(item.proof_s3_path)}
                           target="_blank"
+                          rel="noopener noreferrer"
                           class="text-blue-600 hover:text-blue-800 text-xs"
                         >
                           View Proof
