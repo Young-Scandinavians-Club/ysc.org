@@ -133,6 +133,13 @@ defmodule YscWeb.EventsLiveTest do
       assert html =~ ~p"/contact"
     end
 
+    test "contact link pre-fills Events subject and message", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/events")
+
+      assert html =~ "subject=Events"
+      assert html =~ "message="
+    end
+
     test "has link to news page", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/events")
 
@@ -396,6 +403,29 @@ defmodule YscWeb.EventsLiveTest do
       html = render(view)
       assert html =~ "Events"
       assert html =~ "Upcoming Events"
+    end
+  end
+
+  describe "community chat links" do
+    test "shows WhatsApp link for authenticated users", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/events")
+
+      assert html =~ "chat.whatsapp.com"
+    end
+
+    test "does not show WhatsApp link for unauthenticated users", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/events")
+
+      refute html =~ "chat.whatsapp.com"
+    end
+
+    test "shows Discord link", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/events")
+
+      assert html =~ "discord.gg"
     end
   end
 end

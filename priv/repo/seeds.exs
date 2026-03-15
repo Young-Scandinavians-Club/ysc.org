@@ -44,6 +44,15 @@ Repo.insert!(
   on_conflict: :nothing
 )
 
+Repo.insert!(
+  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
+    group: "socials",
+    name: "whatsapp",
+    value: "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
+  }),
+  on_conflict: :nothing
+)
+
 first_names = [
   "Karl",
   "Erik",

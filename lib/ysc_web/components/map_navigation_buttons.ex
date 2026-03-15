@@ -95,6 +95,7 @@ defmodule YscWeb.Components.MapNavigationButtons do
     <a
       href={@href}
       target="_blank"
+      rel="noopener noreferrer"
       class="group hover:blue-600 hover:fill-blue-600 transition ease-in-out duration-200"
       aria-label={@label}
     >
