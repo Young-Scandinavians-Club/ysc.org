@@ -105,7 +105,7 @@ defmodule YscWeb.Router do
   end
 
   scope "/", YscWeb do
-    pipe_through [:browser, :mount_site_settings]
+    pipe_through [:browser]
 
     get "/history", PageController, :history
     get "/board", PageController, :board

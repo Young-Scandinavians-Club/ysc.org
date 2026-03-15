@@ -80,9 +80,9 @@ defmodule YscWeb.Api.BookingsController do
     - property: "tahoe" or "clear_lake" (optional, defaults to "tahoe")
   """
   def lookup(conn, params) do
-    last_name = Map.get(params, "last_name", "")
+    last_name = String.trim(Map.get(params, "last_name", ""))
 
-    if String.trim(last_name) == "" do
+    if last_name == "" do
       conn
       |> put_status(:unprocessable_entity)
       |> json(%{error: "last_name is required"})

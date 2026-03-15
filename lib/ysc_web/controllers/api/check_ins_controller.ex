@@ -11,10 +11,13 @@ defmodule YscWeb.Api.CheckInsController do
 
   action_fallback YscWeb.Api.FallbackController
 
+  @valid_properties ~w(tahoe clear_lake)
+
   @doc """
   Perform check-in for one or more bookings.
 
   Request body (JSON):
+    - property: "tahoe" or "clear_lake" (required)
     - booking_ids: list of booking IDs or reference IDs (required)
     - rules_agreed: boolean (required, must be true)
     - vehicles: list of vehicle objects (optional)
@@ -22,6 +25,7 @@ defmodule YscWeb.Api.CheckInsController do
 
   Example:
     {
+      "property": "tahoe",
       "booking_ids": ["BK-ABC123"],
       "rules_agreed": true,
       "vehicles": [
@@ -30,9 +34,10 @@ defmodule YscWeb.Api.CheckInsController do
     }
   """
   def create(conn, params) do
-    with {:ok, booking_ids} <- extract_booking_ids(params),
+    with {:ok, property} <- extract_property(params),
+         {:ok, booking_ids} <- extract_booking_ids(params),
          {:ok, rules_agreed} <- extract_rules_agreed(params),
-         {:ok, bookings} <- resolve_bookings(booking_ids),
+         {:ok, bookings} <- resolve_bookings(booking_ids, property),
          vehicles = extract_vehicles(params),
          attrs = %{
            rules_agreed: rules_agreed,
@@ -46,9 +51,26 @@ defmodule YscWeb.Api.CheckInsController do
     end
   end
 
+  defp extract_property(%{"property" => property})
+       when property in @valid_properties do
+    {:ok, String.to_existing_atom(property)}
+  end
+
+  defp extract_property(%{"property" => _}) do
+    {:error, "invalid property. Use 'tahoe' or 'clear_lake'"}
+  end
+
+  defp extract_property(_params) do
+    {:error, "property is required. Use 'tahoe' or 'clear_lake'"}
+  end
+
   defp extract_booking_ids(%{"booking_ids" => ids})
        when is_list(ids) and ids != [] do
-    {:ok, ids}
+    if Enum.all?(ids, &(is_binary(&1) or is_integer(&1))) do
+      {:ok, ids}
+    else
+      {:error, "each booking_id must be a string or integer"}
+    end
   end
 
   defp extract_booking_ids(%{"booking_ids" => _}) do
@@ -69,14 +91,16 @@ defmodule YscWeb.Api.CheckInsController do
     {:error, "rules_agreed is required and must be true"}
   end
 
-  defp resolve_bookings(ids) do
+  defp resolve_bookings(ids, property) do
     bookings =
       Enum.reduce_while(ids, [], fn id, acc ->
+        id_str = to_string(id)
+
         booking =
-          case Bookings.get_booking_by_reference_id(to_string(id)) do
+          case Bookings.get_booking_by_reference_id(id_str) do
             nil ->
               try do
-                Bookings.get_booking!(to_string(id))
+                Bookings.get_booking!(id_str)
               rescue
                 Ecto.NoResultsError -> nil
               end
@@ -85,10 +109,17 @@ defmodule YscWeb.Api.CheckInsController do
               b
           end
 
-        if is_nil(booking) do
-          {:halt, {:error, "booking not found: #{id}"}}
-        else
-          {:cont, [booking | acc]}
+        cond do
+          is_nil(booking) ->
+            {:halt, {:error, "booking not found: #{id_str}"}}
+
+          booking.property != property ->
+            {:halt,
+             {:error,
+              "booking #{id_str} belongs to property '#{booking.property}', not '#{property}'"}}
+
+          true ->
+            {:cont, [booking | acc]}
         end
       end)
 
@@ -99,13 +130,17 @@ defmodule YscWeb.Api.CheckInsController do
   end
 
   defp extract_vehicles(%{"vehicles" => vehicles}) when is_list(vehicles) do
-    Enum.map(vehicles, fn v ->
-      %{
-        "type" => Map.get(v, "type", ""),
-        "color" => Map.get(v, "color", ""),
-        "make" => Map.get(v, "make", "")
-      }
-    end)
+    if Enum.all?(vehicles, &is_map/1) do
+      Enum.map(vehicles, fn v ->
+        %{
+          "type" => Map.get(v, "type", ""),
+          "color" => Map.get(v, "color", ""),
+          "make" => Map.get(v, "make", "")
+        }
+      end)
+    else
+      []
+    end
   end
 
   defp extract_vehicles(_params), do: []
