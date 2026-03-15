@@ -250,18 +250,24 @@ defmodule YscWeb.ContactLive do
     current_user = socket.assigns[:current_user]
 
     base_params = starting_params(current_user)
-    # Pre-fill subject from query parameter if provided
-    params_with_subject =
-      if subject = params["subject"] do
-        Map.put(base_params, :subject, subject)
-      else
-        base_params
-      end
+
+    prefilled_params =
+      base_params
+      |> then(fn p ->
+        if subject = params["subject"],
+          do: Map.put(p, :subject, subject),
+          else: p
+      end)
+      |> then(fn p ->
+        if message = params["message"],
+          do: Map.put(p, :message, message),
+          else: p
+      end)
 
     changeset =
       Ysc.Forms.ContactForm.changeset(
         %Ysc.Forms.ContactForm{},
-        params_with_subject
+        prefilled_params
       )
 
     {:ok,
