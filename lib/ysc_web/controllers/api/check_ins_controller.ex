@@ -11,8 +11,6 @@ defmodule YscWeb.Api.CheckInsController do
 
   action_fallback YscWeb.Api.FallbackController
 
-  @valid_properties ~w(tahoe clear_lake)
-
   @doc """
   Perform check-in for one or more bookings.
 
@@ -51,10 +49,8 @@ defmodule YscWeb.Api.CheckInsController do
     end
   end
 
-  defp extract_property(%{"property" => property})
-       when property in @valid_properties do
-    {:ok, String.to_existing_atom(property)}
-  end
+  defp extract_property(%{"property" => "tahoe"}), do: {:ok, :tahoe}
+  defp extract_property(%{"property" => "clear_lake"}), do: {:ok, :clear_lake}
 
   defp extract_property(%{"property" => _}) do
     {:error, "invalid property. Use 'tahoe' or 'clear_lake'"}

@@ -9,9 +9,9 @@ defmodule YscWeb.Api.PropertiesJSON do
         property: property,
         name: static_info.name,
         check_in_time:
-          Map.get(settings, "check_in_time", static_info.check_in_time),
+          Map.get(settings, "check_in_time") || static_info.check_in_time,
         check_out_time:
-          Map.get(settings, "check_out_time", static_info.check_out_time),
+          Map.get(settings, "check_out_time") || static_info.check_out_time,
         check_in_instructions: Map.get(settings, "check_in_instructions"),
         check_out_instructions: Map.get(settings, "check_out_instructions"),
         notices: Map.get(settings, "notices"),
