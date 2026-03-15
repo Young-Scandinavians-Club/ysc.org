@@ -353,6 +353,7 @@ defmodule YscWeb.UserRegistrationLive do
                       <.link
                         navigate={~p"/bylaws"}
                         target="_blank"
+                        rel="noopener noreferrer"
                         class="inline-flex items-center gap-1 text-blue-600 hover:underline"
                       >
                         Young Scandinavians Club Bylaws

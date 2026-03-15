@@ -1745,6 +1745,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <a
                           href="https://www.google.com/maps/dir/?api=1&destination=9325+Bass+Road+Kelseyville+CA+95451"
                           target="_blank"
+                          rel="noopener noreferrer"
                           class="inline-flex items-center gap-2 text-teal-600 font-semibold hover:text-teal-800"
                         >
                           <.icon name="hero-map-pin" class="w-4 h-4" /> Open in Maps
@@ -2383,6 +2384,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <.link
                         navigate={~p"/code-of-conduct"}
                         target="_blank"
+                        rel="noopener noreferrer"
                         class="flex items-center justify-between p-5 bg-white border border-zinc-200 rounded-xl font-bold hover:bg-zinc-100 transition-colors"
                       >
                         <span class="flex items-center gap-3">

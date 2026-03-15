@@ -45,6 +45,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 :if={@event.state == :published}
                 href={~p"/events/#{@event.id}"}
                 target="_blank"
+                rel="noopener noreferrer"
                 class="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-blue-700 transition"
               >
                 <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
