@@ -21,12 +21,7 @@ config :ysc, YscWeb.Endpoint,
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [
     ip: {0, 0, 0, 0},
-    port: 4000,
-    protocol_options: [
-      # LiveView Native can generate large query strings (interface metadata).
-      # Raise request-line limit in dev to avoid 414 responses while iterating.
-      max_request_line_length: 64_000
-    ]
+    port: 4000
   ],
   check_origin: false,
   code_reloader: true,
@@ -44,12 +39,10 @@ config :ysc, YscWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg|swiftui\.styles)$",
+      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
       ~r"assets/js/.*(js)$",
       ~r"priv/gettext/.*(po)$",
-      ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$",
-      ~r"lib/ysc_web/(live|components)/.*neex$",
-      ~r"lib/ysc_web/styles/.*(ex|neex|heex)$"
+      ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$"
     ]
   ]
 
@@ -140,13 +133,8 @@ config :ysc,
 # Include HEEx debug annotations as HTML comments in rendered markup
 config :phoenix_live_view, :debug_heex_annotations, true
 
-config :live_view_native_stylesheet,
-  annotations: true,
-  pretty: true
-
-# Native iOS API Key Configuration
-# Default API key for development (can be overridden via NATIVE_API_KEY env var)
-config :ysc, :native_api_key, System.get_env("NATIVE_API_KEY") || "development"
+# Kiosk API key for property kiosk app authentication (can be overridden via env var)
+config :ysc, :kiosk_api_key, System.get_env("KIOSK_API_KEY") || "dev-kiosk-key"
 
 # OAuth Configuration for development
 # Set these via environment variables or use test values

@@ -1,6 +1,5 @@
 defmodule YscWeb.HomeLive do
   use YscWeb, :live_view
-  use YscNative, :live_view
 
   import YscWeb.Live.AsyncHelpers
 
@@ -12,56 +11,43 @@ defmodule YscWeb.HomeLive do
   import Ecto.Query
 
   @impl true
-  def mount(params, session, socket) do
-    if Map.get(params, "_format") == "swiftui" do
-      # SwiftUI/native format - load minimal data synchronously
-      upcoming_events =
-        Events.list_upcoming_events(3)
-        |> Enum.reject(&(&1.state == :cancelled))
+  def mount(_params, session, socket) do
+    user = socket.assigns.current_user
 
-      {:ok,
-       assign(socket,
-         page_title: "Kiosk",
-         upcoming_events: upcoming_events
-       )}
-    else
-      user = socket.assigns.current_user
+    if user do
+      # Logged-in user: use async loading for performance
+      socket = mount_minimal_assigns(socket)
 
-      if user do
-        # Logged-in user: use async loading for performance
-        socket = mount_minimal_assigns(socket)
+      # Check if user just logged in (from session) and should show passkey prompt
+      just_logged_in =
+        Map.get(session, "just_logged_in", false) ||
+          Map.get(session, :just_logged_in, false)
 
-        # Check if user just logged in (from session) and should show passkey prompt
-        just_logged_in =
-          Map.get(session, "just_logged_in", false) ||
-            Map.get(session, :just_logged_in, false)
+      user_with_passkeys = Accounts.get_user!(user.id, [:passkeys])
 
-        user_with_passkeys = Accounts.get_user!(user.id, [:passkeys])
+      show_passkey_prompt =
+        just_logged_in &&
+          Accounts.should_show_passkey_prompt?(user_with_passkeys)
 
-        show_passkey_prompt =
-          just_logged_in &&
-            Accounts.should_show_passkey_prompt?(user_with_passkeys)
+      socket =
+        assign(socket,
+          show_passkey_prompt: show_passkey_prompt,
+          just_logged_in: just_logged_in
+        )
 
-        socket =
-          assign(socket,
-            show_passkey_prompt: show_passkey_prompt,
-            just_logged_in: just_logged_in
-          )
+      # Note: The just_logged_in session flag will persist for this page load
+      # It will be cleared on the next page navigation
 
-        # Note: The just_logged_in session flag will persist for this page load
-        # It will be cleared on the next page navigation
-
-        if connected?(socket) do
-          {:ok, load_home_data_async(socket)}
-        else
-          {:ok, socket}
-        end
+      if connected?(socket) do
+        {:ok, load_home_data_async(socket)}
       else
-        # Guest user: load data synchronously for SEO
-        # Search engines need to see content in the initial HTML response
-        socket = mount_guest_with_data(socket)
         {:ok, socket}
       end
+    else
+      # Guest user: load data synchronously for SEO
+      # Search engines need to see content in the initial HTML response
+      socket = mount_guest_with_data(socket)
+      {:ok, socket}
     end
   end
 
@@ -2197,46 +2183,8 @@ defmodule YscWeb.HomeLive do
   end
 
   @impl true
-  def handle_params(_params, uri, socket) do
-    # Parse URI to get current path and send to SwiftUI
-    parsed_uri = URI.parse(uri)
-    current_path = parsed_uri.path || "/"
-
-    # Send current path to SwiftUI via push_event
-    socket =
-      socket
-      |> Phoenix.LiveView.push_event("current_path", %{path: current_path})
-
+  def handle_params(_params, _uri, socket) do
     {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("native_nav", %{"to" => to}, socket) do
-    allowed =
-      MapSet.new([
-        "/",
-        "/property-check-in",
-        "/bookings/tahoe",
-        "/bookings/tahoe/staying-with",
-        "/bookings/clear-lake",
-        "/cabin-rules"
-      ])
-
-    if MapSet.member?(allowed, to) do
-      # Send push_event to notify SwiftUI of navigation
-      socket =
-        if to != "/" do
-          socket
-          |> Phoenix.LiveView.push_event("navigate_away_from_home", %{})
-        else
-          socket
-          |> Phoenix.LiveView.push_event("navigate_to_home", %{})
-        end
-
-      {:noreply, push_navigate(socket, to: to)}
-    else
-      {:noreply, socket}
-    end
   end
 
   @impl true
