@@ -122,6 +122,10 @@ shell-format-check:  ## Check shell script formatting with shfmt
 	@command -v shfmt >/dev/null 2>&1 || { echo "Install shfmt: brew install shfmt"; exit 1; }
 	@if [ -n "$(SHELL_SCRIPTS)" ]; then shfmt -d -i 2 -ci $(SHELL_SCRIPTS); fi
 
+.PHONY: dialyzer
+dialyzer:  ## Run Dialyzer type checker (builds PLT on first run, cached after)
+	@mix dialyzer
+
 .PHONY: lint
 lint:  ## Run the lint suite
 	@mix credo --all
