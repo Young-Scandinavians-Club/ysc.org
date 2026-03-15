@@ -117,6 +117,48 @@ defmodule YscWeb.ContactLiveTest do
       # Form should still load
       assert html =~ "Get in touch"
     end
+
+    test "pre-fills subject=Events from URL parameter", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/contact?subject=Events")
+
+      assert has_element?(
+               view,
+               "select[name='contact_form[subject]'] option[value='Events']"
+             )
+    end
+  end
+
+  describe "message parameter" do
+    test "pre-fills message from URL parameter", %{conn: conn} do
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/contact?subject=Events&message=Hi%2C%20I%20have%20an%20idea%20for%20an%20event"
+        )
+
+      assert html =~ "Hi, I have an idea for an event"
+    end
+
+    test "works without message parameter", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      assert has_element?(view, "textarea[name='contact_form[message]']")
+    end
+
+    test "pre-fills both subject and message together", %{conn: conn} do
+      {:ok, view, html} =
+        live(
+          conn,
+          ~p"/contact?subject=Events&message=Hi%2C%20I%20have%20an%20idea%20for%20an%20event%20I%27d%20love%20to%20host%20with%20YSC.%20Here%27s%20what%20I%20had%20in%20mind%3A%20"
+        )
+
+      assert has_element?(
+               view,
+               "select[name='contact_form[subject]'] option[value='Events']"
+             )
+
+      assert html =~ "Hi, I have an idea for an event"
+    end
   end
 
   describe "subject options" do

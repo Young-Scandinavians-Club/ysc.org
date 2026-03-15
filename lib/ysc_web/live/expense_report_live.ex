@@ -1407,6 +1407,7 @@ defmodule YscWeb.ExpenseReportLive do
                           <a
                             href={ExpenseReports.receipt_url(item.receipt_s3_path)}
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1"
                           >
                             <.icon name="hero-document-check" class="w-4 h-4" />
@@ -1471,6 +1472,7 @@ defmodule YscWeb.ExpenseReportLive do
                           <a
                             href={ExpenseReports.receipt_url(item.proof_s3_path)}
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1"
                           >
                             <.icon name="hero-document-check" class="w-4 h-4" />
@@ -2044,6 +2046,7 @@ defmodule YscWeb.ExpenseReportLive do
                                   )
                                 }
                                 target="_blank"
+                                rel="noopener noreferrer"
                                 class="block"
                               >
                                 <div class="w-24 h-24 bg-red-50 border-2 border-red-300 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
@@ -2094,6 +2097,7 @@ defmodule YscWeb.ExpenseReportLive do
                                     )
                                   }
                                   target="_blank"
+                                  rel="noopener noreferrer"
                                   class="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
                                 >
                                   Open PDF
@@ -2392,6 +2396,7 @@ defmodule YscWeb.ExpenseReportLive do
                                   )
                                 }
                                 target="_blank"
+                                rel="noopener noreferrer"
                                 class="block"
                               >
                                 <div class="w-24 h-24 bg-red-50 border-2 border-red-300 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
@@ -2442,6 +2447,7 @@ defmodule YscWeb.ExpenseReportLive do
                                     )
                                   }
                                   target="_blank"
+                                  rel="noopener noreferrer"
                                   class="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
                                 >
                                   Open PDF

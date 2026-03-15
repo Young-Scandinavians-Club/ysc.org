@@ -57,7 +57,9 @@ defmodule YscWeb.EventsLive do
                 Have an idea for an event? We'd love to help you host it! Reach out through our contact page.
               </p>
               <.link
-                navigate={~p"/contact"}
+                navigate={
+                  ~p"/contact?subject=Events&message=Hi%2C%20I%20have%20an%20idea%20for%20an%20event%20I%27d%20love%20to%20host%20with%20YSC.%20Here%27s%20what%20I%20had%20in%20mind%3A%20"
+                }
                 class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 Contact Us <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
@@ -84,7 +86,7 @@ defmodule YscWeb.EventsLive do
                   </p>
                   <div class="flex flex-col gap-2">
                     <a
-                      href="https://discord.gg/ysc"
+                      href={@site_setting_socials_discord}
                       target="_blank"
                       rel="noopener noreferrer"
                       class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-blue-600 transition-colors"
@@ -96,13 +98,13 @@ defmodule YscWeb.EventsLive do
                     </a>
                     <a
                       :if={@current_user}
-                      href="#"
-                      class="inline-flex items-center text-sm font-bold text-zinc-400 cursor-not-allowed"
-                      title="WhatsApp link coming soon"
+                      href={@site_setting_socials_whatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-green-600 transition-colors"
                     >
                       <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
                       WhatsApp
-                      <span class="ml-2 text-sm text-zinc-400">(Coming Soon)</span>
                     </a>
                   </div>
                 </div>

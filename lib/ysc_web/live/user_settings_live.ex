@@ -593,7 +593,7 @@ defmodule YscWeb.UserSettingsLive do
                       class="text-blue-600 hover:underline"
                       href="https://gravatar.com/connect"
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       Gravatar profile
                     </a>

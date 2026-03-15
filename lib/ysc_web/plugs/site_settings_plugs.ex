@@ -22,6 +22,7 @@ defmodule YscWeb.Plugs.SiteSettingsPlugs do
     )
     |> assign(:site_setting_socials_facebook, Settings.get_setting("facebook"))
     |> assign(:site_setting_socials_discord, Settings.get_setting("discord"))
+    |> assign(:site_setting_socials_whatsapp, Settings.get_setting("whatsapp"))
   end
 
   defp mount_site_settings(socket) do
@@ -33,6 +34,9 @@ defmodule YscWeb.Plugs.SiteSettingsPlugs do
     end)
     |> Phoenix.Component.assign_new(:site_setting_socials_discord, fn ->
       Settings.get_setting("discord")
+    end)
+    |> Phoenix.Component.assign_new(:site_setting_socials_whatsapp, fn ->
+      Settings.get_setting("whatsapp")
     end)
   end
 end

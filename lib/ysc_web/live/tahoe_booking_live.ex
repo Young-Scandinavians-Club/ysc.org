@@ -3331,6 +3331,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <a
                             href="https://dot.ca.gov/travel/winter-driving-tips"
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="text-blue-700 hover:text-blue-900 underline"
                           >
                             California Winter Driving Tips
@@ -3350,6 +3351,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <a
                             href="https://twitter.com/CHP_Truckee"
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="text-blue-700 hover:text-blue-900 underline"
                           >
                             @CHP_Truckee
@@ -3358,6 +3360,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <a
                             href="https://twitter.com/CaltransDist3"
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="text-blue-700 hover:text-blue-900 underline"
                           >
                             @CaltransDist3
@@ -3366,6 +3369,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <a
                             href="https://twitter.com/NWSReno"
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="text-blue-700 hover:text-blue-900 underline"
                           >
                             @NWSReno
