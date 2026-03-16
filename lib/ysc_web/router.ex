@@ -15,17 +15,12 @@ defmodule YscWeb.Router do
             end)
 
   pipeline :browser do
-    plug :accepts, [
-      "html",
-      "swiftui"
-    ]
+    plug :accepts, ["html"]
 
     plug :fetch_session
     plug :fetch_live_flash
 
-    plug :put_root_layout,
-      html: {YscWeb.Layouts, :root},
-      swiftui: {YscWeb.Layouts.SwiftUI, :root}
+    plug :put_root_layout, html: {YscWeb.Layouts, :root}
 
     plug :protect_from_forgery
 
@@ -94,14 +89,23 @@ defmodule YscWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Pipeline for native iOS API key validation
-  # Only validates API key for swiftui format requests
-  pipeline :native_api_key do
-    plug YscWeb.Plugs.NativeAPIKey
+  pipeline :mobile_api do
+    plug :accepts, ["json"]
+    plug YscWeb.Plugs.MobileAPIAuth
+  end
+
+  scope "/api/v1/mobile", YscWeb.Api do
+    pipe_through [:mobile_api]
+
+    get "/bookings/lookup", BookingsController, :lookup
+    get "/bookings/calendar", BookingsController, :calendar
+    get "/bookings", BookingsController, :index
+    get "/properties/:property/info", PropertiesController, :info
+    post "/check-in", CheckInsController, :create
   end
 
   scope "/", YscWeb do
-    pipe_through [:browser, :native_api_key, :mount_site_settings]
+    pipe_through [:browser]
 
     get "/history", PageController, :history
     get "/board", PageController, :board
@@ -137,12 +141,10 @@ defmodule YscWeb.Router do
       live "/newsletter/unsubscribe/:token", NewsletterUnsubscribeLive, :index
 
       live "/bookings/tahoe", TahoeBookingLive, :index
-      live "/bookings/tahoe/staying-with", TahoeStayingWithLive, :index
+
       live "/bookings/clear-lake", ClearLakeBookingLive, :index
       live "/bookings/checkout/:booking_id", BookingCheckoutLive, :index
       live "/bookings/:booking_id/receipt", BookingReceiptLive, :index
-      live "/property-check-in", PropertyCheckInLive, :index
-      live "/cabin-rules", TahoeCabinRulesLive, :index
     end
   end
 
