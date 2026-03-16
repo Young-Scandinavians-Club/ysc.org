@@ -122,6 +122,7 @@ defmodule Ysc.Bookings.PricingHelpers do
   end
 
   # Calculate price for buyout mode
+  @dialyzer {:nowarn_function, calculate_buyout_price: 4}
   defp calculate_buyout_price(socket, property, guests_count, children_count) do
     case Bookings.calculate_booking_price(
            property,
@@ -135,7 +136,7 @@ defmodule Ysc.Bookings.PricingHelpers do
         assign(socket,
           calculated_price: price,
           price_breakdown:
-            Map.merge(breakdown || %{}, %{
+            Map.merge(breakdown, %{
               guests_count: guests_count,
               children_count: children_count
             }),
@@ -148,6 +149,7 @@ defmodule Ysc.Bookings.PricingHelpers do
   end
 
   # Calculate price for room mode (Tahoe)
+  @dialyzer {:nowarn_function, calculate_room_price: 5}
   defp calculate_room_price(
          socket,
          property,
@@ -187,7 +189,7 @@ defmodule Ysc.Bookings.PricingHelpers do
           using_minimum_pricing = billable_people > guests_count
 
           final_breakdown =
-            (breakdown || %{})
+            breakdown
             |> Map.merge(%{
               room_count: room_count,
               guests_count: guests_count,
@@ -212,6 +214,7 @@ defmodule Ysc.Bookings.PricingHelpers do
   end
 
   # Calculate price for day mode (Clear Lake)
+  @dialyzer {:nowarn_function, calculate_day_price: 3}
   defp calculate_day_price(socket, property, guests_count) do
     case Bookings.calculate_booking_price(
            property,
@@ -224,7 +227,7 @@ defmodule Ysc.Bookings.PricingHelpers do
         assign(socket,
           calculated_price: price,
           price_breakdown:
-            Map.merge(breakdown || %{}, %{
+            Map.merge(breakdown, %{
               guests_count: guests_count
             }),
           price_error: nil

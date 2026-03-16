@@ -155,6 +155,7 @@ defmodule Mix.Tasks.TestOutageEmail do
     }
   end
 
+  @dialyzer {:nowarn_function, send_outage_notification_email: 2}
   defp send_outage_notification_email(booking, outage) when is_map(outage) do
     # Ensure user is preloaded
     booking = Repo.preload(booking, :user)

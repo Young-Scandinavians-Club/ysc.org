@@ -210,7 +210,6 @@ defmodule YscWeb.Telemetry do
 
     {total, cpu, io} =
       case total_run_queue_lengths do
-        {total_val, cpu_val, io_val} -> {total_val, cpu_val, io_val}
         total_val when is_integer(total_val) -> {total_val, 0, 0}
       end
 

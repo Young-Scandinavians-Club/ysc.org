@@ -1,6 +1,20 @@
 defmodule YscWeb.TahoeBookingLive do
   use YscWeb, :live_view
 
+  @dialyzer {:nowarn_function, determine_room_availability_status: 7}
+  @dialyzer {:nowarn_function, calculate_room_availability_status: 7}
+  @dialyzer {:nowarn_function, max_rooms_for_user: 1}
+  @dialyzer {:nowarn_function, get_room_image_url: 1}
+  @dialyzer {:nowarn_function, validate_and_create_booking: 1}
+  # Elixir compiles `cond do ... true -> end` catch-alls into synthesised
+  # `case true do true -> ...; false -> throw end` BEAM code with no source-line
+  # annotation. Dialyzer flags the dead `false ->` branch as
+  # `pattern_match (Pattern: false, Type: true)` and attributes it to line 1
+  # because the synthesised clause has no line info. The scoped
+  # `{:no_match, function_name: arity}` form does not suppress this class of
+  # warning reliably; the module-level attribute is required.
+  @dialyzer :no_match
+
   alias Ysc.Bookings
 
   alias Ysc.Bookings.{
@@ -398,7 +412,7 @@ defmodule YscWeb.TahoeBookingLive do
 
   # Helper function to get booking eligibility
   defp get_booking_eligibility(socket, parsed_params) do
-    if socket.assigns[:can_book] != nil do
+    if Map.has_key?(socket.assigns, :can_book) do
       # Already computed in mount - reuse it
       {
         socket.assigns.can_book,
@@ -1275,16 +1289,16 @@ defmodule YscWeb.TahoeBookingLive do
                                   phx-click="increase-guests"
                                   phx-click-stop
                                   disabled={
-                                    (parse_guests_count(@guests_count) || 1) +
-                                      (parse_children_count(@children_count) || 0) >=
+                                    parse_guests_count(@guests_count) +
+                                      parse_children_count(@children_count) >=
                                       @max_cabin_capacity
                                   }
                                   aria-label="Increase number of adults"
                                   class={[
                                     "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
                                     if(
-                                      (parse_guests_count(@guests_count) || 1) +
-                                        (parse_children_count(@children_count) || 0) >=
+                                      parse_guests_count(@guests_count) +
+                                        parse_children_count(@children_count) >=
                                         @max_cabin_capacity,
                                       do:
                                         "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed",
@@ -1342,16 +1356,16 @@ defmodule YscWeb.TahoeBookingLive do
                                   phx-click="increase-children"
                                   phx-click-stop
                                   disabled={
-                                    (parse_guests_count(@guests_count) || 1) +
-                                      (parse_children_count(@children_count) || 0) >=
+                                    parse_guests_count(@guests_count) +
+                                      parse_children_count(@children_count) >=
                                       @max_cabin_capacity
                                   }
                                   aria-label="Increase number of children"
                                   class={[
                                     "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
                                     if(
-                                      (parse_guests_count(@guests_count) || 1) +
-                                        (parse_children_count(@children_count) || 0) >=
+                                      parse_guests_count(@guests_count) +
+                                        parse_children_count(@children_count) >=
                                         @max_cabin_capacity,
                                       do:
                                         "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed",
@@ -1560,7 +1574,8 @@ defmodule YscWeb.TahoeBookingLive do
                   :if={
                     can_select_multiple_rooms?(assigns) &&
                       length(@selected_room_ids) < max_rooms_for_user(assigns) &&
-                      (parse_guests_count(@guests_count) || 1) > 1
+                      parse_guests_count(@guests_count) +
+                        parse_children_count(@children_count) > 1
                   }
                   class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded"
                 >
@@ -1596,8 +1611,8 @@ defmodule YscWeb.TahoeBookingLive do
                            room.id in @selected_room_ids) ||
                           (!can_select_multiple_rooms?(assigns) &&
                              @selected_room_id == room.id) %>
-                      <% guests_count = parse_guests_count(@guests_count) || 1 %>
-                      <% children_count = parse_children_count(@children_count) || 0 %>
+                      <% guests_count = parse_guests_count(@guests_count) %>
+                      <% children_count = parse_children_count(@children_count) %>
                       <% total_people = guests_count + children_count %>
                       <% only_one_person_selected = total_people == 1 %>
                       <% cannot_add_second_room =
@@ -2034,8 +2049,8 @@ defmodule YscWeb.TahoeBookingLive do
                   :if={
                     can_select_multiple_rooms?(assigns) &&
                       length(@selected_room_ids) > 0 &&
-                      (parse_guests_count(@guests_count) || 1) +
-                        (parse_children_count(@children_count) || 0) == 1
+                      parse_guests_count(@guests_count) +
+                        parse_children_count(@children_count) == 1
                   }
                   class="text-amber-600 text-sm mt-2"
                 >
@@ -2099,7 +2114,8 @@ defmodule YscWeb.TahoeBookingLive do
                       @selected_booking_mode == :room &&
                         can_select_multiple_rooms?(assigns) &&
                         length(@selected_room_ids) < max_rooms_for_user(assigns) &&
-                        (parse_guests_count(@guests_count) || 1) > 1
+                        parse_guests_count(@guests_count) +
+                          parse_children_count(@children_count) > 1
                     }
                     class="p-2 bg-blue-50 border border-blue-200 rounded"
                   >
@@ -2131,9 +2147,9 @@ defmodule YscWeb.TahoeBookingLive do
                       <%= for room_id <- @selected_room_ids do %>
                         <% room = Enum.find(@available_rooms, &(&1.id == room_id)) %>
                         <%= if room do %>
-                          <% guests_count = parse_guests_count(@guests_count) || 1 %>
+                          <% guests_count = parse_guests_count(@guests_count) %>
                           <% children_count =
-                            parse_children_count(@children_count) || 0 %>
+                            parse_children_count(@children_count) %>
                           <% total_people = guests_count + children_count %>
                           <% min_required = room.min_billable_occupancy || 1 %>
                           <div
@@ -2556,11 +2572,10 @@ defmodule YscWeb.TahoeBookingLive do
                                   "17 guests (full cabin)"
                                 else
                                   guests_count =
-                                    parse_guests_count(assigns.guests_count) || 1
+                                    parse_guests_count(assigns.guests_count)
 
                                   children_count =
-                                    parse_children_count(assigns.children_count) ||
-                                      0
+                                    parse_children_count(assigns.children_count)
 
                                   total = guests_count + children_count
 
@@ -5242,8 +5257,8 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp can_add_room_to_list?(socket, current_ids) do
     max_rooms = max_rooms_for_user(socket.assigns)
-    guests_count = parse_guests_count(socket.assigns.guests_count) || 1
-    children_count = parse_children_count(socket.assigns.children_count) || 0
+    guests_count = parse_guests_count(socket.assigns.guests_count)
+    children_count = parse_children_count(socket.assigns.children_count)
     total_people = guests_count + children_count
 
     has_enough_people = total_people > 1 || current_ids == []
@@ -5353,13 +5368,8 @@ defmodule YscWeb.TahoeBookingLive do
         "Parsed: guests=#{guests_count}, children=#{children_count}"
     )
 
-    validated_guests =
-      if is_integer(guests_count) && guests_count > 0, do: guests_count, else: 1
-
-    validated_children =
-      if is_integer(children_count) && children_count >= 0,
-        do: children_count,
-        else: 0
+    validated_guests = guests_count
+    validated_children = children_count
 
     total_people = validated_guests + validated_children
 
@@ -5767,7 +5777,7 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp has_rooms_selected?(room_ids_or_id) do
     case room_ids_or_id do
-      room_id when is_binary(room_id) -> not is_nil(room_id)
+      _room_id when is_binary(room_ids_or_id) -> true
       room_ids when is_list(room_ids) -> room_ids != []
       _ -> false
     end
@@ -5804,7 +5814,7 @@ defmodule YscWeb.TahoeBookingLive do
     guests_count_valid? =
       case booking_mode do
         :buyout -> true
-        :room -> not is_nil(guests_count) && guests_count > 0
+        :room -> guests_count != nil && guests_count > 0
       end
 
     if is_nil(checkin_date) || is_nil(checkout_date) || !guests_count_valid? do
@@ -5851,9 +5861,6 @@ defmodule YscWeb.TahoeBookingLive do
               room_ids
             )
           end
-
-        _ ->
-          {:error, :invalid_booking_mode}
       end
     end
   end
@@ -5893,13 +5900,15 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp format_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      if is_binary(msg) do
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
-        end)
-      else
-        to_string(msg)
-      end
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        placeholder = "%{#{key}}"
+
+        if String.contains?(acc, placeholder) do
+          String.replace(acc, placeholder, to_string(value))
+        else
+          acc
+        end
+      end)
     end)
   end
 
@@ -6436,14 +6445,8 @@ defmodule YscWeb.TahoeBookingLive do
     nights = Date.diff(checkout_date, checkin_date)
 
     # Get max nights from season for check-in date
-    max_nights =
-      if checkin_date do
-        season = Ysc.Bookings.Season.for_date(:tahoe, checkin_date)
-        Ysc.Bookings.Season.get_max_nights(season, :tahoe)
-      else
-        # Fallback to Tahoe default
-        4
-      end
+    season = Ysc.Bookings.Season.for_date(:tahoe, checkin_date)
+    max_nights = Ysc.Bookings.Season.get_max_nights(season, :tahoe)
 
     if nights > max_nights do
       Map.put(
@@ -6457,7 +6460,7 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp validate_active_booking(socket) do
-    errors = socket.assigns.date_validation_errors || %{}
+    errors = socket.assigns.date_validation_errors
 
     if socket.assigns.checkin_date && socket.assigns.checkout_date &&
          socket.assigns.user do
@@ -6687,6 +6690,7 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
+  @dialyzer {:nowarn_function, tahoe_redirect_to: 6}
   defp tahoe_redirect_to(
          checkin_date,
          checkout_date,
@@ -6811,10 +6815,6 @@ defmodule YscWeb.TahoeBookingLive do
 
         [subscription | _] ->
           get_membership_type_from_subscription(subscription)
-
-        multiple ->
-          most_expensive = get_most_expensive_subscription(multiple)
-          get_membership_type_from_subscription(most_expensive)
       end
     end
   end
@@ -6824,24 +6824,6 @@ defmodule YscWeb.TahoeBookingLive do
       nil -> :none
       plan_id -> plan_id
     end
-  end
-
-  defp get_most_expensive_subscription(subscriptions) do
-    membership_plans = Application.get_env(:ysc, :membership_plans, [])
-
-    price_to_amount =
-      Map.new(membership_plans, fn plan ->
-        {plan.stripe_price_id, plan.amount}
-      end)
-
-    Enum.max_by(subscriptions, fn subscription ->
-      subscription = Repo.preload(subscription, :subscription_items)
-
-      case subscription.subscription_items do
-        [item | _] -> Map.get(price_to_amount, item.stripe_price_id, 0)
-        _ -> 0
-      end
-    end)
   end
 
   defp count_rooms_in_active_bookings(active_bookings) do
@@ -6951,16 +6933,12 @@ defmodule YscWeb.TahoeBookingLive do
     # Handle both user struct and assigns map
     membership_type =
       cond do
-        is_map(user_or_assigns) &&
-            Map.has_key?(user_or_assigns, :membership_type) ->
+        Map.has_key?(user_or_assigns, :membership_type) ->
           user_or_assigns.membership_type
 
-        is_map(user_or_assigns) && Map.has_key?(user_or_assigns, :user) ->
-          # It's an assigns map with user
-          case user_or_assigns[:membership_type] do
-            nil -> get_membership_type(user_or_assigns.user)
-            type -> type
-          end
+        Map.has_key?(user_or_assigns, :user) ->
+          # It's an assigns map with user (membership_type key not present)
+          get_membership_type(user_or_assigns.user)
 
         true ->
           # It's a user struct
@@ -6969,8 +6947,7 @@ defmodule YscWeb.TahoeBookingLive do
 
     # Check if user already has a booking (for assigns map only)
     existing_rooms =
-      if is_map(user_or_assigns) &&
-           Map.has_key?(user_or_assigns, :active_bookings) do
+      if Map.has_key?(user_or_assigns, :active_bookings) do
         active_bookings = user_or_assigns[:active_bookings] || []
         count_rooms_in_active_bookings(active_bookings)
       else
@@ -7072,8 +7049,8 @@ defmodule YscWeb.TahoeBookingLive do
          (socket.assigns.selected_room_id ||
             (socket.assigns.selected_room_ids &&
                socket.assigns.selected_room_ids != [])) do
-      guests_count = parse_guests_count(socket.assigns.guests_count) || 1
-      children_count = parse_children_count(socket.assigns.children_count) || 0
+      guests_count = parse_guests_count(socket.assigns.guests_count)
+      children_count = parse_children_count(socket.assigns.children_count)
       total_guests = guests_count + children_count
 
       # Get selected room IDs

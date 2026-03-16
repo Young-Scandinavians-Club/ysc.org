@@ -127,17 +127,6 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
                 Webhooks.update_webhook_state(webhook_event, :processed)
 
                 :ok
-
-              {:error, reason} ->
-                Ysc.Logging.warning("Error finding expense report",
-                  bill_id: bill_id,
-                  error: reason
-                )
-
-                # Mark webhook event as failed
-                Webhooks.update_webhook_state(webhook_event, :failed)
-
-                {:error, reason}
             end
 
           {:error, :no_linked_bill} ->

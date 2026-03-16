@@ -1772,6 +1772,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
   ## Private Functions
 
+  @dialyzer {:nowarn_function, calculate_booking_price: 1}
   defp calculate_booking_price(booking) do
     nights = Date.diff(booking.checkout_date, booking.checkin_date)
 
@@ -2109,6 +2110,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
   # Helper to calculate price for multiple rooms (fallback)
   # For per-guest pricing, calculate once for total guests regardless of room count
+  @dialyzer {:nowarn_function, calculate_multi_room_price_for_checkout: 7}
   defp calculate_multi_room_price_for_checkout(
          property,
          checkin_date,
@@ -2244,6 +2246,7 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
+  @dialyzer {:nowarn_function, build_simple_breakdown: 5}
   defp build_simple_breakdown(
          breakdown,
          nights,

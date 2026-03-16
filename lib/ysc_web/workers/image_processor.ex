@@ -148,7 +148,7 @@ defmodule YscWeb.Workers.ImageProcessor do
          {:ok, parsed} <- Image.open(raw_path),
          # Remove EXIF, IPTC, XMP only; keep color profile (ICC)
          {:ok, stripped} <- Image.remove_metadata(parsed, [:exif, :iptc, :xmp]),
-         :ok <- write_stripped_image(stripped, stripped_path, ext),
+         {:ok, _} <- write_stripped_image(stripped, stripped_path, ext),
          _ <- Media.upload_file_to_s3(stripped_path, raw_key) do
       Ysc.Logging.info(
         "Replaced raw S3 object with metadata-stripped version: #{image.id}"
@@ -178,10 +178,7 @@ defmodule YscWeb.Workers.ImageProcessor do
         _ -> []
       end
 
-    case Image.write(stripped, path, opts) do
-      :ok -> :ok
-      other -> other
-    end
+    Image.write(stripped, path, opts)
   end
 
   defp raw_key_from_image(image) do

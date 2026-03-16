@@ -68,6 +68,7 @@ defmodule Ysc.Messages do
     end
   end
 
+  @dialyzer {:nowarn_function, build_and_run_email_transaction: 2}
   defp build_and_run_email_transaction(email, attrs) do
     Ecto.Multi.new()
     |> Ecto.Multi.insert(
@@ -415,7 +416,7 @@ defmodule Ysc.Messages do
           params: %{booking_id: 123}
         )
   """
-  @spec run_send_sms_idempotent(String.t(), String.t(), keyword()) ::
+  @spec run_send_sms_idempotent(String.t(), String.t(), map()) ::
           {:ok, map()} | {:error, String.t()}
   def run_send_sms_idempotent(phone_number, body, attrs) do
     Ysc.Logging.debug("run_send_sms_idempotent called",
@@ -521,6 +522,7 @@ defmodule Ysc.Messages do
     {:error, "failed to send SMS"}
   end
 
+  @dialyzer {:nowarn_function, build_and_run_sms_transaction: 3}
   defp build_and_run_sms_transaction(phone_number, body, attrs) do
     # attrs already contains phone_number and rendered_message from send_sms_idempotent
     # But we use the parameters here to ensure consistency

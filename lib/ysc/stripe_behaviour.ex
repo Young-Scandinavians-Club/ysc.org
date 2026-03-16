@@ -16,5 +16,5 @@ defmodule Ysc.StripeBehaviour do
   @callback retrieve_payment_method(String.t()) ::
               {:ok, Stripe.PaymentMethod.t()} | {:error, any()}
   @callback list_events(map(), keyword()) ::
-              {:ok, Stripe.List.t()} | {:error, any()}
+              {:ok, Stripe.List.t(any())} | {:error, any()}
 end

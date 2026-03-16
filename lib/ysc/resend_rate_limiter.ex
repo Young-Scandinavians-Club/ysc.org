@@ -51,6 +51,7 @@ defmodule Ysc.ResendRateLimiter do
   - `:ok` on success
   """
   @spec record_resend(String.t() | integer(), atom(), integer()) :: :ok
+  @dialyzer {:nowarn_function, record_resend: 3}
   def record_resend(
         identifier,
         type,
@@ -66,10 +67,10 @@ defmodule Ysc.ResendRateLimiter do
       {:error, reason} ->
         require Ysc.Logging
 
-        Ysc.Logging.error("[ResendRateLimiter] Failed to cache rate limit", %{
+        Ysc.Logging.error("[ResendRateLimiter] Failed to cache rate limit",
           cache_key: cache_key,
           reason: reason
-        })
+        )
 
         # In test environment, this might fail if cache isn't initialized
         # For now, we'll still return :ok to avoid breaking callers
@@ -207,8 +208,7 @@ defmodule Ysc.ResendRateLimiter do
 
         disabled_until ->
           case DateTime.diff(disabled_until, DateTime.utc_now(), :second) do
-            remaining when is_integer(remaining) -> max(0, remaining)
-            _ -> 0
+            remaining -> max(0, remaining)
           end
       end
     else

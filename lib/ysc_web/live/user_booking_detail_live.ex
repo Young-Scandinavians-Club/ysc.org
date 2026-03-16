@@ -174,9 +174,6 @@ defmodule YscWeb.UserBookingDetailLive do
 
                 {:cancellation_failed, _} ->
                   "Failed to cancel booking. Please try again or contact support."
-
-                _ ->
-                  "Failed to cancel booking. Please try again or contact support."
               end
 
             {:noreply,

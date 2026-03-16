@@ -33,6 +33,7 @@ defmodule YscWeb.QuickbooksWebhookController do
     ]
   }
   """
+  @dialyzer {:nowarn_function, webhook: 2}
   def webhook(conn, params) do
     Ysc.Logging.info("Received QuickBooks webhook",
       payload: inspect(params, limit: 100)

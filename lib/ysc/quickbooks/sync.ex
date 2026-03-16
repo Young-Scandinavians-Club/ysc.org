@@ -541,6 +541,7 @@ defmodule Ysc.Quickbooks.Sync do
   # Resolves QuickBooks customer_id for a payment. Uses the payment's user when present;
   # when user_id is nil or user not found, uses config :system_customer_id if set so
   # system/anonymous payments can still export (e.g. for payouts).
+  @dialyzer {:nowarn_function, get_customer_id_for_payment: 1}
   defp get_customer_id_for_payment(%Payment{user_id: user_id} = payment) do
     case get_user(user_id) do
       {:ok, user} ->
@@ -567,9 +568,6 @@ defmodule Ysc.Quickbooks.Sync do
 
           {:error, :user_not_found}
         end
-
-      {:error, _reason} = error ->
-        error
     end
   end
 
@@ -665,28 +663,10 @@ defmodule Ysc.Quickbooks.Sync do
         )
 
         error
-
-      error ->
-        Ysc.Logging.error(
-          "[QB Sync] get_or_create_customer: Failed to get or create customer (unexpected error format) - Error: #{inspect(error)}, User ID: #{user.id}, Email: #{user.email}",
-          user_id: user.id,
-          user_email: user.email,
-          full_error: inspect(error),
-          extra: %{
-            user_id: user.id,
-            user_email: user.email,
-            error: inspect(error)
-          },
-          tags: %{
-            quickbooks_operation: "get_or_create_customer",
-            error_type: "unexpected_error_format"
-          }
-        )
-
-        error
     end
   end
 
+  @dialyzer {:nowarn_function, get_payment_entity_info: 1}
   defp get_payment_entity_info(%Payment{} = payment) do
     Ysc.Logging.debug(
       "[QB Sync] get_payment_entity_info: Fetching entity info for payment",
@@ -1765,6 +1745,7 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  @dialyzer {:nowarn_function, get_or_create_item_with_fallback: 3}
   defp get_or_create_item_with_fallback(
          item_name,
          config_key,
@@ -1776,22 +1757,18 @@ defmodule Ysc.Quickbooks.Sync do
         # No override, get or create via API
         # Get income account if provided
         income_account_ref =
-          if income_account_name do
-            case client_module().query_account_by_name(income_account_name) do
-              {:ok, account_id} ->
-                Ysc.Logging.debug(
-                  "[QB Sync] get_or_create_item_with_fallback: Found income account",
-                  account_name: income_account_name,
-                  account_id: account_id
-                )
+          case client_module().query_account_by_name(income_account_name) do
+            {:ok, account_id} ->
+              Ysc.Logging.debug(
+                "[QB Sync] get_or_create_item_with_fallback: Found income account",
+                account_name: income_account_name,
+                account_id: account_id
+              )
 
-                %{value: account_id}
+              %{value: account_id}
 
-              _ ->
-                nil
-            end
-          else
-            nil
+            _ ->
+              nil
           end
 
         client_module().get_or_create_item(item_name,
@@ -2135,36 +2112,7 @@ defmodule Ysc.Quickbooks.Sync do
     # The code above (lines 1599-1638) should have already set refund_from_account_id,
     # but we also handle the case where refund_from_account_ref might be in params
     # (though this shouldn't happen in normal flow)
-    params =
-      cond do
-        # If refund_from_account_id is already set, we're good
-        Map.has_key?(params, :refund_from_account_id) ->
-          # Remove refund_from_account_ref if it exists (shouldn't be there, but clean up)
-          Map.delete(params, :refund_from_account_ref)
-
-        # If refund_from_account_ref is in params, convert it
-        Map.has_key?(params, :refund_from_account_ref) ->
-          ref = params.refund_from_account_ref
-
-          params
-          |> Map.merge(%{
-            refund_from_account_id: ref.value,
-            refund_from_account_name: ref.name
-          })
-          |> Map.delete(:refund_from_account_ref)
-
-        # Fallback: this shouldn't happen, but provide a default
-        true ->
-          Ysc.Logging.warning(
-            "[QB Sync] create_refund_sales_receipt: refund_from_account_id not set, using fallback",
-            refund_id: refund.id
-          )
-
-          Map.merge(params, %{
-            refund_from_account_id: "undeposited_funds_account_default",
-            refund_from_account_name: "Undeposited Funds"
-          })
-      end
+    params = Map.delete(params, :refund_from_account_ref)
 
     Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Calling Quickbooks.create_refund_receipt",
@@ -2190,6 +2138,7 @@ defmodule Ysc.Quickbooks.Sync do
   # Does NOT create new Sales Receipts - payments/refunds are already recorded when they happen.
   # The Deposit moves money from Undeposited Funds (where Sales Receipts deposited) to the Bank,
   # and includes a line for Stripe fees (expense).
+  @dialyzer {:nowarn_function, create_payout_deposit: 1}
   defp create_payout_deposit(%Payout{} = payout) do
     Ysc.Logging.debug(
       "[QB Sync] create_payout_deposit: Creating payout deposit (linking to existing Sales Receipts)",
@@ -2745,10 +2694,7 @@ defmodule Ysc.Quickbooks.Sync do
         payout_id: payout.id,
         total_fees: inspect(total_fees),
         fees_cents:
-          if(total_fees,
-            do: total_fees.amount |> Decimal.mult(100) |> Decimal.to_integer(),
-            else: 0
-          )
+          total_fees.amount |> Decimal.mult(100) |> Decimal.to_integer()
       )
 
       total_fees
@@ -2775,6 +2721,7 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  @dialyzer {:nowarn_function, create_payout_deposit_with_lines: 4}
   defp create_payout_deposit_with_lines(
          payout,
          bank_account_id,

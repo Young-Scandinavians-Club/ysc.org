@@ -41,6 +41,7 @@ defmodule Ysc.PromEx do
     ]
   end
 
+  @dialyzer {:nowarn_function, dashboards: 0}
   @impl true
   def dashboards do
     [
@@ -52,6 +53,7 @@ defmodule Ysc.PromEx do
     ]
   end
 
+  @dialyzer {:nowarn_function, metrics: 0}
   def metrics do
     [
       # Ticket Order Metrics

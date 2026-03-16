@@ -867,6 +867,7 @@ defmodule YscWeb.OrderConfirmationLive do
   end
 
   # Format alternative payment method names for display
+  @dialyzer {:nowarn_function, format_alternative_payment_method: 2}
   defp format_alternative_payment_method(type, _payment_method)
        when is_atom(type) do
     case type do

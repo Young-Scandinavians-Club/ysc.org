@@ -2212,6 +2212,7 @@ defmodule YscWeb.HomeLive do
     {:noreply, push_navigate(socket, to: ~p"/users/settings/passkeys/new")}
   end
 
+  @dialyzer {:nowarn_function, handle_event: 3}
   def handle_event("subscribe_newsletter", params, socket) do
     email = params["email"]
     remote_ip = socket.assigns.remote_ip

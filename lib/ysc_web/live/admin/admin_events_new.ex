@@ -675,11 +675,7 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("save", %{"event" => event_params}, socket) do
-    event_changeset =
-      %Event{}
-      |> Event.changeset(event_params)
-
-    case Events.create_event(event_changeset) do
+    case Events.create_event(event_params) do
       {:ok, event} ->
         {:noreply, push_patch(socket, to: "/admin/events/#{event.id}/edit")}
 

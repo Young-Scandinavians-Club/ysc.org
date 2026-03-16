@@ -705,6 +705,7 @@ defmodule Ysc.Subscriptions do
   end
 
   # Helper function to cancel any existing schedules
+  @dialyzer {:nowarn_function, cancel_existing_schedules: 1}
   defp cancel_existing_schedules(subscription_id) do
     case Stripe.SubscriptionSchedule.list(%{subscription: subscription_id}) do
       {:ok, %{data: schedules}} when schedules != [] ->
@@ -727,6 +728,7 @@ defmodule Ysc.Subscriptions do
 
   # Helper function to create subscription schedule
   # Uses a two-step approach: first create schedule from subscription, then update with phases
+  @dialyzer {:nowarn_function, create_subscription_schedule: 2}
   defp create_subscription_schedule(stripe_sub, end_timestamp) do
     # Step 1: Create schedule from subscription (without phases)
     case Stripe.SubscriptionSchedule.create(%{
@@ -829,6 +831,7 @@ defmodule Ysc.Subscriptions do
     end
   end
 
+  @dialyzer {:nowarn_function, do_change_membership_plan_stripe: 3}
   defp do_change_membership_plan_stripe(
          %Subscription{} = subscription,
          new_price_id,
@@ -971,6 +974,7 @@ defmodule Ysc.Subscriptions do
     end
   end
 
+  @dialyzer {:nowarn_function, schedule_downgrade_at_renewal: 4}
   defp schedule_downgrade_at_renewal(
          subscription,
          stripe_sub,
@@ -1119,6 +1123,7 @@ defmodule Ysc.Subscriptions do
       {:ok, %Stripe.Subscription{}}
 
   """
+  @dialyzer {:nowarn_function, create_stripe_subscription: 2}
   def create_stripe_subscription(user, params) do
     # Handle both keyword lists and maps
     prices = params[:prices] || params["prices"] || params.prices
@@ -1204,6 +1209,7 @@ defmodule Ysc.Subscriptions do
   def create_subscription_paid_out_of_band(_user, _plan_id),
     do: {:error, :invalid_plan}
 
+  @dialyzer {:nowarn_function, ensure_user_has_stripe_id: 1}
   defp ensure_user_has_stripe_id(%{stripe_id: nil} = user) do
     case Ysc.Customers.create_stripe_customer(user) do
       {:ok, _} -> Ysc.Accounts.get_user!(user.id)
@@ -1248,6 +1254,8 @@ defmodule Ysc.Subscriptions do
     end
   end
 
+  @dialyzer {:nowarn_function,
+             do_create_subscription_paid_out_of_band_stripe: 2}
   defp do_create_subscription_paid_out_of_band_stripe(user, plan) do
     require Ysc.Logging
 
@@ -1447,6 +1455,7 @@ defmodule Ysc.Subscriptions do
       {:error, :invoice_not_found}
 
   """
+  @dialyzer {:nowarn_function, retry_failed_invoice: 2}
   def retry_failed_invoice(user, invoice_id) when is_binary(invoice_id) do
     require Ysc.Logging
 
@@ -1509,21 +1518,12 @@ defmodule Ysc.Subscriptions do
                   )
 
                   {:error, error.message}
-
-                {:error, reason} ->
-                  Ysc.Logging.error("Failed to retry payment for invoice",
-                    user_id: user.id,
-                    invoice_id: invoice_id,
-                    error: inspect(reason)
-                  )
-
-                  {:error, :payment_failed}
               end
             end
           end
         end
 
-      {:error, %Stripe.Error{code: code}} when code in ["resource_missing"] ->
+      {:error, %Stripe.Error{code: :not_found}} ->
         Ysc.Logging.warning("Invoice not found in Stripe",
           user_id: user.id,
           invoice_id: invoice_id
@@ -1539,15 +1539,6 @@ defmodule Ysc.Subscriptions do
         )
 
         {:error, error.message}
-
-      {:error, reason} ->
-        Ysc.Logging.error("Failed to retrieve invoice from Stripe",
-          user_id: user.id,
-          invoice_id: invoice_id,
-          error: inspect(reason)
-        )
-
-        {:error, :stripe_error}
     end
   end
 

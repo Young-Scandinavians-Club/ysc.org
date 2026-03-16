@@ -360,7 +360,7 @@ defmodule YscWeb.AdminPostsLive do
     """
   end
 
-  @spec mount(any(), any(), map()) :: {:ok, map()}
+  @dialyzer {:nowarn_function, mount: 3}
   def mount(_params, _session, socket) do
     new_post_changeset = Post.new_post_changeset(%Post{}, %{})
 

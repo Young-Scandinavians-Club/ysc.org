@@ -149,8 +149,6 @@ defmodule Ysc.Stripe.WebhookHandler do
     ArgumentError -> :USD
   end
 
-  defp normalize_currency(_), do: :USD
-
   # Only put datetime in map when value is present. Used to avoid overwriting
   # existing subscription period dates with nil when Stripe sends null
   # (e.g. when subscription is attached to a schedule for scheduled downgrades).
@@ -1101,7 +1099,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       customer_id: customer_id,
       subscription_id: subscription_id_raw,
       billing_reason: billing_reason,
-      invoice_keys: if(is_map(invoice), do: Map.keys(invoice), else: [])
+      invoice_keys: Map.keys(invoice)
     )
 
     # Check if this is a subscription invoice (membership)
@@ -1602,11 +1600,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       Ysc.Logging.debug("Unhandled invoice webhook event",
         event_type: event_name,
-        event_object_type:
-          if(is_map(event_object),
-            do: "map",
-            else: inspect(event_object.__struct__)
-          )
+        event_object_type: Map.get(event_object, "object")
       )
     end
 
@@ -1712,8 +1706,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         Ysc.Logging.info("Stripe payout processed successfully in ledger",
           payout_id: payout_id,
           amount: Money.to_string!(payout_amount),
-          fee_total:
-            if(fee_total, do: Money.to_string!(fee_total), else: "none")
+          fee_total: Money.to_string!(fee_total)
         )
 
         # Fetch and link payments/refunds from Stripe
@@ -2265,13 +2258,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp membership_upgrade?(old_type, new_type) do
     case {old_type, new_type} do
       {:single, :family} -> true
-      {"single", :family} -> true
-      {:single, "family"} -> true
-      {"single", "family"} -> true
       {:family, :single} -> false
-      {"family", :single} -> false
-      {:family, "single"} -> false
-      {"family", "single"} -> false
       _ -> nil
     end
   end
@@ -2463,6 +2450,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   ## Returns:
   - `%Money{}` - The Stripe fee amount
   """
+  @dialyzer {:nowarn_function, extract_stripe_fee_from_payment_intent: 1}
   def extract_stripe_fee_from_payment_intent(payment_intent) do
     require Ysc.Logging
 
@@ -2541,13 +2529,14 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp get_charge_from_payment_intent(_), do: {:error, :no_charge_found}
 
   # Helper to retrieve payment intent with charges expanded
+  @dialyzer {:nowarn_function, retrieve_payment_intent_with_charges: 1}
   defp retrieve_payment_intent_with_charges(nil),
     do: {:error, :no_payment_intent_id}
 
   defp retrieve_payment_intent_with_charges(payment_intent_id) do
-    case Stripe.PaymentIntent.retrieve(payment_intent_id, %{
+    case Stripe.PaymentIntent.retrieve(payment_intent_id,
            expand: ["charges.data.balance_transaction"]
-         }) do
+         ) do
       {:ok, payment_intent} -> {:ok, payment_intent}
       {:error, reason} -> {:error, reason}
     end
@@ -2629,18 +2618,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         case Stripe.Charge.retrieve(charge_id) do
           {:ok, charge} ->
             # Get the payment method ID from the charge
-            payment_method_id =
-              cond do
-                is_struct(charge) ->
-                  Map.get(charge, :payment_method) ||
-                    Map.get(charge, "payment_method")
-
-                is_map(charge) ->
-                  charge[:payment_method] || charge["payment_method"]
-
-                true ->
-                  nil
-              end
+            payment_method_id = charge.payment_method
 
             case payment_method_id do
               nil ->
@@ -2744,8 +2722,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           {:error, error} ->
             Ysc.Logging.warning("Failed to retrieve charge from Stripe",
               charge_id: charge_id,
-              error:
-                if(is_struct(error), do: error.message, else: inspect(error)),
+              error: error.message,
               invoice_id: invoice_id
             )
 
@@ -2776,7 +2753,7 @@ defmodule Ysc.Stripe.WebhookHandler do
     # If payment_intent is not directly available, try to get it from charge
     payment_intent_id =
       if is_nil(payment_intent_id) && charge_id do
-        case Stripe.Charge.retrieve(charge_id, %{expand: ["payment_intent"]}) do
+        case Stripe.Charge.retrieve(charge_id, expand: ["payment_intent"]) do
           {:ok, charge} ->
             charge.payment_intent
 
@@ -2865,29 +2842,15 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp do_fetch_transactions(payout_id, acc, starting_after) do
     require Ysc.Logging
 
-    params = %{
-      payout: payout_id,
-      limit: 100,
-      expand: ["data.source"]
-    }
+    params = %{payout: payout_id, limit: 100}
 
-    # Add the cursor if we have one
     params =
       if starting_after,
         do: Map.put(params, :starting_after, starting_after),
         else: params
 
-    # Check if BalanceTransaction.all is available
-    result =
-      if Code.ensure_loaded(Stripe.BalanceTransaction) &&
-           function_exported?(Stripe.BalanceTransaction, :all, 1) do
-        Stripe.BalanceTransaction.all(params)
-      else
-        {:error, :not_available}
-      end
-
-    case result do
-      {:ok, %{data: data, has_more: true}} when is_list(data) ->
+    case Stripe.BalanceTransaction.all(params, expand: ["data.source"]) do
+      {:ok, %Stripe.List{data: data, has_more: true}} when is_list(data) ->
         last_id = List.last(data) |> extract_balance_transaction_id()
 
         Ysc.Logging.debug("Fetched balance transactions page",
@@ -2909,42 +2872,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           {:ok, acc ++ data}
         end
 
-      {:ok, %{data: data, has_more: false}} when is_list(data) ->
-        Ysc.Logging.debug("Fetched final balance transactions page",
-          payout_id: payout_id,
-          page_size: length(data),
-          has_more: false
-        )
-
-        {:ok, acc ++ data}
-
-      {:ok, %Stripe.List{data: data, has_more: true}} when is_list(data) ->
-        # Handle Stripe.List struct format (backwards compatibility)
-        last_id = List.last(data) |> extract_balance_transaction_id()
-
-        Ysc.Logging.debug("Fetched balance transactions page (List format)",
-          payout_id: payout_id,
-          page_size: length(data),
-          has_more: true,
-          last_id: last_id
-        )
-
-        if last_id do
-          do_fetch_transactions(payout_id, acc ++ data, last_id)
-        else
-          Ysc.Logging.warning(
-            "Could not extract last_id from balance transactions, stopping pagination",
-            payout_id: payout_id,
-            page_size: length(data)
-          )
-
-          {:ok, acc ++ data}
-        end
-
       {:ok, %Stripe.List{data: data, has_more: false}} when is_list(data) ->
-        # Handle Stripe.List struct format (backwards compatibility)
-        Ysc.Logging.debug(
-          "Fetched final balance transactions page (List format)",
+        Ysc.Logging.debug("Fetched final balance transactions page",
           payout_id: payout_id,
           page_size: length(data),
           has_more: false
@@ -2956,22 +2885,10 @@ defmodule Ysc.Stripe.WebhookHandler do
         Ysc.Logging.error("Failed to fetch balance transactions",
           payout_id: payout_id,
           error: inspect(reason),
-          error_type:
-            if(is_struct(reason), do: reason.__struct__, else: :unknown)
+          error_type: reason.__struct__
         )
 
         {:error, reason}
-
-      unexpected ->
-        Ysc.Logging.error(
-          "Unexpected response format from BalanceTransaction.all",
-          payout_id: payout_id,
-          response_type: inspect(unexpected.__struct__ || :map),
-          response_keys:
-            if(is_map(unexpected), do: Map.keys(unexpected), else: [])
-        )
-
-        {:error, {:unexpected_format, unexpected}}
     end
   end
 
@@ -3126,7 +3043,6 @@ defmodule Ysc.Stripe.WebhookHandler do
               case result do
                 :ok -> {linked + 1, skipped}
                 :skipped -> {linked, skipped + 1}
-                _ -> {linked, skipped + 1}
               end
             end)
 

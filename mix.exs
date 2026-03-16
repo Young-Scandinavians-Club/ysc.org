@@ -10,6 +10,11 @@ defmodule Ysc.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:mix, :credo, :stripity_stripe, :duckdbex],
+        list_unused_filters: true
+      ],
       test_coverage: [
         tool: ExCoveralls,
         ignore_modules: [
@@ -81,6 +86,7 @@ defmodule Ysc.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 0.1"},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:dns_cluster, "~> 0.2"},
       {:duckdbex, "~> 0.3.21", only: [:dev], runtime: false},
       {:ecto_enum, "~> 1.4"},
@@ -88,7 +94,6 @@ defmodule Ysc.MixProject do
       {:ecto_sql, "~> 3.13"},
       {:ecto_ulid, "~> 0.3"},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
-      {:exgravatar, "~> 2.0"},
       {:ex_aws_s3, "~> 2.0"},
       {:ex_aws, "~> 2.1"},
       {:ex_cldr_calendars, "~> 2.4"},
@@ -102,6 +107,7 @@ defmodule Ysc.MixProject do
       {:ex_money_sql, "~> 1.0"},
       {:ex_phone_number, "~> 0.4"},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
+      {:exgravatar, "~> 2.0"},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.17"},
       {:floki, ">= 0.30.0"},
@@ -114,8 +120,8 @@ defmodule Ysc.MixProject do
       {:iso, ">= 0.0.0"},
       {:jason, "~> 1.4"},
       {:let_me, "~> 1.2.3"},
-      {:locus, "~> 2.3"},
       {:live_toast, "~> 0.8.0"},
+      {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:mjml_eex, "~> 0.13"},
       {:mogrify, "~> 0.8"},
@@ -168,6 +174,7 @@ defmodule Ysc.MixProject do
         "format",
         "compile",
         "credo --strict",
+        "dialyzer",
         "shell_lint"
       ],
       test: [

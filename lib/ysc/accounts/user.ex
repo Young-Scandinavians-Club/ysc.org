@@ -8,6 +8,8 @@ defmodule Ysc.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{}
+
   alias Ysc.Extensions.PhoneNumber
   alias Ysc.Accounts.{Address, FamilyMember, SignupApplication, User}
 

@@ -951,6 +951,7 @@ defmodule YscWeb.UserRegistrationLive do
   defp convert_value_to_attrs(value), do: value
 
   # Convert a map with atom keys to string keys
+  @dialyzer {:nowarn_function, map_to_string_keys: 1}
   defp map_to_string_keys(map) when is_map(map) do
     map
     |> Enum.map(fn

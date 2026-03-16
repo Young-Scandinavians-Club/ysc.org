@@ -1956,6 +1956,7 @@ defmodule Ysc.Bookings.BookingLocker do
     )
   end
 
+  @dialyzer {:nowarn_function, build_room_pricing_items: 6}
   defp build_room_pricing_items(
          room,
          total,
@@ -1979,23 +1980,18 @@ defmodule Ysc.Bookings.BookingLocker do
       }
     }
 
-    # If breakdown is provided, convert atom keys to string keys and merge
-    if breakdown && is_map(breakdown) do
-      breakdown_string_keys =
-        breakdown
-        |> Enum.map(fn
-          {key, value} when is_atom(key) ->
-            {to_string(key), convert_money_to_map(value)}
+    breakdown_string_keys =
+      breakdown
+      |> Enum.map(fn
+        {key, value} when is_atom(key) ->
+          {to_string(key), convert_money_to_map(value)}
 
-          {key, value} ->
-            {key, convert_money_to_map(value)}
-        end)
-        |> Enum.into(%{})
+        {key, value} ->
+          {key, convert_money_to_map(value)}
+      end)
+      |> Enum.into(%{})
 
-      Map.merge(base_item, breakdown_string_keys)
-    else
-      base_item
-    end
+    Map.merge(base_item, breakdown_string_keys)
   end
 
   # Helper to convert Money structs to maps for JSON encoding

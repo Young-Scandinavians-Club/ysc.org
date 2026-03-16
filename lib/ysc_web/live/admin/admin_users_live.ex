@@ -1178,7 +1178,7 @@ defmodule YscWeb.AdminUsersLive do
              current_user
            ) do
         :ok ->
-          if note != "" and note != nil do
+          if note != "" do
             Accounts.create_user_note(
               user,
               %{"note" => note, "category" => "rejection"},

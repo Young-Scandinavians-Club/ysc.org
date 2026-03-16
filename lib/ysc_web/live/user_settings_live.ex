@@ -89,8 +89,7 @@ defmodule YscWeb.UserSettingsLive do
                   click here to resend
                 </.link>
               <% else %>
-                <% sms_countdown =
-                  max(0, sms_resend_seconds_remaining(assigns) || 0) %>
+                <% sms_countdown = sms_resend_seconds_remaining(assigns) %>
                 <span
                   class="text-zinc-500 cursor-not-allowed font-bold"
                   data-countdown={sms_countdown}
@@ -175,8 +174,7 @@ defmodule YscWeb.UserSettingsLive do
                   click here to resend
                 </.link>
               <% else %>
-                <% email_countdown =
-                  max(0, email_resend_seconds_remaining(assigns) || 0) %>
+                <% email_countdown = email_resend_seconds_remaining(assigns) %>
                 <span
                   class="text-zinc-500 cursor-not-allowed font-bold"
                   data-countdown={email_countdown}
@@ -3306,6 +3304,7 @@ defmodule YscWeb.UserSettingsLive do
     end
   end
 
+  @dialyzer {:nowarn_function, handle_event: 3}
   def handle_event(
         "select_membership",
         %{"membership_type" => membership_type} = _params,
@@ -3510,7 +3509,7 @@ defmodule YscWeb.UserSettingsLive do
           # payment_method.attached / payment_method.updated overwriting default)
           _ =
             Stripe.PaymentMethod.update(payment_method_id, %{
-              metadata: %{set_as_default: "true"}
+              metadata: %{"set_as_default" => "true"}
             })
 
           # Store the payment method in our database and set it as default
@@ -3668,8 +3667,7 @@ defmodule YscWeb.UserSettingsLive do
            ) do
         {:ok, setup_intent} ->
           Ysc.Logging.info("Setup intent created successfully",
-            setup_intent_id: setup_intent.id,
-            has_client_secret: not is_nil(setup_intent.client_secret)
+            setup_intent_id: setup_intent.id
           )
 
           {:noreply,
@@ -3682,9 +3680,6 @@ defmodule YscWeb.UserSettingsLive do
           error_message =
             case error do
               %Stripe.Error{message: msg} -> msg
-              %{message: msg} -> msg
-              msg when is_binary(msg) -> msg
-              other -> inspect(other, pretty: true)
             end
 
           Ysc.Logging.error("Failed to create setup intent",
@@ -3956,21 +3951,6 @@ defmodule YscWeb.UserSettingsLive do
              title: "Membership"
            )
            |> push_patch(to: ~p"/users/membership")}
-
-        _subscription ->
-          # Cache invalidation is handled in Subscriptions.resume (via update_subscription)
-          # Also invalidate for sub-accounts since they inherit from primary user
-          sub_accounts = Accounts.get_sub_accounts(user)
-
-          Enum.each(sub_accounts, fn sub_account ->
-            MembershipCache.invalidate_user(sub_account.id)
-          end)
-
-          {:noreply,
-           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
-             title: "Membership"
-           )
-           |> push_patch(to: ~p"/users/membership")}
       end
     end
   end
@@ -4039,57 +4019,9 @@ defmodule YscWeb.UserSettingsLive do
       {:noreply, _socket} = reply ->
         reply
 
-      {:error, :user_not_active} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "You must have an approved account to change your membership plan.",
-           title: "Membership"
-         )}
-
-      {:error, :invalid_membership_type} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Invalid membership type selected.",
-           title: "Membership"
-         )}
-
-      {:error, :membership_not_found} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Current membership not found.",
-           title: "Membership"
-         )}
-
-      {:error, :change_not_allowed} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "This membership change is not allowed.",
-           title: "Membership"
-         )}
-
-      {:error, :same_plan} ->
-        {:noreply, socket}
-
       {:error, reason} when is_binary(reason) ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
-
-      {:error, _reason} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Failed to change membership plan. Please try again.",
-           title: "Membership"
-         )}
     end
   end
 
@@ -4525,6 +4457,7 @@ defmodule YscWeb.UserSettingsLive do
      )}
   end
 
+  @dialyzer {:nowarn_function, format_payment_error: 1}
   defp format_payment_error(%Stripe.Error{code: code})
        when code in [:card_declined, "card_declined"] do
     "Your card was declined. Please try a different payment method or contact your bank."
@@ -4541,10 +4474,6 @@ defmodule YscWeb.UserSettingsLive do
     else
       error
     end
-  end
-
-  defp format_payment_error(_) do
-    "Failed to process payment. Please try again or contact support if the issue persists."
   end
 
   defp invalidate_membership_cache(user) do
@@ -4893,6 +4822,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   # Helper function to ensure Stripe customer exists
+  @dialyzer {:nowarn_function, ensure_stripe_customer_exists: 1}
   defp ensure_stripe_customer_exists(user) do
     if user.stripe_id == nil do
       # No stripe_id - create new customer

@@ -4682,7 +4682,6 @@ defmodule YscWeb.AdminBookingsLive do
         error_message =
           case reason do
             {:refund_failed, _} -> "Failed to process refund. Please try again."
-            _ -> "Failed to approve refund. Please try again."
           end
 
         {:noreply, YscWeb.Flash.put_toast(socket, :error, error_message)}
@@ -4750,7 +4749,6 @@ defmodule YscWeb.AdminBookingsLive do
         error_message =
           case reason do
             {:refund_failed, _} -> "Failed to process refund. Please try again."
-            _ -> "Failed to approve refund. Please try again."
           end
 
         {:noreply, YscWeb.Flash.put_toast(socket, :error, error_message)}

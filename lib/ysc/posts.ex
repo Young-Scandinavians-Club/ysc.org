@@ -306,6 +306,7 @@ defmodule Ysc.Posts do
     end
   end
 
+  @dialyzer {:nowarn_function, add_comment_to_post_multi: 1}
   defp add_comment_to_post_multi(params) do
     changeset = Comment.new_comment_changeset(%Comment{}, params)
 

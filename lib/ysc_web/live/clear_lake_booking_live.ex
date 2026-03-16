@@ -3360,10 +3360,6 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         [subscription | _] ->
           get_membership_type_from_subscription(subscription)
-
-        multiple ->
-          most_expensive = get_most_expensive_subscription(multiple)
-          get_membership_type_from_subscription(most_expensive)
       end
     end
   end
@@ -3373,39 +3369,6 @@ defmodule YscWeb.ClearLakeBookingLive do
       nil -> :none
       plan_id -> plan_id
     end
-  end
-
-  defp get_most_expensive_subscription(subscriptions) do
-    membership_plans = Application.get_env(:ysc, :membership_plans, [])
-
-    price_to_amount =
-      Map.new(membership_plans, fn plan ->
-        {plan.stripe_price_id, plan.amount}
-      end)
-
-    Enum.max_by(subscriptions, fn subscription ->
-      subscription_items =
-        case subscription.subscription_items do
-          %Ecto.Association.NotLoaded{} ->
-            # Preload subscription items if not loaded
-            subscription = Ysc.Repo.preload(subscription, :subscription_items)
-            subscription.subscription_items
-
-          items when is_list(items) ->
-            items
-
-          _ ->
-            []
-        end
-
-      case subscription_items do
-        [item | _] ->
-          Map.get(price_to_amount, item.stripe_price_id, 0)
-
-        _ ->
-          0
-      end
-    end)
   end
 
   defp date_to_datetime_string(nil), do: ""
@@ -3437,7 +3400,6 @@ defmodule YscWeb.ClearLakeBookingLive do
     case URI.parse(uri) do
       %URI{query: nil} -> %{}
       %URI{query: query} -> parse_query_string(query)
-      _ -> %{}
     end
   end
 
@@ -3450,8 +3412,6 @@ defmodule YscWeb.ClearLakeBookingLive do
       end
     end)
   end
-
-  defp find_malformed_query_key(_), do: nil
 
   defp parse_query_string(nil), do: %{}
   defp parse_query_string(""), do: %{}
@@ -3872,7 +3832,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   defp normalize_guests_count(guests_count) do
-    if guests_count, do: min(max(guests_count, 1), @max_guests), else: 1
+    min(max(guests_count, 1), @max_guests)
   end
 
   defp normalize_booking_mode(booking_mode) do

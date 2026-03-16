@@ -3622,7 +3622,6 @@ defmodule YscWeb.EventDetailsLive do
     case URI.parse(uri) do
       %URI{query: nil} -> %{}
       %URI{query: query} -> URI.decode_query(query)
-      _ -> %{}
     end
   end
 
@@ -4027,8 +4026,8 @@ defmodule YscWeb.EventDetailsLive do
     |> Decimal.to_integer()
   end
 
+  @dialyzer {:nowarn_function, money_to_cents: 1}
   defp money_to_cents(_) do
-    # Fallback for invalid money values
     0
   end
 

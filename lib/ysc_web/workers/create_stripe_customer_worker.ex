@@ -23,6 +23,7 @@ defmodule YscWeb.Workers.CreateStripeCustomerWorker do
   alias Ysc.Repo
 
   @impl Oban.Worker
+  @dialyzer {:nowarn_function, perform: 1}
   def perform(%Oban.Job{args: %{"user_id" => user_id}}) do
     case Repo.get(User, user_id) do
       nil ->

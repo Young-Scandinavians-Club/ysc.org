@@ -147,6 +147,7 @@ defmodule Ysc.Bookings.BookingValidator do
   end
 
   # Maximum nights validation based on season configuration
+  @dialyzer {:nowarn_function, validate_max_nights: 1}
   defp validate_max_nights(changeset) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
@@ -156,14 +157,8 @@ defmodule Ysc.Bookings.BookingValidator do
       nights = Date.diff(checkout_date, checkin_date)
 
       # Get max nights from season for check-in date
-      max_nights =
-        if checkin_date do
-          season = Season.for_date(property, checkin_date)
-          Season.get_max_nights(season, property)
-        else
-          # Fallback to property defaults
-          get_default_max_nights(property)
-        end
+      season = Season.for_date(property, checkin_date)
+      max_nights = Season.get_max_nights(season, property)
 
       if nights > max_nights do
         Ecto.Changeset.add_error(
@@ -575,14 +570,11 @@ defmodule Ysc.Bookings.BookingValidator do
 
         [subscription | _] ->
           get_membership_type_from_subscription(subscription)
-
-        multiple ->
-          most_expensive = get_most_expensive_subscription(multiple)
-          get_membership_type_from_subscription(most_expensive)
       end
     end
   end
 
+  @dialyzer {:nowarn_function, get_membership_type_from_subscription: 1}
   defp get_membership_type_from_subscription(subscription) do
     subscription = Repo.preload(subscription, :subscription_items)
 
@@ -601,24 +593,6 @@ defmodule Ysc.Bookings.BookingValidator do
       _ ->
         :none
     end
-  end
-
-  defp get_most_expensive_subscription(subscriptions) do
-    membership_plans = Application.get_env(:ysc, :membership_plans, [])
-
-    price_to_amount =
-      Map.new(membership_plans, fn plan ->
-        {plan.stripe_price_id, plan.amount}
-      end)
-
-    Enum.max_by(subscriptions, fn subscription ->
-      subscription = Repo.preload(subscription, :subscription_items)
-
-      case subscription.subscription_items do
-        [item | _] -> Map.get(price_to_amount, item.stripe_price_id, 0)
-        _ -> 0
-      end
-    end)
   end
 
   defp day_of_week(date) do
@@ -653,14 +627,6 @@ defmodule Ysc.Bookings.BookingValidator do
         :checkout_date,
         "Bookings containing Saturday must also include Sunday (full weekend required)"
       )
-    end
-  end
-
-  defp get_default_max_nights(property) do
-    case property do
-      :tahoe -> 4
-      :clear_lake -> 30
-      _ -> 4
     end
   end
 

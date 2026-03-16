@@ -78,15 +78,13 @@ defmodule YscWeb.Emails.BookingRefundPending do
     refund_percentage =
       if payment && Money.positive?(payment.amount) &&
            Money.positive?(pending_refund.policy_refund_amount) do
-        case Money.div(pending_refund.policy_refund_amount, payment.amount) do
-          {:ok, ratio} ->
-            Decimal.mult(ratio, Decimal.new(100))
-            |> Decimal.round(1)
-            |> Decimal.to_float()
-
-          _ ->
-            nil
-        end
+        Decimal.div(
+          pending_refund.policy_refund_amount.amount,
+          payment.amount.amount
+        )
+        |> Decimal.mult(Decimal.new(100))
+        |> Decimal.round(1)
+        |> Decimal.to_float()
       else
         nil
       end

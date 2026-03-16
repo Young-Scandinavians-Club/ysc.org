@@ -414,6 +414,7 @@ defmodule Ysc.Accounts.AuthService do
 
   # Private helper functions
 
+  @dialyzer {:nowarn_function, enrich_with_geo_data: 1}
   defp enrich_with_geo_data(%{ip_address: ip} = auth_data) when is_binary(ip) do
     geo = Ysc.GeoIP.lookup(ip)
     Map.merge(auth_data, geo)

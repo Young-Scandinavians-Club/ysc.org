@@ -8,7 +8,7 @@ defmodule Ysc.Stripe.PaymentIntentBehaviour do
               {:ok, Stripe.PaymentIntent.t()} | {:error, Stripe.Error.t()}
 
   @callback list(params :: map()) ::
-              {:ok, Stripe.List.t()} | {:error, Stripe.Error.t()}
+              {:ok, Stripe.List.t(any())} | {:error, Stripe.Error.t()}
 
   @callback cancel(payment_intent_id :: String.t(), params :: map()) ::
               {:ok, Stripe.PaymentIntent.t()} | {:error, Stripe.Error.t()}

@@ -383,10 +383,10 @@ defmodule YscWeb.UserLoginLive do
         allow_credentials: allow_credentials
       )
 
-    Ysc.Logging.debug("[UserLoginLive] Authentication challenge created", %{
+    Ysc.Logging.debug("[UserLoginLive] Authentication challenge created",
       challenge_bytes_length: byte_size(challenge.bytes),
       timeout: challenge.timeout
-    })
+    )
 
     # Convert challenge to JSON-serializable format for JS
     # Note: We omit allow_credentials from the JSON to enable discoverable credentials
@@ -484,23 +484,23 @@ defmodule YscWeb.UserLoginLive do
   def handle_event("verify_authentication", response, socket) do
     require Ysc.Logging
 
-    Ysc.Logging.info("[UserLoginLive] verify_authentication event received", %{
+    Ysc.Logging.info("[UserLoginLive] verify_authentication event received",
       has_response: !is_nil(response),
-      response_keys: if(response, do: Map.keys(response), else: []),
-      has_raw_id: !is_nil(response && response["rawId"]),
-      has_id: !is_nil(response && response["id"]),
-      has_response_object: !is_nil(response && response["response"])
-    })
+      response_keys: Map.keys(response),
+      has_raw_id: !is_nil(response["rawId"]),
+      has_id: !is_nil(response["id"]),
+      has_response_object: !is_nil(response["response"])
+    )
 
     challenge = socket.assigns.passkey_challenge
     auth_mode = socket.assigns[:passkey_auth_mode] || :non_discoverable
 
-    Ysc.Logging.debug("[UserLoginLive] Verification state", %{
+    Ysc.Logging.debug("[UserLoginLive] Verification state",
       has_challenge: !is_nil(challenge),
       auth_mode: auth_mode,
       challenge_bytes_length:
         if(challenge, do: byte_size(challenge.bytes), else: nil)
-    })
+    )
 
     if is_nil(challenge) do
       Ysc.Logging.warning(
@@ -521,7 +521,7 @@ defmodule YscWeb.UserLoginLive do
       # All binary data from JavaScript is Base64URL encoded and must be decoded here
       raw_id_string = response["rawId"] || response["id"]
 
-      Ysc.Logging.debug("[UserLoginLive] Decoding authentication response", %{
+      Ysc.Logging.debug("[UserLoginLive] Decoding authentication response",
         raw_id_string: raw_id_string,
         has_authenticator_data:
           !is_nil(response["response"]["authenticatorData"]),
@@ -529,7 +529,7 @@ defmodule YscWeb.UserLoginLive do
         has_signature: !is_nil(response["response"]["signature"]),
         has_user_handle: !is_nil(response["response"]["userHandle"]),
         response_keys: Map.keys(response["response"] || %{})
-      })
+      )
 
       raw_id = Base.url_decode64!(raw_id_string, padding: false)
 
@@ -546,13 +546,13 @@ defmodule YscWeb.UserLoginLive do
       signature =
         Base.url_decode64!(response["response"]["signature"], padding: false)
 
-      Ysc.Logging.debug("[UserLoginLive] Decoded authentication data", %{
+      Ysc.Logging.debug("[UserLoginLive] Decoded authentication data",
         raw_id_length: byte_size(raw_id),
         raw_id_hex: Base.encode16(raw_id, case: :lower),
         authenticator_data_length: byte_size(authenticator_data),
         client_data_json_length: byte_size(client_data_json),
         signature_length: byte_size(signature)
-      })
+      )
 
       # Find passkey by external_id first (needed for verification)
       case Ysc.Accounts.get_user_passkey_by_external_id(raw_id) do
@@ -668,17 +668,15 @@ defmodule YscWeb.UserLoginLive do
                   if passkey.external_id != raw_id do
                     Ysc.Logging.error(
                       "[UserLoginLive] CRITICAL: raw_id from response does not match passkey.external_id",
-                      %{
-                        raw_id_hex: Base.encode16(raw_id, case: :lower),
-                        raw_id_base64url:
-                          Base.url_encode64(raw_id, padding: false),
-                        passkey_external_id_hex:
-                          Base.encode16(passkey.external_id, case: :lower),
-                        passkey_external_id_base64url:
-                          Base.url_encode64(passkey.external_id, padding: false),
-                        lengths_match:
-                          byte_size(raw_id) == byte_size(passkey.external_id)
-                      }
+                      raw_id_hex: Base.encode16(raw_id, case: :lower),
+                      raw_id_base64url:
+                        Base.url_encode64(raw_id, padding: false),
+                      passkey_external_id_hex:
+                        Base.encode16(passkey.external_id, case: :lower),
+                      passkey_external_id_base64url:
+                        Base.url_encode64(passkey.external_id, padding: false),
+                      lengths_match:
+                        byte_size(raw_id) == byte_size(passkey.external_id)
                     )
 
                     {:noreply,
@@ -838,7 +836,7 @@ defmodule YscWeb.UserLoginLive do
        ) do
     require Ysc.Logging
 
-    Ysc.Logging.info("[UserLoginLive] verify_passkey_authentication called", %{
+    Ysc.Logging.info("[UserLoginLive] verify_passkey_authentication called",
       passkey_id: passkey.id,
       passkey_user_id: passkey.user_id,
       passkey_user_id_hex: Base.encode16(passkey.user_id, case: :lower),
@@ -850,7 +848,7 @@ defmodule YscWeb.UserLoginLive do
       passkey_sign_count: passkey.sign_count,
       ids_match: passkey.external_id == raw_id,
       user_ids_match: passkey.user_id == user_id
-    })
+    )
 
     # For Wax.authenticate, we must use the raw_id from the response
     # This is the credential_id that the browser/authenticator used, and it must match
@@ -859,13 +857,13 @@ defmodule YscWeb.UserLoginLive do
     # because Wax.authenticate validates it against the authenticator_data structure
     credential_id_to_verify = raw_id
 
-    Ysc.Logging.debug("[UserLoginLive] Calling Wax.authenticate", %{
+    Ysc.Logging.debug("[UserLoginLive] Calling Wax.authenticate",
       credential_id_length: byte_size(credential_id_to_verify),
       authenticator_data_length: byte_size(authenticator_data),
       signature_length: byte_size(signature),
       client_data_json_length: byte_size(client_data_json),
       challenge_bytes_length: byte_size(challenge.bytes)
-    })
+    )
 
     # Verify the authentication
     # For discoverable credentials, Wax.authenticate needs the public key to verify the signature.
@@ -893,19 +891,17 @@ defmodule YscWeb.UserLoginLive do
         # So we allow >= instead of > to handle the first use case
         new_sign_count = authenticator_data.sign_count
 
-        Ysc.Logging.debug("[UserLoginLive] Checking sign_count", %{
+        Ysc.Logging.debug("[UserLoginLive] Checking sign_count",
           new_sign_count: new_sign_count,
           passkey_sign_count: passkey.sign_count,
           sign_count_valid: new_sign_count >= passkey.sign_count
-        })
+        )
 
         if new_sign_count >= passkey.sign_count do
           Ysc.Logging.info(
             "[UserLoginLive] Sign count check passed, proceeding with login",
-            %{
-              user_id: user_id,
-              user_id_hex: Base.encode16(user_id, case: :lower)
-            }
+            user_id: user_id,
+            user_id_hex: Base.encode16(user_id, case: :lower)
           )
 
           # Update passkey sign_count and last_used_at
@@ -954,14 +950,11 @@ defmodule YscWeb.UserLoginLive do
 
           require Ysc.Logging
 
-          Ysc.Logging.info("[UserLoginLive] Redirecting to passkey login", %{
-            redirect_url: redirect_url,
+          Ysc.Logging.info("[UserLoginLive] Redirecting to passkey login",
             base_path: base_path,
-            query_string: query_string,
-            user_id_hex: Base.encode16(user_id, case: :lower),
-            query_params: query_params,
-            has_redirect_to: Map.has_key?(query_params, "redirect_to")
-          })
+            has_redirect_to: Map.has_key?(query_params, "redirect_to"),
+            has_token: Map.has_key?(query_params, "token")
+          )
 
           {:noreply,
            socket
@@ -995,9 +988,9 @@ defmodule YscWeb.UserLoginLive do
         # Log the error with full context
         error_string = inspect(reason, pretty: true, limit: :infinity)
 
-        Ysc.Logging.error("[UserLoginLive] Wax.authenticate failed", %{
+        Ysc.Logging.error("[UserLoginLive] Wax.authenticate failed",
           error: error_string,
-          error_type: if(is_exception(reason), do: :exception, else: :unknown),
+          error_type: :exception,
           passkey_id: passkey.id,
           passkey_user_id: passkey.user_id,
           passkey_user_id_hex: Base.encode16(passkey.user_id, case: :lower),
@@ -1010,7 +1003,7 @@ defmodule YscWeb.UserLoginLive do
           authenticator_data_length: byte_size(authenticator_data),
           signature_length: byte_size(signature),
           client_data_json_length: byte_size(client_data_json)
-        })
+        )
 
         {:noreply,
          YscWeb.Flash.put_toast(

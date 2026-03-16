@@ -1150,7 +1150,7 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp parse_money(amount_string) when is_binary(amount_string) do
     case Money.new(:USD, amount_string) do
-      {:ok, money} -> money
+      %Money{} = money -> money
       _ -> nil
     end
   end
@@ -1274,7 +1274,7 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp parse_amount_to_money(amount) when is_binary(amount) do
     case Money.new(:USD, amount) do
-      {:ok, money} -> money
+      %Money{} = money -> money
       _ -> Money.new(0, :USD)
     end
   end

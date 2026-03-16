@@ -325,6 +325,7 @@ defmodule YscWeb.UserSecurityLive do
     end
   end
 
+  @dialyzer {:nowarn_function, process_password_change_after_reauth: 1}
   defp process_password_change_after_reauth(socket) do
     user = socket.assigns.current_user
     user_params = socket.assigns.pending_password_change

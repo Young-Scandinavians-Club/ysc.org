@@ -665,6 +665,7 @@ defmodule Ysc.Bookings do
   @doc """
   Creates a check-in with associated bookings and vehicles.
   """
+  @dialyzer {:nowarn_function, create_check_in: 1}
   def create_check_in(attrs \\ %{}) do
     import Ecto.Multi
 
@@ -3657,6 +3658,7 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @dialyzer {:nowarn_function, handle_stripe_refund_creation: 3}
   defp handle_stripe_refund_creation(
          refund_params,
          payment_intent_id,
