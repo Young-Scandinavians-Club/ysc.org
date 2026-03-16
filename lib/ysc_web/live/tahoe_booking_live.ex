@@ -6,10 +6,10 @@ defmodule YscWeb.TahoeBookingLive do
   @dialyzer {:nowarn_function, max_rooms_for_user: 1}
   @dialyzer {:nowarn_function, get_room_image_url: 1}
   @dialyzer {:nowarn_function, validate_and_create_booking: 1}
-  # render/1 is compiled from a large ~H template; dialyzer cannot accurately
-  # trace boolean types through the macro-generated &&/|| chains in :if= guards,
-  # causing spurious pattern_match warnings (Pattern: false, Type: true).
-  @dialyzer {:nowarn_function, render: 1}
+  # extract_room_id_from_value/1 is only called from the branch where
+  # Map.has_key?(params, "value") is true, so dialyzer infers `value` as
+  # binary() and flags the `true ->` catch-all in the cond as unreachable.
+  @dialyzer {:no_match, extract_room_id_from_value: 1}
 
   alias Ysc.Bookings
 
