@@ -72,9 +72,12 @@ html.sidebar-collapsed #admin-collapse-chevron {
         display: flex !important;
         opacity: 0;
         max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
         overflow: hidden;
         pointer-events: none;
-        transition: opacity 200ms ease 40ms, max-height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+        transition: opacity 200ms ease 40ms, max-height 300ms cubic-bezier(0.4, 0, 0.2, 1),
+                    padding 300ms cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     #admin-nav-user-full {
@@ -153,6 +156,8 @@ html.sidebar-collapsed #admin-collapse-chevron {
     html.sidebar-collapsed #admin-nav-user-collapsed {
         opacity: 1;
         max-height: 80px;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
         pointer-events: auto;
     }
 }
