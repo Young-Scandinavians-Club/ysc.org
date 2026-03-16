@@ -727,6 +727,7 @@ defmodule YscWeb.TahoeBookingLive do
     ~H"""
     <div
       id="tahoe-booking-page"
+      class="overflow-x-hidden"
       phx-hook={if assigns[:scroll_to_section], do: "ScrollToSection", else: nil}
       data-section={
         if assigns[:scroll_to_section], do: assigns.scroll_to_section, else: nil
