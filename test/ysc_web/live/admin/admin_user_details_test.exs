@@ -425,6 +425,86 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "profile form - save fields with incomplete billing address" do
+    test "admin can change role when user has no billing address", %{conn: conn} do
+      user = user_fixture(%{role: :member})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert has_element?(view, "#user-profile-form")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "role" => "admin",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      updated = Ysc.Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.role == :admin
+    end
+
+    test "admin can change state when user has no billing address", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "suspended",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      updated = Ysc.Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :suspended
+    end
+
+    test "admin can change first name when user has no billing address", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Alice"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "first_name" => "Alicia",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      updated = Ysc.Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.first_name == "Alicia"
+    end
+  end
+
   defp register_and_log_in_admin(%{conn: conn}) do
     user = user_fixture(%{role: :admin})
     %{conn: log_in_user(conn, user), user: user}

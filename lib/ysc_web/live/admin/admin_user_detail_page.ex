@@ -208,6 +208,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         <div :if={@live_action == :profile} class="max-w-lg px-2 space-y-8">
           <.simple_form
             for={@form}
+            id="user-profile-form"
             phx-change="validate"
             phx-submit="save"
             class="py-8"
