@@ -5,7 +5,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
   Covers index (list), calendar view, and lookup (by last name) actions,
   including property filtering, date filtering, and validation errors.
   """
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   import Ysc.BookingsFixtures
   import Ysc.AccountsFixtures
@@ -37,10 +37,11 @@ defmodule YscWeb.Api.BookingsControllerTest do
   @test_token "test-kiosk-secret"
 
   setup %{conn: conn} do
+    previous = Application.get_env(:ysc, :kiosk_api_key)
     Application.put_env(:ysc, :kiosk_api_key, @test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, "dev-kiosk-key")
+      Application.put_env(:ysc, :kiosk_api_key, previous)
     end)
 
     authed_conn =

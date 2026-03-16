@@ -4,15 +4,16 @@ defmodule YscWeb.Api.PropertiesControllerTest do
 
   Covers static property info, settings overrides, and validation.
   """
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   @test_token "test-kiosk-secret"
 
   setup %{conn: conn} do
+    prev = Application.get_env(:ysc, :kiosk_api_key)
     Application.put_env(:ysc, :kiosk_api_key, @test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, "dev-kiosk-key")
+      Application.put_env(:ysc, :kiosk_api_key, prev)
     end)
 
     authed_conn =

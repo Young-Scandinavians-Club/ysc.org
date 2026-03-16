@@ -9,10 +9,11 @@ defmodule YscWeb.Plugs.MobileAPIAuthTest do
   @test_token "test-kiosk-secret"
 
   setup do
+    original_kiosk_key = Application.get_env(:ysc, :kiosk_api_key)
     Application.put_env(:ysc, :kiosk_api_key, @test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, "dev-kiosk-key")
+      Application.put_env(:ysc, :kiosk_api_key, original_kiosk_key)
     end)
 
     :ok
@@ -79,6 +80,10 @@ defmodule YscWeb.Plugs.MobileAPIAuthTest do
 
       assert conn.halted
       assert conn.status == 401
+
+      assert Jason.decode!(conn.resp_body) == %{
+               "error" => "Invalid authorization token"
+             }
     end
   end
 

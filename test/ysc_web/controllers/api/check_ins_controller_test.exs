@@ -5,17 +5,18 @@ defmodule YscWeb.Api.CheckInsControllerTest do
   Covers successful check-in, input validation, property scope enforcement,
   vehicle handling, and malformed payload protection.
   """
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   import Ysc.BookingsFixtures
 
   @test_token "test-kiosk-secret"
 
   setup %{conn: conn} do
+    prev = Application.get_env(:ysc, :kiosk_api_key)
     Application.put_env(:ysc, :kiosk_api_key, @test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, "dev-kiosk-key")
+      Application.put_env(:ysc, :kiosk_api_key, prev)
     end)
 
     authed_conn =
