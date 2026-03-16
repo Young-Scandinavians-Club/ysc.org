@@ -449,7 +449,7 @@ defmodule YscWeb.AdminComponents do
         <%!-- Fixed bottom user card (expanded) --%>
         <div
           id="admin-nav-user-full"
-          class="flex-shrink-0 px-4 py-4 border-t border-zinc-800 bg-zinc-900"
+          class="flex-shrink-0 px-5 py-4 border-t border-zinc-800 bg-zinc-900"
         >
           <.user_card
             email={@email}
