@@ -358,6 +358,7 @@ defmodule Ysc.ExpenseReports do
     end
   end
 
+  @dialyzer {:nowarn_function, send_expense_report_emails_impl: 1}
   defp send_expense_report_emails_impl(%ExpenseReport{} = expense_report) do
     require Ysc.Logging
 
@@ -391,19 +392,9 @@ defmodule Ysc.ExpenseReports do
       Ysc.Logging.info("send_expense_report_emails_impl: Email data prepared",
         expense_report_id: expense_report.id,
         email_data_keys: Map.keys(email_data),
-        email_data_expense_report_keys:
-          if(Map.has_key?(email_data, :expense_report),
-            do: Map.keys(email_data.expense_report),
-            else: :not_present
-          ),
+        email_data_expense_report_keys: Map.keys(email_data.expense_report),
         email_data_first_name: Map.get(email_data, :first_name),
-        expense_items_count:
-          if(
-            Map.has_key?(email_data, :expense_report) &&
-              Map.has_key?(email_data.expense_report, :expense_items),
-            do: length(email_data.expense_report.expense_items),
-            else: :not_present
-          )
+        expense_items_count: length(email_data.expense_report.expense_items)
       )
 
       subject = ExpenseReportConfirmation.get_subject()
@@ -506,16 +497,8 @@ defmodule Ysc.ExpenseReports do
           "send_expense_report_emails_impl: Treasurer email data prepared",
           expense_report_id: expense_report.id,
           email_data_keys: Map.keys(email_data),
-          email_data_expense_report_keys:
-            if(Map.has_key?(email_data, :expense_report),
-              do: Map.keys(email_data.expense_report),
-              else: :not_present
-            ),
-          email_data_user_keys:
-            if(Map.has_key?(email_data, :user),
-              do: Map.keys(email_data.user),
-              else: :not_present
-            )
+          email_data_expense_report_keys: Map.keys(email_data.expense_report),
+          email_data_user_keys: Map.keys(email_data.user)
         )
 
         subject = ExpenseReportTreasurerNotification.get_subject()

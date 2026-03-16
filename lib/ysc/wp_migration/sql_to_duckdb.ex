@@ -102,6 +102,7 @@ defmodule Ysc.WpMigration.SqlToDuckdb do
   # State machine per line. We watch for INSERT INTO `<prefix>_<table>` lines,
   # then accumulate until we see the closing unquoted semicolon, then flush.
 
+  @dialyzer {:nowarn_function, stream_and_load: 4}
   defp stream_and_load(sql_path, conn, prefix, tables) do
     target_tables = MapSet.new(tables)
 

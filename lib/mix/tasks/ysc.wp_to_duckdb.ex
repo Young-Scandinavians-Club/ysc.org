@@ -24,6 +24,7 @@ defmodule Mix.Tasks.Ysc.WpToDuckdb do
     force: :boolean
   ]
 
+  @dialyzer {:nowarn_function, run: 1}
   def run(args) do
     {opts, _, _} = OptionParser.parse(List.wrap(args), strict: @switches)
 

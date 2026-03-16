@@ -8,6 +8,8 @@ defmodule Ysc.Ledgers.Refund do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{}
+
   @reference_prefix "RFD"
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}

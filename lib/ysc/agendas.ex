@@ -65,6 +65,7 @@ defmodule Ysc.Agendas do
     end
   end
 
+  @dialyzer {:nowarn_function, update_agenda_position: 3}
   def update_agenda_position(event_id, agenda, new_index) do
     %Agenda{} = agenda
 
@@ -86,6 +87,7 @@ defmodule Ysc.Agendas do
     end
   end
 
+  @dialyzer {:nowarn_function, update_agenda_item_position: 3}
   def update_agenda_item_position(event_id, agenda_item, new_index) do
     %AgendaItem{} = agenda_item
 
@@ -113,6 +115,7 @@ defmodule Ysc.Agendas do
     end
   end
 
+  @dialyzer {:nowarn_function, move_agenda_item_to_agenda: 4}
   def move_agenda_item_to_agenda(event_id, agenda_item, agenda, at_index) do
     %AgendaItem{} = agenda_item
 
@@ -213,6 +216,7 @@ defmodule Ysc.Agendas do
     AgendaItem.changeset(agenda_item_or_changeset, attrs)
   end
 
+  @dialyzer {:nowarn_function, create_agenda_item: 3}
   def create_agenda_item(event_id, agenda, attrs \\ %{}) do
     changeset = AgendaItem.changeset(%AgendaItem{agenda_id: agenda.id}, attrs)
 
@@ -250,6 +254,7 @@ defmodule Ysc.Agendas do
     Agenda.changeset(agenda, attrs)
   end
 
+  @dialyzer {:nowarn_function, create_agenda: 2}
   def create_agenda(event, attrs \\ %{}) do
     changeset = Agenda.changeset(%Agenda{event_id: event.id}, attrs)
 
@@ -285,10 +290,12 @@ defmodule Ysc.Agendas do
     end
   end
 
+  @dialyzer {:nowarn_function, multi_update_all: 4}
   defp multi_update_all(multi, name, func, opts \\ []) do
     Ecto.Multi.update_all(multi, name, func, opts)
   end
 
+  @dialyzer {:nowarn_function, multi_reposition: 6}
   defp multi_reposition(
          %Ecto.Multi{} = multi,
          name,

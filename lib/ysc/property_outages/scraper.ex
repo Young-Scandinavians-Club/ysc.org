@@ -97,26 +97,13 @@ defmodule Ysc.PropertyOutages.Scraper do
       {:ok, provider}
     rescue
       error ->
-        error_info =
-          if is_exception(error) do
-            %{
-              exception_type: error.__struct__,
-              message: Exception.message(error)
-            }
-          else
-            %{error: inspect(error)}
-          end
-
         Ysc.Logging.error(
           "Failed to scrape outages from provider",
-          Map.merge(
-            %{
-              provider: provider,
-              error: inspect(error),
-              stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-            },
-            error_info
-          )
+          provider: provider,
+          error: inspect(error),
+          exception_type: error.__struct__,
+          message: Exception.message(error),
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
         )
 
         {:error, provider}
@@ -246,7 +233,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
         Ysc.Logging.debug("Optimum API response headers",
           content_encoding: content_encoding,
-          body_size: if(is_binary(body), do: byte_size(body), else: 0)
+          body_size: byte_size(body)
         )
 
         # Decompress the body if it's compressed
@@ -276,13 +263,9 @@ defmodule Ysc.PropertyOutages.Scraper do
 
         # Log response body preview for debugging
         body_preview =
-          if is_binary(decompressed_body) do
-            decompressed_body
-            |> String.slice(0, 500)
-            |> String.replace(~r/\n/, " ")
-          else
-            inspect(decompressed_body)
-          end
+          decompressed_body
+          |> String.slice(0, 500)
+          |> String.replace(~r/\n/, " ")
 
         Ysc.Logging.debug("Optimum API response preview",
           body_preview: body_preview
@@ -301,11 +284,7 @@ defmodule Ysc.PropertyOutages.Scraper do
             Ysc.Logging.error("Failed to parse Optimum JSON response",
               error: inspect(reason),
               body_preview: body_preview,
-              body_length:
-                if(is_binary(decompressed_body),
-                  do: byte_size(decompressed_body),
-                  else: 0
-                )
+              body_length: byte_size(decompressed_body)
             )
 
             {:error, :parse_error}
@@ -316,12 +295,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         {:error, :not_found}
 
       {:ok, %{status: status, body: body}} ->
-        body_preview =
-          if is_binary(body) do
-            body |> String.slice(0, 200)
-          else
-            inspect(body)
-          end
+        body_preview = body |> String.slice(0, 200)
 
         Ysc.Logging.error("Unexpected status code from Optimum API",
           status: status,
@@ -332,22 +306,10 @@ defmodule Ysc.PropertyOutages.Scraper do
 
       {:error, reason} ->
         error_details =
-          case reason do
-            %{__struct__: _} ->
-              Map.from_struct(reason)
-              |> Map.take([:reason, :message, :exception, :kind, :stacktrace])
-              |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-              |> Map.new()
-
-            map when is_map(map) ->
-              map
-
-            tuple when is_tuple(tuple) ->
-              tuple
-
-            other ->
-              other
-          end
+          Map.from_struct(reason)
+          |> Map.take([:reason, :message, :exception, :kind, :stacktrace])
+          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+          |> Map.new()
 
         Ysc.Logging.error("Network error fetching Optimum outages",
           error: inspect(reason),
@@ -488,7 +450,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
         Ysc.Logging.debug("Liberty Utilities API response headers",
           content_encoding: content_encoding,
-          body_size: if(is_binary(body), do: byte_size(body), else: 0)
+          body_size: byte_size(body)
         )
 
         # Try to parse as JSON first (Finch might have already decompressed)
@@ -543,17 +505,12 @@ defmodule Ysc.PropertyOutages.Scraper do
                 {:error, reason} ->
                   # Log detailed error information
                   body_preview =
-                    if is_binary(decompressed_body) do
-                      # Try to show first few bytes as hex for binary data
-                      if String.valid?(decompressed_body) do
-                        decompressed_body
-                        |> String.slice(0, 500)
-                        |> String.replace(~r/\n/, " ")
-                      else
-                        "Binary data (first 100 bytes): #{Base.encode16(:binary.part(decompressed_body, 0, min(100, byte_size(decompressed_body))))}"
-                      end
+                    if String.valid?(decompressed_body) do
+                      decompressed_body
+                      |> String.slice(0, 500)
+                      |> String.replace(~r/\n/, " ")
                     else
-                      inspect(decompressed_body)
+                      "Binary data (first 100 bytes): #{Base.encode16(:binary.part(decompressed_body, 0, min(100, byte_size(decompressed_body))))}"
                     end
 
                   Ysc.Logging.error(
@@ -561,11 +518,7 @@ defmodule Ysc.PropertyOutages.Scraper do
                     error: inspect(reason),
                     content_encoding: content_encoding,
                     body_preview: body_preview,
-                    body_length:
-                      if(is_binary(decompressed_body),
-                        do: byte_size(decompressed_body),
-                        else: 0
-                      )
+                    body_length: byte_size(decompressed_body)
                   )
 
                   {:error, :parse_error}
@@ -590,12 +543,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         {:error, :not_found}
 
       {:ok, %{status: status, body: body, headers: headers}} ->
-        body_preview =
-          if is_binary(body) do
-            body |> String.slice(0, 200)
-          else
-            inspect(body)
-          end
+        body_preview = body |> String.slice(0, 200)
 
         # Extract relevant headers
         response_headers =
@@ -616,7 +564,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           status: status,
           url: @liberty_api_url,
           body_preview: body_preview,
-          body_length: if(is_binary(body), do: byte_size(body), else: 0),
+          body_length: byte_size(body),
           response_headers: response_headers,
           account_id: @liberty_account_id
         )
@@ -625,25 +573,10 @@ defmodule Ysc.PropertyOutages.Scraper do
 
       {:error, reason} ->
         error_details =
-          case reason do
-            %{__struct__: _} ->
-              # It's a struct, extract useful fields
-              Map.from_struct(reason)
-              |> Map.take([:reason, :message, :exception, :kind, :stacktrace])
-              |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-              |> Map.new()
-
-            map when is_map(map) ->
-              # It's already a map
-              map
-
-            tuple when is_tuple(tuple) ->
-              # It's a tuple like {:error, reason}
-              tuple
-
-            other ->
-              other
-          end
+          Map.from_struct(reason)
+          |> Map.take([:reason, :message, :exception, :kind, :stacktrace])
+          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+          |> Map.new()
 
         Ysc.Logging.error("Network error fetching Liberty Utilities outages",
           error: inspect(reason),
@@ -679,11 +612,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           commodity_type: incident["commodity_Type"],
           is_electricity: is_electricity,
           has_account: has_account,
-          affected_areas_count:
-            if(is_list(incident["affectedAreas"]),
-              do: length(incident["affectedAreas"]),
-              else: 0
-            )
+          affected_areas_count: length(incident["affectedAreas"] || [])
         )
 
         is_electricity && has_account
@@ -784,6 +713,7 @@ defmodule Ysc.PropertyOutages.Scraper do
     []
   end
 
+  @dialyzer {:nowarn_function, get_error_type: 1}
   defp get_error_type(error) do
     cond do
       is_atom(error) -> "atom"

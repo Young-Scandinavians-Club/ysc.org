@@ -1429,6 +1429,7 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @dialyzer {:nowarn_function, user_email_multi: 3}
   defp user_email_multi(user, email, context) do
     changeset =
       user
@@ -1495,6 +1496,7 @@ defmodule Ysc.Accounts do
   This is used when a user doesn't have a password yet and is setting one for the first time.
   Unlike update_user_password, this doesn't validate a current password.
   """
+  @dialyzer {:nowarn_function, set_user_initial_password: 2}
   def set_user_initial_password(user, attrs) do
     changeset = User.password_changeset(user, attrs)
 
@@ -1511,6 +1513,7 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @dialyzer {:nowarn_function, update_user_password: 3}
   def update_user_password(user, password, attrs) do
     changeset =
       user
@@ -1698,6 +1701,7 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @dialyzer {:nowarn_function, confirm_user_multi: 1}
   defp confirm_user_multi(user) do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, User.confirm_changeset(user))
@@ -1770,6 +1774,7 @@ defmodule Ysc.Accounts do
       {:error, %Ecto.Changeset{}}
 
   """
+  @dialyzer {:nowarn_function, reset_user_password: 2}
   def reset_user_password(user, attrs) do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, User.password_changeset(user, attrs))
@@ -1792,6 +1797,7 @@ defmodule Ysc.Accounts do
     |> Repo.one()
   end
 
+  @dialyzer {:nowarn_function, record_application_outcome: 4}
   def record_application_outcome(:approved, user, application, current_user) do
     with :ok <-
            Policy.authorize(:signup_application_update, current_user, %{
@@ -2542,6 +2548,7 @@ defmodule Ysc.Accounts do
   The user becomes independent and can purchase their own membership or join another family later.
   Returns {:ok, updated_user} or {:error, :not_sub_account}.
   """
+  @dialyzer {:nowarn_function, leave_family_membership: 1}
   def leave_family_membership(user) do
     if sub_account?(user) do
       primary_user_id = user.primary_user_id
@@ -2593,6 +2600,7 @@ defmodule Ysc.Accounts do
   Removes a sub-account from a family group.
   This makes the sub-account independent (no longer associated with primary).
   """
+  @dialyzer {:nowarn_function, remove_sub_account: 2}
   def remove_sub_account(sub_account, primary_user) do
     if sub_account.primary_user_id == primary_user.id do
       result =
@@ -2798,32 +2806,6 @@ defmodule Ysc.Accounts do
             _ ->
               :single
           end
-
-        multiple ->
-          membership_plans = Application.get_env(:ysc, :membership_plans, [])
-
-          price_to_type =
-            Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
-
-          multiple
-          |> Enum.map(fn s ->
-            s = Repo.preload(s, :subscription_items)
-
-            case s.subscription_items do
-              [item | _] ->
-                Map.get(price_to_type, item.stripe_price_id, :single)
-
-              _ ->
-                :single
-            end
-          end)
-          |> Enum.max_by(fn t ->
-            case t do
-              :family -> 2
-              :lifetime -> 3
-              _ -> 1
-            end
-          end)
       end
     end
   end

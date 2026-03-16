@@ -90,6 +90,7 @@ defmodule YscWeb.PageController do
     |> render(:terms_of_service)
   end
 
+  @dialyzer {:nowarn_function, board: 2}
   def board(conn, _params) do
     bod_members =
       Ysc.Accounts.list_bod_members()

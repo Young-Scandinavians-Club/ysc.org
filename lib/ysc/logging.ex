@@ -12,10 +12,10 @@ defmodule Ysc.Logging do
   - Sentry integration code is not compiled (no external calls during tests)
 
   ## Usage
-      
+
       # Basic error logging (automatically sent to Sentry in prod)
       Ysc.Logging.error("Failed to process payment", user_id: user.id)
-      
+
       # With exception and stacktrace
       rescue
         error ->
@@ -26,7 +26,7 @@ defmodule Ysc.Logging do
             tags: %{service: "stripe"}
           )
       end
-      
+
       # Other log levels work normally (not sent to Sentry)
       Ysc.Logging.info("User logged in", user_id: user.id)
       Ysc.Logging.warning("Rate limit approaching", current: 90, max: 100)
@@ -36,6 +36,78 @@ defmodule Ysc.Logging do
 
   # Compile-time check for test environment
   @in_test Mix.env() == :test
+
+  @doc false
+  def normalize_opts(opts) do
+    if is_map(opts), do: Enum.to_list(opts), else: opts
+  end
+
+  @doc false
+  def maybe_put_sentry_opt(opts, _key, nil), do: opts
+  def maybe_put_sentry_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  @doc false
+  def maybe_merge_extra(base, nil), do: base
+
+  def maybe_merge_extra(base, extra) when is_map(extra),
+    do: Map.merge(base, extra)
+
+  @doc false
+  def build_error_metadata(opts, nil, _stacktrace), do: opts
+
+  def build_error_metadata(opts, error, stacktrace) do
+    error_message =
+      if is_exception(error) do
+        Exception.message(error)
+      else
+        inspect(error)
+      end
+
+    base = Keyword.put(opts, :error, error_message)
+
+    if stacktrace do
+      Keyword.put(base, :stacktrace, Exception.format_stacktrace(stacktrace))
+    else
+      base
+    end
+  end
+
+  @doc false
+  def capture_sentry(
+        nil,
+        _stacktrace,
+        _sentry_extra,
+        _sentry_tags,
+        _message,
+        _opts
+      ),
+      do: :ok
+
+  def capture_sentry(
+        error,
+        stacktrace,
+        sentry_extra,
+        sentry_tags,
+        message,
+        opts
+      ) do
+    sentry_opts = []
+    sentry_opts = maybe_put_sentry_opt(sentry_opts, :stacktrace, stacktrace)
+
+    base_extra = %{log_message: message, metadata: Enum.into(opts, %{})}
+    final_extra = maybe_merge_extra(base_extra, sentry_extra)
+    sentry_opts = Keyword.put(sentry_opts, :extra, final_extra)
+    sentry_opts = maybe_put_sentry_opt(sentry_opts, :tags, sentry_tags)
+
+    if is_exception(error) do
+      Sentry.capture_exception(error, sentry_opts)
+    else
+      Sentry.capture_message(
+        "Error: #{message}",
+        Keyword.merge(sentry_opts, level: :error)
+      )
+    end
+  end
 
   @doc """
   Log an error message and automatically send to Sentry if error/exception is present.
@@ -52,17 +124,17 @@ defmodule Ysc.Logging do
 
       # Simple error log
       Ysc.Logging.error("Something went wrong", user_id: 123)
-      
+
       # With exception
       rescue
         _error ->
-          Ysc.Logging.error("Failed to save", 
+          Ysc.Logging.error("Failed to save",
             error: error,
             stacktrace: __STACKTRACE__,
             entity_id: entity.id
           )
       end
-      
+
       # With Sentry extras and tags
       Ysc.Logging.error("API call failed",
         error: error,
@@ -85,56 +157,21 @@ defmodule Ysc.Logging do
       else
         # In production: full Sentry integration
         quote do
-          if error do
-            sentry_opts = []
-
-            sentry_opts =
-              if stacktrace do
-                Keyword.put(sentry_opts, :stacktrace, stacktrace)
-              else
-                sentry_opts
-              end
-
-            # Build extra context for Sentry
-            base_extra = %{
-              log_message: message,
-              metadata: Enum.into(opts, %{})
-            }
-
-            final_extra =
-              if sentry_extra do
-                Map.merge(base_extra, sentry_extra)
-              else
-                base_extra
-              end
-
-            sentry_opts = Keyword.put(sentry_opts, :extra, final_extra)
-
-            sentry_opts =
-              if sentry_tags do
-                Keyword.put(sentry_opts, :tags, sentry_tags)
-              else
-                sentry_opts
-              end
-
-            # Capture the exception in Sentry
-            if is_exception(error) do
-              Sentry.capture_exception(error, sentry_opts)
-            else
-              # For non-exception errors, capture as a message
-              Sentry.capture_message(
-                "Error: #{message}",
-                Keyword.merge(sentry_opts, level: :error)
-              )
-            end
-          end
+          Ysc.Logging.capture_sentry(
+            error,
+            stacktrace,
+            sentry_extra,
+            sentry_tags,
+            message,
+            opts
+          )
         end
       end
 
     quote do
       require Logger
 
-      opts = unquote(opts)
+      opts = Ysc.Logging.normalize_opts(unquote(opts))
       message = unquote(message)
 
       # Extract Sentry-specific options
@@ -143,30 +180,8 @@ defmodule Ysc.Logging do
       {sentry_extra, opts} = Keyword.pop(opts, :extra)
       {sentry_tags, opts} = Keyword.pop(opts, :tags)
 
-      # Build Logger metadata from remaining options
       logger_metadata =
-        if error do
-          error_message =
-            if is_exception(error) do
-              Exception.message(error)
-            else
-              inspect(error)
-            end
-
-          base_metadata = Keyword.put(opts, :error, error_message)
-
-          if stacktrace do
-            Keyword.put(
-              base_metadata,
-              :stacktrace,
-              Exception.format_stacktrace(stacktrace)
-            )
-          else
-            base_metadata
-          end
-        else
-          opts
-        end
+        Ysc.Logging.build_error_metadata(opts, error, stacktrace)
 
       # Log to Logger (always, in all environments)
       Logger.error(message, logger_metadata)
@@ -184,7 +199,7 @@ defmodule Ysc.Logging do
   defmacro info(message, opts \\ []) do
     quote do
       require Logger
-      Logger.info(unquote(message), unquote(opts))
+      Logger.info(unquote(message), Ysc.Logging.normalize_opts(unquote(opts)))
     end
   end
 
@@ -194,7 +209,11 @@ defmodule Ysc.Logging do
   defmacro warning(message, opts \\ []) do
     quote do
       require Logger
-      Logger.warning(unquote(message), unquote(opts))
+
+      Logger.warning(
+        unquote(message),
+        Ysc.Logging.normalize_opts(unquote(opts))
+      )
     end
   end
 
@@ -204,7 +223,7 @@ defmodule Ysc.Logging do
   defmacro debug(message, opts \\ []) do
     quote do
       require Logger
-      Logger.debug(unquote(message), unquote(opts))
+      Logger.debug(unquote(message), Ysc.Logging.normalize_opts(unquote(opts)))
     end
   end
 end

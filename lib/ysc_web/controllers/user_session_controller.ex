@@ -283,7 +283,7 @@ defmodule YscWeb.UserSessionController do
           |> Map.merge(parsed)
       end
 
-    Ysc.Logging.info("[UserSessionController] passkey_login called", %{
+    Ysc.Logging.info("[UserSessionController] passkey_login called",
       params: params,
       query_params: conn.query_params,
       path_params: conn.path_params,
@@ -291,7 +291,7 @@ defmodule YscWeb.UserSessionController do
       parsed_params: parsed_params,
       has_token: Map.has_key?(parsed_params, "token"),
       has_redirect_to: Map.has_key?(parsed_params, "redirect_to")
-    })
+    )
 
     case parsed_params do
       %{"token" => token, "redirect_to" => redirect_to} ->
@@ -358,8 +358,6 @@ defmodule YscWeb.UserSessionController do
       end
     end)
   end
-
-  defp find_malformed_query_key(_), do: nil
 
   # sobelow_skip ["XSS.SendResp"]
   defp passkey_login_with_token(conn, token, redirect_to) do
@@ -506,9 +504,9 @@ defmodule YscWeb.UserSessionController do
       end
     else
       # Invalid user ID (e.g. user was deleted after token was issued)
-      Ysc.Logging.warning("[UserSessionController] User not found", %{
+      Ysc.Logging.warning("[UserSessionController] User not found",
         user_id_hex: Base.encode16(user_id, case: :lower)
-      })
+      )
 
       conn
       |> YscWeb.Flash.put_toast(:error, "Invalid login session.",

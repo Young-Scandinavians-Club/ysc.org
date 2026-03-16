@@ -5,6 +5,8 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{}
+
   alias Ysc.Accounts.{User, Address}
 
   alias Ysc.ExpenseReports.{

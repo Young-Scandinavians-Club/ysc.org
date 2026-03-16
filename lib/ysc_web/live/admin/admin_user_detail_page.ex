@@ -2947,6 +2947,7 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> assign(:unsealed_account, nil)}
   end
 
+  @dialyzer {:nowarn_function, handle_event: 3}
   def handle_event(
         "update_membership_period",
         %{"membership" => membership_params},

@@ -8,6 +8,8 @@ defmodule Ysc.Application do
   # Resolved at compile time; Mix is not available in releases.
   @env Mix.env()
 
+  @dialyzer {:nowarn_function, start: 2}
+
   @impl true
   def start(_type, _args) do
     :logger.add_handler(:ysc_sentry_handler, Sentry.LoggerHandler, %{

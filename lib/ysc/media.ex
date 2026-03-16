@@ -370,10 +370,8 @@ defmodule Ysc.Media do
   defp format_to_extension(format) do
     case format do
       :jpg -> ".jpg"
-      :jpeg -> ".jpg"
       :png -> ".png"
       :webp -> ".webp"
-      _ -> ".jpg"
     end
   end
 
@@ -453,9 +451,6 @@ defmodule Ysc.Media do
 
         {:error, reason} ->
           raise "Blurhash generation failed: #{inspect(reason)}"
-
-        other ->
-          raise "Blurhash generation returned unexpected result: #{inspect(other)}"
       end
 
     # Clean up any PNG file that Blurhash might have created in the original directory

@@ -18,6 +18,7 @@ defmodule Ysc.Customers do
       {:ok, %Stripe.Customer{}}
 
   """
+  @dialyzer {:nowarn_function, create_stripe_customer: 1}
   def create_stripe_customer(%User{} = user) do
     if Ysc.Env.test?() do
       # In tests we avoid calling the real Stripe API. We still persist a deterministic
@@ -125,6 +126,7 @@ defmodule Ysc.Customers do
       {:error, :no_stripe_customer}
 
   """
+  @dialyzer {:nowarn_function, update_stripe_customer: 1}
   def update_stripe_customer(%User{} = user) do
     if user.stripe_id do
       if Ysc.Env.test?() do
@@ -254,6 +256,7 @@ defmodule Ysc.Customers do
       {:ok, %Stripe.Subscription{}}
 
   """
+  @dialyzer {:nowarn_function, create_subscription: 2}
   def create_subscription(%User{} = user, params) do
     # Prevent sub-accounts from creating subscriptions
     if Ysc.Accounts.sub_account?(user) do
@@ -395,6 +398,7 @@ defmodule Ysc.Customers do
     Application.get_env(:ysc, :stripe_invoice_module, Stripe.Invoice)
   end
 
+  @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
   defp ensure_stripe_customer(%User{stripe_id: nil} = user) do
     case create_stripe_customer(user) do
       {:ok, _stripe_customer} ->

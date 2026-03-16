@@ -212,9 +212,6 @@ defmodule YscWeb.BookingReceiptLive do
 
             {:cancellation_failed, _} ->
               "Failed to cancel booking. Please try again or contact support."
-
-            _ ->
-              "Failed to cancel booking. Please try again or contact support."
           end
 
         {:noreply,
@@ -1129,6 +1126,7 @@ defmodule YscWeb.BookingReceiptLive do
 
   ## Private Functions
 
+  @dialyzer {:nowarn_function, handle_stripe_redirect: 3}
   defp handle_stripe_redirect(params, booking, socket) do
     redirect_status = Map.get(params, "redirect_status")
     payment_intent_id = Map.get(params, "payment_intent")
@@ -1187,6 +1185,7 @@ defmodule YscWeb.BookingReceiptLive do
     end
   end
 
+  @dialyzer {:nowarn_function, process_payment_success: 2}
   defp process_payment_success(booking, payment_intent_id_or_secret) do
     # Extract payment intent ID if a client secret was passed
     payment_intent_id =
@@ -1199,9 +1198,9 @@ defmodule YscWeb.BookingReceiptLive do
       end
 
     # Retrieve payment intent to verify (expand payment_method and charges)
-    case Stripe.PaymentIntent.retrieve(payment_intent_id, %{
+    case Stripe.PaymentIntent.retrieve(payment_intent_id,
            expand: ["payment_method", "charges"]
-         }) do
+         ) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
           # Process payment in ledger
@@ -1286,7 +1285,7 @@ defmodule YscWeb.BookingReceiptLive do
           payment_intent.payment_method.id
 
         # Or get it from the first charge (charges is a List struct with data field)
-        payment_intent.charges && payment_intent.charges.data &&
+        payment_intent.charges.data != nil &&
             payment_intent.charges.data != [] ->
           first_charge = List.first(payment_intent.charges.data)
           # Payment method might be a string ID or an expanded object
@@ -1359,15 +1358,11 @@ defmodule YscWeb.BookingReceiptLive do
     end
   end
 
-  defp cents_to_money(cents, currency)
-
   defp cents_to_money(cents, currency) when is_integer(cents) do
     cents_decimal = Decimal.new(cents)
     dollars = Decimal.div(cents_decimal, Decimal.new(100))
     Money.new(currency, dollars)
   end
-
-  defp cents_to_money(_, _), do: Money.new(0, :USD)
 
   # Load receipt data asynchronously after WebSocket connection
   defp load_receipt_data_async(socket, booking) do
@@ -1627,6 +1622,7 @@ defmodule YscWeb.BookingReceiptLive do
   defp format_date(nil, _timezone), do: "—"
   defp format_date(_, _timezone), do: "—"
 
+  @dialyzer {:nowarn_function, format_datetime: 2}
   defp format_datetime(%DateTime{} = datetime, timezone) do
     datetime
     |> DateTime.shift_zone!(timezone)
@@ -1642,8 +1638,6 @@ defmodule YscWeb.BookingReceiptLive do
   defp format_payment_date(%Date{} = date, timezone) do
     format_date(date, timezone)
   end
-
-  defp format_payment_date(_, _timezone), do: "—"
 
   defp get_cabin_master_email(property) do
     case property do

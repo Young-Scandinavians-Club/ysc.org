@@ -74,11 +74,6 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
             write_opts = write_options(path)
 
             case Image.write(stripped, tmp, write_opts) do
-              :ok ->
-                File.rename!(tmp, path)
-                Mix.shell().info("  ✓ Stripped metadata: #{path}")
-                :ok
-
               {:ok, _image} ->
                 File.rename!(tmp, path)
                 Mix.shell().info("  ✓ Stripped metadata: #{path}")

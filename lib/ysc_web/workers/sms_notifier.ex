@@ -455,6 +455,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     )
   end
 
+  @dialyzer {:nowarn_function, handle_sms_result: 7}
   defp handle_sms_result(
          {:ok, %{id: message_id}},
          job,

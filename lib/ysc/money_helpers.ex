@@ -36,9 +36,6 @@ defmodule Ysc.MoneyHelper do
 
         {decimal, _} ->
           Money.new(:USD, decimal)
-
-        _ ->
-          nil
       end
     end
   end

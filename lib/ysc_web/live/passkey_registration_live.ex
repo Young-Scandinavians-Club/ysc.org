@@ -294,8 +294,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
           {:error, reason} ->
             Ysc.Logging.error("[PasskeyRegistrationLive] Wax.register failed",
               error: inspect(reason, pretty: true, limit: :infinity),
-              user_id: user.id,
-              has_challenge: !is_nil(challenge)
+              user_id: user.id
             )
 
             {:noreply,

@@ -35,14 +35,8 @@ defmodule YscWeb.Validators.FileValidator do
          :ok <- File.close(file) do
       result
     else
-      {:error, reason} = error when is_atom(reason) ->
-        error
-
-      {:error, reason} ->
-        {:error, "Failed to validate file: #{inspect(reason)}"}
-
-      other ->
-        {:error, "Unexpected error validating file: #{inspect(other)}"}
+      {:error, reason} when is_atom(reason) ->
+        {:error, reason}
     end
   end
 

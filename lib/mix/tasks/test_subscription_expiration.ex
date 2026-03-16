@@ -65,6 +65,7 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.{ExpirationWorker, Subscription}
 
+  @dialyzer {:nowarn_function, run: 1}
   def run(args) do
     # Start the application
     Mix.Task.run("app.start")
@@ -525,6 +526,7 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
     end
   end
 
+  @dialyzer {:nowarn_function, trigger_renewal: 1}
   defp trigger_renewal(opts) do
     case get_user(opts) do
       nil ->

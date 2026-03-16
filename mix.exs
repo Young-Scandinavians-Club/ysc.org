@@ -12,6 +12,7 @@ defmodule Ysc.MixProject do
       deps: deps(),
       dialyzer: [
         plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:mix, :credo, :stripity_stripe, :duckdbex],
         list_unused_filters: true
       ],
       test_coverage: [

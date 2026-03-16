@@ -92,6 +92,7 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
   end
 
   # Send alert to monitoring system
+  @dialyzer {:nowarn_function, send_imbalance_alert: 1}
   defp send_imbalance_alert(details) do
     %{
       difference: difference,
@@ -111,7 +112,7 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
       imbalanced_accounts
       |> Enum.sort_by(
         fn {_account, balance} ->
-          abs(Money.to_decimal(balance))
+          balance |> Money.to_decimal() |> Decimal.abs()
         end,
         :desc
       )

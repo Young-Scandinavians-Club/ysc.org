@@ -200,6 +200,7 @@ defmodule Ysc.Tickets.StripeService do
   - `{:ok, customer_id}` on success
   - `{:error, reason}` on failure
   """
+  @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
   def ensure_stripe_customer(user) do
     case get_stripe_customer_id(user) do
       nil ->

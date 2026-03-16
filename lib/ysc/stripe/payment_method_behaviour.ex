@@ -11,5 +11,5 @@ defmodule Ysc.Stripe.PaymentMethodBehaviour do
               {:ok, Stripe.PaymentMethod.t()} | {:error, Stripe.Error.t()}
 
   @callback list(params :: map()) ::
-              {:ok, Stripe.List.t()} | {:error, Stripe.Error.t()}
+              {:ok, Stripe.List.t(any())} | {:error, Stripe.Error.t()}
 end

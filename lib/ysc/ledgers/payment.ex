@@ -8,6 +8,8 @@ defmodule Ysc.Ledgers.Payment do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{}
+
   @reference_prefix "PMT"
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}

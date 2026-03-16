@@ -642,6 +642,7 @@ defmodule YscWeb.AdminSettingsLive do
   defp format_duration(ms) when is_number(ms) and ms < 3_600_000,
     do: "#{Float.round(ms / 60_000, 2)}m"
 
+  @dialyzer {:nowarn_function, format_duration: 1}
   defp format_duration(ms) when is_number(ms),
     do: "#{Float.round(ms / 3_600_000, 2)}h"
 

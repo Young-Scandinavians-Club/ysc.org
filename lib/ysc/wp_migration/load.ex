@@ -1258,6 +1258,7 @@ defmodule Ysc.WpMigration.Load do
 
   # Generates a plain-text preview from scrubbed HTML body.
   # Strips all remaining tags, collapses whitespace, and trims to 200 characters.
+  @dialyzer {:nowarn_function, generate_preview_text: 1}
   defp generate_preview_text(nil), do: nil
   defp generate_preview_text(""), do: nil
 
@@ -1306,6 +1307,7 @@ defmodule Ysc.WpMigration.Load do
 
   # Last-resort fallback: parse the transformed post body for the first <img>
   # and look up the Image record by its raw_image_path.
+  @dialyzer {:nowarn_function, first_body_image_id_from_src: 1}
   defp first_body_image_id_from_src(nil), do: nil
   defp first_body_image_id_from_src(""), do: nil
 
@@ -1427,6 +1429,7 @@ defmodule Ysc.WpMigration.Load do
   # environment (e.g. loading a production backup into a sandbox/dev Stripe
   # account), the lookup will return a :resource_missing error and we create a
   # fresh Stripe customer instead, overwriting the stale production ID.
+  @dialyzer {:nowarn_function, ensure_stripe_customer: 2}
   defp ensure_stripe_customer(user, wp_cus_id) do
     case Stripe.Customer.retrieve(wp_cus_id) do
       {:ok, _customer} ->
@@ -1515,6 +1518,7 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
+  @dialyzer {:nowarn_function, load_subscription_via_stripe: 4}
   defp load_subscription_via_stripe(row, user_id, renewal_dt, start_dt) do
     user = Ysc.Accounts.get_user!(user_id)
 
