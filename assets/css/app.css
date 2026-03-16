@@ -12,6 +12,7 @@
     z-index: 10000;
 }
 
+
 /* Improve scrolling performance and prevent layout shifts */
 
 html {
@@ -26,6 +27,7 @@ html {
 [id^="presidents-"] {
     scroll-margin-top: 6rem;
 }
+
 
 /* No transition on body padding — it must snap in sync with the nav
    becoming fixed so there is zero layout shift. */
@@ -180,17 +182,16 @@ html {
    STICKY NAVBAR
    ============================================= */
 
+
 /* Transitions for the navbar */
 
 #rootNavbar {
     /* Shadow animates smoothly so the nav "lifts up" on scroll and
        "sits down" when the user returns to the top.
        Transform handles the mobile slide-in/out. */
-    transition: background-color 0.2s ease-out,
-                border-color 0.2s ease-out,
-                box-shadow 0.25s ease-out,
-                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.25s ease-out, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 
 /* ---- Sticky state ---- */
 
@@ -201,9 +202,11 @@ html {
     right: 0;
     z-index: 100;
     background-color: white;
-    border-bottom: 1px solid #f4f4f5; /* zinc-100 */
+    border-bottom: 1px solid #f4f4f5;
+    /* zinc-100 */
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
 }
+
 
 /* ---- Mobile: hide on scroll-down, reveal on scroll-up ---- */
 
@@ -213,20 +216,46 @@ html {
     }
 }
 
+
 /* =============================================
    HERO MODE — override transparent styles when sticky
    ============================================= */
 
+
+/*
+ * The nav is already position:fixed in hero mode so nav-sticky only needs to
+ * trigger the pseudo-element cross-fade.  Override the generic nav-sticky
+ * background/shadow rules here — those are handled by ::after instead.
+ */
+
 #site-header.hero-mode #rootNavbar.nav-sticky {
-    background-color: white;
+    background-color: transparent;
     background-image: none;
-    border-color: #f4f4f5;
+    border-color: transparent;
+    box-shadow: none;
 }
 
+
+/* Gradient fades out */
+
+#site-header.hero-mode #rootNavbar.nav-sticky::before {
+    opacity: 0;
+}
+
+
+/* White background fades in */
+
+#site-header.hero-mode #rootNavbar.nav-sticky::after {
+    opacity: 1;
+}
+
+
 /* Nav links back to dark */
+
 #site-header.hero-mode #rootNavbar.nav-sticky .nav-link,
 #site-header.hero-mode #rootNavbar.nav-sticky button.nav-link {
-    color: #18181b; /* zinc-900 */
+    color: #18181b;
+    /* zinc-900 */
     text-shadow: none;
 }
 
@@ -236,12 +265,16 @@ html {
     color: #18181b;
 }
 
+
 /* Hamburger icon back to dark */
+
 #site-header.hero-mode #rootNavbar.nav-sticky .nav-icon span {
     background: #18181b;
 }
 
+
 /* Hamburger button label back to dark */
+
 #site-header.hero-mode #rootNavbar.nav-sticky .menu-label,
 #site-header.hero-mode #rootNavbar.nav-sticky .hamburger-btn {
     color: #18181b;
@@ -252,7 +285,9 @@ html {
     background-color: #f4f4f5;
 }
 
+
 /* Avatar back to dark */
+
 #site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link {
     color: #18181b;
     text-shadow: none;
@@ -402,14 +437,55 @@ html {
     z-index: 50;
 }
 
+
+/*
+ * In hero mode, keep the navbar always position:fixed so there is no discrete
+ * position change (static → fixed) when the scroll threshold is crossed.
+ * That position jump was the root cause of the layout shift.
+ *
+ * Backgrounds are handled entirely by ::before (gradient) and ::after (white)
+ * pseudo-elements whose opacity is cross-faded.  This lets us smoothly
+ * transition between the two because opacity animates perfectly, while a
+ * direct transition between background-image and background-color does not.
+ */
+
 #site-header.hero-mode #rootNavbar {
-    background: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.45) 0%,
-        rgba(0, 0, 0, 0.12) 60%,
-        transparent 100%
-    );
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: transparent;
     border-color: transparent;
+}
+
+
+/* Gradient layer — visible by default, fades out when sticky */
+
+#site-header.hero-mode #rootNavbar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient( to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.12) 60%, transparent 100%);
+    opacity: 1;
+    transition: opacity 0.2s ease-out;
+    pointer-events: none;
+    z-index: -1;
+}
+
+
+/* White solid background — hidden by default, fades in when sticky */
+
+#site-header.hero-mode #rootNavbar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: white;
+    border-bottom: 1px solid #f4f4f5;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+    pointer-events: none;
+    z-index: -1;
 }
 
 
@@ -421,6 +497,7 @@ html {
 #site-header.hero-mode .hamburger-btn,
 #site-header.hero-mode #avatar-menu-link {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.5);
+    transition: color 0.2s ease-out, text-shadow 0.2s ease-out, background-color 0.15s ease-out;
 }
 
 #site-header.hero-mode .nav-link {
@@ -434,6 +511,7 @@ html {
 
 #site-header.hero-mode .nav-icon span {
     background: white;
+    transition: background-color 0.35s ease-out;
 }
 
 #site-header.hero-mode button.nav-link {
@@ -849,6 +927,7 @@ body.overflow-hidden {
     color: #1d4ed8;
 }
 
+
 /* Inline image figure created by GLightboxHook for plain <a><img>caption</a> */
 
 .post-render figure.post-render-image-figure {
@@ -915,7 +994,6 @@ body.overflow-hidden {
 .fi:before {
     content: " ";
 }
-
 
 
 /*
