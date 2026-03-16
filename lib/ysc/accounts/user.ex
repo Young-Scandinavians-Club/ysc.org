@@ -266,6 +266,18 @@ defmodule Ysc.Accounts.User do
   A changeset for updating user and address information together.
   """
   def update_user_with_address_changeset(user, attrs, opts \\ []) do
+    billing_attrs =
+      (attrs["billing_address"] || attrs[:billing_address] || %{})
+      |> Map.new(fn {k, v} -> {to_string(k), v} end)
+
+    billing_empty? =
+      Enum.all?(
+        ["address", "city", "region", "postal_code", "country"],
+        fn key ->
+          (billing_attrs[key] || "") == ""
+        end
+      )
+
     user
     |> cast(attrs, [
       :state,
@@ -280,7 +292,15 @@ defmodule Ysc.Accounts.User do
       :lifetime_membership_awarded_at,
       :date_of_birth
     ])
-    |> cast_assoc(:billing_address, with: &Address.changeset/2)
+    |> then(fn changeset ->
+      if billing_empty? do
+        changeset
+      else
+        cast_assoc(changeset, :billing_address,
+          with: &Address.optional_changeset/2
+        )
+      end
+    end)
     |> validate_length(:first_name, min: 1, max: 150)
     |> validate_length(:last_name, min: 1, max: 150)
     |> validate_required([:first_name, :last_name])

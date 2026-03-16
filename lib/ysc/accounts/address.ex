@@ -38,6 +38,20 @@ defmodule Ysc.Accounts.Address do
   end
 
   @doc """
+  A lenient changeset for admin contexts where address fields are optional.
+  Allows saving a user without requiring all address fields to be filled in.
+  """
+  def optional_changeset(address, attrs) do
+    address
+    |> cast(attrs, [:address, :city, :region, :postal_code, :country])
+    |> validate_length(:address, max: 255)
+    |> validate_length(:city, max: 100)
+    |> validate_length(:region, max: 100)
+    |> validate_length(:postal_code, max: 20)
+    |> validate_length(:country, max: 100)
+  end
+
+  @doc """
   Creates an address changeset from signup application data.
   """
   def from_signup_application_changeset(address, signup_application) do
