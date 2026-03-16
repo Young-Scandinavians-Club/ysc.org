@@ -416,7 +416,7 @@ defmodule Ysc.Messages do
           params: %{booking_id: 123}
         )
   """
-  @spec run_send_sms_idempotent(String.t(), String.t(), map() | keyword()) ::
+  @spec run_send_sms_idempotent(String.t(), String.t(), map()) ::
           {:ok, map()} | {:error, String.t()}
   def run_send_sms_idempotent(phone_number, body, attrs) do
     Ysc.Logging.debug("run_send_sms_idempotent called",

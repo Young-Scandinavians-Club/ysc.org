@@ -1600,7 +1600,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       Ysc.Logging.debug("Unhandled invoice webhook event",
         event_type: event_name,
-        event_object_type: inspect(event_object)
+        event_object_type: Map.get(event_object, "object")
       )
     end
 

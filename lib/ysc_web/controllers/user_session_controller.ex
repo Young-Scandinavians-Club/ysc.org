@@ -283,12 +283,21 @@ defmodule YscWeb.UserSessionController do
           |> Map.merge(parsed)
       end
 
+    redact = fn map ->
+      Map.filter(map, fn {k, _v} ->
+        k = String.downcase(to_string(k))
+
+        not (String.contains?(k, "token") or String.contains?(k, "pass") or
+               String.contains?(k, "secret") or k == "redirect_to")
+      end)
+    end
+
     Ysc.Logging.info("[UserSessionController] passkey_login called",
-      params: params,
-      query_params: conn.query_params,
+      params: redact.(params),
+      query_params: redact.(conn.query_params),
       path_params: conn.path_params,
-      merged_params: merged_params,
-      parsed_params: parsed_params,
+      merged_params: redact.(merged_params),
+      parsed_params: redact.(parsed_params),
       has_token: Map.has_key?(parsed_params, "token"),
       has_redirect_to: Map.has_key?(parsed_params, "redirect_to")
     )

@@ -6,7 +6,6 @@ defmodule YscWeb.TahoeBookingLive do
   @dialyzer {:nowarn_function, max_rooms_for_user: 1}
   @dialyzer {:nowarn_function, get_room_image_url: 1}
   @dialyzer {:nowarn_function, validate_and_create_booking: 1}
-  @dialyzer :no_match
 
   alias Ysc.Bookings
 
@@ -1567,7 +1566,8 @@ defmodule YscWeb.TahoeBookingLive do
                   :if={
                     can_select_multiple_rooms?(assigns) &&
                       length(@selected_room_ids) < max_rooms_for_user(assigns) &&
-                      parse_guests_count(@guests_count) > 1
+                      parse_guests_count(@guests_count) +
+                        parse_children_count(@children_count) > 1
                   }
                   class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded"
                 >
@@ -2106,7 +2106,8 @@ defmodule YscWeb.TahoeBookingLive do
                       @selected_booking_mode == :room &&
                         can_select_multiple_rooms?(assigns) &&
                         length(@selected_room_ids) < max_rooms_for_user(assigns) &&
-                        parse_guests_count(@guests_count) > 1
+                        parse_guests_count(@guests_count) +
+                          parse_children_count(@children_count) > 1
                     }
                     class="p-2 bg-blue-50 border border-blue-200 rounded"
                   >
@@ -5892,7 +5893,13 @@ defmodule YscWeb.TahoeBookingLive do
   defp format_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
       Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
+        placeholder = "%{#{key}}"
+
+        if String.contains?(acc, placeholder) do
+          String.replace(acc, placeholder, to_string(value))
+        else
+          acc
+        end
       end)
     end)
   end

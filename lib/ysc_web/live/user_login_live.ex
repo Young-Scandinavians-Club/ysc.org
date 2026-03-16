@@ -951,12 +951,9 @@ defmodule YscWeb.UserLoginLive do
           require Ysc.Logging
 
           Ysc.Logging.info("[UserLoginLive] Redirecting to passkey login",
-            redirect_url: redirect_url,
             base_path: base_path,
-            query_string: query_string,
-            user_id_hex: Base.encode16(user_id, case: :lower),
-            query_params: query_params,
-            has_redirect_to: Map.has_key?(query_params, "redirect_to")
+            has_redirect_to: Map.has_key?(query_params, "redirect_to"),
+            has_token: Map.has_key?(query_params, "token")
           )
 
           {:noreply,

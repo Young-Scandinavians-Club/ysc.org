@@ -262,10 +262,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           end
 
         # Log response body preview for debugging
-        body_preview =
-          decompressed_body
-          |> String.slice(0, 500)
-          |> String.replace(~r/\n/, " ")
+        body_preview = safe_body_preview(decompressed_body, 500)
 
         Ysc.Logging.debug("Optimum API response preview",
           body_preview: body_preview
@@ -295,7 +292,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         {:error, :not_found}
 
       {:ok, %{status: status, body: body}} ->
-        body_preview = body |> String.slice(0, 200)
+        body_preview = safe_body_preview(body, 200)
 
         Ysc.Logging.error("Unexpected status code from Optimum API",
           status: status,
@@ -504,14 +501,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
                 {:error, reason} ->
                   # Log detailed error information
-                  body_preview =
-                    if String.valid?(decompressed_body) do
-                      decompressed_body
-                      |> String.slice(0, 500)
-                      |> String.replace(~r/\n/, " ")
-                    else
-                      "Binary data (first 100 bytes): #{Base.encode16(:binary.part(decompressed_body, 0, min(100, byte_size(decompressed_body))))}"
-                    end
+                  body_preview = safe_body_preview(decompressed_body, 500)
 
                   Ysc.Logging.error(
                     "Failed to parse Liberty Utilities JSON response",
@@ -543,7 +533,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         {:error, :not_found}
 
       {:ok, %{status: status, body: body, headers: headers}} ->
-        body_preview = body |> String.slice(0, 200)
+        body_preview = safe_body_preview(body, 200)
 
         # Extract relevant headers
         response_headers =
@@ -1030,6 +1020,16 @@ defmodule Ysc.PropertyOutages.Scraper do
         booking_id: booking.id,
         outage_id: outage.incident_id
       )
+    end
+  end
+
+  defp safe_body_preview(body, limit) when is_binary(body) do
+    if String.valid?(body) do
+      body
+      |> String.slice(0, limit)
+      |> String.replace(~r/\n/, " ")
+    else
+      "Binary data (first 100 bytes): #{Base.encode16(:binary.part(body, 0, min(100, byte_size(body))))}"
     end
   end
 end

@@ -131,3 +131,4 @@ $RECYCLE.BIN/
 
 # Dialyzer PLTs
 /priv/plts/*.plt
+/priv/plts/*.plt.hash
