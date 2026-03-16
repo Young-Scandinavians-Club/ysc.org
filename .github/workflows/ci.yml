@@ -48,9 +48,6 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      - name: Clean removed LiveView Native build artifacts
-        run: mix deps.clean live_view_native live_view_native_swiftui live_view_native_stylesheet live_view_native_live_form --build
-
       - name: Compile
         run: mix compile --warnings-as-errors
 
@@ -140,9 +137,6 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      - name: Clean removed LiveView Native build artifacts
-        run: mix deps.clean live_view_native live_view_native_swiftui live_view_native_stylesheet live_view_native_live_form --build
-
       - name: Compile
         run: mix compile --warnings-as-errors
 
@@ -174,9 +168,6 @@ jobs:
 
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Clean removed LiveView Native build artifacts
-        run: mix deps.clean live_view_native live_view_native_swiftui live_view_native_stylesheet live_view_native_live_form --build
 
       - name: Compile
         run: mix compile --warnings-as-errors

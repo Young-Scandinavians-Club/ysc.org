@@ -62,8 +62,6 @@ defmodule YscWeb.CoverageRoutesSmokeTest do
 
       # Booking marketing pages (no auth required)
       assert {:ok, _view, _html} = live(conn, ~p"/bookings/tahoe")
-
-      # Note: /bookings/tahoe/staying-with is a native-only route (SwiftUI), skip in web test
       assert {:ok, _view, _html} = live(conn, ~p"/bookings/clear-lake")
 
       # Basic controllers (hit plug pipelines + controller code)
