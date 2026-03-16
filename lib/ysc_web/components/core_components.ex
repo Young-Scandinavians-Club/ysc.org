@@ -612,7 +612,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "block h-10 min-w-30 bg-white border rounded shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm",
+          "block w-full h-10 min-w-30 bg-white border rounded shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm",
           if(@label != "", do: "mt-2", else: "")
         ]}
         multiple={@multiple}
