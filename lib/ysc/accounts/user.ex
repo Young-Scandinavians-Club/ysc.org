@@ -266,7 +266,9 @@ defmodule Ysc.Accounts.User do
   A changeset for updating user and address information together.
   """
   def update_user_with_address_changeset(user, attrs, opts \\ []) do
-    billing_attrs = Map.get(attrs, "billing_address", %{})
+    billing_attrs =
+      (attrs["billing_address"] || attrs[:billing_address] || %{})
+      |> Map.new(fn {k, v} -> {to_string(k), v} end)
 
     billing_empty? =
       Enum.all?(

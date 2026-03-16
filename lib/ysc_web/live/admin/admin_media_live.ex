@@ -1113,7 +1113,7 @@ defmodule YscWeb.AdminMediaLive do
           <button
             phx-click={JS.patch(build_image_edit_url_with_state(assigns, item.id))}
             id={id}
-            class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg transition-all duration-200 overflow-hidden"
+            class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden"
           >
             <canvas
               id={"blur-hash-image-#{item.id}"}
