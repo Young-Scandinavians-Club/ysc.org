@@ -49,10 +49,5 @@ config :sentry,
   enable_source_code_context: true,
   root_source_code_paths: [File.cwd!()]
 
-# LiveView Native Stylesheet output in production: keep it small.
-config :live_view_native_stylesheet,
-  annotations: false,
-  pretty: false
-
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

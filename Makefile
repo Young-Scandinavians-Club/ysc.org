@@ -164,51 +164,6 @@ clean-elixir:  ## Clean up Elixir and Phoenix files
 clean: clean-elixir clean-docker  ## Clean docker and elixir
 
 ##
-# ~~~ iOS Build Targets ~~~
-##
-
-.PHONY: build-ios-ipad
-build-ios-ipad:  ## Build the iOS app for iPad target
-	@echo "$(BOLD)Building iOS app for iPad...$(RESET)"
-	@xcodebuild -project native/swiftui/Ysc.xcodeproj \
-		-scheme Ysc \
-		-destination 'generic/platform=iOS' \
-		-configuration Debug \
-		build
-	@echo "$(GREEN)Build complete!$(RESET)"
-
-.PHONY: run-ios-ipad-simulator
-run-ios-ipad-simulator:  ## Build and launch the iOS app in iPad simulator
-	@echo "$(BOLD)Building and launching iOS app in iPad simulator...$(RESET)"
-	@xcodebuild -project native/swiftui/Ysc.xcodeproj \
-		-scheme Ysc \
-		-destination 'platform=iOS Simulator,name=iPad' \
-		-configuration Debug \
-		-derivedDataPath build/ios \
-		build
-	@echo "$(BOLD)Finding iPad simulator...$(RESET)"
-	@SIMULATOR_UDID=$$(xcrun simctl list devices | grep -i "iPad" | grep -E '\([0-9A-F-]{36}\)' | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'); \
-	if [ -z "$$SIMULATOR_UDID" ]; then \
-		echo "$(RED)No iPad simulator found. Please create one in Xcode.$(RESET)"; \
-		exit 1; \
-	fi; \
-	echo "$(BOLD)Using simulator: $$SIMULATOR_UDID$(RESET)"; \
-	echo "$(BOLD)Booting simulator...$(RESET)"; \
-	xcrun simctl boot $$SIMULATOR_UDID 2>/dev/null || true; \
-	open -a Simulator; \
-	sleep 3; \
-	APP_PATH=$$(find build/ios/Build/Products/Debug-iphonesimulator -name "Ysc.app" -type d | head -1); \
-	if [ -z "$$APP_PATH" ]; then \
-		echo "$(RED)Could not find built app at build/ios/Build/Products/Debug-iphonesimulator/Ysc.app$(RESET)"; \
-		exit 1; \
-	fi; \
-	echo "$(BOLD)Installing app...$(RESET)"; \
-	xcrun simctl install $$SIMULATOR_UDID "$$APP_PATH" || (echo "$(RED)Installation failed$(RESET)" && exit 1); \
-	echo "$(BOLD)Launching app...$(RESET)"; \
-	xcrun simctl launch $$SIMULATOR_UDID com.example.Ysc || (echo "$(RED)Launch failed$(RESET)" && exit 1); \
-	echo "$(GREEN)App launched in iPad simulator!$(RESET)"
-
-##
 # ~~~ Release Targets ~~~
 ##
 

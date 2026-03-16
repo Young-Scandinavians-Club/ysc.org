@@ -366,4 +366,3 @@ Key metrics to monitor:
 2. **Wait Lists**: Queue system for sold-out events
 3. **Bulk Operations**: Admin tools for managing multiple orders
 4. **Analytics**: Detailed reporting on ticket sales
-5. **Mobile App**: Native mobile ticket management

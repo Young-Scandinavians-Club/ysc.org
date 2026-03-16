@@ -16,6 +16,7 @@ defmodule YscWeb.CoreComponents do
   """
   use Phoenix.Component
   use Gettext, backend: YscWeb.Gettext
+  use YscWeb, :verified_routes
 
   import Exgravatar
   alias Phoenix.LiveView.JS
@@ -2071,7 +2072,7 @@ defmodule YscWeb.CoreComponents do
     <img
       :if={!@no_circle}
       class={["object-contain", @class]}
-      src="/images/ysc_logo.png"
+      src={~p"/images/ysc_logo.png"}
       alt="The Young Scandinavian Club Logo"
       width={@width}
       height={@height}
@@ -2080,7 +2081,7 @@ defmodule YscWeb.CoreComponents do
     <img
       :if={@no_circle}
       class={["object-contain", @class]}
-      src="/images/ysc_logo_no_circle.svg"
+      src={~p"/images/ysc_logo_no_circle.svg"}
       alt="The Young Scandinavian Club Logo"
       width={@width}
       height={@height}
@@ -2112,36 +2113,12 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  @default_images %{
-    "DK" => %{
-      0 => "/images/default_avatars/denmark_flag.png",
-      1 => "/images/default_avatars/denmark_houses.png"
-    },
-    "FI" => %{
-      0 => "/images/default_avatars/finland_flag.png",
-      1 => "/images/default_avatars/finland_house.png"
-    },
-    "IS" => %{
-      0 => "/images/default_avatars/iceland_flag.png",
-      1 => "/images/default_avatars/iceland_landscape.png"
-    },
-    "NO" => %{
-      0 => "/images/default_avatars/norway_flag.png",
-      1 => "/images/default_avatars/norway_fjord.png"
-    },
-    "SE" => %{
-      0 => "/images/default_avatars/sweden_flag.png",
-      1 => "/images/default_avatars/sweden_houses.png"
-    }
-  }
-
   attr :email, :string, required: true
   attr :user_id, :string, required: true
   attr :country, :string, required: true
   attr :class, :string, default: ""
 
   def user_avatar_image(assigns) do
-    # Handle nil assigns gracefully
     email = assigns[:email] || "default@example.com"
     user_id = assigns[:user_id] || "0"
     country = assigns[:country] || "SE"
@@ -2151,12 +2128,7 @@ defmodule YscWeb.CoreComponents do
     image_id =
       user_id |> String.replace(~r/[^\d]/, "") |> String.to_integer() |> rem(2)
 
-    image_path =
-      Map.get(
-        Map.get(@default_images, country, @default_images["SE"]),
-        image_id,
-        "/images/default_avatars/sweden_flag.png"
-      )
+    image_path = default_avatar_path(country, image_id)
 
     assigns =
       assigns
@@ -2166,6 +2138,38 @@ defmodule YscWeb.CoreComponents do
     <img class={@class} src={@full_path} loading="lazy" alt="User avatar" />
     """
   end
+
+  defp default_avatar_path("DK", 0),
+    do: ~p"/images/default_avatars/denmark_flag.webp"
+
+  defp default_avatar_path("DK", 1),
+    do: ~p"/images/default_avatars/denmark_houses.webp"
+
+  defp default_avatar_path("FI", 0),
+    do: ~p"/images/default_avatars/finland_flag.webp"
+
+  defp default_avatar_path("FI", 1),
+    do: ~p"/images/default_avatars/finland_house.webp"
+
+  defp default_avatar_path("IS", 0),
+    do: ~p"/images/default_avatars/iceland_flag.webp"
+
+  defp default_avatar_path("IS", 1),
+    do: ~p"/images/default_avatars/iceland_landscape.webp"
+
+  defp default_avatar_path("NO", 0),
+    do: ~p"/images/default_avatars/norway_flag.webp"
+
+  defp default_avatar_path("NO", 1),
+    do: ~p"/images/default_avatars/norway_fjord.webp"
+
+  defp default_avatar_path("SE", 0),
+    do: ~p"/images/default_avatars/sweden_flag.webp"
+
+  defp default_avatar_path("SE", 1),
+    do: ~p"/images/default_avatars/sweden_houses.webp"
+
+  defp default_avatar_path(_, image_id), do: default_avatar_path("SE", image_id)
 
   defp full_path(email, image_path) do
     if Application.get_env(:ysc, :dev_routes, false) == true do

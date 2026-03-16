@@ -374,12 +374,11 @@ if config_env() == :prod do
     webhook_url: System.fetch_env!("DISCORD_WEBHOOK_URL"),
     enabled: true
 
-  # ## Native iOS API Key Configuration
+  # ## Kiosk API Key Configuration
   #
-  # Configure API key for native iOS app authentication.
-  # This key is used to validate requests from the iOS app.
-  # Set via NATIVE_API_KEY environment variable.
-  config :ysc, :native_api_key, System.get_env("NATIVE_API_KEY")
+  # Static token used by the property kiosk app (React Native).
+  # Set via KIOSK_API_KEY environment variable.
+  config :ysc, :kiosk_api_key, System.get_env("KIOSK_API_KEY")
 
   # ## Cloak Encryption Configuration
   #

@@ -301,28 +301,11 @@ config :ysc,
   stripe_customer_db_sync_delay_ms: 50,
   stripe_customer_db_sync_retry_delay_ms: 100
 
-config :phoenix_template, :format_encoders, swiftui: Phoenix.HTML.Engine
+config :phoenix_template, :format_encoders, []
 
 config :mime, :types, %{
-  "text/styles" => ["styles"],
-  "text/swiftui" => ["swiftui"]
+  "text/styles" => ["styles"]
 }
-
-config :live_view_native,
-  plugins: [
-    LiveViewNative.SwiftUI
-  ]
-
-config :phoenix, :template_engines, neex: LiveViewNative.Engine
-
-config :live_view_native_stylesheet,
-  content: [
-    swiftui: [
-      "lib/**/swiftui/*",
-      "lib/**/*swiftui*"
-    ]
-  ],
-  output: "priv/static/assets"
 
 # Ueberauth configuration
 # Provider credentials are configured at runtime in config/runtime.exs

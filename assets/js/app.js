@@ -48,7 +48,6 @@ import AutoConsumeUpload from "./auto_consume_upload";
 import ImageCarouselAutoplay from "./image_carousel_autoplay";
 import ReadingProgress from "./reading_progress";
 import TimelineFilter from "./timeline_filter";
-import PathTracker from "./path_tracker";
 import ReceiptLightbox from "./receipt_lightbox";
 import ScrollToSection from "./scroll_to_section";
 import PasskeyAuth from "./passkey_auth";
@@ -85,7 +84,6 @@ let Hooks = {
     ImageCarouselAutoplay,
     ReadingProgress,
     TimelineFilter,
-    PathTracker,
     ReceiptLightbox,
     ScrollToSection,
     PasskeyAuth,
