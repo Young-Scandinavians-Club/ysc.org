@@ -2822,7 +2822,7 @@ defmodule YscWeb.ExpenseReportLive do
           </div>
           <!-- Sticky Summary Sidebar -->
           <div class="lg:col-span-1">
-            <div class="lg:sticky lg:top-8">
+            <div class="lg:sticky lg:top-24">
               <!-- Mobile: Fixed bottom summary -->
               <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 shadow-lg z-40 p-4">
                 <div class="max-w-screen-xl mx-auto">
