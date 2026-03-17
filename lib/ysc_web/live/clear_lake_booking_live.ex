@@ -15,7 +15,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
 
-    today = Date.utc_today()
+    timezone = get_timezone_from_socket(socket)
+    today = today_in_timezone(timezone)
 
     {current_season, season_start_date, season_end_date} =
       SeasonHelpers.get_current_season_info(:clear_lake, today)
@@ -150,6 +151,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         meta_description:
           "Book a stay at the Young Scandinavians Club Clear Lake cabin. Choose your dates and guests.",
         property: :clear_lake,
+        timezone: timezone,
         user: user_with_subs,
         checkin_date: checkin_date,
         checkout_date: checkout_date,
@@ -295,7 +297,8 @@ defmodule YscWeb.ClearLakeBookingLive do
       {today, max_booking_date, current_season, season_start_date,
        season_end_date} =
         if dates_changed do
-          today = Date.utc_today()
+          timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+          today = today_in_timezone(timezone)
 
           {current_season, season_start_date, season_end_date} =
             SeasonHelpers.get_current_season_info(:clear_lake, today)
@@ -578,7 +581,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
                       {booking.reference_id}
                     </span>
-                    <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>
+                    <%= if Date.compare(booking.checkout_date, @today) == :eq do %>
                       <span class="text-xs font-bold text-amber-600 italic">
                         Today!
                       </span>
@@ -3991,4 +3994,18 @@ defmodule YscWeb.ClearLakeBookingLive do
         {true, true}
     end
   end
+
+  defp get_timezone_from_socket(socket) do
+    connect_params = get_connect_params(socket) || %{}
+    Map.get(connect_params, "timezone", "America/Los_Angeles")
+  end
+
+  defp today_in_timezone(timezone)
+       when is_binary(timezone) and timezone != "" do
+    DateTime.now!(timezone) |> DateTime.to_date()
+  rescue
+    _ -> Date.utc_today()
+  end
+
+  defp today_in_timezone(_), do: Date.utc_today()
 end

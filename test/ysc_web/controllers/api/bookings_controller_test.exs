@@ -133,6 +133,48 @@ defmodule YscWeb.Api.BookingsControllerTest do
       assert Map.has_key?(booking, "guests")
       assert Map.has_key?(booking, "check_ins")
     end
+
+    test "booking response includes full check-in and vehicle details", %{
+      conn: conn
+    } do
+      booking = booking_fixture()
+
+      {:ok, _check_in} =
+        Ysc.Bookings.create_check_in(%{
+          bookings: [booking],
+          rules_agreed: true,
+          vehicles: [
+            %{"type" => "sedan", "color" => "blue", "make" => "Toyota"},
+            %{"type" => "suv", "color" => "black", "make" => "Honda"}
+          ]
+        })
+
+      response =
+        get(
+          conn,
+          "/api/v1/mobile/bookings?property=tahoe&start_date=#{Date.to_iso8601(booking.checkin_date)}&end_date=#{Date.to_iso8601(booking.checkout_date)}"
+        )
+
+      assert %{"data" => bookings} = json_response(response, 200)
+      found = Enum.find(bookings, &(&1["id"] == to_string(booking.id)))
+      assert found != nil
+
+      assert [check_in | _] = found["check_ins"]
+      assert Map.has_key?(check_in, "id")
+      assert Map.has_key?(check_in, "checked_in_at")
+      assert check_in["rules_agreed"] == true
+      assert Map.has_key?(check_in, "vehicles")
+
+      assert [vehicle1, vehicle2] = check_in["vehicles"]
+      assert vehicle1["type"] == "sedan"
+      assert vehicle1["color"] == "blue"
+      assert vehicle1["make"] == "Toyota"
+      assert Map.has_key?(vehicle1, "id")
+
+      assert vehicle2["type"] == "suv"
+      assert vehicle2["color"] == "black"
+      assert vehicle2["make"] == "Honda"
+    end
   end
 
   describe "GET /api/v1/mobile/bookings/calendar (calendar)" do
@@ -263,6 +305,29 @@ defmodule YscWeb.Api.BookingsControllerTest do
         get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name=Xyzzy_NoMatch")
 
       assert %{"data" => []} = json_response(response, 200)
+    end
+
+    test "lookup returns check-ins with vehicle details", %{conn: conn} do
+      user = user_fixture(last_name: "VehicleTest")
+      booking = active_booking_fixture(user_id: user.id)
+
+      {:ok, _check_in} =
+        Ysc.Bookings.create_check_in(%{
+          bookings: [booking],
+          rules_agreed: true,
+          vehicles: [%{"type" => "truck", "color" => "red", "make" => "Ford"}]
+        })
+
+      response =
+        get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name=VehicleTest")
+
+      assert %{"data" => [found | _]} = json_response(response, 200)
+      assert found["id"] == to_string(booking.id)
+      assert [check_in | _] = found["check_ins"]
+      assert [vehicle | _] = check_in["vehicles"]
+      assert vehicle["type"] == "truck"
+      assert vehicle["color"] == "red"
+      assert vehicle["make"] == "Ford"
     end
   end
 end

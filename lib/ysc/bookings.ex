@@ -813,12 +813,13 @@ defmodule Ysc.Bookings do
         )
         |> Repo.all()
 
-      # Preload booking_guests with ordering separately
+      # Preload booking_guests, check_ins with vehicles
       Enum.map(bookings, fn booking ->
         booking
         |> Repo.preload([
           {:booking_guests,
-           from(bg in BookingGuest, order_by: [asc: bg.order_index])}
+           from(bg in BookingGuest, order_by: [asc: bg.order_index])},
+          check_ins: :check_in_vehicles
         ])
       end)
     end

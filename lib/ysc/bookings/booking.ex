@@ -73,7 +73,8 @@ defmodule Ysc.Bookings.Booking do
     field :checked_in, :boolean, default: false
 
     many_to_many :rooms, Ysc.Bookings.Room,
-      join_through: Ysc.Bookings.BookingRoom
+      join_through: Ysc.Bookings.BookingRoom,
+      on_replace: :delete
 
     belongs_to :user, Ysc.Accounts.User, foreign_key: :user_id, references: :id
 
