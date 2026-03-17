@@ -42,7 +42,7 @@ defmodule YscWeb.TahoeBookingLive do
     user = socket.assigns.current_user
 
     timezone = get_timezone_from_socket(socket)
-    today = today_in_timezone(timezone)
+    today = today_in_timezone(cabin_timezone())
 
     # Load seasons once using cache to avoid multiple queries
     alias Ysc.Bookings.SeasonCache
@@ -315,8 +315,7 @@ defmodule YscWeb.TahoeBookingLive do
 
     # Update if dates, guest counts, or tab have changed
     if should_update_availability(socket, parsed_params, tab_changed) do
-      timezone = socket.assigns[:timezone] || "America/Los_Angeles"
-      today = today_in_timezone(timezone)
+      today = today_in_timezone(cabin_timezone())
       seasons = socket.assigns.seasons
 
       {current_season, season_start_date, season_end_date} =
@@ -6344,7 +6343,7 @@ defmodule YscWeb.TahoeBookingLive do
       if socket.assigns.user do
         user = socket.assigns.user
         family_user_ids = get_family_group_user_ids(user)
-        today = Date.utc_today()
+        today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
         # Check for any active bookings (status = :complete) with checkout_date >= today
         has_active_booking =
@@ -6654,7 +6653,7 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp booking_still_active?(checkout_date) do
-    today = Date.utc_today()
+    today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
     Date.compare(checkout_date, today) == :gt or
       (Date.compare(checkout_date, today) == :eq and not past_checkout_time?())
@@ -6742,8 +6741,7 @@ defmodule YscWeb.TahoeBookingLive do
   # Get active bookings for the entire family group (primary user + all sub-accounts)
   defp get_family_group_active_bookings(user, limit \\ 10) do
     family_user_ids = get_family_group_user_ids(user)
-    today = Date.utc_today()
-    checkout_time = ~T[11:00:00]
+    today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
     query =
       from b in Booking,
@@ -6761,9 +6759,7 @@ defmodule YscWeb.TahoeBookingLive do
     bookings
     |> Enum.filter(fn booking ->
       if Date.compare(booking.checkout_date, today) == :eq do
-        now = DateTime.utc_now()
-        checkout_datetime = DateTime.new!(today, checkout_time, "Etc/UTC")
-        DateTime.compare(now, checkout_datetime) == :lt
+        not past_checkout_time?()
       else
         true
       end
@@ -6778,11 +6774,9 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp past_checkout_time? do
-    today = Date.utc_today()
+    now = DateTime.now!(cabin_timezone())
     checkout_time = ~T[11:00:00]
-    checkout_datetime = DateTime.new!(today, checkout_time, "Etc/UTC")
-    now = DateTime.utc_now()
-    DateTime.compare(now, checkout_datetime) == :gt
+    Time.compare(DateTime.to_time(now), checkout_time) == :gt
   end
 
   defp get_membership_type(user) do
@@ -6854,7 +6848,8 @@ defmodule YscWeb.TahoeBookingLive do
     case List.first(active_bookings) do
       nil ->
         # No active bookings, use default range
-        {Date.utc_today(), max_booking_date}
+        {DateTime.now!(cabin_timezone()) |> DateTime.to_date(),
+         max_booking_date}
 
       booking ->
         existing_checkin = booking.checkin_date
@@ -6879,7 +6874,7 @@ defmodule YscWeb.TahoeBookingLive do
           restricted_max = Date.add(existing_checkin, max_nights)
 
           # Ensure we don't go before today or after max_booking_date
-          today = Date.utc_today()
+          today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
           restricted_min =
             if Date.compare(restricted_min, today) == :lt,
@@ -7471,8 +7466,11 @@ defmodule YscWeb.TahoeBookingLive do
        when is_binary(timezone) and timezone != "" do
     DateTime.now!(timezone) |> DateTime.to_date()
   rescue
-    _ -> Date.utc_today()
+    _ -> DateTime.now!(cabin_timezone()) |> DateTime.to_date()
   end
 
-  defp today_in_timezone(_), do: Date.utc_today()
+  defp today_in_timezone(_),
+    do: DateTime.now!(cabin_timezone()) |> DateTime.to_date()
+
+  defp cabin_timezone, do: "America/Los_Angeles"
 end

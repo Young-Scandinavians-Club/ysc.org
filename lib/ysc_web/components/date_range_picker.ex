@@ -258,15 +258,14 @@ defmodule YscWeb.Components.DateRangePicker do
     range_start = from_str!(assigns.start_date_field.value)
     range_end = from_str!(end_value(assigns))
 
-    today = assigns[:today] || Date.utc_today()
+    injected_today = assigns[:today]
+    today = injected_today || Date.utc_today()
 
-    # Preserve current date if we have one, otherwise use today
+    # Injected today takes priority; otherwise preserve current date if we have one
     current_date =
-      if socket.assigns[:current] && socket.assigns.current[:date] do
-        socket.assigns.current.date
-      else
-        today
-      end
+      injected_today ||
+        (socket.assigns[:current] && socket.assigns.current[:date]) ||
+        Date.utc_today()
 
     {
       :ok,

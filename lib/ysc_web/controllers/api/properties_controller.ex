@@ -247,6 +247,6 @@ defmodule YscWeb.Api.PropertiesController do
     Enum.join(parts, "\n\n")
   end
 
-  defp maybe_append(list, _item, false), do: list
+  defp maybe_append(list, _item, val) when val == false or is_nil(val), do: list
   defp maybe_append(list, item, _), do: list ++ [item]
 end

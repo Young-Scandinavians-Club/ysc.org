@@ -5230,9 +5230,13 @@ defmodule YscWeb.AdminBookingsLive do
           has_multiple_rooms ->
             [skip_validation: true]
 
-          # For single-room or buyout bookings, update rooms from form
+          # For single-room bookings, update rooms from form
           room_id && booking_params["booking_mode"] == :room ->
             [skip_validation: true, rooms: rooms]
+
+          # For buyout bookings, clear rooms so stale associations don't persist
+          booking_params["booking_mode"] == :buyout ->
+            [skip_validation: true, rooms: []]
 
           true ->
             [skip_validation: true]
@@ -6562,10 +6566,11 @@ defmodule YscWeb.AdminBookingsLive do
   defp today_in_timezone(timezone) when is_binary(timezone) do
     DateTime.now!(timezone) |> DateTime.to_date()
   rescue
-    _ -> Date.utc_today()
+    _ -> DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
   end
 
-  defp today_in_timezone(_), do: Date.utc_today()
+  defp today_in_timezone(_),
+    do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
   # Step size for prev/next calendar navigation (shift window by this many days)
   defp calendar_shift_days, do: 30
