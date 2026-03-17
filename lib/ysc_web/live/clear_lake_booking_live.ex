@@ -15,7 +15,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
 
-    today = Date.utc_today()
+    timezone = get_timezone_from_socket(socket)
+    today = today_in_timezone(timezone)
 
     {current_season, season_start_date, season_end_date} =
       SeasonHelpers.get_current_season_info(:clear_lake, today)
@@ -117,7 +118,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         # Load active bookings for the user
         active_bookings =
           if user_with_subs,
-            do: get_active_bookings(user_with_subs.id),
+            do: get_active_bookings(user_with_subs.id, today),
             else: []
 
         {user_with_subs, can_book, booking_error_title, booking_disabled_reason,
@@ -150,6 +151,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         meta_description:
           "Book a stay at the Young Scandinavians Club Clear Lake cabin. Choose your dates and guests.",
         property: :clear_lake,
+        timezone: timezone,
         user: user_with_subs,
         checkin_date: checkin_date,
         checkout_date: checkout_date,
@@ -241,7 +243,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     # Load active bookings for the user (only if not already loaded in mount)
     active_bookings =
       if user_for_check && !socket.assigns[:active_bookings] do
-        get_active_bookings(user_for_check.id)
+        get_active_bookings(user_for_check.id, socket.assigns.today)
       else
         socket.assigns[:active_bookings] || []
       end
@@ -295,7 +297,8 @@ defmodule YscWeb.ClearLakeBookingLive do
       {today, max_booking_date, current_season, season_start_date,
        season_end_date} =
         if dates_changed do
-          today = Date.utc_today()
+          timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+          today = today_in_timezone(timezone)
 
           {current_season, season_start_date, season_end_date} =
             SeasonHelpers.get_current_season_info(:clear_lake, today)
@@ -578,7 +581,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
                       {booking.reference_id}
                     </span>
-                    <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>
+                    <%= if Date.compare(booking.checkout_date, @today) == :eq do %>
                       <span class="text-xs font-bold text-amber-600 italic">
                         Today!
                       </span>
@@ -3922,15 +3925,13 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   # Gets active bookings for a user (bookings that haven't ended yet)
-  defp get_active_bookings(user_id, limit \\ 10) do
-    today = Date.utc_today()
-
+  defp get_active_bookings(user_id, today_date, limit \\ 10) do
     query =
       from b in Booking,
         where: b.user_id == ^user_id,
         where: b.property == :clear_lake,
         where: b.status == :complete,
-        where: b.checkout_date >= ^today,
+        where: b.checkout_date >= ^today_date,
         order_by: [asc: b.checkin_date],
         limit: ^limit
 
@@ -3991,4 +3992,22 @@ defmodule YscWeb.ClearLakeBookingLive do
         {true, true}
     end
   end
+
+  defp get_timezone_from_socket(socket) do
+    connect_params = get_connect_params(socket) || %{}
+    Map.get(connect_params, "timezone", "America/Los_Angeles")
+  end
+
+  defp today_in_timezone(timezone)
+       when is_binary(timezone) and timezone != "" do
+    DateTime.now!(timezone) |> DateTime.to_date()
+  rescue
+    _ -> DateTime.now!(default_timezone()) |> DateTime.to_date()
+  end
+
+  defp today_in_timezone(_),
+    do: DateTime.now!(default_timezone()) |> DateTime.to_date()
+
+  defp default_timezone,
+    do: Application.get_env(:ysc, :default_timezone, "America/Los_Angeles")
 end

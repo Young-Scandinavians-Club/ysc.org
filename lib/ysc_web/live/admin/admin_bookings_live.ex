@@ -3178,7 +3178,7 @@ defmodule YscWeb.AdminBookingsLive do
         :calendar
       end
 
-    today = Date.utc_today()
+    today = today_in_timezone(timezone)
 
     # Read calendar dates from params if available, otherwise default to current month
     {calendar_start, calendar_end} =
@@ -3189,10 +3189,10 @@ defmodule YscWeb.AdminBookingsLive do
           {start, ending}
         rescue
           _ ->
-            default_date_range()
+            default_date_range(timezone)
         end
       else
-        default_date_range()
+        default_date_range(timezone)
       end
 
     form_data = %{
@@ -3425,7 +3425,8 @@ defmodule YscWeb.AdminBookingsLive do
                    socket.assigns[:calendar_end_date] do
                 {socket, false}
               else
-                {start_date, end_date} = default_date_range()
+                timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+                {start_date, end_date} = default_date_range(timezone)
 
                 socket =
                   socket
@@ -3441,7 +3442,8 @@ defmodule YscWeb.AdminBookingsLive do
           {socket, false}
 
         true ->
-          {start_date, end_date} = default_date_range()
+          timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+          {start_date, end_date} = default_date_range(timezone)
 
           socket =
             socket
@@ -3485,6 +3487,28 @@ defmodule YscWeb.AdminBookingsLive do
         {socket, property_changed}
       else
         {socket, false}
+      end
+
+    # Reload door codes when property changes (tabs use JS.patch, not select-property event)
+    socket =
+      if property_changed do
+        door_codes = Bookings.list_door_codes(socket.assigns.selected_property)
+
+        active_door_code =
+          Bookings.get_active_door_code(socket.assigns.selected_property)
+
+        door_code_form =
+          %Ysc.Bookings.DoorCode{}
+          |> Ysc.Bookings.DoorCode.changeset(%{})
+          |> to_form(as: "door_code")
+
+        socket
+        |> assign(:door_codes, door_codes)
+        |> assign(:active_door_code, active_door_code)
+        |> assign(:door_code_warning, nil)
+        |> assign(:door_code_form, door_code_form)
+      else
+        socket
       end
 
     # Update calendar view only if dates or property changed (avoid duplicate queries on initial mount)
@@ -3754,12 +3778,14 @@ defmodule YscWeb.AdminBookingsLive do
       end
 
     # Calendar dates should already be set from handle_params, but ensure they're preserved
+    timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+
     socket =
       if socket.assigns[:calendar_start_date] &&
            socket.assigns[:calendar_end_date] do
         socket
       else
-        {start_date, end_date} = default_date_range()
+        {start_date, end_date} = default_date_range(timezone)
 
         socket
         |> assign(:calendar_start_date, start_date)
@@ -3792,12 +3818,14 @@ defmodule YscWeb.AdminBookingsLive do
       end
 
     # Calendar dates should already be set from handle_params, but ensure they're preserved
+    timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+
     socket =
       if socket.assigns[:calendar_start_date] &&
            socket.assigns[:calendar_end_date] do
         socket
       else
-        {start_date, end_date} = default_date_range()
+        {start_date, end_date} = default_date_range(timezone)
 
         socket
         |> assign(:calendar_start_date, start_date)
@@ -5002,7 +5030,8 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   def handle_event("today", _, socket) do
-    {calendar_start, calendar_end} = default_date_range()
+    timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+    {calendar_start, calendar_end} = default_date_range(timezone)
 
     # Update URL to preserve date range
     query_params = %{
@@ -5186,13 +5215,31 @@ defmodule YscWeb.AdminBookingsLive do
     existing_booking = socket.assigns[:booking]
 
     # Build changeset opts - include rooms for new bookings or when changing booking type
+    # When updating a booking with multiple rooms, do NOT pass rooms - the form only
+    # supports a single room_id and would incorrectly replace all rooms with one.
     changeset_opts =
       if existing_booking do
-        # For updates, only set rooms if explicitly changing to room booking
-        if room_id && booking_params["booking_mode"] == :room do
-          [skip_validation: true, rooms: rooms]
-        else
-          [skip_validation: true]
+        existing_rooms =
+          (Ecto.assoc_loaded?(existing_booking.rooms) && existing_booking.rooms) ||
+            []
+
+        has_multiple_rooms = length(existing_rooms) > 1
+
+        cond do
+          # Preserve existing rooms when booking has multiple - form can't represent them
+          has_multiple_rooms ->
+            [skip_validation: true]
+
+          # For single-room bookings, update rooms from form
+          room_id && booking_params["booking_mode"] == :room ->
+            [skip_validation: true, rooms: rooms]
+
+          # For buyout bookings, clear rooms so stale associations don't persist
+          booking_params["booking_mode"] == :buyout ->
+            [skip_validation: true, rooms: []]
+
+          true ->
+            [skip_validation: true]
         end
       else
         # For new bookings, always include rooms (even if empty for buyouts)
@@ -6505,12 +6552,25 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   # Default date range: today - 3 days to today + 30 days (current bookings visible with minimal scrolling)
-  defp default_date_range do
-    today = Date.utc_today()
+  defp default_date_range(timezone)
+       when is_binary(timezone) and timezone != "" do
+    today = today_in_timezone(timezone)
     start_date = Date.add(today, -3)
     end_date = Date.add(today, 30)
     {start_date, end_date}
   end
+
+  defp default_date_range(_), do: default_date_range("America/Los_Angeles")
+
+  # Today's date in the user's timezone (for calendar "today" highlighting)
+  defp today_in_timezone(timezone) when is_binary(timezone) do
+    DateTime.now!(timezone) |> DateTime.to_date()
+  rescue
+    _ -> DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+  end
+
+  defp today_in_timezone(_),
+    do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
   # Step size for prev/next calendar navigation (shift window by this many days)
   defp calendar_shift_days, do: 30

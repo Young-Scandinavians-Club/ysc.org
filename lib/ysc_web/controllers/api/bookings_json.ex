@@ -93,25 +93,27 @@ defmodule YscWeb.Api.BookingsJSON do
         checked_in_at:
           ci.checked_in_at && DateTime.to_iso8601(ci.checked_in_at),
         rules_agreed: ci.rules_agreed,
-        vehicles: vehicles(ci.check_in_vehicles)
+        vehicles: vehicles(ci)
       }
     end)
   end
 
   defp check_ins(_), do: []
 
-  defp vehicles(vehicles) when is_list(vehicles) do
-    Enum.map(vehicles, fn v ->
-      %{
-        id: to_string(v.id),
-        type: v.type,
-        color: v.color,
-        make: v.make
-      }
-    end)
+  defp vehicles(%{check_in_vehicles: vehicles}) when is_list(vehicles) do
+    Enum.map(vehicles, &vehicle/1)
   end
 
   defp vehicles(_), do: []
+
+  defp vehicle(v) do
+    %{
+      id: to_string(v.id),
+      type: v.type,
+      color: v.color,
+      make: v.make
+    }
+  end
 
   defp dates_in_range(checkin, checkout, range_start, range_end) do
     effective_start =

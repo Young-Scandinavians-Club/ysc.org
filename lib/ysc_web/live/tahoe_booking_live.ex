@@ -41,7 +41,8 @@ defmodule YscWeb.TahoeBookingLive do
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
 
-    today = Date.utc_today()
+    timezone = get_timezone_from_socket(socket)
+    today = today_in_timezone(cabin_timezone())
 
     # Load seasons once using cache to avoid multiple queries
     alias Ysc.Bookings.SeasonCache
@@ -224,6 +225,7 @@ defmodule YscWeb.TahoeBookingLive do
         meta_description:
           "Book a stay at the Young Scandinavians Club Lake Tahoe cabin. Choose your dates, rooms, and guests.",
         property: :tahoe,
+        timezone: timezone,
         user: user_with_subs,
         checkin_date: checkin_date,
         checkout_date: checkout_date,
@@ -313,7 +315,7 @@ defmodule YscWeb.TahoeBookingLive do
 
     # Update if dates, guest counts, or tab have changed
     if should_update_availability(socket, parsed_params, tab_changed) do
-      today = Date.utc_today()
+      today = today_in_timezone(cabin_timezone())
       seasons = socket.assigns.seasons
 
       {current_season, season_start_date, season_end_date} =
@@ -871,7 +873,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                       {booking.reference_id}
                     </span>
-                    <%= if Date.compare(booking.checkout_date, Date.utc_today()) == :eq do %>
+                    <%= if Date.compare(booking.checkout_date, @today) == :eq do %>
                       <span class="text-xs font-bold text-amber-600 italic">
                         Today!
                       </span>
@@ -1027,7 +1029,7 @@ defmodule YscWeb.TahoeBookingLive do
                           else:
                             "border-zinc-300 hover:border-blue-400 hover:bg-zinc-50"
                         ),
-                        if(not can_select_booking_mode?(@seasons, Date.utc_today()),
+                        if(not can_select_booking_mode?(@seasons, @today),
                           do: "opacity-50 cursor-not-allowed",
                           else: ""
                         )
@@ -1038,9 +1040,7 @@ defmodule YscWeb.TahoeBookingLive do
                           name="booking_mode"
                           value="buyout"
                           checked={@selected_booking_mode == :buyout}
-                          disabled={
-                            not can_select_booking_mode?(@seasons, Date.utc_today())
-                          }
+                          disabled={not can_select_booking_mode?(@seasons, @today)}
                           class="sr-only"
                         />
                         <div class="flex items-center gap-3 mb-2">
@@ -1072,9 +1072,7 @@ defmodule YscWeb.TahoeBookingLive do
                           Reserve the entire cabin exclusively for your group. Includes all 7 bedrooms, 3 bathrooms, and the sauna.
                         </p>
                         <p
-                          :if={
-                            not can_select_booking_mode?(@seasons, Date.utc_today())
-                          }
+                          :if={not can_select_booking_mode?(@seasons, @today)}
                           class="text-xs text-amber-600 mt-2 ml-9 font-medium"
                         >
                           Full buyout is only available May–November.
@@ -6345,7 +6343,7 @@ defmodule YscWeb.TahoeBookingLive do
       if socket.assigns.user do
         user = socket.assigns.user
         family_user_ids = get_family_group_user_ids(user)
-        today = Date.utc_today()
+        today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
         # Check for any active bookings (status = :complete) with checkout_date >= today
         has_active_booking =
@@ -6655,7 +6653,7 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp booking_still_active?(checkout_date) do
-    today = Date.utc_today()
+    today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
     Date.compare(checkout_date, today) == :gt or
       (Date.compare(checkout_date, today) == :eq and not past_checkout_time?())
@@ -6743,8 +6741,7 @@ defmodule YscWeb.TahoeBookingLive do
   # Get active bookings for the entire family group (primary user + all sub-accounts)
   defp get_family_group_active_bookings(user, limit \\ 10) do
     family_user_ids = get_family_group_user_ids(user)
-    today = Date.utc_today()
-    checkout_time = ~T[11:00:00]
+    today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
     query =
       from b in Booking,
@@ -6762,9 +6759,7 @@ defmodule YscWeb.TahoeBookingLive do
     bookings
     |> Enum.filter(fn booking ->
       if Date.compare(booking.checkout_date, today) == :eq do
-        now = DateTime.utc_now()
-        checkout_datetime = DateTime.new!(today, checkout_time, "Etc/UTC")
-        DateTime.compare(now, checkout_datetime) == :lt
+        not past_checkout_time?()
       else
         true
       end
@@ -6779,11 +6774,9 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp past_checkout_time? do
-    today = Date.utc_today()
+    now = DateTime.now!(cabin_timezone())
     checkout_time = ~T[11:00:00]
-    checkout_datetime = DateTime.new!(today, checkout_time, "Etc/UTC")
-    now = DateTime.utc_now()
-    DateTime.compare(now, checkout_datetime) == :gt
+    Time.compare(DateTime.to_time(now), checkout_time) == :gt
   end
 
   defp get_membership_type(user) do
@@ -6855,7 +6848,8 @@ defmodule YscWeb.TahoeBookingLive do
     case List.first(active_bookings) do
       nil ->
         # No active bookings, use default range
-        {Date.utc_today(), max_booking_date}
+        {DateTime.now!(cabin_timezone()) |> DateTime.to_date(),
+         max_booking_date}
 
       booking ->
         existing_checkin = booking.checkin_date
@@ -6880,7 +6874,7 @@ defmodule YscWeb.TahoeBookingLive do
           restricted_max = Date.add(existing_checkin, max_nights)
 
           # Ensure we don't go before today or after max_booking_date
-          today = Date.utc_today()
+          today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
           restricted_min =
             if Date.compare(restricted_min, today) == :lt,
@@ -7462,4 +7456,21 @@ defmodule YscWeb.TahoeBookingLive do
       available_rooms != []
     end
   end
+
+  defp get_timezone_from_socket(socket) do
+    connect_params = get_connect_params(socket) || %{}
+    Map.get(connect_params, "timezone", "America/Los_Angeles")
+  end
+
+  defp today_in_timezone(timezone)
+       when is_binary(timezone) and timezone != "" do
+    DateTime.now!(timezone) |> DateTime.to_date()
+  rescue
+    _ -> DateTime.now!(cabin_timezone()) |> DateTime.to_date()
+  end
+
+  defp today_in_timezone(_),
+    do: DateTime.now!(cabin_timezone()) |> DateTime.to_date()
+
+  defp cabin_timezone, do: "America/Los_Angeles"
 end

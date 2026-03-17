@@ -8,7 +8,7 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
   which means jobs are executed immediately and not queued. This affects
   how we verify job scheduling.
   """
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   alias Ysc.ExpenseReports.Scheduler
 
@@ -26,16 +26,16 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
     end
 
     test "logs initialization message at info level" do
-      # Set Logger level to :info to capture the logs (test mode is :error by default)
-      Logger.configure(level: :info)
-
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          Scheduler.start_scheduler()
-        end)
+          Logger.configure(level: :info)
 
-      # Reset Logger level
-      Logger.configure(level: :error)
+          try do
+            Scheduler.start_scheduler()
+          after
+            Logger.configure(level: :error)
+          end
+        end)
 
       assert log =~ "Expense report QuickBooks sync scheduler initialized"
       assert log =~ "enqueueing initial sync job"

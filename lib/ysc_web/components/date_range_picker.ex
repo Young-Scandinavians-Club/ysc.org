@@ -150,7 +150,7 @@ defmodule YscWeb.Components.DateRangePicker do
                 }
                 class={[
                   "calendar-day overflow-hidden py-1.5 h-10 rounded w-auto focus:z-10 w-full transition duration-300",
-                  today?(day) && "font-bold border border-zinc-400 rounded",
+                  today?(day, @today) && "font-bold border border-zinc-400 rounded",
                   date_disabled?(
                     day,
                     @min,
@@ -258,13 +258,14 @@ defmodule YscWeb.Components.DateRangePicker do
     range_start = from_str!(assigns.start_date_field.value)
     range_end = from_str!(end_value(assigns))
 
-    # Preserve current date if we have one, otherwise use today
+    injected_today = assigns[:today]
+    today = injected_today || Date.utc_today()
+
+    # Injected today takes priority; otherwise preserve current date if we have one
     current_date =
-      if socket.assigns[:current] && socket.assigns.current[:date] do
-        socket.assigns.current.date
-      else
+      injected_today ||
+        (socket.assigns[:current] && socket.assigns.current[:date]) ||
         Date.utc_today()
-      end
 
     {
       :ok,
@@ -275,7 +276,7 @@ defmodule YscWeb.Components.DateRangePicker do
       |> assign(:range_end, range_end)
       |> assign(:max, assigns[:max])
       |> assign(:property, assigns[:property])
-      |> assign(:today, assigns[:today] || Date.utc_today())
+      |> assign(:today, today)
       |> assign(:date_tooltips, assigns[:date_tooltips] || %{})
       |> assign(:allow_saturdays, assigns[:allow_saturdays] || false)
       # Only reset state if we don't have a range yet, otherwise preserve it
@@ -341,7 +342,7 @@ defmodule YscWeb.Components.DateRangePicker do
 
   @impl true
   def handle_event("today", _, socket) do
-    new_date = Date.utc_today()
+    new_date = socket.assigns.today
     {:noreply, socket |> assign(:current, format_date(new_date))}
   end
 
@@ -780,7 +781,7 @@ defmodule YscWeb.Components.DateRangePicker do
     end
   end
 
-  defp today?(day), do: day == Date.utc_today()
+  defp today?(day, today), do: today && day == today
 
   defp other_month?(day, current_date) do
     Date.beginning_of_month(day) != Date.beginning_of_month(current_date)
