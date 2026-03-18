@@ -177,7 +177,7 @@ defmodule YscWeb.AgendaEditComponentTest do
   end
 
   describe "form behavior" do
-    test "form validates on change", %{agenda: agenda, event: event} do
+    test "form submits on blur", %{agenda: agenda, event: event} do
       {:ok, _item} =
         Agendas.create_agenda_item(event.id, agenda, %{
           title: "Test"
@@ -193,7 +193,8 @@ defmodule YscWeb.AgendaEditComponentTest do
           event_id: event.id
         })
 
-      assert html =~ "phx-change=\"validate\""
+      assert html =~ "phx-submit=\"save\""
+      assert html =~ "phx-blur"
     end
 
     test "form submits on save", %{agenda: agenda, event: event} do

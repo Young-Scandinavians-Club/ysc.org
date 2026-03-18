@@ -57,8 +57,9 @@ defmodule YscWeb.Api.EventsJSON do
         type: t.type,
         price: t.price && Money.to_string!(t.price),
         quantity: t.quantity,
-        tickets_sold: Map.get(t, :tickets_sold, 0),
-        available: Map.get(t, :available),
+        tickets_sold: Map.get(t, :sold_tickets_count, 0),
+        available:
+          t.quantity && t.quantity - Map.get(t, :sold_tickets_count, 0),
         requires_registration: t.requires_registration,
         start_date: t.start_date && DateTime.to_iso8601(t.start_date),
         end_date: t.end_date && DateTime.to_iso8601(t.end_date)
