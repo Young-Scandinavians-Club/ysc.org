@@ -3185,9 +3185,16 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   @impl true
-  def mount(%{"id" => event_id}, _session, socket) do
-    # Fetch only essential event data for initial static render (SEO & fast first paint)
-    case Repo.get(Event, event_id) do
+  def mount(%{"id" => id_or_ref}, _session, socket) do
+    # Support lookup by either ULID (id) or reference_id (e.g. "EVT-XXXX")
+    event =
+      if String.starts_with?(id_or_ref, "EVT") do
+        Events.get_event_by_reference(id_or_ref)
+      else
+        Repo.get(Event, id_or_ref)
+      end
+
+    case event do
       nil ->
         {:ok,
          socket
@@ -3195,6 +3202,8 @@ defmodule YscWeb.EventDetailsLive do
          |> redirect(to: ~p"/events")}
 
       event ->
+        event_id = event.id
+
         # For disconnected mount: minimal data for fast static HTML
         # For connected mount: full data loading via assign_async
         socket = mount_minimal_assigns(socket, event, event_id)
