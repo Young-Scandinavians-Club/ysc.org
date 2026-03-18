@@ -401,6 +401,120 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Paginated list of upcoming published/cancelled events for the mobile API.
+
+  Accepts a map with optional keys:
+    - "page"      – 1-based page number (default 1)
+    - "page_size" – records per page (default 20, max 100)
+
+  Returns `{events, meta}` where meta contains pagination details and each
+  event is enriched with pricing_info, ticket_tiers, ticket_count, and image
+  (same shape as `list_upcoming_events/1`).
+  """
+  def list_upcoming_events_paginated(params \\ %{}) do
+    page = parse_page_param(params, "page", 1)
+    page_size = parse_page_param(params, "page_size", 20) |> min(100)
+    offset = (page - 1) * page_size
+
+    now = DateTime.utc_now()
+    three_days_ago = DateTime.add(now, -3, :day)
+
+    total_count =
+      from(e in Event,
+        where: e.start_date > ^now,
+        where: e.state in [:published, :cancelled],
+        select: count(e.id)
+      )
+      |> Repo.one()
+
+    events =
+      from(e in Event,
+        where: e.start_date > ^now,
+        where: e.state in [:published, :cancelled],
+        left_join: t in Ticket,
+        on:
+          t.event_id == e.id and t.status == :confirmed and
+            t.inserted_at >= ^three_days_ago,
+        left_join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id and tt.type != :donation,
+        group_by: e.id,
+        select: %{
+          id: e.id,
+          reference_id: e.reference_id,
+          state: e.state,
+          published_at: e.published_at,
+          publish_at: e.publish_at,
+          organizer_id: e.organizer_id,
+          title: e.title,
+          description: e.description,
+          max_attendees: e.max_attendees,
+          age_restriction: e.age_restriction,
+          show_participants: e.show_participants,
+          raw_details: e.raw_details,
+          rendered_details: e.rendered_details,
+          image_id: e.image_id,
+          start_date: e.start_date,
+          start_time: e.start_time,
+          end_date: e.end_date,
+          end_time: e.end_time,
+          location_name: e.location_name,
+          address: e.address,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          place_id: e.place_id,
+          partiful_link: e.partiful_link,
+          tickets_tbd: e.tickets_tbd,
+          lock_version: e.lock_version,
+          inserted_at: e.inserted_at,
+          updated_at: e.updated_at,
+          recent_tickets_count: count(t.id),
+          selling_fast: fragment("count(?) >= 5", t.id)
+        },
+        order_by: [
+          asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
+          asc: e.start_date,
+          asc: e.start_time
+        ],
+        limit: ^page_size,
+        offset: ^offset
+      )
+      |> Repo.all()
+      |> add_pricing_info_batch()
+
+    total_pages = ceil(total_count / page_size)
+
+    meta = %{
+      page: page,
+      page_size: page_size,
+      total_count: total_count,
+      total_pages: total_pages,
+      has_next_page: page < total_pages,
+      has_prev_page: page > 1
+    }
+
+    {events, meta}
+  end
+
+  defp parse_page_param(params, key, default) do
+    case Map.get(params, key) do
+      nil ->
+        default
+
+      val when is_integer(val) ->
+        max(val, 1)
+
+      val when is_binary(val) ->
+        case Integer.parse(val) do
+          {n, ""} -> max(n, 1)
+          _ -> default
+        end
+
+      _ ->
+        default
+    end
+  end
+
+  @doc """
   Fetch upcoming events as full Event structs with given preloads.
 
   Use for admin pickers (e.g. newsletter) where full structs and cover_image are needed.

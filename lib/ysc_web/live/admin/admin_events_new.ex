@@ -420,15 +420,39 @@ defmodule YscWeb.AdminEventsNewLive do
                 id="agendas"
                 phx-update="stream"
                 phx-hook="Sortable"
-                class="w-full flex gap-3 snap-x overflow-x-auto"
+                class="w-full flex gap-3 snap-x overflow-x-auto pb-2"
               >
                 <li
                   :for={{id, agenda} <- @streams.agendas}
                   id={id}
                   data-id={agenda.id}
-                  class="py-4 bg-zinc-100 rounded-lg flex-shrink-0"
+                  class="bg-zinc-100 rounded-lg flex-shrink-0 flex flex-col"
                 >
-                  <div class="mx-auto max-w-7xl px-4 space-y-4">
+                  <div
+                    class="drag-handle flex items-center justify-center py-1.5 rounded-t-lg cursor-grab active:cursor-grabbing hover:bg-zinc-200 transition group"
+                    title="Drag to reorder"
+                  >
+                    <div class="flex flex-col gap-0.5">
+                      <div class="flex gap-0.5">
+                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
+                        </div>
+                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
+                        </div>
+                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
+                        </div>
+                      </div>
+                      <div class="flex gap-0.5">
+                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
+                        </div>
+                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
+                        </div>
+                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mx-auto max-w-7xl px-4 pt-2 pb-4 space-y-4">
                     <div class="flex flex-row justify-between space-x-4">
                       <div class="w-full">
                         <.live_component
@@ -581,7 +605,7 @@ defmodule YscWeb.AdminEventsNewLive do
         organizer_id: socket.assigns.current_user.id
       })
 
-    {:ok, push_patch(socket, to: "/admin/events/#{inserted_event.id}/edit")}
+    {:ok, push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
   end
 
   @impl true
@@ -928,7 +952,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_info(
-        {YscWeb.Agendas,
+        {Ysc.Agendas,
          %Ysc.MessagePassingEvents.AgendaRepositioned{agenda: agenda}},
         socket
       ) do
