@@ -194,7 +194,6 @@ defmodule YscWeb.NewsLive do
           id="news-grid"
           class="grid grid-cols-1 md:grid-cols-2 py-4 gap-8"
           phx-update="stream"
-          phx-viewport-top={@page > 1 && "prev-page"}
           phx-viewport-bottom={!@end_of_timeline? && "next-page"}
         >
           <div
@@ -298,7 +297,7 @@ defmodule YscWeb.NewsLive do
       |> assign(:featured, nil)
       |> assign(:post_count, 0)
       |> stream(:posts, [])
-      |> assign(:page, 1)
+      |> assign(:cursor, nil)
       |> assign(:per_page, 10)
       |> assign(:end_of_timeline?, false)
       |> assign(:async_data_loaded, false)
@@ -322,7 +321,7 @@ defmodule YscWeb.NewsLive do
            |> Ysc.Repo.preload([:author, :featured_image])
          end},
         {:post_count, fn -> Posts.count_published_posts() end},
-        {:posts, fn -> Posts.list_posts(0, 10) end}
+        {:posts, fn -> Posts.list_posts(nil, 10) end}
       ]
 
       tasks
@@ -341,11 +340,18 @@ defmodule YscWeb.NewsLive do
     post_count = Map.get(results, :post_count, 0)
     posts = Map.get(results, :posts, [])
 
+    new_cursor =
+      case List.last(posts) do
+        nil -> nil
+        post -> post.published_on
+      end
+
     {:noreply,
      socket
      |> assign(:featured, featured)
      |> assign(:post_count, post_count)
      |> assign(:end_of_timeline?, length(posts) < socket.assigns.per_page)
+     |> assign(:cursor, new_cursor)
      |> assign(:async_data_loaded, true)
      |> stream(:posts, posts)}
   end
@@ -358,36 +364,27 @@ defmodule YscWeb.NewsLive do
 
   @impl true
   def handle_event("next-page", _, socket) do
-    {:noreply, paginate_posts(socket, socket.assigns.page + 1)}
+    {:noreply, paginate_posts(socket)}
   end
 
-  def handle_event("prev-page", %{"_overran" => true}, socket) do
-    {:noreply, paginate_posts(socket, 1)}
-  end
+  defp paginate_posts(socket) do
+    %{per_page: per_page, cursor: cursor} = socket.assigns
+    new_posts = Posts.list_posts(cursor, per_page)
 
-  def handle_event("prev-page", _, socket) do
-    if socket.assigns.page > 1 do
-      {:noreply, paginate_posts(socket, socket.assigns.page - 1)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  defp paginate_posts(socket, new_page) when new_page >= 1 do
-    %{per_page: per_page, page: cur_page} = socket.assigns
-
-    new_posts = Posts.list_posts((new_page - 1) * per_page, per_page)
+    new_cursor =
+      case List.last(new_posts) do
+        nil -> cursor
+        post -> post.published_on
+      end
 
     case new_posts do
       [] ->
-        socket
-        |> assign(:end_of_timeline?, new_page >= cur_page)
-        |> assign(:page, new_page)
+        assign(socket, :end_of_timeline?, true)
 
-      [_ | _] = new_posts ->
+      new_posts ->
         socket
         |> assign(:end_of_timeline?, length(new_posts) < per_page)
-        |> assign(:page, new_page)
+        |> assign(:cursor, new_cursor)
         |> stream(:posts, new_posts, at: -1)
     end
   end

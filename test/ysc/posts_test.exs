@@ -362,8 +362,11 @@ defmodule Ysc.PostsTest do
   end
 
   describe "list_posts/2" do
-    test "returns paginated published posts", %{author: author} do
-      # Create multiple published posts
+    test "returns paginated published posts using keyset cursor", %{
+      author: author
+    } do
+      now = DateTime.utc_now()
+
       for i <- 1..5 do
         {:ok, _} =
           Posts.create_post(
@@ -373,19 +376,26 @@ defmodule Ysc.PostsTest do
               "url_name" => "post-#{i}",
               "state" => "published",
               "featured_post" => false,
-              "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+              "published_on" =>
+                DateTime.truncate(DateTime.add(now, -i, :second), :second)
             },
             author
           )
       end
 
-      # Get first page
-      page1 = Posts.list_posts(0, 2)
+      # First page: cursor is nil
+      page1 = Posts.list_posts(nil, 2)
       assert length(page1) == 2
 
-      # Get second page
-      page2 = Posts.list_posts(2, 2)
+      # Second page: cursor is the published_on of the last item on page 1
+      cursor = List.last(page1).published_on
+      page2 = Posts.list_posts(cursor, 2)
       assert length(page2) >= 2
+
+      # Pages must not overlap
+      page1_ids = Enum.map(page1, & &1.id)
+      page2_ids = Enum.map(page2, & &1.id)
+      assert Enum.empty?(page1_ids -- (page1_ids -- page2_ids))
     end
   end
 
