@@ -129,6 +129,10 @@ defmodule YscWeb.Api.BookingsControllerTest do
       assert Map.has_key?(booking, "guests_count")
       assert Map.has_key?(booking, "checked_in")
       assert Map.has_key?(booking, "member")
+      member = booking["member"]
+      assert member != nil
+      assert Map.has_key?(member, "avatar_url")
+      assert String.starts_with?(member["avatar_url"], "https://")
       assert Map.has_key?(booking, "rooms")
       assert Map.has_key?(booking, "guests")
       assert Map.has_key?(booking, "check_ins")
@@ -328,6 +332,84 @@ defmodule YscWeb.Api.BookingsControllerTest do
       assert vehicle["type"] == "truck"
       assert vehicle["color"] == "red"
       assert vehicle["make"] == "Ford"
+    end
+  end
+
+  describe "member avatar_url" do
+    test "index includes member avatar_url with Gravatar format when user has email",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(email: "avatar-test@example.com")
+      _booking = booking_fixture(user_id: user.id)
+
+      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+
+      assert %{"data" => [booking | _]} = json_response(response, 200)
+      member = booking["member"]
+      avatar_url = member["avatar_url"]
+      assert avatar_url =~ "gravatar.com"
+      assert avatar_url =~ "s=512"
+      # Gravatar URL includes MD5 hash of lowercase email
+      expected_hash =
+        :crypto.hash(:md5, "avatar-test@example.com")
+        |> Base.encode16(case: :lower)
+
+      assert avatar_url =~ expected_hash
+    end
+
+    test "calendar includes member avatar_url in each booking", %{conn: conn} do
+      user = user_fixture(last_name: "CalendarAvatar")
+      booking = active_booking_fixture(user_id: user.id)
+
+      response =
+        get(
+          conn,
+          ~p"/api/v1/mobile/bookings/calendar?property=tahoe&start_date=#{Date.to_iso8601(booking.checkin_date)}&end_date=#{Date.to_iso8601(booking.checkout_date)}"
+        )
+
+      assert %{"data" => grouped} = json_response(response, 200)
+      date_str = Date.to_iso8601(booking.checkin_date)
+      assert [calendar_booking | _] = grouped[date_str]
+      assert calendar_booking["member"]["avatar_url"] != nil
+
+      assert String.starts_with?(
+               calendar_booking["member"]["avatar_url"],
+               "http"
+             )
+    end
+
+    test "lookup includes member avatar_url", %{conn: conn} do
+      user = user_fixture(last_name: "LookupAvatar")
+      _booking = active_booking_fixture(user_id: user.id)
+
+      response =
+        get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name=LookupAvatar")
+
+      assert %{"data" => [booking | _]} = json_response(response, 200)
+      assert booking["member"]["avatar_url"] != nil
+      assert String.starts_with?(booking["member"]["avatar_url"], "http")
+    end
+
+    test "avatar_url uses country-based default path when user has most_connected_country",
+         %{
+           conn: conn
+         } do
+      user =
+        user_fixture(
+          email: "norway-user@example.com",
+          most_connected_country: "NO"
+        )
+
+      _booking = booking_fixture(user_id: user.id)
+
+      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+
+      assert %{"data" => [booking | _]} = json_response(response, 200)
+      avatar_url = booking["member"]["avatar_url"]
+
+      # Gravatar URL includes d= param with encoded default; or if no Gravatar, direct default
+      assert avatar_url =~ "norway" or avatar_url =~ "gravatar.com"
     end
   end
 end

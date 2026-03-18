@@ -3,6 +3,8 @@ defmodule YscWeb.Api.BookingsJSON do
   JSON rendering for booking API responses.
   """
 
+  alias YscWeb.UserAvatar
+
   def index(%{bookings: bookings}) do
     %{data: Enum.map(bookings, &booking/1)}
   end
@@ -58,7 +60,13 @@ defmodule YscWeb.Api.BookingsJSON do
       id: to_string(user.id),
       first_name: user.first_name,
       last_name: user.last_name,
-      email: user.email
+      email: user.email,
+      avatar_url:
+        UserAvatar.url(
+          user.email,
+          user.id,
+          user.most_connected_country
+        )
     }
   end
 
