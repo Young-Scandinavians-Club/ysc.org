@@ -45,7 +45,6 @@ defmodule YscWeb.AgendaEditComponent do
             :let={_f}
             for={form}
             as={nil}
-            phx-change="validate"
             phx-submit="save"
             phx-value-id={form.data.id}
             phx-target={@myself}
@@ -155,16 +154,8 @@ defmodule YscWeb.AgendaEditComponent do
      stream_delete(socket, :agenda_items, to_change_form(agenda_item, %{}))}
   end
 
-  def update(
-        %{
-          event: %Ysc.MessagePassingEvents.AgendaItemUpdated{
-            agenda_item: agenda_item
-          }
-        },
-        socket
-      ) do
-    {:ok,
-     stream_insert(socket, :agenda_items, to_change_form(agenda_item, %{}))}
+  def update(%{event: %Ysc.MessagePassingEvents.AgendaItemUpdated{}}, socket) do
+    {:ok, socket}
   end
 
   def update(
@@ -188,24 +179,6 @@ defmodule YscWeb.AgendaEditComponent do
      socket
      |> assign(agenda_id: agenda.id)
      |> stream(:agenda_items, agenda_forms)}
-  end
-
-  def handle_event(
-        "validate",
-        %{"agenda_item" => agenda_item_params} = params,
-        socket
-      ) do
-    agenda_item = %AgendaItem{
-      id: params["id"],
-      agenda_id: socket.assigns[:agenda_id]
-    }
-
-    {:noreply,
-     stream_insert(
-       socket,
-       :agenda_items,
-       to_change_form(agenda_item, agenda_item_params, :validate)
-     )}
   end
 
   def handle_event("save", %{"id" => id, "agenda_item" => params}, socket) do

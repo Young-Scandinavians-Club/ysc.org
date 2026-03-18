@@ -101,6 +101,7 @@ defmodule YscWeb.Router do
     get "/bookings/calendar", BookingsController, :calendar
     get "/bookings", BookingsController, :index
     get "/properties/:property/info", PropertiesController, :info
+    get "/events", EventsController, :index
     post "/check-in", CheckInsController, :create
   end
 
