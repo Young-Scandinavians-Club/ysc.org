@@ -1,5 +1,5 @@
 defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
