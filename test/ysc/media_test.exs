@@ -20,22 +20,6 @@ defmodule Ysc.MediaTest do
     end
   end
 
-  describe "list_images/2" do
-    test "returns paginated images" do
-      images = Media.list_images(0, 10)
-      assert is_list(images)
-      assert length(images) <= 10
-    end
-  end
-
-  describe "list_images/3" do
-    test "filters images by year" do
-      current_year = Date.utc_today().year
-      images = Media.list_images(0, 10, current_year)
-      assert is_list(images)
-    end
-  end
-
   describe "get_available_years/0" do
     test "returns list of years" do
       years = Media.get_available_years()
@@ -194,6 +178,34 @@ defmodule Ysc.MediaTest do
       all = Media.list_images_cursor(limit: 50)
       with_empty_search = Media.list_images_cursor(search: "", limit: 50)
       assert length(all) == length(with_empty_search)
+    end
+
+    test "second page items are strictly before the cursor", %{user: user} do
+      now = DateTime.utc_now()
+
+      for i <- 1..4 do
+        {:ok, _} =
+          %Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/cursor-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at:
+              DateTime.truncate(DateTime.add(now, -i * 60, :second), :second),
+            updated_at:
+              DateTime.truncate(DateTime.add(now, -i * 60, :second), :second)
+          }
+          |> Repo.insert()
+      end
+
+      page1 = Media.list_images_cursor(limit: 2)
+      assert length(page1) == 2
+
+      cursor = List.last(page1).inserted_at
+      page2 = Media.list_images_cursor(limit: 2, before_date: cursor)
+
+      assert Enum.all?(page2, fn img ->
+               DateTime.compare(img.inserted_at, cursor) == :lt
+             end)
     end
   end
 

@@ -23,30 +23,6 @@ defmodule Ysc.Media do
     {:ok, Media.Image |> order_by(desc: :id) |> Repo.all()}
   end
 
-  def list_images(offset, limit) do
-    Repo.all(
-      from i in Media.Image,
-        order_by: [{:desc, :inserted_at}],
-        limit: ^limit,
-        offset: ^offset
-    )
-  end
-
-  def list_images(offset, limit, year) when is_integer(year) do
-    start_date = DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-    end_date = DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
-
-    Repo.all(
-      from i in Media.Image,
-        where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
-        order_by: [{:desc, :inserted_at}],
-        limit: ^limit,
-        offset: ^offset
-    )
-  end
-
-  def list_images(offset, limit, nil), do: list_images(offset, limit)
-
   @doc """
   Gets all distinct years from images, ordered descending.
   """

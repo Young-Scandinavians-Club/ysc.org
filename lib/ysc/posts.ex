@@ -47,15 +47,25 @@ defmodule Ysc.Posts do
     |> Repo.aggregate(:count, :id)
   end
 
-  def list_posts(offset, limit) do
-    # Preload associations - Ecto will batch load these efficiently
+  def list_posts(nil, limit) do
     Repo.all(
       from p in Post,
         where: p.state == :published,
         where: p.featured_post == false,
-        order_by: [{:desc, :published_on}],
-        limit: ^limit,
-        offset: ^offset
+        order_by: [{:desc, p.published_on}],
+        limit: ^limit
+    )
+    |> Repo.preload([:author, :featured_image])
+  end
+
+  def list_posts(%DateTime{} = cursor, limit) do
+    Repo.all(
+      from p in Post,
+        where: p.state == :published,
+        where: p.featured_post == false,
+        where: p.published_on < ^cursor,
+        order_by: [{:desc, p.published_on}],
+        limit: ^limit
     )
     |> Repo.preload([:author, :featured_image])
   end

@@ -208,8 +208,7 @@ defmodule YscWeb.NewsLiveTest do
       assert result =~ "Club News" or is_binary(result)
     end
 
-    test "prev-page event loads previous posts", %{conn: conn} do
-      # Create enough posts for pagination
+    test "next-page appends more posts using cursor", %{conn: conn} do
       for i <- 1..15 do
         create_post(%{title: "Post #{i}"})
       end
@@ -218,37 +217,9 @@ defmodule YscWeb.NewsLiveTest do
 
       render_async(view)
 
-      # Go to next page first
-      render_click(view, "next-page")
+      # Trigger load of next batch via cursor
+      result = render_click(view, "next-page")
 
-      # Then go back
-      result = render_click(view, "prev-page")
-
-      # Should still render successfully
-      assert result =~ "Club News" or is_binary(result)
-    end
-
-    test "prev-page with overran flag resets to page 1", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/news")
-
-      render_async(view)
-
-      # Trigger prev-page with overran flag
-      result = render_click(view, "prev-page", %{"_overran" => true})
-
-      # Should still render successfully
-      assert result =~ "Club News" or is_binary(result)
-    end
-
-    test "does not go below page 1 when on first page", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/news")
-
-      render_async(view)
-
-      # Try to go to previous page when already on page 1
-      result = render_click(view, "prev-page")
-
-      # Should still render successfully
       assert result =~ "Club News" or is_binary(result)
     end
   end
