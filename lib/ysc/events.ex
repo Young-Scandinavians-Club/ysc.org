@@ -44,6 +44,13 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Fetch an event by its reference ID, returns nil if not found.
+  """
+  def get_event_by_reference(reference_id) do
+    Repo.get_by(Event, reference_id: reference_id)
+  end
+
+  @doc """
   List all events, optionally with filters.
   """
   def list_events(filters \\ %{}) do
