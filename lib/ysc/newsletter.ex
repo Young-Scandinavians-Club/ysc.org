@@ -768,11 +768,16 @@ defmodule Ysc.Newsletter do
       if post_identifiers == [] do
         %{}
       else
+        # Split identifiers so each `in` clause only receives values of the
+        # matching column type — mixing slugs into the ULID-typed `id` binding
+        # raises an Ecto.Query.CastError at runtime.
+        {post_ids, post_slugs} =
+          Enum.split_with(post_identifiers, &ulid?/1)
+
         rows =
           Repo.all(
             from p in Post,
-              where:
-                p.id in ^post_identifiers or p.url_name in ^post_identifiers,
+              where: p.id in ^post_ids or p.url_name in ^post_slugs,
               select: {p.id, p.url_name, p.title}
           )
 
@@ -794,6 +799,12 @@ defmodule Ysc.Newsletter do
       %{url: url, clicks: clicks, title: title, type: type}
     end)
   end
+
+  # Ecto.ULID values are 26-character Crockford base-32 strings.
+  defp ulid?(value) when is_binary(value),
+    do: String.match?(value, ~r/^[0-9A-HJKMNP-TV-Z]{26}$/i)
+
+  defp ulid?(_), do: false
 
   defp classify_link(url, base_url) do
     path =
