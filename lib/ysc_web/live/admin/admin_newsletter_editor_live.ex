@@ -42,7 +42,9 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:preview_ready?, false)
      |> assign(:post_visible_count, 10)
      |> assign(:event_visible_count, 10)
-     |> assign(:readonly?, false)}
+     |> assign(:readonly?, false)
+     |> assign(:email_stats, nil)
+     |> assign(:click_stats, nil)}
   end
 
   @impl true
@@ -77,8 +79,25 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     |> assign(:picker_data_loaded?, false)
     |> assign(:picker_load_started?, false)
     |> maybe_start_async_load_picker()
+    |> maybe_load_email_stats(edition)
     |> assign_preview_data()
   end
+
+  defp maybe_load_email_stats(socket, %Edition{status: :sent, id: edition_id})
+       when is_binary(edition_id) do
+    if connected?(socket) do
+      start_async(socket, :load_email_stats, fn ->
+        %{
+          by_type: Newsletter.count_email_events_by_type(edition_id),
+          by_link: Newsletter.count_clicks_by_link(edition_id)
+        }
+      end)
+    else
+      socket
+    end
+  end
+
+  defp maybe_load_email_stats(socket, _edition), do: socket
 
   defp maybe_start_async_load_picker(socket) do
     if connected?(socket) do
@@ -342,7 +361,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             Newsletter sent — editing is disabled
           </p>
         </div>
-        <div class="flex flex-wrap gap-x-8 gap-y-3">
+        <%!-- Delivery & engagement summary --%>
+        <div class="flex flex-wrap gap-x-8 gap-y-3 mb-4">
           <div>
             <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
               Sent at
@@ -366,7 +386,80 @@ defmodule YscWeb.AdminNewsletterEditorLive do
               {format_count(@edition.sent_count || 0)}
             </p>
           </div>
+          <%= cond do %>
+            <% is_nil(@email_stats) -> %>
+              <div class="flex items-center gap-2 text-sm text-green-700">
+                <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" />
+                Loading stats…
+              </div>
+            <% @email_stats == :error -> %>
+              <div class="flex items-center gap-2 text-sm text-amber-700">
+                <.icon name="hero-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                Stats could not be loaded
+              </div>
+            <% true -> %>
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+                  Clicks
+                </p>
+                <p class="text-sm font-semibold text-green-900 mt-0.5">
+                  {format_count(Map.get(@email_stats, "click", 0))}
+                  <%= if (@edition.sent_count || 0) > 0 do %>
+                    <span class="font-normal text-green-700">
+                      ({Float.round(
+                        Map.get(@email_stats, "click", 0) / @edition.sent_count *
+                          100,
+                        1
+                      )}%)
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+                  Bounces
+                </p>
+                <p class="text-sm font-semibold text-green-900 mt-0.5">
+                  {format_count(Map.get(@email_stats, "bounce", 0))}
+                  <%= if (@edition.sent_count || 0) > 0 do %>
+                    <span class="font-normal text-green-700">
+                      ({Float.round(
+                        Map.get(@email_stats, "bounce", 0) / @edition.sent_count *
+                          100,
+                        1
+                      )}%)
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+          <% end %>
         </div>
+        <%!-- Link click breakdown --%>
+        <%= if is_list(@click_stats) and @click_stats != [] do %>
+          <div class="border-t border-green-200 pt-4">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-green-600 mb-2">
+              Clicks by link
+            </p>
+            <div class="space-y-1.5">
+              <%= for {url, clicks} <- @click_stats do %>
+                <div class="flex items-center gap-3 text-sm">
+                  <span class="font-semibold text-green-900 shrink-0 tabular-nums w-8 text-right">
+                    {clicks}
+                  </span>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-green-700 hover:text-green-900 hover:underline truncate max-w-xs lg:max-w-lg"
+                    title={url}
+                  >
+                    {url}
+                  </a>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
       </div>
 
       <%!-- Mobile tab switcher (hidden on lg+) --%>
@@ -1346,6 +1439,24 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:post_results, [])
      |> assign(:event_results, [])
      |> assign(:picker_data_loaded?, true)}
+  end
+
+  def handle_async(
+        :load_email_stats,
+        {:ok, %{by_type: by_type, by_link: by_link}},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:email_stats, by_type)
+     |> assign(:click_stats, by_link)}
+  end
+
+  def handle_async(:load_email_stats, {:exit, _reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(:email_stats, :error)
+     |> assign(:click_stats, :error)}
   end
 
   defp normalize_upload_payload({:ok, id}) when is_binary(id), do: id

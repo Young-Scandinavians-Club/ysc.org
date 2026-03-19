@@ -19,7 +19,7 @@ defmodule YscWeb.UserTicketsLive do
             </h1>
           </div>
           <.link
-            navigate={~p"/events"}
+            href={~p"/events"}
             class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition shadow-lg shadow-zinc-200"
           >
             <.icon name="hero-plus" class="w-4 h-4" /> Find More Events
@@ -44,7 +44,7 @@ defmodule YscWeb.UserTicketsLive do
               You haven't purchased any event tickets yet.
             </p>
             <.link
-              navigate={~p"/events"}
+              href={~p"/events"}
               class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition shadow-lg"
             >
               <.icon name="hero-plus" class="w-4 h-4" /> Browse Events
@@ -66,7 +66,7 @@ defmodule YscWeb.UserTicketsLive do
                 </div>
 
                 <.link
-                  navigate={~p"/events/#{ticket_order.event_id}"}
+                  href={~p"/events/#{ticket_order.event_id}"}
                   class="block group-hover:text-teal-600 transition-colors"
                 >
                   <h2 class="text-3xl font-black text-zinc-900 tracking-tighter mb-2">
