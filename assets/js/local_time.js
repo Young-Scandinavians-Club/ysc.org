@@ -1,48 +1,35 @@
 // LocalTime Hook for Phoenix LiveView
-// Converts UTC timestamps to browser local time
+// Converts UTC timestamps to browser local time, falling back to America/Los_Angeles (PST/PDT).
 const LocalTime = {
-    mounted() {
-        this.updateTime();
-    },
-
-    updated() {
-        this.updateTime();
-    },
+    mounted() { this.updateTime(); },
+    updated() { this.updateTime(); },
 
     updateTime() {
         const utcTimeString = this.el.dataset.utcTime;
-        const prefix = this.el.dataset.prefix || "";
-
-        if (!utcTimeString) {
-            return;
-        }
+        if (!utcTimeString) return;
 
         try {
-            // Parse the UTC time string
             const utcDate = new Date(utcTimeString);
+            if (isNaN(utcDate.getTime())) return;
 
-            if (isNaN(utcDate.getTime())) {
-                console.error('Invalid UTC time format:', utcTimeString);
-                return;
+            // Detect the browser timezone; fall back to Pacific time.
+            let timeZone;
+            try {
+                timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Los_Angeles";
+            } catch (_) {
+                timeZone = "America/Los_Angeles";
             }
 
-            // Format the date in local timezone
-            const options = {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                timeZoneName: 'short'
-            };
+            const datePart = utcDate.toLocaleDateString("en-US", {
+                year: "numeric", month: "long", day: "numeric", timeZone,
+            });
+            const timePart = utcDate.toLocaleTimeString("en-US", {
+                hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone,
+            });
 
-            const localTimeString = utcDate.toLocaleString(undefined, options);
-
-            // Update the element's text content
-            this.el.textContent = prefix + localTimeString;
+            this.el.textContent = `${datePart} at ${timePart}`;
         } catch (error) {
-            console.error('Error converting UTC time to local time:', error);
+            // Leave the server-rendered fallback text untouched on any error.
         }
     }
 };

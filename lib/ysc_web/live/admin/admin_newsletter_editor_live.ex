@@ -369,9 +369,16 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             </p>
             <p class="text-sm font-semibold text-green-900 mt-0.5">
               <%= if @edition.sent_at do %>
-                {Calendar.strftime(@edition.sent_at, "%B %-d, %Y")}
-                <span class="font-normal text-green-700">
-                  at {Calendar.strftime(@edition.sent_at, "%-I:%M %p")} UTC
+                <span
+                  id="edition-sent-at"
+                  phx-hook="LocalTime"
+                  phx-update="ignore"
+                  data-utc-time={DateTime.to_iso8601(@edition.sent_at)}
+                >
+                  {Calendar.strftime(@edition.sent_at, "%B %-d, %Y")}
+                  <span class="font-normal text-green-700">
+                    at {Calendar.strftime(@edition.sent_at, "%-I:%M %p")} UTC
+                  </span>
                 </span>
               <% else %>
                 —
