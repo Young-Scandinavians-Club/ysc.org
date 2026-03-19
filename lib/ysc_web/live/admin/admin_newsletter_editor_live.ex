@@ -392,6 +392,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" />
                 Loading stats…
               </div>
+            <% @email_stats == :error -> %>
+              <div class="flex items-center gap-2 text-sm text-amber-700">
+                <.icon name="hero-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                Stats could not be loaded
+              </div>
             <% true -> %>
               <div>
                 <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
@@ -430,7 +435,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           <% end %>
         </div>
         <%!-- Link click breakdown --%>
-        <%= if not is_nil(@click_stats) and @click_stats != [] do %>
+        <%= if is_list(@click_stats) and @click_stats != [] do %>
           <div class="border-t border-green-200 pt-4">
             <p class="text-[11px] font-medium uppercase tracking-wide text-green-600 mb-2">
               Clicks by link
@@ -1450,8 +1455,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   def handle_async(:load_email_stats, {:exit, _reason}, socket) do
     {:noreply,
      socket
-     |> assign(:email_stats, %{})
-     |> assign(:click_stats, [])}
+     |> assign(:email_stats, :error)
+     |> assign(:click_stats, :error)}
   end
 
   defp normalize_upload_payload({:ok, id}) when is_binary(id), do: id
