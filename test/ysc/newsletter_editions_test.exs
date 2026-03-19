@@ -206,24 +206,26 @@ defmodule Ysc.NewsletterEditionsTest do
   # ---------------------------------------------------------------------------
 
   describe "send_edition/1" do
-    test "returns :ok for a draft edition" do
+    test "returns {:ok, edition} with :sending status for a draft edition" do
       # In test mode (Oban inline), the job executes immediately; we verify the
       # return value and that the edition ends up marked as sent.
       edition = edition_fixture(admin_fixture())
 
-      assert :ok = Newsletter.send_edition(edition)
+      assert {:ok, sending_edition} = Newsletter.send_edition(edition)
+      assert sending_edition.status == :sending
 
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.status == :sent
     end
 
-    test "returns :ok for a :scheduled edition (send now overrides the schedule)" do
+    test "returns {:ok, edition} with :sending status for a :scheduled edition (send now overrides the schedule)" do
       edition = edition_fixture(admin_fixture())
 
       {:ok, scheduled} =
         Newsletter.update_edition(edition, %{"status" => :scheduled})
 
-      assert :ok = Newsletter.send_edition(scheduled)
+      assert {:ok, sending_edition} = Newsletter.send_edition(scheduled)
+      assert sending_edition.status == :sending
     end
 
     test "returns error when edition is already sent" do
