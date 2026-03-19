@@ -44,7 +44,7 @@ defmodule YscWeb.Workers.NewsletterSender do
           :ok
 
         edition ->
-          if edition.status in [:draft, :scheduled] do
+          if edition.status in [:draft, :scheduled, :sending] do
             send_to_subscribers(edition)
           else
             Ysc.Logging.info(
@@ -59,7 +59,14 @@ defmodule YscWeb.Workers.NewsletterSender do
     end
   end
 
+  if Ysc.Env.dev?() do
+    defp maybe_dev_delay, do: Process.sleep(8_000)
+  else
+    defp maybe_dev_delay, do: :ok
+  end
+
   defp send_to_subscribers(edition) do
+    maybe_dev_delay()
     edition = Repo.preload(edition, :cover_image)
     post_ids = edition.post_ids || []
     event_ids = edition.event_ids || []
@@ -147,6 +154,8 @@ defmodule YscWeb.Workers.NewsletterSender do
 
             :ok
         end
+
+        Newsletter.broadcast_edition_sent(Repo.preload(sent_edition, :creator))
 
         Ysc.Logging.info("NewsletterSender: completed",
           edition_id: edition.id,

@@ -27,7 +27,7 @@ defmodule Ysc.Newsletter.Edition do
     field :intro_text, :string
     field :post_ids, {:array, :string}, default: []
     field :event_ids, {:array, :string}, default: []
-    field :status, Ecto.Enum, values: [:draft, :scheduled, :sent]
+    field :status, Ecto.Enum, values: [:draft, :scheduled, :sending, :sent]
     field :scheduled_at, :utc_datetime
     field :sent_at, :utc_datetime
     field :sent_count, :integer, default: 0

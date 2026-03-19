@@ -13,6 +13,8 @@ defmodule YscWeb.AdminNewslettersLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
+
     subscriber_count =
       Newsletter.list_subscribers(subscribed: true) |> length()
 
@@ -113,6 +115,16 @@ defmodule YscWeb.AdminNewslettersLive do
   @impl true
   def handle_async(:load_subscribers, {:exit, _}, socket) do
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:edition_sent, edition}, socket) do
+    {:noreply,
+     socket
+     |> stream_insert(:editions, edition)
+     |> YscWeb.Flash.put_toast(:info, "\"#{edition.title}\" has been sent.",
+       title: "Newsletter sent"
+     )}
   end
 
   defp allowed_tab("subscribers"), do: "subscribers"
@@ -340,9 +352,17 @@ defmodule YscWeb.AdminNewslettersLive do
                 </.link>
 
                 <div class="flex items-center gap-3 mt-2 flex-wrap">
-                  <.badge type={edition_status_badge(edition.status)}>
-                    {format_status(edition.status)}
-                  </.badge>
+                  <%= if edition.status == :sending do %>
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
+                      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+                      </span>
+                      Sending…
+                    </span>
+                  <% else %>
+                    <.badge type={edition_status_badge(edition.status)}>
+                      {format_status(edition.status)}
+                    </.badge>
+                  <% end %>
                   <span class="text-sm text-zinc-500">
                     <%= cond do %>
                       <% edition.sent_at -> %>
@@ -371,18 +391,26 @@ defmodule YscWeb.AdminNewslettersLive do
                   >
                     Edit
                   </.link>
+                  <%= if edition.status == :sending do %>
+                    <span class="inline-flex items-center gap-1.5 text-sm text-blue-600 font-semibold">
+                      <span class="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+                      </span>
+                      Sending…
+                    </span>
+                  <% else %>
+                    <button
+                      :if={edition.status == :draft}
+                      type="button"
+                      class="text-green-600 font-semibold hover:underline text-sm"
+                      phx-click="send-now"
+                      phx-value-id={edition.id}
+                      data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
+                    >
+                      Send Now
+                    </button>
+                  <% end %>
                   <button
-                    :if={edition.status == :draft}
-                    type="button"
-                    class="text-green-600 font-semibold hover:underline text-sm"
-                    phx-click="send-now"
-                    phx-value-id={edition.id}
-                    data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
-                  >
-                    Send Now
-                  </button>
-                  <button
-                    :if={edition.status != :sent}
+                    :if={edition.status not in [:sent, :sending]}
                     type="button"
                     class="text-red-600 font-semibold hover:underline text-sm"
                     phx-click="delete-edition"
@@ -462,9 +490,17 @@ defmodule YscWeb.AdminNewslettersLive do
                 <span class="text-zinc-600">{edition.subject}</span>
               </:col>
               <:col :let={{_, edition}} label="Status" field={:status}>
-                <.badge type={edition_status_badge(edition.status)}>
-                  {format_status(edition.status)}
-                </.badge>
+                <%= if edition.status == :sending do %>
+                  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
+                    <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+                    </span>
+                    Sending…
+                  </span>
+                <% else %>
+                  <.badge type={edition_status_badge(edition.status)}>
+                    {format_status(edition.status)}
+                  </.badge>
+                <% end %>
               </:col>
               <:col :let={{_, edition}} label="Created" field={:inserted_at}>
                 <span class="text-zinc-600">
@@ -503,20 +539,27 @@ defmodule YscWeb.AdminNewslettersLive do
                   >
                     <.icon name="hero-pencil-square" class="w-4 h-4" />
                   </.link>
+                  <%= if edition.status == :sending do %>
+                    <span class="p-1.5" title="Sending…">
+                      <span class="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin">
+                      </span>
+                    </span>
+                  <% else %>
+                    <button
+                      :if={edition.status == :draft}
+                      type="button"
+                      class="p-1.5 rounded text-green-600 hover:bg-green-50"
+                      phx-click="send-now"
+                      phx-value-id={edition.id}
+                      phx-click-stop
+                      data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
+                      title="Send now"
+                    >
+                      <.icon name="hero-paper-airplane" class="w-4 h-4" />
+                    </button>
+                  <% end %>
                   <button
-                    :if={edition.status == :draft}
-                    type="button"
-                    class="p-1.5 rounded text-green-600 hover:bg-green-50"
-                    phx-click="send-now"
-                    phx-value-id={edition.id}
-                    phx-click-stop
-                    data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
-                    title="Send now"
-                  >
-                    <.icon name="hero-paper-airplane" class="w-4 h-4" />
-                  </button>
-                  <button
-                    :if={edition.status != :sent}
+                    :if={edition.status not in [:sent, :sending]}
                     type="button"
                     class="p-1.5 rounded text-red-600 hover:bg-red-50"
                     phx-click="delete-edition"
@@ -906,13 +949,13 @@ defmodule YscWeb.AdminNewslettersLive do
     edition = Newsletter.get_edition!(id)
 
     case Newsletter.send_edition(edition) do
-      :ok ->
+      {:ok, sending_edition} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Newsletter send queued.",
+         |> stream_insert(:editions, sending_edition)
+         |> YscWeb.Flash.put_toast(:info, "Sending newsletter…",
            title: "Newsletter"
-         )
-         |> push_patch(to: ~p"/admin/newsletters")}
+         )}
 
       {:error, :already_sent} ->
         {:noreply,
@@ -1166,10 +1209,12 @@ defmodule YscWeb.AdminNewslettersLive do
 
   defp edition_status_badge(:draft), do: "yellow"
   defp edition_status_badge(:scheduled), do: "sky"
+  defp edition_status_badge(:sending), do: "blue"
   defp edition_status_badge(:sent), do: "green"
 
   defp format_status(:draft), do: "Draft"
   defp format_status(:scheduled), do: "Scheduled"
+  defp format_status(:sending), do: "Sending…"
   defp format_status(:sent), do: "Sent"
 
   defp format_date(nil), do: ""
