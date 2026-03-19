@@ -802,12 +802,12 @@ defmodule Ysc.Newsletter do
       |> String.trim_leading("/")
 
     cond do
-      String.match?(path, ~r{^events/([^/?#]+)}) ->
-        [_, id] = Regex.run(~r{^events/([^/?#]+)}, path)
+      match = Regex.run(~r{^events/([^/?#]+)}, path) ->
+        [_, id] = match
         {:event, id}
 
-      String.match?(path, ~r{^posts/([^/?#]+)}) ->
-        [_, id_or_slug] = Regex.run(~r{^posts/([^/?#]+)}, path)
+      match = Regex.run(~r{^posts/([^/?#]+)}, path) ->
+        [_, id_or_slug] = match
         {:post, id_or_slug}
 
       true ->
