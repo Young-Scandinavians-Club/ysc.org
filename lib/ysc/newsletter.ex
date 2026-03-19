@@ -531,8 +531,13 @@ defmodule Ysc.Newsletter do
              |> Oban.insert() do
         {:ok, sending_edition}
       else
-        {:error, %Ecto.Changeset{} = cs} -> {:error, cs}
-        {:error, reason} -> {:error, reason}
+        {:error, %Ecto.Changeset{}} = err ->
+          err
+
+        {:error, reason} ->
+          # Oban insert failed — revert status so the edition is not stuck in :sending
+          update_edition(edition, %{status: edition.status})
+          {:error, reason}
       end
     end
   end
