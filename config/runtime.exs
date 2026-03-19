@@ -299,6 +299,14 @@ if config_env() == :prod do
     """
   end
 
+  # ## SES Configuration Set (for open/click/bounce tracking)
+  #
+  # When set, all outgoing emails will be sent with this SES Configuration Set,
+  # enabling open, click, and bounce tracking via SNS webhooks.
+  # Events are routed to POST /webhooks/ses via an SNS subscription.
+  # If not set, tracking is disabled and emails are sent without a configuration set.
+  config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
+
   # ## S3 Configuration (Tigris)
   #
   # Configure Tigris storage settings (S3-compatible) based on environment variables.

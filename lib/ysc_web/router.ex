@@ -445,5 +445,6 @@ defmodule YscWeb.Router do
     pipe_through [:api]
 
     post "/quickbooks", QuickbooksWebhookController, :webhook
+    post "/ses", SesWebhookController, :webhook
   end
 end

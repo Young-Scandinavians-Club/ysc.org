@@ -2,6 +2,9 @@ import Config
 
 config :ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock
 
+# Skip SNS signature verification in tests (no real AWS cert to fetch)
+config :ysc, :sns_skip_signature_verification, true
+
 # Speed up QuickBooks tests by disabling rate limit backoff delays
 config :ysc,
   quickbooks_max_429_retries: 0,
