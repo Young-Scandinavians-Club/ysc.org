@@ -1134,7 +1134,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       {:ok, socket} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Newsletter send queued.",
+         |> YscWeb.Flash.put_toast(:info, "Sending newsletter…",
            title: "Newsletter"
          )
          |> push_navigate(to: ~p"/admin/newsletters")}
@@ -1182,7 +1182,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     case persist_edition(socket) do
       {:ok, edition, socket} ->
         case Newsletter.send_edition(edition) do
-          :ok -> {:ok, socket}
+          {:ok, _} -> {:ok, socket}
           _ -> {:error, socket}
         end
 

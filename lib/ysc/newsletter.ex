@@ -15,6 +15,24 @@ defmodule Ysc.Newsletter do
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Newsletter.Edition
 
+  @editions_topic "newsletter_editions"
+
+  @doc """
+  Subscribes the calling process to edition lifecycle broadcasts.
+
+  Broadcasted messages: `{:edition_sent, %Edition{}}`.
+  """
+  def subscribe_to_edition_updates do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @editions_topic)
+  end
+
+  @doc """
+  Broadcasts that an edition has been sent to all subscribers.
+  """
+  def broadcast_edition_sent(%Edition{} = edition) do
+    Phoenix.PubSub.broadcast(Ysc.PubSub, @editions_topic, {:edition_sent, edition})
+  end
+
   # Fields fetched in list queries — excludes :archived_html (large text).
   # Use get_edition!/1 or get_sent_edition/1 when the full record is needed.
   @edition_list_fields [
@@ -494,17 +512,22 @@ defmodule Ysc.Newsletter do
   job will run but `NewsletterSender` checks for `:sent` status and skips it
   safely.
 
-  Returns `{:error, :already_sent}` if the edition has already been sent.
+  Returns `{:error, :already_sent}` if the edition is already sending or sent.
+  Returns `{:ok, sending_edition}` on success so callers have the updated struct.
   """
   def send_edition(%Edition{} = edition) do
-    if edition.status == :sent do
+    if edition.status in [:sending, :sent] do
       {:error, :already_sent}
     else
-      case %{edition_id: edition.id}
-           |> YscWeb.Workers.NewsletterSender.new()
-           |> Oban.insert() do
-        {:ok, _job} -> :ok
-        {:error, _reason} = err -> err
+      with {:ok, sending_edition} <- update_edition(edition, %{status: :sending}),
+           {:ok, _job} <-
+             %{edition_id: edition.id}
+             |> YscWeb.Workers.NewsletterSender.new()
+             |> Oban.insert() do
+        {:ok, sending_edition}
+      else
+        {:error, %Ecto.Changeset{} = cs} -> {:error, cs}
+        {:error, reason} -> {:error, reason}
       end
     end
   end
