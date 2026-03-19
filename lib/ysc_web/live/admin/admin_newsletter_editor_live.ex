@@ -369,9 +369,16 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             </p>
             <p class="text-sm font-semibold text-green-900 mt-0.5">
               <%= if @edition.sent_at do %>
-                {Calendar.strftime(@edition.sent_at, "%B %-d, %Y")}
-                <span class="font-normal text-green-700">
-                  at {Calendar.strftime(@edition.sent_at, "%-I:%M %p")} UTC
+                <span
+                  id="edition-sent-at"
+                  phx-hook="LocalTime"
+                  phx-update="ignore"
+                  data-utc-time={DateTime.to_iso8601(@edition.sent_at)}
+                >
+                  {Calendar.strftime(@edition.sent_at, "%B %-d, %Y")}
+                  <span class="font-normal text-green-700">
+                    at {Calendar.strftime(@edition.sent_at, "%-I:%M %p")} UTC
+                  </span>
                 </span>
               <% else %>
                 —
@@ -398,6 +405,23 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 Stats could not be loaded
               </div>
             <% true -> %>
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+                  Unique opens
+                </p>
+                <p class="text-sm font-semibold text-green-900 mt-0.5">
+                  {format_count(Map.get(@email_stats, "open", 0))}
+                  <%= if (@edition.sent_count || 0) > 0 do %>
+                    <span class="font-normal text-green-700">
+                      ({Float.round(
+                        Map.get(@email_stats, "open", 0) / @edition.sent_count *
+                          100,
+                        1
+                      )}%)
+                    </span>
+                  <% end %>
+                </p>
+              </div>
               <div>
                 <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
                   Clicks
@@ -440,21 +464,50 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             <p class="text-[11px] font-medium uppercase tracking-wide text-green-600 mb-2">
               Clicks by link
             </p>
-            <div class="space-y-1.5">
-              <%= for {url, clicks} <- @click_stats do %>
-                <div class="flex items-center gap-3 text-sm">
-                  <span class="font-semibold text-green-900 shrink-0 tabular-nums w-8 text-right">
+            <div class="space-y-2">
+              <%= for %{url: url, clicks: clicks, title: title, type: type} <- @click_stats do %>
+                <div class="flex items-start gap-3 text-sm">
+                  <span class="font-semibold text-green-900 shrink-0 tabular-nums w-8 text-right pt-0.5">
                     {clicks}
                   </span>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-green-700 hover:text-green-900 hover:underline truncate max-w-xs lg:max-w-lg"
-                    title={url}
-                  >
-                    {url}
-                  </a>
+                  <div class="min-w-0">
+                    <%= if title do %>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class={[
+                          "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0",
+                          type == :event && "bg-violet-100 text-violet-700",
+                          type == :post && "bg-sky-100 text-sky-700"
+                        ]}>
+                          {if(type == :event, do: "Event", else: "Post")}
+                        </span>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="font-medium text-green-900 hover:underline truncate"
+                          title={url}
+                        >
+                          {title}
+                        </a>
+                      </div>
+                      <p
+                        class="text-green-600 truncate text-xs mt-0.5 max-w-xs lg:max-w-lg"
+                        title={url}
+                      >
+                        {url}
+                      </p>
+                    <% else %>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-green-700 hover:text-green-900 hover:underline truncate block max-w-xs lg:max-w-lg"
+                        title={url}
+                      >
+                        {url}
+                      </a>
+                    <% end %>
+                  </div>
                 </div>
               <% end %>
             </div>

@@ -15,6 +15,8 @@ defmodule Ysc.Newsletter do
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.EmailEvent
+  alias Ysc.Events.Event
+  alias Ysc.Posts.Post
 
   @editions_topic "newsletter_editions"
 
@@ -690,29 +692,126 @@ defmodule Ysc.Newsletter do
   @doc """
   Returns a summary count of email events grouped by type for a given edition.
 
+  Opens and clicks are counted as unique recipients (distinct email). Bounces
+  and complaints use total event count since they are delivery-level signals.
+
   Example return: `%{"open" => 42, "click" => 17, "bounce" => 3}`
   """
   def count_email_events_by_type(edition_id) when is_binary(edition_id) do
+    unique_types = ["open", "click"]
+
     EmailEvent
     |> where([e], e.edition_id == ^edition_id)
     |> group_by([e], e.event_type)
-    |> select([e], {e.event_type, count(e.id)})
+    |> select([e], {
+      e.event_type,
+      fragment(
+        "CASE WHEN ? = ANY(?) THEN COUNT(DISTINCT ?) ELSE COUNT(*) END",
+        e.event_type,
+        ^unique_types,
+        e.email
+      )
+    })
     |> Repo.all()
     |> Map.new()
   end
 
   @doc """
-  Returns click counts per link URL for a given edition, sorted by most clicked first.
+  Returns unique-recipient click counts per link URL for a given edition,
+  sorted by most clicked first, with resolved titles for event and post URLs.
 
-  Example return: [{"https://ysc.org/events", 12}, {"https://ysc.org/posts/abc", 5}]
+  Bare base-URL clicks (e.g. "https://ysc.org" or "https://ysc.org/") are
+  excluded as they don't provide meaningful engagement signal.
+
+  Each entry is a map:
+    %{url: url, clicks: n, title: "Event/Post title" | nil, type: :event | :post | :other}
   """
   def count_clicks_by_link(edition_id) when is_binary(edition_id) do
-    EmailEvent
-    |> where([e], e.edition_id == ^edition_id and e.event_type == "click")
-    |> where([e], not is_nil(e.link_url))
-    |> group_by([e], e.link_url)
-    |> select([e], {e.link_url, count(e.id)})
-    |> order_by([e], desc: count(e.id))
-    |> Repo.all()
+    base_url = String.trim_trailing(YscWeb.Endpoint.url(), "/")
+
+    raw =
+      EmailEvent
+      |> where([e], e.edition_id == ^edition_id and e.event_type == "click")
+      |> where([e], not is_nil(e.link_url))
+      |> where(
+        [e],
+        e.link_url != ^base_url and e.link_url != ^(base_url <> "/")
+      )
+      |> group_by([e], e.link_url)
+      |> select([e], {e.link_url, count(e.email, :distinct)})
+      |> order_by([e], desc: count(e.email, :distinct))
+      |> Repo.all()
+
+    classified =
+      Enum.map(raw, fn {url, clicks} ->
+        {type, id_or_slug} = classify_link(url, base_url)
+        {url, clicks, type, id_or_slug}
+      end)
+
+    event_ids =
+      for {_url, _clicks, :event, id} <- classified, do: id
+
+    post_identifiers =
+      for {_url, _clicks, :post, id_or_slug} <- classified, do: id_or_slug
+
+    event_titles =
+      if event_ids == [] do
+        %{}
+      else
+        Repo.all(
+          from e in Event, where: e.id in ^event_ids, select: {e.id, e.title}
+        )
+        |> Map.new()
+      end
+
+    post_titles =
+      if post_identifiers == [] do
+        %{}
+      else
+        rows =
+          Repo.all(
+            from p in Post,
+              where:
+                p.id in ^post_identifiers or p.url_name in ^post_identifiers,
+              select: {p.id, p.url_name, p.title}
+          )
+
+        Enum.reduce(rows, %{}, fn {id, url_name, title}, acc ->
+          acc
+          |> Map.put(id, title)
+          |> Map.put(url_name, title)
+        end)
+      end
+
+    Enum.map(classified, fn {url, clicks, type, id_or_slug} ->
+      title =
+        case type do
+          :event -> Map.get(event_titles, id_or_slug)
+          :post -> Map.get(post_titles, id_or_slug)
+          _ -> nil
+        end
+
+      %{url: url, clicks: clicks, title: title, type: type}
+    end)
+  end
+
+  defp classify_link(url, base_url) do
+    path =
+      url
+      |> String.trim_leading(base_url)
+      |> String.trim_leading("/")
+
+    cond do
+      match = Regex.run(~r{^events/([^/?#]+)}, path) ->
+        [_, id] = match
+        {:event, id}
+
+      match = Regex.run(~r{^posts/([^/?#]+)}, path) ->
+        [_, id_or_slug] = match
+        {:post, id_or_slug}
+
+      true ->
+        {:other, nil}
+    end
   end
 end
