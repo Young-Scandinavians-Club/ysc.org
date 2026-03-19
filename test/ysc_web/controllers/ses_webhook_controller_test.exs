@@ -355,25 +355,24 @@ defmodule YscWeb.SesWebhookControllerTest do
   describe "Newsletter.count_email_events_by_type/1" do
     test "returns counts grouped by event type" do
       edition = create_edition()
-      email = "counts@example.com"
 
       Newsletter.record_email_event(%{
         event_type: "open",
-        email: email,
+        email: "counts-a@example.com",
         environment: "test",
         edition_id: edition.id
       })
 
       Newsletter.record_email_event(%{
         event_type: "open",
-        email: email,
+        email: "counts-b@example.com",
         environment: "test",
         edition_id: edition.id
       })
 
       Newsletter.record_email_event(%{
         event_type: "click",
-        email: email,
+        email: "counts-a@example.com",
         environment: "test",
         edition_id: edition.id
       })

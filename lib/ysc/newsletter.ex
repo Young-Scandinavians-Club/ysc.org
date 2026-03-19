@@ -742,26 +742,53 @@ defmodule Ysc.Newsletter do
       |> order_by([e], desc: count(e.email, :distinct))
       |> Repo.all()
 
-    Enum.map(raw, fn {url, clicks} ->
-      {type, id_or_slug} = classify_link(url, base_url)
+    classified =
+      Enum.map(raw, fn {url, clicks} ->
+        {type, id_or_slug} = classify_link(url, base_url)
+        {url, clicks, type, id_or_slug}
+      end)
 
+    event_ids =
+      for {_url, _clicks, :event, id} <- classified, do: id
+
+    post_identifiers =
+      for {_url, _clicks, :post, id_or_slug} <- classified, do: id_or_slug
+
+    event_titles =
+      if event_ids == [] do
+        %{}
+      else
+        Repo.all(
+          from e in Event, where: e.id in ^event_ids, select: {e.id, e.title}
+        )
+        |> Map.new()
+      end
+
+    post_titles =
+      if post_identifiers == [] do
+        %{}
+      else
+        rows =
+          Repo.all(
+            from p in Post,
+              where:
+                p.id in ^post_identifiers or p.url_name in ^post_identifiers,
+              select: {p.id, p.url_name, p.title}
+          )
+
+        Enum.reduce(rows, %{}, fn {id, url_name, title}, acc ->
+          acc
+          |> Map.put(id, title)
+          |> Map.put(url_name, title)
+        end)
+      end
+
+    Enum.map(classified, fn {url, clicks, type, id_or_slug} ->
       title =
-        case {type, id_or_slug} do
-          {:event, id} ->
-            case Repo.get(Event, id) do
-              %Event{title: t} -> t
-              nil -> nil
-            end
-
-          {:post, id_or_slug} ->
-            Repo.one(
-              from p in Post,
-                where: p.id == ^id_or_slug or p.url_name == ^id_or_slug,
-                select: p.title
-            )
-
-          _ ->
-            nil
+        case type do
+          :event -> Map.get(event_titles, id_or_slug)
+          :post -> Map.get(post_titles, id_or_slug)
+          _ -> nil
         end
 
       %{url: url, clicks: clicks, title: title, type: type}

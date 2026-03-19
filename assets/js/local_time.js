@@ -20,14 +20,12 @@ const LocalTime = {
                 timeZone = "America/Los_Angeles";
             }
 
-            const datePart = utcDate.toLocaleDateString("en-US", {
-                year: "numeric", month: "long", day: "numeric", timeZone,
-            });
-            const timePart = utcDate.toLocaleTimeString("en-US", {
+            const locale = this.el.lang || document.documentElement.lang || navigator.language || undefined;
+
+            this.el.textContent = utcDate.toLocaleString(locale, {
+                year: "numeric", month: "long", day: "numeric",
                 hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone,
             });
-
-            this.el.textContent = `${datePart} at ${timePart}`;
         } catch (error) {
             // Leave the server-rendered fallback text untouched on any error.
         }
