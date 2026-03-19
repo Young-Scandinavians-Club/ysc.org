@@ -334,7 +334,11 @@ defmodule YscWeb.NewsletterArchiveLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    remote_ip = get_connect_info(socket, :peer_data).address
+    remote_ip =
+      case get_connect_info(socket, :peer_data) do
+        %{address: address} -> address
+        _ -> nil
+      end
 
     {:ok,
      socket

@@ -69,7 +69,13 @@ const AutoResizeIframe = {
 
                 const blob = new Blob([html], { type: "text/html" });
                 const url = URL.createObjectURL(blob);
-                const win = window.open(url);
+                let win;
+                try {
+                    win = window.open(url);
+                } catch (_e) {
+                    URL.revokeObjectURL(url);
+                    return;
+                }
                 if (win) {
                     win.addEventListener(
                         "load",
@@ -82,6 +88,9 @@ const AutoResizeIframe = {
                         },
                         { once: true }
                     );
+                } else {
+                    // Popup was blocked — nothing to print, release the URL immediately.
+                    URL.revokeObjectURL(url);
                 }
             } catch (_e) {}
         });
