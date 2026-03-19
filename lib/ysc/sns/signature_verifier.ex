@@ -80,16 +80,19 @@ defmodule Ysc.SNS.SignatureVerifier do
   defp extract_public_key(pem) do
     try do
       [{:Certificate, der, _}] = :public_key.pem_decode(pem)
+
+      # Decode with :otp so the SPKI's public key is already in Elixir/Erlang term
+      # form (e.g. {:RSAPublicKey, modulus, exponent}) ready for :public_key.verify/4.
+      # Do NOT attempt to re-encode the OTPSubjectPublicKeyInfo back to DER —
+      # the ASN.1 encoder expects the plain SubjectPublicKeyInfo record type and
+      # will crash with a badarg on the OTP variant.
       cert = :public_key.pkix_decode_cert(der, :otp)
+      # {:OTPCertificate, tbs, _sig_alg, _sig}
       tbs = elem(cert, 1)
+      # {:OTPTBSCertificate, ..., spki, ...} — spki is at index 7
       spki = elem(tbs, 7)
-
-      public_key =
-        :public_key.pem_entry_decode(
-          {:SubjectPublicKeyInfo,
-           :public_key.der_encode(:SubjectPublicKeyInfo, spki), :not_encrypted}
-        )
-
+      # {:OTPSubjectPublicKeyInfo, _algorithm, subject_public_key}
+      public_key = elem(spki, 2)
       {:ok, public_key}
     rescue
       error ->
