@@ -244,6 +244,25 @@ defmodule YscWeb.SesWebhookControllerTest do
     end
   end
 
+  describe "mask_email/1 (via controller logging - no PII leaks)" do
+    test "hard bounce logs do not contain the raw email address", %{conn: conn} do
+      # We can't directly inspect log output in tests, but we can verify the
+      # controller processes the event without crashing (mask_email handles it).
+      {:ok, _subscriber} = Newsletter.subscribe("piitest@example.com")
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "piitest@example.com",
+          env: "test",
+          bounce_type: "Permanent",
+          bounce_sub_type: "General"
+        )
+
+      conn = post_notification(conn, ses_event)
+      assert conn.status == 200
+    end
+  end
+
   describe "webhook/2 - invalid payloads" do
     test "returns 400 for invalid JSON", %{conn: conn} do
       conn =

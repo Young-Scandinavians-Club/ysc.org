@@ -89,6 +89,9 @@ defmodule Ysc.Messages do
         email
 
       config_set ->
+        # Build as a map first for easy conditional merging, then convert to the
+        # list of %{name: string, value: string} maps that Swoosh.Adapters.AmazonSES
+        # requires (see its prepare_tags/2 which pattern-matches on :name/:value keys).
         tags =
           %{
             "template" => to_string(attrs[:message_template]),
@@ -97,6 +100,7 @@ defmodule Ysc.Messages do
           |> maybe_put_ses_tag("user_id", attrs[:user_id])
           |> maybe_put_ses_tag("edition_id", attrs[:edition_id])
           |> maybe_put_ses_tag("subscriber_id", attrs[:subscriber_id])
+          |> Enum.map(fn {k, v} -> %{name: k, value: v} end)
 
         email
         |> Swoosh.Email.put_provider_option(:configuration_set_name, config_set)

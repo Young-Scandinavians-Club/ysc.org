@@ -155,7 +155,7 @@ defmodule YscWeb.SesWebhookController do
         Ysc.Logging.warning("SES webhook: failed to record email event",
           errors: inspect(changeset.errors),
           event_type: event_type,
-          email: email
+          email: mask_email(email)
         )
     end
   end
@@ -182,7 +182,7 @@ defmodule YscWeb.SesWebhookController do
 
     if bounce_type == "Permanent" do
       Ysc.Logging.info("SES webhook: hard bounce received, unsubscribing",
-        email: email,
+        email: mask_email(email),
         bounce_sub_type: get_in(ses_event, ["bounce", "bounceSubType"])
       )
 
@@ -193,13 +193,13 @@ defmodule YscWeb.SesWebhookController do
         {:ok, subscriber} ->
           Ysc.Logging.info(
             "SES webhook: subscriber unsubscribed due to hard bounce",
-            email: email,
+            email: mask_email(email),
             subscriber_id: subscriber.id
           )
 
         {:error, reason} ->
           Ysc.Logging.error("SES webhook: failed to unsubscribe hard bounce",
-            email: email,
+            email: mask_email(email),
             error: inspect(reason)
           )
       end
@@ -247,6 +247,31 @@ defmodule YscWeb.SesWebhookController do
         end
     end
   end
+
+  # Masks an email address to avoid logging raw PII.
+  # "user@example.com" → "u**r@example.com"
+  # Single-character local parts are fully masked: "a@b.com" → "*@b.com"
+  defp mask_email(email) when is_binary(email) do
+    case String.split(email, "@", parts: 2) do
+      [local, domain] when byte_size(local) > 2 ->
+        first = String.first(local)
+        last = String.last(local)
+        stars = String.duplicate("*", byte_size(local) - 2)
+        "#{first}#{stars}#{last}@#{domain}"
+
+      [local, domain] when byte_size(local) == 2 ->
+        first = String.first(local)
+        "#{first}*@#{domain}"
+
+      [local, domain] ->
+        "#{String.duplicate("*", byte_size(local))}@#{domain}"
+
+      _ ->
+        "[invalid email]"
+    end
+  end
+
+  defp mask_email(other), do: inspect(other)
 
   defp verify_sns_signature(sns_message) do
     if Application.get_env(:ysc, :sns_skip_signature_verification, false) do

@@ -34,7 +34,10 @@ defmodule Ysc.SNS.SignatureVerifier do
   defp validate_cert_url(url) when is_binary(url) do
     case URI.parse(url) do
       %URI{scheme: "https", host: host} when is_binary(host) ->
-        if Enum.any?(@valid_cert_domains, &String.ends_with?(host, &1)) do
+        if Enum.any?(
+             @valid_cert_domains,
+             &(host == &1 or String.ends_with?(host, "." <> &1))
+           ) do
           :ok
         else
           Ysc.Logging.warning("SNS cert URL has invalid host",
