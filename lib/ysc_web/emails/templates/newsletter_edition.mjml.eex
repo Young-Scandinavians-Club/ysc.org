@@ -34,15 +34,15 @@
 <%= for post <- @posts do %>
 <mj-section background-color="#fff" padding="8px 48px 24px 48px" border-radius="0">
   <mj-group>
-    <mj-column width="40%" vertical-align="middle" padding="0">
+    <mj-column width="40%" vertical-align="top" padding="8px 0 0 0">
       <%= if post[:image_url] do %>
       <mj-image src="<%= post[:image_url] %>" alt="" border-radius="8px" padding="0" height="160px" css-class="post-thumb"></mj-image>
       <% else %>
       <mj-spacer height="160px"></mj-spacer>
       <% end %>
     </mj-column>
-    <mj-column width="60%" vertical-align="middle" padding-left="24px">
-      <mj-text align="left" font-weight="bold" font-size="17px" padding-bottom="4px"><%= post[:title] %></mj-text>
+    <mj-column width="60%" vertical-align="middle" padding="0">
+      <mj-text align="left" font-weight="bold" font-size="17px" padding-bottom="8px"><%= post[:title] %></mj-text>
       <mj-text align="left" font-size="14px" color="#64748b" padding-top="0" line-height="1.5"><%= post[:preview_text] %></mj-text>
       <mj-text align="left" padding-top="4px">
         <a href="<%= post[:url] %>" style="color: #1447e6; text-decoration: none; font-size: 14px; font-weight: bold;">Read more →</a>

@@ -692,8 +692,9 @@ defmodule Ysc.Newsletter do
   @doc """
   Returns a summary count of email events grouped by type for a given edition.
 
-  Opens and clicks are counted as unique recipients (distinct email). Bounces
-  and complaints use total event count since they are delivery-level signals.
+  Opens and clicks are counted as unique recipients (distinct email) for
+  meaningful engagement rates. Bounces and complaints use total event counts
+  since they are delivery-level signals.
 
   Example return: `%{"open" => 42, "click" => 17, "bounce" => 3}`
   """
@@ -717,7 +718,7 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
-  Returns unique-recipient click counts per link URL for a given edition,
+  Returns total click counts per link URL for a given edition,
   sorted by most clicked first, with resolved titles for event and post URLs.
 
   Bare base-URL clicks (e.g. "https://ysc.org" or "https://ysc.org/") are
@@ -738,8 +739,8 @@ defmodule Ysc.Newsletter do
         e.link_url != ^base_url and e.link_url != ^(base_url <> "/")
       )
       |> group_by([e], e.link_url)
-      |> select([e], {e.link_url, count(e.email, :distinct)})
-      |> order_by([e], desc: count(e.email, :distinct))
+      |> select([e], {e.link_url, count(e.id)})
+      |> order_by([e], desc: count(e.id))
       |> Repo.all()
 
     classified =

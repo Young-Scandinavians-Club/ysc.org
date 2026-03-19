@@ -424,7 +424,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
               </div>
               <div>
                 <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Clicks
+                  Unique clickers
                 </p>
                 <p class="text-sm font-semibold text-green-900 mt-0.5">
                   {format_count(Map.get(@email_stats, "click", 0))}
