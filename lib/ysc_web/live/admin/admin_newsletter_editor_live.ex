@@ -407,6 +407,23 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             <% true -> %>
               <div>
                 <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+                  Unique opens
+                </p>
+                <p class="text-sm font-semibold text-green-900 mt-0.5">
+                  {format_count(Map.get(@email_stats, "open", 0))}
+                  <%= if (@edition.sent_count || 0) > 0 do %>
+                    <span class="font-normal text-green-700">
+                      ({Float.round(
+                        Map.get(@email_stats, "open", 0) / @edition.sent_count *
+                          100,
+                        1
+                      )}%)
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
                   Clicks
                 </p>
                 <p class="text-sm font-semibold text-green-900 mt-0.5">
