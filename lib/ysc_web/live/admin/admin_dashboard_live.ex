@@ -471,7 +471,7 @@ defmodule YscWeb.AdminDashboardLive do
               }>
                 <div class="flex justify-between items-start mb-4 group">
                   <.link
-                    navigate={~p"/events/#{event.id}"}
+                    href={~p"/events/#{event.id}"}
                     class="text-sm font-bold text-zinc-900 leading-tight group-hover:text-blue-600 transition-colors flex-1"
                   >
                     {event.title}

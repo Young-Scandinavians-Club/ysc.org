@@ -38,7 +38,7 @@
       <div class="flex flex-row items-center justify-between max-w-screen-xl mx-auto py-4 lg:py-0 px-4">
         <!-- Logo - hidden on mobile -->
         <.link
-          navigate={~p"/"}
+          href={~p"/"}
           class="hidden lg:flex items-center flex-shrink-0"
         >
           <.ysc_logo no_circle={true} class="h-12 w-12" width={48} height={48} />
@@ -53,7 +53,7 @@
               <ul class="flex flex-row lg:border-0 ms-6 items-center gap-2">
                 <li>
                   <.link
-                    navigate={~p"/news"}
+                    href={~p"/news"}
                     class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     News
@@ -61,7 +61,7 @@
                 </li>
                 <li>
                   <.link
-                    navigate={~p"/events"}
+                    href={~p"/events"}
                     class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Events
@@ -69,7 +69,7 @@
                 </li>
                 <li>
                   <.link
-                    navigate={~p"/bookings/tahoe"}
+                    href={~p"/bookings/tahoe"}
                     class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Tahoe Cabin
@@ -77,7 +77,7 @@
                 </li>
                 <li>
                   <.link
-                    navigate={~p"/bookings/clear-lake"}
+                    href={~p"/bookings/clear-lake"}
                     class="nav-link px-4 py-3 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Clear Lake Cabin
@@ -101,7 +101,7 @@
                     >
                       <li>
                         <.link
-                          navigate={~p"/newsletters"}
+                          href={~p"/newsletters"}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Newsletters
@@ -109,7 +109,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/history"}
+                          href={~p"/history"}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Our History
@@ -117,7 +117,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/board"}
+                          href={~p"/board"}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Board of Directors
@@ -125,7 +125,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/volunteer"}
+                          href={~p"/volunteer"}
                           class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
                         >
                           Volunteer
@@ -133,7 +133,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/contact"}
+                          href={~p"/contact"}
                           class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
                         >
                           Contact Us
@@ -150,7 +150,7 @@
               <ul class="flex flex-col font-medium">
                 <li>
                   <.link
-                    navigate={~p"/news"}
+                    href={~p"/news"}
                     phx-click={
                       JS.remove_class("open", to: "#navbar-dropdown-hamburger")
                       |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
@@ -169,7 +169,7 @@
                 </li>
                 <li>
                   <.link
-                    navigate={~p"/events"}
+                    href={~p"/events"}
                     phx-click={
                       JS.remove_class("open", to: "#navbar-dropdown-hamburger")
                       |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
@@ -188,7 +188,7 @@
                 </li>
                 <li>
                   <.link
-                    navigate={~p"/bookings/tahoe"}
+                    href={~p"/bookings/tahoe"}
                     phx-click={
                       JS.remove_class("open", to: "#navbar-dropdown-hamburger")
                       |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
@@ -207,7 +207,7 @@
                 </li>
                 <li>
                   <.link
-                    navigate={~p"/bookings/clear-lake"}
+                    href={~p"/bookings/clear-lake"}
                     phx-click={
                       JS.remove_class("open", to: "#navbar-dropdown-hamburger")
                       |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
@@ -243,7 +243,7 @@
                     >
                       <li>
                         <.link
-                          navigate={~p"/newsletters"}
+                          href={~p"/newsletters"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -266,7 +266,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/history"}
+                          href={~p"/history"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -289,7 +289,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/board"}
+                          href={~p"/board"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -312,7 +312,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/volunteer"}
+                          href={~p"/volunteer"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -335,7 +335,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/contact"}
+                          href={~p"/contact"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -388,7 +388,7 @@
                     >
                       <li>
                         <.link
-                          navigate={~p"/users/membership"}
+                          href={~p"/users/membership"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -411,7 +411,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/users/payments"}
+                          href={~p"/users/payments"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -434,7 +434,7 @@
                       </li>
                       <li>
                         <.link
-                          navigate={~p"/users/settings"}
+                          href={~p"/users/settings"}
                           phx-click={
                             JS.remove_class("open",
                               to: "#navbar-dropdown-hamburger"
@@ -502,7 +502,7 @@
                     Sign In
                   </.link>
                   <.link
-                    navigate={~p"/users/register"}
+                    href={~p"/users/register"}
                     phx-click={
                       JS.remove_class("open", to: "#navbar-dropdown-hamburger")
                       |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
@@ -540,7 +540,7 @@
       title="Application Under Review"
     >
       Your membership application is currently being reviewed by our board. You will be able to access all features of the website once your application has been approved. For more details <.link
-        navigate={~p"/pending-review"}
+        href={~p"/pending-review"}
         class="hover:underline font-bold"
       >click here</.link>.
     </.alert_banner>
@@ -577,7 +577,7 @@
         title="Application Under Review"
       >
         Your membership application is currently being reviewed by our board. You will be able to access all features of the website once your application has been approved. For more details <.link
-          navigate={~p"/pending-review"}
+          href={~p"/pending-review"}
           class="hover:underline font-bold"
         >click here</.link>.
       </.alert_banner>
@@ -607,7 +607,7 @@
       <div class="space-y-8 lg:flex lg:justify-between lg:space-y-4">
         <div class="lg:flex-shrink-0">
           <.link
-            navigate={~p"/"}
+            href={~p"/"}
             class="flex items-center font-semibold"
           >
             <.ysc_logo
@@ -678,7 +678,7 @@
             <ul class="space-y-3 text-sm text-zinc-600">
               <li>
                 <.link
-                  navigate={~p"/privacy-policy"}
+                  href={~p"/privacy-policy"}
                   class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
                 >
                   Privacy Policy
@@ -686,7 +686,7 @@
               </li>
               <li>
                 <.link
-                  navigate={~p"/terms-of-service"}
+                  href={~p"/terms-of-service"}
                   class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
                 >
                   Terms of Service
@@ -694,7 +694,7 @@
               </li>
               <li>
                 <.link
-                  navigate={~p"/code-of-conduct"}
+                  href={~p"/code-of-conduct"}
                   class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
                 >
                   Code of Conduct
@@ -709,7 +709,7 @@
             <ul class="space-y-3 text-sm text-zinc-600">
               <li>
                 <.link
-                  navigate={~p"/financials"}
+                  href={~p"/financials"}
                   class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
                 >
                   Financials & Meetings
@@ -717,7 +717,7 @@
               </li>
               <li>
                 <.link
-                  navigate={~p"/bylaws"}
+                  href={~p"/bylaws"}
                   class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
                 >
                   Bylaws
@@ -725,7 +725,7 @@
               </li>
               <li>
                 <.link
-                  navigate={~p"/report-conduct-violation"}
+                  href={~p"/report-conduct-violation"}
                   class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
                 >
                   Report Conduct Violation
@@ -739,7 +739,7 @@
         <div class="text-sm text-zinc-600 text-center sm:text-left flex flex-wrap items-baseline justify-center sm:justify-start gap-x-1">
           <span class="whitespace-nowrap">
             © {DateTime.utc_now().year} <.link
-              navigate={~p"/"}
+              href={~p"/"}
               class="hover:text-zinc-900 transition-colors font-medium"
             >Young Scandinavians Club</.link>.
           </span>

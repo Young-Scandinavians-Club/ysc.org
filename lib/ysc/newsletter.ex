@@ -700,4 +700,19 @@ defmodule Ysc.Newsletter do
     |> Repo.all()
     |> Map.new()
   end
+
+  @doc """
+  Returns click counts per link URL for a given edition, sorted by most clicked first.
+
+  Example return: [{"https://ysc.org/events", 12}, {"https://ysc.org/posts/abc", 5}]
+  """
+  def count_clicks_by_link(edition_id) when is_binary(edition_id) do
+    EmailEvent
+    |> where([e], e.edition_id == ^edition_id and e.event_type == "click")
+    |> where([e], not is_nil(e.link_url))
+    |> group_by([e], e.link_url)
+    |> select([e], {e.link_url, count(e.id)})
+    |> order_by([e], desc: count(e.id))
+    |> Repo.all()
+  end
 end
