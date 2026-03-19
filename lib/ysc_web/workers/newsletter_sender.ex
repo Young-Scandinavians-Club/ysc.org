@@ -108,7 +108,9 @@ defmodule YscWeb.Workers.NewsletterSender do
             params: %{edition_id: edition.id},
             email: subscriber.email,
             user_id: subscriber.user_id,
-            rendered_message: html
+            rendered_message: html,
+            edition_id: edition.id,
+            subscriber_id: subscriber.id
           }
 
           case Messages.run_send_message_idempotent(email, idempotency_attrs) do

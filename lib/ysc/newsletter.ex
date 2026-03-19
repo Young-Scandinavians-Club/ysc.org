@@ -14,6 +14,7 @@ defmodule Ysc.Newsletter do
   alias Ysc.Repo
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Newsletter.Edition
+  alias Ysc.Newsletter.EmailEvent
 
   @editions_topic "newsletter_editions"
 
@@ -620,5 +621,83 @@ defmodule Ysc.Newsletter do
 
       {:ok, updated}
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Email event tracking (SES opens, clicks, bounces, complaints)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Records an SES email event (open, click, bounce, complaint) in the database.
+
+  Returns `{:ok, event}` or `{:error, changeset}`.
+  """
+  def record_email_event(attrs) do
+    %EmailEvent{}
+    |> EmailEvent.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Handles a hard bounce for the given email address.
+
+  Unsubscribes the subscriber from the newsletter (if they exist and are
+  currently subscribed) and records a note in their metadata. This prevents
+  future newsletters from being sent to an address that is known to bounce.
+
+  Returns `{:ok, subscriber}` if the subscriber was found and unsubscribed,
+  `{:ok, :not_subscribed}` if no active subscription was found, or
+  `{:error, changeset}` on update failure.
+  """
+  def handle_hard_bounce(email) when is_binary(email) do
+    case get_subscriber_by_email(email) do
+      nil ->
+        {:ok, :not_subscribed}
+
+      %Subscriber{subscribed: false} ->
+        {:ok, :not_subscribed}
+
+      subscriber ->
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        updated_metadata =
+          Map.merge(subscriber.metadata || %{}, %{
+            "hard_bounced_at" => DateTime.to_iso8601(now),
+            "unsubscribe_reason" => "hard_bounce"
+          })
+
+        subscriber
+        |> Subscriber.update_changeset(%{
+          subscribed: false,
+          unsubscribed_at: now,
+          source: "hard_bounce",
+          metadata: updated_metadata
+        })
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Returns email events for a given edition, ordered by most recent first.
+  """
+  def list_email_events_for_edition(edition_id) when is_binary(edition_id) do
+    EmailEvent
+    |> where([e], e.edition_id == ^edition_id)
+    |> order_by([e], desc: e.inserted_at)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns a summary count of email events grouped by type for a given edition.
+
+  Example return: `%{"open" => 42, "click" => 17, "bounce" => 3}`
+  """
+  def count_email_events_by_type(edition_id) when is_binary(edition_id) do
+    EmailEvent
+    |> where([e], e.edition_id == ^edition_id)
+    |> group_by([e], e.event_type)
+    |> select([e], {e.event_type, count(e.id)})
+    |> Repo.all()
+    |> Map.new()
   end
 end

@@ -87,4 +87,15 @@ defmodule Ysc.Env do
   def non_prod? do
     current() in [:dev, :test, :sandbox]
   end
+
+  @doc """
+  Returns the SES Configuration Set name for email tracking, or nil if not configured.
+
+  When nil, no Configuration Set is attached to outgoing emails and SES event
+  tracking (opens, clicks, bounces) is disabled.
+  """
+  @spec ses_configuration_set() :: String.t() | nil
+  def ses_configuration_set do
+    Application.get_env(:ysc, :ses_configuration_set)
+  end
 end
