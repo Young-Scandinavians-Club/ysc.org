@@ -139,6 +139,9 @@ defmodule YscWeb.Router do
 
       live "/news", NewsLive, :index
 
+      live "/newsletters", NewsletterArchiveLive, :index
+      live "/newsletters/:id", NewsletterArchiveLive, :show
+
       live "/newsletter/unsubscribe/:token", NewsletterUnsubscribeLive, :index
 
       live "/bookings/tahoe", TahoeBookingLive, :index

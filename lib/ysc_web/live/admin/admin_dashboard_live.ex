@@ -22,504 +22,496 @@ defmodule YscWeb.AdminDashboardLive do
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
     >
-      <div class="bg-zinc-50/80 min-h-screen -mx-4 lg:-mx-10 px-4 lg:px-10 py-8">
-        <!-- Command Center Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
-          <div>
-            <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
-              Welcome back, {Ysc.title_case(@current_user.first_name)} 👋
-            </h1>
-            <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
-              <span class="relative inline-flex w-2 h-2">
-                <span class={[
-                  "w-2 h-2 rounded-full",
-                  if(@loading_dashboard, do: "bg-amber-500", else: "bg-emerald-500")
-                ]}>
-                </span>
-                <span class={[
-                  "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:4s]",
-                  if(@loading_dashboard,
-                    do: "bg-amber-500 animate-ping",
-                    else: "bg-emerald-500 animate-ping"
-                  )
-                ]}>
-                </span>
-                <span class={[
-                  "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:5s]",
-                  if(@loading_dashboard,
-                    do: "bg-amber-500 animate-pulse",
-                    else: "bg-emerald-500 animate-pulse"
-                  )
-                ]}>
-                </span>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-6 mb-8">
+        <div>
+          <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+            Welcome back, {Ysc.title_case(@current_user.first_name)}
+          </h1>
+          <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
+            <span class="relative inline-flex w-2 h-2">
+              <span class={[
+                "w-2 h-2 rounded-full",
+                if(@loading_dashboard, do: "bg-amber-500", else: "bg-emerald-500")
+              ]}>
               </span>
-              <%= if @loading_dashboard do %>
-                Loading dashboard...
-              <% else %>
-                Build: {@build_version}
-              <% end %>
-            </p>
-          </div>
-          <div class="w-full md:w-96">
-            <.live_component module={YscWeb.AdminSearchComponent} id="admin-search" />
-          </div>
+              <span class={[
+                "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:4s]",
+                if(@loading_dashboard,
+                  do: "bg-amber-500 animate-ping",
+                  else: "bg-emerald-500 animate-ping"
+                )
+              ]}>
+              </span>
+              <span class={[
+                "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:5s]",
+                if(@loading_dashboard,
+                  do: "bg-amber-500 animate-pulse",
+                  else: "bg-emerald-500 animate-pulse"
+                )
+              ]}>
+              </span>
+            </span>
+            <%= if @loading_dashboard do %>
+              Loading dashboard...
+            <% else %>
+              Build: {@build_version}
+            <% end %>
+          </p>
         </div>
-        <!-- Tiered Stats Row -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
-          <!-- Applications Card -->
-          <.link
-            navigate="/admin/users?filters[0][_persistent_id]=0&filters[0][field]=state&filters[0][op]=in&filters[0][value][]=pending_approval"
-            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
-          >
-            <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Applications
-              </p>
-              <div class="flex items-baseline gap-2">
-                <p class="text-3xl font-black text-zinc-900 group-hover:text-amber-600 transition-colors">
-                  {@pending_reviews_count}
-                </p>
-                <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded italic">
-                  Pending
-                </span>
-              </div>
-            </div>
-            <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-2 gap-4">
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">
-                  This Month
-                </p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@applications_this_month}
-                </p>
-                <p class="text-xs text-zinc-500 mt-0.5">
-                  <%= if @applications_last_month > 0 do %>
-                    <span class={
-                      if @applications_month_change >= 0,
-                        do: "text-emerald-600",
-                        else: "text-rose-600"
-                    }>
-                      {if @applications_month_change >= 0, do: "+", else: ""}{@applications_month_change}%
-                    </span>
-                  <% else %>
-                    <span class="text-zinc-400">—</span>
-                  <% end %>
-                </p>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">YTD</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@applications_this_year}
-                </p>
-                <p class="text-xs text-zinc-500 mt-0.5">
-                  <%= if @applications_last_year > 0 do %>
-                    <span class={
-                      if @applications_year_change >= 0,
-                        do: "text-emerald-600",
-                        else: "text-rose-600"
-                    }>
-                      {if @applications_year_change >= 0, do: "+", else: ""}{@applications_year_change}%
-                    </span>
-                  <% else %>
-                    <span class="text-zinc-400">—</span>
-                  <% end %>
-                </p>
-              </div>
-            </div>
-            <p class="text-xs text-amber-600 font-medium mt-3 group-hover:underline">
-              Review applications →
+        <div class="w-full md:w-96">
+          <.live_component module={YscWeb.AdminSearchComponent} id="admin-search" />
+        </div>
+      </div>
+      <!-- Tiered Stats Row -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
+        <!-- Applications Card -->
+        <.link
+          navigate="/admin/users?filters[0][_persistent_id]=0&filters[0][field]=state&filters[0][op]=in&filters[0][value][]=pending_approval"
+          class="bg-white p-6 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Applications
             </p>
-          </.link>
-          <!-- Memberships Card -->
-          <.link
-            navigate={~p"/admin/memberships"}
-            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
-          >
-            <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Memberships
+            <div class="flex items-baseline gap-2">
+              <p class="text-3xl font-black text-zinc-900 group-hover:text-amber-600 transition-colors">
+                {@pending_reviews_count}
               </p>
-              <div class="flex items-baseline gap-2">
-                <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
-                  {@membership_stats.total}
-                </p>
-                <span class="text-xs font-bold text-zinc-500">
-                  active
-                </span>
-              </div>
-            </div>
-            <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@membership_stats.single}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@membership_stats.family}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
-                <p class="text-sm font-black text-zinc-700">
-                  {@membership_stats.lifetime}
-                </p>
-              </div>
-            </div>
-            <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-              View all memberships →
-            </p>
-          </.link>
-          <!-- Total Revenue Card -->
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
-            <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Total Revenue ({Timex.format!(DateTime.utc_now(), "{Mshort}")})
-              </p>
-              <div class="flex items-baseline gap-2">
-                <p class="text-3xl font-black text-emerald-600">
-                  {format_money(@current_month_revenue)}
-                </p>
-                <span class={[
-                  "text-xs font-bold flex items-center",
-                  get_revenue_change_color_class(@revenue_change_direction)
-                ]}>
-                  <.icon
-                    name={get_revenue_change_icon(@revenue_change_direction)}
-                    class="w-3 h-3 mr-1"
-                  />
-                  {@revenue_change_text}
-                </span>
-              </div>
-            </div>
-            <div class="mt-6 pt-4 border-t border-zinc-50 grid grid-cols-2 gap-4">
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">
-                  vs Last Month
-                </p>
-                <p class="text-sm font-bold text-zinc-500">
-                  {format_money(@last_month_revenue)}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">
-                  vs {Timex.format!(DateTime.utc_now(), "{Mshort}")} '23
-                </p>
-                <p class="text-sm font-bold text-zinc-500">
-                  {format_money(@last_year_month_revenue)}
-                </p>
-              </div>
+              <.badge type="yellow">Pending</.badge>
             </div>
           </div>
-          <!-- Revenue Mix Card -->
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between">
+          <div class="mt-6 pt-4 border-t border-zinc-100 grid grid-cols-2 gap-4">
             <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Revenue Mix
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                This Month
               </p>
-              <div class="w-full bg-zinc-100 h-3 rounded-full overflow-hidden flex mb-2">
-                <div
-                  class="bg-blue-600 h-full"
-                  style={"width: #{@revenue_mix_bookings_percent}%"}
-                  title="Bookings"
-                >
-                </div>
-                <div
-                  class="bg-purple-500 h-full"
-                  style={"width: #{@revenue_mix_events_percent}%"}
-                  title="Events"
-                >
-                </div>
-                <div
-                  class="bg-emerald-500 h-full"
-                  style={"width: #{@revenue_mix_membership_percent}%"}
-                  title="Membership"
-                >
-                </div>
-              </div>
+              <p class="text-sm font-black text-zinc-700">
+                {@applications_this_month}
+              </p>
+              <p class="text-xs text-zinc-500 mt-0.5">
+                <%= if @applications_last_month > 0 do %>
+                  <span class={
+                    if @applications_month_change >= 0,
+                      do: "text-emerald-600",
+                      else: "text-rose-600"
+                  }>
+                    {if @applications_month_change >= 0, do: "+", else: ""}{@applications_month_change}%
+                  </span>
+                <% else %>
+                  <span class="text-zinc-400">—</span>
+                <% end %>
+              </p>
             </div>
-            <div class="mt-4 space-y-2">
-              <div class="flex justify-between items-center">
-                <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
-                  <span class="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>Bookings
-                </span>
-                <span class="text-sm font-black text-zinc-700">
-                  {format_money(@revenue_bookings)}
-                </span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
-                  <span class="w-2 h-2 rounded-full bg-purple-500 mr-2"></span>Events
-                </span>
-                <span class="text-sm font-black text-zinc-700">
-                  {format_money(@revenue_events)}
-                </span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>Membership
-                </span>
-                <span class="text-sm font-black text-zinc-700">
-                  {format_money(@revenue_membership)}
-                </span>
-              </div>
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">YTD</p>
+              <p class="text-sm font-black text-zinc-700">
+                {@applications_this_year}
+              </p>
+              <p class="text-xs text-zinc-500 mt-0.5">
+                <%= if @applications_last_year > 0 do %>
+                  <span class={
+                    if @applications_year_change >= 0,
+                      do: "text-emerald-600",
+                      else: "text-rose-600"
+                  }>
+                    {if @applications_year_change >= 0, do: "+", else: ""}{@applications_year_change}%
+                  </span>
+                <% else %>
+                  <span class="text-zinc-400">—</span>
+                <% end %>
+              </p>
             </div>
           </div>
-          <!-- Active Now Card -->
-          <.link
-            navigate={~p"/admin/bookings"}
-            class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100 flex flex-col justify-between hover:shadow-md hover:border-zinc-200 transition-all group"
-          >
-            <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-                Staying Now
-              </p>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            Review applications →
+          </p>
+        </.link>
+        <!-- Memberships Card -->
+        <.link
+          navigate={~p"/admin/memberships"}
+          class="bg-white p-6 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Memberships
+            </p>
+            <div class="flex items-baseline gap-2">
               <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
-                {@active_guests_count}
+                {@membership_stats.total}
               </p>
-              <p class="text-xs text-zinc-500 mt-1 font-medium">
-                Guests across properties
+              <span class="text-xs font-bold text-zinc-500">
+                active
+              </span>
+            </div>
+          </div>
+          <div class="mt-6 pt-4 border-t border-zinc-100 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
+              <p class="text-sm font-black text-zinc-700">
+                {@membership_stats.single}
               </p>
             </div>
-            <div class="mt-6 flex -space-x-2 overflow-hidden">
-              <div :for={user <- @active_guests_sample} class="relative">
-                <.user_avatar_image
-                  email={user.email}
-                  user_id={user.id}
-                  country={user.most_connected_country}
-                  class="inline-block h-6 w-6 rounded-full ring-2 ring-white"
-                />
-              </div>
-              <div
-                :if={@active_guests_count > length(@active_guests_sample)}
-                class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-500 ring-2 ring-white"
-              >
-                +{@active_guests_count - length(@active_guests_sample)}
-              </div>
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
+              <p class="text-sm font-black text-zinc-700">
+                {@membership_stats.family}
+              </p>
             </div>
-            <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-              View all bookings →
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
+              <p class="text-sm font-black text-zinc-700">
+                {@membership_stats.lifetime}
+              </p>
+            </div>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            View all memberships →
+          </p>
+        </.link>
+        <!-- Total Revenue Card -->
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 flex flex-col justify-between">
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Total Revenue ({Timex.format!(DateTime.utc_now(), "{Mshort}")})
             </p>
-          </.link>
+            <div class="flex items-baseline gap-2">
+              <p class="text-3xl font-black text-emerald-600">
+                {format_money(@current_month_revenue)}
+              </p>
+              <span class={[
+                "text-xs font-bold flex items-center",
+                get_revenue_change_color_class(@revenue_change_direction)
+              ]}>
+                <.icon
+                  name={get_revenue_change_icon(@revenue_change_direction)}
+                  class="w-3 h-3 mr-1"
+                />
+                {@revenue_change_text}
+              </span>
+            </div>
+          </div>
+          <div class="mt-6 pt-4 border-t border-zinc-100 grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                vs Last Month
+              </p>
+              <p class="text-sm font-bold text-zinc-500">
+                {format_money(@last_month_revenue)}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                vs {Timex.format!(DateTime.utc_now(), "{Mshort}")} '23
+              </p>
+              <p class="text-sm font-bold text-zinc-500">
+                {format_money(@last_year_month_revenue)}
+              </p>
+            </div>
+          </div>
         </div>
-        <!-- Priority Dashboard Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
-          <section class="lg:col-span-2 space-y-6">
-            <!-- Review Applications Section -->
-            <div class="bg-white rounded shadow-sm border border-zinc-200 p-8">
-              <div class="flex items-center justify-between mb-8 border-b border-zinc-50 pb-4">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <.icon name="hero-users" class="w-6 h-6 text-amber-600" />
-                  </div>
-                  <h2 class="text-2xl font-black text-zinc-900 tracking-tight">
-                    Review Applications
-                  </h2>
-                </div>
-                <span
-                  :if={@pending_reviews_count > 0}
-                  class="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-black rounded uppercase ring-1 ring-amber-200"
-                >
-                  {@pending_reviews_count} PENDING
-                </span>
-              </div>
-
+        <!-- Revenue Mix Card -->
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 flex flex-col justify-between">
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Revenue Mix
+            </p>
+            <div class="w-full bg-zinc-100 h-3 rounded-full overflow-hidden flex mb-2">
               <div
-                :if={Enum.empty?(@pending_users)}
-                class="text-center py-10 border-2 border-dashed border-zinc-100 rounded"
+                class="bg-blue-600 h-full"
+                style={"width: #{@revenue_mix_bookings_percent}%"}
+                title="Bookings"
               >
-                <.icon
-                  name="hero-check-circle"
-                  class="w-8 h-8 text-zinc-200 mx-auto mb-2"
-                />
-                <p class="text-sm text-zinc-400">No pending applications</p>
               </div>
-
-              <div :if={not Enum.empty?(@pending_users)} class="space-y-4">
-                <div
-                  :for={user <- @pending_users}
-                  class={[
-                    "flex items-center gap-5 p-5 bg-white border border-zinc-100 rounded hover:shadow-xl hover:-translate-y-0.5 transition-all group relative overflow-hidden",
-                    get_application_card_classes(user)
-                  ]}
-                >
-                  <div class={[
-                    "absolute left-0 top-0 bottom-0 w-1 group-hover:w-1.5 transition-all",
-                    get_status_pillar_color(user)
-                  ]}>
-                  </div>
-
-                  <div class="relative flex-shrink-0">
-                    <.user_avatar_image
-                      email={user.email}
-                      user_id={user.id}
-                      country={user.most_connected_country}
-                      class="w-14 h-14 rounded object-cover ring-2 ring-zinc-50 shadow-sm"
-                    />
-                  </div>
-
-                  <div class="flex-1 min-w-0">
-                    <h4 class="font-bold text-zinc-900 truncate text-lg tracking-tight">
-                      {"#{user.first_name} #{user.last_name}"}
-                    </h4>
-                    <div class="flex items-center gap-3 mt-0.5">
-                      <span class={get_status_badge_classes(user)}>
-                        {get_status_badge_text(user)}
-                      </span>
-                      <span class="text-xs text-zinc-400 italic font-medium">
-                        {get_time_waiting_text(user)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="flex items-center gap-6">
-                    <div class="hidden sm:block text-right border-r border-zinc-100 pr-6">
-                      <p class="text-xs font-black text-zinc-400 uppercase tracking-widest mb-0.5">
-                        Plan Type
-                      </p>
-                      <p class="text-xs font-bold text-zinc-700">
-                        {get_membership_type_display(user)}
-                      </p>
-                    </div>
-                    <.button
-                      phx-click="navigate-to-review"
-                      phx-value-user-id={user.id}
-                    >
-                      {get_review_button_text(user)}
-                    </.button>
-                  </div>
-                </div>
+              <div
+                class="bg-purple-500 h-full"
+                style={"width: #{@revenue_mix_events_percent}%"}
+                title="Events"
+              >
+              </div>
+              <div
+                class="bg-emerald-500 h-full"
+                style={"width: #{@revenue_mix_membership_percent}%"}
+                title="Membership"
+              >
               </div>
             </div>
-            <!-- Recent Discussions Section -->
-            <div class="bg-white rounded shadow-sm border border-zinc-200 p-8">
-              <h3 class="text-lg font-black text-zinc-900 tracking-tight mb-6">
-                Recent Discussions
-              </h3>
-              <div
-                :if={Enum.empty?(@latest_comments)}
-                class="text-center py-10 border-2 border-dashed border-zinc-100 rounded"
-              >
-                <.icon
-                  name="hero-chat-bubble-left-right"
-                  class="w-8 h-8 text-zinc-200 mx-auto mb-2"
-                />
-                <p class="text-sm text-zinc-400">No new comments to moderate</p>
-              </div>
-              <ul :if={not Enum.empty?(@latest_comments)} class="space-y-4">
-                <li
-                  :for={comment <- @latest_comments}
-                  class="border-b border-zinc-200 pb-4 last:border-0"
-                >
-                  <div class="flex justify-between items-start mb-2">
-                    <div class="flex-1">
-                      <.link
-                        navigate={
-                          ~p"/posts/#{comment.post.url_name || comment.post.id}"
-                        }
-                        class="text-sm font-semibold text-zinc-800 hover:text-blue-600"
-                      >
-                        {comment.post.title}
-                      </.link>
-                      <p class="text-sm text-zinc-600 mt-1 line-clamp-2">
-                        {comment.text}
-                      </p>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between text-xs text-zinc-500 mt-2">
-                    <span>
-                      By
-                      <span class="font-medium text-zinc-700">
-                        {"#{comment.author.first_name} #{comment.author.last_name}"}
-                      </span>
-                    </span>
-                    <span>
-                      {Timex.format!(
-                        comment.inserted_at,
-                        "{YYYY}-{0M}-{0D} {h12}:{m} {AM}"
-                      )}
-                    </span>
-                  </div>
-                </li>
-              </ul>
+          </div>
+          <div class="mt-4 space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
+                <span class="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>Bookings
+              </span>
+              <span class="text-sm font-black text-zinc-700">
+                {format_money(@revenue_bookings)}
+              </span>
             </div>
-          </section>
-          <!-- Ticket Sales Sidebar -->
-          <section class="lg:col-span-1">
-            <div class="sticky top-24 bg-white rounded shadow-sm border border-zinc-200 p-8 h-fit">
-              <div class="flex items-center justify-between mb-8 border-b border-zinc-50 pb-4">
-                <h2 class="text-xl font-black text-zinc-900 tracking-tight">
-                  Ticket Sales
+            <div class="flex justify-between items-center">
+              <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
+                <span class="w-2 h-2 rounded-full bg-purple-500 mr-2"></span>Events
+              </span>
+              <span class="text-sm font-black text-zinc-700">
+                {format_money(@revenue_events)}
+              </span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center text-xs font-bold text-zinc-500 uppercase">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>Membership
+              </span>
+              <span class="text-sm font-black text-zinc-700">
+                {format_money(@revenue_membership)}
+              </span>
+            </div>
+          </div>
+        </div>
+        <!-- Active Now Card -->
+        <.link
+          navigate={~p"/admin/bookings"}
+          class="bg-white p-6 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Staying Now
+            </p>
+            <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+              {@active_guests_count}
+            </p>
+            <p class="text-xs text-zinc-500 mt-1 font-medium">
+              Guests across properties
+            </p>
+          </div>
+          <div class="mt-6 flex -space-x-2 overflow-hidden">
+            <div :for={user <- @active_guests_sample} class="relative">
+              <.user_avatar_image
+                email={user.email}
+                user_id={user.id}
+                country={user.most_connected_country}
+                class="inline-block h-6 w-6 rounded-full ring-2 ring-white"
+              />
+            </div>
+            <div
+              :if={@active_guests_count > length(@active_guests_sample)}
+              class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-500 ring-2 ring-white"
+            >
+              +{@active_guests_count - length(@active_guests_sample)}
+            </div>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            View all bookings →
+          </p>
+        </.link>
+      </div>
+      <!-- Priority Dashboard Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
+        <section class="lg:col-span-2 space-y-6">
+          <!-- Review Applications Section -->
+          <div class="bg-white rounded shadow-sm border border-zinc-200 p-8">
+            <div class="flex items-center justify-between mb-8 border-b border-zinc-50 pb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <.icon name="hero-users" class="w-6 h-6 text-amber-600" />
+                </div>
+                <h2 class="text-2xl font-black text-zinc-900 tracking-tight">
+                  Review Applications
                 </h2>
-                <.link
-                  navigate={~p"/admin/events"}
-                  class="text-xs font-black text-teal-600 underline"
-                >
-                  VIEW ALL
-                </.link>
               </div>
+              <.badge :if={@pending_reviews_count > 0} type="yellow">
+                {@pending_reviews_count} pending
+              </.badge>
+            </div>
 
+            <div
+              :if={Enum.empty?(@pending_users)}
+              class="text-center py-10 border-2 border-dashed border-zinc-100 rounded"
+            >
+              <.icon
+                name="hero-check-circle"
+                class="w-8 h-8 text-zinc-200 mx-auto mb-2"
+              />
+              <p class="text-sm text-zinc-400">No pending applications</p>
+            </div>
+
+            <div :if={not Enum.empty?(@pending_users)} class="space-y-4">
               <div
-                :if={Enum.empty?(@events_with_tickets)}
-                class="text-center py-10 border-2 border-dashed border-zinc-100 rounded"
+                :for={user <- @pending_users}
+                class={[
+                  "flex items-center gap-5 p-5 bg-white border border-zinc-100 rounded hover:ring-2 hover:ring-zinc-200 transition-all group relative overflow-hidden",
+                  get_application_card_classes(user)
+                ]}
               >
-                <.icon
-                  name="hero-calendar"
-                  class="w-8 h-8 text-zinc-200 mx-auto mb-2"
-                />
-                <p class="text-sm text-zinc-400">No upcoming events</p>
+                <div class={[
+                  "absolute left-0 top-0 bottom-0 w-1 group-hover:w-1.5 transition-all",
+                  get_status_pillar_color(user)
+                ]}>
+                </div>
+
+                <div class="relative flex-shrink-0">
+                  <.user_avatar_image
+                    email={user.email}
+                    user_id={user.id}
+                    country={user.most_connected_country}
+                    class="w-14 h-14 rounded object-cover ring-2 ring-zinc-50 shadow-sm"
+                  />
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-bold text-zinc-900 truncate text-lg tracking-tight">
+                    {"#{user.first_name} #{user.last_name}"}
+                  </h4>
+                  <div class="flex items-center gap-3 mt-0.5">
+                    <.badge type={get_status_badge_type(user)}>
+                      {get_status_badge_text(user)}
+                    </.badge>
+                    <span class="text-xs text-zinc-400 italic font-medium">
+                      {get_time_waiting_text(user)}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-6">
+                  <div class="hidden sm:block text-right border-r border-zinc-100 pr-6">
+                    <p class="text-xs font-black text-zinc-400 uppercase tracking-widest mb-0.5">
+                      Plan Type
+                    </p>
+                    <p class="text-xs font-bold text-zinc-700">
+                      {get_membership_type_display(user)}
+                    </p>
+                  </div>
+                  <.button
+                    phx-click="navigate-to-review"
+                    phx-value-user-id={user.id}
+                  >
+                    {get_review_button_text(user)}
+                  </.button>
+                </div>
               </div>
-
-              <div :if={not Enum.empty?(@events_with_tickets)} class="space-y-10">
-                <div :for={
-                  %{event: event, ticket_tiers: tiers} <- @events_with_tickets
-                }>
-                  <div class="flex justify-between items-start mb-4 group">
+            </div>
+          </div>
+          <!-- Recent Discussions Section -->
+          <div class="bg-white rounded shadow-sm border border-zinc-200 p-8">
+            <h3 class="text-lg font-black text-zinc-900 tracking-tight mb-6">
+              Recent Discussions
+            </h3>
+            <div
+              :if={Enum.empty?(@latest_comments)}
+              class="text-center py-10 border-2 border-dashed border-zinc-100 rounded"
+            >
+              <.icon
+                name="hero-chat-bubble-left-right"
+                class="w-8 h-8 text-zinc-200 mx-auto mb-2"
+              />
+              <p class="text-sm text-zinc-400">No new comments to moderate</p>
+            </div>
+            <ul :if={not Enum.empty?(@latest_comments)} class="space-y-4">
+              <li
+                :for={comment <- @latest_comments}
+                class="border-b border-zinc-200 pb-4 last:border-0"
+              >
+                <div class="flex justify-between items-start mb-2">
+                  <div class="flex-1">
                     <.link
-                      navigate={~p"/events/#{event.id}"}
-                      class="text-sm font-bold text-zinc-900 leading-tight group-hover:text-blue-600 transition-colors flex-1"
+                      navigate={
+                        ~p"/posts/#{comment.post.url_name || comment.post.id}"
+                      }
+                      class="text-sm font-semibold text-zinc-800 hover:text-blue-600"
                     >
-                      {event.title}
+                      {comment.post.title}
                     </.link>
-                    <.icon
-                      name="hero-arrow-top-right-on-square"
-                      class="w-4 h-4 text-zinc-300 flex-shrink-0 ml-2"
-                    />
+                    <p class="text-sm text-zinc-600 mt-1 line-clamp-2">
+                      {comment.text}
+                    </p>
                   </div>
+                </div>
+                <div class="flex items-center justify-between text-xs text-zinc-500 mt-2">
+                  <span>
+                    By
+                    <span class="font-medium text-zinc-700">
+                      {"#{comment.author.first_name} #{comment.author.last_name}"}
+                    </span>
+                  </span>
+                  <span>
+                    {Timex.format!(
+                      comment.inserted_at,
+                      "{YYYY}-{0M}-{0D} {h12}:{m} {AM}"
+                    )}
+                  </span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+        <!-- Ticket Sales Sidebar -->
+        <section class="lg:col-span-1">
+          <div class="sticky top-24 bg-white rounded shadow-sm border border-zinc-200 p-8 h-fit">
+            <div class="flex items-center justify-between mb-8 border-b border-zinc-50 pb-4">
+              <h2 class="text-xl font-black text-zinc-900 tracking-tight">
+                Ticket Sales
+              </h2>
+              <.link
+                navigate={~p"/admin/events"}
+                class="text-xs font-black text-blue-600 underline"
+              >
+                VIEW ALL
+              </.link>
+            </div>
 
-                  <div :if={Enum.empty?(tiers)} class="text-xs text-zinc-500">
-                    No ticket tiers configured
-                  </div>
+            <div
+              :if={Enum.empty?(@events_with_tickets)}
+              class="text-center py-10 border-2 border-dashed border-zinc-100 rounded"
+            >
+              <.icon
+                name="hero-calendar"
+                class="w-8 h-8 text-zinc-200 mx-auto mb-2"
+              />
+              <p class="text-sm text-zinc-400">No upcoming events</p>
+            </div>
 
-                  <div :if={not Enum.empty?(tiers)} class="space-y-4">
-                    <div :for={tier <- tiers} class="space-y-1">
-                      <div class="flex justify-between text-xs font-black text-zinc-400 uppercase tracking-widest">
-                        <span>{tier.name}</span>
-                        <span class="text-zinc-900">
-                          {tier.sold_tickets_count} / {if tier.quantity,
-                            do: tier.quantity,
-                            else: "∞"}
-                        </span>
-                      </div>
+            <div :if={not Enum.empty?(@events_with_tickets)} class="space-y-10">
+              <div :for={
+                %{event: event, ticket_tiers: tiers} <- @events_with_tickets
+              }>
+                <div class="flex justify-between items-start mb-4 group">
+                  <.link
+                    navigate={~p"/events/#{event.id}"}
+                    class="text-sm font-bold text-zinc-900 leading-tight group-hover:text-blue-600 transition-colors flex-1"
+                  >
+                    {event.title}
+                  </.link>
+                  <.icon
+                    name="hero-arrow-top-right-on-square"
+                    class="w-4 h-4 text-zinc-300 flex-shrink-0 ml-2"
+                  />
+                </div>
+
+                <div :if={Enum.empty?(tiers)} class="text-xs text-zinc-500">
+                  No ticket tiers configured
+                </div>
+
+                <div :if={not Enum.empty?(tiers)} class="space-y-4">
+                  <div :for={tier <- tiers} class="space-y-1">
+                    <div class="flex justify-between text-xs font-black text-zinc-400 uppercase tracking-widest">
+                      <span>{tier.name}</span>
+                      <span class="text-zinc-900">
+                        {tier.sold_tickets_count} / {if tier.quantity,
+                          do: tier.quantity,
+                          else: "∞"}
+                      </span>
+                    </div>
+                    <div
+                      :if={tier.sold_tickets_count > 0}
+                      class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden"
+                    >
                       <div
-                        :if={tier.sold_tickets_count > 0}
-                        class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden"
+                        class="bg-zinc-900 h-full rounded-full transition-all duration-1000"
+                        style={"width: #{calculate_progress_percentage(tier)}%"}
                       >
-                        <div
-                          class="bg-zinc-900 h-full rounded-full transition-all duration-1000"
-                          style={"width: #{calculate_progress_percentage(tier)}%"}
-                        >
-                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
     </.side_menu>
     """
@@ -528,13 +520,11 @@ defmodule YscWeb.AdminDashboardLive do
   @impl true
   @spec mount(any(), any(), map()) :: {:ok, map()}
   def mount(_params, _session, socket) do
-    build_version = get_build_version()
-
     # Initialize with placeholder values for fast initial render
     socket =
       socket
       |> assign(:active_page, :dashboard)
-      |> assign(:build_version, build_version)
+      |> assign(:build_version, BuildVersion.version())
       |> assign(:page_title, "Dashboard")
       |> assign(:loading_dashboard, true)
       # Placeholder values - will be populated when connected
@@ -547,7 +537,6 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:revenue_change_direction, :neutral)
       |> assign(:last_month_revenue, Money.new(:USD, 0))
       |> assign(:last_year_month_revenue, Money.new(:USD, 0))
-      |> assign(:next_event_date, nil)
       |> assign(:applications_this_month, 0)
       |> assign(:applications_this_year, 0)
       |> assign(:applications_last_month, 0)
@@ -591,8 +580,6 @@ defmodule YscWeb.AdminDashboardLive do
      revenue_mix_events_percent, revenue_mix_membership_percent} =
       calculate_all_revenue_stats()
 
-    next_event_date = get_next_event_date(events_with_tickets)
-
     {applications_this_month, applications_this_year, applications_last_month,
      applications_last_year, applications_month_change,
      applications_year_change} =
@@ -613,7 +600,6 @@ defmodule YscWeb.AdminDashboardLive do
      |> assign(:revenue_change_direction, revenue_change_direction)
      |> assign(:last_month_revenue, last_month_revenue)
      |> assign(:last_year_month_revenue, last_year_month_revenue)
-     |> assign(:next_event_date, next_event_date)
      |> assign(:applications_this_month, applications_this_month)
      |> assign(:applications_this_year, applications_this_year)
      |> assign(:applications_last_month, applications_last_month)
@@ -629,14 +615,6 @@ defmodule YscWeb.AdminDashboardLive do
      |> assign(:active_guests_count, active_guests_count)
      |> assign(:active_guests_sample, active_guests_sample)
      |> assign(:membership_stats, membership_stats)}
-  end
-
-  defp get_next_event_date(events_with_tickets) do
-    events_with_tickets
-    |> Enum.map(fn %{event: event} -> event.start_date end)
-    |> Enum.filter(&(&1 != nil))
-    |> Enum.sort()
-    |> List.first()
   end
 
   defp build_review_url(user_id) do
@@ -805,26 +783,19 @@ defmodule YscWeb.AdminDashboardLive do
     end
   end
 
-  defp get_status_badge_classes(user) do
+  defp get_status_badge_type(user) do
     if user.registration_form && user.registration_form.completed do
       submitted_at = user.registration_form.completed
       hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
 
       cond do
-        hours_ago < 24 ->
-          "text-xs font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 uppercase tracking-widest"
-
-        hours_ago >= 24 && hours_ago <= 48 ->
-          "text-xs font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 uppercase tracking-widest"
-
-        hours_ago > 48 ->
-          "text-xs font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 uppercase tracking-widest"
-
-        true ->
-          "text-xs font-black text-zinc-600 bg-zinc-50 px-1.5 py-0.5 uppercase tracking-widest"
+        hours_ago < 24 -> "green"
+        hours_ago >= 24 && hours_ago <= 48 -> "yellow"
+        hours_ago > 48 -> "red"
+        true -> "dark"
       end
     else
-      "text-xs font-black text-zinc-600 bg-zinc-50 px-1.5 py-0.5 uppercase tracking-widest"
+      "dark"
     end
   end
 
@@ -893,7 +864,6 @@ defmodule YscWeb.AdminDashboardLive do
     if tier.quantity && tier.quantity > 0 do
       min(100, round(tier.sold_tickets_count / tier.quantity * 100))
     else
-      # For unlimited tiers, show 0% or a small visual indicator
       0
     end
   end
@@ -1210,10 +1180,6 @@ defmodule YscWeb.AdminDashboardLive do
     sample_users = Enum.take(unique_users, 3)
 
     {length(unique_users), sample_users}
-  end
-
-  defp get_build_version do
-    BuildVersion.version()
   end
 
   @impl true

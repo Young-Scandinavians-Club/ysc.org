@@ -154,6 +154,23 @@ defmodule YscWeb.Emails.NewsletterEdition do
   end
 
   @doc """
+  Builds assigns for archiving a sent edition (no subscriber context).
+
+  Produces the same output as `build_preview_assigns/5` but accepts the full
+  edition struct (with `:cover_image` preloaded) so callers don't need to
+  extract the cover URL themselves.
+  """
+  def build_archive_assigns(edition, posts, events) do
+    build_preview_assigns(
+      edition.title,
+      edition.intro_text,
+      cover_image_url(edition),
+      posts,
+      events
+    )
+  end
+
+  @doc """
   Builds assigns for the admin editor preview (full email as recipients see it).
 
   Uses a placeholder subscriber so first_name is "there" and unsubscribe_url points

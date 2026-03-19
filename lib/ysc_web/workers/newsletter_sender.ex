@@ -128,7 +128,14 @@ defmodule YscWeb.Workers.NewsletterSender do
       sent_count: sent_count
     }
 
-    Newsletter.update_edition(edition, attrs)
+    {:ok, sent_edition} = Newsletter.update_edition(edition, attrs)
+
+    archive_html =
+      NewsletterEdition.render(
+        NewsletterEdition.build_archive_assigns(sent_edition, posts, events)
+      )
+
+    Newsletter.store_archive_html(sent_edition, archive_html)
 
     Ysc.Logging.info("NewsletterSender: completed",
       edition_id: edition.id,
