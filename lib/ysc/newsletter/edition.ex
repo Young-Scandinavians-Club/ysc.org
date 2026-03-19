@@ -31,6 +31,7 @@ defmodule Ysc.Newsletter.Edition do
     field :scheduled_at, :utc_datetime
     field :sent_at, :utc_datetime
     field :sent_count, :integer, default: 0
+    field :archived_html, :string
 
     belongs_to :cover_image, Image
     belongs_to :creator, User

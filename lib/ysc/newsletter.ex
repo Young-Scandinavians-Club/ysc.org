@@ -15,6 +15,25 @@ defmodule Ysc.Newsletter do
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Newsletter.Edition
 
+  # Fields fetched in list queries — excludes :archived_html (large text).
+  # Use get_edition!/1 or get_sent_edition/1 when the full record is needed.
+  @edition_list_fields [
+    :id,
+    :title,
+    :subject,
+    :intro_text,
+    :status,
+    :post_ids,
+    :event_ids,
+    :sent_at,
+    :sent_count,
+    :scheduled_at,
+    :cover_image_id,
+    :creator_id,
+    :inserted_at,
+    :updated_at
+  ]
+
   @doc """
   Subscribes an email to the newsletter.
 
@@ -292,6 +311,7 @@ defmodule Ysc.Newsletter do
   def list_editions do
     Edition
     |> order_by([e], desc: e.inserted_at)
+    |> select([e], struct(e, ^@edition_list_fields))
     |> Repo.all()
     |> Repo.preload([:cover_image, :creator])
   end
@@ -309,6 +329,7 @@ defmodule Ysc.Newsletter do
 
     base_query =
       Edition
+      |> select([e], struct(e, ^@edition_list_fields))
       |> preload([:cover_image, :creator])
       |> Ecto.Query.exclude(:order_by)
       |> maybe_filter_inserted_at_from(date_from)
@@ -390,6 +411,38 @@ defmodule Ysc.Newsletter do
   """
   def get_edition!(id),
     do: Repo.get!(Edition, id) |> Repo.preload([:cover_image, :creator])
+
+  @doc """
+  Lists all sent editions, most recently sent first.
+
+  Excludes archived_html to keep list queries lean.
+  """
+  def list_sent_editions do
+    from(e in Edition,
+      where: e.status == :sent,
+      order_by: [desc: e.sent_at],
+      select: struct(e, ^@edition_list_fields)
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns a single sent edition by id, including archived_html.
+
+  Returns nil if the edition does not exist or has not been sent.
+  """
+  def get_sent_edition(id) do
+    Repo.get_by(Edition, id: id, status: :sent)
+  end
+
+  @doc """
+  Stores the de-personalized archived HTML for a sent edition.
+  """
+  def store_archive_html(%Edition{} = edition, html) when is_binary(html) do
+    edition
+    |> Ecto.Changeset.change(%{archived_html: html})
+    |> Repo.update()
+  end
 
   @doc """
   Creates a new newsletter edition (draft).

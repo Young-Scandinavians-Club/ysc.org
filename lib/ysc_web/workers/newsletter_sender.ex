@@ -128,15 +128,46 @@ defmodule YscWeb.Workers.NewsletterSender do
       sent_count: sent_count
     }
 
-    Newsletter.update_edition(edition, attrs)
+    case Newsletter.update_edition(edition, attrs) do
+      {:ok, sent_edition} ->
+        archive_html =
+          NewsletterEdition.render(
+            NewsletterEdition.build_archive_assigns(sent_edition, posts, events)
+          )
 
-    Ysc.Logging.info("NewsletterSender: completed",
-      edition_id: edition.id,
-      sent_count: sent_count,
-      subscriber_count: length(subscribers)
-    )
+        case Newsletter.store_archive_html(sent_edition, archive_html) do
+          {:ok, _} ->
+            :ok
 
-    :ok
+          {:error, reason} ->
+            Ysc.Logging.error("NewsletterSender: failed to store archive HTML",
+              edition_id: edition.id,
+              error: inspect(reason)
+            )
+
+            :ok
+        end
+
+        Ysc.Logging.info("NewsletterSender: completed",
+          edition_id: edition.id,
+          sent_count: sent_count,
+          subscriber_count: length(subscribers)
+        )
+
+        :ok
+
+      {:error, reason} ->
+        # Emails were already delivered (idempotency key prevents re-sends).
+        # Log and return :ok so Oban does not retry — a retry cannot undo
+        # the sends and would only waste attempts.
+        Ysc.Logging.error("NewsletterSender: failed to mark edition as sent",
+          edition_id: edition.id,
+          attrs: inspect(attrs),
+          error: inspect(reason)
+        )
+
+        :ok
+    end
   end
 
   defp plain_text_fallback(edition) do
