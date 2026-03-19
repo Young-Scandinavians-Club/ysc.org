@@ -354,7 +354,8 @@ defmodule YscWeb.AdminNewslettersLive do
                 <div class="flex items-center gap-3 mt-2 flex-wrap">
                   <%= if edition.status == :sending do %>
                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-                      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+                      </span>
                       Sending…
                     </span>
                   <% else %>
@@ -392,7 +393,8 @@ defmodule YscWeb.AdminNewslettersLive do
                   </.link>
                   <%= if edition.status == :sending do %>
                     <span class="inline-flex items-center gap-1.5 text-sm text-blue-600 font-semibold">
-                      <span class="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                      <span class="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+                      </span>
                       Sending…
                     </span>
                   <% else %>
@@ -490,7 +492,8 @@ defmodule YscWeb.AdminNewslettersLive do
               <:col :let={{_, edition}} label="Status" field={:status}>
                 <%= if edition.status == :sending do %>
                   <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-                    <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                    <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+                    </span>
                     Sending…
                   </span>
                 <% else %>
@@ -538,7 +541,8 @@ defmodule YscWeb.AdminNewslettersLive do
                   </.link>
                   <%= if edition.status == :sending do %>
                     <span class="p-1.5" title="Sending…">
-                      <span class="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></span>
+                      <span class="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin">
+                      </span>
                     </span>
                   <% else %>
                     <button

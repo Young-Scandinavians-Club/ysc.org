@@ -30,7 +30,11 @@ defmodule Ysc.Newsletter do
   Broadcasts that an edition has been sent to all subscribers.
   """
   def broadcast_edition_sent(%Edition{} = edition) do
-    Phoenix.PubSub.broadcast(Ysc.PubSub, @editions_topic, {:edition_sent, edition})
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      @editions_topic,
+      {:edition_sent, edition}
+    )
   end
 
   # Fields fetched in list queries — excludes :archived_html (large text).
@@ -519,7 +523,8 @@ defmodule Ysc.Newsletter do
     if edition.status in [:sending, :sent] do
       {:error, :already_sent}
     else
-      with {:ok, sending_edition} <- update_edition(edition, %{status: :sending}),
+      with {:ok, sending_edition} <-
+             update_edition(edition, %{status: :sending}),
            {:ok, _job} <-
              %{edition_id: edition.id}
              |> YscWeb.Workers.NewsletterSender.new()
