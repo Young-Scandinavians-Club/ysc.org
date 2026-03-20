@@ -1140,17 +1140,20 @@ defmodule Ysc.Accounts do
   end
 
   def list_paginated_users(params) do
+    now = DateTime.utc_now()
     {membership_filters, other_params} = extract_membership_filters(params)
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
     base_query =
       from(u in User, where: u.state != :deleted)
-      |> build_membership_query_filter(membership_filters)
-      |> apply_membership_order_by(membership_sort)
+      |> build_membership_query_filter(membership_filters, now)
+      |> apply_membership_order_by(membership_sort, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
-        meta = restore_membership_filters(meta, membership_filters)
+        meta =
+          restore_membership_filters(meta, membership_filters, membership_sort)
+
         {:ok, {preload_active_subscriptions(users), meta}}
 
       error ->
@@ -1184,17 +1187,20 @@ defmodule Ysc.Accounts do
           any()
         ) :: {:error, Flop.Meta.t()} | {:ok, {list(), Flop.Meta.t()}}
   def list_paginated_users(params, search_term) do
+    now = DateTime.utc_now()
     {membership_filters, other_params} = extract_membership_filters(params)
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
     base_query =
       fuzzy_search_user(search_term)
-      |> build_membership_query_filter(membership_filters)
-      |> apply_membership_order_by(membership_sort)
+      |> build_membership_query_filter(membership_filters, now)
+      |> apply_membership_order_by(membership_sort, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
-        meta = restore_membership_filters(meta, membership_filters)
+        meta =
+          restore_membership_filters(meta, membership_filters, membership_sort)
+
         users_with_subscriptions = preload_active_subscriptions(users)
 
         final_users =
@@ -2070,9 +2076,12 @@ defmodule Ysc.Accounts do
     end)
   end
 
-  defp restore_membership_filters(meta, nil), do: meta
+  defp restore_membership_filters(meta, nil, nil), do: meta
 
-  defp restore_membership_filters(%Flop.Meta{} = meta, membership_values) do
+  defp restore_membership_filters(meta, nil, membership_sort),
+    do: restore_membership_sort(meta, membership_sort)
+
+  defp restore_membership_filters(meta, membership_values, membership_sort) do
     membership_flop_filter = %Flop.Filter{
       field: :membership_type,
       op: :in,
@@ -2082,6 +2091,30 @@ defmodule Ysc.Accounts do
     updated_flop = %{
       meta.flop
       | filters: meta.flop.filters ++ [membership_flop_filter]
+    }
+
+    %{meta | flop: updated_flop}
+    |> restore_membership_sort(membership_sort)
+  end
+
+  defp restore_membership_sort(meta, nil), do: meta
+
+  defp restore_membership_sort(
+         %Flop.Meta{} = meta,
+         {:membership_type, direction, index}
+       ) do
+    current_order_by = meta.flop.order_by || []
+    current_directions = meta.flop.order_directions || []
+
+    # Clamp index to valid range in case other sorts were removed by Flop validation.
+    safe_index = min(index, length(current_order_by))
+
+    updated_flop = %{
+      meta.flop
+      | order_by:
+          List.insert_at(current_order_by, safe_index, :membership_type),
+        order_directions:
+          List.insert_at(current_directions, safe_index, direction)
     }
 
     %{meta | flop: updated_flop}
@@ -2147,12 +2180,11 @@ defmodule Ysc.Accounts do
   end
 
   # Applies membership type filter at the DB query level so Flop pagination is accurate.
-  defp build_membership_query_filter(query, nil), do: query
-  defp build_membership_query_filter(query, []), do: query
+  defp build_membership_query_filter(query, nil, _now), do: query
+  defp build_membership_query_filter(query, [], _now), do: query
 
-  defp build_membership_query_filter(query, membership_filters) do
+  defp build_membership_query_filter(query, membership_filters, now) do
     membership_plans = Application.get_env(:ysc, :membership_plans)
-    now = DateTime.utc_now()
 
     active_sub_user_ids =
       from s in Ysc.Subscriptions.Subscription,
@@ -2229,7 +2261,6 @@ defmodule Ysc.Accounts do
               _ -> :asc
             end)
 
-          # Remove membership_type from order_by and order_directions
           new_order_by = List.delete_at(order_by, membership_sort_index)
 
           new_order_directions =
@@ -2240,7 +2271,9 @@ defmodule Ysc.Accounts do
             |> Map.put("order_by", new_order_by)
             |> Map.put("order_directions", new_order_directions)
 
-          {{:membership_type, direction}, new_params}
+          # Include the original index so it can be restored at the correct
+          # position in meta.flop.order_by after Flop processes the query.
+          {{:membership_type, direction, membership_sort_index}, new_params}
         else
           {nil, params}
         end
@@ -2250,11 +2283,14 @@ defmodule Ysc.Accounts do
     end
   end
 
-  defp apply_membership_order_by(query, nil), do: query
+  defp apply_membership_order_by(query, nil, _now), do: query
 
-  defp apply_membership_order_by(query, {:membership_type, direction}) do
+  defp apply_membership_order_by(
+         query,
+         {:membership_type, direction, _index},
+         now
+       ) do
     membership_plans = Application.get_env(:ysc, :membership_plans)
-    now = DateTime.utc_now()
 
     single_price =
       Enum.find_value(membership_plans, fn p ->

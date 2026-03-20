@@ -3,9 +3,10 @@ defmodule Ysc.Stripe.RetryHelper do
   Transparent retry wrapper for Stripe API calls that handles rate-limit
   (429) responses with exponential backoff + jitter.
 
-  Stripe returns `%Stripe.Error{code: :rate_limit_error}` on 429.
-  This module retries up to `@max_retries` times with exponential backoff
-  before returning the original error.
+  Stripe 429 responses surface as either `%Stripe.Error{code: :rate_limit_error}`
+  (when the body carries an explicit type) or `%Stripe.Error{code: :too_many_requests}`
+  (when only the HTTP status is present). This module retries on both, up to
+  `@max_retries` times with exponential backoff before returning the original error.
 
   ## Usage
 
@@ -37,8 +38,9 @@ defmodule Ysc.Stripe.RetryHelper do
 
   defp do_retry(callback, attempt) do
     case callback.() do
-      {:error, %Stripe.Error{code: :rate_limit_error}}
-      when attempt < @max_retries ->
+      {:error, %Stripe.Error{code: code}}
+      when code in [:rate_limit_error, :too_many_requests] and
+             attempt < @max_retries ->
         backoff = @base_backoff_ms * Integer.pow(2, attempt)
         jitter = :rand.uniform(max(div(backoff, 2), 1))
         sleep_ms = backoff + jitter

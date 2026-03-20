@@ -552,7 +552,7 @@ defmodule Ysc.WpMigration.WpRepo do
     # Subscriptions live in posts/postmeta regardless of HPOS
     subs_cte = """
     WITH user_subs AS (
-      SELECT CAST(p.ID AS VARCHAR) AS sub_id, p.post_parent AS parent_order_id
+      SELECT CAST(p.ID AS VARCHAR) AS sub_id, CAST(p.post_parent AS VARCHAR) AS parent_order_id
       FROM #{@table_prefix}_posts p
       JOIN #{@table_prefix}_postmeta pm ON pm.post_id = p.ID
         AND pm.meta_key = '_customer_user' AND pm.meta_value = $1

@@ -727,21 +727,22 @@ defmodule Ysc.Subscriptions do
            Stripe.SubscriptionSchedule.list(%{subscription: subscription_id})
          end) do
       {:ok, %{data: schedules}} when schedules != [] ->
-        Enum.each(schedules, fn schedule ->
-          if schedule.status != "canceled" do
-            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-              Stripe.SubscriptionSchedule.cancel(schedule.id)
-            end)
+        schedules
+        |> Enum.filter(&(&1.status != "canceled"))
+        |> Enum.reduce_while(:ok, fn schedule, :ok ->
+          case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                 Stripe.SubscriptionSchedule.cancel(schedule.id)
+               end) do
+            {:ok, _} -> {:cont, :ok}
+            {:error, reason} -> {:halt, {:error, reason}}
           end
         end)
-
-        :ok
 
       {:ok, %{data: []}} ->
         :ok
 
-      _ ->
-        :ok
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

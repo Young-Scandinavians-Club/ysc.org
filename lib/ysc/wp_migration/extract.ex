@@ -95,7 +95,11 @@ defmodule Ysc.WpMigration.Extract do
       meta = WpRepo.get_usermeta(repo, user_id)
       {:ok, membership} = WpRepo.get_membership_for_user(repo, user_id)
 
-      {:ok, payments} = WpRepo.get_membership_payments_for_user(repo, user_id)
+      payments =
+        case WpRepo.get_membership_payments_for_user(repo, user_id) do
+          {:ok, p} -> p
+          {:error, _reason} -> []
+        end
 
       last_payment_date =
         case payments do

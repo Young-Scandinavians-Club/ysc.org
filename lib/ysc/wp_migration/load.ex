@@ -2042,24 +2042,24 @@ defmodule Ysc.WpMigration.Load do
   # Strip property prefixes like "Tahoe " and normalize case so that
   # WP names like "Tahoe Room 5A" match DB names like "Room 5a".
   defp normalize_wp_room_name(name) when is_binary(name) do
-    name
-    |> String.replace(~r/^tahoe\s+/i, "")
-    |> String.trim()
-    |> String.downcase()
-    |> then(fn downcased ->
-      # Capitalize first letter of each word to match DB convention ("Room 5a")
-      downcased
+    trimmed = String.trim(name)
+
+    if trimmed == "" do
+      name
+    else
+      trimmed
+      |> String.replace(~r/^tahoe\s+/i, "")
+      |> String.trim()
+      |> String.downcase()
       |> String.split(" ")
       |> Enum.map_join(" ", &String.capitalize/1)
-
-      # Keep sub-letter lowercase: "5A" → "5a" (String.capitalize does this)
-    end)
+    end
   end
 
   defp normalize_wp_room_name(name), do: name
 
   # Case-insensitive room lookup: tries exact match first, then ILIKE.
-  defp find_room_by_name(name) do
+  defp find_room_by_name(name) when is_binary(name) and name != "" do
     case Repo.get_by(Room, name: name, property: :tahoe) do
       nil ->
         Repo.one(
@@ -2074,6 +2074,8 @@ defmodule Ysc.WpMigration.Load do
         room
     end
   end
+
+  defp find_room_by_name(_name), do: nil
 
   defp parse_booking_date(nil), do: nil
   defp parse_booking_date(""), do: nil

@@ -927,7 +927,14 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                stripe_payment_method
              ) do
           {:ok, _} ->
-            updated_user = Accounts.get_user!(user.id)
+            updated_user =
+              Accounts.get_user!(user.id, [
+                :subscriptions,
+                :family_members,
+                :registration_form,
+                :billing_address
+              ])
+
             default_pm = Ysc.Payments.get_default_payment_method(updated_user)
 
             if updated_user.stripe_id do
@@ -958,7 +965,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                     title: "Payment"
                   )
 
-                  {:noreply, socket}
+                  {:noreply,
+                   socket
+                   |> assign(:user, updated_user)
+                   |> assign(:payment_method_saved, true)
+                   |> assign(:default_payment_method, default_pm)}
               end
             else
               {:noreply,
