@@ -524,9 +524,10 @@ defmodule YscWeb.UserAuth do
 
   defp signed_in_path(%Plug.Conn{} = conn) do
     if user = conn.assigns[:current_user] do
-      case user.state do
-        :pending_approval -> ~p"/pending-review"
-        _ -> ~p"/"
+      cond do
+        user.state == :pending_approval -> ~p"/pending-review"
+        Accounts.needs_post_migration_onboarding?(user) -> ~p"/onboarding"
+        true -> ~p"/"
       end
     else
       ~p"/"
@@ -535,9 +536,10 @@ defmodule YscWeb.UserAuth do
 
   defp signed_in_path(socket) do
     if user = socket.assigns[:current_user] do
-      case user.state do
-        :pending_approval -> ~p"/pending-review"
-        _ -> ~p"/"
+      cond do
+        user.state == :pending_approval -> ~p"/pending-review"
+        Accounts.needs_post_migration_onboarding?(user) -> ~p"/onboarding"
+        true -> ~p"/"
       end
     else
       ~p"/"

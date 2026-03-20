@@ -23,10 +23,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   # Step constants
   @step_profile 1
-  @step_phone_verification 2
-  @step_payment 3
-  @step_family 4
-  @step_complete 5
+  @step_address 2
+  @step_phone_verification 3
+  @step_payment 4
+  @step_family 5
+  @step_complete 6
 
   @impl true
   def mount(_params, _session, socket) do
@@ -37,14 +38,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         Accounts.get_user!(user.id, [
           :subscriptions,
           :family_members,
-          :registration_form
+          :registration_form,
+          :billing_address
         ])
 
       membership_plan = resolve_membership_plan(user)
-      has_real_subscription = has_real_stripe_subscription?(user)
+      active_subscription = find_active_real_subscription(user)
+      has_real_subscription = not is_nil(active_subscription)
       is_family_plan = membership_plan in [:family, :lifetime]
 
-      steps = build_steps(is_family_plan, has_real_subscription)
+      # Only lifetime members skip the payment step entirely.
+      # Users with an active subscription still see it (to review details + add PM if missing).
+      skip_payment = membership_plan == :lifetime
+      steps = build_steps(is_family_plan, skip_payment)
 
       socket =
         socket
@@ -54,12 +60,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         |> assign(:steps, steps)
         |> assign(:membership_plan, membership_plan)
         |> assign(:has_real_subscription, has_real_subscription)
+        |> assign(:active_subscription, active_subscription)
         |> assign(:is_family_plan, is_family_plan)
         # Profile step
         |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
         |> assign(:original_phone, user.phone_number)
+        # Address step
+        |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
         # Phone verification step
-        |> assign(:phone_code_form, to_form(%{"code" => ""}))
+        |> assign(:phone_code_form, to_form(%{"code" => ""}, as: "phone_code"))
         |> assign(:phone_code_valid, false)
         |> assign(:phone_verification_code_state, %{})
         |> assign(:sms_resend_disabled_until, nil)
@@ -87,12 +96,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-zinc-50">
+    <div class="min-h-screen bg-white">
       <div class="max-w-2xl mx-auto py-8 px-4">
         <%!-- Logo --%>
         <div class="flex justify-center mb-8">
           <.link navigate={~p"/"} class="hover:opacity-80 transition duration-200">
-            <.ysc_logo class="h-20" width={80} height={80} fetchpriority="high" />
+            <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
           </.link>
         </div>
 
@@ -110,6 +119,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             <.step_profile form={@profile_form} />
           <% end %>
           <%= if @current_step == 2 do %>
+            <.step_address form={@address_form} />
+          <% end %>
+          <%= if @current_step == 3 do %>
             <.step_phone_verification
               form={@phone_code_form}
               user={@user}
@@ -117,24 +129,26 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               sms_resend_disabled_until={@sms_resend_disabled_until}
             />
           <% end %>
-          <%= if @current_step == 3 do %>
+          <%= if @current_step == 4 do %>
             <.step_payment
               user={@user}
               membership_plan={@membership_plan}
+              has_real_subscription={@has_real_subscription}
+              active_subscription={@active_subscription}
               public_key={@public_key}
               payment_intent_secret={@payment_intent_secret}
               payment_method_saved={@payment_method_saved}
               default_payment_method={@default_payment_method}
             />
           <% end %>
-          <%= if @current_step == 4 do %>
+          <%= if @current_step == 5 do %>
             <.step_family
               user={@user}
               family_members_forms={@family_members_forms}
               invite_results={@invite_results}
             />
           <% end %>
-          <%= if @current_step == 5 do %>
+          <%= if @current_step == 6 do %>
             <.step_complete user={@user} />
           <% end %>
         </div>
@@ -177,10 +191,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         </div>
         <.input
           field={@form[:phone_number]}
-          type="tel"
+          type="phone-input"
           label="Phone Number"
-          placeholder="+1 (555) 000-0000"
-          required
         />
         <.input
           field={@form[:date_of_birth]}
@@ -195,13 +207,62 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           prompt="Select a country"
         />
         <:actions>
-          <div class="flex justify-end">
-            <.button
-              type="submit"
-              phx-disable-with="Saving..."
-            >
-              <.icon name="hero-arrow-right" class="w-4 h-4 me-1" />
+          <div class="flex justify-end w-full">
+            <.button type="submit" phx-disable-with="Saving...">
               Confirm & Continue
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+            </.button>
+          </div>
+        </:actions>
+      </.simple_form>
+    </div>
+    """
+  end
+
+  attr :form, :any, required: true
+
+  defp step_address(assigns) do
+    ~H"""
+    <div>
+      <.header class="text-left">
+        Confirm Your Address
+        <:subtitle>
+          Please review and confirm your mailing address. We use this for membership correspondence and renewal notices.
+        </:subtitle>
+      </.header>
+
+      <.simple_form
+        for={@form}
+        id="onboarding-address-form"
+        phx-submit="save_address"
+        phx-change="validate_address"
+        class="mt-6 space-y-4"
+      >
+        <.input
+          field={@form[:address]}
+          type="text"
+          label="Street Address"
+          placeholder="123 Main St"
+          required
+        />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <.input field={@form[:city]} type="text" label="City" required />
+          <.input field={@form[:region]} type="text" label="State / Region" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <.input
+            field={@form[:postal_code]}
+            type="text"
+            label="Postal / ZIP Code"
+            required
+          />
+          <.input field={@form[:country]} type="text" label="Country" required />
+        </div>
+        <:actions>
+          <div class="flex justify-end w-full">
+            <.button type="submit" phx-disable-with="Saving...">
+              Confirm & Continue
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
             </.button>
           </div>
         </:actions>
@@ -241,24 +302,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         />
         <:actions>
           <div class="flex items-center justify-between w-full">
-            <button
+            <.button
               type="button"
+              variant="outline"
+              color="zinc"
               phx-click="resend_phone_code"
+              phx-disable-with="Sending..."
               disabled={not is_nil(@sms_resend_disabled_until)}
-              class="text-sm text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Resend code
-            </button>
+            </.button>
             <.button
               type="submit"
               phx-disable-with="Verifying..."
               disabled={not @phone_code_valid}
-              class={
-                if(not @phone_code_valid,
-                  do: "opacity-50 cursor-not-allowed",
-                  else: ""
-                )
-              }
             >
               <.icon name="hero-check-circle" class="w-4 h-4 me-1" /> Verify Phone
             </.button>
@@ -271,6 +328,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   attr :user, :any, required: true
   attr :membership_plan, :atom, required: true
+  attr :has_real_subscription, :boolean, required: true
+  attr :active_subscription, :any, required: true
   attr :public_key, :string, required: true
   attr :payment_intent_secret, :any, required: true
   attr :payment_method_saved, :boolean, required: true
@@ -279,71 +338,191 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   defp step_payment(assigns) do
     ~H"""
     <div>
-      <.header class="text-left">
-        Set Up Auto-Renewal
-        <:subtitle>
-          Your membership will now auto-renew annually. Please add a payment method to keep your membership active.
-        </:subtitle>
-      </.header>
+      <%= if @has_real_subscription do %>
+        <%!-- User has an active subscription: show details and optionally collect PM --%>
+        <.header class="text-left">
+          Your Membership
+          <:subtitle>
+            Your membership is active. Review the details below and make sure a payment method is on file for auto-renewal.
+          </:subtitle>
+        </.header>
 
-      <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800 mb-6">
-        <div class="flex items-start gap-3">
-          <.icon name="hero-information-circle" class="w-5 h-5 mt-0.5 shrink-0" />
-          <div>
-            <strong>Your plan: {plan_name(@membership_plan)}</strong>
-            <br />
-            You'll be charged annually on your renewal date. You can cancel at any time from your account settings.
+        <div class="mt-6 border border-zinc-200 rounded-lg divide-y divide-zinc-100">
+          <div class="flex items-center justify-between px-4 py-3">
+            <span class="text-sm text-zinc-500">Plan</span>
+            <span class="text-sm font-medium text-zinc-900">
+              {plan_name(@membership_plan)}
+            </span>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3">
+            <span class="text-sm text-zinc-500">Status</span>
+            <span class="inline-flex items-center gap-1.5 text-sm font-medium text-green-700">
+              <.icon name="hero-check-circle" class="w-4 h-4" /> Active
+            </span>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3">
+            <span class="text-sm text-zinc-500">Next Renewal</span>
+            <span class="text-sm font-medium text-zinc-900">
+              {format_renewal_date(
+                @active_subscription && @active_subscription.current_period_end
+              )}
+            </span>
           </div>
         </div>
-      </div>
 
-      <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
-        <%!-- Payment method already saved --%>
-        <div class="p-4 bg-green-50 rounded-lg border border-green-200 mb-6">
-          <div class="flex items-center gap-3 text-green-800">
+        <p class="mt-3 text-xs text-zinc-400">
+          If anything looks incorrect, please contact <.link
+            href="mailto:info@ysc.org"
+            class="text-blue-600 hover:underline"
+          >
+            info@ysc.org
+          </.link>.
+        </p>
+
+        <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
+          <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
+            <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
+            <div class="text-sm">
+              <span class="font-medium">Payment method on file:</span>
+              {payment_method_display(@default_payment_method)}
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end">
+            <.button
+              phx-click="confirm_payment_step"
+              phx-disable-with="Continuing..."
+            >
+              Continue <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
+            </.button>
+          </div>
+        <% else %>
+          <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
+            <.icon name="hero-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
+            <span>
+              No payment method on file. Please add one to ensure your membership auto-renews on the next billing date.
+            </span>
+          </div>
+          <%= if is_nil(@payment_intent_secret) do %>
+            <div class="mt-6 flex justify-end">
+              <.button phx-click="load_payment_form" phx-disable-with="Loading...">
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
+                Add Payment Method
+              </.button>
+            </div>
+          <% else %>
+            <form
+              id="onboarding-payment-form"
+              class="mt-6 flex flex-col space-y-4"
+              phx-hook="StripeInput"
+              data-clientSecret={@payment_intent_secret}
+              data-publicKey={@public_key}
+              data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+            >
+              <div id="onboarding-payment-errors">
+                <p id="card-errors" class="text-red-400 text-sm"></p>
+              </div>
+              <div id="payment-element"></div>
+              <div class="flex justify-end mt-4">
+                <.button type="submit" id="submit">
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
+                  Save Payment Method
+                </.button>
+              </div>
+            </form>
+          <% end %>
+        <% end %>
+      <% else %>
+        <%!-- No active subscription: offer to set one up, with a skip option --%>
+        <.header class="text-left">
+          Set Up Auto-Renewal
+          <:subtitle>
+            Your membership is not currently active. Add a payment method to activate auto-renewal, or skip for now.
+          </:subtitle>
+        </.header>
+
+        <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800">
+          <div class="flex items-start gap-3">
+            <.icon name="hero-information-circle" class="w-5 h-5 mt-0.5 shrink-0" />
+            <div>
+              <strong>Plan: {plan_name(@membership_plan)}</strong>
+              <br />
+              You'll be billed annually. You can cancel at any time from your account settings.
+            </div>
+          </div>
+        </div>
+
+        <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
+          <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
             <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
             <span class="text-sm font-medium">
               Payment method saved successfully.
             </span>
           </div>
-        </div>
-        <div class="flex justify-end">
-          <.button phx-click="confirm_payment_step">
-            <.icon name="hero-arrow-right" class="w-4 h-4 me-1" /> Continue
-          </.button>
-        </div>
-      <% else %>
-        <%= if is_nil(@payment_intent_secret) do %>
-          <div class="flex justify-center py-8">
-            <.button phx-click="load_payment_form" phx-disable-with="Loading...">
-              <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-              Add Payment Method
+          <div class="mt-6 flex items-center justify-between">
+            <.button
+              type="button"
+              variant="outline"
+              color="zinc"
+              phx-click="skip_payment_step"
+              phx-disable-with="Skipping..."
+            >
+              Skip for now
+            </.button>
+            <.button
+              phx-click="confirm_payment_step"
+              phx-disable-with="Activating..."
+            >
+              Activate Membership
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>
         <% else %>
-          <form
-            id="onboarding-payment-form"
-            class="flex flex-col space-y-4"
-            phx-hook="StripeInput"
-            data-clientSecret={@payment_intent_secret}
-            data-publicKey={@public_key}
-            data-submitURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/payment-method"}
-            data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
-          >
-            <div id="onboarding-payment-errors">
-              <p id="card-errors" class="text-red-400 text-sm"></p>
-            </div>
-            <div id="payment-element"></div>
-            <div class="flex justify-end mt-4">
-              <button
-                type="submit"
-                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition-colors"
+          <%= if is_nil(@payment_intent_secret) do %>
+            <div class="mt-6 flex items-center justify-between">
+              <.button
+                type="button"
+                variant="outline"
+                color="zinc"
+                phx-click="skip_payment_step"
+                phx-disable-with="Skipping..."
               >
-                <.icon name="hero-lock-closed" class="w-4 h-4" />
-                Save Payment Method
-              </button>
+                Skip for now
+              </.button>
+              <.button phx-click="load_payment_form" phx-disable-with="Loading...">
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
+                Add Payment Method
+              </.button>
             </div>
-          </form>
+          <% else %>
+            <form
+              id="onboarding-payment-form"
+              class="mt-6 flex flex-col space-y-4"
+              phx-hook="StripeInput"
+              data-clientSecret={@payment_intent_secret}
+              data-publicKey={@public_key}
+              data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+            >
+              <div id="onboarding-payment-errors">
+                <p id="card-errors" class="text-red-400 text-sm"></p>
+              </div>
+              <div id="payment-element"></div>
+              <div class="mt-4 flex items-center justify-between">
+                <.button
+                  type="button"
+                  variant="outline"
+                  color="zinc"
+                  phx-click="skip_payment_step"
+                  phx-disable-with="Skipping..."
+                >
+                  Skip for now
+                </.button>
+                <.button type="submit" id="submit">
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
+                  Save & Activate
+                </.button>
+              </div>
+            </form>
+          <% end %>
         <% end %>
       <% end %>
     </div>
@@ -384,19 +563,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <%!-- Family member forms --%>
       <div id="family-member-entries" class="mt-6 space-y-4">
         <%= for {form, idx} <- Enum.with_index(@family_members_forms) do %>
-          <div class="p-4 border border-zinc-200 rounded-lg bg-zinc-50 space-y-3">
+          <div class="p-4 border border-zinc-200 rounded-lg space-y-3">
             <div class="flex items-center justify-between">
               <h4 class="text-sm font-semibold text-zinc-700">
                 Family Member {idx + 1}
               </h4>
-              <button
+              <.button
                 type="button"
+                variant="outline"
+                color="red"
                 phx-click="remove_family_member"
                 phx-value-index={idx}
-                class="text-red-500 hover:text-red-700"
               >
                 <.icon name="hero-x-mark" class="w-4 h-4" />
-              </button>
+              </.button>
             </div>
             <.simple_form
               for={form}
@@ -445,13 +625,14 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       </div>
 
       <div class="mt-4 flex items-center justify-between">
-        <button
+        <.button
           type="button"
+          variant="outline"
+          color="blue"
           phx-click="add_family_member"
-          class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline"
         >
-          <.icon name="hero-plus-circle" class="w-4 h-4" /> Add a family member
-        </button>
+          <.icon name="hero-plus-circle" class="w-4 h-4 me-1" /> Add a family member
+        </.button>
 
         <.button phx-click="complete_family_step" phx-disable-with="Finishing...">
           <.icon name="hero-check-circle" class="w-4 h-4 me-1" />
@@ -478,7 +659,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       </p>
       <.link
         navigate={~p"/"}
-        class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-zinc-900 text-white font-medium hover:bg-zinc-700 transition-colors"
+        class="inline-flex items-center gap-2 phx-submit-loading:opacity-75 rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition duration-150 ease-in-out"
       >
         <.icon name="hero-home" class="w-4 h-4" /> Go to Dashboard
       </.link>
@@ -546,13 +727,62 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  def handle_event("validate_phone_code", params, socket) do
-    code = get_in(params, ["phone_code", "code"]) || ""
-    valid = String.length(String.replace(code, ~r/\D/, "")) == 6
-    {:noreply, assign(socket, :phone_code_valid, valid)}
+  def handle_event("validate_address", %{"address" => params}, socket) do
+    user = socket.assigns.user
+
+    form =
+      user
+      |> Accounts.change_billing_address(params)
+      |> Map.put(:action, :validate)
+      |> to_form()
+
+    {:noreply, assign(socket, :address_form, form)}
   end
 
-  def handle_event("verify_phone", %{"phone_code" => %{"code" => code}}, socket) do
+  def handle_event("save_address", %{"address" => params}, socket) do
+    user = socket.assigns.user
+
+    case Accounts.update_billing_address(user, params) do
+      {:ok, updated_user} ->
+        {:noreply,
+         advance_to_next_step(
+           assign(socket, :user, updated_user),
+           @step_address
+         )}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :address_form, to_form(changeset))}
+    end
+  end
+
+  def handle_event("validate_phone_code", params, socket) do
+    raw = get_in(params, ["phone_code", "code"]) || ""
+
+    # OTP input fires phx-input on each keystroke, sending only the changed digit as
+    # an indexed map. Merge with accumulated state so all digits are available.
+    current_state = socket.assigns.phone_verification_code_state || %{}
+
+    merged =
+      if is_map(raw) do
+        Map.merge(if(is_map(current_state), do: current_state, else: %{}), raw)
+      else
+        raw
+      end
+
+    normalized = normalize_verification_code(merged)
+
+    valid =
+      String.length(normalized) == 6 && String.match?(normalized, ~r/^\d{6}$/)
+
+    {:noreply,
+     socket
+     |> assign(:phone_code_valid, valid)
+     |> assign(:phone_verification_code_state, merged)}
+  end
+
+  def handle_event("verify_phone", params, socket) do
+    raw = get_in(params, ["phone_code", "code"]) || ""
+    code = normalize_verification_code(raw)
     user = socket.assigns.user
 
     case Accounts.verify_phone_verification_code(user, code) do
@@ -605,26 +835,48 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   def handle_event("resend_phone_code", _params, socket) do
     user = socket.assigns.user
-    now = System.system_time(:second)
 
-    phone_code = Accounts.generate_and_store_phone_verification_code(user)
-    timestamp = Integer.to_string(now)
+    case Ysc.ResendRateLimiter.check_and_record_resend(user.id, :sms) do
+      {:ok, :allowed} ->
+        {code, is_existing} =
+          case Ysc.VerificationCache.get_code(user.id, :phone_verification) do
+            {:ok, existing_code} ->
+              {existing_code, true}
 
-    _job =
-      Accounts.send_phone_verification_code(
-        user,
-        phone_code,
-        "resend_#{timestamp}"
-      )
+            {:error, _} ->
+              {Accounts.generate_and_store_phone_verification_code(user), false}
+          end
 
-    {:noreply,
-     socket
-     |> assign(:sms_resend_disabled_until, now + 60)
-     |> YscWeb.Flash.put_toast(
-       :info,
-       "A new code was sent to #{user.phone_number}",
-       title: "Code Sent"
-     )}
+        timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
+        suffix =
+          if is_existing,
+            do: "resend_existing_#{timestamp}",
+            else: "resend_new_#{timestamp}"
+
+        _job = Accounts.send_phone_verification_code(user, code, suffix)
+
+        {:noreply,
+         socket
+         |> assign(
+           :sms_resend_disabled_until,
+           Ysc.ResendRateLimiter.disabled_until(60)
+         )
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "A new code was sent to #{user.phone_number}",
+           title: "Code Sent"
+         )}
+
+      {:error, :rate_limited, _remaining} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Please wait before requesting another verification code.",
+           title: "Phone verification"
+         )}
+    end
   end
 
   def handle_event("load_payment_form", _params, socket) do
@@ -730,39 +982,48 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     user = socket.assigns.user
     default_pm = socket.assigns.default_payment_method
 
-    if is_nil(default_pm) do
-      {:noreply,
-       YscWeb.Flash.put_toast(
-         socket,
-         :error,
-         "Please add a payment method before continuing.",
-         title: "Payment Required"
-       )}
-    else
-      # Create the real Stripe subscription
-      case create_stripe_subscription(
-             user,
-             socket.assigns.membership_plan,
-             default_pm
-           ) do
-        {:ok, _subscription} ->
-          {:noreply, advance_to_next_step(socket, @step_payment)}
+    cond do
+      socket.assigns.has_real_subscription ->
+        # Already subscribed — just advance without touching Stripe subscriptions.
+        {:noreply, advance_to_next_step(socket, @step_payment)}
 
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to create subscription during onboarding",
-            user_id: user.id,
-            reason: inspect(reason)
-          )
+      is_nil(default_pm) ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Please add a payment method before continuing.",
+           title: "Payment Required"
+         )}
 
-          {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "Could not activate subscription. Please contact support.",
-             title: "Subscription Error"
-           )}
-      end
+      true ->
+        case create_stripe_subscription(
+               user,
+               socket.assigns.membership_plan,
+               default_pm
+             ) do
+          {:ok, _subscription} ->
+            {:noreply, advance_to_next_step(socket, @step_payment)}
+
+          {:error, reason} ->
+            Ysc.Logging.error("Failed to create subscription during onboarding",
+              user_id: user.id,
+              reason: inspect(reason)
+            )
+
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Could not activate subscription. Please contact support.",
+               title: "Subscription Error"
+             )}
+        end
     end
+  end
+
+  def handle_event("skip_payment_step", _params, socket) do
+    {:noreply, advance_to_next_step(socket, @step_payment)}
   end
 
   def handle_event("add_family_member", _params, socket) do
@@ -865,6 +1126,76 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   def handle_event("complete_family_step", _params, socket) do
+    user = socket.assigns.user
+    pending_forms = socket.assigns.family_members_forms
+
+    # Auto-send invites for any forms the user filled in but didn't explicitly submit.
+    new_results =
+      Enum.reduce(pending_forms, socket.assigns.invite_results, fn form,
+                                                                   results ->
+        member_params = form.source || %{}
+        email = String.trim(member_params["email"] || "")
+
+        if email == "" do
+          results
+        else
+          relationship =
+            case member_params["relationship"] do
+              "spouse" -> :spouse
+              _ -> :child
+            end
+
+          result =
+            case FamilyInvites.create_invite(user, email,
+                   relationship: relationship
+                 ) do
+              {:ok, _invite} ->
+                _ = upsert_family_member_record(user, member_params)
+                %{ok: true, message: "Invite sent to #{email}"}
+
+              {:error, :pending_invite_exists} ->
+                %{ok: true, message: "An invite was already sent to #{email}"}
+
+              {:error, :email_already_registered} ->
+                %{
+                  ok: false,
+                  message:
+                    "#{email} already has an account. They can be linked in Family Settings."
+                }
+
+              {:error, :max_sub_accounts_reached} ->
+                %{
+                  ok: false,
+                  message: "Maximum number of family members reached."
+                }
+
+              {:error, :max_spouses_reached} ->
+                %{
+                  ok: false,
+                  message:
+                    "You can only have one spouse on the family membership."
+                }
+
+              {:error, :invalid_membership_type} ->
+                %{
+                  ok: false,
+                  message:
+                    "Your membership plan doesn't support family invites."
+                }
+
+              {:error, _} ->
+                %{ok: false, message: "Could not send invite to #{email}."}
+            end
+
+          results ++ [result]
+        end
+      end)
+
+    socket =
+      socket
+      |> assign(:invite_results, new_results)
+      |> assign(:family_members_forms, [])
+
     {:noreply, finalize_onboarding(socket)}
   end
 
@@ -882,14 +1213,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  defp build_steps(is_family_plan, has_real_subscription) do
+  defp build_steps(is_family_plan, skip_payment) do
     base = [
       {"Profile", @step_profile},
+      {"Address", @step_address},
       {"Membership", @step_payment}
     ]
 
     base =
-      if has_real_subscription,
+      if skip_payment,
         do: List.delete(base, {"Membership", @step_payment}),
         else: base
 
@@ -972,17 +1304,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   # warnings for this function. The Customers.create_subscription/2 module has a
   # similar annotation for the same reason.
   @dialyzer {:nowarn_function, create_stripe_subscription: 3}
+  # Lifetime members have no Stripe subscription — this is a no-op.
+  defp create_stripe_subscription(_user, :lifetime, _default_pm),
+    do: {:ok, :lifetime_no_op}
+
   defp create_stripe_subscription(user, plan, default_pm) do
     price_id = get_price_id(plan)
 
     if is_nil(price_id) do
       {:error, :no_price_id_for_plan}
     else
-      # Remove any migrated local subscription before creating a real one
-      user
-      |> Subscriptions.list_subscriptions()
-      |> Enum.filter(&migrated_subscription?/1)
-      |> Enum.each(&Subscriptions.delete_subscription/1)
+      # Stable idempotency key scoped to this user + plan so Stripe deduplicates
+      # any duplicate requests within its 24-hour idempotency window.
+      idempotency_key = "wp_onboarding_#{user.id}_#{plan}"
 
       case Customers.create_subscription(
              user,
@@ -990,9 +1324,17 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                "#{YscWeb.Endpoint.url()}/billing/user/#{user.id}/finalize",
              prices: [%{price: price_id, quantity: 1}],
              default_payment_method: default_pm.provider_id,
-             expand: ["latest_invoice"]
+             expand: ["latest_invoice"],
+             idempotency_key: idempotency_key
            ) do
         {:ok, stripe_subscription} ->
+          # Delete migrated placeholder subscriptions only after Stripe succeeds
+          # to avoid data loss if the Stripe call fails or the process crashes.
+          user
+          |> Subscriptions.list_subscriptions()
+          |> Enum.filter(&migrated_subscription?/1)
+          |> Enum.each(&Subscriptions.delete_subscription/1)
+
           Subscriptions.create_subscription_from_stripe(
             user,
             stripe_subscription
@@ -1011,17 +1353,26 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   defp migrated_subscription?(_), do: false
 
-  defp has_real_stripe_subscription?(user) do
-    subscriptions = Subscriptions.list_subscriptions(user)
-
-    Enum.any?(subscriptions, fn sub ->
+  defp find_active_real_subscription(user) do
+    user
+    |> Subscriptions.list_subscriptions()
+    |> Enum.find(fn sub ->
       Subscriptions.active?(sub) and not migrated_subscription?(sub)
     end)
   end
 
   # Resolve the intended membership plan for a WP-migrated user.
-  # Checks (in order): real active sub, migrated sub name, signup application, default single.
+  # Checks (in order): lifetime award, real active sub, migrated sub name, signup application, default single.
   defp resolve_membership_plan(user) do
+    # Lifetime membership takes precedence over all subscription-based logic.
+    if not is_nil(user.lifetime_membership_awarded_at) do
+      :lifetime
+    else
+      resolve_membership_plan_from_subscriptions(user)
+    end
+  end
+
+  defp resolve_membership_plan_from_subscriptions(user) do
     plans = Application.get_env(:ysc, :membership_plans, [])
     subscriptions = Subscriptions.list_subscriptions(user)
 
@@ -1130,10 +1481,56 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
+  # Normalise an OTP verification code from whichever format the OTP input
+  # delivers it: indexed-key map (%{"0" => "1", "1" => "2", ...}), list, or
+  # plain string.  Non-integer map keys (e.g. "_unused_1") are ignored.
+  defp normalize_verification_code(code) when is_map(code) do
+    code
+    |> Enum.filter(fn {k, _v} ->
+      case Integer.parse(k) do
+        {_int, ""} -> true
+        _ -> false
+      end
+    end)
+    |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
+    |> Enum.map(fn {_k, v} -> v end)
+    |> Enum.reject(&(&1 == "" || is_nil(&1)))
+    |> Enum.join("")
+  end
+
+  defp normalize_verification_code(code) when is_list(code) do
+    code |> Enum.reject(&(&1 == "" || is_nil(&1))) |> Enum.join("")
+  end
+
+  defp normalize_verification_code(code) when is_binary(code), do: code
+  defp normalize_verification_code(_), do: ""
+
   defp plan_name(:family), do: "Family Membership"
   defp plan_name(:single), do: "Single Membership"
   defp plan_name(:lifetime), do: "Lifetime Membership"
   defp plan_name(_), do: "Membership"
+
+  defp format_renewal_date(nil), do: "—"
+
+  defp format_renewal_date(%DateTime{} = dt) do
+    months =
+      ~w[January February March April May June July August September October November December]
+
+    "#{Enum.at(months, dt.month - 1)} #{dt.day}, #{dt.year}"
+  end
+
+  defp payment_method_display(nil), do: "—"
+
+  defp payment_method_display(%{display_brand: brand, last_four: last4})
+       when is_binary(brand) and is_binary(last4) do
+    "#{String.capitalize(brand)} ···· #{last4}"
+  end
+
+  defp payment_method_display(%{last_four: last4}) when is_binary(last4) do
+    "Card ···· #{last4}"
+  end
+
+  defp payment_method_display(_), do: "Card on file"
 
   defp nordic_country_options do
     [
