@@ -101,11 +101,15 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
              stripe_payment_method
            ),
          {:ok, _stripe_customer} <-
-           @customer_module.update(
-             user.stripe_id,
-             %{invoice_settings: %{default_payment_method: payment_method_id}},
-             []
-           ) do
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             @customer_module.update(
+               user.stripe_id,
+               %{
+                 invoice_settings: %{default_payment_method: payment_method_id}
+               },
+               []
+             )
+           end) do
       # Reload user to get updated payment method info
       updated_user = Ysc.Accounts.get_user!(user.id)
 
@@ -159,7 +163,9 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
   defp format_error_reason(reason), do: inspect(reason)
 
   defp retrieve_stripe_payment_method(payment_method_id) do
-    case @payment_method_module.retrieve(payment_method_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           @payment_method_module.retrieve(payment_method_id)
+         end) do
       {:ok, payment_method} -> {:ok, payment_method}
       {:error, _} -> {:error, :stripe_error}
     end
@@ -186,7 +192,10 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
     id = Map.get(conn.params, "setup_intent")
 
     with id when not is_nil(id) <- id,
-         {:ok, intent} <- @setup_intent_module.retrieve(id, %{}),
+         {:ok, intent} <-
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             @setup_intent_module.retrieve(id, %{})
+           end),
          true <- intent.customer == conn.assigns.current_user.stripe_id do
       Map.take(intent, [:id, :client_secret, :status, :payment_method])
     else
@@ -198,7 +207,10 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
     id = Map.get(conn.params, "payment_intent")
 
     with id when not is_nil(id) <- id,
-         {:ok, intent} <- @payment_intent_module.retrieve(id, %{}),
+         {:ok, intent} <-
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             @payment_intent_module.retrieve(id, %{})
+           end),
          true <- intent.customer == conn.assigns.current_user.stripe_id do
       Map.take(intent, [:id, :client_secret, :amount, :currency, :status])
     else

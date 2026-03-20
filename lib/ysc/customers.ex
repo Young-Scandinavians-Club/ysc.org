@@ -45,7 +45,9 @@ defmodule Ysc.Customers do
         }
       }
 
-      case Stripe.Customer.create(customer_params) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Customer.create(customer_params)
+           end) do
         {:ok, stripe_customer} ->
           # Reload user to get latest version and avoid stale entry errors
           # This is important when called from async tasks
@@ -156,7 +158,9 @@ defmodule Ysc.Customers do
             customer_params
           end
 
-        case Stripe.Customer.update(user.stripe_id, customer_params) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.Customer.update(user.stripe_id, customer_params)
+             end) do
           {:ok, stripe_customer} ->
             {:ok, stripe_customer}
 
@@ -365,7 +369,9 @@ defmodule Ysc.Customers do
         setup_intent_params
       end
 
-    Stripe.SetupIntent.create(setup_intent_params)
+    Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+      Stripe.SetupIntent.create(setup_intent_params)
+    end)
   end
 
   @doc """

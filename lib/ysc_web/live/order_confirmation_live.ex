@@ -813,9 +813,11 @@ defmodule YscWeb.OrderConfirmationLive do
 
               # Payment method is a string ID - retrieve it
               is_binary(payment_intent.payment_method) ->
-                case Stripe.PaymentMethod.retrieve(
-                       payment_intent.payment_method
-                     ) do
+                case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                       Stripe.PaymentMethod.retrieve(
+                         payment_intent.payment_method
+                       )
+                     end) do
                   {:ok, pm} -> pm.type
                   _ -> nil
                 end
@@ -831,9 +833,11 @@ defmodule YscWeb.OrderConfirmationLive do
                     first_charge.payment_method.type
 
                   is_binary(first_charge.payment_method) ->
-                    case Stripe.PaymentMethod.retrieve(
-                           first_charge.payment_method
-                         ) do
+                    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                           Stripe.PaymentMethod.retrieve(
+                             first_charge.payment_method
+                           )
+                         end) do
                       {:ok, pm} -> pm.type
                       _ -> nil
                     end

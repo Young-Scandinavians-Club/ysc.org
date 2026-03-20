@@ -146,7 +146,9 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   defp sync_subscription_from_stripe(%Subscription{} = subscription) do
     require Ysc.Logging
 
-    case subscription_retriever().retrieve(subscription.stripe_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           subscription_retriever().retrieve(subscription.stripe_id)
+         end) do
       {:ok, stripe_subscription} ->
         # Update local subscription with latest data from Stripe
         attrs = %{

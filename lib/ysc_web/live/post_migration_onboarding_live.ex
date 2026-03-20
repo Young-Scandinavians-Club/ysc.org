@@ -708,14 +708,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               "onboarding_initial"
             )
 
-          {:noreply,
-           socket
-           |> assign(:current_step, @step_phone_verification)
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "A verification code was sent to #{updated_user.phone_number}",
-             title: "Phone Verification"
-           )}
+          YscWeb.Flash.send_toast(
+            :info,
+            "A verification code was sent to #{updated_user.phone_number}",
+            title: "Phone Verification"
+          )
+
+          {:noreply, assign(socket, :current_step, @step_phone_verification)}
         else
           # Skip phone verification, proceed to next step
           {:noreply, advance_to_next_step(socket, @step_profile)}
@@ -794,41 +793,35 @@ defmodule YscWeb.PostMigrationOnboardingLive do
              |> advance_to_next_step(@step_phone_verification)}
 
           {:error, _} ->
-            {:noreply,
-             YscWeb.Flash.put_toast(
-               socket,
-               :error,
-               "Failed to save verification. Please try again.",
-               title: "Error"
-             )}
+            YscWeb.Flash.send_toast(
+              :error,
+              "Failed to save verification. Please try again.", title: "Error")
+
+            {:noreply, socket}
         end
 
       {:error, :invalid_code} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "That code is incorrect. Please try again.",
-           title: "Invalid Code"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "That code is incorrect. Please try again.", title: "Invalid Code")
+
+        {:noreply, socket}
 
       {:error, :expired} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Your code has expired. Please request a new one.",
-           title: "Expired Code"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "Your code has expired. Please request a new one.",
+          title: "Expired Code"
+        )
+
+        {:noreply, socket}
 
       {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Could not verify the code. Please try again.",
-           title: "Error"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "Could not verify the code. Please try again.", title: "Error")
+
+        {:noreply, socket}
     end
   end
 
@@ -855,26 +848,25 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
         _job = Accounts.send_phone_verification_code(user, code, suffix)
 
+        YscWeb.Flash.send_toast(
+          :info,
+          "A new code was sent to #{user.phone_number}", title: "Code Sent")
+
         {:noreply,
-         socket
-         |> assign(
+         assign(
+           socket,
            :sms_resend_disabled_until,
            Ysc.ResendRateLimiter.disabled_until(60)
-         )
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "A new code was sent to #{user.phone_number}",
-           title: "Code Sent"
          )}
 
       {:error, :rate_limited, _remaining} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Please wait before requesting another verification code.",
-           title: "Phone verification"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "Please wait before requesting another verification code.",
+          title: "Phone verification"
+        )
+
+        {:noreply, socket}
     end
   end
 
@@ -894,13 +886,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           error: inspect(error)
         )
 
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Failed to initialize payment form. Please try again.",
-           title: "Payment Error"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "Failed to initialize payment form. Please try again.",
+          title: "Payment Error"
+        )
+
+        {:noreply, socket}
     end
   end
 
@@ -911,69 +903,81 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       ) do
     user = socket.assigns.user
 
-    case Stripe.PaymentMethod.retrieve(payment_method_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.PaymentMethod.retrieve(payment_method_id)
+         end) do
       {:ok, stripe_payment_method} ->
         _ =
-          Stripe.PaymentMethod.update(payment_method_id, %{
-            metadata: %{"set_as_default" => "true"}
-          })
+          Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+            Stripe.PaymentMethod.update(payment_method_id, %{
+              metadata: %{"set_as_default" => "true"}
+            })
+          end)
 
         case Ysc.Payments.upsert_and_set_default_payment_method_from_stripe(
                user,
                stripe_payment_method
              ) do
           {:ok, _} ->
-            case Stripe.Customer.update(user.stripe_id, %{
-                   invoice_settings: %{
-                     default_payment_method: payment_method_id
-                   }
-                 }) do
-              {:ok, _} ->
-                updated_user = Accounts.get_user!(user.id)
+            updated_user = Accounts.get_user!(user.id)
+            default_pm = Ysc.Payments.get_default_payment_method(updated_user)
 
-                default_pm =
-                  Ysc.Payments.get_default_payment_method(updated_user)
+            if updated_user.stripe_id do
+              case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                     Stripe.Customer.update(updated_user.stripe_id, %{
+                       invoice_settings: %{
+                         default_payment_method: payment_method_id
+                       }
+                     })
+                   end) do
+                {:ok, _} ->
+                  {:noreply,
+                   socket
+                   |> assign(:user, updated_user)
+                   |> assign(:payment_method_saved, true)
+                   |> assign(:default_payment_method, default_pm)}
 
-                {:noreply,
-                 socket
-                 |> assign(:user, updated_user)
-                 |> assign(:payment_method_saved, true)
-                 |> assign(:default_payment_method, default_pm)}
+                {:error, err} ->
+                  Ysc.Logging.error(
+                    "Failed to set default payment method in Stripe during onboarding",
+                    user_id: updated_user.id,
+                    error: inspect(err)
+                  )
 
-              {:error, err} ->
-                Ysc.Logging.error(
-                  "Failed to set default payment method in Stripe during onboarding",
-                  user_id: user.id,
-                  error: inspect(err)
-                )
+                  YscWeb.Flash.send_toast(
+                    :error,
+                    "Payment method saved but could not set as default.",
+                    title: "Payment"
+                  )
 
-                {:noreply,
-                 YscWeb.Flash.put_toast(
-                   socket,
-                   :error,
-                   "Payment method saved but could not set as default.",
-                   title: "Payment"
-                 )}
+                  {:noreply, socket}
+              end
+            else
+              {:noreply,
+               socket
+               |> assign(:user, updated_user)
+               |> assign(:payment_method_saved, true)
+               |> assign(:default_payment_method, default_pm)}
             end
 
           {:error, _} ->
-            {:noreply,
-             YscWeb.Flash.put_toast(
-               socket,
-               :error,
-               "Failed to store payment method. Please try again.",
-               title: "Payment"
-             )}
+            YscWeb.Flash.send_toast(
+              :error,
+              "Failed to store payment method. Please try again.",
+              title: "Payment"
+            )
+
+            {:noreply, socket}
         end
 
       {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Could not retrieve payment method. Please try again.",
-           title: "Payment"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "Could not retrieve payment method. Please try again.",
+          title: "Payment"
+        )
+
+        {:noreply, socket}
     end
   end
 
@@ -987,13 +991,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         {:noreply, advance_to_next_step(socket, @step_payment)}
 
       is_nil(default_pm) ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Please add a payment method before continuing.",
-           title: "Payment Required"
-         )}
+        YscWeb.Flash.send_toast(
+          :error,
+          "Please add a payment method before continuing.",
+          title: "Payment Required"
+        )
+
+        {:noreply, socket}
 
       true ->
         case create_stripe_subscription(
@@ -1010,13 +1014,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               reason: inspect(reason)
             )
 
-            {:noreply,
-             YscWeb.Flash.put_toast(
-               socket,
-               :error,
-               "Could not activate subscription. Please contact support.",
-               title: "Subscription Error"
-             )}
+            YscWeb.Flash.send_toast(
+              :error,
+              "Could not activate subscription. Please contact support.",
+              title: "Subscription Error"
+            )
+
+            {:noreply, socket}
         end
     end
   end
@@ -1253,6 +1257,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   defp advance_to_next_step(socket, current_step) do
     steps = socket.assigns.steps
     step_numbers = Enum.map(steps, fn {_, n} -> n end)
+    socket = Phoenix.LiveView.clear_flash(socket)
 
     # Phone verification is not in the steps list; treat it as if we're after profile
     effective_step =
@@ -1310,12 +1315,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         assign(socket, :current_step, @step_complete)
 
       {:error, _} ->
-        YscWeb.Flash.put_toast(
-          socket,
+        YscWeb.Flash.send_toast(
           :error,
-          "Could not complete setup. Please try again.",
-          title: "Error"
-        )
+          "Could not complete setup. Please try again.", title: "Error")
+
+        socket
     end
   end
 

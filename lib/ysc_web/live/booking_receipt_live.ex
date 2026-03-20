@@ -1198,9 +1198,11 @@ defmodule YscWeb.BookingReceiptLive do
       end
 
     # Retrieve payment intent to verify (expand payment_method and charges)
-    case Stripe.PaymentIntent.retrieve(payment_intent_id,
-           expand: ["payment_method", "charges"]
-         ) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.PaymentIntent.retrieve(payment_intent_id,
+             expand: ["payment_method", "charges"]
+           )
+         end) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
           # Process payment in ledger
@@ -1315,7 +1317,9 @@ defmodule YscWeb.BookingReceiptLive do
 
       pm_id when is_binary(pm_id) ->
         # Retrieve the full payment method from Stripe
-        case Stripe.PaymentMethod.retrieve(pm_id) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.PaymentMethod.retrieve(pm_id)
+             end) do
           {:ok, stripe_payment_method} ->
             # Get the user to sync the payment method
             user = Ysc.Accounts.get_user!(user_id)

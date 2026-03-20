@@ -583,10 +583,12 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
             # and generates an immediate invoice, forcing Stripe to attempt payment
             # proration_behavior: "create_prorations" ensures proper handling of unused time
             # Note: For existing subscriptions, billing_cycle_anchor must be "now", "unchanged", or unset
-            case Stripe.Subscription.update(sub.stripe_id, %{
-                   billing_cycle_anchor: "now",
-                   proration_behavior: "create_prorations"
-                 }) do
+            case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                   Stripe.Subscription.update(sub.stripe_id, %{
+                     billing_cycle_anchor: "now",
+                     proration_behavior: "create_prorations"
+                   })
+                 end) do
               {:ok, stripe_subscription} ->
                 IO.puts("✅ Updated subscription in Stripe")
                 IO.puts("   New status: #{stripe_subscription.status}")
