@@ -598,9 +598,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <.input
                 field={form[:email]}
                 type="email"
-                label="Email Address"
+                label="Email Address (optional)"
                 placeholder="member@example.com"
-                required
               />
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <.input field={form[:birth_date]} type="date" label="Date of Birth" />
@@ -1065,7 +1064,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     member_params = params["family_member"] || %{}
     user = socket.assigns.user
 
-    email = member_params["email"] || ""
+    email = String.trim(member_params["email"] || "")
 
     relationship =
       case member_params["relationship"] do
@@ -1073,50 +1072,59 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         _ -> :child
       end
 
+    # Always persist the family member record regardless of whether an invite is sent.
+    _ = upsert_family_member_record(user, member_params)
+
     result =
-      case FamilyInvites.create_invite(user, email, relationship: relationship) do
-        {:ok, _invite} ->
-          # Also upsert FamilyMember record
-          _ = upsert_family_member_record(user, member_params)
-          %{ok: true, message: "Invite sent to #{email}"}
+      if email == "" do
+        %{ok: true, message: "Family member saved."}
+      else
+        case FamilyInvites.create_invite(user, email,
+               relationship: relationship
+             ) do
+          {:ok, _invite} ->
+            %{ok: true, message: "Invite sent to #{email}"}
 
-        {:error, :invalid_membership_type} ->
-          %{
-            ok: false,
-            message: "Your membership plan doesn't support family invites."
-          }
+          {:error, :invalid_membership_type} ->
+            %{
+              ok: false,
+              message: "Your membership plan doesn't support family invites."
+            }
 
-        {:error, :max_sub_accounts_reached} ->
-          %{ok: false, message: "Maximum number of family members reached."}
+          {:error, :max_sub_accounts_reached} ->
+            %{ok: false, message: "Maximum number of family members reached."}
 
-        {:error, :email_already_registered} ->
-          %{
-            ok: false,
-            message:
-              "#{email} already has an account. They can be linked in Family Settings."
-          }
+          {:error, :email_already_registered} ->
+            %{
+              ok: false,
+              message:
+                "#{email} already has an account. They can be linked in Family Settings."
+            }
 
-        {:error, :pending_invite_exists} ->
-          %{ok: false, message: "An invite was already sent to #{email}."}
+          {:error, :pending_invite_exists} ->
+            %{ok: false, message: "An invite was already sent to #{email}."}
 
-        {:error, :max_spouses_reached} ->
-          %{
-            ok: false,
-            message: "You can only have one spouse on the family membership."
-          }
+          {:error, :max_spouses_reached} ->
+            %{
+              ok: false,
+              message: "You can only have one spouse on the family membership."
+            }
 
-        {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
-          errors =
-            Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
+          {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+            errors =
+              Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} ->
+                msg
+              end)
 
-          %{ok: false, message: "Could not send invite: #{inspect(errors)}"}
+            %{ok: false, message: "Could not send invite: #{inspect(errors)}"}
 
-        {:error, reason} ->
-          %{ok: false, message: "Could not send invite: #{inspect(reason)}"}
+          {:error, reason} ->
+            %{ok: false, message: "Could not send invite: #{inspect(reason)}"}
+        end
       end
 
     updated_results = socket.assigns.invite_results ++ [result]
-    # Remove the submitted form entry on success
+
     updated_forms =
       if result.ok,
         do: List.delete_at(socket.assigns.family_members_forms, idx),
@@ -1132,62 +1140,70 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     user = socket.assigns.user
     pending_forms = socket.assigns.family_members_forms
 
-    # Auto-send invites for any forms the user filled in but didn't explicitly submit.
+    # Auto-process any forms the user filled in but didn't explicitly submit.
+    # Always upsert the family member record; send an invite only when email is present.
     new_results =
       Enum.reduce(pending_forms, socket.assigns.invite_results, fn form,
                                                                    results ->
         member_params = form.source || %{}
+        first_name = String.trim(member_params["first_name"] || "")
         email = String.trim(member_params["email"] || "")
 
-        if email == "" do
+        if first_name == "" do
+          # Skip entirely empty forms
           results
         else
-          relationship =
-            case member_params["relationship"] do
-              "spouse" -> :spouse
-              _ -> :child
-            end
+          _ = upsert_family_member_record(user, member_params)
 
           result =
-            case FamilyInvites.create_invite(user, email,
-                   relationship: relationship
-                 ) do
-              {:ok, _invite} ->
-                _ = upsert_family_member_record(user, member_params)
-                %{ok: true, message: "Invite sent to #{email}"}
+            if email == "" do
+              %{ok: true, message: "Family member saved."}
+            else
+              relationship =
+                case member_params["relationship"] do
+                  "spouse" -> :spouse
+                  _ -> :child
+                end
 
-              {:error, :pending_invite_exists} ->
-                %{ok: true, message: "An invite was already sent to #{email}"}
+              case FamilyInvites.create_invite(user, email,
+                     relationship: relationship
+                   ) do
+                {:ok, _invite} ->
+                  %{ok: true, message: "Invite sent to #{email}"}
 
-              {:error, :email_already_registered} ->
-                %{
-                  ok: false,
-                  message:
-                    "#{email} already has an account. They can be linked in Family Settings."
-                }
+                {:error, :pending_invite_exists} ->
+                  %{ok: true, message: "An invite was already sent to #{email}"}
 
-              {:error, :max_sub_accounts_reached} ->
-                %{
-                  ok: false,
-                  message: "Maximum number of family members reached."
-                }
+                {:error, :email_already_registered} ->
+                  %{
+                    ok: false,
+                    message:
+                      "#{email} already has an account. They can be linked in Family Settings."
+                  }
 
-              {:error, :max_spouses_reached} ->
-                %{
-                  ok: false,
-                  message:
-                    "You can only have one spouse on the family membership."
-                }
+                {:error, :max_sub_accounts_reached} ->
+                  %{
+                    ok: false,
+                    message: "Maximum number of family members reached."
+                  }
 
-              {:error, :invalid_membership_type} ->
-                %{
-                  ok: false,
-                  message:
-                    "Your membership plan doesn't support family invites."
-                }
+                {:error, :max_spouses_reached} ->
+                  %{
+                    ok: false,
+                    message:
+                      "You can only have one spouse on the family membership."
+                  }
 
-              {:error, _} ->
-                %{ok: false, message: "Could not send invite to #{email}."}
+                {:error, :invalid_membership_type} ->
+                  %{
+                    ok: false,
+                    message:
+                      "Your membership plan doesn't support family invites."
+                  }
+
+                {:error, _} ->
+                  %{ok: false, message: "Could not send invite to #{email}."}
+              end
             end
 
           results ++ [result]
