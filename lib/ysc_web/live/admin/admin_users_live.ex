@@ -676,7 +676,7 @@ defmodule YscWeb.AdminUsersLive do
             <div :if={@meta && !@empty} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/users?#{Map.take(@params, ["search"])}"}
+                path={~p"/admin/users?#{@params}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -713,7 +713,7 @@ defmodule YscWeb.AdminUsersLive do
               id="admin_users_list"
               items={@streams.users}
               meta={@meta}
-              path={~p"/admin/users?#{Map.take(@params, ["search"])}"}
+              path={~p"/admin/users?#{@params}"}
             >
               <:col :let={{_, user}} label="Name" field={:first_name}>
                 <.link
@@ -802,7 +802,7 @@ defmodule YscWeb.AdminUsersLive do
 
             <Flop.Phoenix.pagination
               meta={@meta}
-              path={~p"/admin/users?#{Map.take(@params, ["search"])}"}
+              path={~p"/admin/users?#{@params}"}
               class="flex items-center justify-center py-10 text-base"
               page_list_attrs={[
                 class: "flex gap-1 order-2 justify-center items-center"
@@ -999,8 +999,25 @@ defmodule YscWeb.AdminUsersLive do
 
     new_params = Map.replace(params, "filters", updated_filters)
 
+    existing = socket.assigns[:params]
+
     new_params =
-      Map.put(new_params, "search", socket.assigns[:params]["search"])
+      new_params
+      |> then(fn p ->
+        if existing["search"],
+          do: Map.put(p, "search", existing["search"]),
+          else: p
+      end)
+      |> then(fn p ->
+        if existing["order_by"],
+          do: Map.put(p, "order_by", existing["order_by"]),
+          else: p
+      end)
+      |> then(fn p ->
+        if existing["order_directions"],
+          do: Map.put(p, "order_directions", existing["order_directions"]),
+          else: p
+      end)
 
     {:noreply,
      assign(socket, :params, new_params)

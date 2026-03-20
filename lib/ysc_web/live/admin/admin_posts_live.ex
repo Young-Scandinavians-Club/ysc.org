@@ -238,7 +238,7 @@ defmodule YscWeb.AdminPostsLive do
             <div :if={@meta} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/posts"}
+                path={~p"/admin/posts?#{@params}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -275,7 +275,7 @@ defmodule YscWeb.AdminPostsLive do
               id="admin_posts_list"
               items={@streams.posts}
               meta={@meta}
-              path={~p"/admin/posts"}
+              path={~p"/admin/posts?#{@params}"}
               row_click={
                 fn {_, post} -> JS.navigate(~p"/admin/posts/#{post.id}") end
               }
@@ -368,6 +368,7 @@ defmodule YscWeb.AdminPostsLive do
      socket
      |> assign(:page_title, "Posts")
      |> assign(:active_page, :news)
+     |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
      |> assign(:date_to, "")
@@ -391,6 +392,7 @@ defmodule YscWeb.AdminPostsLive do
         {:noreply,
          socket
          |> assign(:meta, meta)
+         |> assign(:params, params)
          |> assign(:author_filter, author_filter)
          |> assign(:search_query, search_query)
          |> assign(:date_from, date_from)

@@ -433,7 +433,7 @@ defmodule YscWeb.AdminNewslettersLive do
             <div :if={@meta && !@empty} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/newsletters"}
+                path={~p"/admin/newsletters?#{@params}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -470,7 +470,7 @@ defmodule YscWeb.AdminNewslettersLive do
               id="admin_newsletters_list"
               items={@streams.editions}
               meta={@meta}
-              path={~p"/admin/newsletters"}
+              path={~p"/admin/newsletters?#{@params}"}
               row_click={
                 fn {_, edition} ->
                   JS.navigate(~p"/admin/newsletters/#{edition.id}/edit")
@@ -584,7 +584,7 @@ defmodule YscWeb.AdminNewslettersLive do
             <Flop.Phoenix.pagination
               :if={@meta}
               meta={@meta}
-              path={~p"/admin/newsletters"}
+              path={~p"/admin/newsletters?#{@params}"}
               class="flex items-center justify-center py-10 text-base"
               page_list_attrs={[
                 class: "flex gap-1 order-2 justify-center items-center"

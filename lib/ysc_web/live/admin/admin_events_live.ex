@@ -190,7 +190,7 @@ defmodule YscWeb.AdminEventsLive do
             <div :if={@meta} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/events"}
+                path={~p"/admin/events?#{@params}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -227,7 +227,7 @@ defmodule YscWeb.AdminEventsLive do
               id="admin_events_list"
               items={@streams.events}
               meta={@meta}
-              path={~p"/admin/events"}
+              path={~p"/admin/events?#{@params}"}
               row_click={
                 fn {_, event} -> JS.navigate(~p"/admin/events/#{event.id}/edit") end
               }
@@ -296,6 +296,7 @@ defmodule YscWeb.AdminEventsLive do
      socket
      |> assign(:page_title, "Events")
      |> assign(:active_page, :events)
+     |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
      |> assign(:date_to, ""), temporary_assigns: [author_filter: []]}
@@ -317,6 +318,7 @@ defmodule YscWeb.AdminEventsLive do
         {:noreply,
          socket
          |> assign(:meta, meta)
+         |> assign(:params, params)
          |> assign(:author_filter, author_filter)
          |> assign(:search_query, search_query)
          |> assign(:date_from, date_from)
