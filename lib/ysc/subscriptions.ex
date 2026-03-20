@@ -420,7 +420,9 @@ defmodule Ysc.Subscriptions do
 
   defp do_get_scheduled_downgrade_info(%Subscription{} = subscription) do
     with {:ok, stripe_sub} <-
-           stripe_subscription_retriever().retrieve(subscription.stripe_id),
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_subscription_retriever().retrieve(subscription.stripe_id)
+           end),
          schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
          {:ok, schedule} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -484,7 +486,9 @@ defmodule Ysc.Subscriptions do
 
   defp do_cancel_scheduled_downgrade(%Subscription{} = subscription) do
     with {:ok, stripe_sub} <-
-           stripe_subscription_retriever().retrieve(subscription.stripe_id),
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_subscription_retriever().retrieve(subscription.stripe_id)
+           end),
          schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
          {:ok, _} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -773,12 +777,22 @@ defmodule Ysc.Subscriptions do
           end_date: end_timestamp
         }
 
-        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          Stripe.SubscriptionSchedule.update(schedule.id, %{
-            phases: [phase],
-            end_behavior: "release"
-          })
-        end)
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.SubscriptionSchedule.update(schedule.id, %{
+                 phases: [phase],
+                 end_behavior: "release"
+               })
+             end) do
+          {:ok, _} = ok ->
+            ok
+
+          {:error, _} = error ->
+            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+              Stripe.SubscriptionSchedule.cancel(schedule.id)
+            end)
+
+            error
+        end
 
       error ->
         error
@@ -1066,15 +1080,23 @@ defmodule Ysc.Subscriptions do
                  Stripe.SubscriptionSchedule.create(%{
                    from_subscription: stripe_sub.id
                  })
-               end),
-             {:ok, _} <-
-               Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               end) do
+          case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
                  Stripe.SubscriptionSchedule.update(schedule.id, %{
                    phases: [phase1, phase2],
                    end_behavior: "release"
                  })
                end) do
-          {:ok, schedule}
+            {:ok, _} ->
+              {:ok, schedule}
+
+            {:error, _} = error ->
+              Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                Stripe.SubscriptionSchedule.cancel(schedule.id)
+              end)
+
+              error
+          end
         end
       end
 

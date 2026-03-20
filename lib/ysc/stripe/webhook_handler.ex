@@ -1139,7 +1139,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             billing_reason: billing_reason
           )
 
-          unless wp_migration_event?(invoice) do
+          unless wp_migration_event?(subscription_id) do
             enqueue_membership_payment_failure_email(
               user,
               membership_type,
@@ -1232,7 +1232,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             :ok
           else
-            if wp_migration_event?(invoice) do
+            if wp_migration_event?(subscription_id) do
               Ysc.Logging.info(
                 "Skipping payment processing for WP migration subscription",
                 invoice_id: invoice_id,
@@ -1331,7 +1331,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                       nil
                     end
 
-                  unless wp_migration_event?(invoice) do
+                  unless wp_migration_event?(subscription_id) do
                     if is_renewal do
                       enqueue_membership_renewal_success_email(
                         user,
@@ -3961,7 +3961,18 @@ defmodule Ysc.Stripe.WebhookHandler do
       :ok
   end
 
-  defp wp_migration_event?(_invoice) do
-    Ysc.Settings.get_setting_safe("wp_migration_active") == "true"
+  defp wp_migration_event?(subscription_id) when is_binary(subscription_id) do
+    if Ysc.Settings.get_setting_safe("wp_migration_active") != "true" do
+      false
+    else
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Subscription.retrieve(subscription_id)
+           end) do
+        {:ok, %{metadata: %{"wp_migration" => "true"}}} -> true
+        _ -> false
+      end
+    end
   end
+
+  defp wp_migration_event?(_), do: false
 end

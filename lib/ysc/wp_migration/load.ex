@@ -1499,14 +1499,13 @@ defmodule Ysc.WpMigration.Load do
   defp create_fresh_stripe_customer(user) do
     original_stripe_id = user.stripe_id
 
+    fresh_user_for_create = Repo.get!(User, user.id)
+
     result =
-      Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-        case Customers.create_stripe_customer(Repo.get!(User, user.id)) do
-          {:ok, _} = ok -> ok
-          {:error, %Stripe.Error{} = err} -> {:error, err}
-          {:error, reason} -> {:error, %{message: inspect(reason)}}
-        end
-      end)
+      case Customers.create_stripe_customer(fresh_user_for_create) do
+        {:ok, _} = ok -> ok
+        {:error, reason} -> {:error, reason}
+      end
 
     case result do
       {:ok, _} ->
@@ -1702,12 +1701,14 @@ defmodule Ysc.WpMigration.Load do
       if price_id do
         trial_end = DateTime.to_unix(renewal_dt)
 
-        migrated_stripe_id = "migrated_#{user_id}"
-
         existing =
-          Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
+          Repo.one(
+            from s in Ysc.Subscriptions.Subscription,
+              where: s.user_id == ^user_id,
+              limit: 1
+          )
 
-        if existing && existing.stripe_id != migrated_stripe_id do
+        if existing && !String.starts_with?(existing.stripe_id, "migrated_") do
           Ysc.Logging.info(
             "[WP Load] Stripe subscription already exists for user #{user_id} (sub=#{existing.stripe_id}), skipping"
           )
@@ -1781,8 +1782,16 @@ defmodule Ysc.WpMigration.Load do
                       membership_type
                     )
 
-                  _ ->
-                    :ok
+                  {:error, changeset} ->
+                    Ysc.Logging.error(
+                      "[WP Load] Local subscription persistence failed for user #{user_id} " <>
+                        "(stripe_sub=#{stripe_sub.id}): #{inspect(changeset.errors)}; " <>
+                        "canceling orphaned Stripe subscription"
+                    )
+
+                    Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                      Stripe.Subscription.delete(stripe_sub.id)
+                    end)
                 end
 
               {:error, %Stripe.Error{} = err} ->
