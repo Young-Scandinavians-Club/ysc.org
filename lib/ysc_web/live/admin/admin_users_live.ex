@@ -676,7 +676,7 @@ defmodule YscWeb.AdminUsersLive do
             <div :if={@meta && !@empty} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/users?#{@params}"}
+                path={~p"/admin/users?#{non_flop_params(@params)}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -713,7 +713,7 @@ defmodule YscWeb.AdminUsersLive do
               id="admin_users_list"
               items={@streams.users}
               meta={@meta}
-              path={~p"/admin/users?#{@params}"}
+              path={~p"/admin/users?#{non_flop_params(@params)}"}
             >
               <:col :let={{_, user}} label="Name" field={:first_name}>
                 <.link
@@ -802,7 +802,7 @@ defmodule YscWeb.AdminUsersLive do
 
             <Flop.Phoenix.pagination
               meta={@meta}
-              path={~p"/admin/users?#{@params}"}
+              path={~p"/admin/users?#{non_flop_params(@params)}"}
               class="flex items-center justify-center py-10 text-base"
               page_list_attrs={[
                 class: "flex gap-1 order-2 justify-center items-center"
@@ -1361,4 +1361,10 @@ defmodule YscWeb.AdminUsersLive do
   end
 
   defp list_params_for_back(_), do: %{}
+
+  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
+  defp non_flop_params(params) when is_map(params),
+    do: Map.drop(params, @flop_keys)
+
+  defp non_flop_params(_), do: %{}
 end

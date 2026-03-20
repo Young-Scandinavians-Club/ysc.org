@@ -238,7 +238,7 @@ defmodule YscWeb.AdminPostsLive do
             <div :if={@meta} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/posts?#{@params}"}
+                path={~p"/admin/posts?#{non_flop_params(@params)}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -275,7 +275,7 @@ defmodule YscWeb.AdminPostsLive do
               id="admin_posts_list"
               items={@streams.posts}
               meta={@meta}
-              path={~p"/admin/posts?#{@params}"}
+              path={~p"/admin/posts?#{non_flop_params(@params)}"}
               row_click={
                 fn {_, post} -> JS.navigate(~p"/admin/posts/#{post.id}") end
               }
@@ -648,4 +648,10 @@ defmodule YscWeb.AdminPostsLive do
   defp maybe_stream_update_post(socket, %Post{} = post) do
     stream_insert(socket, :posts, post)
   end
+
+  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
+  defp non_flop_params(params) when is_map(params),
+    do: Map.drop(params, @flop_keys)
+
+  defp non_flop_params(_), do: %{}
 end

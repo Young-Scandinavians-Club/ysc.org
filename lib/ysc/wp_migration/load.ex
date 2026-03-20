@@ -1493,9 +1493,11 @@ defmodule Ysc.WpMigration.Load do
 
   # Creates a fresh Stripe customer, replacing any stale stripe_id the user
   # may already carry (e.g. a production ID that doesn't exist in sandbox).
+  # Returns {:ok, reloaded_user} only when a new stripe_id is confirmed in the
+  # DB, or {:error, reason} otherwise.
   @dialyzer {:nowarn_function, create_fresh_stripe_customer: 1}
   defp create_fresh_stripe_customer(user) do
-    fresh_user = Repo.get!(User, user.id)
+    original_stripe_id = user.stripe_id
 
     result =
       Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -1508,12 +1510,29 @@ defmodule Ysc.WpMigration.Load do
 
     case result do
       {:ok, _} ->
-        :ok
+        # Customers.create_stripe_customer/1 can return {:ok, _} even when the
+        # DB update of stripe_id failed (it logs the error and relies on a
+        # webhook to fix it later). Reload and verify the stripe_id was actually
+        # persisted and is different from the original stale/nil value.
+        fresh_user = Repo.get!(User, user.id)
+
+        if fresh_user.stripe_id && fresh_user.stripe_id != original_stripe_id do
+          {:ok, fresh_user}
+        else
+          Ysc.Logging.warning(
+            "[WP Load] Stripe customer API call succeeded but stripe_id was not persisted " <>
+              "for user #{user.id} (#{user.email}); original=#{inspect(original_stripe_id)}"
+          )
+
+          {:error, :no_stripe_id}
+        end
 
       {:error, reason} ->
         Ysc.Logging.warning(
-          "[WP Load] Failed to create Stripe customer for user #{user.id} (#{fresh_user.email}): #{inspect(reason)}"
+          "[WP Load] Failed to create Stripe customer for user #{user.id} (#{user.email}): #{inspect(reason)}"
         )
+
+        {:error, reason}
     end
   end
 
@@ -1786,14 +1805,17 @@ defmodule Ysc.WpMigration.Load do
 
   # Guarantees the user has a valid stripe_id. If missing or stale (the
   # customer doesn't exist in the connected Stripe environment), a new
-  # Stripe customer is created. Returns the reloaded user or nil on failure.
+  # Stripe customer is created. Returns the reloaded user on success, or nil
+  # when a verified stripe_id could not be established.
   defp ensure_user_has_stripe_customer(user_id) do
     user = Ysc.Accounts.get_user!(user_id)
 
     cond do
       is_nil(user.stripe_id) or user.stripe_id == "" ->
-        create_fresh_stripe_customer(user)
-        Repo.get!(User, user_id)
+        case create_fresh_stripe_customer(user) do
+          {:ok, fresh_user} -> fresh_user
+          {:error, _} -> nil
+        end
 
       true ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -1803,8 +1825,10 @@ defmodule Ysc.WpMigration.Load do
             user
 
           {:error, _} ->
-            create_fresh_stripe_customer(user)
-            Repo.get!(User, user_id)
+            case create_fresh_stripe_customer(user) do
+              {:ok, fresh_user} -> fresh_user
+              {:error, _} -> nil
+            end
         end
     end
   end
