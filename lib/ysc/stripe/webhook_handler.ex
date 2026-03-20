@@ -733,18 +733,16 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp handle("customer.subscription.created", %Stripe.Subscription{} = event) do
-    # Only create locally when status is active or trialing. Subscriptions often
-    # start as "incomplete" (e.g. admin "paid elsewhere" or checkout); we pay the
-    # invoice or the user pays, then subscription.updated fires with "active".
-    # If we create from "incomplete" here, we race with the admin/checkout flow
-    # which then finds our incomplete record and returns it without updating,
-    # so the membership appears missing (active? is false for incomplete).
-    if event.status in ["active", "trialing"] do
-      customer = Ysc.Accounts.get_user_from_stripe_id(event.customer)
-      Subscriptions.create_subscription_from_stripe(customer, event)
-    end
+    if event.metadata["wp_migration"] == "true" do
+      :ok
+    else
+      if event.status in ["active", "trialing"] do
+        customer = Ysc.Accounts.get_user_from_stripe_id(event.customer)
+        Subscriptions.create_subscription_from_stripe(customer, event)
+      end
 
-    :ok
+      :ok
+    end
   end
 
   defp handle("customer.subscription.deleted", %Stripe.Subscription{} = event) do
@@ -1141,14 +1139,14 @@ defmodule Ysc.Stripe.WebhookHandler do
             billing_reason: billing_reason
           )
 
-          # CRITICAL: Enqueue email notification asynchronously
-          # This ensures email failures don't cause webhook processing to fail
-          enqueue_membership_payment_failure_email(
-            user,
-            membership_type,
-            is_renewal,
-            invoice_id
-          )
+          unless wp_migration_event?(subscription_id) do
+            enqueue_membership_payment_failure_email(
+              user,
+              membership_type,
+              is_renewal,
+              invoice_id
+            )
+          end
 
           # If this is a renewal payment failure, check if subscription should be expired
           # and immediately invalidate cache to revoke access
@@ -1234,132 +1232,142 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             :ok
           else
-            # CRITICAL: Pre-fetch data from Stripe BEFORE transaction
-            # This avoids holding database transaction open during slow API calls
+            if wp_migration_event?(subscription_id) do
+              Ysc.Logging.info(
+                "Skipping payment processing for WP migration subscription",
+                invoice_id: invoice_id,
+                subscription_id: subscription_id,
+                user_id: user.id
+              )
 
-            # Find or create subscription reference (may fetch from Stripe)
-            entity_id =
-              find_or_create_subscription_reference(subscription_id, user)
+              :ok
+            else
+              # CRITICAL: Pre-fetch data from Stripe BEFORE transaction
+              # This avoids holding database transaction open during slow API calls
 
-            # Extract stripe fee (may fetch from Stripe)
-            stripe_fee = extract_stripe_fee_from_invoice(invoice)
+              # Find or create subscription reference (may fetch from Stripe)
+              entity_id =
+                find_or_create_subscription_reference(subscription_id, user)
 
-            # Extract payment method (may fetch from Stripe)
-            payment_method_id = extract_payment_method_from_invoice(invoice)
+              # Extract stripe fee (may fetch from Stripe)
+              stripe_fee = extract_stripe_fee_from_invoice(invoice)
 
-            # Now process payment with pre-fetched data
-            amount_paid = invoice[:amount_paid] || invoice["amount_paid"]
+              # Extract payment method (may fetch from Stripe)
+              payment_method_id = extract_payment_method_from_invoice(invoice)
 
-            billing_reason =
-              invoice[:billing_reason] || invoice["billing_reason"]
+              # Now process payment with pre-fetched data
+              amount_paid = invoice[:amount_paid] || invoice["amount_paid"]
 
-            description = invoice[:description] || invoice["description"]
-            number = invoice[:number] || invoice["number"]
+              billing_reason =
+                invoice[:billing_reason] || invoice["billing_reason"]
 
-            # For subscription_update (proration), build a clear description so it shows in payment history
-            membership_type =
-              get_membership_type_from_subscription_id(subscription_id)
+              description = invoice[:description] || invoice["description"]
+              number = invoice[:number] || invoice["number"]
 
-            payment_description =
-              if billing_reason == "subscription_update" do
-                proration_details =
-                  extract_proration_details(invoice, membership_type)
+              # For subscription_update (proration), build a clear description so it shows in payment history
+              membership_type =
+                get_membership_type_from_subscription_id(subscription_id)
 
-                build_proration_payment_description(
-                  proration_details,
-                  membership_type
-                )
-              else
-                "Membership payment - #{description || "Invoice #{number}"}"
-              end
-
-            payment_attrs = %{
-              user_id: user.id,
-              amount:
-                Money.new(MoneyHelper.cents_to_dollars(amount_paid), :USD),
-              entity_type: :membership,
-              entity_id: entity_id,
-              external_payment_id: invoice_id,
-              stripe_fee: stripe_fee,
-              description: payment_description,
-              property: nil,
-              payment_method_id: payment_method_id
-            }
-
-            case Ledgers.process_payment(payment_attrs) do
-              {:ok, {payment, _transaction, _entries}} ->
-                Ysc.Logging.info(
-                  "Subscription payment processed successfully in ledger",
-                  invoice_id: invoice_id,
-                  user_id: user.id,
-                  subscription_id: subscription_id,
-                  entity_id: entity_id
-                )
-
-                # CRITICAL: Enqueue email sending asynchronously
-                # This ensures email failures don't cause webhook processing to fail
-                billing_reason =
-                  invoice[:billing_reason] || invoice["billing_reason"]
-
-                is_renewal =
-                  billing_reason == "subscription_cycle" ||
-                    billing_reason == "subscription_update"
-
-                membership_type =
-                  get_membership_type_from_subscription_id(subscription_id)
-
-                payment_date =
-                  case payment.payment_date do
-                    %Date{} = date -> date
-                    %DateTime{} = datetime -> DateTime.to_date(datetime)
-                    _ -> Date.utc_today()
-                  end
-
-                # For subscription updates (upgrades/downgrades), extract proration details
-                proration_details =
-                  if billing_reason == "subscription_update" do
+              payment_description =
+                if billing_reason == "subscription_update" do
+                  proration_details =
                     extract_proration_details(invoice, membership_type)
-                  else
-                    nil
-                  end
 
-                # Enqueue the appropriate email job
-                if is_renewal do
-                  enqueue_membership_renewal_success_email(
-                    user,
-                    membership_type,
-                    payment.amount,
-                    payment_date,
-                    billing_reason,
-                    proration_details
+                  build_proration_payment_description(
+                    proration_details,
+                    membership_type
                   )
                 else
-                  # First-time membership payment - always paid online via Stripe
-                  # (paid_elsewhere is for admin-recorded in-person payments only)
-                  paid_elsewhere = false
-
-                  enqueue_membership_payment_confirmation_email(
-                    user,
-                    membership_type,
-                    payment.amount,
-                    payment_date,
-                    paid_elsewhere
-                  )
+                  "Membership payment - #{description || "Invoice #{number}"}"
                 end
 
-                :ok
+              payment_attrs = %{
+                user_id: user.id,
+                amount:
+                  Money.new(MoneyHelper.cents_to_dollars(amount_paid), :USD),
+                entity_type: :membership,
+                entity_id: entity_id,
+                external_payment_id: invoice_id,
+                stripe_fee: stripe_fee,
+                description: payment_description,
+                property: nil,
+                payment_method_id: payment_method_id
+              }
 
-              {:error, reason} ->
-                Ysc.Logging.error(
-                  "Failed to process subscription payment in ledger",
-                  invoice_id: invoice_id,
-                  user_id: user.id,
-                  subscription_id: subscription_id,
-                  error: reason
-                )
+              case Ledgers.process_payment(payment_attrs) do
+                {:ok, {payment, _transaction, _entries}} ->
+                  Ysc.Logging.info(
+                    "Subscription payment processed successfully in ledger",
+                    invoice_id: invoice_id,
+                    user_id: user.id,
+                    subscription_id: subscription_id,
+                    entity_id: entity_id
+                  )
 
-                # Raise error to mark webhook as failed and rollback transaction
-                raise "Failed to process payment: #{inspect(reason)}"
+                  # CRITICAL: Enqueue email sending asynchronously
+                  # This ensures email failures don't cause webhook processing to fail
+                  billing_reason =
+                    invoice[:billing_reason] || invoice["billing_reason"]
+
+                  is_renewal =
+                    billing_reason == "subscription_cycle" ||
+                      billing_reason == "subscription_update"
+
+                  membership_type =
+                    get_membership_type_from_subscription_id(subscription_id)
+
+                  payment_date =
+                    case payment.payment_date do
+                      %Date{} = date -> date
+                      %DateTime{} = datetime -> DateTime.to_date(datetime)
+                      _ -> Date.utc_today()
+                    end
+
+                  # For subscription updates (upgrades/downgrades), extract proration details
+                  proration_details =
+                    if billing_reason == "subscription_update" do
+                      extract_proration_details(invoice, membership_type)
+                    else
+                      nil
+                    end
+
+                  unless wp_migration_event?(subscription_id) do
+                    if is_renewal do
+                      enqueue_membership_renewal_success_email(
+                        user,
+                        membership_type,
+                        payment.amount,
+                        payment_date,
+                        billing_reason,
+                        proration_details
+                      )
+                    else
+                      paid_elsewhere = false
+
+                      enqueue_membership_payment_confirmation_email(
+                        user,
+                        membership_type,
+                        payment.amount,
+                        payment_date,
+                        paid_elsewhere
+                      )
+                    end
+                  end
+
+                  :ok
+
+                {:error, reason} ->
+                  Ysc.Logging.error(
+                    "Failed to process subscription payment in ledger",
+                    invoice_id: invoice_id,
+                    user_id: user.id,
+                    subscription_id: subscription_id,
+                    error: reason
+                  )
+
+                  # Raise error to mark webhook as failed and rollback transaction
+                  raise "Failed to process payment: #{inspect(reason)}"
+              end
             end
           end
         else
@@ -1943,7 +1951,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     try do
       # Fetch the charge with expanded balance transaction to get actual fees
-      case Stripe.Charge.retrieve(charge_id, expand: ["balance_transaction"]) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Charge.retrieve(charge_id, expand: ["balance_transaction"])
+           end) do
         {:ok,
          %Stripe.Charge{
            balance_transaction: %Stripe.BalanceTransaction{fee: fee}
@@ -2011,7 +2021,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     try do
       # Try to get the charge amount to calculate estimated fee
-      case Stripe.Charge.retrieve(charge_id) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Charge.retrieve(charge_id)
+           end) do
         {:ok, %Stripe.Charge{amount: amount}} ->
           # amount is in cents, convert to dollars for calculation
           amount_dollars = MoneyHelper.cents_to_dollars(amount)
@@ -2329,7 +2341,9 @@ defmodule Ysc.Stripe.WebhookHandler do
         )
 
         # IMPORTANT: Fetch from Stripe BEFORE transaction to avoid long-running transaction
-        case Stripe.Subscription.retrieve(stripe_subscription_id) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.Subscription.retrieve(stripe_subscription_id)
+             end) do
           {:ok, stripe_subscription} ->
             # Now create in database - this will be wrapped in the outer transaction
             case Subscriptions.create_subscription_from_stripe(
@@ -2534,9 +2548,11 @@ defmodule Ysc.Stripe.WebhookHandler do
     do: {:error, :no_payment_intent_id}
 
   defp retrieve_payment_intent_with_charges(payment_intent_id) do
-    case Stripe.PaymentIntent.retrieve(payment_intent_id,
-           expand: ["charges.data.balance_transaction"]
-         ) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.PaymentIntent.retrieve(payment_intent_id,
+             expand: ["charges.data.balance_transaction"]
+           )
+         end) do
       {:ok, payment_intent} -> {:ok, payment_intent}
       {:error, reason} -> {:error, reason}
     end
@@ -2615,7 +2631,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       charge_id when is_binary(charge_id) ->
         # Retrieve the charge to get payment method details
-        case Stripe.Charge.retrieve(charge_id) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.Charge.retrieve(charge_id)
+             end) do
           {:ok, charge} ->
             # Get the payment method ID from the charge
             payment_method_id = charge.payment_method
@@ -2649,9 +2667,11 @@ defmodule Ysc.Stripe.WebhookHandler do
                         invoice_id: invoice_id
                       )
 
-                      case Stripe.PaymentMethod.retrieve(
-                             stripe_payment_method_id
-                           ) do
+                      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                             Stripe.PaymentMethod.retrieve(
+                               stripe_payment_method_id
+                             )
+                           end) do
                         {:ok, stripe_payment_method} ->
                           # Sync the payment method to our database
                           case Ysc.Payments.sync_payment_method_from_stripe(
@@ -2753,7 +2773,9 @@ defmodule Ysc.Stripe.WebhookHandler do
     # If payment_intent is not directly available, try to get it from charge
     payment_intent_id =
       if is_nil(payment_intent_id) && charge_id do
-        case Stripe.Charge.retrieve(charge_id, expand: ["payment_intent"]) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.Charge.retrieve(charge_id, expand: ["payment_intent"])
+             end) do
           {:ok, charge} ->
             charge.payment_intent
 
@@ -2849,7 +2871,9 @@ defmodule Ysc.Stripe.WebhookHandler do
         do: Map.put(params, :starting_after, starting_after),
         else: params
 
-    case Stripe.BalanceTransaction.all(params, expand: ["data.source"]) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.BalanceTransaction.all(params, expand: ["data.source"])
+         end) do
       {:ok, %Stripe.List{data: data, has_more: true}} when is_list(data) ->
         last_id = List.last(data) |> extract_balance_transaction_id()
 
@@ -2926,9 +2950,11 @@ defmodule Ysc.Stripe.WebhookHandler do
     # First, try to get fees from the payout's balance transaction (most reliable)
     # The payout's balance transaction contains the total fees for all charges/refunds in the payout
     updated_payout =
-      case Stripe.Payout.retrieve(stripe_payout_id,
-             expand: ["balance_transaction"]
-           ) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Payout.retrieve(stripe_payout_id,
+               expand: ["balance_transaction"]
+             )
+           end) do
         {:ok,
          %Stripe.Payout{
            balance_transaction: %Stripe.BalanceTransaction{fee: fee_cents} = bt
@@ -3327,7 +3353,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           is_binary(charge_id) ->
             # Source is just an ID, fetch the charge
-            case Stripe.Charge.retrieve(charge_id) do
+            case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                   Stripe.Charge.retrieve(charge_id)
+                 end) do
               {:ok, charge} ->
                 charge
 
@@ -3455,7 +3483,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           is_binary(stripe_refund_id) ->
             # Source is just an ID, fetch the refund
-            case Stripe.Refund.retrieve(stripe_refund_id) do
+            case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                   Stripe.Refund.retrieve(stripe_refund_id)
+                 end) do
               {:ok, refund} ->
                 refund
 
@@ -3488,7 +3518,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
         if charge_id do
           # Get the charge to find the payment intent
-          case Stripe.Charge.retrieve(charge_id) do
+          case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                 Stripe.Charge.retrieve(charge_id)
+               end) do
             {:ok, charge} ->
               payment_intent_id = charge.payment_intent
 
@@ -3623,9 +3655,11 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   # Helper function to get membership type from Stripe subscription API
   defp get_membership_type_from_stripe_subscription(subscription_id) do
-    case Stripe.Subscription.retrieve(subscription_id,
-           expand: ["items.data.price"]
-         ) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.Subscription.retrieve(subscription_id,
+             expand: ["items.data.price"]
+           )
+         end) do
       {:ok, stripe_subscription} ->
         membership_type =
           case stripe_subscription.items.data do
@@ -3926,4 +3960,19 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       :ok
   end
+
+  defp wp_migration_event?(subscription_id) when is_binary(subscription_id) do
+    if Ysc.Settings.get_setting_safe("wp_migration_active") != "true" do
+      false
+    else
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Subscription.retrieve(subscription_id)
+           end) do
+        {:ok, %{metadata: %{"wp_migration" => "true"}}} -> true
+        _ -> false
+      end
+    end
+  end
+
+  defp wp_migration_event?(_), do: false
 end

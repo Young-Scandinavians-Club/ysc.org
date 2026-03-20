@@ -235,7 +235,12 @@ defmodule Ysc.Payments do
 
     # Get all payment methods from Stripe
     stripe_payment_methods =
-      case Stripe.PaymentMethod.list(%{customer: user.stripe_id, type: "card"}) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.PaymentMethod.list(%{
+               customer: user.stripe_id,
+               type: "card"
+             })
+           end) do
         {:ok, %{data: payment_methods}} ->
           payment_methods
 
@@ -258,7 +263,9 @@ defmodule Ysc.Payments do
 
     # Get the default payment method from Stripe customer
     stripe_default_pm =
-      case Stripe.Customer.retrieve(user.stripe_id) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Customer.retrieve(user.stripe_id)
+           end) do
         {:ok, customer} ->
           if customer.invoice_settings &&
                customer.invoice_settings.default_payment_method do

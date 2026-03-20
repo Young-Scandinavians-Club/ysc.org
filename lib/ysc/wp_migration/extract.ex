@@ -95,6 +95,23 @@ defmodule Ysc.WpMigration.Extract do
       meta = WpRepo.get_usermeta(repo, user_id)
       {:ok, membership} = WpRepo.get_membership_for_user(repo, user_id)
 
+      payments =
+        case WpRepo.get_membership_payments_for_user(repo, user_id) do
+          {:ok, p} -> p
+          {:error, _reason} -> []
+        end
+
+      last_payment_date =
+        case payments do
+          [%{"payment_date" => d} | _] when d != "" -> normalize_datetime(d)
+          _ -> nil
+        end
+
+      sub_status = presence(membership["sub_status"])
+
+      has_active_wp_subscription =
+        is_binary(sub_status) and sub_status in ["wc-active", "wc-on-hold"]
+
       %{
         "wp_user_id" => user_id,
         "email" => row["user_email"],
@@ -122,14 +139,17 @@ defmodule Ysc.WpMigration.Extract do
         "wcm_status" => presence(membership["wcm_status"]),
         "wcm_start_date" => normalize_datetime(membership["wcm_start_date"]),
         "wcm_end_date" => normalize_datetime(membership["wcm_end_date"]),
-        "sub_status" => presence(membership["sub_status"]),
+        "sub_status" => sub_status,
         "sub_original_start_date" =>
           normalize_datetime(membership["sub_original_start_date"]),
         "sub_start_date" => normalize_datetime(membership["sub_start_date"]),
         "sub_next_payment_date" =>
           normalize_datetime(nil_if_zero(membership["sub_next_payment_date"])),
         "sub_amount" => presence(membership["sub_amount"]),
-        "sub_period" => presence(membership["sub_period"])
+        "sub_period" => presence(membership["sub_period"]),
+        # Payment-history-derived fields for date verification
+        "last_membership_payment_date" => last_payment_date,
+        "has_active_wp_subscription" => has_active_wp_subscription
       }
     end)
   end

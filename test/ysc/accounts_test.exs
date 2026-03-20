@@ -528,6 +528,43 @@ defmodule Ysc.AccountsTest do
 
       assert Enum.any?(users, &(&1.id == user.id))
     end
+
+    test "multi-column order_by with membership_type restores sort metadata at original index" do
+      _user = user_fixture(%{phone_number: "+14159098268"})
+
+      # membership_type is at index 1 — after last_name.
+      params = %{
+        "page" => "1",
+        "page_size" => "10",
+        "order_by" => ["last_name", "membership_type"],
+        "order_directions" => ["asc", "desc"]
+      }
+
+      assert {:ok, {_users, meta}} = Accounts.list_paginated_users(params)
+
+      # membership_type must be restored at index 1, preserving last_name at 0.
+      assert meta.flop.order_by == [:last_name, :membership_type]
+      assert meta.flop.order_directions == [:asc, :desc]
+    end
+
+    test "membership_type sort-only restores metadata at index 0 ahead of Flop defaults" do
+      _user = user_fixture(%{phone_number: "+14159098270"})
+
+      params = %{
+        "page" => "1",
+        "page_size" => "10",
+        "order_by" => ["membership_type"],
+        "order_directions" => ["asc"]
+      }
+
+      assert {:ok, {_users, meta}} = Accounts.list_paginated_users(params)
+
+      # With membership_type stripped, Flop falls back to its default order
+      # ([:first_name, :last_name]). After restoration, membership_type is
+      # prepended at index 0 to reflect the user's original sort intent.
+      assert meta.flop.order_by == [:membership_type, :first_name, :last_name]
+      assert meta.flop.order_directions == [:asc, :asc, :asc]
+    end
   end
 
   describe "update_user_profile/2" do

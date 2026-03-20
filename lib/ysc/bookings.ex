@@ -3676,7 +3676,9 @@ defmodule Ysc.Bookings do
 
       {:ok, refund}
     else
-      case Stripe.Refund.create(refund_params) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.Refund.create(refund_params)
+           end) do
         {:ok, refund} ->
           Ysc.Logging.info("Stripe refund created successfully",
             refund_id: refund.id,

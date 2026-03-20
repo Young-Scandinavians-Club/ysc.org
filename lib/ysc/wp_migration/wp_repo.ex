@@ -212,7 +212,14 @@ defmodule Ysc.WpMigration.WpRepo do
         else
           meta_by_id = fetch_mphb_booking_meta(conn, ids)
           rooms_by_id = fetch_mphb_reserved_rooms(conn, ids)
-          build_mphb_booking_list(id_rows, meta_by_id, rooms_by_id)
+          customer_user_map = resolve_mphb_customer_user_ids(conn, meta_by_id)
+
+          build_mphb_booking_list(
+            id_rows,
+            meta_by_id,
+            rooms_by_id,
+            customer_user_map
+          )
         end
 
       _ ->
@@ -287,12 +294,58 @@ defmodule Ysc.WpMigration.WpRepo do
     end
   end
 
-  defp build_mphb_booking_list(id_rows, meta_by_id, rooms_by_id) do
+  defp resolve_mphb_customer_user_ids(conn, meta_by_id) do
+    customer_post_ids =
+      meta_by_id
+      |> Map.values()
+      |> Enum.map(& &1["mphb_customer_id"])
+      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+      |> Enum.uniq()
+
+    if customer_post_ids == [] do
+      %{}
+    else
+      placeholders =
+        customer_post_ids
+        |> Enum.with_index(1)
+        |> Enum.map_join(", ", fn {_id, i} -> "$#{i}" end)
+
+      sql = """
+      SELECT post_id, meta_value
+      FROM #{@table_prefix}_postmeta
+      WHERE post_id IN (#{placeholders})
+        AND meta_key = '_mphb_user_id'
+      """
+
+      case query_maps(conn, sql, Enum.map(customer_post_ids, &to_string/1)) do
+        {:ok, rows} ->
+          Map.new(rows, fn r -> {r["post_id"], r["meta_value"]} end)
+
+        _ ->
+          %{}
+      end
+    end
+  end
+
+  defp build_mphb_booking_list(
+         id_rows,
+         meta_by_id,
+         rooms_by_id,
+         customer_user_map
+       ) do
     Enum.map(id_rows, fn row ->
       id = row["ID"]
       meta = Map.get(meta_by_id, id, %{})
       rooms = Map.get(rooms_by_id, id, [])
-      Map.merge(meta, %{"ID" => id, "reserved_rooms" => rooms})
+
+      customer_post_id = meta["mphb_customer_id"]
+
+      wp_user_id =
+        Map.get(customer_user_map, customer_post_id, customer_post_id)
+
+      meta
+      |> Map.put("mphb_customer_id", wp_user_id)
+      |> Map.merge(%{"ID" => id, "reserved_rooms" => rooms})
     end)
   end
 
@@ -534,6 +587,88 @@ defmodule Ysc.WpMigration.WpRepo do
       end
 
     {:ok, wcm |> Map.merge(sub) |> Map.merge(sub_original)}
+  end
+
+  @doc """
+  Returns completed membership payment dates for the given WP user_id.
+
+  Finds all WooCommerce orders (initial + renewals) associated with the user's
+  subscriptions, returning `[%{"payment_date" => ..., "order_total" => ...}]`
+  sorted most-recent-first. Handles both HPOS and legacy order storage.
+  """
+  def get_membership_payments_for_user(
+        %__MODULE__{conn: conn, hpos: hpos},
+        user_id
+      ) do
+    uid_str = to_string(user_id)
+
+    # Subscriptions live in posts/postmeta regardless of HPOS
+    subs_cte = """
+    WITH user_subs AS (
+      SELECT CAST(p.ID AS VARCHAR) AS sub_id, CAST(p.post_parent AS VARCHAR) AS parent_order_id
+      FROM #{@table_prefix}_posts p
+      JOIN #{@table_prefix}_postmeta pm ON pm.post_id = p.ID
+        AND pm.meta_key = '_customer_user' AND pm.meta_value = $1
+      WHERE p.post_type = 'shop_subscription'
+    )
+    """
+
+    sql =
+      if hpos do
+        subs_cte <>
+          """
+          SELECT DISTINCT
+            COALESCE(o.date_created_gmt, '') AS payment_date,
+            COALESCE(CAST(o.total_amount AS VARCHAR), '') AS order_total
+          FROM #{@table_prefix}_wc_orders o
+          WHERE o.status = 'wc-completed'
+            AND (
+              CAST(o.id AS VARCHAR) IN (
+                SELECT CAST(om.order_id AS VARCHAR)
+                FROM #{@table_prefix}_wc_orders_meta om
+                JOIN user_subs us ON us.sub_id = om.meta_value
+                WHERE om.meta_key = '_subscription_renewal'
+              )
+              OR CAST(o.id AS VARCHAR) IN (
+                SELECT parent_order_id FROM user_subs
+                WHERE parent_order_id IS NOT NULL AND parent_order_id != '' AND parent_order_id != '0'
+              )
+            )
+          ORDER BY payment_date DESC
+          """
+      else
+        subs_cte <>
+          """
+          SELECT DISTINCT
+            COALESCE(pm_paid.meta_value, o.post_date, '') AS payment_date,
+            COALESCE(pm_total.meta_value, '') AS order_total
+          FROM #{@table_prefix}_posts o
+          LEFT JOIN #{@table_prefix}_postmeta pm_paid ON pm_paid.post_id = o.ID
+            AND pm_paid.meta_key = '_paid_date'
+          LEFT JOIN #{@table_prefix}_postmeta pm_total ON pm_total.post_id = o.ID
+            AND pm_total.meta_key = '_order_total'
+          WHERE o.post_type = 'shop_order'
+            AND o.post_status = 'wc-completed'
+            AND (
+              o.ID IN (
+                SELECT pm_ren.post_id
+                FROM #{@table_prefix}_postmeta pm_ren
+                JOIN user_subs us ON us.sub_id = pm_ren.meta_value
+                WHERE pm_ren.meta_key = '_subscription_renewal'
+              )
+              OR CAST(o.ID AS VARCHAR) IN (
+                SELECT parent_order_id FROM user_subs
+                WHERE parent_order_id IS NOT NULL AND parent_order_id != '' AND parent_order_id != '0'
+              )
+            )
+          ORDER BY payment_date DESC
+          """
+      end
+
+    case query_maps(conn, sql, [uid_str]) do
+      {:ok, rows} -> {:ok, rows}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @doc "Returns attachment post row for the given attachment_id, or nil."

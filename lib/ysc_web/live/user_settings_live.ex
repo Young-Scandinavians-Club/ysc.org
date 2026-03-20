@@ -3503,27 +3503,29 @@ defmodule YscWeb.UserSettingsLive do
        )}
     else
       # Retrieve the payment method from Stripe and store it locally
-      case Stripe.PaymentMethod.retrieve(payment_method_id) do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.PaymentMethod.retrieve(payment_method_id)
+           end) do
         {:ok, stripe_payment_method} ->
-          # Tag in Stripe so webhooks know to set this as default (avoids race with
-          # payment_method.attached / payment_method.updated overwriting default)
           _ =
-            Stripe.PaymentMethod.update(payment_method_id, %{
-              metadata: %{"set_as_default" => "true"}
-            })
+            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+              Stripe.PaymentMethod.update(payment_method_id, %{
+                metadata: %{"set_as_default" => "true"}
+              })
+            end)
 
-          # Store the payment method in our database and set it as default
           case Ysc.Payments.upsert_and_set_default_payment_method_from_stripe(
                  user,
                  stripe_payment_method
                ) do
             {:ok, _} ->
-              # Update Stripe customer to use this payment method as default
-              case Stripe.Customer.update(user.stripe_id, %{
-                     invoice_settings: %{
-                       default_payment_method: payment_method_id
-                     }
-                   }) do
+              case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                     Stripe.Customer.update(user.stripe_id, %{
+                       invoice_settings: %{
+                         default_payment_method: payment_method_id
+                       }
+                     })
+                   end) do
                 {:ok, _stripe_customer} ->
                   # Reload user and payment methods to get updated info
                   updated_user = Ysc.Accounts.get_user!(user.id)
@@ -4223,11 +4225,13 @@ defmodule YscWeb.UserSettingsLive do
       default_payment_method_id: selected_payment_method.provider_id
     )
 
-    case Stripe.Customer.update(user.stripe_id, %{
-           invoice_settings: %{
-             default_payment_method: selected_payment_method.provider_id
-           }
-         }) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.Customer.update(user.stripe_id, %{
+             invoice_settings: %{
+               default_payment_method: selected_payment_method.provider_id
+             }
+           })
+         end) do
       {:ok, _stripe_customer} ->
         Ysc.Logging.info(
           "Successfully updated Stripe customer default payment method",
@@ -4910,7 +4914,9 @@ defmodule YscWeb.UserSettingsLive do
 
   # Helper function to verify if Stripe customer exists
   defp verify_stripe_customer_exists(stripe_id) do
-    case Stripe.Customer.retrieve(stripe_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.Customer.retrieve(stripe_id)
+         end) do
       {:ok, _customer} -> :ok
       {:error, %Stripe.Error{code: :resource_missing}} -> {:error, :not_found}
       {:error, error} -> {:error, error}

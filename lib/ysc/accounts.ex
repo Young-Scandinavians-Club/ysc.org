@@ -1140,23 +1140,21 @@ defmodule Ysc.Accounts do
   end
 
   def list_paginated_users(params) do
-    # Extract membership_type filter if present
+    now = DateTime.utc_now()
     {membership_filters, other_params} = extract_membership_filters(params)
-    # Check if sorting by membership_type
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
     base_query =
       from(u in User, where: u.state != :deleted)
-      |> build_membership_query_filter(membership_filters)
+      |> build_membership_query_filter(membership_filters, now)
+      |> apply_membership_order_by(membership_sort, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
-        users_with_subscriptions = preload_active_subscriptions(users)
+        meta =
+          restore_membership_filters(meta, membership_filters, membership_sort)
 
-        sorted_users =
-          apply_membership_sorting(users_with_subscriptions, membership_sort)
-
-        {:ok, {sorted_users, meta}}
+        {:ok, {preload_active_subscriptions(users), meta}}
 
       error ->
         error
@@ -1189,27 +1187,26 @@ defmodule Ysc.Accounts do
           any()
         ) :: {:error, Flop.Meta.t()} | {:ok, {list(), Flop.Meta.t()}}
   def list_paginated_users(params, search_term) do
-    # Extract membership_type filter if present
+    now = DateTime.utc_now()
     {membership_filters, other_params} = extract_membership_filters(params)
-    # Check if sorting by membership_type
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
     base_query =
       fuzzy_search_user(search_term)
-      |> build_membership_query_filter(membership_filters)
+      |> build_membership_query_filter(membership_filters, now)
+      |> apply_membership_order_by(membership_sort, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
+        meta =
+          restore_membership_filters(meta, membership_filters, membership_sort)
+
         users_with_subscriptions = preload_active_subscriptions(users)
 
-        sorted_users =
-          apply_membership_sorting(users_with_subscriptions, membership_sort)
-
-        # Sort by relevance when no explicit user-chosen sort is active
         final_users =
-          if explicit_sort?(other_params),
-            do: sorted_users,
-            else: sort_by_relevance(sorted_users, search_term)
+          if explicit_sort?(other_params) or membership_sort != nil,
+            do: users_with_subscriptions,
+            else: sort_by_relevance(users_with_subscriptions, search_term)
 
         {:ok, {final_users, meta}}
 
@@ -2079,6 +2076,50 @@ defmodule Ysc.Accounts do
     end)
   end
 
+  defp restore_membership_filters(meta, nil, nil), do: meta
+
+  defp restore_membership_filters(meta, nil, membership_sort),
+    do: restore_membership_sort(meta, membership_sort)
+
+  defp restore_membership_filters(meta, membership_values, membership_sort) do
+    membership_flop_filter = %Flop.Filter{
+      field: :membership_type,
+      op: :in,
+      value: Enum.map(membership_values, &to_string/1)
+    }
+
+    updated_flop = %{
+      meta.flop
+      | filters: meta.flop.filters ++ [membership_flop_filter]
+    }
+
+    %{meta | flop: updated_flop}
+    |> restore_membership_sort(membership_sort)
+  end
+
+  defp restore_membership_sort(meta, nil), do: meta
+
+  defp restore_membership_sort(
+         %Flop.Meta{} = meta,
+         {:membership_type, direction, index}
+       ) do
+    current_order_by = meta.flop.order_by || []
+    current_directions = meta.flop.order_directions || []
+
+    # Clamp index to valid range in case other sorts were removed by Flop validation.
+    safe_index = min(index, length(current_order_by))
+
+    updated_flop = %{
+      meta.flop
+      | order_by:
+          List.insert_at(current_order_by, safe_index, :membership_type),
+        order_directions:
+          List.insert_at(current_directions, safe_index, direction)
+    }
+
+    %{meta | flop: updated_flop}
+  end
+
   # Helper function to extract membership_type filters from params
   defp extract_membership_filters(params) do
     case params do
@@ -2139,12 +2180,11 @@ defmodule Ysc.Accounts do
   end
 
   # Applies membership type filter at the DB query level so Flop pagination is accurate.
-  defp build_membership_query_filter(query, nil), do: query
-  defp build_membership_query_filter(query, []), do: query
+  defp build_membership_query_filter(query, nil, _now), do: query
+  defp build_membership_query_filter(query, [], _now), do: query
 
-  defp build_membership_query_filter(query, membership_filters) do
+  defp build_membership_query_filter(query, membership_filters, now) do
     membership_plans = Application.get_env(:ysc, :membership_plans)
-    now = DateTime.utc_now()
 
     active_sub_user_ids =
       from s in Ysc.Subscriptions.Subscription,
@@ -2204,122 +2244,11 @@ defmodule Ysc.Accounts do
   end
 
   # Helper function to get membership type for filtering
-  defp get_active_membership_type_for_filter(user, price_to_type) do
-    # Check for lifetime membership first (highest priority)
-    if has_lifetime_membership?(user) do
-      :lifetime
-    else
-      # Get all subscriptions for the user
-      subscriptions =
-        case user.subscriptions do
-          %Ecto.Association.NotLoaded{} ->
-            # Fetch subscriptions if not loaded
-            Ysc.Subscriptions.list_subscriptions(user)
-
-          subscriptions when is_list(subscriptions) ->
-            subscriptions
-
-          _ ->
-            []
-        end
-
-      # Filter for active subscriptions only
-      active_subscriptions =
-        Enum.filter(subscriptions, fn subscription ->
-          Ysc.Subscriptions.valid?(subscription)
-        end)
-
-      case active_subscriptions do
-        [] ->
-          :none
-
-        [single_subscription] ->
-          get_membership_type_from_subscription_for_filter(
-            single_subscription,
-            price_to_type
-          )
-
-        multiple_subscriptions ->
-          # If multiple active subscriptions, pick the most expensive one
-          most_expensive =
-            get_most_expensive_subscription_for_filter(multiple_subscriptions)
-
-          get_membership_type_from_subscription_for_filter(
-            most_expensive,
-            price_to_type
-          )
-      end
-    end
-  end
-
-  defp get_membership_type_from_subscription_for_filter(
-         subscription,
-         price_to_type
-       ) do
-    subscription_items =
-      case subscription.subscription_items do
-        %Ecto.Association.NotLoaded{} ->
-          # Preload subscription items if not loaded
-          subscription = Repo.preload(subscription, :subscription_items)
-          subscription.subscription_items
-
-        items when is_list(items) ->
-          items
-
-        _ ->
-          []
-      end
-
-    case subscription_items do
-      [item | _] ->
-        Map.get(price_to_type, item.stripe_price_id, :none)
-
-      _ ->
-        :none
-    end
-  end
-
-  defp get_most_expensive_subscription_for_filter(subscriptions) do
-    membership_plans = Application.get_env(:ysc, :membership_plans)
-
-    # Create a map of price_id to amount for quick lookup
-    price_to_amount =
-      Map.new(membership_plans, fn plan ->
-        {plan.stripe_price_id, plan.amount}
-      end)
-
-    # Find the subscription with the highest amount
-    Enum.max_by(subscriptions, fn subscription ->
-      # Get the first subscription item (assuming one item per subscription)
-      subscription_items =
-        case subscription.subscription_items do
-          %Ecto.Association.NotLoaded{} ->
-            # Preload subscription items if not loaded
-            subscription = Repo.preload(subscription, :subscription_items)
-            subscription.subscription_items
-
-          items when is_list(items) ->
-            items
-
-          _ ->
-            []
-        end
-
-      case subscription_items do
-        [item | _] ->
-          Map.get(price_to_amount, item.stripe_price_id, 0)
-
-        _ ->
-          0
-      end
-    end)
-  end
-
   # Helper function to extract membership_type sorting from params
   defp extract_membership_sort(params) do
     case params do
-      %{"order_by" => order_by, "order_directions" => order_directions} ->
-        # Check if membership_type is in the order_by list
+      %{"order_by" => order_by, "order_directions" => order_directions}
+      when is_list(order_by) and is_list(order_directions) ->
         membership_sort_index =
           Enum.find_index(order_by, &(&1 == "membership_type"))
 
@@ -2332,7 +2261,6 @@ defmodule Ysc.Accounts do
               _ -> :asc
             end)
 
-          # Remove membership_type from order_by and order_directions
           new_order_by = List.delete_at(order_by, membership_sort_index)
 
           new_order_directions =
@@ -2343,7 +2271,9 @@ defmodule Ysc.Accounts do
             |> Map.put("order_by", new_order_by)
             |> Map.put("order_directions", new_order_directions)
 
-          {{:membership_type, direction}, new_params}
+          # Include the original index so it can be restored at the correct
+          # position in meta.flop.order_by after Flop processes the query.
+          {{:membership_type, direction, membership_sort_index}, new_params}
         else
           {nil, params}
         end
@@ -2353,34 +2283,104 @@ defmodule Ysc.Accounts do
     end
   end
 
-  # Helper function to apply membership sorting to users
-  defp apply_membership_sorting(users, nil), do: users
+  defp apply_membership_order_by(query, nil, _now), do: query
 
-  defp apply_membership_sorting(users, {:membership_type, direction}) do
-    # Get membership plans for sorting
+  defp apply_membership_order_by(
+         query,
+         {:membership_type, direction, _index},
+         now
+       ) do
     membership_plans = Application.get_env(:ysc, :membership_plans)
 
-    price_to_type =
-      Map.new(membership_plans, fn plan -> {plan.stripe_price_id, plan.id} end)
+    single_price =
+      Enum.find_value(membership_plans, fn p ->
+        if p.id == :single, do: p.stripe_price_id
+      end)
 
-    # Define sort order for membership types
-    membership_sort_order = %{
-      :lifetime => 1,
-      :family => 2,
-      :single => 3,
-      :none => 4
-    }
+    family_price =
+      Enum.find_value(membership_plans, fn p ->
+        if p.id == :family, do: p.stripe_price_id
+      end)
 
-    Enum.sort_by(
-      users,
-      fn user ->
-        membership_type =
-          get_active_membership_type_for_filter(user, price_to_type)
+    case direction do
+      :asc ->
+        from u in query,
+          order_by:
+            fragment(
+              """
+              CASE
+                WHEN ? IS NOT NULL THEN 1
+                WHEN EXISTS (
+                  SELECT 1 FROM subscriptions s
+                  JOIN subscription_items si ON si.subscription_id = s.id
+                  WHERE s.user_id = ?
+                    AND s.stripe_status IN ('active', 'trialing')
+                    AND (s.current_period_end IS NULL OR s.current_period_end > ?)
+                    AND (s.ends_at IS NULL OR s.ends_at > ?)
+                    AND si.stripe_price_id = ?
+                ) THEN 2
+                WHEN EXISTS (
+                  SELECT 1 FROM subscriptions s
+                  JOIN subscription_items si ON si.subscription_id = s.id
+                  WHERE s.user_id = ?
+                    AND s.stripe_status IN ('active', 'trialing')
+                    AND (s.current_period_end IS NULL OR s.current_period_end > ?)
+                    AND (s.ends_at IS NULL OR s.ends_at > ?)
+                    AND si.stripe_price_id = ?
+                ) THEN 3
+                ELSE 4
+              END ASC
+              """,
+              u.lifetime_membership_awarded_at,
+              u.id,
+              ^now,
+              ^now,
+              ^family_price,
+              u.id,
+              ^now,
+              ^now,
+              ^single_price
+            )
 
-        Map.get(membership_sort_order, membership_type, 4)
-      end,
-      direction
-    )
+      :desc ->
+        from u in query,
+          order_by:
+            fragment(
+              """
+              CASE
+                WHEN ? IS NOT NULL THEN 1
+                WHEN EXISTS (
+                  SELECT 1 FROM subscriptions s
+                  JOIN subscription_items si ON si.subscription_id = s.id
+                  WHERE s.user_id = ?
+                    AND s.stripe_status IN ('active', 'trialing')
+                    AND (s.current_period_end IS NULL OR s.current_period_end > ?)
+                    AND (s.ends_at IS NULL OR s.ends_at > ?)
+                    AND si.stripe_price_id = ?
+                ) THEN 2
+                WHEN EXISTS (
+                  SELECT 1 FROM subscriptions s
+                  JOIN subscription_items si ON si.subscription_id = s.id
+                  WHERE s.user_id = ?
+                    AND s.stripe_status IN ('active', 'trialing')
+                    AND (s.current_period_end IS NULL OR s.current_period_end > ?)
+                    AND (s.ends_at IS NULL OR s.ends_at > ?)
+                    AND si.stripe_price_id = ?
+                ) THEN 3
+                ELSE 4
+              END DESC
+              """,
+              u.lifetime_membership_awarded_at,
+              u.id,
+              ^now,
+              ^now,
+              ^family_price,
+              u.id,
+              ^now,
+              ^now,
+              ^single_price
+            )
+    end
   end
 
   @doc """

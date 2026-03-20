@@ -433,7 +433,7 @@ defmodule YscWeb.AdminNewslettersLive do
             <div :if={@meta && !@empty} class="pt-4">
               <Flop.Phoenix.pagination
                 meta={@meta}
-                path={~p"/admin/newsletters"}
+                path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
                 class="flex items-center justify-center py-4 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"
@@ -470,7 +470,7 @@ defmodule YscWeb.AdminNewslettersLive do
               id="admin_newsletters_list"
               items={@streams.editions}
               meta={@meta}
-              path={~p"/admin/newsletters"}
+              path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
               row_click={
                 fn {_, edition} ->
                   JS.navigate(~p"/admin/newsletters/#{edition.id}/edit")
@@ -584,7 +584,7 @@ defmodule YscWeb.AdminNewslettersLive do
             <Flop.Phoenix.pagination
               :if={@meta}
               meta={@meta}
-              path={~p"/admin/newsletters"}
+              path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
               class="flex items-center justify-center py-10 text-base"
               page_list_attrs={[
                 class: "flex gap-1 order-2 justify-center items-center"
@@ -1251,4 +1251,10 @@ defmodule YscWeb.AdminNewslettersLive do
   defp subscribers_list_path(params) do
     ~p"/admin/newsletters?#{Map.put(params || %{}, "tab", "subscribers")}"
   end
+
+  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
+  defp non_flop_params(params) when is_map(params),
+    do: Map.drop(params, @flop_keys)
+
+  defp non_flop_params(_), do: %{}
 end

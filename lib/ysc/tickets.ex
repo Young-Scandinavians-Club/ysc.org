@@ -666,7 +666,9 @@ defmodule Ysc.Tickets do
 
     result =
       with {:ok, payment_intent} <-
-             Stripe.PaymentIntent.retrieve(payment_intent_id, %{}),
+             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.PaymentIntent.retrieve(payment_intent_id, %{})
+             end),
            :ok <- validate_payment_intent(payment_intent, ticket_order),
            {:ok, {payment, _transaction, _entries}} <-
              process_ledger_payment(ticket_order, payment_intent),
@@ -1240,7 +1242,9 @@ defmodule Ysc.Tickets do
 
       payment_method_id when is_binary(payment_method_id) ->
         # Retrieve the full payment method from Stripe
-        case Stripe.PaymentMethod.retrieve(payment_method_id) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.PaymentMethod.retrieve(payment_method_id)
+             end) do
           {:ok, stripe_payment_method} ->
             user = Ysc.Accounts.get_user!(user_id)
 

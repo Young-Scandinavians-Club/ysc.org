@@ -2202,7 +2202,7 @@ defmodule YscWeb.AdminBookingsLive do
                 id="admin_reservations_list"
                 items={@streams.reservations}
                 meta={@reservation_meta}
-                path={~p"/admin/bookings"}
+                path={@reservations_path}
               >
                 <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                   <.badge type="default" class="whitespace-nowrap">
@@ -2405,7 +2405,7 @@ defmodule YscWeb.AdminBookingsLive do
 
               <Flop.Phoenix.pagination
                 meta={@reservation_meta}
-                path={~p"/admin/bookings"}
+                path={@reservations_path}
                 class="flex items-center justify-center py-10 text-base"
                 page_list_attrs={[
                   class: "flex gap-1 order-2 justify-center items-center"

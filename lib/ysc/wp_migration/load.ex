@@ -67,32 +67,85 @@ defmodule Ysc.WpMigration.Load do
 
     if dry_run do
       Ysc.Logging.info(
-        "Dry run: would load #{length(users_data)} users, #{length(applications_data)} applications, #{length(posts_data)} posts"
+        "[WP Load] DRY RUN — would load #{length(users_data)} users, " <>
+          "#{length(applications_data)} applications, #{length(posts_data)} posts"
       )
 
       {:ok, %{}}
     else
-      # Resolve migration uploader (first admin) for Image.user_id
+      Ysc.Logging.info(
+        "[WP Load] Starting migration load from #{export_dir} " <>
+          "(#{length(users_data)} users, #{length(applications_data)} applications, " <>
+          "#{length(posts_data)} posts, #{length(stripe_data || [])} stripe lookups, " <>
+          "#{length(bookings_data || [])} bookings, stripe_subscriptions=#{create_stripe_subscriptions})"
+      )
+
+      Ysc.Settings.get_or_create_setting(
+        "wp_migration_active",
+        "migration",
+        "true"
+      )
+
+      Ysc.Settings.update_setting("wp_migration_active", "true")
+
+      Ysc.Logging.info(
+        "[WP Load] Comms suppression ENABLED via site setting wp_migration_active=true"
+      )
+
       uploader = get_migration_uploader()
 
+      Ysc.Logging.info("[WP Load] Phase: Users")
       {:ok, user_map} = load_users(users_data)
+
+      Ysc.Logging.info(
+        "[WP Load] Phase: Users complete — #{map_size(user_map)} mapped"
+      )
+
+      Ysc.Logging.info("[WP Load] Phase: Applications")
       {:ok, _} = load_applications(applications_data, user_map)
+      Ysc.Logging.info("[WP Load] Phase: Applications complete")
 
       {:ok, image_map, filename_map} =
-        if upload_media and File.dir?(media_dir),
-          do: load_media(media_dir, uploader),
-          else: {:ok, %{}, %{}}
+        if upload_media and File.dir?(media_dir) do
+          Ysc.Logging.info("[WP Load] Phase: Media upload")
+          result = load_media(media_dir, uploader)
+          Ysc.Logging.info("[WP Load] Phase: Media complete")
+          result
+        else
+          Ysc.Logging.info("[WP Load] Phase: Media skipped")
+          {:ok, %{}, %{}}
+        end
 
+      Ysc.Logging.info("[WP Load] Phase: Posts")
       {:ok, _} = load_posts(posts_data, user_map, image_map, filename_map)
+      Ysc.Logging.info("[WP Load] Phase: Posts complete")
 
-      if stripe_data && stripe_data != [],
-        do: load_stripe(stripe_data, user_map)
+      if stripe_data && stripe_data != [] do
+        Ysc.Logging.info(
+          "[WP Load] Phase: Stripe customers (#{length(stripe_data)} lookups)"
+        )
+
+        load_stripe(stripe_data, user_map)
+        Ysc.Logging.info("[WP Load] Phase: Stripe customers complete")
+      end
+
+      Ysc.Logging.info(
+        "[WP Load] Phase: Subscriptions (create_stripe=#{create_stripe_subscriptions})"
+      )
 
       load_subscriptions(users_data, user_map, create_stripe_subscriptions)
+      Ysc.Logging.info("[WP Load] Phase: Subscriptions complete")
 
-      if bookings_data && bookings_data != [],
-        do: load_bookings(bookings_data, user_map)
+      if bookings_data && bookings_data != [] do
+        Ysc.Logging.info(
+          "[WP Load] Phase: Bookings (#{length(bookings_data)} bookings)"
+        )
 
+        load_bookings(bookings_data, user_map)
+        Ysc.Logging.info("[WP Load] Phase: Bookings complete")
+      end
+
+      Ysc.Logging.info("[WP Load] Migration load finished successfully")
       {:ok, %{user_map: user_map, image_map: image_map}}
     end
   end
@@ -187,13 +240,10 @@ defmodule Ysc.WpMigration.Load do
               {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
 
             {:error, changeset} ->
-              Ysc.Logging.warning("Failed to insert user",
-                email: email,
-                errors: inspect(changeset.errors)
+              Ysc.Logging.warning(
+                "[WP Load] Failed to insert user #{email}: #{inspect(changeset.errors)}"
               )
 
-              # Skip users that fail validation rather than halting the entire
-              # migration. The user can be corrected and re-imported on a re-run.
               {:cont, {:ok, acc}}
           end
       end
@@ -286,9 +336,8 @@ defmodule Ysc.WpMigration.Load do
           :ok
 
         {:error, cs} ->
-          Ysc.Logging.warning("Failed to upsert address",
-            user_id: user_id,
-            errors: inspect(cs.errors)
+          Ysc.Logging.warning(
+            "[WP Load] Failed to upsert address for user #{user_id}: #{inspect(cs.errors)}"
           )
       end
     end
@@ -868,10 +917,8 @@ defmodule Ysc.WpMigration.Load do
       end)
 
     if best_score >= 0.88 do
-      Ysc.Logging.info("Fuzzy-matched country name",
-        input: key,
-        matched_code: best_code,
-        score: Float.round(best_score, 3)
+      Ysc.Logging.info(
+        "[WP Load] Fuzzy-matched country \"#{key}\" → #{best_code} (score=#{Float.round(best_score, 3)})"
       )
 
       best_code
@@ -949,9 +996,8 @@ defmodule Ysc.WpMigration.Load do
             {:cont, {:ok, :done}}
 
           {:error, cs} ->
-            Ysc.Logging.warning("Failed to insert application",
-              user_id: user_id,
-              errors: inspect(cs.errors)
+            Ysc.Logging.warning(
+              "[WP Load] Failed to insert application for user #{user_id}: #{inspect(cs.errors)}"
             )
 
             {:cont, {:ok, :done}}
@@ -989,7 +1035,10 @@ defmodule Ysc.WpMigration.Load do
 
   defp load_media(media_dir, uploader) do
     if is_nil(uploader) do
-      Ysc.Logging.warning("No uploader user for media; skipping media load")
+      Ysc.Logging.warning(
+        "[WP Load] No uploader user for media; skipping media load"
+      )
+
       {:ok, %{}, %{}}
     else
       subdirs =
@@ -1209,9 +1258,8 @@ defmodule Ysc.WpMigration.Load do
             {:cont, {:ok, :done}}
 
           {:error, cs} ->
-            Ysc.Logging.warning("Failed to insert post",
-              url_name: url_name,
-              errors: inspect(cs.errors)
+            Ysc.Logging.warning(
+              "[WP Load] Failed to insert post \"#{url_name}\": #{inspect(cs.errors)}"
             )
 
             {:cont, {:ok, :done}}
@@ -1386,7 +1434,9 @@ defmodule Ysc.WpMigration.Load do
         if pm_id && pm_id != "" do
           user = Repo.get!(User, user_id)
 
-          case Stripe.PaymentMethod.retrieve(pm_id) do
+          case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                 Stripe.PaymentMethod.retrieve(pm_id)
+               end) do
             {:ok, stripe_pm} ->
               case Payments.upsert_and_set_default_payment_method_from_stripe(
                      user,
@@ -1396,23 +1446,19 @@ defmodule Ysc.WpMigration.Load do
                   :ok
 
                 {:error, reason} ->
-                  Ysc.Logging.warning("Failed to set default payment method",
-                    user_id: user_id,
-                    stripe_payment_method_id: pm_id,
-                    error: inspect(reason)
+                  Ysc.Logging.warning(
+                    "[WP Load] Failed to set default payment method pm=#{pm_id} for user #{user_id}: #{inspect(reason)}"
                   )
               end
 
             {:error, %Stripe.Error{code: :resource_missing}} ->
               Ysc.Logging.info(
-                "Stripe payment method not found in this environment, skipping",
-                stripe_payment_method_id: pm_id
+                "[WP Load] Stripe PM #{pm_id} not found in this environment, skipping"
               )
 
             {:error, reason} ->
-              Ysc.Logging.warning("Could not retrieve Stripe payment method",
-                stripe_payment_method_id: pm_id,
-                error: inspect(reason)
+              Ysc.Logging.warning(
+                "[WP Load] Could not retrieve Stripe PM #{pm_id}: #{inspect(reason)}"
               )
           end
         end
@@ -1425,13 +1471,14 @@ defmodule Ysc.WpMigration.Load do
   # Ensures the user has a valid Stripe customer in the connected Stripe account.
   #
   # If the WP customer ID exists in the current Stripe environment (production
-  # loading into production), it is reused. If the ID belongs to a different
-  # environment (e.g. loading a production backup into a sandbox/dev Stripe
-  # account), the lookup will return a :resource_missing error and we create a
-  # fresh Stripe customer instead, overwriting the stale production ID.
+  # loading into production), it is reused. If it doesn't — whether because of
+  # :resource_missing, a cross-account mismatch, or any other API error — we
+  # create a fresh Stripe customer in the connected environment.
   @dialyzer {:nowarn_function, ensure_stripe_customer: 2}
   defp ensure_stripe_customer(user, wp_cus_id) do
-    case Stripe.Customer.retrieve(wp_cus_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.Customer.retrieve(wp_cus_id)
+         end) do
       {:ok, _customer} ->
         if user.stripe_id != wp_cus_id do
           user
@@ -1439,26 +1486,52 @@ defmodule Ysc.WpMigration.Load do
           |> Repo.update()
         end
 
-      {:error, %Stripe.Error{code: :resource_missing}} ->
-        if is_nil(user.stripe_id) do
-          case Customers.create_stripe_customer(user) do
-            {:ok, _} ->
-              :ok
+      {:error, _reason} ->
+        create_fresh_stripe_customer(user)
+    end
+  end
 
-            {:error, reason} ->
-              Ysc.Logging.warning("Failed to create Stripe customer",
-                user_id: user.id,
-                error: inspect(reason)
-              )
-          end
+  # Creates a fresh Stripe customer, replacing any stale stripe_id the user
+  # may already carry (e.g. a production ID that doesn't exist in sandbox).
+  # Returns {:ok, reloaded_user} only when a new stripe_id is confirmed in the
+  # DB, or {:error, reason} otherwise.
+  @dialyzer {:nowarn_function, create_fresh_stripe_customer: 1}
+  defp create_fresh_stripe_customer(user) do
+    original_stripe_id = user.stripe_id
+
+    fresh_user_for_create = Repo.get!(User, user.id)
+
+    result =
+      case Customers.create_stripe_customer(fresh_user_for_create) do
+        {:ok, _} = ok -> ok
+        {:error, reason} -> {:error, reason}
+      end
+
+    case result do
+      {:ok, _} ->
+        # Customers.create_stripe_customer/1 can return {:ok, _} even when the
+        # DB update of stripe_id failed (it logs the error and relies on a
+        # webhook to fix it later). Reload and verify the stripe_id was actually
+        # persisted and is different from the original stale/nil value.
+        fresh_user = Repo.get!(User, user.id)
+
+        if fresh_user.stripe_id && fresh_user.stripe_id != original_stripe_id do
+          {:ok, fresh_user}
+        else
+          Ysc.Logging.warning(
+            "[WP Load] Stripe customer API call succeeded but stripe_id was not persisted " <>
+              "for user #{user.id} (#{user.email}); original=#{inspect(original_stripe_id)}"
+          )
+
+          {:error, :no_stripe_id}
         end
 
       {:error, reason} ->
-        Ysc.Logging.warning("Could not verify Stripe customer",
-          user_id: user.id,
-          stripe_customer_id: wp_cus_id,
-          error: inspect(reason)
+        Ysc.Logging.warning(
+          "[WP Load] Failed to create Stripe customer for user #{user.id} (#{user.email}): #{inspect(reason)}"
         )
+
+        {:error, reason}
     end
   end
 
@@ -1467,10 +1540,8 @@ defmodule Ysc.WpMigration.Load do
       user_id = user_map[row["wp_user_id"]]
 
       if user_id && active_membership?(row) do
-        renewal_dt =
-          parse_subscription_datetime(
-            row["sub_next_payment_date"] || row["wcm_end_date"]
-          )
+        auto_renew = should_auto_renew?(row)
+        recorded_end_dt = best_end_date(row)
 
         start_dt =
           parse_subscription_datetime(
@@ -1478,15 +1549,27 @@ defmodule Ysc.WpMigration.Load do
               row["wcm_start_date"]
           )
 
-        if is_nil(renewal_dt) do
-          Ysc.Logging.warning("Skipping subscription for user: no renewal date",
-            wp_user_id: row["wp_user_id"]
+        if is_nil(recorded_end_dt) do
+          Ysc.Logging.warning(
+            "[WP Load] Skipping subscription for wp_user #{row["wp_user_id"]} (#{row["email"]}): no renewal date found"
           )
         else
           if create_stripe_subscriptions do
-            load_subscription_via_stripe(row, user_id, renewal_dt, start_dt)
+            load_subscription_via_stripe(
+              row,
+              user_id,
+              recorded_end_dt,
+              start_dt,
+              auto_renew
+            )
           else
-            load_subscription_locally(row, user_id, renewal_dt, start_dt)
+            load_subscription_locally(
+              row,
+              user_id,
+              recorded_end_dt,
+              start_dt,
+              auto_renew
+            )
           end
         end
       end
@@ -1495,34 +1578,121 @@ defmodule Ysc.WpMigration.Load do
     :ok
   end
 
-  defp load_subscription_locally(_row, user_id, renewal_dt, start_dt) do
+  # User had an active WP subscription (including on-hold, which indicates a
+  # payment hiccup but the intent to keep renewing). Users who only had a
+  # WooCommerce Membership record without an underlying subscription were
+  # managed manually and should not auto-renew.
+  defp should_auto_renew?(row) do
+    row["has_active_wp_subscription"] == true or
+      (is_binary(row["sub_status"]) and
+         row["sub_status"] in ["wc-active", "wc-on-hold"])
+  end
+
+  # Pick the most favorable (latest) end date for the user by comparing:
+  #   1. The recorded end date from WP (sub_next_payment_date / wcm_end_date)
+  #   2. The date derived from their last membership payment + 1 year
+  defp best_end_date(row) do
+    recorded =
+      parse_subscription_datetime(
+        row["sub_next_payment_date"] || row["wcm_end_date"]
+      )
+
+    payment_derived =
+      case parse_subscription_datetime(row["last_membership_payment_date"]) do
+        %DateTime{} = dt ->
+          # Renewals are always for 1 year
+          date = DateTime.to_date(dt)
+          next_year = date.year + 1
+          max_day = :calendar.last_day_of_the_month(next_year, date.month)
+          renewed = Date.new!(next_year, date.month, min(date.day, max_day))
+          DateTime.new!(renewed, ~T[00:00:00], "Etc/UTC")
+
+        _ ->
+          nil
+      end
+
+    pick_latest_datetime(recorded, payment_derived)
+  end
+
+  defp pick_latest_datetime(nil, nil), do: nil
+  defp pick_latest_datetime(nil, b), do: b
+  defp pick_latest_datetime(a, nil), do: a
+
+  defp pick_latest_datetime(a, b) do
+    if DateTime.compare(a, b) == :lt, do: b, else: a
+  end
+
+  defp load_subscription_locally(
+         row,
+         user_id,
+         renewal_dt,
+         start_dt,
+         auto_renew
+       ) do
     migrated_stripe_id = "migrated_#{user_id}"
 
     existing = Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
+
+    expired? = DateTime.compare(renewal_dt, DateTime.utc_now()) != :gt
 
     attrs = %{
       user_id: user_id,
       name: "Membership Subscription",
       stripe_id: migrated_stripe_id,
-      stripe_status: "active",
+      stripe_status: if(expired?, do: "canceled", else: "active"),
       current_period_end: renewal_dt,
-      start_date: start_dt || renewal_dt
+      start_date: start_dt || renewal_dt,
+      ends_at: if(auto_renew && !expired?, do: nil, else: renewal_dt)
     }
 
-    if existing do
-      existing
-      |> Subscription.changeset(attrs)
-      |> Repo.update()
-    else
-      Subscriptions.create_subscription(attrs)
+    Ysc.Logging.info(
+      "[WP Load] Creating local subscription for user #{user_id}: " <>
+        "auto_renew=#{auto_renew}, period_end=#{DateTime.to_iso8601(renewal_dt)}, expired=#{expired?}"
+    )
+
+    sub_result =
+      if existing do
+        existing
+        |> Subscription.changeset(attrs)
+        |> Repo.update()
+      else
+        Subscriptions.create_subscription(attrs)
+      end
+
+    case sub_result do
+      {:ok, subscription} ->
+        membership_type =
+          row["membership_type"] || row["sub_product_name"] || "single"
+
+        price_id = resolve_stripe_price_id(membership_type)
+
+        if price_id do
+          create_subscription_item_for_migration(
+            subscription,
+            nil,
+            price_id,
+            membership_type
+          )
+        end
+
+        {:ok, subscription}
+
+      error ->
+        error
     end
   end
 
-  @dialyzer {:nowarn_function, load_subscription_via_stripe: 4}
-  defp load_subscription_via_stripe(row, user_id, renewal_dt, start_dt) do
-    user = Ysc.Accounts.get_user!(user_id)
+  @dialyzer {:nowarn_function, load_subscription_via_stripe: 5}
+  defp load_subscription_via_stripe(
+         row,
+         user_id,
+         renewal_dt,
+         start_dt,
+         auto_renew
+       ) do
+    user = ensure_user_has_stripe_customer(user_id)
 
-    if user.stripe_id do
+    if user && user.stripe_id do
       membership_type =
         row["membership_type"] || row["sub_product_name"] || "single"
 
@@ -1531,71 +1701,145 @@ defmodule Ysc.WpMigration.Load do
       if price_id do
         trial_end = DateTime.to_unix(renewal_dt)
 
-        migrated_stripe_id = "migrated_#{user_id}"
-
         existing =
-          Subscriptions.get_subscription_by_stripe_id(migrated_stripe_id)
+          Repo.one(
+            from s in Ysc.Subscriptions.Subscription,
+              where: s.user_id == ^user_id,
+              limit: 1
+          )
 
-        if existing && existing.stripe_id != migrated_stripe_id do
+        if existing && !String.starts_with?(existing.stripe_id, "migrated_") do
           Ysc.Logging.info(
-            "Stripe subscription already exists for user, skipping",
-            user_id: user_id,
-            stripe_subscription_id: existing.stripe_id
+            "[WP Load] Stripe subscription already exists for user #{user_id} (sub=#{existing.stripe_id}), skipping"
           )
         else
-          Ysc.Logging.info("Creating Stripe subscription for migrated user",
-            user_id: user_id,
-            stripe_customer_id: user.stripe_id,
-            price_id: price_id,
-            trial_end: trial_end
-          )
+          now_unix = DateTime.to_unix(DateTime.utc_now())
 
-          case Stripe.Subscription.create(%{
-                 customer: user.stripe_id,
-                 items: [%{price: price_id}],
-                 trial_end: trial_end,
-                 trial_settings: %{
-                   end_behavior: %{missing_payment_method: "pause"}
-                 }
-               }) do
-            {:ok, stripe_sub} ->
-              attrs = %{
-                user_id: user_id,
-                name: "Membership Subscription",
-                stripe_id: stripe_sub.id,
-                stripe_status: stripe_sub.status,
-                current_period_end: renewal_dt,
-                start_date: start_dt || renewal_dt
-              }
+          if trial_end <= now_unix do
+            Ysc.Logging.info(
+              "[WP Load] Membership expired for user #{user_id}, creating local-only subscription (trial_end=#{trial_end} is in the past)"
+            )
 
-              if existing do
-                existing
-                |> Subscription.changeset(attrs)
-                |> Repo.update()
+            load_subscription_locally(
+              row,
+              user_id,
+              renewal_dt,
+              start_dt,
+              false
+            )
+          else
+            Ysc.Logging.info(
+              "[WP Load] Creating Stripe subscription for user #{user_id}: " <>
+                "customer=#{user.stripe_id}, price=#{price_id}, trial_end=#{trial_end}, auto_renew=#{auto_renew}"
+            )
+
+            stripe_params = %{
+              customer: user.stripe_id,
+              items: [%{price: price_id}],
+              trial_end: trial_end,
+              trial_settings: %{
+                end_behavior: %{missing_payment_method: "pause"}
+              },
+              metadata: %{"wp_migration" => "true"}
+            }
+
+            stripe_params =
+              if auto_renew do
+                stripe_params
               else
-                Subscriptions.create_subscription(attrs)
+                Map.put(stripe_params, :cancel_at_period_end, true)
               end
 
-            {:error, %Stripe.Error{} = err} ->
-              Ysc.Logging.warning("Failed to create Stripe subscription",
-                user_id: user_id,
-                stripe_customer_id: user.stripe_id,
-                error: err.message
-              )
+            case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                   Stripe.Subscription.create(stripe_params)
+                 end) do
+              {:ok, stripe_sub} ->
+                attrs = %{
+                  user_id: user_id,
+                  name: "Membership Subscription",
+                  stripe_id: stripe_sub.id,
+                  stripe_status: stripe_sub.status,
+                  current_period_end: renewal_dt,
+                  start_date: start_dt || renewal_dt,
+                  ends_at: if(auto_renew, do: nil, else: renewal_dt)
+                }
+
+                sub_result =
+                  if existing do
+                    existing
+                    |> Subscription.changeset(attrs)
+                    |> Repo.update()
+                  else
+                    Subscriptions.create_subscription(attrs)
+                  end
+
+                case sub_result do
+                  {:ok, subscription} ->
+                    create_subscription_item_for_migration(
+                      subscription,
+                      stripe_sub,
+                      price_id,
+                      membership_type
+                    )
+
+                  {:error, changeset} ->
+                    Ysc.Logging.error(
+                      "[WP Load] Local subscription persistence failed for user #{user_id} " <>
+                        "(stripe_sub=#{stripe_sub.id}): #{inspect(changeset.errors)}; " <>
+                        "canceling orphaned Stripe subscription"
+                    )
+
+                    Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                      Stripe.Subscription.delete(stripe_sub.id)
+                    end)
+                end
+
+              {:error, %Stripe.Error{} = err} ->
+                Ysc.Logging.warning(
+                  "[WP Load] Failed to create Stripe subscription for user #{user_id} (customer=#{user.stripe_id}): #{err.message}"
+                )
+            end
           end
         end
       else
         Ysc.Logging.warning(
-          "Skipping Stripe subscription: no configured Stripe price ID for membership type",
-          user_id: user_id,
-          membership_type: membership_type
+          "[WP Load] Skipping Stripe subscription for user #{user_id}: no configured price ID for membership_type=#{membership_type}"
         )
       end
     else
       Ysc.Logging.warning(
-        "Skipping Stripe subscription: user has no stripe_id (ensure_stripe_customer may have failed)",
-        user_id: user_id
+        "[WP Load] Skipping Stripe subscription for user #{user_id}: could not create Stripe customer"
       )
+    end
+  end
+
+  # Guarantees the user has a valid stripe_id. If missing or stale (the
+  # customer doesn't exist in the connected Stripe environment), a new
+  # Stripe customer is created. Returns the reloaded user on success, or nil
+  # when a verified stripe_id could not be established.
+  defp ensure_user_has_stripe_customer(user_id) do
+    user = Ysc.Accounts.get_user!(user_id)
+
+    cond do
+      is_nil(user.stripe_id) or user.stripe_id == "" ->
+        case create_fresh_stripe_customer(user) do
+          {:ok, fresh_user} -> fresh_user
+          {:error, _} -> nil
+        end
+
+      true ->
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               Stripe.Customer.retrieve(user.stripe_id)
+             end) do
+          {:ok, _} ->
+            user
+
+          {:error, _} ->
+            case create_fresh_stripe_customer(user) do
+              {:ok, fresh_user} -> fresh_user
+              {:error, _} -> nil
+            end
+        end
     end
   end
 
@@ -1611,6 +1855,65 @@ defmodule Ysc.WpMigration.Load do
     case Enum.find(plans, &(&1.id == plan_id)) do
       %{stripe_price_id: id} when is_binary(id) and id != "" -> id
       _ -> nil
+    end
+  end
+
+  defp create_subscription_item_for_migration(
+         subscription,
+         stripe_sub,
+         price_id,
+         membership_type
+       ) do
+    plan_id =
+      cond do
+        membership_type in ["family", "Family", "wc-family"] -> :family
+        true -> :single
+      end
+
+    plans = Application.get_env(:ysc, :membership_plans, [])
+    plan = Enum.find(plans, &(&1.id == plan_id))
+
+    stripe_item_id =
+      case stripe_sub do
+        %{items: %{data: [%{id: id} | _]}} -> id
+        _ -> "migrated_item_#{subscription.id}"
+      end
+
+    stripe_product_id =
+      case stripe_sub do
+        %{items: %{data: [%{price: %{product: prod}} | _]}} -> prod
+        _ -> "migrated_product_#{plan_id}"
+      end
+
+    existing =
+      Repo.get_by(Ysc.Subscriptions.SubscriptionItem,
+        subscription_id: subscription.id
+      )
+
+    unless existing do
+      attrs = %{
+        stripe_id: stripe_item_id,
+        stripe_product_id: stripe_product_id,
+        stripe_price_id: price_id,
+        quantity: 1,
+        subscription_id: subscription.id
+      }
+
+      case %Ysc.Subscriptions.SubscriptionItem{}
+           |> Ysc.Subscriptions.SubscriptionItem.changeset(attrs)
+           |> Repo.insert() do
+        {:ok, _} ->
+          Ysc.Accounts.MembershipCache.invalidate_user(subscription.user_id)
+
+          Ysc.Logging.info(
+            "[WP Load] Created subscription_item for user #{subscription.user_id}: plan=#{plan && plan.name}, price=#{price_id}"
+          )
+
+        {:error, changeset} ->
+          Ysc.Logging.warning(
+            "[WP Load] Failed to create subscription_item for user #{subscription.user_id}: #{inspect(changeset.errors)}"
+          )
+      end
     end
   end
 
@@ -1642,61 +1945,80 @@ defmodule Ysc.WpMigration.Load do
   defp parse_subscription_datetime(_), do: nil
 
   defp load_bookings(bookings_data, user_map) do
+    user_ids = Map.values(user_map)
+
+    user_name_map =
+      from(u in User,
+        where: u.id in ^user_ids,
+        select: {u.id, u.first_name, u.last_name}
+      )
+      |> Repo.all()
+      |> Map.new(fn {id, first, last} -> {id, {first || "", last || ""}} end)
+
     for row <- bookings_data do
       wp_user_id = row["wp_customer_user_id"]
       user_id = wp_user_id && user_map[wp_user_id]
 
       if is_nil(user_id) do
         Ysc.Logging.warning(
-          "Skipping WP booking: no migrated user for wp_customer_user_id",
-          wp_booking_id: row["wp_booking_id"],
-          wp_customer_user_id: wp_user_id
+          "[WP Load] Skipping booking #{row["wp_booking_id"]}: no migrated user for wp_customer_user_id=#{wp_user_id}"
         )
       else
-        load_one_booking(row, user_id)
+        {user_first, user_last} = Map.get(user_name_map, user_id, {"", ""})
+        load_one_booking(row, user_id, user_first, user_last)
       end
     end
 
     :ok
   end
 
-  defp load_one_booking(row, user_id) do
-    room_names = Enum.map(row["rooms"] || [], & &1["room_name"])
+  defp load_one_booking(row, user_id, booking_user_first, booking_user_last) do
+    raw_room_names = Enum.map(row["rooms"] || [], & &1["room_name"])
 
-    room_structs =
-      Enum.reduce_while(room_names, {:ok, []}, fn name, {:ok, acc} ->
-        case Repo.get_by(Room, name: name, property: :tahoe) do
-          nil ->
-            Ysc.Logging.warning("Skipping room: no Room found for name",
-              room_name: name,
-              wp_booking_id: row["wp_booking_id"]
-            )
+    buyout? =
+      Enum.any?(raw_room_names, fn name ->
+        normalized = String.downcase(name || "")
 
-            {:cont, {:ok, acc}}
-
-          room ->
-            {:cont, {:ok, [room | acc]}}
-        end
+        String.contains?(normalized, "buyout") or
+          String.contains?(normalized, "full cabin")
       end)
 
-    room_structs =
-      case room_structs do
-        {:ok, list} -> Enum.reverse(list)
-        _ -> []
+    {room_structs, booking_mode} =
+      if buyout? do
+        {[], :buyout}
+      else
+        rooms =
+          raw_room_names
+          |> Enum.map(&normalize_wp_room_name/1)
+          |> Enum.reduce([], fn name, acc ->
+            case find_room_by_name(name) do
+              nil ->
+                Ysc.Logging.warning(
+                  "[WP Load] Skipping room \"#{name}\" in booking #{row["wp_booking_id"]}: no match in DB"
+                )
+
+                acc
+
+              room ->
+                [room | acc]
+            end
+          end)
+          |> Enum.reverse()
+
+        {rooms, :room}
       end
 
-    if room_structs == [] do
-      Ysc.Logging.warning("Skipping WP booking: no rooms resolved",
-        wp_booking_id: row["wp_booking_id"]
+    if room_structs == [] and not buyout? do
+      Ysc.Logging.warning(
+        "[WP Load] Skipping booking #{row["wp_booking_id"]}: no rooms resolved from #{inspect(raw_room_names)}"
       )
 
       :ok
     else
       case parse_booking_date(row["checkin_date"]) do
         nil ->
-          Ysc.Logging.warning("Skipping WP booking: invalid checkin_date",
-            wp_booking_id: row["wp_booking_id"],
-            checkin_date: row["checkin_date"]
+          Ysc.Logging.warning(
+            "[WP Load] Skipping booking #{row["wp_booking_id"]}: invalid checkin_date=#{inspect(row["checkin_date"])}"
           )
 
           :ok
@@ -1704,9 +2026,8 @@ defmodule Ysc.WpMigration.Load do
         checkin_date ->
           case parse_booking_date(row["checkout_date"]) do
             nil ->
-              Ysc.Logging.warning("Skipping WP booking: invalid checkout_date",
-                wp_booking_id: row["wp_booking_id"],
-                checkout_date: row["checkout_date"]
+              Ysc.Logging.warning(
+                "[WP Load] Skipping booking #{row["wp_booking_id"]}: invalid checkout_date=#{inspect(row["checkout_date"])}"
               )
 
               :ok
@@ -1726,21 +2047,33 @@ defmodule Ysc.WpMigration.Load do
                   guests_count: row["guests_count"] || 0,
                   children_count: row["children_count"] || 0,
                   property: :tahoe,
-                  booking_mode: :room,
+                  booking_mode: booking_mode,
                   status: :complete,
                   total_price: total_price,
                   user_id: user_id
                 }
 
-                case Booking.changeset(%Booking{}, attrs, rooms: room_structs)
+                case Booking.changeset(%Booking{}, attrs,
+                       rooms: room_structs,
+                       skip_validation: true
+                     )
                      |> Repo.insert() do
                   {:ok, booking} ->
+                    guest_first = row["guest_first_name"] || "Guest"
+                    guest_last = row["guest_last_name"] || "Guest"
+
+                    is_booking_user =
+                      String.downcase(String.trim(guest_first)) ==
+                        String.downcase(String.trim(booking_user_first)) and
+                        String.downcase(String.trim(guest_last)) ==
+                          String.downcase(String.trim(booking_user_last))
+
                     %BookingGuest{}
                     |> BookingGuest.changeset(%{
                       booking_id: booking.id,
-                      first_name: row["guest_first_name"] || "Guest",
-                      last_name: row["guest_last_name"] || "Guest",
-                      is_booking_user: true,
+                      first_name: guest_first,
+                      last_name: guest_last,
+                      is_booking_user: is_booking_user,
                       order_index: 0
                     })
                     |> Repo.insert()
@@ -1748,9 +2081,8 @@ defmodule Ysc.WpMigration.Load do
                     :ok
 
                   {:error, changeset} ->
-                    Ysc.Logging.warning("Failed to insert migrated booking",
-                      wp_booking_id: row["wp_booking_id"],
-                      errors: inspect(changeset.errors)
+                    Ysc.Logging.warning(
+                      "[WP Load] Failed to insert booking #{row["wp_booking_id"]}: #{inspect(changeset.errors)}"
                     )
 
                     :ok
@@ -1760,6 +2092,44 @@ defmodule Ysc.WpMigration.Load do
       end
     end
   end
+
+  # Strip property prefixes like "Tahoe " and normalize case so that
+  # WP names like "Tahoe Room 5A" match DB names like "Room 5a".
+  defp normalize_wp_room_name(name) when is_binary(name) do
+    trimmed = String.trim(name)
+
+    if trimmed == "" do
+      name
+    else
+      trimmed
+      |> String.replace(~r/^tahoe\s+/i, "")
+      |> String.trim()
+      |> String.downcase()
+      |> String.split(" ")
+      |> Enum.map_join(" ", &String.capitalize/1)
+    end
+  end
+
+  defp normalize_wp_room_name(name), do: name
+
+  # Case-insensitive room lookup: tries exact match first, then ILIKE.
+  defp find_room_by_name(name) when is_binary(name) and name != "" do
+    case Repo.get_by(Room, name: name, property: :tahoe) do
+      nil ->
+        Repo.one(
+          from r in Room,
+            where:
+              r.property == :tahoe and
+                fragment("LOWER(?)", r.name) == ^String.downcase(name),
+            limit: 1
+        )
+
+      room ->
+        room
+    end
+  end
+
+  defp find_room_by_name(_name), do: nil
 
   defp parse_booking_date(nil), do: nil
   defp parse_booking_date(""), do: nil
