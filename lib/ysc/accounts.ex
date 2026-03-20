@@ -1161,17 +1161,148 @@ defmodule Ysc.Accounts do
     end
   end
 
-  defp fuzzy_search_user(search_term) do
-    phone_like = "%#{search_term}%"
+  defp fuzzy_search_user(search_term, opts) do
+    term = String.trim(search_term)
+    rank? = Keyword.get(opts, :rank, true)
+    words = String.split(term, ~r/\s+/, trim: true)
 
-    from(u in User,
-      where:
-        u.state != :deleted and
-          (fragment("SIMILARITY(?, ?) > 0.3", u.email, ^search_term) or
-             fragment("SIMILARITY(?, ?) > 0.3", u.first_name, ^search_term) or
-             fragment("SIMILARITY(?, ?) > 0.3", u.last_name, ^search_term) or
-             ilike(u.phone_number, ^phone_like))
-    )
+    case words do
+      [w1, w2 | _] -> build_multi_word_search(term, w1, w2, rank?)
+      _ -> build_single_word_search(term, rank?)
+    end
+  end
+
+  defp build_single_word_search(term, rank?) do
+    lower_term = String.downcase(term)
+    prefix_like = "#{lower_term}%"
+    contains_like = "%#{term}%"
+
+    query =
+      from(u in User,
+        where:
+          u.state != :deleted and
+            (fragment("LOWER(?) = ?", u.email, ^lower_term) or
+               fragment("LOWER(?) = ?", u.first_name, ^lower_term) or
+               fragment("LOWER(?) = ?", u.last_name, ^lower_term) or
+               fragment("LOWER(?) LIKE ?", u.first_name, ^prefix_like) or
+               fragment("LOWER(?) LIKE ?", u.last_name, ^prefix_like) or
+               fragment("LOWER(?) LIKE ?", u.email, ^prefix_like) or
+               ilike(u.phone_number, ^contains_like) or
+               fragment("SIMILARITY(?, ?) > 0.35", u.first_name, ^term) or
+               fragment("SIMILARITY(?, ?) > 0.35", u.last_name, ^term) or
+               fragment("SIMILARITY(?, ?) > 0.45", u.email, ^term))
+      )
+
+    if rank? do
+      from(u in query,
+        order_by: [
+          desc:
+            fragment(
+              """
+              CASE WHEN LOWER(?) = ? OR LOWER(?) = ? THEN 50 ELSE 0 END +
+              CASE WHEN LOWER(?) = ? THEN 50 ELSE 0 END +
+              CASE WHEN ? ILIKE ? THEN 40 ELSE 0 END +
+              GREATEST(SIMILARITY(?, ?), SIMILARITY(?, ?), SIMILARITY(?, ?)) * 20
+              """,
+              u.first_name,
+              ^lower_term,
+              u.last_name,
+              ^lower_term,
+              u.email,
+              ^lower_term,
+              u.phone_number,
+              ^contains_like,
+              u.first_name,
+              ^term,
+              u.last_name,
+              ^term,
+              u.email,
+              ^term
+            )
+        ]
+      )
+    else
+      query
+    end
+  end
+
+  defp build_multi_word_search(term, w1, w2, rank?) do
+    lower_w1 = String.downcase(w1)
+    lower_w2 = String.downcase(w2)
+    lower_term = String.downcase(term)
+    contains_like = "%#{term}%"
+    prefix_w1 = "#{lower_w1}%"
+    prefix_w2 = "#{lower_w2}%"
+
+    query =
+      from(u in User,
+        where:
+          u.state != :deleted and
+            ((fragment("LOWER(?) = ?", u.first_name, ^lower_w1) and
+                fragment("LOWER(?) = ?", u.last_name, ^lower_w2)) or
+               (fragment("LOWER(?) = ?", u.first_name, ^lower_w2) and
+                  fragment("LOWER(?) = ?", u.last_name, ^lower_w1)) or
+               (fragment("LOWER(?) LIKE ?", u.first_name, ^prefix_w1) and
+                  fragment("LOWER(?) LIKE ?", u.last_name, ^prefix_w2)) or
+               (fragment("LOWER(?) LIKE ?", u.first_name, ^prefix_w2) and
+                  fragment("LOWER(?) LIKE ?", u.last_name, ^prefix_w1)) or
+               fragment("LOWER(?) = ?", u.email, ^lower_term) or
+               ilike(u.phone_number, ^contains_like) or
+               (fragment(
+                  "GREATEST(SIMILARITY(?, ?), SIMILARITY(?, ?)) > 0.35",
+                  u.first_name,
+                  ^w1,
+                  u.first_name,
+                  ^w2
+                ) and
+                  fragment(
+                    "GREATEST(SIMILARITY(?, ?), SIMILARITY(?, ?)) > 0.35",
+                    u.last_name,
+                    ^w1,
+                    u.last_name,
+                    ^w2
+                  )))
+      )
+
+    if rank? do
+      from(u in query,
+        order_by: [
+          desc:
+            fragment(
+              """
+              CASE WHEN (LOWER(?) = ? AND LOWER(?) = ?) OR
+                        (LOWER(?) = ? AND LOWER(?) = ?) THEN 100 ELSE 0 END +
+              CASE WHEN LOWER(?) = ? THEN 50 ELSE 0 END +
+              CASE WHEN ? ILIKE ? THEN 40 ELSE 0 END +
+              (GREATEST(SIMILARITY(?, ?), SIMILARITY(?, ?)) +
+               GREATEST(SIMILARITY(?, ?), SIMILARITY(?, ?))) * 10
+              """,
+              u.first_name,
+              ^lower_w1,
+              u.last_name,
+              ^lower_w2,
+              u.first_name,
+              ^lower_w2,
+              u.last_name,
+              ^lower_w1,
+              u.email,
+              ^lower_term,
+              u.phone_number,
+              ^contains_like,
+              u.first_name,
+              ^w1,
+              u.first_name,
+              ^w2,
+              u.last_name,
+              ^w1,
+              u.last_name,
+              ^w2
+            )
+        ]
+      )
+    else
+      query
+    end
   end
 
   def list_paginated_users(params, nil), do: list_paginated_users(params)
@@ -1191,8 +1322,10 @@ defmodule Ysc.Accounts do
     {membership_filters, other_params} = extract_membership_filters(params)
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
+    has_explicit_sort = explicit_sort?(other_params) or membership_sort != nil
+
     base_query =
-      fuzzy_search_user(search_term)
+      fuzzy_search_user(search_term, rank: !has_explicit_sort)
       |> build_membership_query_filter(membership_filters, now)
       |> apply_membership_order_by(membership_sort, now)
 
@@ -1201,54 +1334,15 @@ defmodule Ysc.Accounts do
         meta =
           restore_membership_filters(meta, membership_filters, membership_sort)
 
-        users_with_subscriptions = preload_active_subscriptions(users)
-
-        final_users =
-          if explicit_sort?(other_params) or membership_sort != nil,
-            do: users_with_subscriptions,
-            else: sort_by_relevance(users_with_subscriptions, search_term)
-
-        {:ok, {final_users, meta}}
+        {:ok, {preload_active_subscriptions(users), meta}}
 
       error ->
         error
     end
   end
 
-  # Returns true when the URL params carry an explicit order_by chosen by the user.
   defp explicit_sort?(%{"order_by" => [_ | _]}), do: true
   defp explicit_sort?(_), do: false
-
-  # Ranks users on the current page by how closely they match the search term.
-  # Tiers (lower = better):
-  #   0 – exact match on first or last name
-  #   1 – name starts with the search term
-  #   2 – name or email contains the search term
-  #   3 – similarity-only match (no simple substring)
-  defp sort_by_relevance(users, search_term) do
-    term = String.downcase(search_term)
-
-    Enum.sort_by(users, fn user ->
-      first = String.downcase(user.first_name || "")
-      last = String.downcase(user.last_name || "")
-      email = String.downcase(user.email || "")
-
-      cond do
-        first == term or last == term ->
-          0
-
-        String.starts_with?(first, term) or String.starts_with?(last, term) ->
-          1
-
-        String.contains?(first, term) or String.contains?(last, term) or
-            String.contains?(email, term) ->
-          2
-
-        true ->
-          3
-      end
-    end)
-  end
 
   def update_user(user, params, %User{} = current_user) do
     with :ok <- Policy.authorize(:user_update, current_user, user) do
