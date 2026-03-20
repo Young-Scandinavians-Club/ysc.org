@@ -477,7 +477,18 @@ defmodule Ysc.Accounts do
               )
           end
 
-          # Return user for use after transaction
+          # Mark onboarding as complete immediately for new UI-registered users.
+          # WP-migrated users are inserted directly via registration_changeset (not
+          # through this function) and will have this field as nil, triggering the
+          # post-migration onboarding wizard on their first login.
+          {:ok, user} =
+            user
+            |> Ecto.Changeset.change(
+              post_migration_onboarding_completed_at:
+                DateTime.truncate(DateTime.utc_now(), :second)
+            )
+            |> Repo.update()
+
           user
 
         {:error, changeset} ->
@@ -1134,15 +1145,14 @@ defmodule Ysc.Accounts do
     # Check if sorting by membership_type
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
-    base_query = from(u in User, where: u.state != :deleted)
+    base_query =
+      from(u in User, where: u.state != :deleted)
+      |> build_membership_query_filter(membership_filters)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
-        # Apply membership filters if any
-        filtered_users = apply_membership_filters(users, membership_filters)
-        # Preload active subscriptions after the main query
-        users_with_subscriptions = preload_active_subscriptions(filtered_users)
-        # Apply membership sorting if needed
+        users_with_subscriptions = preload_active_subscriptions(users)
+
         sorted_users =
           apply_membership_sorting(users_with_subscriptions, membership_sort)
 
@@ -1184,15 +1194,14 @@ defmodule Ysc.Accounts do
     # Check if sorting by membership_type
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
-    case Flop.validate_and_run(fuzzy_search_user(search_term), other_params,
-           for: User
-         ) do
+    base_query =
+      fuzzy_search_user(search_term)
+      |> build_membership_query_filter(membership_filters)
+
+    case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
-        # Apply membership filters if any
-        filtered_users = apply_membership_filters(users, membership_filters)
-        # Preload active subscriptions after the main query
-        users_with_subscriptions = preload_active_subscriptions(filtered_users)
-        # Apply membership sorting if needed
+        users_with_subscriptions = preload_active_subscriptions(users)
+
         sorted_users =
           apply_membership_sorting(users_with_subscriptions, membership_sort)
 
@@ -2080,16 +2089,27 @@ defmodule Ysc.Accounts do
             case filter do
               %{"field" => "membership_type", "value" => value}
               when value != "" and value != [""] ->
-                # Clean up the value - remove empty strings
+                # Clean up the value - remove empty strings and atomize
+                valid_types = ~w(single family lifetime none)
+
                 cleaned_value =
                   case value do
-                    list when is_list(list) -> Enum.reject(list, &(&1 == ""))
-                    other -> other
+                    list when is_list(list) ->
+                      list
+                      |> Enum.reject(&(&1 == ""))
+                      |> Enum.filter(&(&1 in valid_types))
+                      |> Enum.map(&String.to_existing_atom/1)
+
+                    other when is_binary(other) ->
+                      if other in valid_types,
+                        do: [String.to_existing_atom(other)],
+                        else: []
+
+                    _ ->
+                      []
                   end
 
-                if cleaned_value != [] and cleaned_value != "",
-                  do: cleaned_value,
-                  else: nil
+                if cleaned_value != [], do: cleaned_value, else: nil
 
               _ ->
                 nil
@@ -2099,14 +2119,14 @@ defmodule Ysc.Accounts do
         if membership_filter do
           # Remove the membership_type filter from the filters map
           cleaned_filters =
-            Enum.reject(filters, fn {_key, filter} ->
-              case filter do
-                %{"field" => "membership_type"} -> true
-                _ -> false
-              end
+            filters
+            |> Enum.reject(fn {_key, filter} ->
+              match?(%{"field" => "membership_type"}, filter)
             end)
             |> Enum.with_index()
-            |> Map.new(fn {filter, index} -> {to_string(index), filter} end)
+            |> Map.new(fn {{_key, filter_map}, index} ->
+              {to_string(index), filter_map}
+            end)
 
           {membership_filter, Map.put(params, "filters", cleaned_filters)}
         else
@@ -2118,22 +2138,69 @@ defmodule Ysc.Accounts do
     end
   end
 
-  # Helper function to apply membership filters to users
-  defp apply_membership_filters(users, nil), do: users
+  # Applies membership type filter at the DB query level so Flop pagination is accurate.
+  defp build_membership_query_filter(query, nil), do: query
+  defp build_membership_query_filter(query, []), do: query
 
-  defp apply_membership_filters(users, membership_filters) do
-    # Get membership plans for price ID lookup
+  defp build_membership_query_filter(query, membership_filters) do
     membership_plans = Application.get_env(:ysc, :membership_plans)
+    now = DateTime.utc_now()
 
-    price_to_type =
-      Map.new(membership_plans, fn plan -> {plan.stripe_price_id, plan.id} end)
+    active_sub_user_ids =
+      from s in Ysc.Subscriptions.Subscription,
+        where: s.stripe_status in ["active", "trialing"],
+        where: is_nil(s.current_period_end) or s.current_period_end > ^now,
+        where: is_nil(s.ends_at) or s.ends_at > ^now,
+        select: s.user_id
 
-    Enum.filter(users, fn user ->
-      user_membership_type =
-        get_active_membership_type_for_filter(user, price_to_type)
+    condition =
+      Enum.reduce(membership_filters, nil, fn type, acc ->
+        type_condition =
+          case type do
+            :lifetime ->
+              dynamic([u], not is_nil(u.lifetime_membership_awarded_at))
 
-      user_membership_type in membership_filters
-    end)
+            :none ->
+              dynamic(
+                [u],
+                is_nil(u.lifetime_membership_awarded_at) and
+                  u.id not in subquery(active_sub_user_ids)
+              )
+
+            plan_type when plan_type in [:single, :family] ->
+              price_id =
+                Enum.find_value(membership_plans, fn p ->
+                  if p.id == plan_type, do: p.stripe_price_id
+                end)
+
+              if price_id do
+                price_sub_query =
+                  from s in Ysc.Subscriptions.Subscription,
+                    join: si in assoc(s, :subscription_items),
+                    where: s.stripe_status in ["active", "trialing"],
+                    where:
+                      is_nil(s.current_period_end) or
+                        s.current_period_end > ^now,
+                    where: is_nil(s.ends_at) or s.ends_at > ^now,
+                    where: si.stripe_price_id == ^price_id,
+                    select: s.user_id
+
+                dynamic([u], u.id in subquery(price_sub_query))
+              end
+
+            _ ->
+              nil
+          end
+
+        case {acc, type_condition} do
+          {nil, nil} -> nil
+          {nil, cond} -> cond
+          {acc, nil} -> acc
+          {acc, cond} -> dynamic([u], ^acc or ^cond)
+        end
+      end)
+
+    if condition, do: where(query, ^condition), else: query
   end
 
   # Helper function to get membership type for filtering
@@ -2257,7 +2324,13 @@ defmodule Ysc.Accounts do
           Enum.find_index(order_by, &(&1 == "membership_type"))
 
         if membership_sort_index do
-          direction = Enum.at(order_directions, membership_sort_index, :asc)
+          direction =
+            order_directions
+            |> Enum.at(membership_sort_index, "asc")
+            |> then(fn
+              "desc" -> :desc
+              _ -> :asc
+            end)
 
           # Remove membership_type from order_by and order_directions
           new_order_by = List.delete_at(order_by, membership_sort_index)
@@ -2292,9 +2365,10 @@ defmodule Ysc.Accounts do
 
     # Define sort order for membership types
     membership_sort_order = %{
-      :family => 1,
-      :single => 2,
-      :none => 3
+      :lifetime => 1,
+      :family => 2,
+      :single => 3,
+      :none => 4
     }
 
     Enum.sort_by(
@@ -2870,5 +2944,33 @@ defmodule Ysc.Accounts do
   # Helper function to check if we're in dev/sandbox mode
   defp dev_or_sandbox? do
     Ysc.Env.non_prod?()
+  end
+
+  ## Post-migration onboarding
+
+  @doc """
+  Returns true when a user needs to complete the post-migration onboarding wizard.
+
+  Conditions:
+  - The user has not yet completed onboarding (`post_migration_onboarding_completed_at` is nil)
+  - The user has finished account setup (email verified)
+  - The user's account is active (not pending approval or suspended)
+  """
+  def needs_post_migration_onboarding?(%User{} = user) do
+    is_nil(user.post_migration_onboarding_completed_at) and
+      not is_nil(user.email_verified_at) and
+      user.state == :active
+  end
+
+  @doc """
+  Marks the post-migration onboarding as complete for a user.
+  """
+  def complete_post_migration_onboarding(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(
+      post_migration_onboarding_completed_at:
+        DateTime.truncate(DateTime.utc_now(), :second)
+    )
+    |> Repo.update()
   end
 end

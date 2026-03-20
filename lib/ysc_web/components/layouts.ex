@@ -129,6 +129,7 @@ defmodule YscWeb.Layouts do
       "/users/settings/confirm-email",
       "/users/log-in/auto",
       "/account/setup",
+      "/onboarding",
       "/report-conduct-violation"
     ])
   end

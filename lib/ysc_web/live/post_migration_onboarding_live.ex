@@ -1,0 +1,1569 @@
+defmodule YscWeb.PostMigrationOnboardingLive do
+  @moduledoc """
+  Full-screen onboarding wizard for WP-migrated users completing their first login.
+
+  Steps:
+    1 - Profile review/edit (name, phone, date of birth, country)
+    2 - Phone verification via SMS OTP (only if phone was added/changed or unverified)
+    3 - Payment method collection + Stripe subscription creation
+    4 - Family member listing + invite sending (family plans only)
+  """
+  use YscWeb, :live_view
+
+  require Ysc.Logging
+
+  # Dialyzer cannot fully type-check LiveView handle_event callbacks due to their
+  # polymorphic nature and the dynamic Stripe client return types.
+  @dialyzer {:nowarn_function, handle_event: 3}
+
+  alias Ysc.Accounts
+  alias Ysc.Accounts.FamilyInvites
+  alias Ysc.Customers
+  alias Ysc.Subscriptions
+
+  # Step constants
+  @step_profile 1
+  @step_address 2
+  @step_phone_verification 3
+  @step_payment 4
+  @step_family 5
+  @step_complete 6
+
+  @impl true
+  def mount(_params, _session, socket) do
+    user = socket.assigns.current_user
+
+    if Accounts.needs_post_migration_onboarding?(user) do
+      user =
+        Accounts.get_user!(user.id, [
+          :subscriptions,
+          :family_members,
+          :registration_form,
+          :billing_address
+        ])
+
+      membership_plan = resolve_membership_plan(user)
+      active_subscription = find_active_real_subscription(user)
+      has_real_subscription = not is_nil(active_subscription)
+      is_family_plan = membership_plan in [:family, :lifetime]
+
+      # Only lifetime members skip the payment step entirely.
+      # Users with an active subscription still see it (to review details + add PM if missing).
+      skip_payment = membership_plan == :lifetime
+      steps = build_steps(is_family_plan, skip_payment)
+
+      socket =
+        socket
+        |> assign(:page_title, "Welcome Back — Complete Your Profile")
+        |> assign(:user, user)
+        |> assign(:current_step, @step_profile)
+        |> assign(:steps, steps)
+        |> assign(:membership_plan, membership_plan)
+        |> assign(:has_real_subscription, has_real_subscription)
+        |> assign(:active_subscription, active_subscription)
+        |> assign(:is_family_plan, is_family_plan)
+        # Profile step
+        |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
+        |> assign(:original_phone, user.phone_number)
+        # Address step
+        |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
+        # Phone verification step
+        |> assign(:phone_code_form, to_form(%{"code" => ""}, as: "phone_code"))
+        |> assign(:phone_code_valid, false)
+        |> assign(:phone_verification_code_state, %{})
+        |> assign(:sms_resend_disabled_until, nil)
+        # Payment step
+        |> assign(
+          :public_key,
+          Application.get_env(:stripity_stripe, :public_key)
+        )
+        |> assign(:payment_intent_secret, nil)
+        |> assign(:payment_method_saved, false)
+        |> assign(
+          :default_payment_method,
+          Ysc.Payments.get_default_payment_method(user)
+        )
+        # Family step
+        |> assign(:family_members_forms, [])
+        |> assign(:invite_results, [])
+
+      {:ok, socket}
+    else
+      {:ok, redirect(socket, to: ~p"/")}
+    end
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class="min-h-screen bg-white">
+      <div class="max-w-2xl mx-auto py-8 px-4">
+        <%!-- Logo --%>
+        <div class="flex justify-center mb-8">
+          <.link navigate={~p"/"} class="hover:opacity-80 transition duration-200">
+            <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
+          </.link>
+        </div>
+
+        <%!-- Stepper --%>
+        <div class="mb-8">
+          <.stepper
+            active_step={step_index(@current_step, @steps)}
+            steps={Enum.map(@steps, fn {label, _} -> label end)}
+          />
+        </div>
+
+        <%!-- Step content --%>
+        <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8">
+          <%= if @current_step == 1 do %>
+            <.step_profile form={@profile_form} />
+          <% end %>
+          <%= if @current_step == 2 do %>
+            <.step_address form={@address_form} />
+          <% end %>
+          <%= if @current_step == 3 do %>
+            <.step_phone_verification
+              form={@phone_code_form}
+              user={@user}
+              phone_code_valid={@phone_code_valid}
+              sms_resend_disabled_until={@sms_resend_disabled_until}
+            />
+          <% end %>
+          <%= if @current_step == 4 do %>
+            <.step_payment
+              user={@user}
+              membership_plan={@membership_plan}
+              has_real_subscription={@has_real_subscription}
+              active_subscription={@active_subscription}
+              public_key={@public_key}
+              payment_intent_secret={@payment_intent_secret}
+              payment_method_saved={@payment_method_saved}
+              default_payment_method={@default_payment_method}
+            />
+          <% end %>
+          <%= if @current_step == 5 do %>
+            <.step_family
+              user={@user}
+              family_members_forms={@family_members_forms}
+              invite_results={@invite_results}
+            />
+          <% end %>
+          <%= if @current_step == 6 do %>
+            <.step_complete user={@user} />
+          <% end %>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Step components
+  # ---------------------------------------------------------------------------
+
+  attr :form, :any, required: true
+
+  defp step_profile(assigns) do
+    ~H"""
+    <div>
+      <.header class="text-left">
+        Welcome Back! Let's confirm your details.
+        <:subtitle>
+          We've imported your account from our previous system. Please review and update your information below.
+        </:subtitle>
+      </.header>
+
+      <.simple_form
+        for={@form}
+        id="onboarding-profile-form"
+        phx-submit="save_profile"
+        phx-change="validate_profile"
+        class="mt-6 space-y-4"
+      >
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <.input
+            field={@form[:first_name]}
+            type="text"
+            label="First Name"
+            required
+          />
+          <.input field={@form[:last_name]} type="text" label="Last Name" required />
+        </div>
+        <.input
+          field={@form[:phone_number]}
+          type="phone-input"
+          label="Phone Number"
+        />
+        <.input
+          field={@form[:date_of_birth]}
+          type="date"
+          label="Date of Birth"
+        />
+        <.input
+          field={@form[:most_connected_country]}
+          type="select"
+          label="Most Connected Nordic Country"
+          options={nordic_country_options()}
+          prompt="Select a country"
+        />
+        <:actions>
+          <div class="flex justify-end w-full">
+            <.button type="submit" phx-disable-with="Saving...">
+              Confirm & Continue
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+            </.button>
+          </div>
+        </:actions>
+      </.simple_form>
+    </div>
+    """
+  end
+
+  attr :form, :any, required: true
+
+  defp step_address(assigns) do
+    ~H"""
+    <div>
+      <.header class="text-left">
+        Confirm Your Address
+        <:subtitle>
+          Please review and confirm your mailing address. We use this for membership correspondence and renewal notices.
+        </:subtitle>
+      </.header>
+
+      <.simple_form
+        for={@form}
+        id="onboarding-address-form"
+        phx-submit="save_address"
+        phx-change="validate_address"
+        class="mt-6 space-y-4"
+      >
+        <.input
+          field={@form[:address]}
+          type="text"
+          label="Street Address"
+          placeholder="123 Main St"
+          required
+        />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <.input field={@form[:city]} type="text" label="City" required />
+          <.input field={@form[:region]} type="text" label="State / Region" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <.input
+            field={@form[:postal_code]}
+            type="text"
+            label="Postal / ZIP Code"
+            required
+          />
+          <.input field={@form[:country]} type="text" label="Country" required />
+        </div>
+        <:actions>
+          <div class="flex justify-end w-full">
+            <.button type="submit" phx-disable-with="Saving...">
+              Confirm & Continue
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+            </.button>
+          </div>
+        </:actions>
+      </.simple_form>
+    </div>
+    """
+  end
+
+  attr :form, :any, required: true
+  attr :user, :any, required: true
+  attr :phone_code_valid, :boolean, required: true
+  attr :sms_resend_disabled_until, :any, required: true
+
+  defp step_phone_verification(assigns) do
+    ~H"""
+    <div>
+      <.header class="text-left">
+        Verify Your Phone Number
+        <:subtitle>
+          We sent a 6-digit code to <strong>{@user.phone_number}</strong>. Enter it below to verify your number.
+        </:subtitle>
+      </.header>
+
+      <.simple_form
+        for={@form}
+        id="onboarding-phone-form"
+        phx-submit="verify_phone"
+        phx-change="validate_phone_code"
+        class="mt-6"
+      >
+        <.input
+          field={@form[:code]}
+          type="otp"
+          label="Verification Code"
+          required
+          phx-input="validate_phone_code"
+        />
+        <:actions>
+          <div class="flex items-center justify-between w-full">
+            <.button
+              type="button"
+              variant="outline"
+              color="zinc"
+              phx-click="resend_phone_code"
+              phx-disable-with="Sending..."
+              disabled={not is_nil(@sms_resend_disabled_until)}
+            >
+              Resend code
+            </.button>
+            <.button
+              type="submit"
+              phx-disable-with="Verifying..."
+              disabled={not @phone_code_valid}
+            >
+              <.icon name="hero-check-circle" class="w-4 h-4 me-1" /> Verify Phone
+            </.button>
+          </div>
+        </:actions>
+      </.simple_form>
+    </div>
+    """
+  end
+
+  attr :user, :any, required: true
+  attr :membership_plan, :atom, required: true
+  attr :has_real_subscription, :boolean, required: true
+  attr :active_subscription, :any, required: true
+  attr :public_key, :string, required: true
+  attr :payment_intent_secret, :any, required: true
+  attr :payment_method_saved, :boolean, required: true
+  attr :default_payment_method, :any, required: true
+
+  defp step_payment(assigns) do
+    ~H"""
+    <div>
+      <%= if @has_real_subscription do %>
+        <%!-- User has an active subscription: show details and optionally collect PM --%>
+        <.header class="text-left">
+          Your Membership
+          <:subtitle>
+            Your membership is active. Review the details below and make sure a payment method is on file for auto-renewal.
+          </:subtitle>
+        </.header>
+
+        <div class="mt-6 border border-zinc-200 rounded-lg divide-y divide-zinc-100">
+          <div class="flex items-center justify-between px-4 py-3">
+            <span class="text-sm text-zinc-500">Plan</span>
+            <span class="text-sm font-medium text-zinc-900">
+              {plan_name(@membership_plan)}
+            </span>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3">
+            <span class="text-sm text-zinc-500">Status</span>
+            <span class="inline-flex items-center gap-1.5 text-sm font-medium text-green-700">
+              <.icon name="hero-check-circle" class="w-4 h-4" /> Active
+            </span>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3">
+            <span class="text-sm text-zinc-500">Next Renewal</span>
+            <span class="text-sm font-medium text-zinc-900">
+              {format_renewal_date(
+                @active_subscription && @active_subscription.current_period_end
+              )}
+            </span>
+          </div>
+        </div>
+
+        <p class="mt-3 text-xs text-zinc-400">
+          If anything looks incorrect, please contact <.link
+            href="mailto:info@ysc.org"
+            class="text-blue-600 hover:underline"
+          >
+            info@ysc.org
+          </.link>.
+        </p>
+
+        <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
+          <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
+            <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
+            <div class="text-sm">
+              <span class="font-medium">Payment method on file:</span>
+              {payment_method_display(@default_payment_method)}
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end">
+            <.button
+              phx-click="confirm_payment_step"
+              phx-disable-with="Continuing..."
+            >
+              Continue <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
+            </.button>
+          </div>
+        <% else %>
+          <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
+            <.icon name="hero-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
+            <span>
+              No payment method on file. Please add one to ensure your membership auto-renews on the next billing date.
+            </span>
+          </div>
+          <%= if is_nil(@payment_intent_secret) do %>
+            <div class="mt-6 flex justify-end">
+              <.button phx-click="load_payment_form" phx-disable-with="Loading...">
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
+                Add Payment Method
+              </.button>
+            </div>
+          <% else %>
+            <form
+              id="onboarding-payment-form"
+              class="mt-6 flex flex-col space-y-4"
+              phx-hook="StripeInput"
+              data-clientSecret={@payment_intent_secret}
+              data-publicKey={@public_key}
+              data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+            >
+              <div id="onboarding-payment-errors">
+                <p id="card-errors" class="text-red-400 text-sm"></p>
+              </div>
+              <div id="payment-element"></div>
+              <div class="flex justify-end mt-4">
+                <.button type="submit" id="submit">
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
+                  Save Payment Method
+                </.button>
+              </div>
+            </form>
+          <% end %>
+        <% end %>
+      <% else %>
+        <%!-- No active subscription: offer to set one up, with a skip option --%>
+        <.header class="text-left">
+          Set Up Auto-Renewal
+          <:subtitle>
+            Your membership is not currently active. Add a payment method to activate auto-renewal, or skip for now.
+          </:subtitle>
+        </.header>
+
+        <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800">
+          <div class="flex items-start gap-3">
+            <.icon name="hero-information-circle" class="w-5 h-5 mt-0.5 shrink-0" />
+            <div>
+              <strong>Plan: {plan_name(@membership_plan)}</strong>
+              <br />
+              You'll be billed annually. You can cancel at any time from your account settings.
+            </div>
+          </div>
+        </div>
+
+        <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
+          <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
+            <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
+            <span class="text-sm font-medium">
+              Payment method saved successfully.
+            </span>
+          </div>
+          <div class="mt-6 flex items-center justify-between">
+            <.button
+              type="button"
+              variant="outline"
+              color="zinc"
+              phx-click="skip_payment_step"
+              phx-disable-with="Skipping..."
+            >
+              Skip for now
+            </.button>
+            <.button
+              phx-click="confirm_payment_step"
+              phx-disable-with="Activating..."
+            >
+              Activate Membership
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
+            </.button>
+          </div>
+        <% else %>
+          <%= if is_nil(@payment_intent_secret) do %>
+            <div class="mt-6 flex items-center justify-between">
+              <.button
+                type="button"
+                variant="outline"
+                color="zinc"
+                phx-click="skip_payment_step"
+                phx-disable-with="Skipping..."
+              >
+                Skip for now
+              </.button>
+              <.button phx-click="load_payment_form" phx-disable-with="Loading...">
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
+                Add Payment Method
+              </.button>
+            </div>
+          <% else %>
+            <form
+              id="onboarding-payment-form"
+              class="mt-6 flex flex-col space-y-4"
+              phx-hook="StripeInput"
+              data-clientSecret={@payment_intent_secret}
+              data-publicKey={@public_key}
+              data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+            >
+              <div id="onboarding-payment-errors">
+                <p id="card-errors" class="text-red-400 text-sm"></p>
+              </div>
+              <div id="payment-element"></div>
+              <div class="mt-4 flex items-center justify-between">
+                <.button
+                  type="button"
+                  variant="outline"
+                  color="zinc"
+                  phx-click="skip_payment_step"
+                  phx-disable-with="Skipping..."
+                >
+                  Skip for now
+                </.button>
+                <.button type="submit" id="submit">
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
+                  Save & Activate
+                </.button>
+              </div>
+            </form>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :user, :any, required: true
+  attr :family_members_forms, :list, required: true
+  attr :invite_results, :list, required: true
+
+  defp step_family(assigns) do
+    ~H"""
+    <div>
+      <.header class="text-left">
+        Add Family Members
+        <:subtitle>
+          Your Family membership covers your spouse and children under 18. Add them below and we'll send each an invite to create their account.
+        </:subtitle>
+      </.header>
+
+      <%!-- Existing invite results --%>
+      <%= for result <- @invite_results do %>
+        <div class={[
+          "mt-2 p-3 rounded-lg text-sm flex items-center gap-2",
+          if(result.ok,
+            do: "bg-green-50 text-green-800 border border-green-200",
+            else: "bg-red-50 text-red-800 border border-red-200"
+          )
+        ]}>
+          <.icon
+            name={if result.ok, do: "hero-check-circle", else: "hero-x-circle"}
+            class="w-4 h-4 shrink-0"
+          />
+          {result.message}
+        </div>
+      <% end %>
+
+      <%!-- Family member forms --%>
+      <div id="family-member-entries" class="mt-6 space-y-4">
+        <%= for {form, idx} <- Enum.with_index(@family_members_forms) do %>
+          <div class="p-4 border border-zinc-200 rounded-lg space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-semibold text-zinc-700">
+                Family Member {idx + 1}
+              </h4>
+              <.button
+                type="button"
+                variant="outline"
+                color="red"
+                phx-click="remove_family_member"
+                phx-value-index={idx}
+              >
+                <.icon name="hero-x-mark" class="w-4 h-4" />
+              </.button>
+            </div>
+            <.simple_form
+              for={form}
+              id={"family-member-form-#{idx}"}
+              phx-submit="submit_family_member"
+              phx-change="validate_family_member"
+              phx-value-index={idx}
+              class="space-y-3"
+            >
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <.input
+                  field={form[:first_name]}
+                  type="text"
+                  label="First Name"
+                  required
+                />
+                <.input field={form[:last_name]} type="text" label="Last Name" />
+              </div>
+              <.input
+                field={form[:email]}
+                type="email"
+                label="Email Address (optional)"
+                placeholder="member@example.com"
+              />
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <.input field={form[:birth_date]} type="date" label="Date of Birth" />
+                <.input
+                  field={form[:relationship]}
+                  type="select"
+                  label="Relationship"
+                  options={[{"Child", "child"}, {"Spouse", "spouse"}]}
+                />
+              </div>
+              <:actions>
+                <div class="flex justify-end">
+                  <.button type="submit" phx-disable-with="Sending...">
+                    <.icon name="hero-paper-airplane" class="w-4 h-4 me-1" />
+                    Send Invite
+                  </.button>
+                </div>
+              </:actions>
+            </.simple_form>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between">
+        <.button
+          type="button"
+          variant="outline"
+          color="blue"
+          phx-click="add_family_member"
+        >
+          <.icon name="hero-plus-circle" class="w-4 h-4 me-1" /> Add a family member
+        </.button>
+
+        <.button phx-click="complete_family_step" phx-disable-with="Finishing...">
+          <.icon name="hero-check-circle" class="w-4 h-4 me-1" />
+          <%= if @family_members_forms == [] do %>
+            Skip & Finish
+          <% else %>
+            Finish
+          <% end %>
+        </.button>
+      </div>
+    </div>
+    """
+  end
+
+  attr :user, :any, required: true
+
+  defp step_complete(assigns) do
+    ~H"""
+    <div class="text-center py-8">
+      <.icon name="hero-check-circle" class="w-16 h-16 text-green-500 mx-auto mb-4" />
+      <h2 class="text-2xl font-semibold text-zinc-800 mb-2">You're all set!</h2>
+      <p class="text-zinc-500 mb-8">
+        Your account is fully up to date. Welcome to the Young Scandinavians Club!
+      </p>
+      <.link
+        navigate={~p"/"}
+        class="inline-flex items-center gap-2 phx-submit-loading:opacity-75 rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition duration-150 ease-in-out"
+      >
+        <.icon name="hero-home" class="w-4 h-4" /> Go to Dashboard
+      </.link>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Event handlers
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("validate_profile", %{"user" => params}, socket) do
+    form =
+      socket.assigns.user
+      |> Accounts.change_user_profile(params)
+      |> Map.put(:action, :validate)
+      |> to_form()
+
+    {:noreply, assign(socket, :profile_form, form)}
+  end
+
+  def handle_event("save_profile", %{"user" => params}, socket) do
+    user = socket.assigns.user
+
+    case Accounts.update_user_profile(user, params) do
+      {:ok, updated_user} ->
+        phone_changed =
+          updated_user.phone_number != socket.assigns.original_phone
+
+        phone_needs_verification =
+          phone_changed or is_nil(updated_user.phone_verified_at)
+
+        socket =
+          socket
+          |> assign(:user, updated_user)
+
+        if phone_needs_verification and not is_nil(updated_user.phone_number) do
+          # Send verification code and go to phone verification step
+          phone_code =
+            Accounts.generate_and_store_phone_verification_code(updated_user)
+
+          _job =
+            Accounts.send_phone_verification_code(
+              updated_user,
+              phone_code,
+              "onboarding_initial"
+            )
+
+          {:noreply,
+           socket
+           |> assign(:current_step, @step_phone_verification)
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "A verification code was sent to #{updated_user.phone_number}",
+             title: "Phone Verification"
+           )}
+        else
+          # Skip phone verification, proceed to next step
+          {:noreply, advance_to_next_step(socket, @step_profile)}
+        end
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :profile_form, to_form(changeset))}
+    end
+  end
+
+  def handle_event("validate_address", %{"address" => params}, socket) do
+    user = socket.assigns.user
+
+    form =
+      user
+      |> Accounts.change_billing_address(params)
+      |> Map.put(:action, :validate)
+      |> to_form()
+
+    {:noreply, assign(socket, :address_form, form)}
+  end
+
+  def handle_event("save_address", %{"address" => params}, socket) do
+    user = socket.assigns.user
+
+    case Accounts.update_billing_address(user, params) do
+      {:ok, updated_user} ->
+        {:noreply,
+         advance_to_next_step(
+           assign(socket, :user, updated_user),
+           @step_address
+         )}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :address_form, to_form(changeset))}
+    end
+  end
+
+  def handle_event("validate_phone_code", params, socket) do
+    raw = get_in(params, ["phone_code", "code"]) || ""
+
+    # OTP input fires phx-input on each keystroke, sending only the changed digit as
+    # an indexed map. Merge with accumulated state so all digits are available.
+    current_state = socket.assigns.phone_verification_code_state || %{}
+
+    merged =
+      if is_map(raw) do
+        Map.merge(if(is_map(current_state), do: current_state, else: %{}), raw)
+      else
+        raw
+      end
+
+    normalized = normalize_verification_code(merged)
+
+    valid =
+      String.length(normalized) == 6 && String.match?(normalized, ~r/^\d{6}$/)
+
+    {:noreply,
+     socket
+     |> assign(:phone_code_valid, valid)
+     |> assign(:phone_verification_code_state, merged)}
+  end
+
+  def handle_event("verify_phone", params, socket) do
+    raw = get_in(params, ["phone_code", "code"]) || ""
+    code = normalize_verification_code(raw)
+    user = socket.assigns.user
+
+    case Accounts.verify_phone_verification_code(user, code) do
+      {:ok, :verified} ->
+        case Accounts.mark_phone_verified(user) do
+          {:ok, updated_user} ->
+            {:noreply,
+             socket
+             |> assign(:user, updated_user)
+             |> advance_to_next_step(@step_phone_verification)}
+
+          {:error, _} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to save verification. Please try again.",
+               title: "Error"
+             )}
+        end
+
+      {:error, :invalid_code} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "That code is incorrect. Please try again.",
+           title: "Invalid Code"
+         )}
+
+      {:error, :expired} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Your code has expired. Please request a new one.",
+           title: "Expired Code"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not verify the code. Please try again.",
+           title: "Error"
+         )}
+    end
+  end
+
+  def handle_event("resend_phone_code", _params, socket) do
+    user = socket.assigns.user
+
+    case Ysc.ResendRateLimiter.check_and_record_resend(user.id, :sms) do
+      {:ok, :allowed} ->
+        {code, is_existing} =
+          case Ysc.VerificationCache.get_code(user.id, :phone_verification) do
+            {:ok, existing_code} ->
+              {existing_code, true}
+
+            {:error, _} ->
+              {Accounts.generate_and_store_phone_verification_code(user), false}
+          end
+
+        timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
+        suffix =
+          if is_existing,
+            do: "resend_existing_#{timestamp}",
+            else: "resend_new_#{timestamp}"
+
+        _job = Accounts.send_phone_verification_code(user, code, suffix)
+
+        {:noreply,
+         socket
+         |> assign(
+           :sms_resend_disabled_until,
+           Ysc.ResendRateLimiter.disabled_until(60)
+         )
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "A new code was sent to #{user.phone_number}",
+           title: "Code Sent"
+         )}
+
+      {:error, :rate_limited, _remaining} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Please wait before requesting another verification code.",
+           title: "Phone verification"
+         )}
+    end
+  end
+
+  def handle_event("load_payment_form", _params, socket) do
+    user = socket.assigns.user
+
+    case Customers.create_setup_intent(user,
+           stripe: %{payment_method_types: ["card", "us_bank_account"]}
+         ) do
+      {:ok, setup_intent} ->
+        {:noreply,
+         assign(socket, :payment_intent_secret, setup_intent.client_secret)}
+
+      {:error, error} ->
+        Ysc.Logging.error("Failed to create setup intent during onboarding",
+          user_id: user.id,
+          error: inspect(error)
+        )
+
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to initialize payment form. Please try again.",
+           title: "Payment Error"
+         )}
+    end
+  end
+
+  def handle_event(
+        "payment-method-set",
+        %{"payment_method_id" => payment_method_id},
+        socket
+      ) do
+    user = socket.assigns.user
+
+    case Stripe.PaymentMethod.retrieve(payment_method_id) do
+      {:ok, stripe_payment_method} ->
+        _ =
+          Stripe.PaymentMethod.update(payment_method_id, %{
+            metadata: %{"set_as_default" => "true"}
+          })
+
+        case Ysc.Payments.upsert_and_set_default_payment_method_from_stripe(
+               user,
+               stripe_payment_method
+             ) do
+          {:ok, _} ->
+            case Stripe.Customer.update(user.stripe_id, %{
+                   invoice_settings: %{
+                     default_payment_method: payment_method_id
+                   }
+                 }) do
+              {:ok, _} ->
+                updated_user = Accounts.get_user!(user.id)
+
+                default_pm =
+                  Ysc.Payments.get_default_payment_method(updated_user)
+
+                {:noreply,
+                 socket
+                 |> assign(:user, updated_user)
+                 |> assign(:payment_method_saved, true)
+                 |> assign(:default_payment_method, default_pm)}
+
+              {:error, err} ->
+                Ysc.Logging.error(
+                  "Failed to set default payment method in Stripe during onboarding",
+                  user_id: user.id,
+                  error: inspect(err)
+                )
+
+                {:noreply,
+                 YscWeb.Flash.put_toast(
+                   socket,
+                   :error,
+                   "Payment method saved but could not set as default.",
+                   title: "Payment"
+                 )}
+            end
+
+          {:error, _} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to store payment method. Please try again.",
+               title: "Payment"
+             )}
+        end
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not retrieve payment method. Please try again.",
+           title: "Payment"
+         )}
+    end
+  end
+
+  def handle_event("confirm_payment_step", _params, socket) do
+    user = socket.assigns.user
+    default_pm = socket.assigns.default_payment_method
+
+    cond do
+      socket.assigns.has_real_subscription ->
+        # Already subscribed — just advance without touching Stripe subscriptions.
+        {:noreply, advance_to_next_step(socket, @step_payment)}
+
+      is_nil(default_pm) ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Please add a payment method before continuing.",
+           title: "Payment Required"
+         )}
+
+      true ->
+        case create_stripe_subscription(
+               user,
+               socket.assigns.membership_plan,
+               default_pm
+             ) do
+          {:ok, _subscription} ->
+            {:noreply, advance_to_next_step(socket, @step_payment)}
+
+          {:error, reason} ->
+            Ysc.Logging.error("Failed to create subscription during onboarding",
+              user_id: user.id,
+              reason: inspect(reason)
+            )
+
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Could not activate subscription. Please contact support.",
+               title: "Subscription Error"
+             )}
+        end
+    end
+  end
+
+  def handle_event("skip_payment_step", _params, socket) do
+    {:noreply, advance_to_next_step(socket, @step_payment)}
+  end
+
+  def handle_event("add_family_member", _params, socket) do
+    new_form =
+      to_form(
+        %{
+          "first_name" => "",
+          "last_name" => "",
+          "email" => "",
+          "birth_date" => "",
+          "relationship" => "child"
+        },
+        as: "family_member"
+      )
+
+    updated_forms = socket.assigns.family_members_forms ++ [new_form]
+    {:noreply, assign(socket, :family_members_forms, updated_forms)}
+  end
+
+  def handle_event("remove_family_member", %{"index" => idx_str}, socket) do
+    idx = String.to_integer(idx_str)
+    updated_forms = List.delete_at(socket.assigns.family_members_forms, idx)
+    {:noreply, assign(socket, :family_members_forms, updated_forms)}
+  end
+
+  def handle_event("validate_family_member", params, socket) do
+    idx = String.to_integer(params["index"] || "0")
+    member_params = params["family_member"] || %{}
+    form = to_form(member_params, as: "family_member")
+
+    updated_forms =
+      List.replace_at(socket.assigns.family_members_forms, idx, form)
+
+    {:noreply, assign(socket, :family_members_forms, updated_forms)}
+  end
+
+  def handle_event("submit_family_member", params, socket) do
+    idx = String.to_integer(params["index"] || "0")
+    member_params = params["family_member"] || %{}
+    user = socket.assigns.user
+
+    email = String.trim(member_params["email"] || "")
+
+    relationship =
+      case member_params["relationship"] do
+        "spouse" -> :spouse
+        _ -> :child
+      end
+
+    # Always persist the family member record regardless of whether an invite is sent.
+    _ = upsert_family_member_record(user, member_params)
+
+    result =
+      if email == "" do
+        %{ok: true, message: "Family member saved."}
+      else
+        case FamilyInvites.create_invite(user, email,
+               relationship: relationship
+             ) do
+          {:ok, _invite} ->
+            %{ok: true, message: "Invite sent to #{email}"}
+
+          {:error, :invalid_membership_type} ->
+            %{
+              ok: false,
+              message: "Your membership plan doesn't support family invites."
+            }
+
+          {:error, :max_sub_accounts_reached} ->
+            %{ok: false, message: "Maximum number of family members reached."}
+
+          {:error, :email_already_registered} ->
+            %{
+              ok: false,
+              message:
+                "#{email} already has an account. They can be linked in Family Settings."
+            }
+
+          {:error, :pending_invite_exists} ->
+            %{ok: false, message: "An invite was already sent to #{email}."}
+
+          {:error, :max_spouses_reached} ->
+            %{
+              ok: false,
+              message: "You can only have one spouse on the family membership."
+            }
+
+          {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+            errors =
+              Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} ->
+                msg
+              end)
+
+            %{ok: false, message: "Could not send invite: #{inspect(errors)}"}
+
+          {:error, reason} ->
+            %{ok: false, message: "Could not send invite: #{inspect(reason)}"}
+        end
+      end
+
+    updated_results = socket.assigns.invite_results ++ [result]
+
+    updated_forms =
+      if result.ok,
+        do: List.delete_at(socket.assigns.family_members_forms, idx),
+        else: socket.assigns.family_members_forms
+
+    {:noreply,
+     socket
+     |> assign(:family_members_forms, updated_forms)
+     |> assign(:invite_results, updated_results)}
+  end
+
+  def handle_event("complete_family_step", _params, socket) do
+    user = socket.assigns.user
+    pending_forms = socket.assigns.family_members_forms
+
+    # Auto-process any forms the user filled in but didn't explicitly submit.
+    # Always upsert the family member record; send an invite only when email is present.
+    new_results =
+      Enum.reduce(pending_forms, socket.assigns.invite_results, fn form,
+                                                                   results ->
+        member_params = form.source || %{}
+        first_name = String.trim(member_params["first_name"] || "")
+        email = String.trim(member_params["email"] || "")
+
+        if first_name == "" do
+          # Skip entirely empty forms
+          results
+        else
+          _ = upsert_family_member_record(user, member_params)
+
+          result =
+            if email == "" do
+              %{ok: true, message: "Family member saved."}
+            else
+              relationship =
+                case member_params["relationship"] do
+                  "spouse" -> :spouse
+                  _ -> :child
+                end
+
+              case FamilyInvites.create_invite(user, email,
+                     relationship: relationship
+                   ) do
+                {:ok, _invite} ->
+                  %{ok: true, message: "Invite sent to #{email}"}
+
+                {:error, :pending_invite_exists} ->
+                  %{ok: true, message: "An invite was already sent to #{email}"}
+
+                {:error, :email_already_registered} ->
+                  %{
+                    ok: false,
+                    message:
+                      "#{email} already has an account. They can be linked in Family Settings."
+                  }
+
+                {:error, :max_sub_accounts_reached} ->
+                  %{
+                    ok: false,
+                    message: "Maximum number of family members reached."
+                  }
+
+                {:error, :max_spouses_reached} ->
+                  %{
+                    ok: false,
+                    message:
+                      "You can only have one spouse on the family membership."
+                  }
+
+                {:error, :invalid_membership_type} ->
+                  %{
+                    ok: false,
+                    message:
+                      "Your membership plan doesn't support family invites."
+                  }
+
+                {:error, _} ->
+                  %{ok: false, message: "Could not send invite to #{email}."}
+              end
+            end
+
+          results ++ [result]
+        end
+      end)
+
+    socket =
+      socket
+      |> assign(:invite_results, new_results)
+      |> assign(:family_members_forms, [])
+
+    {:noreply, finalize_onboarding(socket)}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helpers
+  # ---------------------------------------------------------------------------
+
+  # Returns the 0-based index of the current step in the steps list (for the stepper component)
+  defp step_index(current_step, steps) do
+    case Enum.find_index(steps, fn {_label, step_num} ->
+           step_num == current_step
+         end) do
+      nil -> 0
+      idx -> idx
+    end
+  end
+
+  defp build_steps(is_family_plan, skip_payment) do
+    base = [
+      {"Profile", @step_profile},
+      {"Address", @step_address},
+      {"Membership", @step_payment}
+    ]
+
+    base =
+      if skip_payment,
+        do: List.delete(base, {"Membership", @step_payment}),
+        else: base
+
+    base = if is_family_plan, do: base ++ [{"Family", @step_family}], else: base
+    base
+  end
+
+  # Advance from the given step to the next applicable step.
+  # For phone verification (not in @steps list), treat it as if coming from profile.
+  defp advance_to_next_step(socket, current_step) do
+    steps = socket.assigns.steps
+    step_numbers = Enum.map(steps, fn {_, n} -> n end)
+
+    # Phone verification is not in the steps list; treat it as if we're after profile
+    effective_step =
+      if current_step == @step_phone_verification,
+        do: @step_profile,
+        else: current_step
+
+    current_idx = Enum.find_index(step_numbers, &(&1 == effective_step))
+
+    next_step =
+      if current_idx && current_idx + 1 < length(step_numbers) do
+        Enum.at(step_numbers, current_idx + 1)
+      else
+        @step_complete
+      end
+
+    cond do
+      next_step == @step_payment ->
+        socket
+        |> assign(:current_step, @step_payment)
+        |> load_payment_form_if_needed()
+
+      next_step == @step_complete ->
+        finalize_onboarding(socket)
+
+      true ->
+        assign(socket, :current_step, next_step)
+    end
+  end
+
+  defp load_payment_form_if_needed(socket) do
+    if is_nil(socket.assigns.payment_intent_secret) and
+         is_nil(socket.assigns.default_payment_method) do
+      user = socket.assigns.user
+
+      case Customers.create_setup_intent(user,
+             stripe: %{payment_method_types: ["card", "us_bank_account"]}
+           ) do
+        {:ok, setup_intent} ->
+          assign(socket, :payment_intent_secret, setup_intent.client_secret)
+
+        {:error, _} ->
+          socket
+      end
+    else
+      socket
+    end
+  end
+
+  defp finalize_onboarding(socket) do
+    user = socket.assigns.user
+
+    case Accounts.complete_post_migration_onboarding(user) do
+      {:ok, _updated_user} ->
+        assign(socket, :current_step, @step_complete)
+
+      {:error, _} ->
+        YscWeb.Flash.put_toast(
+          socket,
+          :error,
+          "Could not complete setup. Please try again.",
+          title: "Error"
+        )
+    end
+  end
+
+  # Dialyzer cannot fully type-check the Stripe client return values, so we suppress
+  # warnings for this function. The Customers.create_subscription/2 module has a
+  # similar annotation for the same reason.
+  @dialyzer {:nowarn_function, create_stripe_subscription: 3}
+  # Lifetime members have no Stripe subscription — this is a no-op.
+  defp create_stripe_subscription(_user, :lifetime, _default_pm),
+    do: {:ok, :lifetime_no_op}
+
+  defp create_stripe_subscription(user, plan, default_pm) do
+    price_id = get_price_id(plan)
+
+    if is_nil(price_id) do
+      {:error, :no_price_id_for_plan}
+    else
+      # Stable idempotency key scoped to this user + plan so Stripe deduplicates
+      # any duplicate requests within its 24-hour idempotency window.
+      idempotency_key = "wp_onboarding_#{user.id}_#{plan}"
+
+      case Customers.create_subscription(
+             user,
+             return_url:
+               "#{YscWeb.Endpoint.url()}/billing/user/#{user.id}/finalize",
+             prices: [%{price: price_id, quantity: 1}],
+             default_payment_method: default_pm.provider_id,
+             expand: ["latest_invoice"],
+             idempotency_key: idempotency_key
+           ) do
+        {:ok, stripe_subscription} ->
+          # Delete migrated placeholder subscriptions only after Stripe succeeds
+          # to avoid data loss if the Stripe call fails or the process crashes.
+          user
+          |> Subscriptions.list_subscriptions()
+          |> Enum.filter(&migrated_subscription?/1)
+          |> Enum.each(&Subscriptions.delete_subscription/1)
+
+          Subscriptions.create_subscription_from_stripe(
+            user,
+            stripe_subscription
+          )
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp migrated_subscription?(%{stripe_id: stripe_id})
+       when is_binary(stripe_id) do
+    String.starts_with?(stripe_id, "migrated_")
+  end
+
+  defp migrated_subscription?(_), do: false
+
+  defp find_active_real_subscription(user) do
+    user
+    |> Subscriptions.list_subscriptions()
+    |> Enum.find(fn sub ->
+      Subscriptions.active?(sub) and not migrated_subscription?(sub)
+    end)
+  end
+
+  # Resolve the intended membership plan for a WP-migrated user.
+  # Checks (in order): lifetime award, real active sub, migrated sub name, signup application, default single.
+  defp resolve_membership_plan(user) do
+    # Lifetime membership takes precedence over all subscription-based logic.
+    if is_nil(user.lifetime_membership_awarded_at) do
+      resolve_membership_plan_from_subscriptions(user)
+    else
+      :lifetime
+    end
+  end
+
+  defp resolve_membership_plan_from_subscriptions(user) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+    subscriptions = Subscriptions.list_subscriptions(user)
+
+    # First: real active subscription
+    real_active =
+      Enum.find(subscriptions, fn sub ->
+        Subscriptions.active?(sub) and not migrated_subscription?(sub)
+      end)
+
+    if real_active do
+      plan_type_from_subscription(real_active, plans)
+    else
+      # Second: migrated subscription
+      migrated =
+        Enum.find(subscriptions, &migrated_subscription?/1)
+
+      if migrated do
+        plan_type_from_subscription(migrated, plans)
+      else
+        # Third: signup application
+        plan_from_application(user) || :single
+      end
+    end
+  end
+
+  defp plan_type_from_subscription(subscription, plans) do
+    items =
+      case subscription.subscription_items do
+        %Ecto.Association.NotLoaded{} ->
+          Ysc.Repo.preload(subscription, :subscription_items).subscription_items
+
+        items ->
+          items
+      end
+
+    case items do
+      [item | _] ->
+        case Enum.find(plans, &(&1.stripe_price_id == item.stripe_price_id)) do
+          %{id: id} -> id
+          _ -> :single
+        end
+
+      _ ->
+        :single
+    end
+  end
+
+  defp plan_from_application(user) do
+    case user.registration_form do
+      %{membership_type: mt} when not is_nil(mt) ->
+        case to_string(mt) do
+          "family" -> :family
+          "single" -> :single
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp upsert_family_member_record(user, params) do
+    first_name = params["first_name"] || ""
+    last_name = params["last_name"] || ""
+    relationship_str = params["relationship"] || "child"
+    birth_date = params["birth_date"]
+
+    type =
+      case relationship_str do
+        "spouse" -> :spouse
+        _ -> :child
+      end
+
+    attrs = %{
+      "first_name" => first_name,
+      "last_name" => last_name,
+      "type" => type,
+      "birth_date" =>
+        if(birth_date == "" or is_nil(birth_date), do: nil, else: birth_date)
+    }
+
+    existing =
+      Enum.find(user.family_members || [], fn fm ->
+        String.downcase(fm.first_name || "") == String.downcase(first_name) and
+          String.downcase(fm.last_name || "") == String.downcase(last_name)
+      end)
+
+    if existing do
+      existing
+      |> Ysc.Accounts.FamilyMember.family_member_changeset(attrs)
+      |> Ysc.Repo.update()
+    else
+      %Ysc.Accounts.FamilyMember{}
+      |> Ysc.Accounts.FamilyMember.family_member_changeset(attrs)
+      |> Ecto.Changeset.put_change(:user_id, user.id)
+      |> Ysc.Repo.insert()
+    end
+  end
+
+  defp get_price_id(plan_id) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case Enum.find(plans, &(&1.id == plan_id)) do
+      %{stripe_price_id: price_id} -> price_id
+      _ -> nil
+    end
+  end
+
+  # Normalise an OTP verification code from whichever format the OTP input
+  # delivers it: indexed-key map (%{"0" => "1", "1" => "2", ...}), list, or
+  # plain string.  Non-integer map keys (e.g. "_unused_1") are ignored.
+  defp normalize_verification_code(code) when is_map(code) do
+    code
+    |> Enum.filter(fn {k, _v} ->
+      case Integer.parse(k) do
+        {_int, ""} -> true
+        _ -> false
+      end
+    end)
+    |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
+    |> Enum.map(fn {_k, v} -> v end)
+    |> Enum.reject(&(&1 == "" || is_nil(&1)))
+    |> Enum.join("")
+  end
+
+  defp normalize_verification_code(code) when is_list(code) do
+    code |> Enum.reject(&(&1 == "" || is_nil(&1))) |> Enum.join("")
+  end
+
+  defp normalize_verification_code(code) when is_binary(code), do: code
+  defp normalize_verification_code(_), do: ""
+
+  defp plan_name(:family), do: "Family Membership"
+  defp plan_name(:single), do: "Single Membership"
+  defp plan_name(:lifetime), do: "Lifetime Membership"
+  defp plan_name(_), do: "Membership"
+
+  defp format_renewal_date(nil), do: "—"
+
+  defp format_renewal_date(%DateTime{} = dt) do
+    months =
+      ~w[January February March April May June July August September October November December]
+
+    "#{Enum.at(months, dt.month - 1)} #{dt.day}, #{dt.year}"
+  end
+
+  defp payment_method_display(nil), do: "—"
+
+  defp payment_method_display(%{display_brand: brand, last_four: last4})
+       when is_binary(brand) and is_binary(last4) do
+    "#{String.capitalize(brand)} ···· #{last4}"
+  end
+
+  defp payment_method_display(%{last_four: last4}) when is_binary(last4) do
+    "Card ···· #{last4}"
+  end
+
+  defp payment_method_display(_), do: "Card on file"
+
+  defp nordic_country_options do
+    [
+      {"Denmark", "DK"},
+      {"Finland", "FI"},
+      {"Iceland", "IS"},
+      {"Norway", "NO"},
+      {"Sweden", "SE"},
+      {"Other", "other"}
+    ]
+  end
+
+  @impl true
+  def handle_params(_params, _uri, socket) do
+    {:noreply, socket}
+  end
+end

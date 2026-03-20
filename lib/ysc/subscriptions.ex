@@ -1128,6 +1128,7 @@ defmodule Ysc.Subscriptions do
     # Handle both keyword lists and maps
     prices = params[:prices] || params["prices"] || params.prices
     expand = params[:expand] || params["expand"] || []
+    idempotency_key = params[:idempotency_key] || params["idempotency_key"]
 
     stripe_params = %{
       customer: user.stripe_id,
@@ -1151,7 +1152,13 @@ defmodule Ysc.Subscriptions do
         stripe_params
       end
 
-    Stripe.Subscription.create(stripe_params)
+    if idempotency_key do
+      Stripe.Subscription.create(stripe_params,
+        headers: %{"Idempotency-Key" => idempotency_key}
+      )
+    else
+      Stripe.Subscription.create(stripe_params)
+    end
   end
 
   @doc """

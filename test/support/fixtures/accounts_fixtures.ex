@@ -48,6 +48,8 @@ defmodule Ysc.AccountsFixtures do
   Directly inserts into the database to bypass password requirement.
   """
   def oauth_user_fixture(attrs \\ %{}) do
+    now = DateTime.truncate(DateTime.utc_now(), :second)
+
     user_attrs =
       %{
         email: unique_user_email(),
@@ -58,12 +60,13 @@ defmodule Ysc.AccountsFixtures do
         role: :member,
         hashed_password: nil,
         password_set_at: nil,
-        confirmed_at: DateTime.utc_now()
+        confirmed_at: now
       }
       |> Map.merge(Enum.into(attrs, %{}))
 
     %Ysc.Accounts.User{}
     |> Ysc.Accounts.User.registration_changeset(user_attrs)
+    |> Ecto.Changeset.put_change(:post_migration_onboarding_completed_at, now)
     |> Ysc.Repo.insert!()
   end
 

@@ -475,7 +475,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                       <div class="flex items-center gap-1.5 flex-wrap">
                         <span class={[
                           "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0",
-                          type == :event && "bg-violet-100 text-violet-700",
+                          type == :event && "bg-purple-100 text-purple-800",
                           type == :post && "bg-sky-100 text-sky-700"
                         ]}>
                           {if(type == :event, do: "Event", else: "Post")}
