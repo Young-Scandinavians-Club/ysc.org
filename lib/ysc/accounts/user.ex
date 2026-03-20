@@ -22,9 +22,10 @@ defmodule Ysc.Accounts.User do
       :phone_number,
       :state,
       :role,
-      :board_position
+      :board_position,
+      :membership_type
     ],
-    sortable: [:email, :first_name, :last_name, :state, :role],
+    sortable: [:email, :first_name, :last_name, :state, :role, :membership_type],
     default_limit: 50,
     max_limit: 200,
     default_order: %{
@@ -66,6 +67,8 @@ defmodule Ysc.Accounts.User do
     field :stripe_id, :string
     field :quickbooks_customer_id, :string
 
+    field :membership_type, :string, virtual: true
+
     # Notification preferences (email). Newsletter state lives in newsletter_subscribers; this is virtual for form only.
     field :newsletter_notifications, :boolean, virtual: true
     field :event_notifications, :boolean, default: true
@@ -104,6 +107,12 @@ defmodule Ysc.Accounts.User do
     field :phone_verified_at, :utc_datetime
     field :password_set_at, :utc_datetime
     field :passkey_prompt_dismissed_at, :utc_datetime
+
+    # Set when a WP-migrated user completes the post-migration onboarding wizard.
+    # Nil means the wizard is pending; non-nil means it has been completed.
+    # Existing/new non-migrated users have this pre-populated by the migration or
+    # the account setup flow, so they are never shown the wizard.
+    field :post_migration_onboarding_completed_at, :utc_datetime
 
     timestamps()
   end

@@ -245,6 +245,26 @@ defmodule YscWeb.Router do
   scope "/", YscWeb do
     pipe_through [:browser, :require_authenticated_user]
 
+    # Post-migration onboarding route — does NOT include ensure_onboarding_complete
+    # to avoid redirect loops. All other authenticated routes redirect here if needed.
+    live_session :post_migration_onboarding,
+      on_mount: [
+        {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.UserAuth, :ensure_authenticated},
+        {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
+        {YscWeb.Plugs.RequestPath, :set_request_path}
+      ] do
+      live "/onboarding", PostMigrationOnboardingLive, :index
+    end
+  end
+
+  scope "/", YscWeb do
+    pipe_through [
+      :browser,
+      :require_authenticated_user,
+      :require_onboarding_complete
+    ]
+
     get "/financials", PageController, :financials
     get "/expensereport/files/:encoded_path", ExpenseReportFileController, :show
 
@@ -252,6 +272,7 @@ defmodule YscWeb.Router do
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :ensure_authenticated},
+        {YscWeb.UserAuth, :ensure_onboarding_complete},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do

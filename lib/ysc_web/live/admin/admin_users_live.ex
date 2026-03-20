@@ -545,23 +545,6 @@ defmodule YscWeb.AdminUsersLive do
                         {"Admin", :admin}
                       ]
                     ],
-                    board_position: [
-                      label: "Board Position",
-                      type: "checkgroup",
-                      multiple: true,
-                      op: :in,
-                      options: [
-                        {"President", :president},
-                        {"Vice President", :vice_president},
-                        {"Secretary", :secretary},
-                        {"Treasurer", :treasurer},
-                        {"Clear Lake Cabin Master", :clear_lake_cabin_master},
-                        {"Tahoe Cabin Master", :tahoe_cabin_master},
-                        {"Event Director", :event_director},
-                        {"Member Outreach & Events", :member_outreach},
-                        {"Membership Director", :membership_director}
-                      ]
-                    ],
                     membership_type: [
                       label: "Membership",
                       type: "checkgroup",

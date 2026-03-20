@@ -735,6 +735,11 @@ defmodule YscWeb.AccountSetupLive do
         # Determine next step, skipping password if already set
         next_step = if is_nil(updated_user.password_set_at), do: 1, else: 4
 
+        # If jumping straight to complete (password already set), mark onboarding done
+        # so the user is not intercepted by the post-migration onboarding wizard.
+        if next_step == 4,
+          do: Accounts.complete_post_migration_onboarding(updated_user)
+
         # Short-lived one-time token for auto-login (verified by controller, then session created)
         one_time_token =
           Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
@@ -1041,6 +1046,10 @@ defmodule YscWeb.AccountSetupLive do
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
 
+      # Mark onboarding as complete for newly registered users so they skip
+      # the post-migration onboarding wizard after this account setup flow.
+      Accounts.complete_post_migration_onboarding(user)
+
       # Short-lived one-time token for auto-login (verified by controller, then session created)
       one_time_token =
         Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
@@ -1163,6 +1172,10 @@ defmodule YscWeb.AccountSetupLive do
         {:ok, :verified} ->
           # Mark phone as verified in database
           {:ok, updated_user} = Accounts.mark_phone_verified(user)
+
+          # Mark onboarding as complete for newly registered users so they skip
+          # the post-migration onboarding wizard after this account setup flow.
+          Accounts.complete_post_migration_onboarding(updated_user)
 
           # Generate session token and redirect based on account state
           token = Accounts.generate_user_session_token(updated_user)
