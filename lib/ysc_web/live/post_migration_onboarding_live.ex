@@ -1365,10 +1365,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   # Checks (in order): lifetime award, real active sub, migrated sub name, signup application, default single.
   defp resolve_membership_plan(user) do
     # Lifetime membership takes precedence over all subscription-based logic.
-    if not is_nil(user.lifetime_membership_awarded_at) do
-      :lifetime
-    else
+    if is_nil(user.lifetime_membership_awarded_at) do
       resolve_membership_plan_from_subscriptions(user)
+    else
+      :lifetime
     end
   end
 
