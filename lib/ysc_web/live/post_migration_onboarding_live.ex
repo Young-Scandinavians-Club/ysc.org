@@ -795,7 +795,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:error, _} ->
             YscWeb.Flash.send_toast(
               :error,
-              "Failed to save verification. Please try again.", title: "Error")
+              "Failed to save verification. Please try again.",
+              title: "Error"
+            )
 
             {:noreply, socket}
         end
@@ -803,7 +805,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, :invalid_code} ->
         YscWeb.Flash.send_toast(
           :error,
-          "That code is incorrect. Please try again.", title: "Invalid Code")
+          "That code is incorrect. Please try again.",
+          title: "Invalid Code"
+        )
 
         {:noreply, socket}
 
@@ -819,7 +823,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "Could not verify the code. Please try again.", title: "Error")
+          "Could not verify the code. Please try again.",
+          title: "Error"
+        )
 
         {:noreply, socket}
     end
@@ -850,7 +856,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
         YscWeb.Flash.send_toast(
           :info,
-          "A new code was sent to #{user.phone_number}", title: "Code Sent")
+          "A new code was sent to #{user.phone_number}",
+          title: "Code Sent"
+        )
 
         {:noreply,
          assign(
@@ -1317,7 +1325,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "Could not complete setup. Please try again.", title: "Error")
+          "Could not complete setup. Please try again.",
+          title: "Error"
+        )
 
         socket
     end
