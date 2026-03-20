@@ -212,7 +212,14 @@ defmodule Ysc.WpMigration.WpRepo do
         else
           meta_by_id = fetch_mphb_booking_meta(conn, ids)
           rooms_by_id = fetch_mphb_reserved_rooms(conn, ids)
-          build_mphb_booking_list(id_rows, meta_by_id, rooms_by_id)
+          customer_user_map = resolve_mphb_customer_user_ids(conn, meta_by_id)
+
+          build_mphb_booking_list(
+            id_rows,
+            meta_by_id,
+            rooms_by_id,
+            customer_user_map
+          )
         end
 
       _ ->
@@ -287,12 +294,58 @@ defmodule Ysc.WpMigration.WpRepo do
     end
   end
 
-  defp build_mphb_booking_list(id_rows, meta_by_id, rooms_by_id) do
+  defp resolve_mphb_customer_user_ids(conn, meta_by_id) do
+    customer_post_ids =
+      meta_by_id
+      |> Map.values()
+      |> Enum.map(& &1["mphb_customer_id"])
+      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+      |> Enum.uniq()
+
+    if customer_post_ids == [] do
+      %{}
+    else
+      placeholders =
+        customer_post_ids
+        |> Enum.with_index(1)
+        |> Enum.map_join(", ", fn {_id, i} -> "$#{i}" end)
+
+      sql = """
+      SELECT post_id, meta_value
+      FROM #{@table_prefix}_postmeta
+      WHERE post_id IN (#{placeholders})
+        AND meta_key = '_mphb_user_id'
+      """
+
+      case query_maps(conn, sql, Enum.map(customer_post_ids, &to_string/1)) do
+        {:ok, rows} ->
+          Map.new(rows, fn r -> {r["post_id"], r["meta_value"]} end)
+
+        _ ->
+          %{}
+      end
+    end
+  end
+
+  defp build_mphb_booking_list(
+         id_rows,
+         meta_by_id,
+         rooms_by_id,
+         customer_user_map
+       ) do
     Enum.map(id_rows, fn row ->
       id = row["ID"]
       meta = Map.get(meta_by_id, id, %{})
       rooms = Map.get(rooms_by_id, id, [])
-      Map.merge(meta, %{"ID" => id, "reserved_rooms" => rooms})
+
+      customer_post_id = meta["mphb_customer_id"]
+
+      wp_user_id =
+        Map.get(customer_user_map, customer_post_id, customer_post_id)
+
+      meta
+      |> Map.put("mphb_customer_id", wp_user_id)
+      |> Map.merge(%{"ID" => id, "reserved_rooms" => rooms})
     end)
   end
 

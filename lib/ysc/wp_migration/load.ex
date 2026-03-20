@@ -1602,10 +1602,11 @@ defmodule Ysc.WpMigration.Load do
       case parse_subscription_datetime(row["last_membership_payment_date"]) do
         %DateTime{} = dt ->
           # Renewals are always for 1 year
-          dt
-          |> DateTime.to_date()
-          |> Date.shift(year: 1)
-          |> DateTime.new!(~T[00:00:00], "Etc/UTC")
+          date = DateTime.to_date(dt)
+          next_year = date.year + 1
+          max_day = :calendar.last_day_of_the_month(next_year, date.month)
+          renewed = Date.new!(next_year, date.month, min(date.day, max_day))
+          DateTime.new!(renewed, ~T[00:00:00], "Etc/UTC")
 
         _ ->
           nil
@@ -1935,6 +1936,16 @@ defmodule Ysc.WpMigration.Load do
   defp parse_subscription_datetime(_), do: nil
 
   defp load_bookings(bookings_data, user_map) do
+    user_ids = Map.values(user_map)
+
+    user_name_map =
+      from(u in User,
+        where: u.id in ^user_ids,
+        select: {u.id, u.first_name, u.last_name}
+      )
+      |> Repo.all()
+      |> Map.new(fn {id, first, last} -> {id, {first || "", last || ""}} end)
+
     for row <- bookings_data do
       wp_user_id = row["wp_customer_user_id"]
       user_id = wp_user_id && user_map[wp_user_id]
@@ -1944,14 +1955,15 @@ defmodule Ysc.WpMigration.Load do
           "[WP Load] Skipping booking #{row["wp_booking_id"]}: no migrated user for wp_customer_user_id=#{wp_user_id}"
         )
       else
-        load_one_booking(row, user_id)
+        {user_first, user_last} = Map.get(user_name_map, user_id, {"", ""})
+        load_one_booking(row, user_id, user_first, user_last)
       end
     end
 
     :ok
   end
 
-  defp load_one_booking(row, user_id) do
+  defp load_one_booking(row, user_id, booking_user_first, booking_user_last) do
     raw_room_names = Enum.map(row["rooms"] || [], & &1["room_name"])
 
     buyout? =
@@ -2038,12 +2050,21 @@ defmodule Ysc.WpMigration.Load do
                      )
                      |> Repo.insert() do
                   {:ok, booking} ->
+                    guest_first = row["guest_first_name"] || "Guest"
+                    guest_last = row["guest_last_name"] || "Guest"
+
+                    is_booking_user =
+                      String.downcase(String.trim(guest_first)) ==
+                        String.downcase(String.trim(booking_user_first)) and
+                        String.downcase(String.trim(guest_last)) ==
+                          String.downcase(String.trim(booking_user_last))
+
                     %BookingGuest{}
                     |> BookingGuest.changeset(%{
                       booking_id: booking.id,
-                      first_name: row["guest_first_name"] || "Guest",
-                      last_name: row["guest_last_name"] || "Guest",
-                      is_booking_user: true,
+                      first_name: guest_first,
+                      last_name: guest_last,
+                      is_booking_user: is_booking_user,
                       order_index: 0
                     })
                     |> Repo.insert()
