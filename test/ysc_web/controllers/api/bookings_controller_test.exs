@@ -17,11 +17,22 @@ defmodule YscWeb.Api.BookingsControllerTest do
     attrs = Map.new(attrs)
     user_id = Map.get(attrs, :user_id) || Ysc.AccountsFixtures.user_fixture().id
 
+    checkin = Date.add(today, -1)
+    checkout = Date.add(today, 2)
+
+    # If checkout lands on Sunday (day 7), the booking would include Saturday night
+    # but not Sunday night, violating the "Saturday must include Sunday" rule.
+    # Extend to Monday so both Saturday and Sunday nights are covered.
+    checkout =
+      if Date.day_of_week(checkout) == 7,
+        do: Date.add(checkout, 1),
+        else: checkout
+
     {:ok, booking} =
       attrs
       |> Enum.into(%{
-        checkin_date: Date.add(today, -1),
-        checkout_date: Date.add(today, 2),
+        checkin_date: checkin,
+        checkout_date: checkout,
         guests_count: 2,
         property: :tahoe,
         booking_mode: :buyout,

@@ -477,7 +477,18 @@ defmodule Ysc.Accounts do
               )
           end
 
-          # Return user for use after transaction
+          # Mark onboarding as complete immediately for new UI-registered users.
+          # WP-migrated users are inserted directly via registration_changeset (not
+          # through this function) and will have this field as nil, triggering the
+          # post-migration onboarding wizard on their first login.
+          {:ok, user} =
+            user
+            |> Ecto.Changeset.change(
+              post_migration_onboarding_completed_at:
+                DateTime.truncate(DateTime.utc_now(), :second)
+            )
+            |> Repo.update()
+
           user
 
         {:error, changeset} ->
