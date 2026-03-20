@@ -1068,7 +1068,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     email = member_params["email"] || ""
 
     relationship =
-      String.to_existing_atom(member_params["relationship"] || "child")
+      case member_params["relationship"] do
+        "spouse" -> :spouse
+        _ -> :child
+      end
 
     result =
       case FamilyInvites.create_invite(user, email, relationship: relationship) do
