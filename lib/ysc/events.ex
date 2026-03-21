@@ -65,17 +65,20 @@ defmodule Ysc.Events do
     date_from = Keyword.get(opts, :date_from, "")
     date_to = Keyword.get(opts, :date_to, "")
     search_term = Keyword.get(opts, :search_term)
+    tab = Keyword.get(opts, :tab, :all)
 
     query =
       if search_term in [nil, ""] do
         Event
         |> where([e], e.state not in ["deleted"])
+        |> maybe_filter_tab(tab)
         |> maybe_filter_start_date_from(date_from)
         |> maybe_filter_start_date_to(date_to)
         |> join(:left, [e], u in assoc(e, :organizer), as: :organizer)
         |> preload([organizer: o], organizer: o)
       else
         fuzzy_search_event(search_term)
+        |> maybe_filter_tab(tab)
         |> maybe_filter_start_date_from(date_from)
         |> maybe_filter_start_date_to(date_to)
       end
@@ -83,6 +86,28 @@ defmodule Ysc.Events do
     query
     |> Flop.validate_and_run(params, for: Event)
   end
+
+  defp maybe_filter_tab(query, :upcoming) do
+    now = DateTime.utc_now()
+
+    query
+    |> where([e], e.state not in ["draft"])
+    |> where([e], e.start_date > ^now)
+  end
+
+  defp maybe_filter_tab(query, :drafts) do
+    where(query, [e], e.state == "draft")
+  end
+
+  defp maybe_filter_tab(query, :past) do
+    now = DateTime.utc_now()
+
+    query
+    |> where([e], e.state not in ["draft"])
+    |> where([e], e.start_date <= ^now)
+  end
+
+  defp maybe_filter_tab(query, _), do: query
 
   defp normalize_list_events_opts(search_term)
        when is_binary(search_term) or is_nil(search_term),

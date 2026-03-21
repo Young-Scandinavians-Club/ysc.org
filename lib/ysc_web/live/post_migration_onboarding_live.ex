@@ -25,6 +25,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   @step_profile 1
   @step_address 2
   @step_phone_verification 3
+  @step_membership_selection 7
   @step_payment 4
   @step_family 5
   @step_complete 6
@@ -45,12 +46,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       membership_plan = resolve_membership_plan(user)
       active_subscription = find_active_real_subscription(user)
       has_real_subscription = not is_nil(active_subscription)
+      needs_plan_selection = membership_plan == :unknown
       is_family_plan = membership_plan in [:family, :lifetime]
 
       # Only lifetime members skip the payment step entirely.
       # Users with an active subscription still see it (to review details + add PM if missing).
       skip_payment = membership_plan == :lifetime
-      steps = build_steps(is_family_plan, skip_payment)
+      steps = build_steps(is_family_plan, skip_payment, needs_plan_selection)
 
       socket =
         socket
@@ -59,6 +61,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         |> assign(:current_step, @step_profile)
         |> assign(:steps, steps)
         |> assign(:membership_plan, membership_plan)
+        |> assign(:needs_plan_selection, needs_plan_selection)
         |> assign(:has_real_subscription, has_real_subscription)
         |> assign(:active_subscription, active_subscription)
         |> assign(:is_family_plan, is_family_plan)
@@ -120,6 +123,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <% end %>
           <%= if @current_step == 2 do %>
             <.step_address form={@address_form} />
+          <% end %>
+          <%= if @current_step == 7 do %>
+            <.step_membership_selection membership_plan={@membership_plan} />
           <% end %>
           <%= if @current_step == 3 do %>
             <.step_phone_verification
@@ -267,6 +273,93 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </div>
         </:actions>
       </.simple_form>
+    </div>
+    """
+  end
+
+  attr :membership_plan, :atom, required: true
+
+  defp step_membership_selection(assigns) do
+    ~H"""
+    <div>
+      <.header class="text-left">
+        Choose Your Membership Type
+        <:subtitle>
+          We couldn't find a membership type on record for your account. Please select the plan that best fits you.
+        </:subtitle>
+      </.header>
+
+      <div id="membership-selection" class="mt-6 space-y-4">
+        <button
+          type="button"
+          id="select-membership-single"
+          phx-click="select_membership"
+          phx-value-plan="single"
+          class={[
+            "w-full text-left p-5 rounded-xl border-2 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+            if(@membership_plan == :single,
+              do: "border-blue-600 bg-blue-50",
+              else:
+                "border-zinc-200 bg-white hover:border-blue-400 hover:bg-blue-50/50"
+            )
+          ]}
+        >
+          <div class="flex items-start gap-4">
+            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-blue-600">
+              <%= if @membership_plan == :single do %>
+                <div class="h-2.5 w-2.5 rounded-full bg-blue-600"></div>
+              <% end %>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-zinc-900">Single Membership</p>
+              <p class="mt-1 text-sm text-zinc-500">
+                Membership for one person. Access to all YSC events and community resources.
+              </p>
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          id="select-membership-family"
+          phx-click="select_membership"
+          phx-value-plan="family"
+          class={[
+            "w-full text-left p-5 rounded-xl border-2 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+            if(@membership_plan == :family,
+              do: "border-blue-600 bg-blue-50",
+              else:
+                "border-zinc-200 bg-white hover:border-blue-400 hover:bg-blue-50/50"
+            )
+          ]}
+        >
+          <div class="flex items-start gap-4">
+            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-blue-600">
+              <%= if @membership_plan == :family do %>
+                <div class="h-2.5 w-2.5 rounded-full bg-blue-600"></div>
+              <% end %>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-zinc-900">Family Membership</p>
+              <p class="mt-1 text-sm text-zinc-500">
+                Covers you, your spouse, and children under 18. Includes family member invitations.
+              </p>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <div class="mt-8 flex justify-end">
+        <.button
+          type="button"
+          id="confirm-membership-selection"
+          phx-click="confirm_membership_selection"
+          disabled={@membership_plan == :unknown}
+        >
+          Confirm & Continue
+          <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+        </.button>
+      </div>
     </div>
     """
   end
@@ -750,6 +843,46 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
       {:error, changeset} ->
         {:noreply, assign(socket, :address_form, to_form(changeset))}
+    end
+  end
+
+  def handle_event("select_membership", %{"plan" => plan_str}, socket) do
+    plan =
+      case plan_str do
+        "family" -> :family
+        "single" -> :single
+        _ -> :unknown
+      end
+
+    {:noreply, assign(socket, :membership_plan, plan)}
+  end
+
+  def handle_event("confirm_membership_selection", _params, socket) do
+    plan = socket.assigns.membership_plan
+
+    if plan == :unknown do
+      YscWeb.Flash.send_toast(
+        :error,
+        "Please select a membership type before continuing.",
+        title: "Selection Required"
+      )
+
+      {:noreply, socket}
+    else
+      is_family_plan = plan == :family
+      skip_payment = false
+      needs_plan_selection = false
+      steps = build_steps(is_family_plan, skip_payment, needs_plan_selection)
+
+      # Rebuild steps without the selection step, then advance from address
+      # (the step that precedes payment in the rebuilt list).
+      socket =
+        socket
+        |> assign(:is_family_plan, is_family_plan)
+        |> assign(:needs_plan_selection, needs_plan_selection)
+        |> assign(:steps, steps)
+
+      {:noreply, advance_to_next_step(socket, @step_address)}
     end
   end
 
@@ -1255,17 +1388,21 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  defp build_steps(is_family_plan, skip_payment) do
+  defp build_steps(is_family_plan, skip_payment, needs_plan_selection) do
     base = [
       {"Profile", @step_profile},
-      {"Address", @step_address},
-      {"Membership", @step_payment}
+      {"Address", @step_address}
     ]
 
     base =
-      if skip_payment,
-        do: List.delete(base, {"Membership", @step_payment}),
+      if needs_plan_selection,
+        do: base ++ [{"Membership Type", @step_membership_selection}],
         else: base
+
+    base =
+      if skip_payment,
+        do: base,
+        else: base ++ [{"Membership", @step_payment}]
 
     base = if is_family_plan, do: base ++ [{"Family", @step_family}], else: base
     base
@@ -1437,7 +1574,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         plan_type_from_subscription(migrated, plans)
       else
         # Third: signup application
-        plan_from_application(user) || :single
+        plan_from_application(user) || :unknown
       end
     end
   end

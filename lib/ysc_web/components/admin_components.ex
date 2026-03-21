@@ -69,6 +69,7 @@ defmodule YscWeb.AdminComponents do
   attr :user_id, :string
   attr :most_connected_country, :string
   attr :board_position, :any, default: nil
+  attr :role, :atom, default: :admin
   slot :inner_block, required: true
 
   def side_menu(assigns) do
@@ -272,7 +273,7 @@ defmodule YscWeb.AdminComponents do
                 </.link>
               </li>
 
-              <li>
+              <li :if={@role == :admin}>
                 <.link
                   navigate="/admin/bookings"
                   title="Bookings"
@@ -305,7 +306,7 @@ defmodule YscWeb.AdminComponents do
                 </.link>
               </li>
 
-              <li>
+              <li :if={@role == :admin}>
                 <.link
                   navigate="/admin/users"
                   title="Users"
@@ -338,7 +339,7 @@ defmodule YscWeb.AdminComponents do
                 </.link>
               </li>
 
-              <li>
+              <li :if={@role == :admin}>
                 <.link
                   navigate="/admin/memberships"
                   title="Memberships"
@@ -371,7 +372,7 @@ defmodule YscWeb.AdminComponents do
                 </.link>
               </li>
 
-              <li :if={@board_position == :treasurer}>
+              <li :if={@role == :admin && @board_position == :treasurer}>
                 <.link
                   navigate="/admin/money"
                   title="Money"

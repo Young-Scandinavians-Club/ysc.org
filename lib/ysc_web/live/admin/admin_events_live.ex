@@ -21,6 +21,7 @@ defmodule YscWeb.AdminEventsLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <div class="flex justify-between py-6">
         <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
@@ -36,6 +37,27 @@ defmodule YscWeb.AdminEventsLive do
       </div>
 
       <div class="w-full pt-4">
+        <%!-- Tab navigation --%>
+        <div class="border-b border-zinc-200 mb-6">
+          <nav id="events-tabs" class="-mb-px flex gap-6" aria-label="Events tabs">
+            <%= for {label, tab_key} <- [{"Upcoming", :upcoming}, {"Drafts", :drafts}, {"Past", :past}, {"All", :all}] do %>
+              <.link
+                patch={~p"/admin/events?#{Map.put(@params, "tab", tab_key)}"}
+                class={[
+                  "whitespace-nowrap pb-3 px-1 border-b-2 text-sm font-medium transition-colors",
+                  if(@active_tab == tab_key,
+                    do: "border-zinc-800 text-zinc-900",
+                    else:
+                      "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+                  )
+                ]}
+              >
+                {label}
+              </.link>
+            <% end %>
+          </nav>
+        </div>
+
         <div>
           <.admin_search_bar
             id="events-search-form"
@@ -296,6 +318,7 @@ defmodule YscWeb.AdminEventsLive do
      socket
      |> assign(:page_title, "Events")
      |> assign(:active_page, :events)
+     |> assign(:active_tab, :upcoming)
      |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
@@ -305,10 +328,12 @@ defmodule YscWeb.AdminEventsLive do
   def handle_params(params, _uri, socket) do
     date_from = Map.get(params, "date_from", "")
     date_to = Map.get(params, "date_to", "")
+    active_tab = parse_tab(Map.get(params, "tab", "upcoming"))
 
     case Events.list_events_paginated(params,
            date_from: date_from,
-           date_to: date_to
+           date_to: date_to,
+           tab: active_tab
          ) do
       {:ok, {events, meta}} ->
         author_filter = Events.get_all_authors()
@@ -319,6 +344,7 @@ defmodule YscWeb.AdminEventsLive do
          socket
          |> assign(:meta, meta)
          |> assign(:params, params)
+         |> assign(:active_tab, active_tab)
          |> assign(:author_filter, author_filter)
          |> assign(:search_query, search_query)
          |> assign(:date_from, date_from)
@@ -374,7 +400,7 @@ defmodule YscWeb.AdminEventsLive do
     date_to = socket.assigns.date_to
 
     new_params =
-      %{"filters" => filter_params}
+      %{"filters" => filter_params, "tab" => socket.assigns.active_tab}
       |> then(fn p ->
         if date_from != "", do: Map.put(p, "date_from", date_from), else: p
       end)
@@ -434,7 +460,10 @@ defmodule YscWeb.AdminEventsLive do
       end
 
     new_params =
-      Map.merge(params, %{"filters" => final_filters})
+      Map.merge(params, %{
+        "filters" => final_filters,
+        "tab" => socket.assigns.active_tab
+      })
       |> then(fn p ->
         if date_from != "", do: Map.put(p, "date_from", date_from), else: p
       end)
@@ -476,6 +505,11 @@ defmodule YscWeb.AdminEventsLive do
     do: Map.replace(filter, "value", "")
 
   defp maybe_update_filter(filter), do: filter
+
+  defp parse_tab("drafts"), do: :drafts
+  defp parse_tab("past"), do: :past
+  defp parse_tab("all"), do: :all
+  defp parse_tab(_), do: :upcoming
 
   @flop_keys ~w(order_by order_directions page page_size limit offset filters)
   defp non_flop_params(params) when is_map(params),

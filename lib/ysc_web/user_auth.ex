@@ -295,6 +295,26 @@ defmodule YscWeb.UserAuth do
     admin_user =
       socket.assigns[:real_current_user] || socket.assigns.current_user
 
+    if admin_user && admin_user.role in [:admin, :volunteer] do
+      {:cont, Phoenix.Component.assign(socket, :admin_role, admin_user.role)}
+    else
+      socket =
+        socket
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "You do not have permission to access this page",
+          title: "Access denied"
+        )
+        |> Phoenix.LiveView.redirect(to: ~p"/")
+
+      {:halt, socket}
+    end
+  end
+
+  def on_mount(:ensure_full_admin, _params, _session, socket) do
+    admin_user =
+      socket.assigns[:real_current_user] || socket.assigns.current_user
+
     if admin_user && admin_user.role == :admin do
       {:cont, socket}
     else
@@ -305,7 +325,7 @@ defmodule YscWeb.UserAuth do
           "You do not have permission to access this page",
           title: "Access denied"
         )
-        |> Phoenix.LiveView.redirect(to: ~p"/")
+        |> Phoenix.LiveView.redirect(to: ~p"/admin")
 
       {:halt, socket}
     end
@@ -475,7 +495,7 @@ defmodule YscWeb.UserAuth do
   def require_admin(conn, _opts) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
 
-    if user && user.role == :admin do
+    if user && user.role in [:admin, :volunteer] do
       conn
     else
       conn
@@ -486,6 +506,23 @@ defmodule YscWeb.UserAuth do
       )
       |> maybe_store_return_to()
       |> redirect(to: ~p"/")
+      |> halt()
+    end
+  end
+
+  def require_full_admin(conn, _opts) do
+    user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
+
+    if user && user.role == :admin do
+      conn
+    else
+      conn
+      |> YscWeb.Flash.put_toast(
+        :error,
+        "You do not have permission to access this page.",
+        title: "Access denied"
+      )
+      |> redirect(to: ~p"/admin")
       |> halt()
     end
   end

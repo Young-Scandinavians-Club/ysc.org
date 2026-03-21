@@ -1,6 +1,8 @@
 defmodule YscWeb.AdminUserDetailsLive do
   use YscWeb, :admin_live_view
 
+  on_mount {YscWeb.UserAuth, :ensure_full_admin}
+
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
@@ -30,6 +32,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <div class="flex flex-col justify-between py-6">
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
@@ -301,7 +304,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <.input
                 type="select"
                 field={@form[:role]}
-                options={[Member: "member", Admin: "admin"]}
+                options={[Member: "member", Admin: "admin", Volunteer: "volunteer"]}
                 label="Role"
               />
 

@@ -21,6 +21,7 @@ defmodule YscWeb.AdminDashboardLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-6 mb-8">
         <div>
@@ -62,8 +63,12 @@ defmodule YscWeb.AdminDashboardLive do
           <.live_component module={YscWeb.AdminSearchComponent} id="admin-search" />
         </div>
       </div>
-      <!-- Tiered Stats Row -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
+      <%!-- Admin-only stats row --%>
+      <div
+        :if={@admin_role == :admin}
+        id="admin-stats-row"
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12"
+      >
         <!-- Applications Card -->
         <.link
           navigate="/admin/users?filters[0][_persistent_id]=0&filters[0][field]=state&filters[0][op]=in&filters[0][value][]=pending_approval"
@@ -300,11 +305,74 @@ defmodule YscWeb.AdminDashboardLive do
           </p>
         </.link>
       </div>
-      <!-- Priority Dashboard Layout -->
+
+      <%!-- Volunteer stats row: shown only to volunteers --%>
+      <div
+        :if={@admin_role == :volunteer}
+        id="volunteer-stats-row"
+        class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+      >
+        <.link
+          navigate={~p"/admin/events"}
+          class="bg-white p-6 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Upcoming Events
+            </p>
+            <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+              {@upcoming_events_count}
+            </p>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            Manage events →
+          </p>
+        </.link>
+        <.link
+          navigate={~p"/admin/posts"}
+          class="bg-white p-6 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              News &amp; Posts
+            </p>
+            <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+              {@published_posts_count}
+            </p>
+            <p class="text-xs text-zinc-500 mt-1 font-medium">published</p>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            Manage posts →
+          </p>
+        </.link>
+        <.link
+          navigate={~p"/admin/newsletters"}
+          class="bg-white p-6 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+              Newsletters
+            </p>
+            <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+              {@newsletter_editions_count}
+            </p>
+            <p class="text-xs text-zinc-500 mt-1 font-medium">editions</p>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            Manage newsletters →
+          </p>
+        </.link>
+      </div>
+      
+    <!-- Priority Dashboard Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
         <section class="lg:col-span-2 space-y-6">
-          <!-- Review Applications Section -->
-          <div class="bg-white rounded shadow-sm border border-zinc-200 p-8">
+          <%!-- Review Applications: admin only --%>
+          <div
+            :if={@admin_role == :admin}
+            id="review-applications-section"
+            class="bg-white rounded shadow-sm border border-zinc-200 p-8"
+          >
             <div class="flex items-center justify-between mb-8 border-b border-zinc-50 pb-4">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
@@ -520,16 +588,15 @@ defmodule YscWeb.AdminDashboardLive do
   @impl true
   @spec mount(any(), any(), map()) :: {:ok, map()}
   def mount(_params, _session, socket) do
-    # Initialize with placeholder values for fast initial render
     socket =
       socket
       |> assign(:active_page, :dashboard)
       |> assign(:build_version, BuildVersion.version())
       |> assign(:page_title, "Dashboard")
       |> assign(:loading_dashboard, true)
-      # Placeholder values - will be populated when connected
       |> assign(:latest_comments, [])
       |> assign(:events_with_tickets, [])
+      # Admin-only placeholders
       |> assign(:pending_users, [])
       |> assign(:pending_reviews_count, 0)
       |> assign(:current_month_revenue, Money.new(:USD, 0))
@@ -557,8 +624,11 @@ defmodule YscWeb.AdminDashboardLive do
         family: 0,
         lifetime: 0
       })
+      # Volunteer-only placeholders
+      |> assign(:upcoming_events_count, 0)
+      |> assign(:published_posts_count, 0)
+      |> assign(:newsletter_editions_count, 0)
 
-    # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do
       send(self(), :load_dashboard_data)
     end
@@ -567,13 +637,29 @@ defmodule YscWeb.AdminDashboardLive do
   end
 
   @impl true
+  def handle_info(
+        :load_dashboard_data,
+        %{assigns: %{admin_role: :volunteer}} = socket
+      ) do
+    latest_comments = Posts.get_latest_comments(5)
+    events_with_tickets = Events.get_upcoming_events_with_ticket_tier_counts()
+
+    {:noreply,
+     socket
+     |> assign(:loading_dashboard, false)
+     |> assign(:latest_comments, latest_comments)
+     |> assign(:events_with_tickets, events_with_tickets)
+     |> assign(:upcoming_events_count, length(events_with_tickets))
+     |> assign(:published_posts_count, get_published_posts_count())
+     |> assign(:newsletter_editions_count, get_newsletter_editions_count())}
+  end
+
+  @impl true
   def handle_info(:load_dashboard_data, socket) do
-    # Load all data in parallel where possible
     latest_comments = Posts.get_latest_comments(5)
     events_with_tickets = Events.get_upcoming_events_with_ticket_tier_counts()
     pending_users = Accounts.get_pending_approval_users()
 
-    # Optimize revenue calculations by fetching accounts once and combining queries
     {current_revenue, revenue_change_text, revenue_change_direction,
      last_month_revenue, last_year_month_revenue, revenue_bookings,
      revenue_events, revenue_membership, revenue_mix_bookings_percent,
@@ -632,6 +718,23 @@ defmodule YscWeb.AdminDashboardLive do
     }
 
     ~p"/admin/users/#{user_id}/review?#{params}"
+  end
+
+  defp get_published_posts_count do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    Repo.one(
+      from p in Ysc.Posts.Post,
+        where: not is_nil(p.published_on),
+        select: count()
+    )
+  end
+
+  defp get_newsletter_editions_count do
+    alias Ysc.Repo
+    import Ecto.Query
+    Repo.one(from e in Ysc.Newsletter.Edition, select: count())
   end
 
   defp get_application_statistics do

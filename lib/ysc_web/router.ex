@@ -85,6 +85,10 @@ defmodule YscWeb.Router do
     plug YscWeb.Plugs.AdminSidebarState
   end
 
+  pipeline :full_admin_only do
+    plug :require_full_admin
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -335,15 +339,25 @@ defmodule YscWeb.Router do
     end
   end
 
+  # Full admin-only routes (not accessible by volunteers)
   scope "/admin", YscWeb do
-    pipe_through [:admin_browser, :require_authenticated_user, :require_admin]
+    pipe_through [
+      :admin_browser,
+      :require_authenticated_user,
+      :require_admin,
+      :full_admin_only
+    ]
 
     get "/impersonate/:user_id", ImpersonationController, :impersonate
     get "/stop-impersonation", ImpersonationController, :stop_impersonation
 
     live_dashboard "/dashboard", metrics: {YscWeb.Telemetry, :metrics}
+  end
 
-    # Handle uploads from editors
+  scope "/admin", YscWeb do
+    pipe_through [:admin_browser, :require_authenticated_user, :require_admin]
+
+    # Handle uploads from editors (accessible to volunteers for content creation)
     post "/trix-uploads", TrixUploadsController, :create
 
     live_session :require_admin,
