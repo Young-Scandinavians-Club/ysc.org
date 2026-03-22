@@ -110,6 +110,7 @@ defmodule YscWeb.CoreComponents do
 
       <.flash kind={:info} flash={@flash} />
       <.flash kind={:info} phx-mounted={show("#flash")}>Welcome Back!</.flash>
+      <.flash kind={:error} id="sys-msg" dismissable={false}>System status…</.flash>
   """
   attr :id, :string, default: "flash", doc: "the optional id of flash container"
   attr :flash, :map, default: %{}, doc: "the map of flash messages to display"
@@ -124,6 +125,11 @@ defmodule YscWeb.CoreComponents do
 
   attr :class, :string, default: nil
 
+  attr :dismissable, :boolean,
+    default: true,
+    doc:
+      "when false, omits the close control and click-to-dismiss (for system-driven flashes)"
+
   slot :inner_block,
     doc: "the optional inner block that renders the flash message"
 
@@ -132,7 +138,10 @@ defmodule YscWeb.CoreComponents do
     <div
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
-      phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
+      phx-click={
+        if @dismissable,
+          do: JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")
+      }
       role="alert"
       class={[
         "fixed top-2 right-2 w-80 sm:w-96 z-[110] rounded-xl p-3 ring-1",
@@ -162,6 +171,7 @@ defmodule YscWeb.CoreComponents do
       </p>
       <p class="mt-2 text-sm leading-5">{msg}</p>
       <button
+        :if={@dismissable}
         type="button"
         class="absolute p-2 group top-1 right-1"
         aria-label={gettext("close")}
@@ -194,6 +204,7 @@ defmodule YscWeb.CoreComponents do
       id="client-error"
       kind={:error}
       title="We can't find the internet"
+      dismissable={false}
       phx-disconnected={show(".phx-client-error #client-error")}
       phx-connected={hide("#client-error")}
       hidden
@@ -206,6 +217,7 @@ defmodule YscWeb.CoreComponents do
       id="server-error"
       kind={:error}
       title="Something went wrong!"
+      dismissable={false}
       phx-disconnected={show(".phx-server-error #server-error")}
       phx-connected={hide("#server-error")}
       hidden
