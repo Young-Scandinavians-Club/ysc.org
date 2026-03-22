@@ -1221,6 +1221,16 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     {:noreply, advance_to_next_step(socket, @step_payment)}
   end
 
+  def handle_event("set-step", %{"step" => step_str}, socket) do
+    requested_index = String.to_integer(step_str)
+    steps = socket.assigns.steps
+
+    case Enum.at(steps, requested_index) do
+      {_label, step_num} -> {:noreply, assign(socket, :current_step, step_num)}
+      nil -> {:noreply, socket}
+    end
+  end
+
   def handle_event("add_family_member", _params, socket) do
     new_form =
       to_form(
