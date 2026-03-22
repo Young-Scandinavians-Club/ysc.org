@@ -27,13 +27,14 @@ const Countdown = {
     },
 
     _init() {
+        this._cleanup();
+
         this._rawExpiry = this.el.dataset.expiresAt;
         if (!this._rawExpiry) return;
 
         this._expiry = new Date(this._rawExpiry);
         if (isNaN(this._expiry.getTime())) return;
 
-        this._cleanup();
         this._tick();
         this._interval = setInterval(() => this._tick(), 1000);
     },
@@ -70,12 +71,14 @@ const Countdown = {
             }
         }
 
+        const totalMin = Math.ceil(totalSec / 60);
+
         if (this.el.dataset.colorSelf !== undefined) {
-            this._applySelfColor(m, expired);
+            this._applySelfColor(totalMin, expired);
         }
 
         if (this.el.dataset.colorContainer !== undefined) {
-            this._applyContainerColor(m, expired, displayEl);
+            this._applyContainerColor(totalMin, expired, displayEl);
         }
 
         if (expired) {
@@ -86,14 +89,22 @@ const Countdown = {
     },
 
     _applySelfColor(minutes, expired) {
+        const cl = this.el.classList;
+        cl.remove(
+            "text-red-600",
+            "text-orange-600",
+            "text-yellow-600",
+            "text-blue-900",
+        );
+
         if (expired) {
-            this.el.className = "font-bold text-red-600";
+            cl.add("font-bold", "text-red-600");
         } else if (minutes < 2) {
-            this.el.className = "font-bold text-orange-600";
+            cl.add("font-bold", "text-orange-600");
         } else if (minutes < 5) {
-            this.el.className = "font-bold text-yellow-600";
+            cl.add("font-bold", "text-yellow-600");
         } else {
-            this.el.className = "font-bold text-blue-900";
+            cl.add("font-bold", "text-blue-900");
         }
     },
 
