@@ -36,9 +36,7 @@ import MoneyInput from "./money_input";
 import Turnstile from "./phoenix_turnstile";
 import StripeInput from "./stripe_payment";
 import StripeElements from "./stripe_elements";
-import CheckoutTimer from "./checkout_timer";
-import HoldCountdown from "./hold_countdown";
-import CountdownColor from "./countdown_color";
+import Countdown from "./countdown";
 import GLightboxHook from "./glightbox_hook";
 import LocalTime from "./local_time";
 import ResendTimer from "./resend_timer";
@@ -73,9 +71,7 @@ let Hooks = {
     Turnstile,
     StripeInput,
     StripeElements,
-    CheckoutTimer,
-    HoldCountdown,
-    CountdownColor,
+    Countdown,
     GLightboxHook,
     LocalTime,
     ResendTimer,
@@ -208,71 +204,8 @@ window.addEventListener("phx:focus-first-input", (e) => {
     }, 150);
 });
 
-window.addEventListener("phx:scroll-to-price-details", () => {
-    const priceDetails = document.getElementById("price-details-section");
-    if (priceDetails) {
-        priceDetails.scrollIntoView({ behavior: "smooth", block: "start" });
-        // Also expand if collapsed on mobile
-        const toggleButton = priceDetails.querySelector('button[phx-click="toggle-price-details"]');
-        if (toggleButton && toggleButton.getAttribute("aria-expanded") !== "true") {
-            toggleButton.click();
-        }
-    }
-});
-
 // connect if there are any LiveViews on the page
 liveSocket.connect();
-
-// Handle Sentry user context updates when user logs in/out
-// LiveView can push this event when authentication state changes
-window.addEventListener("phx:update-sentry-user", (e) => {
-    const { user } = e.detail || {};
-    if (window.Sentry) {
-        if (user) {
-            window.Sentry.setUser({
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                state: user.state,
-            });
-            window.currentUser = user;
-        } else {
-            window.Sentry.setUser(null);
-            window.currentUser = null;
-        }
-    } else {
-        // Just update the local user reference if Sentry is not available
-        window.currentUser = user || null;
-    }
-});
-
-// Add navigation breadcrumbs to Sentry for error context
-window.addEventListener("phx:page-loading-start", (info) => {
-    if (window.Sentry) {
-        window.Sentry.addBreadcrumb({
-            category: "navigation",
-            message: "LiveView navigation started",
-            level: "info",
-        });
-    }
-});
-
-window.addEventListener("phx:page-loading-stop", (info) => {
-    if (window.Sentry) {
-        window.Sentry.addBreadcrumb({
-            category: "navigation",
-            message: "LiveView navigation completed",
-            level: "info",
-        });
-    }
-});
-
-// Capture LiveView errors in Sentry
-liveSocket.on("phx:error", (error) => {
-    if (window.Sentry) {
-        window.Sentry.captureException(error);
-    }
-});
 
 // Handle map toggle text updates
 window.addEventListener("phx:toggle-map-text", () => {
@@ -427,67 +360,9 @@ document.addEventListener("paste", (event) => {
     }
 });
 
-// Auto-submit hook for forms
-let AutoSubmit = {
-    mounted() {
-        this.el.dispatchEvent(new Event("submit", { bubbles: true }));
-    },
-};
-
-// Add AutoSubmit to hooks
-Hooks.AutoSubmit = AutoSubmit;
-
-// Auto-consume uploads when they reach 100% progress
-// Listen for multiple possible events
-window.addEventListener("phx:file-update", (e) => {
-    const { ref, progress } = e.detail || {};
-    if (progress === 100) {
-        // Find the consume button for this ref
-        const consumeButton = document.getElementById(`receipt-consume-${ref}`) ||
-            document.getElementById(`proof-consume-${ref}`);
-        if (consumeButton && !consumeButton.disabled) {
-            // Small delay to ensure upload is fully processed
-            setTimeout(() => {
-                consumeButton.click();
-            }, 200);
-        }
-    }
-});
-
-// Also listen for progress updates via DOM observation
-// Check progress bars periodically for completed uploads
-setInterval(() => {
-    document.querySelectorAll('progress[data-ref]').forEach((progress) => {
-        const ref = progress.getAttribute('data-ref');
-        const progressValue = parseInt(progress.value) || 0;
-        const uploadType = progress.getAttribute('data-upload-type');
-
-        // Check if progress is 100% and button is not disabled
-        if (progressValue === 100) {
-            const consumeButton = document.getElementById(`${uploadType}-consume-${ref}`);
-            if (consumeButton && !consumeButton.disabled && !consumeButton.dataset.consumed) {
-                consumeButton.dataset.consumed = 'true';
-                setTimeout(() => {
-                    consumeButton.click();
-                }, 300);
-            }
-        }
-    });
-}, 500);
-
 // Handle print-page event for PDF download
 window.addEventListener("phx:print-page", () => {
     window.print();
-});
-
-// Handle redirect after delay event (for showing success messages before redirect)
-window.addEventListener("phx:redirect-after-delay", (e) => {
-    const { url, delay = 1500 } = e.detail || {};
-    if (url) {
-        setTimeout(() => {
-            window.location.href = url;
-        }, delay);
-    }
 });
 
 // Handle copy to clipboard for Report ID

@@ -2029,9 +2029,9 @@ defmodule YscWeb.CoreComponents do
           <button
             phx-click="set-step"
             phx-value-step={idx}
-            class="flex items-center gap-x-2 leading-6 text-sm hover:text-zinc-700 hover:scale-105 transition-transform duration-150 cursor-pointer"
+            class="flex items-center gap-x-2 leading-6 text-sm hover:text-blue-400 transition-colors duration-150 cursor-pointer"
           >
-            <span class="flex items-center text-zinc-400 justify-center w-6 h-6 text-xs font-bold border rounded shrink-0 border-zinc-400">
+            <span class="flex items-center text-zinc-400 justify-center w-6 h-6 text-xs font-bold border rounded shrink-0 border-zinc-400 group-hover:border-blue-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-400 transition-colors duration-150">
               {idx + 1}
             </span>
             <span class="hidden sm:inline mx-2">{val}</span>

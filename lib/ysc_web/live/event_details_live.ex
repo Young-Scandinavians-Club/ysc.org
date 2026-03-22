@@ -1736,10 +1736,12 @@ defmodule YscWeb.EventDetailsLive do
             <div
               id="checkout-timer"
               class="font-bold text-blue-900"
-              phx-hook="CheckoutTimer"
+              phx-hook="Countdown"
               data-expires-at={@ticket_order.expires_at}
+              data-expire-event="checkout-expired"
+              data-expire-text="EXPIRED"
+              data-color-self
             >
-              <!-- Timer will be populated by JavaScript -->
             </div>
           </div>
         </div>
