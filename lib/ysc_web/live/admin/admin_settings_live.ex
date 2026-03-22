@@ -6,6 +6,8 @@ defmodule YscWeb.AdminSettingsLive do
 
   use YscWeb, :admin_live_view
 
+  on_mount {YscWeb.UserAuth, :ensure_full_admin}
+
   import YscWeb.CoreComponents
 
   use Phoenix.VerifiedRoutes,
@@ -26,6 +28,7 @@ defmodule YscWeb.AdminSettingsLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <div class="flex justify-between py-6">
         <h1 class="text-2xl font-semibold leading-8 text-zinc-800">

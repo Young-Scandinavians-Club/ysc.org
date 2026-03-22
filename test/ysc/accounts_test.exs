@@ -1183,6 +1183,49 @@ defmodule Ysc.AccountsTest do
 
       refute Repo.get_by(UserToken, user_id: user.id)
     end
+
+    test "sets password_set_at on the user", %{user: user} do
+      {:ok, updated_user} =
+        Accounts.reset_user_password(user, %{password: "new valid password"})
+
+      assert %DateTime{} = updated_user.password_set_at
+    end
+
+    test "sets password_set_at when user previously had no password (oauth user)",
+         %{} do
+      user = oauth_user_fixture()
+      assert is_nil(user.password_set_at)
+
+      {:ok, updated_user} =
+        Accounts.reset_user_password(user, %{password: "new valid password"})
+
+      assert %DateTime{} = updated_user.password_set_at
+    end
+
+    test "updates password_set_at even when already set", %{user: user} do
+      # Backdate password_set_at to the past so any new DateTime.utc_now() is
+      # guaranteed to be strictly greater without sleeping
+      original_set_at = DateTime.add(DateTime.utc_now(), -60, :second)
+
+      {:ok, user_with_password_set} =
+        user
+        |> Ysc.Accounts.User.password_set_changeset(%{
+          password_set_at: original_set_at
+        })
+        |> Ysc.Repo.update()
+
+      assert %DateTime{} = user_with_password_set.password_set_at
+
+      {:ok, updated_user} =
+        Accounts.reset_user_password(user_with_password_set, %{
+          password: "another new valid password"
+        })
+
+      assert %DateTime{} = updated_user.password_set_at
+
+      assert DateTime.compare(updated_user.password_set_at, original_set_at) ==
+               :gt
+    end
   end
 
   describe "inspect/2 for the User module" do

@@ -10,6 +10,8 @@ defmodule YscWeb.AdminMembershipsLive do
   """
   use YscWeb, :admin_live_view
 
+  on_mount {YscWeb.UserAuth, :ensure_full_admin}
+
   import YscWeb.CoreComponents
 
   use Phoenix.VerifiedRoutes,
@@ -66,6 +68,7 @@ defmodule YscWeb.AdminMembershipsLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <div class="bg-zinc-50/80 min-h-screen -mx-4 lg:-mx-10 px-4 lg:px-10 py-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">

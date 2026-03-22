@@ -8,7 +8,7 @@ defenum(UserAccountState, [
   "deleted"
 ])
 
-defenum(UserAccountRole, ["member", "admin"])
+defenum(UserAccountRole, ["member", "admin", "volunteer"])
 defenum(FamilyMemberType, ["spouse", "child"])
 defenum(MembershipType, ["single", "family"])
 

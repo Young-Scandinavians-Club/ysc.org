@@ -1,6 +1,8 @@
 defmodule YscWeb.AdminBookingsLive do
   use YscWeb, :admin_live_view
 
+  on_mount {YscWeb.UserAuth, :ensure_full_admin}
+
   import Phoenix.HTML
   import YscWeb.CoreComponents
   import YscWeb.Components.Autocomplete
@@ -30,6 +32,7 @@ defmodule YscWeb.AdminBookingsLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <!-- New/Edit Blackout Modal -->
       <.modal

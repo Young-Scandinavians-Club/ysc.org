@@ -23,6 +23,7 @@ defmodule YscWeb.AdminPostsLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <.modal
         :if={@live_action == :new}

@@ -76,7 +76,7 @@
     >
       <div
         :if={
-          @current_user && @current_user.role == :admin &&
+          @current_user && @current_user.role in [:admin, :volunteer] &&
             !assigns[:impersonating?]
         }
         id="admin-floating-button-wrap"

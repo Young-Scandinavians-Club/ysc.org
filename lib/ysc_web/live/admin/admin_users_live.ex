@@ -1,6 +1,8 @@
 defmodule YscWeb.AdminUsersLive do
   use YscWeb, :admin_live_view
 
+  on_mount {YscWeb.UserAuth, :ensure_full_admin}
+
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
@@ -21,6 +23,7 @@ defmodule YscWeb.AdminUsersLive do
       user_id={@current_user.id}
       most_connected_country={@current_user.most_connected_country}
       board_position={@current_user.board_position}
+      role={@admin_role}
     >
       <.modal
         :if={@live_action == :edit}
@@ -66,8 +69,8 @@ defmodule YscWeb.AdminUsersLive do
           <.input
             type="select"
             field={@form[:role]}
-            options={["member", "admin"]}
-            label="State"
+            options={["member", "admin", "volunteer"]}
+            label="Role"
           />
 
           <div class="flex flex-row justify-end w-full pt-8">
@@ -542,7 +545,8 @@ defmodule YscWeb.AdminUsersLive do
                       op: :in,
                       options: [
                         {"Member", :member},
-                        {"Admin", :admin}
+                        {"Admin", :admin},
+                        {"Volunteer", :volunteer}
                       ]
                     ],
                     membership_type: [

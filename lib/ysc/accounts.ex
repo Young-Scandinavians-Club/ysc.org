@@ -1878,14 +1878,20 @@ defmodule Ysc.Accounts do
   def reset_user_password(user, attrs) do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, User.password_changeset(user, attrs))
+    |> Ecto.Multi.run(:mark_password_set, fn _repo, %{user: updated_user} ->
+      updated_user
+      |> User.password_set_changeset(%{password_set_at: DateTime.utc_now()})
+      |> Repo.update()
+    end)
     |> Ecto.Multi.delete_all(
       :tokens,
       UserToken.by_user_and_contexts_query(user, :all)
     )
     |> Repo.transaction()
     |> case do
-      {:ok, %{user: user}} -> {:ok, user}
+      {:ok, %{mark_password_set: user}} -> {:ok, user}
       {:error, :user, changeset, _} -> {:error, changeset}
+      {:error, :mark_password_set, changeset, _} -> {:error, changeset}
     end
   end
 
