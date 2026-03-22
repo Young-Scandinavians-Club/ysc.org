@@ -1203,12 +1203,18 @@ defmodule Ysc.AccountsTest do
     end
 
     test "updates password_set_at even when already set", %{user: user} do
-      {:ok, user_with_password_set} = Accounts.mark_password_set(user)
-      original_set_at = user_with_password_set.password_set_at
-      assert %DateTime{} = original_set_at
+      # Backdate password_set_at to the past so any new DateTime.utc_now() is
+      # guaranteed to be strictly greater without sleeping
+      original_set_at = DateTime.add(DateTime.utc_now(), -60, :second)
 
-      # Ensure enough time passes so timestamps can differ
-      Process.sleep(1000)
+      {:ok, user_with_password_set} =
+        user
+        |> Ysc.Accounts.User.password_set_changeset(%{
+          password_set_at: original_set_at
+        })
+        |> Ysc.Repo.update()
+
+      assert %DateTime{} = user_with_password_set.password_set_at
 
       {:ok, updated_user} =
         Accounts.reset_user_password(user_with_password_set, %{
@@ -1217,10 +1223,8 @@ defmodule Ysc.AccountsTest do
 
       assert %DateTime{} = updated_user.password_set_at
 
-      assert DateTime.compare(updated_user.password_set_at, original_set_at) in [
-               :gt,
-               :eq
-             ]
+      assert DateTime.compare(updated_user.password_set_at, original_set_at) ==
+               :gt
     end
   end
 

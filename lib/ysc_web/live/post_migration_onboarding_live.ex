@@ -86,6 +86,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           :default_payment_method,
           Ysc.Payments.get_default_payment_method(user)
         )
+        # Membership selection step (only when plan is :unknown)
+        |> assign(
+          :membership_selection_form,
+          to_form(
+            %{
+              "membership_plan" =>
+                if(membership_plan == :unknown,
+                  do: "",
+                  else: to_string(membership_plan)
+                )
+            },
+            as: "membership_selection"
+          )
+        )
         # Family step
         |> assign(:family_members_forms, [])
         |> assign(:invite_results, [])
@@ -125,7 +139,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             <.step_address form={@address_form} />
           <% end %>
           <%= if @current_step == 7 do %>
-            <.step_membership_selection membership_plan={@membership_plan} />
+            <.step_membership_selection
+              form={@membership_selection_form}
+              membership_plan={@membership_plan}
+            />
           <% end %>
           <%= if @current_step == 3 do %>
             <.step_phone_verification
@@ -277,6 +294,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     """
   end
 
+  attr :form, :any, required: true
   attr :membership_plan, :atom, required: true
 
   defp step_membership_selection(assigns) do
@@ -289,77 +307,48 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         </:subtitle>
       </.header>
 
-      <div id="membership-selection" class="mt-6 space-y-4">
-        <button
-          type="button"
-          id="select-membership-single"
-          phx-click="select_membership"
-          phx-value-plan="single"
-          class={[
-            "w-full text-left p-5 rounded-xl border-2 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-            if(@membership_plan == :single,
-              do: "border-blue-600 bg-blue-50",
-              else:
-                "border-zinc-200 bg-white hover:border-blue-400 hover:bg-blue-50/50"
-            )
-          ]}
-        >
-          <div class="flex items-start gap-4">
-            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-blue-600">
-              <%= if @membership_plan == :single do %>
-                <div class="h-2.5 w-2.5 rounded-full bg-blue-600"></div>
-              <% end %>
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-zinc-900">Single Membership</p>
-              <p class="mt-1 text-sm text-zinc-500">
-                Membership for one person. Access to all YSC events and community resources.
-              </p>
-            </div>
+      <.simple_form
+        for={@form}
+        id="membership-selection"
+        phx-change="validate_membership_selection"
+        phx-submit="confirm_membership_selection"
+        class="mt-6"
+      >
+        <div class="grid w-full gap-4 sm:grid-cols-2">
+          <.input
+            type="large-radio"
+            field={@form[:membership_plan]}
+            id="select-membership-single"
+            value="single"
+            checked={@form[:membership_plan].value == "single"}
+            label="Single Membership"
+            subtitle="Membership for one person. Access to all YSC events and community resources."
+            icon="user"
+          />
+          <.input
+            type="large-radio"
+            field={@form[:membership_plan]}
+            id="select-membership-family"
+            value="family"
+            checked={@form[:membership_plan].value == "family"}
+            label="Family Membership"
+            subtitle="Covers you, your spouse, and children under 18. Includes family member invitations."
+            icon="user-group"
+          />
+        </div>
+        <:actions>
+          <div class="flex justify-end w-full">
+            <.button
+              type="submit"
+              id="confirm-membership-selection"
+              disabled={@membership_plan == :unknown}
+            >
+              Confirm & Continue
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+            </.button>
           </div>
-        </button>
-
-        <button
-          type="button"
-          id="select-membership-family"
-          phx-click="select_membership"
-          phx-value-plan="family"
-          class={[
-            "w-full text-left p-5 rounded-xl border-2 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-            if(@membership_plan == :family,
-              do: "border-blue-600 bg-blue-50",
-              else:
-                "border-zinc-200 bg-white hover:border-blue-400 hover:bg-blue-50/50"
-            )
-          ]}
-        >
-          <div class="flex items-start gap-4">
-            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-blue-600">
-              <%= if @membership_plan == :family do %>
-                <div class="h-2.5 w-2.5 rounded-full bg-blue-600"></div>
-              <% end %>
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-zinc-900">Family Membership</p>
-              <p class="mt-1 text-sm text-zinc-500">
-                Covers you, your spouse, and children under 18. Includes family member invitations.
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      <div class="mt-8 flex justify-end">
-        <.button
-          type="button"
-          id="confirm-membership-selection"
-          phx-click="confirm_membership_selection"
-          disabled={@membership_plan == :unknown}
-        >
-          Confirm & Continue
-          <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
-        </.button>
-      </div>
+        </:actions>
+      </.simple_form>
     </div>
     """
   end
@@ -846,19 +835,37 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  def handle_event("select_membership", %{"plan" => plan_str}, socket) do
+  def handle_event(
+        "validate_membership_selection",
+        %{"membership_selection" => params},
+        socket
+      ) do
     plan =
-      case plan_str do
+      case params["membership_plan"] do
         "family" -> :family
         "single" -> :single
         _ -> :unknown
       end
 
-    {:noreply, assign(socket, :membership_plan, plan)}
+    form = to_form(params, as: "membership_selection")
+
+    {:noreply,
+     socket
+     |> assign(:membership_plan, plan)
+     |> assign(:membership_selection_form, form)}
   end
 
-  def handle_event("confirm_membership_selection", _params, socket) do
-    plan = socket.assigns.membership_plan
+  def handle_event(
+        "confirm_membership_selection",
+        %{"membership_selection" => params},
+        socket
+      ) do
+    plan =
+      case params["membership_plan"] do
+        "family" -> :family
+        "single" -> :single
+        _ -> :unknown
+      end
 
     if plan == :unknown do
       YscWeb.Flash.send_toast(
@@ -869,20 +876,53 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
       {:noreply, socket}
     else
-      is_family_plan = plan == :family
-      skip_payment = false
-      needs_plan_selection = false
-      steps = build_steps(is_family_plan, skip_payment, needs_plan_selection)
+      user = socket.assigns.user
 
-      # Rebuild steps without the selection step, then advance from address
-      # (the step that precedes payment in the rebuilt list).
-      socket =
-        socket
-        |> assign(:is_family_plan, is_family_plan)
-        |> assign(:needs_plan_selection, needs_plan_selection)
-        |> assign(:steps, steps)
+      case persist_membership_plan(user, plan) do
+        {:ok, _} ->
+          updated_user =
+            Accounts.get_user!(user.id, [
+              :subscriptions,
+              :family_members,
+              :registration_form,
+              :billing_address
+            ])
 
-      {:noreply, advance_to_next_step(socket, @step_address)}
+          is_family_plan = plan == :family
+          skip_payment = false
+          needs_plan_selection = false
+
+          steps =
+            build_steps(is_family_plan, skip_payment, needs_plan_selection)
+
+          # Rebuild steps without the selection step, then advance from address
+          # (the step that precedes payment in the rebuilt list).
+          socket =
+            socket
+            |> assign(:user, updated_user)
+            |> assign(:membership_plan, plan)
+            |> assign(:is_family_plan, is_family_plan)
+            |> assign(:needs_plan_selection, needs_plan_selection)
+            |> assign(:steps, steps)
+
+          {:noreply, advance_to_next_step(socket, @step_address)}
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to persist membership plan during onboarding",
+            user_id: user.id,
+            plan: plan,
+            reason: inspect(reason)
+          )
+
+          YscWeb.Flash.send_toast(
+            :error,
+            "Could not save your membership selection. Please try again.",
+            title: "Error"
+          )
+
+          {:noreply, socket}
+      end
     end
   end
 
@@ -1612,6 +1652,36 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
       _ ->
         nil
+    end
+  end
+
+  # Persists the user-selected membership plan to the SignupApplication record so
+  # resolve_membership_plan/1 finds it on any subsequent mount or process restart.
+  defp persist_membership_plan(user, plan) do
+    membership_type = to_string(plan)
+
+    registration_form =
+      case user.registration_form do
+        %Ecto.Association.NotLoaded{} ->
+          Ysc.Repo.preload(user, :registration_form).registration_form
+
+        form ->
+          form
+      end
+
+    if is_nil(registration_form) do
+      %Ysc.Accounts.SignupApplication{}
+      |> Ysc.Accounts.SignupApplication.migration_changeset(%{
+        user_id: user.id,
+        membership_type: membership_type
+      })
+      |> Ysc.Repo.insert()
+    else
+      registration_form
+      |> Ysc.Accounts.SignupApplication.migration_changeset(%{
+        membership_type: membership_type
+      })
+      |> Ysc.Repo.update()
     end
   end
 

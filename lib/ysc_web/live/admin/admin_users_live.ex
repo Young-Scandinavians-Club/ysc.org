@@ -70,7 +70,7 @@ defmodule YscWeb.AdminUsersLive do
             type="select"
             field={@form[:role]}
             options={["member", "admin", "volunteer"]}
-            label="State"
+            label="Role"
           />
 
           <div class="flex flex-row justify-end w-full pt-8">

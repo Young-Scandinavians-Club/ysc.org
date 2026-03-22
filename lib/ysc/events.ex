@@ -65,7 +65,7 @@ defmodule Ysc.Events do
     date_from = Keyword.get(opts, :date_from, "")
     date_to = Keyword.get(opts, :date_to, "")
     search_term = Keyword.get(opts, :search_term)
-    tab = Keyword.get(opts, :tab, :all)
+    tab = opts |> Keyword.get(:tab, :all) |> normalize_tab()
 
     query =
       if search_term in [nil, ""] do
@@ -108,6 +108,14 @@ defmodule Ysc.Events do
   end
 
   defp maybe_filter_tab(query, _), do: query
+
+  @known_tabs ~w(upcoming drafts past all)
+  defp normalize_tab(tab) when is_atom(tab), do: tab
+
+  defp normalize_tab(tab) when is_binary(tab) and tab in @known_tabs,
+    do: String.to_existing_atom(tab)
+
+  defp normalize_tab(_), do: :all
 
   defp normalize_list_events_opts(search_term)
        when is_binary(search_term) or is_nil(search_term),
