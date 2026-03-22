@@ -920,22 +920,36 @@ defmodule Ysc.Events do
   Publish an event by updating its state and setting `published_at`.
   """
   def publish_event(%Event{} = event) do
-    now = DateTime.utc_now()
+    cond do
+      event.state not in [:draft, :scheduled] ->
+        {:error, :invalid_state}
 
-    event
-    |> Event.changeset(%{state: "published", published_at: now})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
+      event.title in [nil, ""] ->
+        {:error, :missing_title}
 
-        # Schedule event notification emails (1 hour after publish)
-        schedule_event_notifications(event, now)
+      event.start_date in [nil, ""] ->
+        {:error, :missing_start_date}
 
-        {:ok, event}
+      true ->
+        now = DateTime.utc_now()
 
-      {:error, changeset} ->
-        {:error, changeset}
+        event
+        |> Event.changeset(%{state: "published", published_at: now})
+        |> Repo.update()
+        |> case do
+          {:ok, updated_event} ->
+            broadcast(%Ysc.MessagePassingEvents.EventUpdated{
+              event: updated_event
+            })
+
+            # Schedule event notification emails (1 hour after publish)
+            schedule_event_notifications(updated_event, now)
+
+            {:ok, updated_event}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
     end
   end
 
