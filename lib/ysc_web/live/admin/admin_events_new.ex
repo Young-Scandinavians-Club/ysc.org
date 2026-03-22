@@ -651,7 +651,14 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("publish-event", _, socket) do
-    if not socket.assigns.can_publish do
+    if socket.assigns.can_publish do
+      Events.publish_event(socket.assigns.event)
+
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
+       |> push_navigate(to: "/admin/events")}
+    else
       {:noreply,
        socket
        |> YscWeb.Flash.put_toast(
@@ -659,13 +666,6 @@ defmodule YscWeb.AdminEventsNewLive do
          "A title and event date must be set before publishing.",
          title: "Event"
        )}
-    else
-      Events.publish_event(socket.assigns.event)
-
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
-       |> push_navigate(to: "/admin/events")}
     end
   end
 
