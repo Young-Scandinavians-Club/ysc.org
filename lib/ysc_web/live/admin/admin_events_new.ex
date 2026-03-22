@@ -72,7 +72,20 @@ defmodule YscWeb.AdminEventsNewLive do
 
           <div class="pl-4 space-x-1 flex flex-row">
             <div :if={@event.state in [:draft, :scheduled]}>
+              <.tooltip
+                :if={!@can_publish}
+                tooltip_text="A title and event date must be set before publishing"
+              >
+                <.button
+                  class="whitespace-nowrap opacity-50 cursor-not-allowed"
+                  color="blue"
+                  disabled
+                >
+                  <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-1 me-1" />Publish
+                </.button>
+              </.tooltip>
               <.button
+                :if={@can_publish}
                 class="whitespace-nowrap"
                 color="blue"
                 phx-click="publish-event"
@@ -94,7 +107,7 @@ defmodule YscWeb.AdminEventsNewLive do
             </div>
 
             <.dropdown
-              :if={@event.state in [:draft, :scheduled]}
+              :if={@event.state in [:draft, :scheduled] && @can_publish}
               id="edit-post-more"
               right={true}
               class={
@@ -587,6 +600,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:end_date, event.end_date)
      |> assign(:start_time, event.start_time)
      |> assign(:end_time, event.end_time)
+     |> assign(:can_publish, can_publish?(event.start_date, event.title))
      |> assign(:ticket_count, length(tickets))
      |> assign(:ticket_tier_count, length(ticket_tiers))
      |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
@@ -637,12 +651,22 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("publish-event", _, socket) do
-    Events.publish_event(socket.assigns.event)
+    if not socket.assigns.can_publish do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "A title and event date must be set before publishing.",
+         title: "Event"
+       )}
+    else
+      Events.publish_event(socket.assigns.event)
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
-     |> push_navigate(to: "/admin/events")}
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
+       |> push_navigate(to: "/admin/events")}
+    end
   end
 
   @impl true
@@ -751,7 +775,11 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:start_date, event_params["start_date"])
      |> assign(:end_date, event_params["end_date"])
      |> assign(:start_time, event_params["start_time"])
-     |> assign(:end_time, event_params["end_time"])}
+     |> assign(:end_time, event_params["end_time"])
+     |> assign(
+       :can_publish,
+       can_publish?(event_params["start_date"], event_params["title"])
+     )}
   end
 
   def handle_event(
@@ -993,6 +1021,7 @@ defmodule YscWeb.AdminEventsNewLive do
        |> assign(:end_date, event.end_date)
        |> assign(:start_time, event.start_time)
        |> assign(:end_time, event.end_time)
+       |> assign(:can_publish, can_publish?(event.start_date, event.title))
        |> assign(:capacity_form, to_form(changeset))
        |> assign_form(changeset)}
     else
@@ -1211,6 +1240,10 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp format_time(time), do: time
+
+  defp can_publish?(start_date, title) do
+    start_date not in [nil, ""] and title not in [nil, ""]
+  end
 
   defp description_length(nil), do: 0
   defp description_length(description), do: String.length(description)
