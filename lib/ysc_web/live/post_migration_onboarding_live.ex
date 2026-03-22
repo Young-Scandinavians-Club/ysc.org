@@ -1704,8 +1704,17 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         if(birth_date == "" or is_nil(birth_date), do: nil, else: birth_date)
     }
 
+    family_members =
+      case user.family_members do
+        %Ecto.Association.NotLoaded{} ->
+          Ysc.Repo.preload(user, :family_members).family_members
+
+        members ->
+          members || []
+      end
+
     existing =
-      Enum.find(user.family_members || [], fn fm ->
+      Enum.find(family_members, fn fm ->
         String.downcase(fm.first_name || "") == String.downcase(first_name) and
           String.downcase(fm.last_name || "") == String.downcase(last_name)
       end)
