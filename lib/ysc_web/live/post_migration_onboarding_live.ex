@@ -1670,9 +1670,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       end
 
     if is_nil(registration_form) do
-      %Ysc.Accounts.SignupApplication{}
+      %Ysc.Accounts.SignupApplication{user_id: user.id}
       |> Ysc.Accounts.SignupApplication.migration_changeset(%{
-        user_id: user.id,
         membership_type: membership_type
       })
       |> Ysc.Repo.insert()
