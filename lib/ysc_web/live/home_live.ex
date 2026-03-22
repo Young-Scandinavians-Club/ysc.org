@@ -1253,7 +1253,7 @@ defmodule YscWeb.HomeLive do
             <p class="font-bold text-zinc-900">Settings</p>
             <p class="text-sm text-zinc-500">Preferences</p>
           </.link>
-          <%= if @current_user && @current_user.role == :admin do %>
+          <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
             <.link
               navigate={~p"/expensereport"}
               class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
