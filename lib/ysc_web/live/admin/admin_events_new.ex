@@ -652,12 +652,43 @@ defmodule YscWeb.AdminEventsNewLive do
   @impl true
   def handle_event("publish-event", _, socket) do
     if socket.assigns.can_publish do
-      Events.publish_event(socket.assigns.event)
+      case Events.publish_event(socket.assigns.event) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
+           |> push_navigate(to: "/admin/events")}
 
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(:info, "Event published.", title: "Event")
-       |> push_navigate(to: "/admin/events")}
+        {:error, :missing_title} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Event title is required before publishing.", title: "Event")}
+
+        {:error, :missing_start_date} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Event date is required before publishing.", title: "Event")}
+
+        {:error, :invalid_state} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Event cannot be published from its current state.",
+             title: "Event"
+           )}
+
+        {:error, _reason} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Failed to publish event. Please try again.", title: "Event")}
+      end
     else
       {:noreply,
        socket
@@ -778,7 +809,10 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:end_time, event_params["end_time"])
      |> assign(
        :can_publish,
-       can_publish?(event_params["start_date"], event_params["title"])
+       can_publish?(
+         Ecto.Changeset.get_field(updated_changeset, :start_date),
+         Ecto.Changeset.get_field(updated_changeset, :title)
+       )
      )}
   end
 
