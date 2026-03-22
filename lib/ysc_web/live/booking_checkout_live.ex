@@ -791,8 +791,10 @@ defmodule YscWeb.BookingCheckoutLive do
               )
             ]}
             id="hold-countdown-container"
-            phx-hook="CountdownColor"
+            phx-hook="Countdown"
             data-expires-at={DateTime.to_iso8601(@booking.hold_expires_at)}
+            data-countdown-target="#hold-countdown"
+            data-color-container
           >
             <div class={[
               "flex items-center gap-2 mb-1",
@@ -817,9 +819,6 @@ defmodule YscWeb.BookingCheckoutLive do
               <span
                 class="font-bold tabular-nums"
                 id="hold-countdown"
-                phx-hook="HoldCountdown"
-                data-expires-at={DateTime.to_iso8601(@booking.hold_expires_at)}
-                data-timezone={@timezone}
               >
                 {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
