@@ -1221,6 +1221,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     {:noreply, advance_to_next_step(socket, @step_payment)}
   end
 
+  def handle_event("set-step", %{"step" => step_str}, socket) do
+    steps = socket.assigns.steps
+
+    case Integer.parse(step_str) do
+      {index, ""} when index >= 0 and index < length(steps) ->
+        {_label, step_num} = Enum.fetch!(steps, index)
+        {:noreply, assign(socket, :current_step, step_num)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("add_family_member", _params, socket) do
     new_form =
       to_form(
@@ -1704,8 +1717,17 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         if(birth_date == "" or is_nil(birth_date), do: nil, else: birth_date)
     }
 
+    family_members =
+      case user.family_members do
+        %Ecto.Association.NotLoaded{} ->
+          Ysc.Repo.preload(user, :family_members).family_members
+
+        members ->
+          members || []
+      end
+
     existing =
-      Enum.find(user.family_members || [], fn fm ->
+      Enum.find(family_members, fn fm ->
         String.downcase(fm.first_name || "") == String.downcase(first_name) and
           String.downcase(fm.last_name || "") == String.downcase(last_name)
       end)
