@@ -1222,12 +1222,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   def handle_event("set-step", %{"step" => step_str}, socket) do
-    requested_index = String.to_integer(step_str)
     steps = socket.assigns.steps
 
-    case Enum.at(steps, requested_index) do
-      {_label, step_num} -> {:noreply, assign(socket, :current_step, step_num)}
-      nil -> {:noreply, socket}
+    case Integer.parse(step_str) do
+      {index, ""} when index >= 0 and index < length(steps) ->
+        {_label, step_num} = Enum.fetch!(steps, index)
+        {:noreply, assign(socket, :current_step, step_num)}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
