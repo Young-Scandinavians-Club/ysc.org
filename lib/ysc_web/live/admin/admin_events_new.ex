@@ -664,14 +664,18 @@ defmodule YscWeb.AdminEventsNewLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Event title is required before publishing.", title: "Event")}
+             "Event title is required before publishing.",
+             title: "Event"
+           )}
 
         {:error, :missing_start_date} ->
           {:noreply,
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Event date is required before publishing.", title: "Event")}
+             "Event date is required before publishing.",
+             title: "Event"
+           )}
 
         {:error, :invalid_state} ->
           {:noreply,
@@ -687,7 +691,9 @@ defmodule YscWeb.AdminEventsNewLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to publish event. Please try again.", title: "Event")}
+             "Failed to publish event. Please try again.",
+             title: "Event"
+           )}
       end
     else
       {:noreply,
