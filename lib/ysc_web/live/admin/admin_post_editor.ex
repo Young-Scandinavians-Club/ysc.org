@@ -223,8 +223,9 @@ defmodule YscWeb.AdminPostEditorLive do
                 <ul class="py-2 lg:hidden">
                   <li :if={@post.state == :draft}>
                     <button
+                      id={"publish-post-#{@post_id}"}
                       type="button"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-left transition duration-400 ease-in-out hover:bg-zinc-100"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left transition duration-300 ease-in-out hover:bg-zinc-100"
                       phx-click="publish-post"
                     >
                       <.icon
@@ -236,8 +237,9 @@ defmodule YscWeb.AdminPostEditorLive do
                   </li>
                   <li :if={@post.state == :deleted}>
                     <button
+                      id={"restore-post-#{@post_id}"}
                       type="button"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-green-700 transition duration-400 ease-in-out hover:bg-zinc-100"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-green-700 transition duration-300 ease-in-out hover:bg-zinc-100"
                       phx-click="restore-post"
                     >
                       <.icon
@@ -249,8 +251,9 @@ defmodule YscWeb.AdminPostEditorLive do
                   </li>
                   <li>
                     <.link
+                      id={"preview-post-#{@post_id}"}
                       navigate={~p"/admin/posts/#{@post_id}/preview"}
-                      class="flex w-full items-center gap-2 px-4 py-2 transition duration-400 ease-in-out hover:bg-zinc-100"
+                      class="flex w-full items-center gap-2 px-4 py-2 transition duration-300 ease-in-out hover:bg-zinc-100"
                     >
                       <.icon
                         name="hero-computer-desktop"
@@ -264,8 +267,9 @@ defmodule YscWeb.AdminPostEditorLive do
                 <ul class="py-2 text-sm font-medium text-zinc-800">
                   <li>
                     <.link
+                      id={"settings-post-#{@post_id}"}
                       navigate={~p"/admin/posts/#{@post_id}/settings"}
-                      class="block px-4 py-2 transition duration-400 ease-in-out hover:bg-zinc-100"
+                      class="block px-4 py-2 transition duration-300 ease-in-out hover:bg-zinc-100"
                     >
                       <.icon
                         name="hero-adjustments-horizontal"
@@ -277,6 +281,7 @@ defmodule YscWeb.AdminPostEditorLive do
 
                   <li class="px-3 py-2 text-red-600 transition duration-200 ease-in-out hover:bg-zinc-100">
                     <button
+                      id={"delete-post-#{@post_id}"}
                       type="button"
                       class="w-full px-1 text-left"
                       phx-click="delete-post"
