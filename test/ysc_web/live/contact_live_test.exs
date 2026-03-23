@@ -170,6 +170,7 @@ defmodule YscWeb.ContactLiveTest do
       assert html =~ "Clear Lake Cabin"
       assert html =~ "Membership"
       assert html =~ "Volunteering"
+      assert html =~ "Choir"
       assert html =~ "Board of Directors"
       assert html =~ "Other"
     end
@@ -219,6 +220,8 @@ defmodule YscWeb.ContactLiveTest do
       assert html =~ "volunteer@ysc.org"
       assert html =~ "Board of Directors"
       assert html =~ "board@ysc.org"
+      assert html =~ "Choir"
+      assert html =~ "choir@ysc.org"
       assert html =~ "General Inquiry"
       assert html =~ "info@ysc.org"
     end
@@ -230,6 +233,7 @@ defmodule YscWeb.ContactLiveTest do
       assert html =~ "mailto:cl@ysc.org"
       assert html =~ "mailto:volunteer@ysc.org"
       assert html =~ "mailto:board@ysc.org"
+      assert html =~ "mailto:choir@ysc.org"
       assert html =~ "mailto:info@ysc.org"
     end
   end
@@ -319,6 +323,7 @@ defmodule YscWeb.ContactLiveTest do
       assert html =~ "hero-home"
       assert html =~ "hero-user-group"
       assert html =~ "hero-users"
+      assert html =~ "hero-musical-note"
       assert html =~ "hero-computer-desktop"
       assert html =~ "hero-envelope"
       assert html =~ "hero-map-pin"
