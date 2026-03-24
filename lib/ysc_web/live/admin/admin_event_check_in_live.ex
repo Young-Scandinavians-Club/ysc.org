@@ -508,18 +508,27 @@ defmodule YscWeb.AdminEventCheckInLive do
   def handle_event("check-in-order", %{"order-id" => order_id}, socket) do
     {session, socket} = get_or_create_session(socket)
 
-    case Scanning.check_in_order(session, order_id) do
-      {:ok, :group_checked_in, count} ->
-        {:noreply,
-         socket
-         |> reload_tickets(socket.assigns.search_query)
-         |> put_flash(
-           :info,
-           "Checked in #{count} ticket#{if count != 1, do: "s"}."
-         )}
+    if is_nil(session) do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         "Could not start a check-in session. Please try again."
+       )}
+    else
+      case Scanning.check_in_order(session, order_id) do
+        {:ok, :group_checked_in, count} ->
+          {:noreply,
+           socket
+           |> reload_tickets(socket.assigns.search_query)
+           |> put_flash(
+             :info,
+             "Checked in #{count} ticket#{if count != 1, do: "s"}."
+           )}
 
-      {:error, _type, message} ->
-        {:noreply, put_flash(socket, :error, message)}
+        {:error, _type, message} ->
+          {:noreply, put_flash(socket, :error, message)}
+      end
     end
   end
 
@@ -601,12 +610,21 @@ defmodule YscWeb.AdminEventCheckInLive do
   defp do_check_in(socket, ticket) do
     {session, socket} = get_or_create_session(socket)
 
-    case Scanning.check_in_single(session, ticket.id) do
-      {:ok, _result} ->
-        {:noreply, reload_tickets(socket, socket.assigns.search_query)}
+    if is_nil(session) do
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         "Could not start a check-in session. Please try again."
+       )}
+    else
+      case Scanning.check_in_single(session, ticket.id) do
+        {:ok, _result} ->
+          {:noreply, reload_tickets(socket, socket.assigns.search_query)}
 
-      {:error, _type, message} ->
-        {:noreply, put_flash(socket, :error, message)}
+        {:error, _type, message} ->
+          {:noreply, put_flash(socket, :error, message)}
+      end
     end
   end
 
@@ -629,15 +647,25 @@ defmodule YscWeb.AdminEventCheckInLive do
         event = socket.assigns.event
         user = socket.assigns.current_user
 
-        {:ok, session} =
-          Scanning.create_session(%{
-            name: "Manual Check-in: #{event.title}",
-            type: :event,
-            event_id: event.id,
-            created_by_id: user.id
-          })
+        case Scanning.create_session(%{
+               name: "Manual Check-in: #{event.title}",
+               type: :event,
+               event_id: event.id,
+               created_by_id: user.id
+             }) do
+          {:ok, session} ->
+            {session, assign(socket, :scan_session, session)}
 
-        {session, assign(socket, :scan_session, session)}
+          {:error, changeset} ->
+            Ysc.Logging.error("Failed to create manual check-in session",
+              extra: %{
+                event_id: event.id,
+                errors: inspect(changeset.errors)
+              }
+            )
+
+            {nil, socket}
+        end
 
       session ->
         {session, socket}
