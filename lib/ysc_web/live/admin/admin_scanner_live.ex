@@ -1322,6 +1322,16 @@ defmodule YscWeb.AdminScannerLive do
     session = socket.assigns.active_session
 
     case Scanning.process_scan(session, data) do
+      {:ok, {_ticket, _record}} ->
+        {:noreply,
+         socket
+         |> assign(:scan_count, socket.assigns.scan_count + 1)
+         |> assign(:scan_result, %{
+           status: :checked_in,
+           message: "Guest checked in successfully"
+         })
+         |> assign(:group_prompt, nil)}
+
       {:ok, result} ->
         {:noreply,
          socket

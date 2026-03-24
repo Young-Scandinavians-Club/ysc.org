@@ -890,7 +890,7 @@ defmodule YscWeb.UserSettingsLive do
               </button>
               <.link
                 navigate={~p"/users/settings/family"}
-                class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 ms-2"
               >
                 <.icon name="hero-user-group" class="w-4 h-4" />
                 Add family members to your membership
