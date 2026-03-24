@@ -15,8 +15,10 @@ defmodule Ysc.Scanning do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Events.Ticket
+  alias Ysc.Events.TicketDetail
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord}
+  alias Ysc.MessagePassingEvents
 
   # --- Session Management ---
 
@@ -338,26 +340,51 @@ defmodule Ysc.Scanning do
   end
 
   defp do_check_in_ticket(session, ticket, checkin_type) do
-    Repo.transaction(fn ->
-      changeset = Ticket.check_in_changeset(ticket)
+    result =
+      Repo.transaction(fn ->
+        changeset = Ticket.check_in_changeset(ticket)
 
-      case Repo.update(changeset) do
-        {:ok, updated_ticket} ->
-          case record_scan(session, %{
-                 user_id: ticket.user_id,
-                 ticket_id: ticket.id,
-                 ticket_order_id: ticket.ticket_order_id,
-                 checkin_type: checkin_type,
-                 result: :success
-               }) do
-            {:ok, record} -> {updated_ticket, record}
-            {:error, reason} -> Repo.rollback(reason)
-          end
+        case Repo.update(changeset) do
+          {:ok, updated_ticket} ->
+            case record_scan(session, %{
+                   user_id: ticket.user_id,
+                   ticket_id: ticket.id,
+                   ticket_order_id: ticket.ticket_order_id,
+                   checkin_type: checkin_type,
+                   result: :success
+                 }) do
+              {:ok, record} -> {updated_ticket, record}
+              {:error, reason} -> Repo.rollback(reason)
+            end
 
-        {:error, changeset} ->
-          Repo.rollback(changeset)
-      end
-    end)
+          {:error, changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+
+    case result do
+      {:ok, {updated_ticket, _record}} ->
+        loaded_ticket =
+          Repo.preload(updated_ticket, [
+            :registration,
+            :user,
+            :ticket_tier,
+            :ticket_order
+          ])
+
+        broadcast_checkin(
+          ticket.event_id,
+          %MessagePassingEvents.TicketCheckedIn{
+            ticket: loaded_ticket,
+            event_id: ticket.event_id
+          }
+        )
+
+        result
+
+      _ ->
+        result
+    end
   end
 
   # --- Manual Lookup ---
@@ -517,6 +544,149 @@ defmodule Ysc.Scanning do
     |> Enum.to_list()
     |> IO.iodata_to_binary()
   end
+
+  # --- Manual Check-in View ---
+
+  @doc """
+  Lists all confirmed tickets for an event for the check-in management view.
+  Optionally filters by a search query matching attendee name, purchaser name,
+  purchaser email, order reference (ORD-xxx), or ticket reference (TKT-xxx).
+  Returns tickets preloaded with registration, user, ticket_tier, and ticket_order.
+  Sorted: pending (not checked in) alphabetically by attendee/purchaser name, then checked-in.
+  """
+  def list_event_checkin_tickets(event_id, search \\ nil) do
+    base_query =
+      Ticket
+      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
+      |> join(:left, [t], td in TicketDetail,
+        on: td.ticket_id == t.id,
+        as: :registration
+      )
+      |> join(:left, [t], u in assoc(t, :user), as: :user)
+      |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
+      |> join(:left, [t], o in assoc(t, :ticket_order), as: :ticket_order)
+      |> preload([registration: td, user: u, ticket_tier: tt, ticket_order: o],
+        registration: td,
+        user: u,
+        ticket_tier: tt,
+        ticket_order: o
+      )
+
+    query =
+      if search && search != "" do
+        search_term = "%#{search}%"
+
+        base_query
+        |> where(
+          [t, registration: td, user: u, ticket_order: o],
+          ilike(
+            fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
+            ^search_term
+          ) or
+            ilike(
+              fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
+              ^search_term
+            ) or
+            ilike(u.email, ^search_term) or
+            ilike(o.reference_id, ^search_term) or
+            ilike(t.reference_id, ^search_term)
+        )
+      else
+        base_query
+      end
+
+    query
+    |> order_by([t, registration: td, user: u],
+      asc: t.checked_in,
+      asc:
+        fragment(
+          "coalesce(?, concat(?, ' ', ?))",
+          fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
+          u.first_name,
+          u.last_name
+        )
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns the check-in counts for an event: {checked_in_count, total_confirmed_count}.
+  """
+  def event_checkin_counts(event_id) do
+    total =
+      Ticket
+      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
+      |> Repo.aggregate(:count)
+
+    checked_in =
+      Ticket
+      |> where(
+        [t],
+        t.event_id == ^event_id and t.status == :confirmed and
+          t.checked_in == true
+      )
+      |> Repo.aggregate(:count)
+
+    {checked_in, total}
+  end
+
+  @doc """
+  Undoes a check-in for a single ticket by ID, setting checked_in to false and
+  clearing checked_in_at. Broadcasts TicketCheckInUndone via PubSub.
+  """
+  def undo_check_in(ticket_id) do
+    case Repo.get(Ticket, ticket_id) do
+      nil ->
+        {:error, :not_found, "Ticket not found."}
+
+      ticket ->
+        changeset = Ticket.undo_check_in_changeset(ticket)
+
+        case Repo.update(changeset) do
+          {:ok, updated_ticket} ->
+            updated_ticket =
+              Repo.preload(updated_ticket, [
+                :registration,
+                :user,
+                :ticket_tier,
+                :ticket_order
+              ])
+
+            broadcast_checkin(
+              ticket.event_id,
+              %MessagePassingEvents.TicketCheckInUndone{
+                ticket: updated_ticket,
+                event_id: ticket.event_id
+              }
+            )
+
+            {:ok, updated_ticket}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
+    end
+  end
+
+  @doc """
+  Subscribe to check-in events for a specific event.
+  """
+  def subscribe_checkin(event_id) do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, checkin_topic(event_id))
+  end
+
+  @doc """
+  Broadcast a check-in event to all subscribers for the given event.
+  """
+  def broadcast_checkin(event_id, event) do
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      checkin_topic(event_id),
+      {__MODULE__, event}
+    )
+  end
+
+  defp checkin_topic(event_id), do: "checkin:event:#{event_id}"
 
   # --- Helpers ---
 

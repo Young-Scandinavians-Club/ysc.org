@@ -213,6 +213,15 @@ defmodule YscWeb.AdminEventsLive do
                     >
                       Edit
                     </button>
+                    <button
+                      :if={event.state in [:published, :scheduled]}
+                      phx-click={
+                        JS.navigate(~p"/admin/events/#{event.id}/check-in")
+                      }
+                      class="text-emerald-600 font-semibold hover:underline cursor-pointer text-sm"
+                    >
+                      Check In
+                    </button>
                   </div>
                 </div>
               </div>
@@ -311,6 +320,13 @@ defmodule YscWeb.AdminEventsLive do
                     class="text-blue-600 font-semibold hover:underline cursor-pointer"
                   >
                     Edit
+                  </button>
+                  <button
+                    :if={event.state in [:published, :scheduled]}
+                    phx-click={JS.navigate(~p"/admin/events/#{event.id}/check-in")}
+                    class="text-emerald-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Check In
                   </button>
                 </div>
               </:action>

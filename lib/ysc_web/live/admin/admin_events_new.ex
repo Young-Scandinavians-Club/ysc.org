@@ -8,6 +8,7 @@ defmodule YscWeb.AdminEventsNewLive do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
+  alias Phoenix.LiveView.JS
   alias Ysc.Events.Event
   alias Ysc.Events
 
@@ -103,6 +104,19 @@ defmodule YscWeb.AdminEventsNewLive do
                 phx-disable-with="Unpublishing..."
               >
                 <.icon name="hero-document-arrow-down" class="w-5 h-5 -mt-1 me-1" />Unpublish
+              </.button>
+            </div>
+
+            <div :if={@event.state in [:published, :scheduled]}>
+              <.button
+                class="whitespace-nowrap"
+                color="green"
+                phx-click={JS.navigate(~p"/admin/events/#{@event.id}/check-in")}
+              >
+                <.icon
+                  name="hero-clipboard-document-check"
+                  class="w-4 h-4 -mt-0.5 me-1"
+                />Check In
               </.button>
             </div>
 
