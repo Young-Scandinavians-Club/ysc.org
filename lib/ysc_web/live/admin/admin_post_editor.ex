@@ -146,35 +146,43 @@ defmodule YscWeb.AdminPostEditorLive do
         phx-submit="save"
         phx-change="post-update"
       >
-        <div class="w-full flex flex-row justify-between">
-          <div class="w-full flex flex-row items-center align-middle mt-4">
-            <.input
-              type="text-growing"
-              field={@form[:title]}
-              phx-debounce="500"
-              growing_field_size="large"
-              class="input-element mt-2 block w-full font-extrabold text-3xl outline-none border-none focus:border focus:border-1 focus:border-zinc-200 rounded text-zinc-900 focus:border-1 focus:border-zinc-400 focus:outline focus:outline-zinc-200 focus:ring-0 leading-6 focus:border-zinc-400"
-            />
+        <div class="mt-4 flex w-full items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <div class="inline-flex max-w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              <div class="flex min-w-0 w-max max-w-full items-center">
+                <.input
+                  type="text-growing"
+                  field={@form[:title]}
+                  phx-debounce="500"
+                  growing_field_size="large"
+                  class="input-element block border-none font-extrabold text-2xl leading-7 text-zinc-900 outline-none focus:border focus:border-1 focus:border-zinc-200 focus:border-zinc-400 focus:outline focus:outline-zinc-200 focus:ring-0 sm:text-3xl sm:leading-8 rounded"
+                />
+              </div>
 
-            <.badge type={post_state_to_badge_style(@post.state)} class="mt-3 ml-3">
-              {String.capitalize("#{@post.state}")}
-            </.badge>
+              <.badge
+                type={post_state_to_badge_style(@post.state)}
+                class="shrink-0 self-center"
+              >
+                {String.capitalize("#{@post.state}")}
+              </.badge>
 
-            <p class={"text-sm text-zinc-600 transition duration-200 ease-in-out align-middle inline-block items-center px-1 mt-4 #{if @saving? == true, do: "opacity-100", else: "opacity-0"}"}>
-              <span>
+              <p class={[
+                "inline-flex shrink-0 items-center text-sm text-zinc-600 transition duration-200 ease-in-out",
+                @saving? && "opacity-100",
+                !@saving? && "opacity-0"
+              ]}>
                 <.icon
                   name="hero-arrow-path"
-                  class="w-4 h-4 -mt-0.5 animate-spin mr-1"
-                />
-              </span>
-              Saving...
-            </p>
+                  class="mr-1 h-4 w-4 shrink-0 animate-spin"
+                /> Saving...
+              </p>
+            </div>
           </div>
 
-          <div class="flex flex-row align-baseline items-end">
+          <div class="flex shrink-0 flex-row items-center gap-2 pt-0.5">
             <.button
               :if={@post.state == :draft}
-              class="hidden lg:block w-28 mr-3"
+              class="hidden lg:mr-1 lg:block lg:w-28"
               type="button"
               phx-click="publish-post"
             >
@@ -185,7 +193,7 @@ defmodule YscWeb.AdminPostEditorLive do
             <.button
               :if={@post.state == :deleted}
               color="green"
-              class="hidden lg:block w-28 mr-3"
+              class="hidden lg:mr-1 lg:block lg:w-28"
               type="button"
               phx-click="restore-post"
             >
@@ -195,7 +203,7 @@ defmodule YscWeb.AdminPostEditorLive do
 
             <button
               type="button"
-              class="hidden lg:block flex-none rounded hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded text-zinc-800 mr-3"
+              class="hidden flex-none rounded px-3 py-2 text-zinc-800 transition duration-200 ease-in-out hover:bg-zinc-100 lg:mr-1 lg:block"
               phx-click={JS.patch(~p"/admin/posts/#{@post_id}/preview")}
             >
               <.icon name="hero-computer-desktop" class="w-5 h-5 -mt-1" />
@@ -212,56 +220,73 @@ defmodule YscWeb.AdminPostEditorLive do
               </:button_block>
 
               <div class="w-full divide-y divide-zinc-100 text-sm text-zinc-700">
-                <ul class="block lg:hidden py-2">
-                  <li>
-                    <.link
-                      navigate={~p"/admin/posts/#{@post_id}/preview"}
-                      class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                <ul class="py-2 lg:hidden">
+                  <li :if={@post.state == :draft}>
+                    <button
+                      id={"publish-post-#{@post_id}"}
+                      type="button"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left transition duration-300 ease-in-out hover:bg-zinc-100"
+                      phx-click="publish-post"
                     >
                       <.icon
                         name="hero-document-arrow-up"
-                        class="w-5 h-5 -mt-1 mr-1"
+                        class="h-5 w-5 shrink-0"
                       />
-                      <span>Publish</span>
-                    </.link>
+                      <span class="leading-none">Publish</span>
+                    </button>
+                  </li>
+                  <li :if={@post.state == :deleted}>
+                    <button
+                      id={"restore-post-#{@post_id}"}
+                      type="button"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-green-700 transition duration-300 ease-in-out hover:bg-zinc-100"
+                      phx-click="restore-post"
+                    >
+                      <.icon
+                        name="hero-cloud-arrow-up"
+                        class="h-5 w-5 shrink-0"
+                      />
+                      <span class="leading-none">Restore</span>
+                    </button>
                   </li>
                   <li>
                     <.link
+                      id={"preview-post-#{@post_id}"}
                       navigate={~p"/admin/posts/#{@post_id}/preview"}
-                      class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
+                      class="flex w-full items-center gap-2 px-4 py-2 transition duration-300 ease-in-out hover:bg-zinc-100"
                     >
                       <.icon
                         name="hero-computer-desktop"
-                        class="w-5 h-5 -mt-1 mr-1"
+                        class="h-5 w-5 shrink-0"
                       />
-                      <span>Preview</span>
+                      <span class="leading-none">Preview</span>
                     </.link>
                   </li>
                 </ul>
 
-                <ul class="py-2 text-sm font-medium text-zinc-800 py-1">
+                <ul class="py-2 text-sm font-medium text-zinc-800">
                   <li>
-                    <li>
-                      <.link
-                        navigate={~p"/admin/posts/#{@post_id}/settings"}
-                        class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-400"
-                      >
-                        <.icon
-                          name="hero-adjustments-horizontal"
-                          class="w-5 h-5 -mt-1 mr-1"
-                        />
-                        <span>Post Settings</span>
-                      </.link>
-                    </li>
+                    <.link
+                      id={"settings-post-#{@post_id}"}
+                      navigate={~p"/admin/posts/#{@post_id}/settings"}
+                      class="block px-4 py-2 transition duration-300 ease-in-out hover:bg-zinc-100"
+                    >
+                      <.icon
+                        name="hero-adjustments-horizontal"
+                        class="mr-2 h-5 w-5 -mt-1"
+                      />
+                      <span>Post Settings</span>
+                    </.link>
                   </li>
 
-                  <li class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100">
+                  <li class="px-3 py-2 text-red-600 transition duration-200 ease-in-out hover:bg-zinc-100">
                     <button
+                      id={"delete-post-#{@post_id}"}
                       type="button"
-                      class="w-full text-left px-1"
+                      class="w-full px-1 text-left"
                       phx-click="delete-post"
                     >
-                      <.icon name="hero-trash" class="w-5 h-5 -mt-1" />
+                      <.icon name="hero-trash" class="inline h-5 w-5 -mt-1" />
                       <span>Delete Post</span>
                     </button>
                   </li>
@@ -271,7 +296,7 @@ defmodule YscWeb.AdminPostEditorLive do
           </div>
         </div>
 
-        <div class="text-sm text-zinc-500 leading-6 py-1 flex flex-row align-baseline items-end">
+        <div class="flex flex-col gap-1 py-1 text-sm leading-6 text-zinc-500 sm:flex-row sm:items-end sm:gap-2">
           <span>
             <.link
               navigate={~p"/posts/#{@post.url_name}"}

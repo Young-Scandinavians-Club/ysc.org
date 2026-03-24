@@ -31,10 +31,10 @@ defmodule YscWeb.AdminEventsNewLive do
     >
       <div class="flex py-6 flex-col">
         <.back navigate={~p"/admin/events?#{@list_params}"}>Back</.back>
-        <div class="flex flex-row justify-between pt-4">
-          <div class="flex flex-col space-y-1">
-            <div class="flex flex-row items-center space-x-3">
-              <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+        <div class="flex flex-col gap-4 pt-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 flex flex-1 flex-col space-y-1">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h1 class="break-words text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl">
                 {@event_title}
               </h1>
 
@@ -47,7 +47,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 href={~p"/events/#{@event.id}"}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-blue-700 transition"
+                class="inline-flex shrink-0 items-center gap-1 text-sm text-zinc-500 transition hover:text-blue-700"
               >
                 <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
                 <span class="sr-only">View Event</span>
@@ -56,9 +56,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
             <div
               :if={@start_date != nil && @start_date != ""}
-              class="flex flex-row space-x-1 items-center"
+              class="flex flex-row items-center gap-1"
             >
-              <.icon name="hero-calendar-days" class="text-zinc-600" />
+              <.icon name="hero-calendar-days" class="shrink-0 text-zinc-600" />
               <p class="text-sm text-zinc-600">
                 {Ysc.Events.DateTimeFormatter.format_datetime(%{
                   start_date: format_date(@start_date),
@@ -70,7 +70,7 @@ defmodule YscWeb.AdminEventsNewLive do
             </div>
           </div>
 
-          <div class="pl-4 space-x-1 flex flex-row">
+          <div class="flex flex-shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
             <div :if={@event.state in [:draft, :scheduled]}>
               <.tooltip
                 :if={!@can_publish}
