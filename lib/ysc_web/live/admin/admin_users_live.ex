@@ -410,7 +410,7 @@ defmodule YscWeb.AdminUsersLive do
               phx-submit="export-csv"
               class="flex flex-col gap-y-2 justify-between"
             >
-              <%= for attr <- ~w(id email first_name last_name phone_number state)a do %>
+              <%= for attr <- ~w(id email first_name last_name phone_number state address)a do %>
                 <.input
                   field={@form[attr]}
                   label={export_field_to_label(attr)}
@@ -1298,6 +1298,10 @@ defmodule YscWeb.AdminUsersLive do
   defp export_field_to_label(:last_name), do: "Last Name"
   defp export_field_to_label(:phone_number), do: "Phone Number"
   defp export_field_to_label(:state), do: "Account State"
+
+  defp export_field_to_label(:address),
+    do: "Address (street, city, region, postal code, country)"
+
   defp export_field_to_label(field), do: "#{field}"
 
   # "pending_approval", "rejected", "active", "suspended", "deleted"

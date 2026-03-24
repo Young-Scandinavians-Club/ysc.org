@@ -107,7 +107,10 @@ defmodule YscWeb.Workers.UserExporter do
           # Load subscriptions with subscription_items for this user
           # Also preload primary_user and their subscriptions if user is a sub-account
           user
-          |> Repo.preload(subscriptions: [:subscription_items])
+          |> Repo.preload([
+            :billing_address,
+            subscriptions: [:subscription_items]
+          ])
           |> then(fn user ->
             if user.primary_user_id do
               primary_user =
@@ -169,8 +172,19 @@ defmodule YscWeb.Workers.UserExporter do
             field when is_binary(field) -> String.to_existing_atom(field)
           end
 
-        value = Map.get(row, field_atom)
-        Map.put(acc, field_atom, value)
+        if field_atom == :address do
+          billing = row.billing_address
+
+          acc
+          |> Map.put(:address, billing && billing.address)
+          |> Map.put(:city, billing && billing.city)
+          |> Map.put(:region, billing && billing.region)
+          |> Map.put(:postal_code, billing && billing.postal_code)
+          |> Map.put(:country, billing && billing.country)
+        else
+          value = Map.get(row, field_atom)
+          Map.put(acc, field_atom, value)
+        end
       end)
 
     # Add membership columns
