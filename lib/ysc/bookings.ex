@@ -2584,10 +2584,10 @@ defmodule Ysc.Bookings do
 
   Returns a map where keys are dates (as Date structs) and values are maps with:
   - `day_bookings_count`: Number of guests already booked for day bookings
-  - `spots_available`: Number of spots remaining (12 - day_bookings_count)
+  - `spots_available`: Number of spots remaining vs 12 (informational, not used as a cap)
   - `has_buyout`: Whether there's a buyout booking on this date
   - `is_blacked_out`: Whether the date is in a blackout period
-  - `can_book_day`: Whether day bookings are possible (not blacked out and spots available)
+  - `can_book_day`: Whether day bookings are possible (not blacked out and no buyout)
   - `can_book_buyout`: Whether buyout is possible (not blacked out and no day bookings)
 
   ## Parameters
@@ -2753,10 +2753,10 @@ defmodule Ysc.Bookings do
 
       # Day bookings can be made if:
       # - Not blacked out
-      # - Spots available
       # - No buyout (confirmed or held)
+      # There is no cap on the number of guests for a la carte bookings
       can_book_day =
-        not is_blacked_out and spots_available > 0 and not info.has_buyout and
+        not is_blacked_out and not info.has_buyout and
           not buyout_held
 
       # Buyout can only be booked if:

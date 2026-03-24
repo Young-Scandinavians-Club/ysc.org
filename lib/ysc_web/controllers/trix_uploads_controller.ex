@@ -1,7 +1,6 @@
 defmodule YscWeb.TrixUploadsController do
   alias Ysc.Posts
   alias Ysc.Media
-  alias Ysc.S3Config
   alias YscWeb.Validators.FileValidator
   use YscWeb, :controller
 
@@ -83,20 +82,11 @@ defmodule YscWeb.TrixUploadsController do
          ]) do
       {:ok, _mime_type} ->
         upload_result = Media.upload_file_to_s3(path)
-        raw_s3_path = upload_result[:body][:location]
-
-        raw_s3_path =
-          if raw_s3_path == "" or is_nil(raw_s3_path) do
-            key = upload_result[:body][:key] || Path.basename(path)
-            S3Config.object_url(key)
-          else
-            raw_s3_path
-          end
 
         {:ok, new_image} =
           Media.add_new_image(
             %{
-              raw_image_path: URI.encode(raw_s3_path),
+              raw_image_path: upload_result[:body][:location],
               user_id: current_user.id
             },
             current_user
@@ -144,19 +134,13 @@ defmodule YscWeb.TrixUploadsController do
         upload_result =
           Media.upload_file_to_s3(path, filename, content_type: mime)
 
-        raw_location = upload_result[:body][:location]
-
-        url =
-          if raw_location == "" or is_nil(raw_location) do
-            key = upload_result[:body][:key] || filename
-            S3Config.object_url(key)
-          else
-            raw_location
-          end
-
         conn
         |> put_status(201)
-        |> json(%{url: url, filename: filename, content_type: mime})
+        |> json(%{
+          url: upload_result[:body][:location],
+          filename: filename,
+          content_type: mime
+        })
 
       {:error, reason} ->
         conn

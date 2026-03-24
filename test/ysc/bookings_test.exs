@@ -987,6 +987,110 @@ defmodule Ysc.BookingsTest do
         assert is_map(date_data)
       end)
     end
+
+    test "can_book_day is true even when more than 12 guests are already booked" do
+      user = user_fixture()
+      start_date = Date.utc_today() |> Date.add(60)
+      end_date = Date.add(start_date, 3)
+
+      # Create two a la carte bookings that together exceed 12 guests
+      {:ok, _b1} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :day,
+          checkin_date: start_date,
+          checkout_date: end_date,
+          guests_count: 8,
+          status: :complete,
+          total_price: Money.new(100, :USD)
+        })
+
+      {:ok, _b2} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :day,
+          checkin_date: start_date,
+          checkout_date: end_date,
+          guests_count: 6,
+          status: :complete,
+          total_price: Money.new(100, :USD)
+        })
+
+      availability =
+        Bookings.get_clear_lake_daily_availability(start_date, end_date)
+
+      night = start_date
+      day_data = availability[night]
+
+      assert day_data.day_bookings_count == 14
+      # No hard cap — day bookings should still be permitted
+      assert day_data.can_book_day == true
+    end
+
+    test "can_book_day is false when a buyout is on the same date" do
+      user = user_fixture()
+      start_date = Date.utc_today() |> Date.add(60)
+      end_date = Date.add(start_date, 2)
+
+      {:ok, _buyout} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :buyout,
+          checkin_date: start_date,
+          checkout_date: end_date,
+          guests_count: 10,
+          status: :complete,
+          total_price: Money.new(500, :USD)
+        })
+
+      availability =
+        Bookings.get_clear_lake_daily_availability(start_date, end_date)
+
+      night = start_date
+      day_data = availability[night]
+
+      assert day_data.has_buyout == true
+      assert day_data.can_book_day == false
+    end
+
+    test "day_bookings_count accumulates across multiple bookings" do
+      user = user_fixture()
+      start_date = Date.utc_today() |> Date.add(45)
+      end_date = Date.add(start_date, 2)
+
+      {:ok, _b1} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :day,
+          checkin_date: start_date,
+          checkout_date: end_date,
+          guests_count: 3,
+          status: :complete,
+          total_price: Money.new(100, :USD)
+        })
+
+      {:ok, _b2} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :day,
+          checkin_date: start_date,
+          checkout_date: end_date,
+          guests_count: 4,
+          status: :complete,
+          total_price: Money.new(100, :USD)
+        })
+
+      availability =
+        Bookings.get_clear_lake_daily_availability(start_date, end_date)
+
+      day_data = availability[start_date]
+      assert day_data.day_bookings_count == 7
+    end
   end
 
   describe "pending refunds" do

@@ -1879,13 +1879,13 @@ defmodule YscWeb.AdminBookingsLive do
               <div class="border-b border-zinc-200 px-2 sm:px-3 py-2.5 text-left font-semibold text-zinc-700 bg-white text-sm">
                 Room
               </div>
-              <!-- Available Slots Row Title (only for Clear Lake) -->
+              <!-- Bookings Row Title (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
                   <div class="h-2 w-2 rounded-full bg-purple-500 flex-shrink-0">
                   </div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
-                    Available Slots
+                    Guests
                   </div>
                 </div>
               <% end %>
@@ -1941,7 +1941,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                 </div>
               </div>
-              <!-- Available Slots Row (only for Clear Lake) -->
+              <!-- Bookings Row (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div
                   class="relative grid"
@@ -1972,8 +1972,8 @@ defmodule YscWeb.AdminBookingsLive do
                         class="flex items-center justify-center h-12"
                         style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
                       >
-                        <span class={"text-sm font-semibold #{if availability_info.spots_available > 0, do: "text-green-600", else: "text-red-600"}"}>
-                          {availability_info.spots_available}/{12} slots
+                        <span class={"text-sm font-semibold #{if availability_info.day_bookings_count > 0, do: "text-amber-600", else: "text-zinc-400"}"}>
+                          {availability_info.day_bookings_count} guests
                         </span>
                       </div>
                     <% end %>
