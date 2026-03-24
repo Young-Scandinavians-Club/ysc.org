@@ -102,7 +102,11 @@ module.exports = {
     window.Trix = Trix;
 
     document.addEventListener("trix-change", () => {
-      emitEditorUpdateEvent(this, this.el);
+      // Defer one microtask to ensure Trix has fully synced the hidden input
+      // value before we read it. Trix 2.x may dispatch trix-change before
+      // completing the hidden-input sync for certain operations (e.g. hard
+      // breaks inserted via Shift+Enter).
+      requestAnimationFrame(() => emitEditorUpdateEvent(this, this.el));
     });
 
     document.addEventListener("trix-blur", () => {
