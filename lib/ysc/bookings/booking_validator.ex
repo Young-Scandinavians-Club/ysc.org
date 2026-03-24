@@ -15,16 +15,14 @@ defmodule Ysc.Bookings.BookingValidator do
   ## Clear Lake Rules:
   - Book by number of guests (not rooms)
   - Priced per guest per day
-  - Maximum 12 guests per day
+  - No limit on the number of guests per day for "A la carte" (day) bookings
   - Option for "full buyout"
   """
   import Ecto.Query, warn: false
   alias Ysc.Repo
-  alias Ysc.Bookings.{Booking, Season, PropertyInventory}
+  alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Accounts.User
   alias Ysc.Subscriptions
-
-  @max_guests_clear_lake 12
 
   @doc """
   Validates a booking changeset according to all business rules.
@@ -416,85 +414,7 @@ defmodule Ysc.Bookings.BookingValidator do
   defp validate_membership_room_limits(changeset, _user, _property),
     do: changeset
 
-  # Clear Lake: Maximum 12 guests per day
-  defp validate_clear_lake_guest_limits(changeset, :clear_lake) do
-    guests_count = Ecto.Changeset.get_field(changeset, :guests_count)
-    checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
-    checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
-    booking_mode = Ecto.Changeset.get_field(changeset, :booking_mode)
-
-    if guests_count && checkin_date && checkout_date && booking_mode != :buyout do
-      if guests_count > @max_guests_clear_lake do
-        Ecto.Changeset.add_error(
-          changeset,
-          :guests_count,
-          "Maximum #{@max_guests_clear_lake} guests allowed per day for Clear Lake"
-        )
-      else
-        # Check daily guest limits across all bookings
-        # Exclude checkout_date from the range since checkout is at 11:00 AM
-        # and check-in is at 15:00 (3 PM), allowing same-day turnarounds
-        # This matches the logic in get_clear_lake_daily_availability
-        date_range =
-          if Date.compare(checkout_date, checkin_date) == :gt do
-            Date.range(checkin_date, Date.add(checkout_date, -1))
-            |> Enum.to_list()
-          else
-            []
-          end
-
-        booking_id = Ecto.Changeset.get_field(changeset, :id)
-
-        date_range
-        |> Enum.reduce(changeset, fn date, acc ->
-          # Count existing guests for this date (excluding current booking if updating)
-          # Only count completed bookings - hold bookings are tracked via capacity_held
-          # This matches the calendar logic which only shows completed bookings
-          existing_guests_query =
-            from b in Booking,
-              where: b.property == :clear_lake,
-              where: b.checkin_date <= ^date,
-              where: b.checkout_date > ^date,
-              where: b.booking_mode != :buyout,
-              where: b.status == :complete,
-              select: fragment("COALESCE(SUM(?), 0)", b.guests_count)
-
-          existing_guests_query =
-            if booking_id do
-              from b in existing_guests_query, where: b.id != ^booking_id
-            else
-              existing_guests_query
-            end
-
-          existing_guests = Repo.one(existing_guests_query) || 0
-
-          # Also get capacity_held from PropertyInventory to account for hold bookings
-          capacity_held =
-            from(pi in PropertyInventory,
-              where: pi.property == :clear_lake,
-              where: pi.day == ^date,
-              select: pi.capacity_held
-            )
-            |> Repo.one() || 0
-
-          total_guests = existing_guests + capacity_held + guests_count
-
-          if total_guests > @max_guests_clear_lake do
-            Ecto.Changeset.add_error(
-              acc,
-              :guests_count,
-              "Maximum #{@max_guests_clear_lake} guests per day exceeded. #{existing_guests + capacity_held} guests already booked on #{date}."
-            )
-          else
-            acc
-          end
-        end)
-      end
-    else
-      changeset
-    end
-  end
-
+  # Clear Lake: A la carte (day) bookings have no guest cap — pass through unchanged.
   defp validate_clear_lake_guest_limits(changeset, _property), do: changeset
 
   # Validate room capacity (guests_count <= sum of room capacities for all rooms)

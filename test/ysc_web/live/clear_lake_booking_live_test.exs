@@ -173,17 +173,18 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "enforces maximum guest capacity of 12", %{conn: conn} do
+    test "accepts guest count beyond the old limit of 12", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      # Try to set guest count beyond max
-      params = %{"guests" => "20"}
+      params = %{"guests_count" => "20"}
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
 
-      assert html =~ "Clear Lake"
+      # 20 guests should be accepted and stored as-is
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.guests_count == 20
     end
   end
 
@@ -250,7 +251,35 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     end
   end
 
-  describe "date tooltips and calendar" do
+  describe "calendar description and availability display" do
+    test "shows registered guests count wording in day mode, not spot availability",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      # Explicitly request day mode so the day section is rendered regardless of pricing rules
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?booking_mode=day")
+
+      html = render(view)
+
+      assert html =~ "how many guests are registered"
+      refute html =~ "spots are available"
+      refute html =~ "spots available are disabled"
+    end
+
+    test "does not show spots-remaining indicator in day booking description",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?booking_mode=day")
+
+      html = render(view)
+
+      refute html =~ "Dates with fewer than"
+      refute html =~ "available are disabled"
+    end
+
     test "displays calendar for date selection", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
@@ -259,7 +288,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       html = render(view)
 
-      # Check for calendar or date picker elements
       assert html =~ "Clear Lake"
     end
   end
@@ -487,16 +515,46 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     end
   end
 
-  describe "max guests" do
-    test "enforces max guests of 12", %{conn: conn} do
+  describe "guest count - no upper limit" do
+    test "allows incrementing guests beyond the old 12-person cap", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
-      # Check socket assigns for max_guests
+      # Increase guests 15 times — should keep working with no hard cap
+      for _i <- 1..15, do: render_click(view, "increase-guests", %{})
+
       state = :sys.get_state(view.pid)
-      assert state.socket.assigns.max_guests == 12
+      assert state.socket.assigns.guests_count == 16
+    end
+
+    test "max_guests is not an assign (no hard cap enforced)", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      state = :sys.get_state(view.pid)
+      refute Map.has_key?(state.socket.assigns, :max_guests)
+    end
+
+    test "increase-guests event always increments the count regardless of how high it is",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      # Start with a count far above the old 12-person cap
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?guests_count=20")
+
+      render_click(view, "increase-guests", %{})
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.guests_count == 21
     end
   end
 
@@ -706,7 +764,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "handles guest count above maximum", %{conn: conn} do
+    test "accepts guest count well above the old maximum", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
@@ -714,8 +772,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       render_change(view, "guests-changed", %{"guests_count" => "50"})
 
-      html = render(view)
-      assert html =~ "Clear Lake"
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.guests_count == 50
     end
   end
 
@@ -898,18 +956,20 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "day mode with maximum guests", %{conn: conn} do
+    test "day mode with large guest count above the old 12-person limit", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      params = %{"booking_mode" => "day", "guests" => "12"}
+      params = %{"booking_mode" => "day", "guests_count" => "20"}
 
       {:ok, view, _html} =
         live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
 
-      html = render(view)
-
-      assert html =~ "Clear Lake"
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.guests_count == 20
+      assert state.socket.assigns.selected_booking_mode == :day
     end
 
     test "switches from day to buyout with valid dates", %{conn: conn} do
@@ -1079,20 +1139,19 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "reaches maximum guest count", %{conn: conn} do
+    test "guest count keeps increasing with no cap", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?guests=11")
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
-      # Increase to max
+      # Three increases from the default of 1
       render_click(view, "increase-guests", %{})
-      # Try to go beyond max
       render_click(view, "increase-guests", %{})
       render_click(view, "increase-guests", %{})
 
-      html = render(view)
-      assert html =~ "Clear Lake"
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.guests_count == 4
     end
   end
 
@@ -1358,7 +1417,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "books with exactly 12 guests (maximum)", %{conn: conn} do
+    test "books with 12 guests (previously the maximum, now just another count)",
+         %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
@@ -1368,14 +1428,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       params = %{
         "checkin_date" => Date.to_string(checkin),
         "checkout_date" => Date.to_string(checkout),
-        "guests" => "12"
+        "guests_count" => "12"
       }
 
       {:ok, view, _html} =
         live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
 
-      html = render(view)
-      assert html =~ "Clear Lake"
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.guests_count == 12
     end
 
     test "books with 4 guests", %{conn: conn} do

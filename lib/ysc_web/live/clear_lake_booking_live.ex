@@ -9,8 +9,6 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Repo
   import Ecto.Query
 
-  @max_guests 12
-
   @impl true
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
@@ -162,7 +160,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         season_end_date: season_end_date,
         selected_booking_mode: booking_mode,
         guests_count: guests_count,
-        max_guests: @max_guests,
         guests_dropdown_open: false,
         calculated_price: nil,
         price_error: nil,
@@ -895,17 +892,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                                   id="increase-guests-button"
                                   phx-click="increase-guests"
                                   phx-click-stop
-                                  disabled={@guests_count >= (@max_guests || 12)}
                                   aria-label="Increase number of guests"
-                                  class={[
-                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
-                                    if(@guests_count >= (@max_guests || 12),
-                                      do:
-                                        "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed",
-                                      else:
-                                        "border-teal-600 bg-teal-600 hover:bg-teal-700 hover:border-teal-700 text-white"
-                                    )
-                                  ]}
+                                  class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold border-teal-600 bg-teal-600 hover:bg-teal-700 hover:border-teal-700 text-white"
                                 >
                                   <.icon name="hero-plus" class="w-5 h-5" />
                                 </button>
@@ -1024,16 +1012,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                   <div class="mb-4">
                     <p class="text-sm font-medium text-zinc-800 mb-2">
-                      The calendar shows how many spots are available for each day (up to 12 guests per day).
-                      <span
-                        :if={@guests_count && @guests_count > 0}
-                        class="font-semibold text-teal-700"
-                      >
-                        Dates with fewer than {@guests_count} spot{if @guests_count ==
-                                                                        1,
-                                                                      do: "",
-                                                                      else: "s"} available are disabled.
-                      </span>
+                      The calendar shows how many guests are registered for each day.
                     </p>
                     <p class="text-xs text-zinc-600">
                       Click on a date to start your selection, then click another date to complete your range.
@@ -2794,8 +2773,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   def handle_event("guests-changed", %{"guests_count" => guests_str}, socket) do
     guests_count = parse_integer(guests_str) || 1
 
-    # Validate that guests_count is within valid range
-    guests_count = min(max(guests_count, 1), @max_guests)
+    # Ensure guests_count is at least 1
+    guests_count = max(guests_count, 1)
 
     # Check if the selected dates still have enough spots available
     availability_error =
@@ -2828,7 +2807,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   def handle_event("increase-guests", _params, socket) do
     current_count = socket.assigns.guests_count || 1
-    new_count = min(current_count + 1, @max_guests)
+    new_count = current_count + 1
 
     # Check if the selected dates still have enough spots available
     availability_error =
@@ -3224,9 +3203,7 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     checkin_date && checkout_date &&
       is_nil(availability_error) &&
-      (booking_mode == :buyout ||
-         (booking_mode == :day && guests_count > 0 &&
-            guests_count <= @max_guests))
+      (booking_mode == :buyout || (booking_mode == :day && guests_count > 0))
   end
 
   defp validate_and_create_booking(socket) do
@@ -3702,11 +3679,11 @@ defmodule YscWeb.ClearLakeBookingLive do
     )
   end
 
-  # Validates that the selected dates have enough spots available for the requested number of guests
+  # Validates that the selected dates are available for the given booking mode
   defp validate_guests_against_availability(
          checkin_date,
          checkout_date,
-         guests_count,
+         _guests_count,
          assigns
        ) do
     # Get availability for the date range
@@ -3733,15 +3710,12 @@ defmodule YscWeb.ClearLakeBookingLive do
         day_availability = Map.get(availability, date)
 
         if day_availability do
-          # Check if there are enough spots available
           if day_availability.is_blacked_out do
             date
           else
             if assigns[:selected_booking_mode] == :day do
-              # For day bookings, check if there are enough spots
-              if day_availability.spots_available < guests_count,
-                do: date,
-                else: nil
+              # For day bookings, only check for blackout/buyout conflicts
+              if day_availability.can_book_day, do: nil, else: date
             else
               # For buyout, check if buyout is possible
               if day_availability.can_book_buyout, do: nil, else: date
@@ -3763,9 +3737,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           "The date #{date_str} is blacked out and cannot be booked."
 
         day_availability && assigns[:selected_booking_mode] == :day ->
-          spots = day_availability.spots_available
-
-          "The date #{date_str} only has #{spots} spot#{if spots == 1, do: "", else: "s"} available, but you're trying to book #{guests_count} guest#{if guests_count == 1, do: "", else: "s"}."
+          "The date #{date_str} is not available for a la carte bookings (a buyout may be in place)."
 
         day_availability && assigns[:selected_booking_mode] == :buyout ->
           "The date #{date_str} cannot be booked as a buyout (there are existing day bookings or another buyout)."
@@ -3835,7 +3807,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   defp normalize_guests_count(guests_count) do
-    min(max(guests_count, 1), @max_guests)
+    max(guests_count, 1)
   end
 
   defp normalize_booking_mode(booking_mode) do

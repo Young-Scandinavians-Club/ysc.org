@@ -531,54 +531,22 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
               !morning_blocked && !afternoon_blocked ->
                 # Fully available
-                # For Clear Lake day bookings, add spot-based background color
-                spot_bg_class = get_clear_lake_spot_background(day, assigns)
-
-                if spot_bg_class do
-                  "#{spot_bg_class} text-zinc-900 border border-green-200 hover:opacity-80"
-                else
-                  "bg-green-50 text-zinc-900 border border-green-200 hover:bg-green-100"
-                end
+                "bg-green-50 text-zinc-900 border border-green-200 hover:bg-green-100"
 
               morning_blocked && !afternoon_blocked ->
                 # Check-out day (Blocked -> Available)
-                spot_bg_class = get_clear_lake_spot_background(day, assigns)
-
                 case morning_style do
                   :gray ->
-                    # If yesterday was gray (past/scope), and today is available, use spot-based or green
-                    bg_class =
-                      if spot_bg_class, do: spot_bg_class, else: "bg-green-50"
-
-                    "#{bg_class} text-zinc-900 border border-green-200 hover:opacity-80"
+                    "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
 
                   :blackout ->
-                    if spot_bg_class == "bg-amber-50" do
-                      "bg-gradient-to-r from-red-800 to-amber-50 text-zinc-900 border border-zinc-300"
-                    else
-                      if spot_bg_class == "bg-teal-50" do
-                        "bg-gradient-to-r from-red-800 to-teal-50 text-zinc-900 border border-zinc-300"
-                      else
-                        "bg-gradient-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
-                      end
-                    end
+                    "bg-gradient-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
 
                   :booked ->
-                    if spot_bg_class == "bg-amber-50" do
-                      "bg-gradient-to-r from-red-200 to-amber-50 text-zinc-900 border border-zinc-300"
-                    else
-                      if spot_bg_class == "bg-teal-50" do
-                        "bg-gradient-to-r from-red-200 to-teal-50 text-zinc-900 border border-zinc-300"
-                      else
-                        "bg-gradient-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
-                      end
-                    end
+                    "bg-gradient-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
 
                   _ ->
-                    bg_class =
-                      if spot_bg_class, do: spot_bg_class, else: "bg-green-50"
-
-                    "#{bg_class} text-zinc-900 border border-green-200 hover:opacity-80"
+                    "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
                 end
 
               !morning_blocked && afternoon_blocked ->
@@ -669,11 +637,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
               !day_info.can_book_buyout
 
             assigns.selected_booking_mode == :day ->
-              # Unavailable for day booking if full or bought out OR not enough spots for selected guests
-              # Only applies to Clear Lake
-              !day_info.can_book_day ||
-                (assigns[:guests_count] &&
-                   day_info.spots_available < assigns.guests_count)
+              # Unavailable for day booking if blacked out or has a buyout
+              !day_info.can_book_day
 
             assigns.selected_booking_mode == :room ->
               # Unavailable for room booking if buyout exists
@@ -849,15 +814,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     end
   end
 
-  defp get_bookings_reason(day, assigns) do
-    day_info = Map.get(assigns.availability, day)
-
-    if assigns.selected_booking_mode == :day && day_info &&
-         day_info.spots_available < (assigns[:guests_count] || 1) do
-      "Not enough spots"
-    else
-      "Booking already exists"
-    end
+  defp get_bookings_reason(_day, _assigns) do
+    "Booking already exists"
   end
 
   defp get_other_reason(day, assigns) do
@@ -884,10 +842,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         day_info.is_blacked_out ->
           :blackout
 
-        assigns.selected_booking_mode == :day &&
-            (!day_info.can_book_day ||
-               (assigns[:guests_count] &&
-                  day_info.spots_available < assigns.guests_count)) ->
+        assigns.selected_booking_mode == :day && !day_info.can_book_day ->
           :bookings
 
         assigns.selected_booking_mode == :buyout && !day_info.can_book_buyout ->
@@ -1069,75 +1024,28 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   defp availability_display(day, mode, availability, assigns) do
     info = Map.get(availability, day)
 
-    # For Clear Lake day bookings, render visual indicator
-    # Tahoe doesn't show per-guest-spot indicators (only buyout or room mode)
+    # For Clear Lake day bookings, show how many guests are registered
     if assigns[:property] == :clear_lake && mode == :day && info &&
-         Map.has_key?(info, :spots_available) do
-      render_clear_lake_spots_html(day, info, assigns)
+         Map.has_key?(info, :day_bookings_count) do
+      booked = info.day_bookings_count
+
+      is_selected =
+        selected_start?(day, assigns.checkin_date) ||
+          selected_end?(day, assigns.checkout_date) ||
+          selected_range?(day, assigns.checkin_date, assigns.checkout_date)
+
+      text_class = if is_selected, do: "text-white/80", else: "text-zinc-500"
+
+      if booked > 0 do
+        Phoenix.HTML.raw(
+          "<span class=\"text-xs font-medium #{text_class}\">#{booked} booked</span>"
+        )
+      else
+        ""
+      end
     else
       availability_display_text(day, mode, availability, assigns)
     end
-  end
-
-  # sobelow_skip ["XSS.Raw"]
-  defp render_clear_lake_spots_html(day, info, assigns) do
-    spots_available = info.spots_available
-    max_spots = 12
-    spots_taken = max_spots - spots_available
-
-    # Check if this date is selected (has blue background)
-    is_selected =
-      selected_start?(day, assigns.checkin_date) ||
-        selected_end?(day, assigns.checkout_date) ||
-        selected_range?(day, assigns.checkin_date, assigns.checkout_date)
-
-    visual_state =
-      cond do
-        spots_available == 0 -> :full
-        spots_available <= 3 -> :high_occupancy
-        spots_available <= 6 -> :medium_occupancy
-        true -> :low_occupancy
-      end
-
-    dots_html =
-      for i <- 1..12 do
-        dot_class =
-          if i <= spots_taken do
-            if visual_state == :full, do: "bg-red-500", else: "bg-amber-400"
-          else
-            # For selected dates, use lighter dots for better contrast
-            if is_selected, do: "bg-white/80", else: "bg-teal-200"
-          end
-
-        "<div class=\"w-1 h-1 rounded-full #{dot_class}\"></div>"
-      end
-      |> Enum.join("")
-
-    # Use white/light text for selected dates, otherwise use the visual state colors
-    text_class =
-      if is_selected do
-        "text-white"
-      else
-        case visual_state do
-          :full -> "text-red-600"
-          :high_occupancy -> "text-amber-600"
-          _ -> "text-zinc-600"
-        end
-      end
-
-    spots_text = if spots_available != 1, do: "spots", else: "spot"
-
-    """
-    <div class="flex flex-col items-center gap-1">
-      <div class="flex flex-wrap justify-center gap-0.5 max-w-[60px]">
-        #{dots_html}
-      </div>
-      <span class="text-xs font-medium whitespace-nowrap #{text_class}">
-        #{spots_available} #{spots_text}
-      </span>
-    </div>
-    """
-    |> Phoenix.HTML.raw()
   end
 
   defp availability_display_text(day, mode, availability, assigns) do
@@ -1170,7 +1078,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           if is_valid_checkout do
             "Check-out only"
           else
-            "Full"
+            "Unavailable"
           end
 
         mode == :room && !info.can_book_room ->
@@ -1181,7 +1089,9 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           end
 
         mode == :day ->
-          "#{info.spots_available} spots"
+          if info.day_bookings_count > 0,
+            do: "#{info.day_bookings_count} booked",
+            else: ""
 
         mode == :buyout ->
           "Available"
@@ -1194,44 +1104,6 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       end
     else
       ""
-    end
-  end
-
-  defp get_clear_lake_spot_background(day, assigns) do
-    # Only apply spot-based background for Clear Lake day bookings
-    # Tahoe doesn't use spot-based backgrounds (only buyout or room mode)
-    if assigns[:property] == :clear_lake &&
-         assigns[:selected_booking_mode] == :day do
-      info = Map.get(assigns.availability, day)
-
-      if info && info.spots_available do
-        spots_available = info.spots_available
-
-        cond do
-          # Fully booked
-          spots_available == 0 ->
-            nil
-
-          # Let the existing unavailable styling handle this
-
-          # Low availability (1-3 spots)
-          spots_available >= 1 && spots_available <= 3 ->
-            "bg-amber-50"
-
-          # High availability (9-12 spots)
-          spots_available >= 9 && spots_available <= 12 ->
-            "bg-teal-50"
-
-          # Medium availability (4-8 spots) - use default green
-          true ->
-            nil
-            # Use default green-50 background
-        end
-      else
-        nil
-      end
-    else
-      nil
     end
   end
 

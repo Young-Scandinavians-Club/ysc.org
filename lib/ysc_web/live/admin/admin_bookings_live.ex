@@ -1972,8 +1972,8 @@ defmodule YscWeb.AdminBookingsLive do
                         class="flex items-center justify-center h-12"
                         style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
                       >
-                        <span class={"text-sm font-semibold #{if availability_info.spots_available > 0, do: "text-green-600", else: "text-red-600"}"}>
-                          {availability_info.spots_available}/{12} slots
+                        <span class={"text-sm font-semibold #{if availability_info.day_bookings_count > 0, do: "text-amber-600", else: "text-zinc-400"}"}>
+                          {availability_info.day_bookings_count} booked
                         </span>
                       </div>
                     <% end %>
