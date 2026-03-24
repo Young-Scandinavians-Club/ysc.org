@@ -187,7 +187,9 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       day_cell = LazyHTML.filter(document, "[data-day=\"#{day_str}\"]")
       day_html = LazyHTML.to_html(day_cell)
 
-      assert day_html =~ "bg-red-200" or day_html =~ "cursor-not-allowed"
+      # The checkin day is a "check-in day" (morning available, afternoon booked),
+      # so it renders a green-to-red gradient rather than a fully blocked bg-red-200 cell.
+      assert day_html =~ "to-red-200"
     end
 
     test "a blacked-out date shows blackout styling" do
@@ -207,7 +209,9 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       day_cell = LazyHTML.filter(document, "[data-day=\"#{day_str}\"]")
       day_html = LazyHTML.to_html(day_cell)
 
-      assert day_html =~ "bg-red-800" or day_html =~ "cursor-not-allowed"
+      # The blackout day is a "check-in day" (morning available, afternoon blacked out),
+      # so it renders a green-to-red-800 gradient rather than a fully blocked bg-red-800 cell.
+      assert day_html =~ "to-red-800"
     end
   end
 end
