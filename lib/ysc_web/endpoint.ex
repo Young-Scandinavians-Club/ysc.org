@@ -88,6 +88,8 @@ defmodule YscWeb.Endpoint do
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
+    # 30 MB — headroom above the 25 MB business-logic limit in TrixUploadsController
+    length: 30_000_000,
     json_decoder: Phoenix.json_library()
 
   plug Sentry.PlugContext

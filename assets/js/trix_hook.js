@@ -5,8 +5,8 @@ function emitEditorUpdateEvent(source, el) {
   source.pushEvent("editor-update", { field: el.name, value: el.value });
 }
 
-function uploadFileAttachment(attachment, postID) {
-  uploadFile(attachment.file, postID, setProgress, setAttributes);
+function uploadFileAttachment(attachment, postID, editorEl) {
+  uploadFile(attachment.file, postID, setProgress, setAttributes, setError);
 
   function setProgress(progress) {
     attachment.setUploadProgress(progress);
@@ -15,9 +15,16 @@ function uploadFileAttachment(attachment, postID) {
   function setAttributes(attributes) {
     attachment.setAttributes(attributes);
   }
+
+  function setError(message) {
+    if (editorEl && editorEl.editor) {
+      editorEl.editor.removeAttachment(attachment);
+    }
+    alert(`Upload failed: ${message}`);
+  }
 }
 
-function uploadFile(file, postID, progressCallback, successCallback) {
+function uploadFile(file, postID, progressCallback, successCallback, errorCallback) {
   const formData = new FormData();
   formData.append("file", file);
   if (postID) {
@@ -40,9 +47,29 @@ function uploadFile(file, postID, progressCallback, successCallback) {
 
   xhr.addEventListener("load", function (_event) {
     if (xhr.status === 201) {
-      const url = xhr.responseText;
-      const attributes = { url, href: `${url}?content-disposition=attachment` };
-      successCallback(attributes);
+      let url;
+      try {
+        const data = JSON.parse(xhr.responseText);
+        url = data.url;
+        const attributes = { url, href: `${url}?content-disposition=attachment` };
+        successCallback(attributes);
+      } catch (_e) {
+        // Fallback for plain-text URL response
+        url = xhr.responseText;
+        const attributes = { url, href: `${url}?content-disposition=attachment` };
+        successCallback(attributes);
+      }
+    } else {
+      let message = "An unexpected error occurred.";
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data.error) message = data.error;
+      } catch (_e) {
+        // keep default message
+      }
+      if (typeof errorCallback === "function") {
+        errorCallback(message);
+      }
     }
   });
 
@@ -116,7 +143,10 @@ module.exports = {
     document.addEventListener("trix-attachment-add", (event) => {
       if (event.attachment.file) {
         const postID = this.el.getAttribute("data-post-id");
-        uploadFileAttachment(event.attachment, postID);
+        const editorEl = document.querySelector(
+          `trix-editor[input="${this.el.id}"]`,
+        );
+        uploadFileAttachment(event.attachment, postID, editorEl);
       }
     });
 

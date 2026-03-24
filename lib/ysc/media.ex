@@ -357,22 +357,33 @@ defmodule Ysc.Media do
     [quality: quality]
   end
 
-  def upload_file_to_s3(path), do: upload_file_to_s3(path, Path.basename(path))
+  def upload_file_to_s3(path),
+    do: upload_file_to_s3(path, Path.basename(path), [])
 
   @doc """
   Uploads a file to S3 at the given key (e.g. to overwrite an existing object).
   Use this to replace the raw upload with a metadata-stripped version.
+
+  ## Options
+  - `:content_type` - The MIME type to set on the S3 object (e.g. `"application/pdf"`).
+    When omitted, S3 infers the content type from the file extension.
   """
-  def upload_file_to_s3(path, key) when is_binary(key) do
+  def upload_file_to_s3(path, key) when is_binary(key),
+    do: upload_file_to_s3(path, key, [])
+
+  def upload_file_to_s3(path, key, opts)
+      when is_binary(key) and is_list(opts) do
     bucket_name = S3Config.bucket_name()
     key = String.trim_leading(key, "/")
+
+    upload_opts =
+      [cache_control: "public, max-age=86400"]
+      |> maybe_add_content_type(opts)
 
     result =
       path
       |> ExAws.S3.Upload.stream_file()
-      |> ExAws.S3.upload(bucket_name, key,
-        cache_control: "public, max-age=86400"
-      )
+      |> ExAws.S3.upload(bucket_name, key, upload_opts)
       |> ExAws.request!()
 
     # Tigris doesn't return location in response, so construct it from the key
@@ -395,6 +406,13 @@ defmodule Ysc.Media do
 
     # Return result with location in body for compatibility
     put_in(result, [:body, :location], location)
+  end
+
+  defp maybe_add_content_type(opts, extra_opts) do
+    case Keyword.get(extra_opts, :content_type) do
+      nil -> opts
+      ct -> Keyword.put(opts, :content_type, ct)
+    end
   end
 
   defp upload_files_to_s3(files) do

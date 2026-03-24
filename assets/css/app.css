@@ -280,7 +280,6 @@ html {
     color: #71717a !important;
 }
 
-
 .tmp-element {
     visibility: hidden;
     white-space: pre;
@@ -793,13 +792,218 @@ body.overflow-hidden {
     line-height: 1.2;
 }
 
+
+/* =============================================
+   FILE ATTACHMENT CARDS (non-image Trix attachments)
+   Applies in the admin editor (.trix-content) and public rendered content (.post-render)
+   ============================================= */
+
+
+/* Reset the old minimal defaults */
+
 .attachment--file {
-    color: #333;
+    display: block;
+    color: inherit;
     line-height: 1;
-    margin: 0 2px 2px 2px;
-    padding: 0.4em 1em;
-    border: 1px solid #bbb;
-    border-radius: 5px;
+    margin: 0.5em 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+}
+
+
+/* Override inline-block from .attachment so file cards are full-width.
+   Also zero out the padding-top/bottom that .post-render figure / .trix-content figure
+   adds to all figures — file cards need no extra inner padding above or below the <a>. */
+
+.trix-content .attachment--file,
+.post-render .attachment--file {
+    display: block;
+    margin: 0.875em 0;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+
+/* The <a> tag becomes the visible card surface */
+
+.trix-content .attachment--file>a,
+.post-render .attachment--file>a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    color: #374151;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    min-width: 0;
+    /* Override .post-render animated underline */
+    background-image: none !important;
+    background-size: 0 !important;
+}
+
+.trix-content .attachment--file>a:hover,
+.post-render .attachment--file>a:hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    color: #111827;
+    background-size: 0 !important;
+}
+
+
+/* --- File type icon (::before on the <a>) --- */
+
+
+/* Default: generic document icon, gray */
+
+.trix-content .attachment--file>a::before,
+.post-render .attachment--file>a::before {
+    content: "";
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
+}
+
+
+/* PDF: red */
+
+.trix-content [data-trix-content-type="application/pdf"]>a::before,
+.post-render [data-trix-content-type="application/pdf"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23DC2626'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
+}
+
+
+/* Word documents: blue */
+
+.trix-content [data-trix-content-type*="wordprocessingml"]>a::before,
+.trix-content [data-trix-content-type*="msword"]>a::before,
+.post-render [data-trix-content-type*="wordprocessingml"]>a::before,
+.post-render [data-trix-content-type*="msword"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%232563EB'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
+}
+
+
+/* Spreadsheets / CSV: green */
+
+.trix-content [data-trix-content-type*="spreadsheetml"]>a::before,
+.trix-content [data-trix-content-type*="excel"]>a::before,
+.trix-content [data-trix-content-type="text/csv"]>a::before,
+.post-render [data-trix-content-type*="spreadsheetml"]>a::before,
+.post-render [data-trix-content-type*="excel"]>a::before,
+.post-render [data-trix-content-type="text/csv"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2316A34A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h1.5a1.125 1.125 0 0 1 1.125 1.125v1.5a1.125 1.125 0 0 1-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m7.5-3.75c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m0 0h-7.5'/%3E%3C/svg%3E");
+}
+
+
+/* Presentations: orange */
+
+.trix-content [data-trix-content-type*="presentationml"]>a::before,
+.trix-content [data-trix-content-type*="powerpoint"]>a::before,
+.post-render [data-trix-content-type*="presentationml"]>a::before,
+.post-render [data-trix-content-type*="powerpoint"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23EA580C'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605'/%3E%3C/svg%3E");
+}
+
+
+/* Archives (zip / gzip / tar / rar): amber */
+
+.trix-content [data-trix-content-type*="zip"]>a::before,
+.trix-content [data-trix-content-type*="gzip"]>a::before,
+.trix-content [data-trix-content-type*="x-tar"]>a::before,
+.trix-content [data-trix-content-type*="x-rar"]>a::before,
+.post-render [data-trix-content-type*="zip"]>a::before,
+.post-render [data-trix-content-type*="gzip"]>a::before,
+.post-render [data-trix-content-type*="x-tar"]>a::before,
+.post-render [data-trix-content-type*="x-rar"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23D97706'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'/%3E%3C/svg%3E");
+}
+
+
+/* Video: violet */
+
+.trix-content [data-trix-content-type^="video/"]>a::before,
+.post-render [data-trix-content-type^="video/"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%237C3AED'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25z'/%3E%3C/svg%3E");
+}
+
+
+/* Audio: pink */
+
+.trix-content [data-trix-content-type^="audio/"]>a::before,
+.post-render [data-trix-content-type^="audio/"]>a::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23DB2777'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z'/%3E%3C/svg%3E");
+}
+
+
+/* --- Caption: filename stacked above size --- */
+
+.trix-content .attachment--file .attachment__caption,
+.post-render .attachment--file .attachment__caption {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+
+.trix-content .attachment--file .attachment__name,
+.post-render .attachment--file .attachment__name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.trix-content .attachment--file .attachment__size,
+.post-render .attachment--file .attachment__size {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    display: block;
+    margin-top: 0.1em;
+}
+
+
+/* Remove the bullet separator (name and size are now stacked) */
+
+.trix-content .attachment--file .attachment__caption .attachment__name+.attachment__size::before,
+.post-render .attachment--file .attachment__caption .attachment__name+.attachment__size::before {
+    content: none;
+}
+
+
+/* --- Download arrow (::after on the <a>) --- */
+
+.trix-content .attachment--file>a::after,
+.post-render .attachment--file>a::after {
+    content: "";
+    flex-shrink: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-left: auto;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0.35;
+    transition: opacity 0.15s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3'/%3E%3C/svg%3E");
+}
+
+.trix-content .attachment--file>a:hover::after,
+.post-render .attachment--file>a:hover::after {
+    opacity: 0.7;
 }
 
 .attachment-gallery {
@@ -3270,11 +3474,18 @@ input[type="text"][list],
 input[type="search"][list] {
     padding-right: 2.5rem;
 }
+
+
 /* === TICKET QR CAROUSEL === */
+
+
 /* Hide scrollbar on the scroll-snap viewport across all browsers */
+
 [data-slider-viewport] {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;     /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
 }
 
 [data-slider-viewport]::-webkit-scrollbar {
