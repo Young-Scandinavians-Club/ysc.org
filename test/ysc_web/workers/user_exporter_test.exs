@@ -8,6 +8,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
   alias YscWeb.Workers.UserExporter
   alias Ysc.Subscriptions
+  alias Ysc.Accounts
   alias Ysc.Repo
 
   # A fixed future datetime in January (PST = UTC-8, no DST ambiguity).
@@ -199,6 +200,78 @@ defmodule YscWeb.Workers.UserExporterTest do
       assert Map.has_key?(row, "primary_user_id")
       refute Map.has_key?(row, "first_name")
       refute Map.has_key?(row, "last_name")
+    end
+  end
+
+  describe "address field" do
+    test "expands address into five sub-columns when included", %{
+      channel: channel
+    } do
+      user = user_fixture()
+
+      {:ok, _} =
+        Accounts.update_billing_address(user, %{
+          "address" => "100 Fjord Lane",
+          "city" => "Bergen",
+          "region" => "CA",
+          "postal_code" => "94102",
+          "country" => "US"
+        })
+
+      path = run_export(channel, oban_job(channel, ["id", "address"], false))
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == user.id))
+
+      assert Map.has_key?(row, "address")
+      assert Map.has_key?(row, "city")
+      assert Map.has_key?(row, "region")
+      assert Map.has_key?(row, "postal_code")
+      assert Map.has_key?(row, "country")
+      assert row["address"] == "100 Fjord Lane"
+      assert row["city"] == "Bergen"
+      assert row["region"] == "CA"
+      assert row["postal_code"] == "94102"
+      assert row["country"] == "US"
+    end
+
+    test "address sub-columns are empty when user has no billing address", %{
+      channel: channel
+    } do
+      user = user_fixture()
+
+      path = run_export(channel, oban_job(channel, ["id", "address"], false))
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == user.id))
+
+      assert row["address"] in [nil, ""]
+      assert row["city"] in [nil, ""]
+      assert row["region"] in [nil, ""]
+      assert row["postal_code"] in [nil, ""]
+      assert row["country"] in [nil, ""]
+    end
+
+    test "address columns are absent when address field is not requested", %{
+      channel: channel
+    } do
+      user = user_fixture()
+
+      {:ok, _} =
+        Accounts.update_billing_address(user, %{
+          "address" => "1 Viking Ave",
+          "city" => "Oslo",
+          "region" => "NY",
+          "postal_code" => "10001",
+          "country" => "US"
+        })
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      [row | _] = parse_csv(path)
+
+      refute Map.has_key?(row, "address")
+      refute Map.has_key?(row, "city")
+      refute Map.has_key?(row, "region")
+      refute Map.has_key?(row, "postal_code")
+      refute Map.has_key?(row, "country")
     end
   end
 end
