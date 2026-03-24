@@ -1077,7 +1077,14 @@ defmodule YscWeb.AdminScannerLive do
       |> assign(:sessions, [])
       |> assign(:detail_session, nil)
       |> assign(:detail_records, [])
-      |> load_event_options()
+      |> assign(:event_options, [])
+
+    socket =
+      if connected?(socket) do
+        load_event_options(socket)
+      else
+        socket
+      end
 
     {:ok, socket}
   end

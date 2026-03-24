@@ -850,6 +850,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       html = TicketPurchaseConfirmation.render(assigns)
       assert is_binary(html)
       assert html =~ "$20.00"
+      assert html =~ assigns.tickets_qr_url
     end
 
     test "TicketPurchaseConfirmation with agenda" do
@@ -906,6 +907,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       html = TicketPurchaseConfirmation.render(assigns)
       assert is_binary(html)
+      assert html =~ assigns.tickets_qr_url
     end
 
     test "ExpenseReportConfirmation with event and bank_account" do

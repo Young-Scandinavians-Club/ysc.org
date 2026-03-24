@@ -257,15 +257,27 @@ defmodule YscWeb.TicketQrLive do
             }
           end)
 
-        {:ok,
-         socket
-         |> assign(:page_title, "#{order.event.title} · Ticket QR")
-         |> assign(:return_to, return_to)
-         |> assign(:event, order.event)
-         |> assign(:order_id, order.id)
-         |> assign(:order_reference, order.reference_id)
-         |> assign(:tickets, confirmed_tickets)
-         |> assign(:ticket_count, length(confirmed_tickets))}
+        if confirmed_tickets == [] do
+          {:ok, push_navigate(socket, to: return_to)}
+        else
+          event = order.event
+
+          {:ok,
+           socket
+           |> assign(:page_title, "#{event.title} · Ticket QR")
+           |> assign(:return_to, return_to)
+           |> assign(:event, %{
+             title: event.title,
+             start_date: event.start_date,
+             start_time: event.start_time,
+             location_name: event.location_name,
+             address: event.address
+           })
+           |> assign(:order_id, order.id)
+           |> assign(:order_reference, order.reference_id)
+           |> assign(:tickets, confirmed_tickets)
+           |> assign(:ticket_count, length(confirmed_tickets))}
+        end
     end
   end
 

@@ -273,6 +273,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       html = TicketPurchaseConfirmation.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
+      assert html =~ assigns.tickets_qr_url
 
       assert TicketPurchaseConfirmation.get_template_name() ==
                "ticket_purchase_confirmation"
