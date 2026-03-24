@@ -1544,7 +1544,7 @@ defmodule YscWeb.HomeLive do
                       <div class="flex items-center gap-3">
                         <.link
                           :if={order_id}
-                          navigate={~p"/tickets/#{order_id}/qr" <> "?return_to=/"}
+                          navigate={~p"/tickets/#{order_id}/qr?return_to=/"}
                           class="inline-flex items-center gap-1 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
                         >
                           <.icon name="hero-qr-code" class="w-3 h-3" /> QR Codes

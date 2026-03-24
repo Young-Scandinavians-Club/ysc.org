@@ -21,6 +21,7 @@ export default {
     this.cameraActive = false;
     this.cameraStarting = false;
     this.isDestroyed = false;
+    this.stopRequested = false;
 
     this.log("hook mounted");
 
@@ -168,8 +169,12 @@ export default {
         }
       )
       .then(() => {
-        if (this.isDestroyed) {
-          return this.scanner?.stop();
+        if (this.isDestroyed || this.stopRequested) {
+          this.stopRequested = false;
+          return this.scanner?.stop().then(() => {
+            this.cameraActive = false;
+            this.scanner = null;
+          });
         }
         this.cameraActive = true;
         this.log("camera started successfully");
@@ -190,7 +195,11 @@ export default {
   },
 
   stopCamera() {
-    this.log("stopCamera called", { cameraActive: this.cameraActive });
+    this.log("stopCamera called", { cameraActive: this.cameraActive, cameraStarting: this.cameraStarting });
+    if (this.cameraStarting) {
+      this.stopRequested = true;
+      return;
+    }
     if (this.scanner && this.cameraActive) {
       this.scanner
         .stop()
