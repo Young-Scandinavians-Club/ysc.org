@@ -37,11 +37,17 @@ defmodule YscWeb.TicketQrLive do
           <.icon name="hero-calendar" class="w-4 h-4 text-zinc-400 shrink-0" />
           {format_event_date(@event.start_date, @event.start_time)}
         </span>
-        <span :if={@event.location_name} class="flex items-center gap-2 text-sm text-zinc-200">
+        <span
+          :if={@event.location_name}
+          class="flex items-center gap-2 text-sm text-zinc-200"
+        >
           <.icon name="hero-map-pin" class="w-4 h-4 text-zinc-400 shrink-0" />
           {@event.location_name}
         </span>
-        <span :if={@event.address} class="flex items-center gap-2 text-sm text-zinc-300">
+        <span
+          :if={@event.address}
+          class="flex items-center gap-2 text-sm text-zinc-300"
+        >
           <.icon name="hero-building-office" class="w-4 h-4 text-zinc-400 shrink-0" />
           {@event.address}
         </span>
@@ -67,7 +73,6 @@ defmodule YscWeb.TicketQrLive do
               >
                 <%!-- Ticket: three joined sections — header / QR body / info stub --%>
                 <div class="shadow-2xl shadow-black/60">
-
                   <%!-- ① Header band --%>
                   <div class="rounded-t-3xl bg-emerald-700">
                     <div class="px-6 py-4 flex items-center justify-between">
@@ -88,7 +93,11 @@ defmodule YscWeb.TicketQrLive do
                   <%!-- ② QR body — main white section --%>
                   <div class="bg-white px-6 pt-6 pb-4">
                     <div class="flex items-center justify-center">
-                      <.qr_code data={ticket.qr_token} size={230} class="rounded-xl" />
+                      <.qr_code
+                        data={ticket.qr_token}
+                        size={230}
+                        class="rounded-xl"
+                      />
                     </div>
                     <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-zinc-400 mt-4">
                       Scan to check in
@@ -96,7 +105,10 @@ defmodule YscWeb.TicketQrLive do
                   </div>
 
                   <%!-- ③ Perforation tear-line with side notches --%>
-                  <div class="bg-white relative flex items-center" style="height: 2rem;">
+                  <div
+                    class="bg-white relative flex items-center"
+                    style="height: 2rem;"
+                  >
                     <div class="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-zinc-900">
                     </div>
                     <div class="absolute inset-x-6 border-t-2 border-dashed border-zinc-300">
@@ -126,7 +138,6 @@ defmodule YscWeb.TicketQrLive do
                       </div>
                     </div>
                   </div>
-
                 </div>
               </div>
             <% end %>

@@ -36,7 +36,8 @@ defmodule YscWeb.AdminScannerLive do
             navigate={~p"/admin/scanner"}
             class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:scale-[0.98] transition duration-150 ease-in-out"
           >
-            <.icon name="hero-qr-code" class="w-4 h-4 -mt-0.5 me-1" /> New Scan Session
+            <.icon name="hero-qr-code" class="w-4 h-4 -mt-0.5 me-1" />
+            New Scan Session
           </.link>
         </div>
 
@@ -148,7 +149,9 @@ defmodule YscWeb.AdminScannerLive do
                 else: "bg-blue-100 text-blue-800"
               )
             ]}>
-              {if @detail_session.type == :membership, do: "Membership", else: "Event"}
+              {if @detail_session.type == :membership,
+                do: "Membership",
+                else: "Event"}
             </span>
           </div>
         </div>
@@ -174,7 +177,10 @@ defmodule YscWeb.AdminScannerLive do
               data-utc-time={DateTime.to_iso8601(@detail_session.inserted_at)}
               class="whitespace-nowrap"
             >
-              {Calendar.strftime(@detail_session.inserted_at, "%b %d, %Y at %H:%M UTC")}
+              {Calendar.strftime(
+                @detail_session.inserted_at,
+                "%b %d, %Y at %H:%M UTC"
+              )}
             </span>
           </div>
           <.button
@@ -184,7 +190,8 @@ defmodule YscWeb.AdminScannerLive do
             color="blue"
             class="shrink-0"
           >
-            <.icon name="hero-arrow-down-tray" class="w-4 h-4 -mt-0.5 me-1" /> Export CSV
+            <.icon name="hero-arrow-down-tray" class="w-4 h-4 -mt-0.5 me-1" />
+            Export CSV
           </.button>
         </div>
 
@@ -238,7 +245,9 @@ defmodule YscWeb.AdminScannerLive do
                   {record.membership_status || "—"}
                 </span>
                 <span
-                  :if={@detail_session.type == :membership && record.membership_type}
+                  :if={
+                    @detail_session.type == :membership && record.membership_type
+                  }
                   class="text-xs text-zinc-500"
                 >
                   {record.membership_type}
@@ -1005,8 +1014,7 @@ defmodule YscWeb.AdminScannerLive do
           target="_blank"
           class="flex items-center gap-2 bg-white text-amber-700 hover:bg-amber-50 font-semibold py-3 px-4 rounded-2xl transition-colors text-sm shrink-0"
         >
-          <.icon name="hero-document-text" class="w-4 h-4" />
-          View Order
+          <.icon name="hero-document-text" class="w-4 h-4" /> View Order
         </.link>
       </div>
     </div>

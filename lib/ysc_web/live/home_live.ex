@@ -1726,7 +1726,10 @@ defmodule YscWeb.HomeLive do
                           Member Since
                         </span>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Timex.format!(@membership_qr_details.member_since, "{Mshort} {D}, {YYYY}")}
+                          {Timex.format!(
+                            @membership_qr_details.member_since,
+                            "{Mshort} {D}, {YYYY}"
+                          )}
                         </span>
                       </div>
                     <% end %>
@@ -1736,7 +1739,10 @@ defmodule YscWeb.HomeLive do
                       </span>
                       <%= if @membership_qr_details.renewal_date do %>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Timex.format!(@membership_qr_details.renewal_date, "{Mshort} {D}, {YYYY}")}
+                          {Timex.format!(
+                            @membership_qr_details.renewal_date,
+                            "{Mshort} {D}, {YYYY}"
+                          )}
                         </span>
                       <% else %>
                         <span class="text-sm font-semibold text-emerald-700">
@@ -1756,7 +1762,11 @@ defmodule YscWeb.HomeLive do
                     <% end %>
                   </div>
                 <% end %>
-                <.button phx-click="hide_membership_qr" color="zinc" class="w-full mt-5">
+                <.button
+                  phx-click="hide_membership_qr"
+                  color="zinc"
+                  class="w-full mt-5"
+                >
                   Close
                 </.button>
               </div>
