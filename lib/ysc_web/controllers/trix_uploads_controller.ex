@@ -83,20 +83,20 @@ defmodule YscWeb.TrixUploadsController do
          ]) do
       {:ok, _mime_type} ->
         upload_result = Media.upload_file_to_s3(path)
-        raw_s3_path = upload_result[:body][:location]
 
-        raw_s3_path =
-          if raw_s3_path == "" or is_nil(raw_s3_path) do
+        s3_url =
+          if upload_result[:body][:location] == "" or
+               is_nil(upload_result[:body][:location]) do
             key = upload_result[:body][:key] || Path.basename(path)
             S3Config.object_url(key)
           else
-            raw_s3_path
+            upload_result[:body][:location]
           end
 
         {:ok, new_image} =
           Media.add_new_image(
             %{
-              raw_image_path: URI.encode(raw_s3_path),
+              raw_image_path: URI.encode(s3_url),
               user_id: current_user.id
             },
             current_user
