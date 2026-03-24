@@ -44,18 +44,26 @@ defmodule YscWeb.TrixUploadsController do
          params,
          current_user
        ) do
-    updated_image = upload_image_file(upload, current_user)
+    case upload_image_file(upload, current_user) do
+      {:ok, updated_image} ->
+        if post_id = params["post_id"] do
+          post = Posts.get_post(post_id)
 
-    if post_id = params["post_id"] do
-      post = Posts.get_post(post_id)
-      if post != nil, do: set_cover_photo(post, updated_image.id, current_user)
+          if post != nil,
+            do: set_cover_photo(post, updated_image.id, current_user)
+        end
+
+        url = get_image_url(updated_image)
+
+        conn
+        |> put_status(201)
+        |> json(%{url: url, filename: filename, content_type: "image"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(422)
+        |> json(%{error: reason})
     end
-
-    url = get_image_url(updated_image)
-
-    conn
-    |> put_status(201)
-    |> json(%{url: url, filename: filename, content_type: "image"})
   end
 
   defp set_cover_photo(post, image_id, user) do
@@ -73,53 +81,54 @@ defmodule YscWeb.TrixUploadsController do
            ".gif",
            ".webp"
          ]) do
-      {:ok, _mime_type} -> :ok
-      {:error, reason} -> raise "File validation failed: #{reason}"
+      {:ok, _mime_type} ->
+        upload_result = Media.upload_file_to_s3(path)
+        raw_s3_path = upload_result[:body][:location]
+
+        raw_s3_path =
+          if raw_s3_path == "" or is_nil(raw_s3_path) do
+            key = upload_result[:body][:key] || Path.basename(path)
+            S3Config.object_url(key)
+          else
+            raw_s3_path
+          end
+
+        {:ok, new_image} =
+          Media.add_new_image(
+            %{
+              raw_image_path: URI.encode(raw_s3_path),
+              user_id: current_user.id
+            },
+            current_user
+          )
+
+        File.mkdir_p!(@temp_dir)
+        tmp_output_file = "#{@temp_dir}/#{new_image.id}"
+        optimized_output_path = "#{tmp_output_file}_optimized"
+        thumbnail_output_path = "#{tmp_output_file}_thumb"
+
+        updated_image =
+          Media.process_image_upload(
+            new_image,
+            path,
+            thumbnail_output_path,
+            optimized_output_path
+          )
+
+        ["_optimized", "_thumb"]
+        |> Enum.each(fn suffix ->
+          [".jpg", ".jpeg", ".png", ".webp"]
+          |> Enum.each(fn ext ->
+            file_path = "#{tmp_output_file}#{suffix}#{ext}"
+            if File.exists?(file_path), do: File.rm(file_path)
+          end)
+        end)
+
+        {:ok, updated_image}
+
+      {:error, reason} ->
+        {:error, reason}
     end
-
-    upload_result = Media.upload_file_to_s3(path)
-    raw_s3_path = upload_result[:body][:location]
-
-    raw_s3_path =
-      if raw_s3_path == "" or is_nil(raw_s3_path) do
-        key = upload_result[:body][:key] || Path.basename(path)
-        S3Config.object_url(key)
-      else
-        raw_s3_path
-      end
-
-    {:ok, new_image} =
-      Media.add_new_image(
-        %{
-          raw_image_path: URI.encode(raw_s3_path),
-          user_id: current_user.id
-        },
-        current_user
-      )
-
-    File.mkdir_p!(@temp_dir)
-    tmp_output_file = "#{@temp_dir}/#{new_image.id}"
-    optimized_output_path = "#{tmp_output_file}_optimized"
-    thumbnail_output_path = "#{tmp_output_file}_thumb"
-
-    updated_image =
-      Media.process_image_upload(
-        new_image,
-        path,
-        thumbnail_output_path,
-        optimized_output_path
-      )
-
-    ["_optimized", "_thumb"]
-    |> Enum.each(fn suffix ->
-      [".jpg", ".jpeg", ".png", ".webp"]
-      |> Enum.each(fn ext ->
-        file_path = "#{tmp_output_file}#{suffix}#{ext}"
-        if File.exists?(file_path), do: File.rm(file_path)
-      end)
-    end)
-
-    updated_image
   end
 
   defp get_image_url(%Media.Image{optimized_image_path: nil} = image),
@@ -135,7 +144,15 @@ defmodule YscWeb.TrixUploadsController do
         upload_result =
           Media.upload_file_to_s3(path, filename, content_type: mime)
 
-        url = upload_result[:body][:location]
+        raw_location = upload_result[:body][:location]
+
+        url =
+          if raw_location == "" or is_nil(raw_location) do
+            key = upload_result[:body][:key] || filename
+            S3Config.object_url(key)
+          else
+            raw_location
+          end
 
         conn
         |> put_status(201)
