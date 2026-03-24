@@ -42,16 +42,19 @@ defmodule YscWeb.Emails.NewsletterEdition do
     Enum.flat_map(nodes, &transform_node_for_email/1)
   end
 
-  # Convert Trix figure attachments to an email-safe img + optional caption p
+  # Convert Trix figure attachments to email-safe HTML.
+  #
+  # Image attachments → <img> + optional styled caption <p>.
+  # Non-image file attachments → styled download link <a> inside a <p>.
   defp transform_node_for_email({"figure", _attrs, children}) do
     fragment = [{"figure", [], children}]
 
-    img_nodes =
-      case Floki.find(fragment, "img") do
-        [{"img", img_attrs, _} | _] ->
-          src = floki_attr(img_attrs, "src")
-          alt = floki_attr(img_attrs, "alt") || ""
+    case Floki.find(fragment, "img") do
+      [{"img", img_attrs, _} | _] ->
+        src = floki_attr(img_attrs, "src")
+        alt = floki_attr(img_attrs, "alt") || ""
 
+        img_nodes =
           if src do
             [
               {"img",
@@ -66,32 +69,72 @@ defmodule YscWeb.Emails.NewsletterEdition do
             []
           end
 
-        _ ->
-          []
-      end
+        caption_nodes =
+          case Floki.find(fragment, "figcaption") do
+            [cap | _] ->
+              text = cap |> Floki.text() |> String.trim()
 
-    caption_nodes =
-      case Floki.find(fragment, "figcaption") do
-        [cap | _] ->
-          text = cap |> Floki.text() |> String.trim()
+              if text != "" do
+                [
+                  {"p",
+                   [
+                     {"style",
+                      "text-align:center;font-size:12px;color:#666666;font-style:italic;margin:4px 0 12px 0;"}
+                   ], [text]}
+                ]
+              else
+                []
+              end
 
-          if text != "" do
-            [
-              {"p",
-               [
-                 {"style",
-                  "text-align:center;font-size:12px;color:#666666;font-style:italic;margin:4px 0 12px 0;"}
-               ], [text]}
-            ]
-          else
-            []
+            _ ->
+              []
           end
 
-        _ ->
-          []
-      end
+        img_nodes ++ caption_nodes
 
-    img_nodes ++ caption_nodes
+      _ ->
+        # Non-image file attachment — render as a download link button
+        href =
+          case Floki.find(fragment, "a") do
+            [{"a", a_attrs, _} | _] -> floki_attr(a_attrs, "href")
+            _ -> nil
+          end
+
+        filename =
+          case Floki.find(fragment, ".attachment__name") do
+            [node | _] -> node |> Floki.text() |> String.trim()
+            _ -> nil
+          end
+
+        filesize =
+          case Floki.find(fragment, ".attachment__size") do
+            [node | _] -> node |> Floki.text() |> String.trim()
+            _ -> nil
+          end
+
+        label =
+          case {filename, filesize} do
+            {nil, _} -> "Download file"
+            {name, nil} -> name
+            {name, size} -> "#{name} (#{size})"
+          end
+
+        if href do
+          [
+            {"p", [{"style", "margin:8px 0 16px 0;"}],
+             [
+               {"a",
+                [
+                  {"href", href},
+                  {"style",
+                   "display:inline-block;padding:8px 14px;background-color:#f5f5f5;border:1px solid #dddddd;border-radius:4px;text-decoration:none;color:#333333;font-size:14px;font-family:Arial,Helvetica,sans-serif;"}
+                ], [label]}
+             ]}
+          ]
+        else
+          if filename, do: [{"p", [], [label]}], else: []
+        end
+    end
   end
 
   # Trix serializes every paragraph as a <div>. Convert these to <p> elements
