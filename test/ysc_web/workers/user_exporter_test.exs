@@ -237,10 +237,11 @@ defmodule YscWeb.Workers.UserExporterTest do
     test "address sub-columns are empty when user has no billing address", %{
       channel: channel
     } do
-      _user = user_fixture()
+      user = user_fixture()
 
       path = run_export(channel, oban_job(channel, ["id", "address"], false))
-      [row | _] = parse_csv(path)
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == user.id))
 
       assert row["address"] in [nil, ""]
       assert row["city"] in [nil, ""]
