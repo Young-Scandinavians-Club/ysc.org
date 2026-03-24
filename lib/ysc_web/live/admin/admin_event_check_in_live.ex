@@ -137,22 +137,22 @@ defmodule YscWeb.AdminEventCheckInLive do
             <%!-- Desktop: table with order grouping --%>
             <div
               :if={@total_count - @checked_in_count > 0}
-              class="hidden md:block bg-white rounded-xl border border-zinc-200 overflow-hidden"
+              class="hidden md:block bg-white rounded-xl border border-zinc-200"
             >
               <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 <div class="col-span-1"></div>
                 <div class="col-span-3">Attendee</div>
-                <div class="col-span-3">Email</div>
+                <div class="col-span-2">Email</div>
                 <div class="col-span-2">Tier</div>
                 <div class="col-span-2">Ticket</div>
-                <div class="col-span-1">Order</div>
+                <div class="col-span-2">Order</div>
               </div>
 
               <div id="pending-groups" phx-update="stream">
                 <div :for={{dom_id, group} <- @streams.pending_groups} id={dom_id}>
                   <%!-- Order group header --%>
                   <div class="grid grid-cols-12 gap-4 px-4 py-2 bg-zinc-50 border-b border-zinc-100">
-                    <div class="col-span-8 flex items-center gap-2">
+                    <div class="col-span-10 flex items-center gap-2">
                       <.icon
                         name="hero-shopping-bag"
                         class="w-3.5 h-3.5 text-zinc-400 shrink-0"
@@ -166,15 +166,17 @@ defmodule YscWeb.AdminEventCheckInLive do
                                                            do: "s"})
                       </span>
                     </div>
-                    <div class="col-span-4 flex justify-end">
+                    <div class="col-span-2 flex items-center">
                       <button
                         :if={length(group.tickets) > 1}
                         phx-click="check-in-order"
                         phx-value-order-id={group.order_id}
-                        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors"
+                        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors whitespace-nowrap"
                       >
-                        <.icon name="hero-check-circle" class="w-3.5 h-3.5" />
-                        Check in all
+                        <.icon
+                          name="hero-check-circle"
+                          class="w-3.5 h-3.5 shrink-0"
+                        /> Check in all
                       </button>
                     </div>
                   </div>
@@ -197,7 +199,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                         {attendee_name(ticket)}
                       </p>
                     </div>
-                    <div class="col-span-3">
+                    <div class="col-span-2">
                       <p class="text-sm text-zinc-600 truncate">
                         {attendee_email(ticket)}
                       </p>
@@ -208,16 +210,16 @@ defmodule YscWeb.AdminEventCheckInLive do
                       </.badge>
                     </div>
                     <div class="col-span-2">
-                      <span class="text-xs font-mono text-zinc-500">
+                      <span class="text-xs font-mono text-zinc-500 whitespace-nowrap">
                         {ticket.reference_id}
                       </span>
                     </div>
-                    <div class="col-span-1">
+                    <div class="col-span-2">
                       <.tooltip
                         :if={ticket.ticket_order}
                         tooltip_text={ticket.ticket_order.reference_id}
                       >
-                        <span class="text-xs font-mono text-zinc-400 hover:text-zinc-600 cursor-default">
+                        <span class="text-xs font-mono text-zinc-400 hover:text-zinc-600 cursor-default whitespace-nowrap">
                           {short_ref(
                             ticket.ticket_order && ticket.ticket_order.reference_id
                           )}
@@ -305,7 +307,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             </div>
 
             <%!-- Desktop --%>
-            <div class="hidden md:block bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <div class="hidden md:block bg-white rounded-xl border border-zinc-200">
               <div id="checked-in-tickets" phx-update="stream">
                 <div
                   :for={{dom_id, ticket} <- @streams.checked_in_tickets}
@@ -336,7 +338,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                       {attendee_name(ticket)}
                     </p>
                   </div>
-                  <div class="col-span-3">
+                  <div class="col-span-2">
                     <p class="text-sm text-zinc-400 truncate">
                       {attendee_email(ticket)}
                     </p>
@@ -347,20 +349,28 @@ defmodule YscWeb.AdminEventCheckInLive do
                     </.badge>
                   </div>
                   <div class="col-span-2">
-                    <span class="text-xs font-mono text-zinc-400">
+                    <span class="text-xs font-mono text-zinc-400 whitespace-nowrap">
                       {ticket.reference_id}
                     </span>
                   </div>
-                  <div class="col-span-1">
-                    <.tooltip
-                      :if={ticket.checked_in_at}
-                      tooltip_text={"Checked in: #{format_checkin_time(ticket.checked_in_at)}"}
-                    >
+                  <div class="col-span-2">
+                    <.tooltip_special :if={ticket.checked_in_at}>
                       <.icon
                         name="hero-clock"
                         class="w-3.5 h-3.5 text-zinc-400 cursor-default"
                       />
-                    </.tooltip>
+                      <:tooltip_body>
+                        Checked in:
+                        <span
+                          id={"checkin-time-#{ticket.id}"}
+                          phx-hook="LocalTime"
+                          phx-update="ignore"
+                          data-utc-time={DateTime.to_iso8601(ticket.checked_in_at)}
+                        >
+                          {format_checkin_time(ticket.checked_in_at)}
+                        </span>
+                      </:tooltip_body>
+                    </.tooltip_special>
                   </div>
                 </div>
               </div>
@@ -714,6 +724,6 @@ defmodule YscWeb.AdminEventCheckInLive do
   defp format_checkin_time(nil), do: ""
 
   defp format_checkin_time(dt) do
-    Calendar.strftime(dt, "%b %d %H:%M UTC")
+    Calendar.strftime(dt, "%b %-d, %H:%M UTC")
   end
 end
