@@ -73,6 +73,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           <div
             :for={day <- Enum.flat_map(@current.week_rows, & &1)}
             class="relative overflow-visible"
+            data-day={Calendar.strftime(day, "%Y-%m-%d")}
           >
             <div
               :if={
@@ -1037,9 +1038,11 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       text_class = if is_selected, do: "text-white/80", else: "text-zinc-500"
 
       if booked > 0 do
-        Phoenix.HTML.raw(
-          "<span class=\"text-xs font-medium #{text_class}\">#{booked} booked</span>"
-        )
+        assigns = %{booked: booked, text_class: text_class}
+
+        ~H"""
+        <span class={["text-xs font-medium", @text_class]}>{@booked} booked</span>
+        """
       else
         ""
       end

@@ -1879,13 +1879,13 @@ defmodule YscWeb.AdminBookingsLive do
               <div class="border-b border-zinc-200 px-2 sm:px-3 py-2.5 text-left font-semibold text-zinc-700 bg-white text-sm">
                 Room
               </div>
-              <!-- Available Slots Row Title (only for Clear Lake) -->
+              <!-- Bookings Row Title (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
                   <div class="h-2 w-2 rounded-full bg-purple-500 flex-shrink-0">
                   </div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
-                    Available Slots
+                    Bookings
                   </div>
                 </div>
               <% end %>
@@ -1941,7 +1941,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                 </div>
               </div>
-              <!-- Available Slots Row (only for Clear Lake) -->
+              <!-- Bookings Row (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div
                   class="relative grid"

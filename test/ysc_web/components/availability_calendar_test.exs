@@ -6,13 +6,15 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
   alias Ysc.Bookings
   alias YscWeb.Components.AvailabilityCalendar
 
-  # Returns a date that falls in the current calendar month and at least 1 day in
-  # the future, so it will be included in the component's rendered month view.
+  # Returns a date that falls in the current calendar month. When today is the
+  # last day of the month (days_left == 0) it returns today so the anchor stays
+  # in the current month; otherwise it advances 1–4 days into the future.
   defp near_future_in_current_month do
     today = Date.utc_today()
     end_of_month = Date.end_of_month(today)
     days_left = Date.diff(end_of_month, today)
-    Date.add(today, max(1, min(days_left, 4)))
+
+    if days_left == 0, do: today, else: Date.add(today, min(days_left, 4))
   end
 
   defp render_clear_lake_calendar(opts \\ []) do
@@ -180,9 +182,12 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
         })
 
       html = render_clear_lake_calendar()
+      day_str = Calendar.strftime(checkin, "%Y-%m-%d")
+      document = LazyHTML.from_fragment(html)
+      day_cell = LazyHTML.filter(document, "[data-day=\"#{day_str}\"]")
+      day_html = LazyHTML.to_html(day_cell)
 
-      # Unavailable due to buyout — should have red/disabled styling
-      assert html =~ "bg-red-200" or html =~ "cursor-not-allowed"
+      assert day_html =~ "bg-red-200" or day_html =~ "cursor-not-allowed"
     end
 
     test "a blacked-out date shows blackout styling" do
@@ -197,8 +202,12 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
         })
 
       html = render_clear_lake_calendar()
+      day_str = Calendar.strftime(blackout_date, "%Y-%m-%d")
+      document = LazyHTML.from_fragment(html)
+      day_cell = LazyHTML.filter(document, "[data-day=\"#{day_str}\"]")
+      day_html = LazyHTML.to_html(day_cell)
 
-      assert html =~ "bg-red-800" or html =~ "cursor-not-allowed"
+      assert day_html =~ "bg-red-800" or day_html =~ "cursor-not-allowed"
     end
   end
 end
