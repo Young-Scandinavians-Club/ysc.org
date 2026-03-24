@@ -65,6 +65,7 @@ defmodule YscWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {YscWeb.Layouts, :admin_root}
     plug :protect_from_forgery
+    plug YscWeb.Plugs.NoIndex
 
     # Enforce SSL/HSTS - only in production
     if @is_prod do

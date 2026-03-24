@@ -76,6 +76,7 @@ defmodule YscWeb.ContactLive do
                   {"Membership", "Membership"},
                   {"Volunteering", "Volunteering"},
                   {"Events", "Events"},
+                  {"Choir", "Choir"},
                   {"Website", "Website"},
                   {"Board of Directors", "Board of Directors"},
                   {"Other", "Other"}
@@ -196,6 +197,25 @@ defmodule YscWeb.ContactLive do
                     Sign in or website related issues.
                   </p>
                   <p class="text-sm text-blue-600 mt-2">web@ysc.org</p>
+                </div>
+              </div>
+            </a>
+
+            <a
+              href="mailto:choir@ysc.org"
+              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
+            >
+              <div class="flex items-start gap-3">
+                <.icon
+                  name="hero-musical-note"
+                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+                />
+                <div>
+                  <h3 class="font-bold text-zinc-900 mb-1">Choir</h3>
+                  <p class="text-sm text-zinc-600">
+                    Questions about choir rehearsals or events.
+                  </p>
+                  <p class="text-sm text-blue-600 mt-2">choir@ysc.org</p>
                 </div>
               </div>
             </a>
