@@ -126,7 +126,7 @@ create_address_for_user = fn user ->
       city: city,
       country: country,
       postal_code: postal_code,
-      region: region
+      region: _region
     }
     when not is_nil(address) and not is_nil(city) and not is_nil(country) and
            not is_nil(postal_code) ->
@@ -710,7 +710,7 @@ if length(active_users) > 0 do
       |> File.ls!()
       |> Enum.filter(&String.contains?(&1, [".jpg", ".jpeg", ".png", ".webp"]))
       |> Enum.with_index()
-      |> Enum.map(fn {filename, index} ->
+      |> Enum.map(fn {filename, _index} ->
         image_path = Path.join(seed_assets_dir, filename)
 
         image_title =
@@ -2085,8 +2085,8 @@ if length(tahoe_rooms) > 0 do
       "Room 7" => "tahoe_room_7.jpg"
     }
 
-    images_created = 0
-    images_associated = 0
+    _images_created = 0
+    _images_associated = 0
 
     {images_created, images_associated} =
       Enum.reduce(tahoe_rooms, {0, 0}, fn room, {created_acc, associated_acc} ->

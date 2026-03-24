@@ -107,6 +107,17 @@ defmodule Ysc.Events.Ticket do
   end
 
   @doc """
+  Changeset for undoing a check-in at an event.
+  Sets checked_in to false and clears the check-in timestamp.
+  """
+  def undo_check_in_changeset(ticket) do
+    ticket
+    |> cast(%{}, [])
+    |> put_change(:checked_in, false)
+    |> put_change(:checked_in_at, nil)
+  end
+
+  @doc """
   Puts a new reference_id on the changeset (for retry after unique constraint).
   Call this when insert fails with a reference_id unique constraint.
   """
