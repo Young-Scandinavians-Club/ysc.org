@@ -1496,15 +1496,15 @@ defmodule YscWeb.HomeLive do
                 class="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
                 <%= for {event, grouped_tiers} <- group_tickets_by_event_and_tier(@upcoming_tickets) do %>
-                  <% order_id =
-                    case grouped_tiers do
-                      [{_tier_name, [first_ticket | _]} | _]
-                      when not is_nil(first_ticket.ticket_order) ->
-                        first_ticket.ticket_order.id
-
-                      _ ->
-                        nil
-                    end %>
+                  <% order_ids =
+                    grouped_tiers
+                    |> Enum.flat_map(fn {_tier_name, tickets} ->
+                      Enum.map(tickets, fn t ->
+                        t.ticket_order && t.ticket_order.id
+                      end)
+                    end)
+                    |> Enum.filter(& &1)
+                    |> Enum.uniq() %>
                   <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
                     <div class="flex justify-between items-start mb-4">
                       <span class={[
@@ -1541,23 +1541,25 @@ defmodule YscWeb.HomeLive do
                       <span class="truncate">{event.location_name}</span>
                     </div>
                     <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 flex items-center justify-between gap-2">
-                      <div class="flex items-center gap-3">
-                        <.link
-                          :if={order_id}
-                          navigate={~p"/tickets/#{order_id}/qr?return_to=/"}
-                          class="inline-flex items-center gap-1 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          <.icon name="hero-qr-code" class="w-3 h-3" /> QR Codes
-                        </.link>
-                        <.link
-                          :if={order_id}
-                          navigate={~p"/orders/#{order_id}/confirmation"}
-                          class="text-xs font-bold text-zinc-500 hover:text-zinc-700 underline transition-colors"
-                        >
-                          View Order
-                        </.link>
+                      <div class="flex flex-col gap-1.5">
+                        <%= for oid <- order_ids do %>
+                          <div class="flex items-center gap-3">
+                            <.link
+                              navigate={~p"/tickets/#{oid}/qr?return_to=/"}
+                              class="inline-flex items-center gap-1 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              <.icon name="hero-qr-code" class="w-3 h-3" /> QR Codes
+                            </.link>
+                            <.link
+                              navigate={~p"/orders/#{oid}/confirmation"}
+                              class="text-xs font-bold text-zinc-500 hover:text-zinc-700 underline transition-colors"
+                            >
+                              View Order
+                            </.link>
+                          </div>
+                        <% end %>
                         <span
-                          :if={!order_id}
+                          :if={order_ids == []}
                           class="text-xs font-bold text-zinc-400"
                         >
                           No order
