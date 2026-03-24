@@ -17,6 +17,23 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     if days_left == 0, do: today, else: Date.add(today, min(days_left, 4))
   end
 
+  # Extracts the HTML content of a single day cell identified by its data-day value.
+  # LazyHTML.filter only searches top-level nodes of a fragment, so it cannot reach
+  # the deeply-nested day divs. Instead we split the rendered string on data-day markers.
+  defp extract_day_cell(html, day_str) do
+    marker = ~s|data-day="#{day_str}">|
+
+    case String.split(html, marker, parts: 2) do
+      [_before, rest] ->
+        rest
+        |> String.split("data-day=", parts: 2)
+        |> List.first()
+
+      _ ->
+        ""
+    end
+  end
+
   defp render_clear_lake_calendar(opts \\ []) do
     today = Date.utc_today()
 
@@ -183,9 +200,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       html = render_clear_lake_calendar()
       day_str = Calendar.strftime(checkin, "%Y-%m-%d")
-      document = LazyHTML.from_fragment(html)
-      day_cell = LazyHTML.filter(document, "[data-day=\"#{day_str}\"]")
-      day_html = LazyHTML.to_html(day_cell)
+      day_html = extract_day_cell(html, day_str)
 
       # The checkin day is a "check-in day" (morning available, afternoon booked),
       # so it renders a green-to-red gradient rather than a fully blocked bg-red-200 cell.
@@ -205,9 +220,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       html = render_clear_lake_calendar()
       day_str = Calendar.strftime(blackout_date, "%Y-%m-%d")
-      document = LazyHTML.from_fragment(html)
-      day_cell = LazyHTML.filter(document, "[data-day=\"#{day_str}\"]")
-      day_html = LazyHTML.to_html(day_cell)
+      day_html = extract_day_cell(html, day_str)
 
       # The blackout day is a "check-in day" (morning available, afternoon blacked out),
       # so it renders a green-to-red-800 gradient rather than a fully blocked bg-red-800 cell.
