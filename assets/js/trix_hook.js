@@ -47,15 +47,19 @@ function uploadFile(file, postID, progressCallback, successCallback, errorCallba
 
   xhr.addEventListener("load", function (_event) {
     if (xhr.status === 201) {
-      let url;
       try {
         const data = JSON.parse(xhr.responseText);
-        url = data.url;
-        const attributes = { url, href: `${url}?content-disposition=attachment` };
+        const url = data.url;
+        const attributes = {
+          url,
+          href: `${url}?content-disposition=attachment`,
+          filename: data.filename,
+          contentType: data.content_type,
+        };
         successCallback(attributes);
       } catch (_e) {
-        // Fallback for plain-text URL response
-        url = xhr.responseText;
+        // Fallback for plain-text URL response (no filename/contentType available)
+        const url = xhr.responseText;
         const attributes = { url, href: `${url}?content-disposition=attachment` };
         successCallback(attributes);
       }
