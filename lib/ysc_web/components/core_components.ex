@@ -2930,4 +2930,31 @@ defmodule YscWeb.CoreComponents do
     </section>
     """
   end
+
+  @doc """
+  Renders a QR code as an inline SVG.
+
+  ## Examples
+
+      <.qr_code data="https://example.com" />
+      <.qr_code data={@token} size={200} class="mx-auto" />
+  """
+  attr :data, :string, required: true
+  attr :size, :integer, default: 250
+  attr :class, :string, default: ""
+
+  def qr_code(assigns) do
+    svg =
+      assigns.data
+      |> EQRCode.encode()
+      |> EQRCode.svg(width: assigns.size)
+
+    assigns = assign(assigns, :svg, svg)
+
+    ~H"""
+    <div class={["inline-block", @class]}>
+      {Phoenix.HTML.raw(@svg)}
+    </div>
+    """
+  end
 end

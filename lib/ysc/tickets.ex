@@ -157,7 +157,7 @@ defmodule Ysc.Tickets do
         :user,
         event: [agendas: :agenda_items],
         payment: :payment_method,
-        tickets: :ticket_tier
+        tickets: [:ticket_tier, :registration]
       ]
     )
     |> Repo.one()

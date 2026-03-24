@@ -843,12 +843,14 @@ defmodule YscWeb.Emails.EmailCoverageTest do
             ticket_tier_name: "General Admission",
             status: :confirmed
           }
-        ]
+        ],
+        tickets_qr_url: "https://example.com/tickets/order-123/qr"
       }
 
       html = TicketPurchaseConfirmation.render(assigns)
       assert is_binary(html)
       assert html =~ "$20.00"
+      assert html =~ assigns.tickets_qr_url
     end
 
     test "TicketPurchaseConfirmation with agenda" do
@@ -899,11 +901,13 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         total_discount: "$0.00",
         has_discounts: false,
         ticket_summaries: [],
-        tickets: []
+        tickets: [],
+        tickets_qr_url: "https://example.com/tickets/order-123/qr"
       }
 
       html = TicketPurchaseConfirmation.render(assigns)
       assert is_binary(html)
+      assert html =~ assigns.tickets_qr_url
     end
 
     test "ExpenseReportConfirmation with event and bank_account" do

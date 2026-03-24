@@ -307,6 +307,7 @@ defmodule YscWeb.Router do
       live "/users/settings/family", FamilyManagementLive, :index
       live "/users/tickets", UserTicketsLive, :index
       live "/tickets/:order_id", UserTicketsLive, :show
+      live "/tickets/:order_id/qr", TicketQrLive, :index
       live "/orders/:order_id/confirmation", OrderConfirmationLive, :index
       live "/bookings/:id", UserBookingDetailLive, :index
       live "/expensereport", ExpenseReportLive, :index
@@ -456,6 +457,11 @@ defmodule YscWeb.Router do
 
       # Website specific settings (such as socials etc)
       live "/settings", AdminSettingsLive, :index
+
+      # QR Scanner
+      live "/scanner", AdminScannerLive, :index
+      live "/scanner/sessions", AdminScannerLive, :sessions
+      live "/scanner/sessions/:id", AdminScannerLive, :session_detail
     end
   end
 

@@ -94,6 +94,20 @@ defmodule YscWeb.Emails.NewsletterEdition do
     img_nodes ++ caption_nodes
   end
 
+  # Trix serializes every paragraph as a <div>. Convert these to <p> elements
+  # so that email clients render paragraph spacing correctly. <br>-only blocks
+  # (Trix's empty-line representation) are dropped to avoid spurious blank lines.
+  defp transform_node_for_email({"div", _attrs, children}) do
+    inner = transform_nodes_for_email(children)
+
+    case inner do
+      # <div><br></div> — Trix empty-block placeholder; emit a spacing <br>
+      [{"br", _, _}] -> [{"br", [], []}]
+      # All other div blocks → <p>
+      _ -> [{"p", [], inner}]
+    end
+  end
+
   # Strip data-trix-* and class attrs from all other tags, recurse into children
   defp transform_node_for_email({tag, attrs, children}) do
     safe_attrs =

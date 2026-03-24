@@ -39,6 +39,8 @@ defmodule Ysc.Application do
       {Ysc.AuthRateLimit, [clean_period: :timer.minutes(1)]},
       # Newsletter rate limiting (bot protection)
       {Ysc.NewsletterRateLimit, [clean_period: :timer.minutes(1)]},
+      # QR scan rate limiting (brute-force protection)
+      {Ysc.ScanRateLimit, [clean_period: :timer.minutes(1)]},
       # Start verification code cache
       Ysc.VerificationCache,
       # Start the Endpoint (http/https)

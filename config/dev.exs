@@ -33,6 +33,8 @@ config :ysc, YscWeb.Endpoint,
       {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]},
     esbuild_admin:
       {Esbuild, :install_and_run, [:admin, ~w(--sourcemap=inline --watch)]},
+    esbuild_html5_qrcode:
+      {Esbuild, :install_and_run, [:html5_qrcode, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]},
     tailwind_admin: {Tailwind, :install_and_run, [:admin, ~w(--watch)]}
   ],
@@ -41,6 +43,8 @@ config :ysc, YscWeb.Endpoint,
     patterns: [
       ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
       ~r"assets/js/.*(js)$",
+      ~r"assets/css/.*(css)$",
+      ~r"assets/vendor/.*(js)$",
       ~r"priv/gettext/.*(po)$",
       ~r"lib/ysc_web/(controllers|live|components)/.*(ex|heex)$"
     ]
