@@ -1726,9 +1726,9 @@ defmodule YscWeb.HomeLive do
                           Member Since
                         </span>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Timex.format!(
+                          {Calendar.strftime(
                             @membership_qr_details.member_since,
-                            "{Mshort} {D}, {YYYY}"
+                            "%b %-d, %Y"
                           )}
                         </span>
                       </div>
@@ -1739,9 +1739,9 @@ defmodule YscWeb.HomeLive do
                       </span>
                       <%= if @membership_qr_details.renewal_date do %>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Timex.format!(
+                          {Calendar.strftime(
                             @membership_qr_details.renewal_date,
-                            "{Mshort} {D}, {YYYY}"
+                            "%b %-d, %Y"
                           )}
                         </span>
                       <% else %>
@@ -2289,8 +2289,13 @@ defmodule YscWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("show_membership_qr", _params, socket) do
-    token = Ysc.Scanning.QrToken.sign_membership(socket.assigns.current_user.id)
+  def handle_event(
+        "show_membership_qr",
+        _params,
+        %{assigns: %{current_user: %{} = user, active_membership?: true}} =
+          socket
+      ) do
+    token = Ysc.Scanning.QrToken.sign_membership(user.id)
     details = build_membership_qr_details(socket.assigns)
 
     {:noreply,
@@ -2298,6 +2303,10 @@ defmodule YscWeb.HomeLive do
      |> assign(:show_membership_qr, true)
      |> assign(:membership_qr_token, token)
      |> assign(:membership_qr_details, details)}
+  end
+
+  def handle_event("show_membership_qr", _params, socket) do
+    {:noreply, socket}
   end
 
   def handle_event("hide_membership_qr", _params, socket) do
@@ -2789,62 +2798,7 @@ defmodule YscWeb.HomeLive do
   defp greeting_for_country("IS"), do: "Halló"
   defp greeting_for_country(_), do: "Hej"
 
-  defp build_membership_qr_details(%{
-         current_user: user,
-         current_membership: membership,
-         is_sub_account: is_sub_account,
-         primary_user: primary_user
-       }) do
-    plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
-    renewal_date = YscWeb.UserAuth.get_membership_renewal_date(membership)
-
-    type_label =
-      case plan_type do
-        :lifetime ->
-          "Lifetime Membership"
-
-        nil ->
-          "Active Membership"
-
-        other ->
-          other
-          |> Atom.to_string()
-          |> String.split("_")
-          |> List.first()
-          |> String.capitalize()
-          |> then(&"#{&1} Membership")
-      end
-
-    member_since =
-      cond do
-        is_map(membership) && Map.get(membership, :type) == :lifetime &&
-            not is_nil(Map.get(membership, :awarded_at)) ->
-          membership.awarded_at
-
-        is_map(membership) && not is_nil(Map.get(membership, :start_date)) ->
-          membership.start_date
-
-        not is_nil(user.inserted_at) ->
-          user.inserted_at
-
-        true ->
-          nil
-      end
-
-    primary_name =
-      if is_sub_account && primary_user do
-        "#{primary_user.first_name} #{primary_user.last_name}"
-      end
-
-    %{
-      type_label: type_label,
-      plan_type: plan_type,
-      member_since: member_since,
-      renewal_date: renewal_date,
-      is_sub_account: is_sub_account,
-      primary_name: primary_name
-    }
+  defp build_membership_qr_details(assigns) do
+    YscWeb.MembershipHelpers.build_membership_qr_details(assigns)
   end
-
-  defp build_membership_qr_details(_assigns), do: nil
 end

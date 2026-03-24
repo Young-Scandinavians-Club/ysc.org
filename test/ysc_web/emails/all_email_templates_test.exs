@@ -266,7 +266,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
             ticket_tier_name: "General Admission",
             status: :confirmed
           }
-        ]
+        ],
+        tickets_qr_url: "https://example.com/tickets/order-123/qr"
       }
 
       html = TicketPurchaseConfirmation.render(assigns)

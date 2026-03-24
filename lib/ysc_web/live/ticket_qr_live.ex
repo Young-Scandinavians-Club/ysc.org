@@ -264,11 +264,14 @@ defmodule YscWeb.TicketQrLive do
   # --- Helpers ---
 
   # Only allow relative paths to prevent open-redirect abuse.
+  # Rejects absolute URLs ("://"), scheme-relative ("//host"), and empty strings.
   defp safe_return_to(path)
        when is_binary(path) and byte_size(path) > 0 do
-    if String.starts_with?(path, "/") and not String.contains?(path, "://"),
-      do: path,
-      else: ~p"/users/tickets"
+    if String.starts_with?(path, "/") and
+         not String.starts_with?(path, "//") and
+         not String.contains?(path, "://"),
+       do: path,
+       else: ~p"/users/tickets"
   end
 
   defp safe_return_to(_), do: ~p"/users/tickets"

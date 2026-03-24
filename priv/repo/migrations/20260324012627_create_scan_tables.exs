@@ -9,7 +9,7 @@ defmodule Ysc.Repo.Migrations.CreateScanTables do
       add :event_id, references(:events, type: :binary_id, on_delete: :nilify_all)
 
       add :created_by_id,
-          references(:users, type: :binary_id, on_delete: :nilify_all),
+          references(:users, type: :binary_id, on_delete: :restrict),
           null: false
 
       add :closed_at, :utc_datetime
@@ -28,11 +28,11 @@ defmodule Ysc.Repo.Migrations.CreateScanTables do
           references(:scan_sessions, type: :binary_id, on_delete: :restrict),
           null: false
 
-      add :user_id, references(:users, type: :binary_id, on_delete: :nilify_all)
-      add :ticket_id, references(:tickets, type: :binary_id, on_delete: :nilify_all)
+      add :user_id, references(:users, type: :binary_id, on_delete: :restrict)
+      add :ticket_id, references(:tickets, type: :binary_id, on_delete: :restrict)
 
       add :ticket_order_id,
-          references(:ticket_orders, type: :binary_id, on_delete: :nilify_all)
+          references(:ticket_orders, type: :binary_id, on_delete: :restrict)
 
       add :checkin_type, :string
       add :result, :string, null: false

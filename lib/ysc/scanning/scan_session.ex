@@ -29,12 +29,19 @@ defmodule Ysc.Scanning.ScanSession do
     timestamps()
   end
 
+  @doc """
+  Changeset for user-provided session attributes (:name, :type, :event_id).
+
+  :created_by_id must be set programmatically by the context via put_change/2
+  after calling this changeset, to prevent callers from spoofing ownership.
+  :closed_at is managed exclusively through close_changeset/1.
+  """
   def changeset(session, attrs) do
     session
-    |> cast(attrs, [:name, :type, :event_id, :created_by_id, :closed_at])
-    |> validate_required([:name, :type, :created_by_id])
+    |> cast(attrs, [:name, :type, :event_id])
+    |> validate_required([:name, :type])
     |> validate_inclusion(:type, [:membership, :event])
-    |> validate_event_required_for_event_type()
+    |> validate_event_id_for_type()
     |> foreign_key_constraint(:event_id)
     |> foreign_key_constraint(:created_by_id)
   end
@@ -43,14 +50,23 @@ defmodule Ysc.Scanning.ScanSession do
     change(session, closed_at: DateTime.utc_now() |> DateTime.truncate(:second))
   end
 
-  defp validate_event_required_for_event_type(changeset) do
+  defp validate_event_id_for_type(changeset) do
     type = get_field(changeset, :type)
     event_id = get_field(changeset, :event_id)
 
-    if type == :event && is_nil(event_id) do
-      add_error(changeset, :event_id, "is required for event scan sessions")
-    else
-      changeset
+    cond do
+      type == :event && is_nil(event_id) ->
+        add_error(changeset, :event_id, "is required for event scan sessions")
+
+      type != :event && not is_nil(event_id) ->
+        add_error(
+          changeset,
+          :event_id,
+          "must be blank for membership scan sessions"
+        )
+
+      true ->
+        changeset
     end
   end
 end

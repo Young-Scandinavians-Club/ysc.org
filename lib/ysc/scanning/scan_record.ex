@@ -38,17 +38,7 @@ defmodule Ysc.Scanning.ScanRecord do
 
   def changeset(record, attrs) do
     record
-    |> cast(attrs, [
-      :scan_session_id,
-      :user_id,
-      :ticket_id,
-      :ticket_order_id,
-      :checkin_type,
-      :result,
-      :membership_status,
-      :membership_type,
-      :metadata
-    ])
+    |> cast(attrs, [:scan_session_id, :checkin_type, :result, :metadata])
     |> validate_required([:scan_session_id, :result])
     |> foreign_key_constraint(:scan_session_id)
     |> foreign_key_constraint(:user_id)

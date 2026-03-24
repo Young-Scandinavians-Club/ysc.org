@@ -15,13 +15,18 @@ defmodule Ysc.Scanning do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Events.Ticket
+  alias Ysc.Tickets.TicketOrder
   alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord}
 
   # --- Session Management ---
 
   def create_session(attrs) do
+    created_by_id = attrs[:created_by_id] || attrs["created_by_id"]
+
     %ScanSession{}
     |> ScanSession.changeset(attrs)
+    |> Ecto.Changeset.put_change(:created_by_id, created_by_id)
+    |> Ecto.Changeset.validate_required([:created_by_id])
     |> Repo.insert()
   end
 
@@ -310,7 +315,7 @@ defmodule Ysc.Scanning do
   Check in all unchecked tickets in an order.
   """
   def check_in_order(%ScanSession{} = session, order_id) do
-    case Repo.get(Ysc.Tickets.TicketOrder, order_id) do
+    case Repo.get(TicketOrder, order_id) do
       nil ->
         {:error, :invalid, "Order not found."}
 
@@ -335,18 +340,23 @@ defmodule Ysc.Scanning do
   defp do_check_in_ticket(session, ticket, checkin_type) do
     Repo.transaction(fn ->
       changeset = Ticket.check_in_changeset(ticket)
-      {:ok, updated_ticket} = Repo.update(changeset)
 
-      {:ok, record} =
-        record_scan(session, %{
-          user_id: ticket.user_id,
-          ticket_id: ticket.id,
-          ticket_order_id: ticket.ticket_order_id,
-          checkin_type: checkin_type,
-          result: :success
-        })
+      case Repo.update(changeset) do
+        {:ok, updated_ticket} ->
+          case record_scan(session, %{
+                 user_id: ticket.user_id,
+                 ticket_id: ticket.id,
+                 ticket_order_id: ticket.ticket_order_id,
+                 checkin_type: checkin_type,
+                 result: :success
+               }) do
+            {:ok, record} -> {updated_ticket, record}
+            {:error, reason} -> Repo.rollback(reason)
+          end
 
-      {updated_ticket, record}
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
     end)
   end
 
@@ -368,7 +378,7 @@ defmodule Ysc.Scanning do
   def manual_ticket_lookup(reference_id, event_id)
       when is_binary(reference_id) do
     order =
-      Ysc.Tickets.TicketOrder
+      TicketOrder
       |> where([o], o.reference_id == ^reference_id and o.event_id == ^event_id)
       |> preload(tickets: [:registration])
       |> Repo.one()
@@ -386,8 +396,29 @@ defmodule Ysc.Scanning do
   # --- Record Keeping ---
 
   defp record_scan(session, attrs) do
+    programmatic_fields =
+      Map.take(attrs, [
+        :user_id,
+        :ticket_id,
+        :ticket_order_id,
+        :membership_status,
+        :membership_type
+      ])
+
+    cast_attrs =
+      attrs
+      |> Map.drop([
+        :user_id,
+        :ticket_id,
+        :ticket_order_id,
+        :membership_status,
+        :membership_type
+      ])
+      |> Map.put(:scan_session_id, session.id)
+
     %ScanRecord{}
-    |> ScanRecord.changeset(Map.put(attrs, :scan_session_id, session.id))
+    |> ScanRecord.changeset(cast_attrs)
+    |> Ecto.Changeset.change(programmatic_fields)
     |> Repo.insert()
   end
 

@@ -21,21 +21,35 @@ defmodule Ysc.Scanning.ScanRecordTest do
       assert cs.valid?
     end
 
-    test "valid record with all optional fields" do
+    test "valid record with all castable optional fields" do
       s = session()
-      user = user_fixture()
 
       cs =
         ScanRecord.changeset(%ScanRecord{}, %{
           scan_session_id: s.id,
-          user_id: user.id,
           result: :success,
           checkin_type: :individual,
+          metadata: %{note: "test"}
+        })
+
+      assert cs.valid?
+    end
+
+    test "programmatic fields (user_id etc.) are set via Ecto.Changeset.change/2" do
+      s = session()
+      user = user_fixture()
+
+      cs =
+        %ScanRecord{}
+        |> ScanRecord.changeset(%{scan_session_id: s.id, result: :success})
+        |> Ecto.Changeset.change(%{
+          user_id: user.id,
           membership_status: "active",
           membership_type: "lifetime"
         })
 
       assert cs.valid?
+      assert Ecto.Changeset.get_change(cs, :user_id) == user.id
     end
 
     test "requires scan_session_id" do

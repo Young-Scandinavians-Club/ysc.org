@@ -19,6 +19,8 @@ export default {
     this.scanner = null;
     this.cooldown = false;
     this.cameraActive = false;
+    this.cameraStarting = false;
+    this.isDestroyed = false;
 
     this.log("hook mounted");
 
@@ -34,16 +36,19 @@ export default {
 
     const overlay = this.el.querySelector("#reconnecting-overlay");
     if (overlay) {
-      window.addEventListener("phx:page-loading-start", (info) => {
+      this.onPageLoadingStart = (info) => {
         if (info.detail?.kind === "error") {
           overlay.classList.remove("hidden");
           overlay.classList.add("flex");
         }
-      });
-      window.addEventListener("phx:page-loading-stop", () => {
+      };
+      this.onPageLoadingStop = () => {
         overlay.classList.add("hidden");
         overlay.classList.remove("flex");
-      });
+      };
+
+      window.addEventListener("phx:page-loading-start", this.onPageLoadingStart);
+      window.addEventListener("phx:page-loading-stop", this.onPageLoadingStop);
     }
 
     // Auto-start: the hook element is only rendered during :scanning phase,
@@ -58,6 +63,12 @@ export default {
   },
 
   async startCamera() {
+    if (this.cameraActive || this.cameraStarting || this.isDestroyed) {
+      return;
+    }
+
+    this.cameraStarting = true;
+
     this.log("startCamera called", {
       isSecureContext: window.isSecureContext,
       protocol: window.location.protocol,
@@ -72,6 +83,7 @@ export default {
         "Current protocol: " + window.location.protocol;
       this.log("insecure context", { protocol: window.location.protocol });
       this.pushEvent("camera_error", { reason });
+      this.cameraStarting = false;
       return;
     }
 
@@ -80,6 +92,7 @@ export default {
       const reason = "Camera API (mediaDevices) not available in this browser.";
       this.log("mediaDevices unavailable");
       this.pushEvent("camera_error", { reason });
+      this.cameraStarting = false;
       return;
     }
 
@@ -100,6 +113,12 @@ export default {
         message: err.message,
       });
       this.pushEvent("camera_error", { reason });
+      this.cameraStarting = false;
+      return;
+    }
+
+    if (this.isDestroyed) {
+      this.cameraStarting = false;
       return;
     }
 
@@ -108,6 +127,7 @@ export default {
       const reason = "QR reader DOM element not found.";
       this.log("reader element missing");
       this.pushEvent("camera_error", { reason });
+      this.cameraStarting = false;
       return;
     }
 
@@ -122,11 +142,12 @@ export default {
         __Html5QrcodeLibrary__: typeof window.__Html5QrcodeLibrary__,
       });
       this.pushEvent("camera_error", { reason });
+      this.cameraStarting = false;
       return;
     }
 
     this.log("creating Html5Qrcode instance", { elementId: readerEl.id });
-    this.scanner = new Html5QrcodeClass(readerEl.id);
+    this.scanner ??= new Html5QrcodeClass(readerEl.id);
 
     this.log("calling scanner.start()");
     this.scanner
@@ -147,17 +168,24 @@ export default {
         }
       )
       .then(() => {
+        if (this.isDestroyed) {
+          return this.scanner?.stop();
+        }
         this.cameraActive = true;
         this.log("camera started successfully");
         this.pushEvent("camera_started", {});
       })
       .catch((err) => {
+        this.scanner = null;
         const reason = "Scanner start failed: " + err.toString();
         this.log("scanner.start() failed", {
           error: err.toString(),
           name: err.name,
         });
         this.pushEvent("camera_error", { reason });
+      })
+      .finally(() => {
+        this.cameraStarting = false;
       });
   },
 
@@ -168,6 +196,7 @@ export default {
         .stop()
         .then(() => {
           this.cameraActive = false;
+          this.scanner = null;
           this.log("camera stopped");
         })
         .catch((err) => {
@@ -177,7 +206,16 @@ export default {
   },
 
   destroyed() {
+    this.isDestroyed = true;
     this.log("hook destroyed");
+
+    if (this.onPageLoadingStart) {
+      window.removeEventListener("phx:page-loading-start", this.onPageLoadingStart);
+    }
+    if (this.onPageLoadingStop) {
+      window.removeEventListener("phx:page-loading-stop", this.onPageLoadingStop);
+    }
+
     this.stopCamera();
   },
 };

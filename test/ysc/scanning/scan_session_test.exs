@@ -4,19 +4,17 @@ defmodule Ysc.Scanning.ScanSessionTest do
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
+  alias Ysc.Scanning
   alias Ysc.Scanning.ScanSession
 
   defp admin_user, do: user_fixture(%{role: "admin"})
 
   describe "changeset/2" do
     test "valid membership session" do
-      admin = admin_user()
-
       cs =
         ScanSession.changeset(%ScanSession{}, %{
           name: "Morning Membership Check",
-          type: :membership,
-          created_by_id: admin.id
+          type: :membership
         })
 
       assert cs.valid?
@@ -30,58 +28,29 @@ defmodule Ysc.Scanning.ScanSessionTest do
         ScanSession.changeset(%ScanSession{}, %{
           name: "Door Scan",
           type: :event,
-          event_id: event.id,
-          created_by_id: admin.id
+          event_id: event.id
         })
 
       assert cs.valid?
     end
 
     test "requires name" do
-      admin = admin_user()
-
-      cs =
-        ScanSession.changeset(%ScanSession{}, %{
-          type: :membership,
-          created_by_id: admin.id
-        })
-
+      cs = ScanSession.changeset(%ScanSession{}, %{type: :membership})
       refute cs.valid?
       assert %{name: [_ | _]} = errors_on(cs)
     end
 
     test "requires type" do
-      admin = admin_user()
-
-      cs =
-        ScanSession.changeset(%ScanSession{}, %{
-          name: "Scan",
-          created_by_id: admin.id
-        })
-
+      cs = ScanSession.changeset(%ScanSession{}, %{name: "Scan"})
       refute cs.valid?
       assert %{type: [_ | _]} = errors_on(cs)
     end
 
-    test "requires created_by_id" do
-      cs =
-        ScanSession.changeset(%ScanSession{}, %{
-          name: "Scan",
-          type: :membership
-        })
-
-      refute cs.valid?
-      assert %{created_by_id: [_ | _]} = errors_on(cs)
-    end
-
     test "requires event_id when type is :event" do
-      admin = admin_user()
-
       cs =
         ScanSession.changeset(%ScanSession{}, %{
           name: "Event Scan",
-          type: :event,
-          created_by_id: admin.id
+          type: :event
         })
 
       refute cs.valid?
@@ -89,17 +58,51 @@ defmodule Ysc.Scanning.ScanSessionTest do
     end
 
     test "does not require event_id when type is :membership" do
+      cs =
+        ScanSession.changeset(%ScanSession{}, %{
+          name: "Membership Scan",
+          type: :membership
+        })
+
+      assert cs.valid?
+      refute Map.has_key?(errors_on(cs), :event_id)
+    end
+
+    test "rejects event_id on membership sessions" do
       admin = admin_user()
+      event = event_fixture(%{organizer_id: admin.id})
 
       cs =
         ScanSession.changeset(%ScanSession{}, %{
           name: "Membership Scan",
           type: :membership,
-          created_by_id: admin.id
+          event_id: event.id
         })
 
-      assert cs.valid?
-      refute Map.has_key?(errors_on(cs), :event_id)
+      refute cs.valid?
+      assert %{event_id: [_ | _]} = errors_on(cs)
+    end
+  end
+
+  describe "create_session/1 via Scanning context" do
+    test "requires created_by_id" do
+      {:error, changeset} =
+        Scanning.create_session(%{name: "Scan", type: :membership})
+
+      assert %{created_by_id: [_ | _]} = errors_on(changeset)
+    end
+
+    test "creates a valid session with created_by_id" do
+      admin = admin_user()
+
+      assert {:ok, session} =
+               Scanning.create_session(%{
+                 name: "Morning Scan",
+                 type: :membership,
+                 created_by_id: admin.id
+               })
+
+      assert session.created_by_id == admin.id
     end
   end
 
@@ -108,13 +111,11 @@ defmodule Ysc.Scanning.ScanSessionTest do
       admin = admin_user()
 
       {:ok, session} =
-        %ScanSession{}
-        |> ScanSession.changeset(%{
+        Scanning.create_session(%{
           name: "To Close",
           type: :membership,
           created_by_id: admin.id
         })
-        |> Ysc.Repo.insert()
 
       assert is_nil(session.closed_at)
 

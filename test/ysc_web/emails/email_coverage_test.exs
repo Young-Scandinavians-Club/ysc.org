@@ -843,7 +843,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
             ticket_tier_name: "General Admission",
             status: :confirmed
           }
-        ]
+        ],
+        tickets_qr_url: "https://example.com/tickets/order-123/qr"
       }
 
       html = TicketPurchaseConfirmation.render(assigns)
@@ -899,7 +900,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         total_discount: "$0.00",
         has_discounts: false,
         ticket_summaries: [],
-        tickets: []
+        tickets: [],
+        tickets_qr_url: "https://example.com/tickets/order-123/qr"
       }
 
       html = TicketPurchaseConfirmation.render(assigns)
