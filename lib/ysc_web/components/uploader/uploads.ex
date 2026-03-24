@@ -6,7 +6,6 @@ defmodule YscWeb.Uploads do
   alias Phoenix.LiveView
 
   alias Ysc.Media
-  alias Ysc.S3Config
   alias YscWeb.Validators.FileValidator
 
   embed_templates("uploads/*")
@@ -158,22 +157,11 @@ defmodule YscWeb.Uploads do
     _dest = Path.join(uploads_dir(), base)
 
     upload_result = Media.upload_file_to_s3(path)
-    raw_s3_path = upload_result[:body][:location]
-
-    # Defensive check: ensure location is not empty (should be handled by upload_file_to_s3, but double-check)
-    raw_s3_path =
-      if raw_s3_path == "" or is_nil(raw_s3_path) do
-        # Fallback: construct URL from key if location is still empty
-        key = upload_result[:body][:key] || base
-        S3Config.object_url(key)
-      else
-        raw_s3_path
-      end
 
     {:ok, new_image} =
       Media.add_new_image(
         %{
-          raw_image_path: URI.encode(raw_s3_path),
+          raw_image_path: upload_result[:body][:location],
           user_id: current_user.id
         },
         current_user

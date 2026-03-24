@@ -1885,7 +1885,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <div class="h-2 w-2 rounded-full bg-purple-500 flex-shrink-0">
                   </div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
-                    Bookings
+                    Guests
                   </div>
                 </div>
               <% end %>
@@ -1973,7 +1973,7 @@ defmodule YscWeb.AdminBookingsLive do
                         style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
                       >
                         <span class={"text-sm font-semibold #{if availability_info.day_bookings_count > 0, do: "text-amber-600", else: "text-zinc-400"}"}>
-                          {availability_info.day_bookings_count} booked
+                          {availability_info.day_bookings_count} guests
                         </span>
                       </div>
                     <% end %>
