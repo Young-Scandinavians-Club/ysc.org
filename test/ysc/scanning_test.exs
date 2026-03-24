@@ -661,4 +661,244 @@ defmodule Ysc.ScanningTest do
       assert Scanning.list_scan_records(session2.id) == []
     end
   end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Manual check-in view helpers (new)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "list_event_checkin_tickets/2" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+      buyer = make_active_member()
+      order = ticket_order_fixture(%{user: buyer, event: event, tier: tier})
+      order = confirm_tickets(order)
+      %{event: event, buyer: buyer, order: order}
+    end
+
+    test "returns confirmed tickets for the event", %{
+      event: event,
+      buyer: buyer
+    } do
+      tickets = Scanning.list_event_checkin_tickets(event.id)
+
+      assert length(tickets) == 1
+      ticket = List.first(tickets)
+      assert ticket.user_id == buyer.id
+    end
+
+    test "does not return unconfirmed tickets", %{event: event} do
+      pending_order =
+        ticket_order_fixture(%{
+          user: make_active_member(),
+          event: event,
+          tier: Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+        })
+
+      all_tickets = Scanning.list_event_checkin_tickets(event.id)
+
+      confirmed_ids =
+        Enum.map(Ysc.Repo.preload(pending_order, :tickets).tickets, & &1.id)
+
+      Enum.each(all_tickets, fn t ->
+        refute t.id in confirmed_ids
+      end)
+    end
+
+    test "filters by buyer name", %{event: event, buyer: buyer} do
+      results = Scanning.list_event_checkin_tickets(event.id, buyer.first_name)
+      assert length(results) == 1
+
+      results_no_match =
+        Scanning.list_event_checkin_tickets(event.id, "ZZZNOMATCH")
+
+      assert results_no_match == []
+    end
+
+    test "filters by buyer email", %{event: event, buyer: buyer} do
+      results = Scanning.list_event_checkin_tickets(event.id, buyer.email)
+      assert length(results) == 1
+    end
+
+    test "filters by order reference ID", %{event: event, order: order} do
+      results =
+        Scanning.list_event_checkin_tickets(event.id, order.reference_id)
+
+      assert length(results) == 1
+    end
+
+    test "filters by ticket reference ID", %{event: event, order: order} do
+      ticket = List.first(order.tickets)
+
+      results =
+        Scanning.list_event_checkin_tickets(event.id, ticket.reference_id)
+
+      assert length(results) == 1
+    end
+
+    test "returns empty list when no search match", %{event: event} do
+      results = Scanning.list_event_checkin_tickets(event.id, "ZZZNOMATCH")
+      assert results == []
+    end
+
+    test "sorts pending tickets before checked-in tickets", %{
+      event: event,
+      order: order
+    } do
+      ticket = List.first(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(
+        checked_in: true,
+        checked_in_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      )
+      |> Ysc.Repo.update!()
+
+      buyer2 = make_active_member()
+      tier2 = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+      order2 = ticket_order_fixture(%{user: buyer2, event: event, tier: tier2})
+      order2 = confirm_tickets(order2)
+      pending_ticket = List.first(order2.tickets)
+
+      results = Scanning.list_event_checkin_tickets(event.id)
+      assert length(results) == 2
+      first = List.first(results)
+      assert first.id == pending_ticket.id
+      assert first.checked_in == false
+    end
+  end
+
+  describe "event_checkin_counts/1" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+      buyer = make_active_member()
+      order = ticket_order_fixture(%{user: buyer, event: event, tier: tier})
+      order = confirm_tickets(order)
+      %{event: event, order: order}
+    end
+
+    test "returns {0, total} when no tickets are checked in", %{event: event} do
+      assert {0, 1} = Scanning.event_checkin_counts(event.id)
+    end
+
+    test "returns correct count after check-in", %{event: event, order: order} do
+      ticket = List.first(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(
+        checked_in: true,
+        checked_in_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      )
+      |> Ysc.Repo.update!()
+
+      assert {1, 1} = Scanning.event_checkin_counts(event.id)
+    end
+
+    test "returns {0, 0} for event with no confirmed tickets" do
+      admin = user_fixture(%{role: "admin"})
+      new_event = event_fixture(%{organizer_id: admin.id})
+      assert {0, 0} = Scanning.event_checkin_counts(new_event.id)
+    end
+  end
+
+  describe "undo_check_in/1" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+      buyer = make_active_member()
+      order = ticket_order_fixture(%{user: buyer, event: event, tier: tier})
+      order = confirm_tickets(order)
+      ticket = List.first(order.tickets)
+
+      ticket =
+        ticket
+        |> Ecto.Changeset.change(
+          checked_in: true,
+          checked_in_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Ysc.Repo.update!()
+
+      %{ticket: ticket}
+    end
+
+    test "sets checked_in to false", %{ticket: ticket} do
+      assert {:ok, updated} = Scanning.undo_check_in(ticket.id)
+      assert updated.checked_in == false
+    end
+
+    test "clears checked_in_at", %{ticket: ticket} do
+      assert {:ok, updated} = Scanning.undo_check_in(ticket.id)
+      assert is_nil(updated.checked_in_at)
+    end
+
+    test "persists the change to the database", %{ticket: ticket} do
+      Scanning.undo_check_in(ticket.id)
+      db_ticket = Ysc.Repo.get!(Ysc.Events.Ticket, ticket.id)
+      assert db_ticket.checked_in == false
+      assert is_nil(db_ticket.checked_in_at)
+    end
+
+    test "returns error for non-existent ticket" do
+      assert {:error, :not_found, _msg} =
+               Scanning.undo_check_in(Ecto.ULID.generate())
+    end
+  end
+
+  describe "subscribe_checkin/1 and broadcast_checkin/2" do
+    test "subscribers receive check-in events" do
+      event_id = Ecto.ULID.generate()
+      Scanning.subscribe_checkin(event_id)
+
+      Scanning.broadcast_checkin(
+        event_id,
+        %Ysc.MessagePassingEvents.TicketCheckedIn{
+          ticket: nil,
+          event_id: event_id
+        }
+      )
+
+      assert_receive {Scanning,
+                      %Ysc.MessagePassingEvents.TicketCheckedIn{
+                        event_id: ^event_id
+                      }}
+    end
+
+    test "subscribers receive undo check-in events" do
+      event_id = Ecto.ULID.generate()
+      Scanning.subscribe_checkin(event_id)
+
+      Scanning.broadcast_checkin(
+        event_id,
+        %Ysc.MessagePassingEvents.TicketCheckInUndone{
+          ticket: nil,
+          event_id: event_id
+        }
+      )
+
+      assert_receive {Scanning,
+                      %Ysc.MessagePassingEvents.TicketCheckInUndone{
+                        event_id: ^event_id
+                      }}
+    end
+
+    test "non-subscribers do not receive events" do
+      event_id = Ecto.ULID.generate()
+      other_event_id = Ecto.ULID.generate()
+      Scanning.subscribe_checkin(other_event_id)
+
+      Scanning.broadcast_checkin(
+        event_id,
+        %Ysc.MessagePassingEvents.TicketCheckedIn{
+          ticket: nil,
+          event_id: event_id
+        }
+      )
+
+      refute_receive {Scanning, %Ysc.MessagePassingEvents.TicketCheckedIn{}}
+    end
+  end
 end

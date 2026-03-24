@@ -114,4 +114,14 @@ defmodule Ysc.MessagePassingEvents do
     @moduledoc false
     defstruct user_id: nil
   end
+
+  defmodule TicketCheckedIn do
+    @moduledoc false
+    defstruct ticket: nil, event_id: nil
+  end
+
+  defmodule TicketCheckInUndone do
+    @moduledoc false
+    defstruct ticket: nil, event_id: nil
+  end
 end

@@ -462,6 +462,9 @@ defmodule YscWeb.Router do
       live "/scanner", AdminScannerLive, :index
       live "/scanner/sessions", AdminScannerLive, :sessions
       live "/scanner/sessions/:id", AdminScannerLive, :session_detail
+
+      # Event check-in management
+      live "/events/:id/check-in", AdminEventCheckInLive, :index
     end
   end
 

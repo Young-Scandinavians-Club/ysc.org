@@ -1750,6 +1750,7 @@ defmodule YscWeb.EventDetailsLive do
               id="checkout-timer"
               class="font-bold text-blue-900"
               phx-hook="Countdown"
+              phx-update="ignore"
               data-expires-at={@ticket_order.expires_at}
               data-expire-event="checkout-expired"
               data-expire-text="EXPIRED"
@@ -3196,6 +3197,18 @@ defmodule YscWeb.EventDetailsLive do
         </div>
       </div>
     </.modal>
+
+    <%!-- Admin floating check-in button (visible to admin and volunteers only) --%>
+    <%= if @current_user && @current_user.role in [:admin, :volunteer] && @event.state in [:published, :scheduled] do %>
+      <div class="fixed bottom-6 right-6 z-50">
+        <.link
+          navigate={~p"/admin/events/#{@event.id}/check-in"}
+          class="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-700 text-white px-4 py-3 text-sm font-semibold shadow-lg transition-colors"
+        >
+          <.icon name="hero-clipboard-document-check" class="w-5 h-5" /> Check-in
+        </.link>
+      </div>
+    <% end %>
     """
   end
 
