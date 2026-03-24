@@ -67,9 +67,7 @@ function uploadFile(file, postID, progressCallback, successCallback, errorCallba
       } catch (_e) {
         // keep default message
       }
-      if (typeof errorCallback === "function") {
-        errorCallback(message);
-      }
+      errorCallback(message);
     }
   });
 
