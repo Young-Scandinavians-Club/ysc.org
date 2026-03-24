@@ -51,9 +51,17 @@ config :esbuild,
   ],
   admin: [
     args:
-      ~w(js/admin.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
+      ~w(js/admin.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --log-override:equals-nan=silent),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
+  ],
+  # Copies html5-qrcode vendor file as-is so its UMD wrapper runs in global scope
+  # when loaded via <script> tag (esbuild bundling breaks UMD global assignment).
+  html5_qrcode: [
+    args:
+      ~w(vendor/html5-qrcode.min.js --loader:.js=copy --outdir=../priv/static/assets),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{}
   ]
 
 # Configure tailwind (the version is required)

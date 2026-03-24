@@ -296,19 +296,32 @@ defmodule YscWeb.EventDetailsLive do
                           <% end %>
                         </div>
                       </div>
-                      <.link
-                        navigate={~p"/orders/#{order_id}/confirmation"}
-                        class={[
-                          "px-6 py-3 backdrop-blur-md rounded text-xs font-black uppercase tracking-widest transition-all",
-                          if(all_refunded,
-                            do:
-                              "bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30",
-                            else: "bg-white/10 hover:bg-white/20 text-white"
-                          )
-                        ]}
-                      >
-                        View Order
-                      </.link>
+                      <div class="flex items-center gap-2">
+                        <%= if !all_refunded && length(confirmed_tickets) > 0 do %>
+                          <.link
+                            navigate={
+                              ~p"/tickets/#{first_ticket.ticket_order.id}/qr" <> "?return_to=/events/#{@event.id}"
+                            }
+                            class="flex items-center gap-1.5 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded text-xs font-black uppercase tracking-widest transition-all"
+                          >
+                            <.icon name="hero-qr-code" class="w-3.5 h-3.5" />
+                            QR Codes
+                          </.link>
+                        <% end %>
+                        <.link
+                          navigate={~p"/orders/#{order_id}/confirmation"}
+                          class={[
+                            "px-4 py-2 backdrop-blur-md rounded text-xs font-black uppercase tracking-widest transition-all",
+                            if(all_refunded,
+                              do:
+                                "bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30",
+                              else: "bg-white/10 hover:bg-white/20 text-white"
+                            )
+                          ]}
+                        >
+                          View Order
+                        </.link>
+                      </div>
                     </div>
                   </div>
                 </div>

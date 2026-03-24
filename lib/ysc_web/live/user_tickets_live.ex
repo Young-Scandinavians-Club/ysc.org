@@ -167,6 +167,13 @@ defmodule YscWeb.UserTicketsLive do
                             <% end %>
                           </span>
                         </div>
+                        <.link
+                          :if={ticket.status == :confirmed}
+                          navigate={~p"/tickets/#{ticket_order.id}/qr" <> "?return_to=/users/tickets"}
+                          class="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          <.icon name="hero-qr-code" class="w-3.5 h-3.5" /> Show QR
+                        </.link>
                       </div>
                     <% end %>
                   </div>

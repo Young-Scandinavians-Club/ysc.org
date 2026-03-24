@@ -748,3 +748,40 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     padding-bottom: 0.75rem;
 }
 
+/* === QR SCANNER FULLSCREEN === */
+
+/* Make html5-qrcode video cover the full container */
+#qr-reader {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+}
+#qr-reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+/* Hide the html5-qrcode default UI chrome (header, footer, select) */
+#qr-reader__header_message,
+#qr-reader__status_span,
+#qr-reader__dashboard_section_csr,
+#qr-reader__dashboard_section_fsr,
+#qr-reader__dashboard {
+    display: none !important;
+}
+#qr-reader__scan_region {
+    min-height: unset !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+/* Result bottom sheet slide-up animation */
+@keyframes scanner-result-slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+.scanner-result-sheet {
+    animation: scanner-result-slide-up 0.25s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+

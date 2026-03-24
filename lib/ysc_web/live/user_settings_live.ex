@@ -829,6 +829,13 @@ defmodule YscWeb.UserSettingsLive do
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
+              <button
+                :if={@active_membership?}
+                phx-click="show_membership_qr"
+                class="mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <.icon name="hero-qr-code" class="w-4 h-4" /> My Membership QR
+              </button>
               <div
                 :if={@pending_family_invites != []}
                 class="mt-6 border-t border-zinc-100 pt-4"
@@ -875,6 +882,12 @@ defmodule YscWeb.UserSettingsLive do
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
+              <button
+                phx-click="show_membership_qr"
+                class="mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <.icon name="hero-qr-code" class="w-4 h-4" /> My Membership QR
+              </button>
               <.link
                 navigate={~p"/users/settings/family"}
                 class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
@@ -1682,6 +1695,75 @@ defmodule YscWeb.UserSettingsLive do
             </div>
           </div>
 
+          <.modal
+            :if={
+              @show_membership_qr &&
+                (@live_action == :membership || @live_action == :payment_method)
+            }
+            id="settings-membership-qr-modal"
+            show
+            on_cancel={JS.push("hide_membership_qr")}
+          >
+            <div class="text-center">
+              <h3 class="text-xl font-bold text-zinc-900 mb-1">
+                My Membership QR
+              </h3>
+              <p class="text-sm text-zinc-500 mb-5">
+                Show this to an admin for membership verification
+              </p>
+              <.qr_code data={@membership_qr_token} size={250} class="mx-auto" />
+              <%= if @membership_qr_details do %>
+                <div class="mt-5 rounded-xl bg-zinc-50 border border-zinc-200 divide-y divide-zinc-200 text-left">
+                  <div class="flex items-center justify-between px-4 py-3">
+                    <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                      Type
+                    </span>
+                    <span class="text-sm font-semibold text-zinc-900">
+                      {@membership_qr_details.type_label}
+                    </span>
+                  </div>
+                  <%= if @membership_qr_details.member_since do %>
+                    <div class="flex items-center justify-between px-4 py-3">
+                      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                        Member Since
+                      </span>
+                      <span class="text-sm font-semibold text-zinc-900">
+                        {Timex.format!(@membership_qr_details.member_since, "{Mshort} {D}, {YYYY}")}
+                      </span>
+                    </div>
+                  <% end %>
+                  <div class="flex items-center justify-between px-4 py-3">
+                    <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                      Valid Until
+                    </span>
+                    <%= if @membership_qr_details.renewal_date do %>
+                      <span class="text-sm font-semibold text-zinc-900">
+                        {Timex.format!(@membership_qr_details.renewal_date, "{Mshort} {D}, {YYYY}")}
+                      </span>
+                    <% else %>
+                      <span class="text-sm font-semibold text-emerald-700">
+                        Forever ✦
+                      </span>
+                    <% end %>
+                  </div>
+                  <%= if @membership_qr_details.is_sub_account && @membership_qr_details.primary_name do %>
+                    <div class="flex items-center justify-between px-4 py-3">
+                      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                        Through
+                      </span>
+                      <span class="text-sm font-semibold text-zinc-900">
+                        {@membership_qr_details.primary_name}
+                      </span>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+              <.button phx-click="hide_membership_qr" color="zinc" class="w-full mt-5">
+                Close
+              </.button>
+            </div>
+          </.modal>
+
           <div :if={@live_action == :notifications} class="space-y-6">
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">
@@ -2319,6 +2401,9 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:pending_email, nil)
       |> assign(:email_code_valid, false)
       |> assign(:email_verification_error, nil)
+      |> assign(:show_membership_qr, false)
+      |> assign(:membership_qr_token, nil)
+      |> assign(:membership_qr_details, nil)
 
     # Payments tab assigns (placeholders for initial render)
     socket =
@@ -3728,6 +3813,25 @@ defmodule YscWeb.UserSettingsLive do
         socket
       ) do
     handle_retry_invoice_payment(socket, invoice_id)
+  end
+
+  def handle_event("show_membership_qr", _params, socket) do
+    token = Ysc.Scanning.QrToken.sign_membership(socket.assigns.current_user.id)
+    details = build_membership_qr_details(socket.assigns)
+
+    {:noreply,
+     socket
+     |> assign(:show_membership_qr, true)
+     |> assign(:membership_qr_token, token)
+     |> assign(:membership_qr_details, details)}
+  end
+
+  def handle_event("hide_membership_qr", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_membership_qr, false)
+     |> assign(:membership_qr_token, nil)
+     |> assign(:membership_qr_details, nil)}
   end
 
   def handle_event("leave-family-membership", _params, socket) do
@@ -5688,4 +5792,63 @@ defmodule YscWeb.UserSettingsLive do
   defp payment_dom_id(_) do
     "payment-#{System.unique_integer([:positive])}"
   end
+
+  defp build_membership_qr_details(%{
+         current_user: user,
+         current_membership: membership,
+         is_sub_account: is_sub_account,
+         primary_user: primary_user
+       }) do
+    plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+    renewal_date = YscWeb.UserAuth.get_membership_renewal_date(membership)
+
+    type_label =
+      case plan_type do
+        :lifetime ->
+          "Lifetime Membership"
+
+        nil ->
+          "Active Membership"
+
+        other ->
+          other
+          |> Atom.to_string()
+          |> String.split("_")
+          |> List.first()
+          |> String.capitalize()
+          |> then(&"#{&1} Membership")
+      end
+
+    member_since =
+      cond do
+        is_map(membership) && Map.get(membership, :type) == :lifetime &&
+            not is_nil(Map.get(membership, :awarded_at)) ->
+          membership.awarded_at
+
+        is_map(membership) && not is_nil(Map.get(membership, :start_date)) ->
+          membership.start_date
+
+        not is_nil(user.inserted_at) ->
+          user.inserted_at
+
+        true ->
+          nil
+      end
+
+    primary_name =
+      if is_sub_account && primary_user do
+        "#{primary_user.first_name} #{primary_user.last_name}"
+      end
+
+    %{
+      type_label: type_label,
+      plan_type: plan_type,
+      member_since: member_since,
+      renewal_date: renewal_date,
+      is_sub_account: is_sub_account,
+      primary_name: primary_name
+    }
+  end
+
+  defp build_membership_qr_details(_assigns), do: nil
 end

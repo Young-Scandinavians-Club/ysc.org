@@ -50,7 +50,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     |> put_resp_header(
       "permissions-policy",
       # Allow payment for Stripe, block other features
-      "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\"), usb=(), magnetometer=(), gyroscope=()"
+      "camera=(self), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\"), usb=(), magnetometer=(), gyroscope=()"
     )
     |> put_resp_header("referrer-policy", "strict-origin-when-cross-origin")
     |> put_resp_header("cross-origin-opener-policy", "same-origin")

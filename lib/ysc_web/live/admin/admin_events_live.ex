@@ -28,12 +28,21 @@ defmodule YscWeb.AdminEventsLive do
           Events
         </h1>
 
-        <.button phx-click={JS.navigate(~p"/admin/events/new")}>
-          <.icon name="hero-calendar" class="w-5 h-5 -mt-1" />
-          <span class="ms-1">
-            New Event
-          </span>
-        </.button>
+        <div class="flex items-center gap-3">
+          <.button phx-click={JS.navigate(~p"/admin/scanner")}>
+            <.icon name="hero-qr-code" class="w-5 h-5 -mt-1" />
+            <span class="ms-1">
+              QR Scanner
+            </span>
+          </.button>
+
+          <.button phx-click={JS.navigate(~p"/admin/events/new")}>
+            <.icon name="hero-calendar" class="w-5 h-5 -mt-1" />
+            <span class="ms-1">
+              New Event
+            </span>
+          </.button>
+        </div>
       </div>
 
       <div class="w-full pt-4">

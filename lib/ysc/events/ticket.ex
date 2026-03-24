@@ -43,6 +43,9 @@ defmodule Ysc.Events.Ticket do
 
     has_one :registration, Ysc.Events.TicketDetail, foreign_key: :ticket_id
 
+    field :checked_in, :boolean, default: false
+    field :checked_in_at, :utc_datetime
+
     timestamps()
   end
 
@@ -83,6 +86,19 @@ defmodule Ysc.Events.Ticket do
     ticket
     |> cast(attrs, [:status])
     |> validate_inclusion(:status, [:pending, :confirmed, :expired, :cancelled])
+  end
+
+  @doc """
+  Changeset for checking in a ticket at an event.
+  Sets checked_in to true and records the check-in timestamp.
+  """
+  def check_in_changeset(ticket, attrs \\ %{}) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    ticket
+    |> cast(attrs, [])
+    |> put_change(:checked_in, true)
+    |> put_change(:checked_in_at, now)
   end
 
   @doc """

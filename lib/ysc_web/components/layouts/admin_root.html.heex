@@ -52,6 +52,16 @@
       nonce={@csp_nonce}
     >
     </script>
+    <%!-- html5-qrcode: loaded as standalone script so its UMD wrapper sets window.Html5Qrcode correctly.
+         Must come before admin.js which references it. --%>
+    <script
+      defer
+      phx-track-static
+      type="text/javascript"
+      src={~p"/assets/html5-qrcode.min.js"}
+      nonce={@csp_nonce}
+    >
+    </script>
     <%!-- Admin hooks bundle - must be deferred before app.js so window.__adminHooks is set first --%>
     <script
       defer

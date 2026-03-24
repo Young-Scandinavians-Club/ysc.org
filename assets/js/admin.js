@@ -16,6 +16,7 @@ import GrowingInput from "./growing_input_field";
 import FocusSearchInput from "./focus_search_input";
 import ScheduleTimezone from "./schedule_timezone";
 import LocalTime from "./local_time";
+import QrScanner from "./qr_scanner";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
@@ -47,6 +48,7 @@ window.__adminHooks = {
     FocusSearchInput,
     ScheduleTimezone,
     LocalTime,
+    QrScanner,
 };
 
 window.addEventListener("phx:focus-search", (e) => {

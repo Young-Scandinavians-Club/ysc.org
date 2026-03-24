@@ -22,6 +22,10 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     YscWeb.Endpoint.url() <> "/events/#{event_id}"
   end
 
+  def tickets_qr_url(order_id) do
+    YscWeb.Endpoint.url() <> "/tickets/#{order_id}/qr"
+  end
+
   @doc """
   Prepares ticket purchase confirmation email data for a completed ticket order.
 
@@ -122,6 +126,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       },
       event_date_time: event_date_time,
       event_url: event_url(ticket_order.event.id),
+      tickets_qr_url: tickets_qr_url(ticket_order.id),
       agenda: agenda_data,
       ticket_order: %{
         reference_id: ticket_order.reference_id,

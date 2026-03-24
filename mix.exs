@@ -91,6 +91,7 @@ defmodule Ysc.MixProject do
       {:dns_cluster, "~> 0.2"},
       {:duckdbex, "~> 0.3.21", only: [:dev], runtime: false},
       {:ecto_enum, "~> 1.4"},
+      {:eqrcode, "~> 0.2"},
       {:ecto_psql_extras, "~> 0.6"},
       {:ecto_sql, "~> 3.13"},
       {:ecto_ulid, "~> 0.3"},
@@ -195,7 +196,8 @@ defmodule Ysc.MixProject do
         "tailwind default",
         "tailwind admin",
         "esbuild default",
-        "esbuild admin"
+        "esbuild admin",
+        "esbuild html5_qrcode"
       ],
       "assets.deploy": [
         "copy_vendor_assets",
@@ -205,6 +207,7 @@ defmodule Ysc.MixProject do
         "tailwind admin --minify",
         "esbuild default --minify",
         "esbuild admin --minify",
+        "esbuild html5_qrcode",
         "phx.digest"
       ]
     ]
