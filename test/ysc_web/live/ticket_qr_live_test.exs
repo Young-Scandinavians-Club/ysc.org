@@ -82,10 +82,10 @@ defmodule YscWeb.TicketQrLiveTest do
       order: order
     } do
       conn = log_in_user(conn, member)
-      {:ok, _view, html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
 
-      assert html =~ event.title
-      assert html =~ "ticket"
+      assert has_element?(view, "#event-title", event.title)
+      assert has_element?(view, "[data-slide]")
     end
 
     test "renders event date and location when present", %{
@@ -128,7 +128,9 @@ defmodule YscWeb.TicketQrLiveTest do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
 
-      assert has_element?(view, "svg")
+      ticket = hd(order.tickets)
+      assert has_element?(view, "#ticket-qr-#{ticket.reference_id}")
+      assert has_element?(view, "#ticket-qr-#{ticket.reference_id} svg")
     end
 
     test "renders the footer instruction text", %{
@@ -150,7 +152,7 @@ defmodule YscWeb.TicketQrLiveTest do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
 
-      assert has_element?(view, "a[href='/orders/#{order.id}/confirmation']")
+      assert has_element?(view, "#confirmation-link")
     end
 
     test "shows navigation controls when order has multiple tickets", %{
@@ -210,7 +212,7 @@ defmodule YscWeb.TicketQrLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/tickets/#{order.id}/qr" <> "?return_to=/events/abc")
 
-      assert has_element?(view, "a[href='/events/abc']")
+      assert has_element?(view, "#back-link[href='/events/abc']")
     end
 
     test "back link defaults to /users/tickets when return_to is absent", %{
@@ -221,7 +223,7 @@ defmodule YscWeb.TicketQrLiveTest do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
 
-      assert has_element?(view, "a[href='/users/tickets']")
+      assert has_element?(view, "#back-link[href='/users/tickets']")
     end
 
     test "rejects absolute return_to URLs and falls back to default", %{
@@ -237,8 +239,8 @@ defmodule YscWeb.TicketQrLiveTest do
           ~p"/tickets/#{order.id}/qr" <> "?return_to=https://evil.example.com"
         )
 
-      assert has_element?(view, "a[href='/users/tickets']")
-      refute has_element?(view, "a[href='https://evil.example.com']")
+      assert has_element?(view, "#back-link[href='/users/tickets']")
+      refute has_element?(view, "#back-link[href='https://evil.example.com']")
     end
   end
 

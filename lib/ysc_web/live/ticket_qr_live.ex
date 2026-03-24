@@ -12,6 +12,7 @@ defmodule YscWeb.TicketQrLive do
       <div class="flex items-center gap-3 px-4 pt-safe-top py-4 border-b border-white/10">
         <%!-- Back button: returns to wherever the user came from --%>
         <.link
+          id="back-link"
           navigate={@return_to}
           class="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30 transition-colors shrink-0"
           aria-label="Go back"
@@ -19,7 +20,10 @@ defmodule YscWeb.TicketQrLive do
           <.icon name="hero-chevron-left" class="w-5 h-5 text-white" />
         </.link>
         <div class="min-w-0">
-          <p class="font-bold text-xl leading-tight truncate text-white">
+          <p
+            id="event-title"
+            class="font-bold text-xl leading-tight truncate text-white"
+          >
             {@event.title}
           </p>
           <p class="text-sm text-zinc-300 mt-0.5">
@@ -92,7 +96,10 @@ defmodule YscWeb.TicketQrLive do
 
                   <%!-- ② QR body — main white section --%>
                   <div class="bg-white px-6 pt-6 pb-4">
-                    <div class="flex items-center justify-center">
+                    <div
+                      id={"ticket-qr-#{ticket.reference_id}"}
+                      class="flex items-center justify-center"
+                    >
                       <.qr_code
                         data={ticket.qr_token}
                         size={230}
@@ -194,6 +201,7 @@ defmodule YscWeb.TicketQrLive do
             Order&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
           </p>
           <.link
+            id="confirmation-link"
             navigate={~p"/orders/#{@order_id}/confirmation"}
             class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
           >

@@ -425,7 +425,7 @@ defmodule Ysc.Scanning do
   def list_scan_records(session_id) do
     ScanRecord
     |> where([r], r.scan_session_id == ^session_id)
-    |> order_by([r], desc: r.inserted_at)
+    |> order_by([r], desc: r.inserted_at, desc: r.id)
     |> preload([:user, :ticket])
     |> Repo.all()
   end

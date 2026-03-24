@@ -598,7 +598,9 @@ defmodule YscWeb.AdminScannerLive do
                 </div>
               </div>
               <div class="flex items-center gap-3 shrink-0 ml-3">
-                <span class="text-white text-sm">{@scan_count} scans</span>
+                <span class="text-white text-sm">
+                  {@scan_count} {if(@scan_count == 1, do: "scan", else: "scans")}
+                </span>
                 <button
                   phx-click="end_session"
                   class="bg-white/15 hover:bg-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-white/20"
@@ -1087,17 +1089,30 @@ defmodule YscWeb.AdminScannerLive do
 
   defp apply_action(socket, :index, %{"resume" => session_id}) do
     session = Scanning.get_session!(session_id)
-    scan_count = Scanning.get_session_scan_count(session_id)
 
-    socket
-    |> assign(:page_title, "QR Scanner")
-    |> assign(:phase, :scanning)
-    |> assign(:active_session, session)
-    |> assign(:scan_count, scan_count)
-    |> assign(:scan_result, nil)
-    |> assign(:camera_error, nil)
-    |> assign(:group_prompt, nil)
-    |> assign(:open_sessions, [])
+    if is_nil(session.closed_at) do
+      scan_count = Scanning.get_session_scan_count(session_id)
+
+      socket
+      |> assign(:page_title, "QR Scanner")
+      |> assign(:phase, :scanning)
+      |> assign(:active_session, session)
+      |> assign(:scan_count, scan_count)
+      |> assign(:scan_result, nil)
+      |> assign(:camera_error, nil)
+      |> assign(:group_prompt, nil)
+      |> assign(:open_sessions, [])
+    else
+      open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+
+      socket
+      |> assign(:page_title, "QR Scanner")
+      |> assign(:phase, :setup)
+      |> assign(:active_session, nil)
+      |> assign(:scan_result, nil)
+      |> assign(:open_sessions, open_sessions)
+      |> put_flash(:error, "That session is already closed.")
+    end
   end
 
   defp apply_action(socket, :index, _params) do
@@ -1137,39 +1152,51 @@ defmodule YscWeb.AdminScannerLive do
   end
 
   def handle_event("start_session", %{"session" => params}, socket) do
-    session_type = socket.assigns.selected_mode
+    session_type_str = socket.assigns.selected_mode
 
-    attrs = %{
-      name: params["name"] || "Scan Session",
-      type: String.to_existing_atom(session_type),
-      event_id: if(session_type == "event", do: params["event_id"]),
-      created_by_id: socket.assigns.current_user.id
-    }
+    session_type =
+      case session_type_str do
+        "membership" -> :membership
+        "event" -> :event
+        _ -> nil
+      end
 
-    case Scanning.create_session(attrs) do
-      {:ok, session} ->
-        session = Scanning.get_session!(session.id)
+    if is_nil(session_type) do
+      {:noreply,
+       put_flash(socket, :error, "Please select a scan mode before starting.")}
+    else
+      attrs = %{
+        name: params["name"] || "Scan Session",
+        type: session_type,
+        event_id: if(session_type == :event, do: params["event_id"]),
+        created_by_id: socket.assigns.current_user.id
+      }
 
-        socket =
-          socket
-          |> assign(:phase, :scanning)
-          |> assign(:active_session, session)
-          |> assign(:scan_count, 0)
-          |> assign(:scan_result, nil)
-          |> assign(:camera_error, nil)
-          |> assign(:group_prompt, nil)
+      case Scanning.create_session(attrs) do
+        {:ok, session} ->
+          session = Scanning.get_session!(session.id)
 
-        {:noreply, socket}
+          socket =
+            socket
+            |> assign(:phase, :scanning)
+            |> assign(:active_session, session)
+            |> assign(:scan_count, 0)
+            |> assign(:scan_result, nil)
+            |> assign(:camera_error, nil)
+            |> assign(:group_prompt, nil)
 
-      {:error, changeset} ->
-        {:noreply,
-         socket
-         |> assign(:setup_form, to_form(changeset, as: :session))
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Could not start session. Check the form.",
-           title: "Error"
-         )}
+          {:noreply, socket}
+
+        {:error, changeset} ->
+          {:noreply,
+           socket
+           |> assign(:setup_form, to_form(changeset, as: :session))
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "Could not start session. Check the form.",
+             title: "Error"
+           )}
+      end
     end
   end
 
@@ -1273,16 +1300,21 @@ defmodule YscWeb.AdminScannerLive do
 
   def handle_event("resume_session", %{"session-id" => session_id}, socket) do
     session = Scanning.get_session!(session_id)
-    scan_count = Scanning.get_session_scan_count(session_id)
 
     socket =
-      socket
-      |> assign(:phase, :scanning)
-      |> assign(:active_session, session)
-      |> assign(:scan_count, scan_count)
-      |> assign(:scan_result, nil)
-      |> assign(:camera_error, nil)
-      |> assign(:group_prompt, nil)
+      if is_nil(session.closed_at) do
+        scan_count = Scanning.get_session_scan_count(session_id)
+
+        socket
+        |> assign(:phase, :scanning)
+        |> assign(:active_session, session)
+        |> assign(:scan_count, scan_count)
+        |> assign(:scan_result, nil)
+        |> assign(:camera_error, nil)
+        |> assign(:group_prompt, nil)
+      else
+        put_flash(socket, :error, "That session is already closed.")
+      end
 
     {:noreply, socket}
   end

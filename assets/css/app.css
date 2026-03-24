@@ -3272,6 +3272,11 @@ input[type="search"][list] {
 }
 /* === TICKET QR CAROUSEL === */
 /* Hide scrollbar on the scroll-snap viewport across all browsers */
+[data-slider-viewport] {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+
 [data-slider-viewport]::-webkit-scrollbar {
     display: none;
 }

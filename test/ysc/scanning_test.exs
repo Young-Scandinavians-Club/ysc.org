@@ -632,13 +632,23 @@ defmodule Ysc.ScanningTest do
     test "returns records for the session ordered newest first" do
       session = scan_session_fixture()
       user = make_active_member()
-      user2 = user_fixture()
+      user2 = make_active_member()
 
-      Scanning.process_scan(session, QrToken.sign_membership(user.id))
-      Scanning.process_scan(session, QrToken.sign_membership(user2.id))
+      {:ok, _} =
+        Scanning.process_scan(session, QrToken.sign_membership(user.id))
 
-      records = Scanning.list_scan_records(session.id)
-      assert length(records) == 2
+      {:ok, _} =
+        Scanning.process_scan(session, QrToken.sign_membership(user2.id))
+
+      [first, second] = Scanning.list_scan_records(session.id)
+
+      assert MapSet.equal?(
+               MapSet.new([first.user_id, second.user_id]),
+               MapSet.new([user.id, user2.id])
+             )
+
+      assert first.user_id == user2.id,
+             "user2 (second scan) should appear first"
     end
 
     test "does not include records from other sessions" do

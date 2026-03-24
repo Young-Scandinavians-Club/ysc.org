@@ -72,10 +72,10 @@ defmodule YscWeb.AdminScannerLiveTest do
     end
 
     test "shows membership and event mode options", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/scanner")
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
 
-      assert html =~ "Membership"
-      assert html =~ "Event"
+      assert has_element?(view, "button[phx-value-mode='membership']")
+      assert has_element?(view, "button[phx-value-mode='event']")
     end
 
     test "shows open sessions when they exist", %{conn: conn, admin: admin} do
@@ -244,7 +244,7 @@ defmodule YscWeb.AdminScannerLiveTest do
       token = QrToken.sign_membership(member.id)
       view |> render_hook("scan_result", %{"data" => token})
 
-      assert render(view) =~ "1 scans"
+      assert render(view) =~ "1 scan"
     end
 
     test "end_session returns to setup phase", %{conn: conn} do
@@ -558,7 +558,7 @@ defmodule YscWeb.AdminScannerLiveTest do
       Scanning.process_scan(session, QrToken.sign_membership(member.id))
 
       {:ok, _view, html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
-      assert html =~ "1 scans"
+      assert html =~ "1 scan"
     end
   end
 end

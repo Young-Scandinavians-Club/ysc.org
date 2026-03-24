@@ -93,12 +93,17 @@ defmodule Ysc.Events.Ticket do
   Sets checked_in to true and records the check-in timestamp.
   """
   def check_in_changeset(ticket, attrs \\ %{}) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
     ticket
     |> cast(attrs, [])
     |> put_change(:checked_in, true)
-    |> put_change(:checked_in_at, now)
+    |> then(fn cs ->
+      if is_nil(ticket.checked_in_at) do
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+        put_change(cs, :checked_in_at, now)
+      else
+        cs
+      end
+    end)
   end
 
   @doc """

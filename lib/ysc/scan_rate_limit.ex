@@ -21,5 +21,5 @@ defmodule Ysc.ScanRateLimit do
     end
   end
 
-  def check(_), do: :ok
+  def check(_), do: :rate_limited
 end

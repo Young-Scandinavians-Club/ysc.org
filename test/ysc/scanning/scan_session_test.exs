@@ -121,7 +121,11 @@ defmodule Ysc.Scanning.ScanSessionTest do
 
       cs = ScanSession.close_changeset(session)
       assert cs.valid?
-      assert get_change(cs, :closed_at) != nil
+
+      closed_at = get_change(cs, :closed_at)
+      assert closed_at != nil
+      assert closed_at.time_zone == "Etc/UTC"
+      assert abs(DateTime.diff(DateTime.utc_now(), closed_at)) < 5
     end
   end
 end
