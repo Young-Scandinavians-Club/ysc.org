@@ -3828,7 +3828,12 @@ defmodule YscWeb.UserSettingsLive do
   def handle_event(
         "show_membership_qr",
         _params,
-        %{assigns: %{current_user: %{} = user, current_membership: %{} = _membership}} =
+        %{
+          assigns: %{
+            current_user: %{} = user,
+            current_membership: %{} = _membership
+          }
+        } =
           socket
       ) do
     token = Ysc.Scanning.QrToken.sign_membership(user.id)
