@@ -39,9 +39,8 @@ defmodule YscWeb.MembershipHelpers do
 
     member_since =
       cond do
-        is_struct(membership) && membership.type == :lifetime &&
-            not is_nil(membership.awarded_at) ->
-          membership.awarded_at
+        plan_type == :lifetime && not is_nil(Map.get(membership, :awarded_at)) ->
+          Map.get(membership, :awarded_at)
 
         is_struct(membership) && not is_nil(membership.start_date) ->
           membership.start_date
