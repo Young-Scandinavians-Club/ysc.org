@@ -1540,19 +1540,26 @@ defmodule YscWeb.HomeLive do
                       <.icon name="hero-map-pin" class="w-3 h-3" />
                       <span class="truncate">{event.location_name}</span>
                     </div>
-                    <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 flex items-center justify-between gap-2">
+                    <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 space-y-3">
+                      <div class="flex flex-wrap gap-1.5">
+                        <%= for {tier_name, tickets} <- grouped_tiers do %>
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-full">
+                            <span class="text-zinc-400">{length(tickets)}×</span>{tier_name}
+                          </span>
+                        <% end %>
+                      </div>
                       <div class="flex flex-col gap-1.5">
                         <%= for oid <- order_ids do %>
                           <div class="flex items-center gap-3">
                             <.link
                               navigate={~p"/tickets/#{oid}/qr?return_to=/"}
-                              class="inline-flex items-center gap-1 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+                              class="inline-flex items-center gap-1.5 rounded py-1.5 px-3 text-sm font-semibold leading-6 text-zinc-100 bg-zinc-900 hover:bg-zinc-800 active:scale-[0.98] active:transition-none transition duration-150 ease-in-out whitespace-nowrap"
                             >
-                              <.icon name="hero-qr-code" class="w-3 h-3" /> QR Codes
+                              <.icon name="hero-qr-code" class="w-4 h-4" /> QR Codes
                             </.link>
                             <.link
                               navigate={~p"/orders/#{oid}/confirmation"}
-                              class="text-xs font-bold text-zinc-500 hover:text-zinc-700 underline transition-colors"
+                              class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                             >
                               View Order
                             </.link>
@@ -1564,13 +1571,6 @@ defmodule YscWeb.HomeLive do
                         >
                           No order
                         </span>
-                      </div>
-                      <div class="flex flex-wrap gap-1">
-                        <%= for {tier_name, tickets} <- grouped_tiers do %>
-                          <span class="text-xs font-bold text-zinc-400">
-                            {length(tickets)}× {tier_name}
-                          </span>
-                        <% end %>
                       </div>
                     </div>
                   </div>
