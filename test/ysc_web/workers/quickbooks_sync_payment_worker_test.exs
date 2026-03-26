@@ -6,7 +6,6 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
 
   alias YscWeb.Workers.QuickbooksSyncPaymentWorker
   alias Ysc.Ledgers
-  alias Ysc.Ledgers.Payment
   alias Ysc.Repo
 
   setup :verify_on_exit!

@@ -84,7 +84,7 @@ defmodule Ysc.DataCase do
        }}
     end)
 
-    # Stripe Invoice: return empty list
+    # Stripe Invoice: return empty list and not-found for retrieve/pay
     stub(Stripe.InvoiceMock, :list, fn _params ->
       {:ok,
        %Stripe.List{
@@ -92,6 +92,30 @@ defmodule Ysc.DataCase do
          has_more: false,
          object: "list",
          url: "/v1/invoices"
+       }}
+    end)
+
+    stub(Stripe.InvoiceMock, :retrieve, fn _invoice_id ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :not_found,
+         message: "No such invoice",
+         request_id: nil,
+         extra: %{},
+         user_message: nil
+       }}
+    end)
+
+    stub(Stripe.InvoiceMock, :pay, fn _invoice_id, _params ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :not_found,
+         message: "No such invoice",
+         request_id: nil,
+         extra: %{},
+         user_message: nil
        }}
     end)
   end
