@@ -238,7 +238,7 @@ defmodule Ysc.Tickets do
         t.status == :confirmed
     )
     |> order_by([t], desc: t.inserted_at)
-    |> preload([:ticket_tier, :ticket_order])
+    |> preload([:ticket_tier, :ticket_order, :registration, :event])
     |> Repo.all()
   end
 

@@ -292,4 +292,160 @@ defmodule YscWeb.TicketQrLiveTest do
       assert html =~ "1 ticket"
     end
   end
+
+  describe "event-scoped QR route" do
+    test "redirects unauthenticated users to login", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture()
+
+      assert {:error, {:redirect, %{to: path}}} =
+               live(conn, ~p"/events/#{event.id}/tickets/qr")
+
+      assert path =~ "/users/log"
+    end
+
+    test "redirects when event has no confirmed tickets for the user", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = user_fixture()
+      event = event_fixture()
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets/qr")
+
+      assert_redirect(view, "/users/tickets")
+    end
+
+    test "renders event title and combined ticket count from multiple orders",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+      order1 = ticket_order_fixture(%{user: member, event: event})
+      order2 = ticket_order_fixture(%{user: member, event: event})
+
+      for order <- [order1, order2] do
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload([:tickets])
+        |> Map.fetch!(:tickets)
+        |> Enum.each(fn t ->
+          t |> Ecto.Changeset.change(status: :confirmed) |> Ysc.Repo.update!()
+        end)
+      end
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets/qr")
+      html = render_async(view)
+
+      assert has_element?(view, "#event-title", event.title)
+      assert html =~ "2 tickets"
+    end
+
+    test "shows all-orders link instead of single order reference", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+      order = ticket_order_fixture(%{user: member, event: event})
+
+      Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+      |> Ysc.Repo.preload([:tickets])
+      |> Map.fetch!(:tickets)
+      |> Enum.each(fn t ->
+        t |> Ecto.Changeset.change(status: :confirmed) |> Ysc.Repo.update!()
+      end)
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets/qr")
+      render_async(view)
+
+      refute has_element?(view, "#confirmation-link")
+      assert has_element?(view, "#all-orders-link")
+    end
+
+    test "shows navigation controls when tickets from multiple orders are combined",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+      order1 = ticket_order_fixture(%{user: member, event: event})
+      order2 = ticket_order_fixture(%{user: member, event: event})
+
+      for order <- [order1, order2] do
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload([:tickets])
+        |> Map.fetch!(:tickets)
+        |> Enum.each(fn t ->
+          t |> Ecto.Changeset.change(status: :confirmed) |> Ysc.Repo.update!()
+        end)
+      end
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets/qr")
+      render_async(view)
+
+      assert has_element?(view, "[data-slider-prev]")
+      assert has_element?(view, "[data-slider-next]")
+      assert has_element?(view, "[data-slider-dots]")
+    end
+
+    test "back link uses return_to path when provided", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+      order = ticket_order_fixture(%{user: member, event: event})
+
+      Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+      |> Ysc.Repo.preload([:tickets])
+      |> Map.fetch!(:tickets)
+      |> Enum.each(fn t ->
+        t |> Ecto.Changeset.change(status: :confirmed) |> Ysc.Repo.update!()
+      end)
+
+      conn = log_in_user(conn, member)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/events/#{event.id}/tickets/qr" <> "?return_to=/")
+
+      assert has_element?(view, "#back-link[href='/']")
+    end
+  end
 end
