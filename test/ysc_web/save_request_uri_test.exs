@@ -1,8 +1,6 @@
 defmodule YscWeb.SaveRequestUriTest do
   use ExUnit.Case, async: true
 
-  alias YscWeb.SaveRequestUri
-
   @moduledoc """
   Tests for SaveRequestUri mount hook.
 
@@ -11,25 +9,6 @@ defmodule YscWeb.SaveRequestUriTest do
   """
 
   describe "on_mount/4" do
-    @tag :skip
-    test "returns continuation tuple" do
-      # Create a minimal socket structure
-      socket = %Phoenix.LiveView.Socket{
-        assigns: %{__changed__: %{}},
-        private: %{},
-        view: YscWeb.TestLiveView
-      }
-
-      # NOTE:
-      # Phoenix LiveView lifecycle hooks can only be attached when the LiveView was
-      # mounted via the router `live/3` macro. Unit tests don't satisfy that, so
-      # this needs an integration test with a test-only route.
-      result = SaveRequestUri.on_mount(:save_request_uri, %{}, %{}, socket)
-
-      # Verify it returns the expected tuple structure
-      assert match?({:cont, _socket}, result)
-    end
-
     test "hook function behavior with URI parsing" do
       # Test the URI parsing logic that the hook uses
       test_cases = [

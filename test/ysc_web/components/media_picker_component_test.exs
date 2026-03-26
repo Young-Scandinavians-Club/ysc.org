@@ -6,8 +6,6 @@ defmodule YscWeb.MediaPickerComponentTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
-  import Ysc.EventsFixtures
-
   alias Ysc.Media.Image
   alias Ysc.Repo
 
@@ -104,25 +102,6 @@ defmodule YscWeb.MediaPickerComponentTest do
       |> render_click()
 
       refute has_element?(view, "#media-picker-modal-newsletter_cover")
-    end
-  end
-
-  describe "MediaPickerComponent in events editor" do
-    setup [:create_admin]
-
-    @tag :skip
-    test "shows the media picker component on events edit page", %{
-      conn: conn,
-      admin: admin
-    } do
-      # Skipped: events edit page has a pre-existing LiveViewTest DOM parsing
-      # issue with the date_range_picker component id="event_date"
-      event = event_fixture(%{organizer_id: admin.id})
-
-      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
-
-      assert has_element?(view, "#media-picker-event_cover")
-      assert has_element?(view, "button", "Choose from library")
     end
   end
 end

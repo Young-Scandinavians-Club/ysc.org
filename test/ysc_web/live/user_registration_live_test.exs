@@ -690,9 +690,9 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       render_change(lv, "recover_wizard", %{"user" => params})
 
-      html = render(lv)
-      assert html =~ "Account Information"
-      assert html =~ ~s(id="step-1-content" class="flex flex-col space-y-3")
+      assert render(lv) =~ "Account Information"
+      assert has_element?(lv, "#step-1-content.flex")
+      refute has_element?(lv, "#step-1-content.hidden")
     end
 
     test "set-step does not jump to additional questions when step 1 is invalid",

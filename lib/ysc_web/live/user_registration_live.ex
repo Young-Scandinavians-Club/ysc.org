@@ -61,7 +61,7 @@ defmodule YscWeb.UserRegistrationLive do
             </.error>
 
             <div id="step-0-content" class={if @current_step !== 0, do: "hidden"}>
-              <div class="py-4 space">
+              <div class="py-4 space pb-8">
                 <p class="mb-4 text-sm font-semibold leading-6 text-zinc-800">
                   Who is applying for membership today?*
                 </p>
@@ -103,7 +103,7 @@ defmodule YscWeb.UserRegistrationLive do
               class={
                 if @current_step !== 1,
                   do: "hidden",
-                  else: "flex flex-col space-y-3"
+                  else: "flex flex-col space-y-3 pb-8"
               }
             >
               <.header class="text-left">Account Information</.header>
@@ -277,7 +277,7 @@ defmodule YscWeb.UserRegistrationLive do
               class={
                 if @current_step !== 2,
                   do: "hidden",
-                  else: "flex flex-col space-y-3"
+                  else: "flex flex-col space-y-3 pb-8"
               }
             >
               <.header class="text-left">Additional Questions</.header>

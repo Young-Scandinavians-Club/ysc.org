@@ -93,14 +93,15 @@ defmodule Ysc.Bookings.PricingRule do
   defp validate_money(changeset, field) do
     validate_change(changeset, field, fn _field, value ->
       case value do
-        %Money{currency: :USD} = money when money.amount >= 0 ->
-          []
-
         %Money{currency: currency} when currency != :USD ->
           [{field, "must be in USD"}]
 
-        %Money{amount: amount} when amount < 0 ->
-          [{field, "must be greater than or equal to 0"}]
+        %Money{} = money ->
+          if Money.positive?(money) or Money.zero?(money) do
+            []
+          else
+            [{field, "must be greater than or equal to 0"}]
+          end
 
         nil ->
           []

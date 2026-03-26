@@ -455,7 +455,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         if assigns[:scroll_to_section], do: assigns.scroll_to_section, else: nil
       }
     >
-      <!-- Hero Section with Carousel (For logged-in users) -->
+      <%!-- Hero Section with Carousel (For logged-in users) --%>
       <section
         :if={@user}
         id="hero-section"
@@ -497,19 +497,19 @@ defmodule YscWeb.ClearLakeBookingLive do
             class="h-full w-full"
           />
           <div
-            class="absolute inset-0 z-[5] bg-black/30 pointer-events-none"
+            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
             aria-hidden="true"
           >
           </div>
         </div>
-        <!-- Title Text Section -->
-        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 lg:py-16 pointer-events-none">
+        <%!-- Title Text Section --%>
+        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
-            <div class="flex items-center gap-3 px-4">
-              <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-lg">
-                Clear Lake Portal
+            <div class="flex items-center gap-4 px-4">
+              <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-lg">
+                Clear Lake Cabin
               </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-teal-600 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-teal-500 backdrop-blur-sm">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-black uppercase tracking-[0.2em] rounded backdrop-blur-sm">
                 Member Access
               </span>
             </div>
@@ -2412,12 +2412,11 @@ defmodule YscWeb.ClearLakeBookingLive do
           </div>
         </div>
       </section>
-      <!-- Hero Section with Carousel (For non-logged-in users) -->
+      <%!-- Hero Section with Carousel (For non-logged-in users) --%>
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden -mt-[88px] pt-[88px]"
-        style="min-height: 75vh;"
+        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[60vh] md:min-h-[75vh]"
       >
         <div
           id="clear-lake-carousel-wrapper-nonuser"
@@ -2460,113 +2459,96 @@ defmodule YscWeb.ClearLakeBookingLive do
           >
           </div>
         </div>
-        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-16 lg:py-20 pointer-events-none">
+        <%!-- Title Text Section --%>
+        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
-            <span class="inline-block px-2.5 sm:px-3 py-1 mb-3 sm:mb-4 text-xs font-bold tracking-widest text-white uppercase bg-amber-700/80 backdrop-blur-sm rounded">
+            <p class="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-3 md:mb-4 drop-shadow-md">
               A Legacy for All Seasons
-            </span>
-            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-3 sm:mb-4 drop-shadow-lg">
-              YSC Clear Lake Cabin
+            </p>
+            <h1 class="text-4xl md:text-7xl font-black text-white drop-shadow-lg mb-4">
+              Clear Lake Cabin
             </h1>
-            <p class="text-base sm:text-lg md:text-xl lg:text-2xl text-zinc-100 max-w-2xl font-normal">
+            <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
               Owned and operated by our community since 1963. A year-round gateway to California's oldest natural lake.
             </p>
           </div>
         </div>
       </section>
-      <!-- Main Content for Non-Logged-In Users -->
-      <section :if={!@user} class="max-w-screen-xl mx-auto px-4 py-20">
-        <div class="space-y-12">
-          <div class="text-center max-w-3xl mx-auto">
-            <h1 class="text-4xl md:text-5xl font-bold text-zinc-900 mb-4">
-              Experience Clear Lake
-            </h1>
-            <p class="text-lg text-zinc-600 leading-relaxed">
-              Welcome to the
-              <strong class="text-zinc-900">YSC Clear Lake Cabin</strong>
-              — your year-round gateway to California's oldest natural lake. Since <strong class="text-zinc-900">1963</strong>, the YSC has proudly owned this beautiful cabin, located in the heart of
-              <strong class="text-zinc-900">Kelseyville</strong>
-              on the shores of <strong class="text-zinc-900">Clear Lake</strong>.
+      <%!-- Main Content for Non-Logged-In Users --%>
+      <section :if={!@user} class="bg-white py-6 md:py-12">
+        <%!-- Section Header --%>
+        <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
+          <div class="text-center py-8 md:py-12 border-y border-zinc-200">
+            <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
+              Since 1963
             </p>
+            <h2 class="text-4xl md:text-7xl font-black text-zinc-900">
+              Experience Clear Lake
+            </h2>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            <div
-              class="bg-gradient-to-br from-teal-50 via-teal-50 to-cyan-50 border-2 border-teal-200 rounded-xl p-6 hover:shadow-sm transition-shadow"
-              style="background: linear-gradient(to bottom right, rgb(240 253 250), rgb(207 250 254));"
-            >
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">⚓</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    Private Dock Access
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    Swim, boat, and unwind at our private dock. Perfect for mooring your boat, enjoying morning coffee over the water, or taking a refreshing dip in California's largest natural lake.
-                  </p>
-                </div>
-              </div>
+        </div>
+        <%!-- Feature Grid --%>
+        <div class="max-w-screen-xl mx-auto px-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
+            <%!-- Private Dock --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                Private Dock Access
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                Swim, boat, and unwind at our private dock. Perfect for mooring your boat, enjoying morning coffee over the water, or taking a refreshing dip in California's largest natural lake.
+              </p>
             </div>
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🌅</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    Year-Round Access
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    <strong class="text-amber-700">Summer (May–Sept):</strong>
-                    Legendary dock parties, community meals, and boat tie-ups. Sleep under the stars on our outdoor sleeping lawn with mattresses provided (bring sleeping bags).
-                    <strong class="text-amber-700">Winter (Oct–April):</strong>
-                    Cozy indoor beds are set up in the cabin (bring your own linens and comforter). Perfect for warm, comfortable lakeside retreats.
-                  </p>
-                </div>
-              </div>
+            <%!-- Year-Round Access --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                Year-Round Access
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                <strong class="text-zinc-900">Summer (May–Sept):</strong>
+                Legendary dock parties and sleeping under the stars on our lawn.<br />
+                <strong class="text-zinc-900">Winter (Oct–April):</strong>
+                Cozy indoor beds set up in the cabin for warm, comfortable lakeside retreats.
+              </p>
             </div>
-            <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🤝</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    A Community Treasure
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    Owned and operated by our members since 1963. <strong class="text-purple-700">Your cabin, your getaway</strong>. Low rates and authentic experiences made possible through our cooperative spirit.
-                  </p>
-                </div>
-              </div>
+            <%!-- Community Treasure --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                A Community Treasure
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                Owned and operated by our members since 1963. <strong class="text-zinc-900">Your cabin, your getaway</strong>. Low rates and authentic experiences made possible through our cooperative spirit.
+              </p>
             </div>
-            <div class="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🏞️</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    California's Oldest Lake
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    Clear Lake is <strong class="text-green-700">2.5 million years old</strong>—the oldest natural lake in North America. Experience a unique ecosystem perfect for bird watching, fishing, and connecting with nature year-round.
-                  </p>
-                </div>
-              </div>
+            <%!-- California's Oldest Lake --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                California's Oldest Lake
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                Clear Lake is
+                <strong class="text-zinc-900">2.5 million years old</strong>
+                — the oldest natural lake in North America. Experience a unique ecosystem perfect for bird watching, fishing, and connecting with nature year-round.
+              </p>
             </div>
           </div>
-          <div class="mt-12 max-w-2xl mx-auto">
-            <div class="p-8 rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 text-white">
-              <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div class="flex-1 text-center md:text-left">
-                  <h2 class="text-2xl font-black mb-2">
-                    Ready to Experience Clear Lake?
-                  </h2>
-                  <p class="text-teal-100">{raw(@booking_disabled_reason)}</p>
-                </div>
-                <.link
-                  navigate={
-                    ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
-                  }
-                  class="px-8 py-3 bg-white text-teal-600 font-bold rounded-md hover:bg-teal-50 transition-colors duration-150 whitespace-nowrap"
-                >
-                  Sign In to Book
-                </.link>
-              </div>
+          <%!-- CTA Card --%>
+          <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
+            <div class="p-8 md:p-12 bg-blue-50/40 rounded-xl border border-blue-200 text-center flex flex-col items-center">
+              <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
+                Ready to Book?
+              </h4>
+              <p class="text-base text-zinc-700 leading-relaxed mb-6">
+                Sign in to view the cabin calendar, check availability, and reserve your dates.
+              </p>
+              <.link
+                navigate={
+                  ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
+                }
+                class="px-8 py-3 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 transition-colors duration-150"
+              >
+                Sign In to Book
+              </.link>
             </div>
           </div>
         </div>

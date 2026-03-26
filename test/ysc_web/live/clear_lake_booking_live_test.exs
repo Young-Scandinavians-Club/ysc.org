@@ -2330,7 +2330,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
-      assert has_element?(view, "h1", "Clear Lake Portal")
+      assert has_element?(view, "h1", "Clear Lake Cabin")
     end
   end
 

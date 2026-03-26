@@ -2091,17 +2091,6 @@ defmodule Ysc.LedgersTest do
       assert entries != []
       assert Enum.all?(entries, &(&1.payment_id == payment.id))
     end
-
-    @tag :skip
-    test "update_entry/2 updates entry [DEPRECATED - ledger entries are append-only]",
-         %{entry: entry} do
-      # NOTE: This test is skipped because ledger entries are now append-only.
-      # A database trigger prevents any updates to ledger_entries after insertion.
-      # Use reversing entries instead of updates for corrections.
-      update_attrs = %{description: "Updated entry description"}
-      assert {:ok, updated} = Ledgers.update_entry(entry, update_attrs)
-      assert updated.description == "Updated entry description"
-    end
   end
 
   describe "refund retrieval" do
@@ -3144,20 +3133,6 @@ defmodule Ysc.LedgersTest do
 
       entry = List.first(entries)
       %{user: user, entry: entry}
-    end
-
-    @tag :skip
-    test "updates entry and maintains balance [DEPRECATED - ledger entries are append-only]",
-         %{entry: entry} do
-      # NOTE: This test is skipped because ledger entries are now append-only.
-      # A database trigger prevents any updates to ledger_entries after insertion.
-      # Use reversing entries instead of updates for corrections.
-      new_amount = Money.new(15_000, :USD)
-
-      assert {:ok, updated_entry} =
-               Ledgers.update_entry_with_balance(entry.id, %{amount: new_amount})
-
-      assert Money.equal?(updated_entry.amount, new_amount)
     end
 
     test "returns error for non-existent entry" do

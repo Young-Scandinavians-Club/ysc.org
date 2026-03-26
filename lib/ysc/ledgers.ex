@@ -986,6 +986,8 @@ defmodule Ysc.Ledgers do
   - `external_refund_id`: External refund ID from payment provider
   """
   def process_refund(attrs) do
+    require Ysc.Logging
+
     %{
       payment_id: payment_id,
       refund_amount: refund_amount,
@@ -995,24 +997,23 @@ defmodule Ysc.Ledgers do
 
     ensure_basic_accounts()
 
-    Repo.transaction(fn ->
-      # Get original payment
-      payment = Repo.get!(Payment, payment_id)
-
-      # Check if this refund has already been processed (idempotency)
+    # Idempotency check BEFORE opening the transaction so that a duplicate refund
+    # does not trigger Repo.rollback from inside a nested Repo.transaction. That
+    # pattern can propagate a savepoint rollback through an outer transaction
+    # (e.g. the webhook-processing transaction) and tear it down unintentionally,
+    # particularly visible in the test sandbox where every call is already wrapped
+    # in a transaction.
+    already_processed =
       if external_refund_id do
         existing_refund = get_refund_by_external_id(external_refund_id)
 
         if existing_refund do
-          require Ysc.Logging
-
           Ysc.Logging.info(
             "Refund already processed, returning existing refund (idempotency)",
             external_refund_id: external_refund_id,
             refund_id: existing_refund.id
           )
 
-          # Find the transaction for this refund
           existing_transaction =
             from(t in LedgerTransaction,
               where: t.refund_id == ^existing_refund.id,
@@ -1020,12 +1021,25 @@ defmodule Ysc.Ledgers do
             )
             |> Repo.one()
 
-          # Return the existing refund wrapped in the error tuple for the caller to handle
-          Repo.rollback(
-            {:already_processed, existing_refund, existing_transaction}
-          )
+          {:already_processed, existing_refund, existing_transaction}
         end
       end
+
+    case already_processed do
+      {:already_processed, existing_refund, existing_transaction} ->
+        # Return the same shape as a successful process_refund so callers
+        # can treat idempotent duplicates identically to first-time success.
+        {:ok, {existing_refund, existing_transaction, []}}
+
+      _ ->
+        do_process_refund(payment_id, refund_amount, reason, external_refund_id)
+    end
+  end
+
+  defp do_process_refund(payment_id, refund_amount, reason, external_refund_id) do
+    Repo.transaction(fn ->
+      # Get original payment
+      payment = Repo.get!(Payment, payment_id)
 
       # Create refund record
       {:ok, refund} =
