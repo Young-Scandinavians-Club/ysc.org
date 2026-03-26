@@ -67,8 +67,9 @@ defmodule YscWeb.TicketQrLiveTest do
       requester = user_fixture()
       conn = log_in_user(conn, requester)
 
-      assert {:error, {:live_redirect, %{to: "/users/tickets"}}} =
-               live(conn, ~p"/tickets/#{order.id}/qr")
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+
+      assert_redirect(view, "/users/tickets")
     end
   end
 
@@ -83,6 +84,7 @@ defmodule YscWeb.TicketQrLiveTest do
     } do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      render_async(view)
 
       assert has_element?(view, "#event-title", event.title)
       assert has_element?(view, "[data-slide]")
@@ -101,7 +103,8 @@ defmodule YscWeb.TicketQrLiveTest do
         })
 
       conn = log_in_user(conn, member)
-      {:ok, _view, html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      html = render_async(view)
 
       assert html =~ "Test Venue"
       assert html =~ "123 Test St"
@@ -113,7 +116,8 @@ defmodule YscWeb.TicketQrLiveTest do
       order: order
     } do
       conn = log_in_user(conn, member)
-      {:ok, _view, html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      html = render_async(view)
 
       ticket = hd(order.tickets)
       assert html =~ "General Admission"
@@ -127,6 +131,7 @@ defmodule YscWeb.TicketQrLiveTest do
     } do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      render_async(view)
 
       ticket = hd(order.tickets)
       assert has_element?(view, "#ticket-qr-#{ticket.reference_id}")
@@ -139,7 +144,8 @@ defmodule YscWeb.TicketQrLiveTest do
       order: order
     } do
       conn = log_in_user(conn, member)
-      {:ok, _view, html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      html = render_async(view)
 
       assert html =~ "Show this QR code to event staff"
     end
@@ -151,6 +157,7 @@ defmodule YscWeb.TicketQrLiveTest do
     } do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      render_async(view)
 
       assert has_element?(view, "#confirmation-link")
     end
@@ -181,6 +188,7 @@ defmodule YscWeb.TicketQrLiveTest do
 
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{multi_order.id}/qr")
+      render_async(view)
 
       assert has_element?(view, "[data-slider-prev]")
       assert has_element?(view, "[data-slider-next]")
@@ -194,6 +202,7 @@ defmodule YscWeb.TicketQrLiveTest do
     } do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      render_async(view)
 
       refute has_element?(view, "[data-slider-prev]")
     end
@@ -277,7 +286,8 @@ defmodule YscWeb.TicketQrLiveTest do
       t2 |> Ecto.Changeset.change(status: :cancelled) |> Ysc.Repo.update!()
 
       conn = log_in_user(conn, member)
-      {:ok, _view, html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      html = render_async(view)
 
       assert html =~ "1 ticket"
     end
