@@ -742,7 +742,7 @@ defmodule YscWeb.TahoeBookingLive do
         if assigns[:scroll_to_section], do: assigns.scroll_to_section, else: nil
       }
     >
-      <!-- Hero Section with Carousel (For logged-in users) -->
+      <%!-- Hero Section (For logged-in users) --%>
       <section
         :if={@user}
         id="hero-section"
@@ -757,30 +757,30 @@ defmodule YscWeb.TahoeBookingLive do
             loading="eager"
           />
           <div
-            class="absolute inset-0 z-[5] bg-black/30 pointer-events-none"
+            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
             aria-hidden="true"
           >
           </div>
         </div>
-        <!-- Title Text Section -->
-        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 lg:py-16 pointer-events-none">
+        <%!-- Title Text Section --%>
+        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
-            <div class="flex items-center gap-3 px-4">
-              <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-lg">
-                Lake Tahoe Cabin
+            <div class="flex items-center gap-4 px-4">
+              <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-lg">
+                Tahoe Cabin
               </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-blue-700/90 mt-1 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-blue-500/50 backdrop-blur-sm">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-black uppercase tracking-[0.2em] rounded backdrop-blur-sm">
                 Member Access
               </span>
             </div>
           </div>
         </div>
       </section>
-      <!-- Hero Section with Carousel (For non-logged-in users) -->
+      <%!-- Hero Section (For non-logged-in users) --%>
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[75vh]"
+        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[60vh] md:min-h-[75vh]"
       >
         <div class="absolute inset-0 h-full w-full z-[2]">
           <img
@@ -791,21 +791,21 @@ defmodule YscWeb.TahoeBookingLive do
             loading="eager"
           />
           <div
-            class="absolute inset-0 z-[5] bg-black/30 pointer-events-none"
+            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
             aria-hidden="true"
           >
           </div>
         </div>
-        <!-- Title Text Section -->
-        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-16 lg:py-20 pointer-events-none">
+        <%!-- Title Text Section --%>
+        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
-            <span class="inline-block px-2.5 sm:px-3 py-1 mb-3 sm:mb-4 text-xs font-bold tracking-widest text-white uppercase bg-blue-700/80 backdrop-blur-sm rounded">
+            <p class="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-3 md:mb-4 drop-shadow-md">
               A Year-Round Retreat
-            </span>
-            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-3 sm:mb-4 drop-shadow-lg">
-              YSC Lake Tahoe Cabin
+            </p>
+            <h1 class="text-4xl md:text-7xl font-black text-white drop-shadow-lg mb-4">
+              Tahoe Cabin
             </h1>
-            <p class="text-base sm:text-lg md:text-xl lg:text-2xl text-zinc-100 max-w-2xl font-normal">
+            <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
               Owned and operated by our community since 1993. A beautiful cabin on the west shore of Lake Tahoe.
             </p>
           </div>
@@ -4354,114 +4354,87 @@ defmodule YscWeb.TahoeBookingLive do
           </div>
         </div>
       </section>
-      <!-- Main Content for Non-Logged-In Users -->
-      <section :if={!@user} class="max-w-screen-xl mx-auto px-4 py-20">
-        <div class="space-y-12">
-          <!-- Welcome Header -->
-          <div class="text-center max-w-3xl mx-auto">
-            <h1 class="text-4xl md:text-5xl font-bold text-zinc-900 mb-4">
-              Experience Tahoe
-            </h1>
-            <p class="text-lg text-zinc-600 leading-relaxed">
-              Welcome to the <strong class="text-zinc-900">YSC Tahoe Cabin</strong>
-              — your year-round retreat in the heart of Lake Tahoe. Since <strong class="text-zinc-900">1993</strong>, the YSC has proudly owned this beautiful cabin, located just minutes from Tahoe City on the
-              <strong class="text-zinc-900">west shore</strong>
-              of <strong class="text-zinc-900">Lake Tahoe</strong>.
+      <%!-- Main Content for Non-Logged-In Users --%>
+      <section :if={!@user} class="bg-white py-6 md:py-12">
+        <%!-- Section Header --%>
+        <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
+          <div class="text-center py-8 md:py-12 border-y border-zinc-200">
+            <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
+              Since 1993
             </p>
+            <h2 class="text-4xl md:text-7xl font-black text-zinc-900">
+              Experience Tahoe
+            </h2>
           </div>
-          <!-- Experience Tahoe Feature Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            <!-- Traditional Sauna -->
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🔥</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    Traditional Sauna and Wood-Fired Fireplace
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    Experience the authentic Scandinavian sauna and our wood-fired fireplace. This traditional feature brings the Nordic wellness culture to the mountains, perfect for unwinding after a day on the slopes or trails.
-                  </p>
-                </div>
-              </div>
+        </div>
+        <%!-- Feature Grid --%>
+        <div class="max-w-screen-xl mx-auto px-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
+            <%!-- Traditional Sauna --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                Traditional Sauna
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                Experience the authentic Scandinavian sauna and our wood-fired fireplace. This traditional feature brings the Nordic wellness culture to the mountains, perfect for unwinding after a day on the slopes.
+              </p>
             </div>
-            <!-- Ski Proximity -->
-            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🎿</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    Ski Proximity
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    <strong class="text-blue-700">20 minutes</strong>
-                    to Palisades Tahoe (site of the 1960 Winter Olympics) and Alpine Meadows. And about
-                    <strong class="text-blue-700">30 minutes</strong>
-                    to Northstar Ski Resort. World-class skiing is right at your doorstep.
-                  </p>
-                </div>
-              </div>
+            <%!-- Ski Proximity --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                Ski Proximity
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                <strong class="text-zinc-900">20 minutes</strong>
+                to Palisades Tahoe (site of the 1960 Winter Olympics) and Alpine Meadows. About
+                <strong class="text-zinc-900">30 minutes</strong>
+                to Northstar. World-class skiing is right at your doorstep.
+              </p>
             </div>
-            <!-- West Shore Magic -->
-            <div class="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🌲</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    West Shore Magic
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    Escape the tourist traps. Our cabin offers quiet, forested living on Tahoe's pristine west shore. Experience the authentic mountain lifestyle away from the crowds.
-                  </p>
-                </div>
-              </div>
+            <%!-- West Shore Magic --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                West Shore Magic
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                Escape the tourist traps. Our cabin offers quiet, forested living on Tahoe's pristine west shore. Experience the authentic mountain lifestyle away from the crowds.
+              </p>
             </div>
-            <!-- The Dugnad Spirit -->
-            <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
-              <div class="flex items-start gap-4">
-                <div class="text-4xl flex-shrink-0">🤝</div>
-                <div class="flex-1">
-                  <h2 class="text-xl font-black text-zinc-900 mb-2">
-                    The Dugnad Spirit
-                  </h2>
-                  <p class="text-zinc-700 leading-relaxed">
-                    <% season_id =
-                      if @checkin_date do
-                        season =
-                          Season.find_season_for_date(@seasons, @checkin_date)
+            <%!-- The Dugnad Spirit --%>
+            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
+              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
+                The Dugnad Spirit
+              </h4>
+              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                <% season_id =
+                  if @checkin_date do
+                    season =
+                      Season.find_season_for_date(@seasons, @checkin_date)
 
-                        if season, do: season.id, else: nil
-                      else
-                        nil
-                      end %>
-                    <% default_adult_price =
-                      get_default_adult_price(@property, season_id) %> Low rates (<strong class="text-purple-700"><%= MoneyHelper.format_money!(default_adult_price) %>/adult</strong>) are possible because members steward the cabin together. This is <strong class="text-purple-700">your cabin — not a hotel</strong>. Members share responsibility for cleaning and maintenance, keeping costs affordable for everyone.
-                  </p>
-                </div>
-              </div>
+                    if season, do: season.id, else: nil
+                  else
+                    nil
+                  end %>
+                <% default_adult_price =
+                  get_default_adult_price(@property, season_id) %> Low rates (<strong class="text-blue-600">{MoneyHelper.format_money!(default_adult_price)}/adult</strong>) are possible because members steward the cabin together. This is <strong class="text-zinc-900">your cabin — not a hotel</strong>.
+              </p>
             </div>
           </div>
-          <!-- CTA Card for Non-Logged-In Users -->
-          <div class="mt-12 max-w-2xl mx-auto">
-            <div class="p-8 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-              <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div class="flex-1 text-center md:text-left">
-                  <h2 class="text-2xl font-black mb-2">
-                    Ready to Experience Tahoe?
-                  </h2>
-                  <p class="text-blue-100">
-                    {raw(@booking_disabled_reason)}
-                  </p>
-                </div>
-                <.link
-                  navigate={
-                    ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/tahoe"}}"
-                  }
-                  class="px-8 py-3 bg-white text-blue-600 font-bold rounded-md hover:bg-blue-50 transition-colors duration-150 whitespace-nowrap"
-                >
-                  Sign In to Book
-                </.link>
-              </div>
+          <%!-- CTA Card --%>
+          <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
+            <div class="p-8 md:p-12 bg-blue-50/40 rounded-xl border border-blue-200 text-center flex flex-col items-center">
+              <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
+                Ready to Book?
+              </h4>
+              <p class="text-base text-zinc-700 leading-relaxed mb-6">
+                Sign in to view the cabin calendar, check availability, and reserve your dates.
+              </p>
+              <.link
+                navigate={~p"/users/log-in?#{%{redirect_to: ~p"/bookings/tahoe"}}"}
+                class="px-8 py-3 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 transition-colors duration-150"
+              >
+                Sign In to Book
+              </.link>
             </div>
           </div>
         </div>

@@ -177,11 +177,7 @@ defmodule Ysc.Bookings.PricingRuleTest do
       assert changeset.valid?
     end
 
-    @tag :skip
-    test "rejects negative amount (VALIDATION BUG: guard clause 'amount < 0' doesn't work with Decimal)" do
-      # NOTE: This test documents a bug in the PricingRule validation.
-      # The guard clause `when amount < 0` in validate_money/2 doesn't work with Decimal values.
-      # Should use Decimal.negative?/1 or Decimal.compare/2 instead.
+    test "rejects negative amount" do
       attrs = %{
         amount: Money.new(-100, :USD),
         booking_mode: :room,
@@ -191,11 +187,10 @@ defmodule Ysc.Bookings.PricingRuleTest do
 
       changeset = PricingRule.changeset(%PricingRule{}, attrs)
 
-      # Currently passes validation incorrectly
-      assert changeset.valid?
-      # Should be:
-      # refute changeset.valid?
-      # assert changeset.errors[:amount] != nil
+      refute changeset.valid?
+      assert changeset.errors[:amount] != nil
+      {message, _} = changeset.errors[:amount]
+      assert message =~ "must be greater than or equal to 0"
     end
 
     test "rejects non-USD currency for amount" do
@@ -230,9 +225,7 @@ defmodule Ysc.Bookings.PricingRuleTest do
       assert message =~ "must be in USD"
     end
 
-    @tag :skip
-    test "rejects negative children_amount (VALIDATION BUG: same Decimal guard clause issue)" do
-      # NOTE: Same validation bug as amount field
+    test "rejects negative children_amount" do
       attrs = %{
         amount: Money.new(10_000, :USD),
         children_amount: Money.new(-50, :USD),
@@ -243,11 +236,10 @@ defmodule Ysc.Bookings.PricingRuleTest do
 
       changeset = PricingRule.changeset(%PricingRule{}, attrs)
 
-      # Currently passes validation incorrectly
-      assert changeset.valid?
-      # Should be:
-      # refute changeset.valid?
-      # assert changeset.errors[:children_amount] != nil
+      refute changeset.valid?
+      assert changeset.errors[:children_amount] != nil
+      {message, _} = changeset.errors[:children_amount]
+      assert message =~ "must be greater than or equal to 0"
     end
 
     test "accepts nil children_amount" do

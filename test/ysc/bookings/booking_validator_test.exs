@@ -991,9 +991,12 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         Repo.update!(
           Ecto.Changeset.change(summer, advance_booking_days: old_advance)
         )
+
+        Ysc.Bookings.SeasonCache.invalidate_property(:tahoe)
       end)
 
       Repo.update!(Ecto.Changeset.change(summer, advance_booking_days: 7))
+      Ysc.Bookings.SeasonCache.invalidate_property(:tahoe)
 
       checkin = ~D[2026-07-13]
       checkout = ~D[2026-07-15]

@@ -66,22 +66,6 @@ defmodule YscWeb.UploadComponentTest do
       assert updated_socket == socket
     end
 
-    @tag :skip
-    test "cancel event cancels upload" do
-      # Note: This test requires actual upload entries which are difficult
-      # to set up in unit tests. Test this through integration tests instead.
-      socket = new_socket(%{id: "test-id"})
-      {:ok, socket} = UploadComponent.mount(socket)
-
-      ref = "entry-ref-123"
-
-      # cancel_upload requires actual upload entries
-      {:noreply, updated_socket} =
-        UploadComponent.handle_event("cancel", %{"ref" => ref}, socket)
-
-      assert %Phoenix.LiveView.Socket{} = updated_socket
-    end
-
     test "save event structure", %{} do
       user = user_fixture()
       socket = new_socket(%{id: "test-id", user_id: user.id})

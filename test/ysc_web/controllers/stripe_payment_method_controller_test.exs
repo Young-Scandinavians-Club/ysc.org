@@ -58,69 +58,6 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       assert redirected_to(conn) == "/"
     end
 
-    @tag :skip
-    test "renders finalize page with valid payment_intent", %{
-      conn: conn,
-      user: user
-    } do
-      # Skipped: Requires Ysc.Controllers.StripePaymentMethodHTML module and finalize.html.heex template
-      # Mock successful payment intent retrieval
-      Stripe.PaymentIntentMock
-      |> stub(:retrieve, fn "pi_test123", %{} ->
-        {:ok,
-         %Stripe.PaymentIntent{
-           id: "pi_test123",
-           client_secret: "pi_test123_secret_xxx",
-           amount: 5000,
-           currency: "usd",
-           status: "succeeded",
-           customer: user.stripe_id
-         }}
-      end)
-
-      conn =
-        conn
-        |> log_in_user(user)
-        |> get("/billing/user/#{user.id}/finalize", %{
-          "payment_intent" => "pi_test123"
-        })
-
-      assert html_response(conn, 200)
-      assert conn.assigns.props.payment_intent
-      assert conn.assigns.props.payment_intent.id == "pi_test123"
-    end
-
-    @tag :skip
-    test "renders finalize page with valid setup_intent", %{
-      conn: conn,
-      user: user
-    } do
-      # Skipped: Requires Ysc.Controllers.StripePaymentMethodHTML module and finalize.html.heex template
-      # Mock successful setup intent retrieval
-      Stripe.SetupIntentMock
-      |> stub(:retrieve, fn "seti_test123", %{} ->
-        {:ok,
-         %Stripe.SetupIntent{
-           id: "seti_test123",
-           client_secret: "seti_test123_secret_xxx",
-           status: "succeeded",
-           payment_method: "pm_test123",
-           customer: user.stripe_id
-         }}
-      end)
-
-      conn =
-        conn
-        |> log_in_user(user)
-        |> get("/billing/user/#{user.id}/finalize", %{
-          "setup_intent" => "seti_test123"
-        })
-
-      assert html_response(conn, 200)
-      assert conn.assigns.props.setup_intent
-      assert conn.assigns.props.setup_intent.id == "seti_test123"
-    end
-
     test "constructs correct URLs in props", %{conn: conn, user: user} do
       conn =
         conn
@@ -167,13 +104,8 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       assert response["error"] == "Invalid user ID format"
     end
 
-    @tag :skip
     test "returns 404 for non-existent user", %{conn: conn, user: user} do
-      # Skipped: Difficult to generate valid ULID that doesn't exist without
-      # understanding exact Ecto.ULID validation rules. The Cast Error test (400)
-      # already verifies invalid format handling, and in practice non-existent
-      # valid ULIDs would be caught by application logic before this controller.
-      non_existent_id = "7ZZZZZZZZZZZZZZZZZZZZZZZ"
+      non_existent_id = Ecto.ULID.generate()
 
       conn =
         conn
@@ -379,11 +311,8 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       assert response["error"] == "Invalid user ID format"
     end
 
-    @tag :skip
     test "setup_payment handles Ecto.NoResultsError", %{conn: conn, user: user} do
-      # Skipped: Same reason as "returns 404 for non-existent user" test
-      # ULID validation makes it difficult to generate valid but non-existent IDs
-      non_existent_id = "7ZZZZZZZZZZZZZZZZZZZZZZZ"
+      non_existent_id = Ecto.ULID.generate()
 
       conn =
         conn
