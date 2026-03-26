@@ -3482,6 +3482,7 @@ input[type="search"][list] {
 /* Hide scrollbar on the scroll-snap viewport across all browsers */
 
 [data-slider-viewport] {
+    -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     /* IE and Edge */
     scrollbar-width: none;

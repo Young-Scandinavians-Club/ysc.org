@@ -133,12 +133,12 @@ defmodule YscWeb.TicketQrLive do
               <%!-- Wider padding (1.5rem) gives the side notch circles room to breathe --%>
               <div
                 data-slider-viewport
-                style="display: flex; overflow-x: scroll; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none;"
+                class="flex overflow-x-scroll snap-x snap-mandatory"
               >
                 <%= for ticket <- @tickets do %>
                   <div
                     data-slide
-                    style="flex: 0 0 100%; scroll-snap-align: start; padding: 0 1.5rem;"
+                    class="shrink-0 basis-full snap-start px-6"
                   >
                     <%!-- Ticket: three joined sections — header / QR body / info stub --%>
                     <div class="shadow-2xl shadow-black/60">
@@ -177,10 +177,7 @@ defmodule YscWeb.TicketQrLive do
                       </div>
 
                       <%!-- ③ Perforation tear-line with side notches --%>
-                      <div
-                        class="bg-white relative flex items-center"
-                        style="height: 2rem;"
-                      >
+                      <div class="bg-white relative flex items-center h-8">
                         <div class="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-zinc-900">
                         </div>
                         <div class="absolute inset-x-6 border-t-2 border-dashed border-zinc-300">
@@ -280,7 +277,7 @@ defmodule YscWeb.TicketQrLive do
       </div>
 
       <%!-- Footer --%>
-      <div class="px-5 py-5 border-t border-white/10 text-center">
+      <div :if={!@load_error} class="px-5 py-5 border-t border-white/10 text-center">
         <p class="text-sm text-zinc-300">
           Show this QR code to event staff for check-in
         </p>
