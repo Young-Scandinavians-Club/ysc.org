@@ -65,7 +65,7 @@ defmodule YscWeb.NewsLive do
         <div id="featured" class="group">
           <.link
             navigate={~p"/posts/#{@featured.url_name}"}
-            class="block overflow-hidden rounded-xl border border-zinc-100 bg-white transition-colors duration-150 hover:border-zinc-200 sm:border-0 sm:bg-transparent"
+            class="block overflow-hidden rounded-xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
           >
             <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden">
               <%!-- Image container --%>
@@ -199,7 +199,7 @@ defmodule YscWeb.NewsLive do
           <div
             :for={{dom_id, post} <- @streams.posts}
             id={dom_id}
-            class="group flex flex-col bg-white rounded-xl p-4 border border-zinc-100 hover:border-zinc-200 transition-colors duration-150"
+            class="group flex flex-col bg-white rounded-xl p-4 border border-zinc-100 transition-all duration-300 hover:ring-2 hover:ring-blue-500"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
               <div class="relative aspect-[16/10] overflow-hidden rounded-xl mb-8">

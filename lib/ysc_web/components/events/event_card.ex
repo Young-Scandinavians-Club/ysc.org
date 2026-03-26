@@ -36,7 +36,7 @@ defmodule YscWeb.Components.Events.EventCard do
 
     ~H"""
     <div class={[
-      "group flex flex-col rounded-xl border transition-all duration-300 overflow-hidden relative",
+      "group flex flex-col rounded-xl border transition-all duration-300 overflow-hidden relative hover:ring-2 hover:ring-blue-500",
       if(@variant == "dark",
         do: "bg-zinc-800 border-zinc-700",
         else: "bg-white border-zinc-100"
