@@ -9,6 +9,8 @@ defmodule Ysc.Accounts.SmsCategories do
   @template_categories %{
     # Account notifications (can be disabled via account_notifications_sms)
     "booking_checkin_reminder" => :account,
+    # Event notifications (can be disabled via event_notifications_sms)
+    "event_notification" => :event,
     # Security notifications (should always be sent, bypassing notification preferences)
     "two_factor_verification" => :account,
     "email_changed" => :account,

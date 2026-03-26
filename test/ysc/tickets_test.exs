@@ -9,9 +9,18 @@ defmodule Ysc.TicketsTest do
   alias Ysc.Tickets.TicketOrder
   import Ysc.AccountsFixtures
 
+  defp user_fixture_unique(attrs \\ %{}) do
+    email =
+      Map.get_lazy(attrs, :email, fn ->
+        "tu#{:erlang.unique_integer([:positive, :monotonic])}@example.com"
+      end)
+
+    user_fixture(Map.put(attrs, :email, email))
+  end
+
   defp tickets_setup do
     Ysc.Ledgers.ensure_basic_accounts()
-    user = user_fixture()
+    user = user_fixture_unique()
 
     user =
       user
@@ -21,7 +30,7 @@ defmodule Ysc.TicketsTest do
       )
       |> Ysc.Repo.update!()
 
-    organizer = user_fixture()
+    organizer = user_fixture_unique()
 
     {:ok, event} =
       Ysc.Events.create_event(%{
@@ -85,7 +94,7 @@ defmodule Ysc.TicketsTest do
       tier1: tier1
     } do
       # Create user without membership
-      user = user_fixture()
+      user = user_fixture_unique()
       ticket_selections = %{tier1.id => 1}
 
       assert {:error, :membership_required} =
@@ -117,6 +126,41 @@ defmodule Ysc.TicketsTest do
                Tickets.create_ticket_order(user.id, event.id, %{
                  small_tier.id => 1
                })
+    end
+
+    test "returns error when event is cancelled", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:ok, cancelled_event} =
+               Ysc.Events.update_event(event, %{state: :cancelled})
+
+      assert {:error, :event_cancelled} =
+               Tickets.create_ticket_order(user.id, cancelled_event.id, %{
+                 tier1.id => 1
+               })
+    end
+
+    test "returns error when ticket tier id is unknown", %{
+      user: user,
+      event: event
+    } do
+      unknown_tier_id = Ecto.ULID.generate()
+
+      assert {:error, :tier_validation_failed} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 unknown_tier_id => 1
+               })
+    end
+
+    test "returns error when quantity is zero", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:error, :tier_validation_failed} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 0})
     end
   end
 
@@ -169,6 +213,11 @@ defmodule Ysc.TicketsTest do
   describe "list_user_ticket_orders/1" do
     setup do
       tickets_setup()
+    end
+
+    test "returns empty list when user has no orders" do
+      user = user_fixture_unique()
+      assert Tickets.list_user_ticket_orders(user.id) == []
     end
 
     test "returns ticket orders for user", %{
@@ -419,6 +468,293 @@ defmodule Ysc.TicketsTest do
       # Verify order is expired
       updated_order = Ysc.Repo.reload!(order)
       assert updated_order.status == :expired
+    end
+  end
+
+  describe "get_user_ticket_order/2 and get_user_ticket_order_by_*" do
+    setup do
+      tickets_setup()
+    end
+
+    test "get_user_ticket_order returns order for owner", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      found = Tickets.get_user_ticket_order(user.id, order.id)
+      assert found.id == order.id
+      assert Ecto.assoc_loaded?(found.tickets)
+    end
+
+    test "get_user_ticket_order returns nil for another user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      other = user_fixture_unique()
+      refute Tickets.get_user_ticket_order(other.id, order.id)
+    end
+
+    test "get_user_ticket_order_by_reference scopes to user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      other = user_fixture_unique()
+
+      refute Tickets.get_user_ticket_order_by_reference(
+               other.id,
+               order.reference_id
+             )
+
+      found =
+        Tickets.get_user_ticket_order_by_reference(user.id, order.reference_id)
+
+      assert found.id == order.id
+    end
+
+    test "get_user_ticket_order_by_payment_id scopes to user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(50, :USD),
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id: "pi_scope_test",
+          stripe_fee: Money.new(160, :USD),
+          description: "Test",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      order
+      |> TicketOrder.status_changeset(%{payment_id: payment.id})
+      |> Ysc.Repo.update!()
+
+      other = user_fixture_unique()
+      refute Tickets.get_user_ticket_order_by_payment_id(other.id, payment.id)
+
+      found = Tickets.get_user_ticket_order_by_payment_id(user.id, payment.id)
+      assert found.id == order.id
+    end
+  end
+
+  describe "complete_ticket_order/2 and cancel_ticket_order/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "complete_ticket_order marks order completed with payment_id", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: order.total_amount,
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id: "pi_complete_test",
+          stripe_fee: Money.new(160, :USD),
+          description: "Complete order",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, completed} = Tickets.complete_ticket_order(order, payment.id)
+      assert completed.status == :completed
+      assert completed.payment_id == payment.id
+      assert completed.completed_at != nil
+    end
+
+    test "cancel_ticket_order cancels order and tickets", %{
+      user: user,
+      event: event,
+      tier2: tier2
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier2.id => 2})
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(order, "changed mind")
+
+      assert cancelled.status == :cancelled
+
+      tickets =
+        Ysc.Repo.all(
+          from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+        )
+
+      assert Enum.all?(tickets, &(&1.status == :cancelled))
+    end
+  end
+
+  describe "validate_booking_capacity/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns :ok for valid selections", %{event: event, tier1: tier1} do
+      assert :ok ==
+               Tickets.validate_booking_capacity(event.id, %{tier1.id => 1})
+    end
+
+    test "returns {:error, :tier_capacity_exceeded} when tier qty too high", %{
+      event: event,
+      tier1: tier1
+    } do
+      assert {:error, :tier_capacity_exceeded} ==
+               Tickets.validate_booking_capacity(event.id, %{tier1.id => 10_000})
+    end
+  end
+
+  describe "list_user_ticket_orders_paginated/2 errors" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns error tuple for invalid Flop params", %{user: user} do
+      assert {:error, _} =
+               Tickets.list_user_ticket_orders_paginated(user.id, %{
+                 page: "not_a_number"
+               })
+    end
+  end
+
+  describe "expire_* checkout session helpers" do
+    setup do
+      tickets_setup()
+    end
+
+    test "expire_user, expire_event, and expire_all process pending sessions",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order_a} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      future_a = DateTime.add(DateTime.utc_now(), 60, :minute)
+
+      {1, _} =
+        Ysc.Repo.update_all(
+          from(to in TicketOrder, where: to.id == ^order_a.id),
+          set: [status: :pending, expires_at: future_a]
+        )
+
+      order_a = Ysc.Repo.reload!(order_a)
+      assert order_a.status == :pending
+
+      assert {:ok, 1} = Tickets.expire_user_pending_checkout_sessions(user.id)
+      assert Ysc.Repo.reload!(order_a).status == :expired
+
+      {:ok, order_b} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      future_b = DateTime.add(DateTime.utc_now(), 60, :minute)
+
+      {1, _} =
+        Ysc.Repo.update_all(
+          from(to in TicketOrder, where: to.id == ^order_b.id),
+          set: [status: :pending, expires_at: future_b]
+        )
+
+      assert {:ok, 1} = Tickets.expire_event_pending_checkout_sessions(event.id)
+      assert Ysc.Repo.reload!(order_b).status == :expired
+
+      {:ok, order_c} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      future_c = DateTime.add(DateTime.utc_now(), 60, :minute)
+
+      {1, _} =
+        Ysc.Repo.update_all(
+          from(to in TicketOrder, where: to.id == ^order_c.id),
+          set: [status: :pending, expires_at: future_c]
+        )
+
+      assert {:ok, count} = Tickets.expire_all_pending_checkout_sessions()
+      assert count >= 1
+      assert Ysc.Repo.reload!(order_c).status == :expired
+    end
+  end
+
+  describe "expire_ticket_order/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "expires a pending order and updates tickets", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+    end
+  end
+
+  describe "refund_tickets/3" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns error when no matching tickets to refund", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:error, {:error, :no_valid_tickets}} ==
+               Tickets.refund_tickets(order, [Ecto.ULID.generate()], "test")
+    end
+  end
+
+  describe "PubSub subscribe helpers" do
+    test "subscribe/0, subscribe/1, and subscribe_event/1 register listeners" do
+      uid = Ecto.ULID.generate()
+      eid = Ecto.ULID.generate()
+
+      assert :ok == Tickets.subscribe()
+      assert :ok == Tickets.subscribe(uid)
+      assert :ok == Tickets.subscribe_event(eid)
+    end
+  end
+
+  describe "event_at_capacity?/1 map variant" do
+    setup do
+      tickets_setup()
+    end
+
+    test "uses id from map for capacity check", %{event: event} do
+      map = %{id: event.id, max_attendees: 10_000}
+      refute Tickets.event_at_capacity?(map)
     end
   end
 end

@@ -7,6 +7,7 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorkerTest do
   alias YscWeb.Workers.SaveTheDateNotificationWorker
   alias Ysc.Events
   alias Ysc.Events.Event
+  alias YscWeb.Emails.{Notifier, SaveTheDateAvailable}
   import Ysc.AccountsFixtures
 
   defp make_job(event_id) do
@@ -43,6 +44,37 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorkerTest do
   end
 
   describe "perform/1" do
+    test "sends to multiple subscribers and completes successfully", %{
+      organizer: organizer
+    } do
+      sub_a = user_fixture(%{event_notifications: true})
+      sub_b = user_fixture(%{event_notifications: true})
+      event = tbd_event(organizer)
+
+      Events.subscribe_to_event_notification(
+        event,
+        sub_a.id,
+        "save_the_date"
+      )
+
+      Events.subscribe_to_event_notification(
+        event,
+        sub_b.id,
+        "save_the_date"
+      )
+
+      event
+      |> Event.changeset(%{tickets_tbd: false})
+      |> Ysc.Repo.update!()
+
+      assert :ok = SaveTheDateNotificationWorker.perform(make_job(event.id))
+
+      assert Events.get_event_notification_subscribers(
+               event.id,
+               "save_the_date"
+             ) == []
+    end
+
     test "returns :ok and sends emails to subscribers", %{organizer: organizer} do
       subscriber = user_fixture(%{event_notifications: true})
       event = tbd_event(organizer)
@@ -120,6 +152,37 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorkerTest do
 
       result = SaveTheDateNotificationWorker.perform(make_job(event.id))
       assert result == :ok
+    end
+
+    test "returns :ok when subscriber email already has idempotent job (duplicate insert)",
+         %{organizer: organizer} do
+      subscriber = user_fixture(%{event_notifications: true})
+      event = tbd_event(organizer)
+
+      Events.subscribe_to_event_notification(
+        event,
+        subscriber.id,
+        "save_the_date"
+      )
+
+      event
+      |> Event.changeset(%{tickets_tbd: false})
+      |> Ysc.Repo.update!()
+
+      email_data = SaveTheDateAvailable.prepare_email_data(event, subscriber)
+
+      assert %Oban.Job{} =
+               Notifier.schedule_email(
+                 subscriber.email,
+                 "save_the_date_available_#{event.id}_#{subscriber.id}",
+                 SaveTheDateAvailable.get_subject(event),
+                 SaveTheDateAvailable.get_template_name(),
+                 email_data,
+                 "",
+                 subscriber.id
+               )
+
+      assert :ok = SaveTheDateNotificationWorker.perform(make_job(event.id))
     end
 
     test "handles missing event gracefully" do

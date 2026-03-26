@@ -701,4 +701,322 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert html =~ "hero-ticket"
     end
   end
+
+  describe "ticket refund display" do
+    test "shows Refunded badge for cancelled ticket in a confirmed order", %{
+      conn: conn
+    } do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      ticket = create_ticket(order, tier)
+
+      {:ok, ticket} =
+        ticket
+        |> Events.Ticket.status_changeset(%{status: :cancelled})
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "Refunded"
+      assert html =~ ticket.reference_id
+    end
+  end
+
+  describe "cancelled orders" do
+    test "shows cancelled heading and copy", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{title: "Winter Gala"})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      {:ok, order} =
+        order
+        |> Tickets.TicketOrder.status_changeset(%{
+          status: :cancelled,
+          cancelled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "Order Cancelled"
+      assert html =~ "Winter Gala"
+    end
+
+    test "cancelled order shows x-circle icon", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      {:ok, order} =
+        order
+        |> Tickets.TicketOrder.status_changeset(%{
+          status: :cancelled,
+          cancelled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "hero-x-circle"
+    end
+  end
+
+  describe "navigation handlers" do
+    test "close redirects to event page", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert {:error, {:redirect, %{to: path}}} = render_click(view, "close")
+      assert path == "/events/#{event.id}"
+    end
+  end
+
+  describe "ticket counts and badges" do
+    test "single ticket shows Ticket in badge", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "1 Ticket"
+    end
+
+    test "multiple tickets show Tickets plural", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket1 = create_ticket(order, tier)
+      _ticket2 = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "2 Tickets"
+    end
+  end
+
+  describe "event fields edge cases" do
+    test "event without cover image shows gradient placeholder", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{with_image: false})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "from-blue-500"
+    end
+
+    test "event without start_time shows Time TBD", %{conn: conn} do
+      user = create_user_with_membership()
+
+      event =
+        create_event(%{
+          start_time: nil
+        })
+
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "Time TBD"
+    end
+
+    test "event without location shows TBD", %{conn: conn} do
+      user = create_user_with_membership()
+
+      event =
+        create_event(%{
+          location_name: nil,
+          address: nil
+        })
+
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "TBD"
+    end
+  end
+
+  describe "discounts and order totals" do
+    test "order with discount shows subtotal and discount lines", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+
+      order =
+        create_ticket_order(user, event, %{
+          total_amount: Money.new(4000, :USD),
+          discount_amount: Money.new(1000, :USD)
+        })
+
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "Subtotal"
+      assert html =~ "Discount"
+    end
+  end
+
+  describe "page structure and identity" do
+    test "root element has order-confirmation id", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(view, "#order-confirmation")
+    end
+
+    test "uses Member when first name is nil", %{conn: conn} do
+      user = create_user_with_membership()
+
+      {:ok, user} =
+        user |> Ecto.Changeset.change(%{first_name: nil}) |> Repo.update()
+
+      event = create_event(%{title: "Club Night"})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "See you at the Event, Member"
+    end
+
+    test "meta description assign reflected in page", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "ticket order confirmation" or
+               html =~ "Young Scandinavians"
+    end
+  end
+
+  describe "async refund loading" do
+    test "render_async completes for cancelled order", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      {:ok, order} =
+        order
+        |> Tickets.TicketOrder.status_changeset(%{
+          status: :cancelled,
+          cancelled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      render_async(view)
+      html = render(view)
+      assert html =~ "Order Cancelled"
+    end
+  end
+
+  describe "registration and ticket tiers" do
+    test "ticket tier with registration shows registration block when detail exists",
+         %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+
+      tier =
+        create_ticket_tier(event, %{
+          requires_registration: true,
+          name: "Workshop"
+        })
+
+      order = create_ticket_order(user, event)
+
+      {:ok, ticket} =
+        %Events.Ticket{}
+        |> Events.Ticket.changeset(%{
+          ticket_order_id: order.id,
+          ticket_tier_id: tier.id,
+          event_id: event.id,
+          user_id: user.id,
+          reference_id: "TKT-#{System.unique_integer()}",
+          status: :confirmed,
+          expires_at: DateTime.add(DateTime.utc_now(), 30, :minute)
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %Events.TicketDetail{}
+        |> Events.TicketDetail.changeset(%{
+          ticket_id: ticket.id,
+          first_name: "Reg",
+          last_name: "User",
+          email: "reg@example.com"
+        })
+        |> Repo.insert()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "Registration Details"
+      assert html =~ "Reg"
+    end
+  end
 end

@@ -2,11 +2,53 @@ defmodule YscWeb.Workers.ImageProcessorTest do
   @moduledoc """
   Tests for ImageProcessor worker module.
   """
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   alias Ysc.Media
   alias YscWeb.Workers.ImageProcessor
   import Ysc.TestDataFactory
+
+  defmodule ServeTextPlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      conn
+      |> put_resp_content_type("text/plain")
+      |> send_resp(200, "not a valid image")
+    end
+  end
+
+  defmodule Serve404Plug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      conn
+      |> put_resp_content_type("text/plain")
+      |> send_resp(404, "missing")
+    end
+  end
+
+  defp start_http_server(plug_module) do
+    {:ok, socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+
+    ref = :"image_processor_http_#{port}_#{System.unique_integer([:positive])}"
+
+    {:ok, _} = Plug.Cowboy.http(plug_module, [], port: port, ref: ref)
+
+    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
+
+    port
+  end
 
   describe "perform/1" do
     test "returns error when image is not found" do
@@ -25,24 +67,57 @@ defmodule YscWeb.Workers.ImageProcessorTest do
       assert {:error, "Image not found"} = result
     end
 
-    test "returns error for non-existent image ID" do
-      fake_id = Ecto.ULID.generate()
+    test "sets image processing_state to failed when downloaded bytes fail image validation" do
+      _ = Application.ensure_all_started(:inets)
+      port = start_http_server(ServeTextPlug)
+
+      image =
+        create_test_image(%{
+          raw_image_path: "http://127.0.0.1:#{port}/fake.jpg",
+          processing_state: "unprocessed"
+        })
 
       job = %Oban.Job{
         id: 1,
-        args: %{"id" => fake_id},
+        args: %{"id" => image.id},
         worker: "YscWeb.Workers.ImageProcessor",
         queue: "media",
         state: "available",
         attempt: 1
       }
 
-      result = ImageProcessor.perform(job)
-      assert {:error, "Image not found"} = result
+      assert match?({:error, _}, ImageProcessor.perform(job))
+
+      updated = Media.fetch_image(image.id)
+      assert updated.processing_state == :failed
+    end
+
+    test "sets image processing_state to failed when HTTP response is not saved to file" do
+      _ = Application.ensure_all_started(:inets)
+      port = start_http_server(Serve404Plug)
+
+      image =
+        create_test_image(%{
+          raw_image_path: "http://127.0.0.1:#{port}/missing.jpg",
+          processing_state: "unprocessed"
+        })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"id" => image.id},
+        worker: "YscWeb.Workers.ImageProcessor",
+        queue: "media",
+        state: "available",
+        attempt: 1
+      }
+
+      assert match?({:error, _}, ImageProcessor.perform(job))
+
+      updated = Media.fetch_image(image.id)
+      assert updated.processing_state == :failed
     end
 
     test "sets image processing_state to failed when download fails" do
-      # URL that will fail immediately (connection refused; nothing on port 1)
       raw_url = "http://127.0.0.1:1/image.jpg"
 
       image =

@@ -10,8 +10,18 @@ defmodule Ysc.SubscriptionsTest do
   alias Ysc.Subscriptions.Subscription
   import Ysc.AccountsFixtures
 
+  # Monotonic unique emails avoid rare collisions when many tests run async.
+  defp user_fixture_unique(attrs \\ %{}) do
+    email =
+      Map.get_lazy(attrs, :email, fn ->
+        "u#{:erlang.unique_integer([:positive, :monotonic])}@example.com"
+      end)
+
+    user_fixture(Map.put(attrs, :email, email))
+  end
+
   setup do
-    user = user_fixture()
+    user = user_fixture_unique()
     %{user: user}
   end
 
@@ -30,6 +40,14 @@ defmodule Ysc.SubscriptionsTest do
 
       assert sub.stripe_id == "sub_123"
       assert sub.stripe_status == "active"
+    end
+
+    test "create_subscription/1 returns error when required fields are missing",
+         %{
+           user: user
+         } do
+      assert {:error, %Ecto.Changeset{}} =
+               Subscriptions.create_subscription(%{user_id: user.id})
     end
 
     test "active?/1 returns true for active/trialing with valid dates" do
@@ -204,6 +222,11 @@ defmodule Ysc.SubscriptionsTest do
       assert found.id == subscription.id
     end
 
+    test "get_subscription/1 returns nil for unknown id" do
+      unknown_id = Ecto.ULID.generate()
+      assert Subscriptions.get_subscription(unknown_id) == nil
+    end
+
     test "get_subscription_by_stripe_id/1 returns subscription", %{user: user} do
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -216,6 +239,85 @@ defmodule Ysc.SubscriptionsTest do
 
       found = Subscriptions.get_subscription_by_stripe_id("sub_stripe_123")
       assert found.id == subscription.id
+    end
+
+    test "get_subscription_by_stripe_id/1 returns nil when not found" do
+      assert Subscriptions.get_subscription_by_stripe_id(
+               "sub_does_not_exist_12345"
+             ) ==
+               nil
+    end
+
+    test "get_active_subscription/1 returns nil when user has no subscriptions" do
+      user = user_fixture_unique()
+      assert Subscriptions.get_active_subscription(user) == nil
+    end
+
+    test "get_active_subscription/1 returns the active subscription when present",
+         %{user: user} do
+      future = DateTime.add(DateTime.utc_now(), 30, :day)
+
+      {:ok, sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_active_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: future,
+          ends_at: nil
+        })
+
+      found = Subscriptions.get_active_subscription(user)
+      assert found.id == sub.id
+    end
+
+    test "change_membership_plan/3 returns error for lifetime plan" do
+      assert {:error, "Lifetime memberships cannot be changed"} =
+               Subscriptions.change_membership_plan(
+                 %{type: :lifetime},
+                 "price_123",
+                 :upgrade
+               )
+    end
+
+    test "change_membership_plan/3 returns error when subscription is nil" do
+      assert {:error, "No active subscription found"} =
+               Subscriptions.change_membership_plan(nil, "price_123", :upgrade)
+    end
+
+    test "create_subscription/1 returns error when required fields missing" do
+      assert {:error, changeset} = Subscriptions.create_subscription(%{})
+      refute changeset.valid?
+    end
+
+    test "update_subscription/2 returns error when unique stripe_id violated",
+         %{
+           user: user
+         } do
+      {:ok, sub_a} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_unique_a_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "A",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, sub_b} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_unique_b_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "B",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert {:error, changeset} =
+               Subscriptions.update_subscription(sub_b, %{
+                 stripe_id: sub_a.stripe_id
+               })
+
+      refute changeset.valid?
     end
 
     test "update_subscription/2 updates subscription", %{user: user} do
@@ -398,14 +500,14 @@ defmodule Ysc.SubscriptionsTest do
 
   describe "create_subscription_paid_out_of_band/2" do
     test "returns {:error, :invalid_plan} for :lifetime plan" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       assert Subscriptions.create_subscription_paid_out_of_band(user, :lifetime) ==
                {:error, :invalid_plan}
     end
 
     test "returns {:error, :invalid_plan} for unknown plan id" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       assert Subscriptions.create_subscription_paid_out_of_band(
                user,
@@ -415,7 +517,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:error, :sub_accounts_cannot_create_subscriptions} for sub-account" do
-      primary = user_fixture()
+      primary = user_fixture_unique()
 
       sub_account =
         %User{}
@@ -442,7 +544,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:error, :user_already_has_active_subscription} when user has active subscription" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, _existing_sub} =
         Subscriptions.create_subscription(%{
@@ -458,7 +560,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "creates subscription and returns {:ok, subscription} when callback returns fake Stripe subscription" do
-      user = user_fixture()
+      user = user_fixture_unique()
       membership_plans = Application.get_env(:ysc, :membership_plans, [])
       single_plan = Enum.find(membership_plans, &(&1.id == :single))
       assert single_plan != nil
@@ -500,7 +602,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "creates family subscription when callback returns fake Stripe subscription for family plan" do
-      user = user_fixture()
+      user = user_fixture_unique()
       membership_plans = Application.get_env(:ysc, :membership_plans, [])
       family_plan = Enum.find(membership_plans, &(&1.id == :family))
       assert family_plan != nil
@@ -538,7 +640,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns callback error when callback returns {:error, reason}" do
-      user = user_fixture(%{stripe_id: "cus_test"})
+      user = user_fixture_unique(%{stripe_id: "cus_test"})
       callback = fn _user, _plan -> {:error, :stripe_api_error} end
 
       try do
@@ -611,7 +713,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:error, _} when downgrading with sub-accounts" do
-      primary = user_fixture()
+      primary = user_fixture_unique()
 
       plans = Application.get_env(:ysc, :membership_plans, [])
       single_plan = Enum.find(plans, &(&1.id == :single))
@@ -665,7 +767,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:scheduled, subscription} for downgrade when callback returns scheduled" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -709,7 +811,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:ok, subscription} for upgrade when callback returns ok" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -758,7 +860,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:ok, subscription} when cancelling scheduled downgrade (same plan) - callback releases" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -805,7 +907,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns nil when callback returns nil" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -832,7 +934,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns scheduled downgrade info when callback returns it" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -872,7 +974,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:ok, subscription} when callback succeeds" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -903,7 +1005,7 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:error, :no_scheduled_downgrade} when callback returns nil for schedule" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
@@ -929,6 +1031,312 @@ defmodule Ysc.SubscriptionsTest do
       after
         Application.delete_env(:ysc, :cancel_scheduled_downgrade_callback)
       end
+    end
+  end
+
+  describe "subscription_struct_from_stripe_subscription/2 and subscription_item_structs_from_stripe_items/2" do
+    test "builds a valid subscription changeset from a Stripe subscription", %{
+      user: user
+    } do
+      now = System.os_time(:second)
+      period_end = now + 86_400
+
+      stripe_sub = %Stripe.Subscription{
+        id: "sub_struct_#{System.unique_integer([:positive])}",
+        status: "active",
+        start_date: now,
+        current_period_start: now,
+        current_period_end: period_end,
+        trial_end: nil,
+        ended_at: nil
+      }
+
+      cs =
+        Subscriptions.subscription_struct_from_stripe_subscription(
+          user,
+          stripe_sub
+        )
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :stripe_id) == stripe_sub.id
+      assert Ecto.Changeset.get_field(cs, :user_id) == user.id
+    end
+
+    test "maps Stripe subscription items to subscription item changesets", %{
+      user: user
+    } do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_items_map",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      stripe_items = [
+        %{
+          id: "si_1",
+          price: %{id: "price_x", product: "prod_y"},
+          quantity: 2
+        }
+      ]
+
+      changesets =
+        Subscriptions.subscription_item_structs_from_stripe_items(
+          stripe_items,
+          subscription
+        )
+
+      assert length(changesets) == 1
+      cs = hd(changesets)
+      assert Ecto.Changeset.get_field(cs, :stripe_id) == "si_1"
+      assert Ecto.Changeset.get_field(cs, :stripe_price_id) == "price_x"
+      assert Ecto.Changeset.get_field(cs, :quantity) == 2
+    end
+  end
+
+  describe "create_subscription_from_stripe/2" do
+    test "creates local subscription and items from a Stripe payload", %{
+      user: user
+    } do
+      now = System.os_time(:second)
+      period_end = now + 365 * 86_400
+
+      stripe_sub = %Stripe.Subscription{
+        id: "sub_from_stripe_#{System.unique_integer([:positive])}",
+        status: "active",
+        start_date: now,
+        current_period_start: now,
+        current_period_end: period_end,
+        trial_end: nil,
+        ended_at: nil,
+        items: %Stripe.List{
+          data: [
+            %{
+              id: "si_new_#{System.unique_integer([:positive])}",
+              price: %{id: "price_from_stripe", product: "prod_from_stripe"},
+              quantity: 1
+            }
+          ],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      assert {:ok, %Subscription{} = sub} =
+               Subscriptions.create_subscription_from_stripe(user, stripe_sub)
+
+      assert sub.stripe_id == stripe_sub.id
+      assert sub.user_id == user.id
+      items = Ysc.Repo.preload(sub, :subscription_items).subscription_items
+      assert length(items) == 1
+      assert hd(items).stripe_price_id == "price_from_stripe"
+    end
+
+    test "returns existing subscription when stripe_id already exists", %{
+      user: user
+    } do
+      {:ok, existing} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_dup_check",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      stripe_sub = %Stripe.Subscription{
+        id: "sub_dup_check",
+        status: "active",
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 1000,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/items"
+        }
+      }
+
+      assert {:ok, returned} =
+               Subscriptions.create_subscription_from_stripe(user, stripe_sub)
+
+      assert returned.id == existing.id
+      assert returned.stripe_id == "sub_dup_check"
+    end
+  end
+
+  describe "mark_as_cancelled/1 and cancel/resume error variants" do
+    test "mark_as_cancelled/1 sets stripe_status to cancelled", %{user: user} do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_mark_cancel",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert {:ok, updated} = Subscriptions.mark_as_cancelled(subscription)
+      assert updated.stripe_status == "cancelled"
+    end
+
+    test "cancel/2 returns error for lifetime map" do
+      assert {:error, msg} = Subscriptions.cancel(%{type: :lifetime}, [])
+      assert msg =~ "Lifetime"
+    end
+
+    test "cancel/2 returns error for nil" do
+      assert {:error, "No subscription to cancel"} =
+               Subscriptions.cancel(nil, [])
+    end
+
+    test "resume/1 returns error for lifetime map" do
+      assert {:error, msg} = Subscriptions.resume(%{type: :lifetime})
+      assert msg =~ "Lifetime"
+    end
+
+    test "resume/1 returns error for nil" do
+      assert {:error, "No subscription to resume"} = Subscriptions.resume(nil)
+    end
+  end
+
+  describe "get_active_subscription/1 edge cases" do
+    test "returns nil when user only has inactive subscriptions", %{user: user} do
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_inactive_only",
+          stripe_status: "canceled",
+          name: "Old",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      refute Subscriptions.get_active_subscription(user)
+    end
+
+    test "returns nil when user has no subscriptions", %{user: user} do
+      refute Subscriptions.get_active_subscription(user)
+    end
+  end
+
+  describe "scheduled_for_cancellation?/1 and get_scheduled_downgrade_info/1 for lifetime" do
+    test "scheduled_for_cancellation? returns false for lifetime map" do
+      refute Subscriptions.scheduled_for_cancellation?(%{type: :lifetime})
+    end
+
+    test "get_scheduled_downgrade_info returns nil for lifetime map" do
+      assert Subscriptions.get_scheduled_downgrade_info(%{type: :lifetime}) ==
+               nil
+    end
+  end
+
+  describe "subscribe_membership_updates/1" do
+    test "subscribes the process to the membership PubSub topic", %{user: user} do
+      topic = "memberships:user:#{user.id}"
+      :ok = Subscriptions.subscribe_membership_updates(user.id)
+      assert Phoenix.PubSub.subscribe(Ysc.PubSub, topic) == :ok
+      Phoenix.PubSub.broadcast(Ysc.PubSub, topic, :ping)
+      assert_receive :ping
+    end
+  end
+
+  describe "retry_failed_invoice/2" do
+    test "returns error for non-binary invoice id" do
+      user = user_fixture_unique(%{stripe_id: "cus_x"})
+
+      assert Subscriptions.retry_failed_invoice(user, nil) ==
+               {:error, :invalid_invoice_id}
+    end
+  end
+
+  describe "status helpers and list isolation" do
+    test "active?/1 returns false for non-active stripe_status" do
+      future = DateTime.add(DateTime.utc_now(), 30, :day)
+
+      refute Subscriptions.active?(%Subscription{
+               stripe_status: "past_due",
+               current_period_end: future,
+               ends_at: nil
+             })
+    end
+
+    test "cancelled?/1 returns false for default branch when period and ends_at are nil" do
+      refute Subscriptions.cancelled?(%Subscription{
+               stripe_status: "past_due",
+               ends_at: nil,
+               current_period_end: nil
+             })
+    end
+
+    test "scheduled_for_cancellation?/1 is true for trialing with future ends_at" do
+      future = DateTime.add(DateTime.utc_now(), 30, :day)
+
+      assert Subscriptions.scheduled_for_cancellation?(%Subscription{
+               stripe_status: "trialing",
+               ends_at: future,
+               current_period_end: future
+             })
+    end
+
+    test "cancelled?/1 returns false when ends_at is nil and period_end is nil" do
+      refute Subscriptions.cancelled?(%Subscription{
+               stripe_status: "active",
+               ends_at: nil,
+               current_period_end: nil
+             })
+    end
+
+    test "list_subscriptions/1 only returns subscriptions for the given user" do
+      u1 = user_fixture_unique()
+      u2 = user_fixture_unique()
+
+      {:ok, sub1} =
+        Subscriptions.create_subscription(%{
+          user_id: u1.id,
+          stripe_id: "sub_iso_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "A",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _sub2} =
+        Subscriptions.create_subscription(%{
+          user_id: u2.id,
+          stripe_id: "sub_iso_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "B",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      ids = Subscriptions.list_subscriptions(u1) |> Enum.map(& &1.id)
+      assert sub1.id in ids
+
+      refute Enum.any?(
+               Subscriptions.list_subscriptions(u1),
+               &(&1.user_id == u2.id)
+             )
+    end
+
+    test "create_subscription_item/1 returns error when attrs are invalid", %{
+      user: user
+    } do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_item_bad_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert {:error, %Ecto.Changeset{}} =
+               Subscriptions.create_subscription_item(%{
+                 subscription_id: subscription.id
+               })
     end
   end
 end

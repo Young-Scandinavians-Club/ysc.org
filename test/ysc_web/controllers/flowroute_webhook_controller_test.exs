@@ -10,8 +10,10 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
   """
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts.User
   alias YscWeb.FlowrouteWebhookController
   alias Ysc.Sms
   alias Ysc.Repo
@@ -291,6 +293,436 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       assert sms_received.is_mms == true
     end
+
+    test "handles HELP command", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-help-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "HELP"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      assert Sms.get_sms_received_by_provider_id(:flowroute, "mdr2-help-123") !=
+               nil
+    end
+
+    test "opt-out from unknown number still returns 200", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-unknown-stop-123",
+          from: "19999999999",
+          to: "12061231234",
+          body: "STOP"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+    end
+
+    test "stores nil provider_timestamp when timestamp is not ISO8601", %{
+      conn: conn
+    } do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-bad-ts-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "no timestamp",
+          timestamp: "not-a-real-timestamp"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(:flowroute, "mdr2-bad-ts-123")
+
+      assert sms_received.provider_timestamp == nil
+    end
+
+    test "parses amount_nanodollars when sent as a string", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-nano-str-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "paid",
+          amount_nanodollars: "42000"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(:flowroute, "mdr2-nano-str-123")
+
+      assert sms_received.amount_nanodollars == 42_000
+    end
+
+    test "normalizes outbound direction", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-outbound-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "Outbound leg",
+          direction: "outbound"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(:flowroute, "mdr2-outbound-123")
+
+      assert sms_received.direction == :outbound
+    end
+
+    test "normalizes unknown received status to nil", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-unknown-status-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "Test",
+          status: "weird-status"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(
+          :flowroute,
+          "mdr2-unknown-status-123"
+        )
+
+      assert sms_received.status == nil
+    end
+
+    test "normalizes unknown direction string to inbound", %{conn: conn} do
+      mid = "mdr2-dir-unknown-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_inbound_sms_payload(
+          message_id: mid,
+          from: "14155551234",
+          to: "12061231234",
+          body: "Hi",
+          direction: "carrier-specific"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received = Sms.get_sms_received_by_provider_id(:flowroute, mid)
+      assert sms_received.direction == :inbound
+    end
+
+    test "stores nil amount_nanodollars when value is not an integer or string",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-nano-obj-#{System.unique_integer([:positive])}"
+
+      payload =
+        put_in(
+          build_inbound_sms_payload(
+            message_id: mid,
+            from: "14155551234",
+            to: "12061231234",
+            body: "x"
+          ),
+          ["data", "attributes", "amount_nanodollars"],
+          %{}
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received = Sms.get_sms_received_by_provider_id(:flowroute, mid)
+      assert sms_received.amount_nanodollars == nil
+    end
+
+    test "accepts nil body and still processes inbound SMS", %{conn: conn} do
+      mid = "mdr2-nil-body-#{System.unique_integer([:positive])}"
+
+      payload =
+        put_in(
+          build_inbound_sms_payload(
+            message_id: mid,
+            from: "14155551234",
+            to: "12061231234",
+            body: "placeholder"
+          ),
+          ["data", "attributes", "body"],
+          nil
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received = Sms.get_sms_received_by_provider_id(:flowroute, mid)
+      assert sms_received.body == nil
+    end
+
+    test "parses amount_nanodollars when sent as integer", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-nano-int-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "paid",
+          amount_nanodollars: 99_000
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(:flowroute, "mdr2-nano-int-123")
+
+      assert sms_received.amount_nanodollars == 99_000
+    end
+
+    test "stores nil amount_nanodollars when value is a non-integer JSON number",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-nano-float-#{System.unique_integer([:positive])}"
+
+      payload =
+        put_in(
+          build_inbound_sms_payload(
+            message_id: mid,
+            from: "14155551234",
+            to: "12061231234",
+            body: "paid"
+          ),
+          ["data", "attributes", "amount_nanodollars"],
+          42_000.5
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received = Sms.get_sms_received_by_provider_id(:flowroute, mid)
+      assert sms_received.amount_nanodollars == nil
+    end
+
+    test "returns 500 when amount_nanodollars is not parseable as integer", %{
+      conn: conn
+    } do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-nano-bad-#{System.unique_integer([:positive])}",
+          from: "14155551234",
+          to: "12061231234",
+          body: "paid",
+          amount_nanodollars: "12.34"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 500
+      assert conn.resp_body == "Internal error"
+    end
+
+    test "treats non-command body as normal inbound SMS", %{conn: conn} do
+      from_e164 = unique_user_phone() |> String.trim_leading("+")
+
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-chat-#{System.unique_integer([:positive])}",
+          from: from_e164,
+          to: "12061231234",
+          body: "Thanks for the reminder about tonight!"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "normalizes inbound received status pending", %{conn: conn} do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-pending-in-#{System.unique_integer([:positive])}",
+          from: "14155551234",
+          to: "12061231234",
+          body: "Hi",
+          status: "pending"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(
+          :flowroute,
+          get_in(payload, ["data", "id"])
+        )
+
+      assert sms_received.status == :pending
+    end
+
+    test "normalizes inbound received status delivered", %{conn: conn} do
+      mid = "mdr2-delivered-in-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_inbound_sms_payload(
+          message_id: mid,
+          from: "14155551234",
+          to: "12061231234",
+          body: "Hi",
+          status: "delivered"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received = Sms.get_sms_received_by_provider_id(:flowroute, mid)
+      assert sms_received.status == :delivered
+    end
+
+    test "normalizes inbound received status failed", %{conn: conn} do
+      mid = "mdr2-failed-in-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_inbound_sms_payload(
+          message_id: mid,
+          from: "14155551234",
+          to: "12061231234",
+          body: "Hi",
+          status: "failed"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received = Sms.get_sms_received_by_provider_id(:flowroute, mid)
+      assert sms_received.status == :failed
+    end
+
+    test "returns 400 when data is nil", %{conn: conn} do
+      conn =
+        FlowrouteWebhookController.handle_inbound_sms(conn, %{"data" => nil})
+
+      assert conn.status == 400
+      assert conn.resp_body == "Invalid payload"
+    end
+
+    test "returns 400 when data has id but attributes are missing", %{
+      conn: conn
+    } do
+      conn =
+        FlowrouteWebhookController.handle_inbound_sms(conn, %{
+          "data" => %{"id" => "mdr2-no-attrs"}
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Invalid payload"
+    end
+
+    test "returns 200 when opt-in cannot update prefs but still sends opt-in SMS",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{phone_number: "+14155551234"})
+
+      {1, _} =
+        Repo.update_all(from(u in User, where: u.id == ^user.id),
+          set: [account_notifications: false]
+        )
+
+      mid = "mdr2-optin-pref-err-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_inbound_sms_payload(
+          message_id: mid,
+          from: "14155551234",
+          to: "12061231234",
+          body: "START"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "returns 200 when opt-out cannot update prefs but still sends opt-out SMS",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{phone_number: "+14155551234"})
+
+      {1, _} =
+        Repo.update_all(from(u in User, where: u.id == ^user.id),
+          set: [account_notifications: false]
+        )
+
+      mid = "mdr2-optout-pref-err-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_inbound_sms_payload(
+          message_id: mid,
+          from: "14155551234",
+          to: "12061231234",
+          body: "STOP"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "defaults inbound direction when direction key is absent", %{
+      conn: conn
+    } do
+      payload =
+        build_inbound_sms_payload(
+          message_id: "mdr2-dir-default-123",
+          from: "14155551234",
+          to: "12061231234",
+          body: "Hi"
+        )
+
+      attrs = Map.delete(payload["data"]["attributes"], "direction")
+      payload = put_in(payload, ["data", "attributes"], attrs)
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+
+      sms_received =
+        Sms.get_sms_received_by_provider_id(
+          :flowroute,
+          "mdr2-dir-default-123"
+        )
+
+      assert sms_received.direction == :inbound
+    end
   end
 
   describe "handle_delivery_receipt/2" do
@@ -447,6 +879,7 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
         Sms.get_sms_message_by_provider_id(:flowroute, "mdr2-status-update-123")
 
       assert hd(receipts).sms_message_id == updated_sms.id
+      assert updated_sms.status == :delivered
     end
 
     test "updates SMS message status to failed from delivery receipt", %{
@@ -481,6 +914,100 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       assert length(receipts) == 1
       assert hd(receipts).status == :failed
+
+      updated_sms =
+        Sms.get_sms_message_by_provider_id(:flowroute, "mdr2-fail-update-123")
+
+      assert updated_sms.status == :failed
+    end
+
+    test "updates SMS message status to sent from message sent DLR", %{
+      conn: conn
+    } do
+      mid = "mdr2-sent-dlr-#{System.unique_integer([:positive])}"
+
+      {:ok, _sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "message sent"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert updated.status == :sent
+    end
+
+    test "updates SMS message status to sent from pending DLR (default status mapping)",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-pending-dlr-#{System.unique_integer([:positive])}"
+
+      {:ok, _sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "pending"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert updated.status == :sent
+    end
+
+    test "updates SMS message status to buffered from message buffered DLR", %{
+      conn: conn
+    } do
+      mid = "mdr2-buffered-sms-#{System.unique_integer([:positive])}"
+
+      {:ok, sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "message buffered"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert updated.id == sms_message.id
+      assert updated.status == :buffered
     end
 
     test "returns 400 for invalid delivery receipt payload", %{conn: conn} do
@@ -531,6 +1058,137 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       assert hd(receipts).provider_timestamp == ~U[2025-12-05 14:30:00Z]
     end
+
+    test "creates delivery receipt for pending status", %{conn: conn} do
+      mid = "mdr2-dlr-pending-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "pending"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      receipts = Sms.list_delivery_receipts_for_message(:flowroute, mid)
+      assert length(receipts) == 1
+      assert hd(receipts).status == :pending
+    end
+
+    test "normalizes unknown delivery receipt status to pending", %{conn: conn} do
+      mid = "mdr2-dlr-unknown-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "carrier-specific-unknown"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      receipts = Sms.list_delivery_receipts_for_message(:flowroute, mid)
+      assert length(receipts) == 1
+      assert hd(receipts).status == :pending
+    end
+
+    test "returns 400 when delivery receipt data is nil", %{conn: conn} do
+      conn =
+        FlowrouteWebhookController.handle_delivery_receipt(conn, %{
+          "data" => nil
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Invalid payload"
+    end
+
+    test "returns 400 when delivery receipt has id but attributes are missing",
+         %{
+           conn: conn
+         } do
+      conn =
+        FlowrouteWebhookController.handle_delivery_receipt(conn, %{
+          "data" => %{"id" => "dlr-no-attrs"}
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Invalid payload"
+    end
+
+    test "stores nil provider_timestamp when DLR timestamp is invalid ISO8601",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-dlr-invalid-ts-#{System.unique_integer([:positive])}"
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "delivered",
+          timestamp: "2025-13-45T99:99:99Z"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      receipts = Sms.list_delivery_receipts_for_message(:flowroute, mid)
+      assert hd(receipts).provider_timestamp == nil
+    end
+
+    test "returns 400 when duplicate delivery receipt for same id and timestamp",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-dlr-dup-#{System.unique_integer([:positive])}"
+      ts = "2025-12-05T10:00:00Z"
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "delivered",
+          timestamp: ts
+        )
+
+      assert FlowrouteWebhookController.handle_delivery_receipt(conn, payload).status ==
+               200
+
+      conn2 =
+        FlowrouteWebhookController.handle_delivery_receipt(
+          build_conn(),
+          payload
+        )
+
+      assert conn2.status == 400
+      assert conn2.resp_body == "Failed to process"
+    end
+
+    test "accepts atom status in delivery receipt attributes (normalize atom pass-through)",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-dlr-atom-#{System.unique_integer([:positive])}"
+
+      payload = %{
+        "data" => %{
+          "id" => mid,
+          "attributes" => %{
+            "status" => :delivered,
+            "status_code" => "0"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      receipts = Sms.list_delivery_receipts_for_message(:flowroute, mid)
+      assert hd(receipts).status == :delivered
+    end
   end
 
   # Helper functions to build FlowRoute webhook payloads
@@ -568,6 +1226,61 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
           "body" => Keyword.get(opts, :body),
           "level" => Keyword.get(opts, :level),
           "timestamp" => Keyword.get(opts, :timestamp)
+        }
+      }
+    }
+  end
+end
+
+defmodule YscWeb.FlowrouteWebhookControllerSmsSendErrorTest do
+  @moduledoc """
+  Tests that require `Application.put_env(:ysc, :flowroute_test_raise, ...)` (async: false).
+  """
+  use YscWeb.ConnCase, async: false
+
+  alias YscWeb.FlowrouteWebhookController
+
+  setup do
+    Cachex.clear(:ysc_cache)
+    on_exit(fn -> Application.delete_env(:ysc, :flowroute_test_raise) end)
+    :ok
+  end
+
+  describe "handle_inbound_sms/2" do
+    test "returns 200 when SMS response send fails (send_response_sms error path)",
+         %{
+           conn: conn
+         } do
+      Application.put_env(:ysc, :flowroute_test_raise, {:runtime, "sms boom"})
+
+      payload =
+        build_help_payload(
+          "mdr2-help-raise-#{System.unique_integer([:positive])}"
+        )
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+  end
+
+  defp build_help_payload(message_id) do
+    %{
+      "data" => %{
+        "id" => message_id,
+        "attributes" => %{
+          "from" => "14155551234",
+          "to" => "12061231234",
+          "body" => "HELP",
+          "is_mms" => false,
+          "direction" => "inbound",
+          "status" => nil,
+          "message_type" => "sms",
+          "message_encoding" => 0,
+          "timestamp" => nil,
+          "amount_display" => nil,
+          "amount_nanodollars" => nil
         }
       }
     }

@@ -4,7 +4,17 @@ defmodule Ysc.AccountsFixtures do
   entities via the `Ysc.Accounts` context.
   """
 
-  def unique_user_email, do: "user#{System.unique_integer()}@example.com"
+  def unique_user_email, do: "user-#{Ecto.UUID.generate()}@example.com"
+
+  def unique_user_phone do
+    n = System.unique_integer([:monotonic, :positive])
+
+    # Valid NANP: +1 + area code 206 (Seattle) + exchange 200-299 (starts with 2) + 4-digit station
+    exchange = 200 + rem(div(n, 10_000), 100)
+    station = rem(n, 10_000)
+    "+1206#{exchange}#{String.pad_leading(Integer.to_string(station), 4, "0")}"
+  end
+
   def valid_user_password, do: "hello world!"
   def valid_user_first_name, do: "John"
   def valid_user_last_name, do: "Doe"
@@ -17,7 +27,7 @@ defmodule Ysc.AccountsFixtures do
       password: valid_user_password(),
       first_name: valid_user_first_name(),
       last_name: valid_user_last_name(),
-      phone_number: "+14159098268",
+      phone_number: unique_user_phone(),
       state: "active",
       role: "member"
     })
@@ -55,7 +65,7 @@ defmodule Ysc.AccountsFixtures do
         email: unique_user_email(),
         first_name: valid_user_first_name(),
         last_name: valid_user_last_name(),
-        phone_number: "+14159098268",
+        phone_number: unique_user_phone(),
         state: :active,
         role: :member,
         hashed_password: nil,

@@ -1,5 +1,5 @@
 defmodule YscWeb.Workers.EmailNotifierTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: false
 
   alias YscWeb.Emails.Notifier
   alias YscWeb.Workers.EmailNotifier
@@ -90,6 +90,44 @@ defmodule YscWeb.Workers.EmailNotifierTest do
                })
 
       assert_email_sent(subject: "Legacy Subject")
+    end
+
+    test "handles legacy args with optional reply_to", %{user: user} do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-LEG-RT",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      reply = "legacy-reply-#{System.unique_integer()}@example.com"
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => "legacy_reply_#{System.unique_integer()}",
+                 "subject" => "Legacy With Reply-To",
+                 "template" => "booking_confirmation",
+                 "params" => params,
+                 "text_body" => "Text body",
+                 "user_id" => user.id,
+                 "reply_to" => reply
+               })
+
+      assert_email_sent(subject: "Legacy With Reply-To", reply_to: reply)
     end
 
     test "skips email if user notification preference is disabled", %{
@@ -366,6 +404,445 @@ defmodule YscWeb.Workers.EmailNotifierTest do
                  where: m.idempotency_key == ^key,
                  select: count()
              ) == 1
+    end
+
+    test "returns error for completely invalid job args" do
+      assert {:error, "Invalid job args: missing required fields"} =
+               perform_job(EmailNotifier, %{"foo" => "bar"})
+    end
+
+    test "normalizes tuple recipient to email string", %{user: user} do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-TUPLE",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      job = %Oban.Job{
+        id: System.unique_integer([:positive]),
+        args: %{
+          "recipient" => {"Display Name", user.email},
+          "idempotency_key" => "tuple_recipient_#{System.unique_integer()}",
+          "subject" => "Tuple Recipient",
+          "template" => "booking_confirmation",
+          "params" => params,
+          "text_body" => "Text body",
+          "user_id" => user.id,
+          "category" => "bookings"
+        },
+        attempt: 1
+      }
+
+      assert :ok = EmailNotifier.perform(job)
+
+      assert_email_sent(subject: "Tuple Recipient", to: {nil, user.email})
+    end
+
+    test "normalizes list recipient with {name, email} tuple", %{user: user} do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-TUPLE-LIST",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      job = %Oban.Job{
+        id: System.unique_integer([:positive]),
+        args: %{
+          "recipient" => [{"Display", user.email}],
+          "idempotency_key" =>
+            "tuple_list_recipient_#{System.unique_integer()}",
+          "subject" => "Tuple List Recipient",
+          "template" => "booking_confirmation",
+          "params" => params,
+          "text_body" => "Text body",
+          "user_id" => user.id,
+          "category" => "bookings"
+        },
+        attempt: 1
+      }
+
+      assert :ok = EmailNotifier.perform(job)
+
+      assert_email_sent(subject: "Tuple List Recipient", to: {nil, user.email})
+    end
+
+    test "sends email when user_id is nil (board-style jobs skip preference check)" do
+      params = %{
+        first_name: "Board",
+        booking: %{
+          reference_id: "REF-NIL-USER",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => "board-style@example.com",
+                 "idempotency_key" => "nil_user_#{System.unique_integer()}",
+                 "subject" => "Nil User Subject",
+                 "template" => "booking_confirmation",
+                 "params" => params,
+                 "text_body" => "Text body",
+                 "user_id" => nil,
+                 "category" => "bookings"
+               })
+
+      assert_email_sent(
+        subject: "Nil User Subject",
+        to: {nil, "board-style@example.com"}
+      )
+    end
+
+    test "normalizes unexpected recipient map via inspect fallback", %{
+      user: user
+    } do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-WEIRD",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      weird = %{not_a: "normal_recipient", email: user.email}
+
+      job = %Oban.Job{
+        id: System.unique_integer([:positive]),
+        args: %{
+          "recipient" => weird,
+          "idempotency_key" => "weird_recipient_#{System.unique_integer()}",
+          "subject" => "Weird Recipient",
+          "template" => "booking_confirmation",
+          "params" => params,
+          "text_body" => "Text body",
+          "user_id" => user.id,
+          "category" => "bookings"
+        },
+        attempt: 1
+      }
+
+      assert :ok = EmailNotifier.perform(job)
+
+      assert_email_sent(subject: "Weird Recipient")
+    end
+
+    test "normalizes list recipient with bare email string", %{user: user} do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-LIST",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => [user.email],
+                 "idempotency_key" =>
+                   "list_recipient_#{System.unique_integer()}",
+                 "subject" => "List Recipient",
+                 "template" => "booking_confirmation",
+                 "params" => params,
+                 "text_body" => "Text body",
+                 "user_id" => user.id,
+                 "category" => "bookings"
+               })
+
+      assert_email_sent(subject: "List Recipient", to: {nil, user.email})
+    end
+
+    test "legacy job args without user_id are invalid (inner invalid-args branch)" do
+      assert {:error, "Invalid job args: missing required fields"} =
+               perform_job(EmailNotifier, %{
+                 "recipient" => "legacy-no-uid@example.com",
+                 "idempotency_key" => "leg_no_uid_#{System.unique_integer()}",
+                 "subject" => "Legacy Subject",
+                 "template" => "booking_confirmation",
+                 "params" => %{},
+                 "text_body" => "Text body"
+               })
+    end
+
+    test "normalizes list recipient with nil head via inspect fallback", %{
+      user: user
+    } do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-NIL-HEAD",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      job = %Oban.Job{
+        id: System.unique_integer([:positive]),
+        queue: "mailers",
+        worker: "YscWeb.Workers.EmailNotifier",
+        state: :executing,
+        attempt: 1,
+        args: %{
+          "recipient" => [nil, user.email],
+          "idempotency_key" => "nil_head_list_#{System.unique_integer()}",
+          "subject" => "Nil head list",
+          "template" => "booking_confirmation",
+          "params" => params,
+          "text_body" => "Text body",
+          "user_id" => user.id,
+          "category" => "bookings"
+        }
+      }
+
+      assert :ok = EmailNotifier.perform(job)
+
+      assert_email_sent(subject: "Nil head list")
+    end
+
+    test "perform logs job metadata when job struct includes queue and worker",
+         %{
+           user: user
+         } do
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-META",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      job = %Oban.Job{
+        id: System.unique_integer([:positive]),
+        queue: "mailers",
+        worker: "YscWeb.Workers.EmailNotifier",
+        state: :available,
+        attempt: 1,
+        args: %{
+          "recipient" => user.email,
+          "idempotency_key" => "meta_job_#{System.unique_integer()}",
+          "subject" => "Meta job struct",
+          "template" => "booking_confirmation",
+          "params" => params,
+          "text_body" => "Text body",
+          "user_id" => user.id,
+          "category" => "bookings"
+        }
+      }
+
+      assert :ok = EmailNotifier.perform(job)
+
+      assert_email_sent(subject: "Meta job struct")
+    end
+  end
+
+  describe "perform/1 invalid args" do
+    test "returns error tuple when required keys are missing" do
+      assert {:error, "Invalid job args: missing required fields"} =
+               perform_job(EmailNotifier, %{
+                 "recipient" => "a@example.com",
+                 "template" => "booking_confirmation"
+               })
+    end
+  end
+
+  describe "perform/1 when Mailer.deliver fails" do
+    setup do
+      prev = Application.get_env(:ysc, Ysc.Mailer) || []
+
+      on_exit(fn ->
+        Application.put_env(:ysc, Ysc.Mailer, prev)
+      end)
+
+      {:ok, mailer_config: prev}
+    end
+
+    test "returns {:error, reason} when run_send_message_idempotent cannot deliver",
+         %{
+           mailer_config: mailer_config
+         } do
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config, adapter: Ysc.Test.FailingSwooshAdapter)
+      )
+
+      user = user_fixture()
+      key = "notifier_inline_fail_#{System.unique_integer()}"
+
+      params = %{
+        first_name: "John",
+        booking: %{
+          reference_id: "REF-FAIL-INLINE",
+          property: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          checkout_date: "Jan 5, 2024",
+          guests_count: 2,
+          children_count: 0,
+          booking_mode: "Room Booking",
+          room_names: "Room 1",
+          nights: 4,
+          is_buyout: false,
+          booking_mode_raw: "room"
+        },
+        total_amount: "$100.00",
+        booking_date: "Dec 25, 2023",
+        booking_url: "http://example.com/bookings/123"
+      }
+
+      assert {:error, "failed to send email"} =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => key,
+                 "subject" => "Inline Mailer Failure",
+                 "template" => "booking_confirmation",
+                 "params" => params,
+                 "text_body" => "Text body",
+                 "user_id" => user.id,
+                 "category" => "bookings"
+               })
+
+      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: key
+             ) == nil
+    end
+  end
+
+  describe "atomize_keys/1" do
+    test "recurses into nested maps and lists" do
+      input = %{
+        "outer" => %{
+          "inner" => "v"
+        },
+        "items" => [%{"a" => 1}, %{"b" => 2}]
+      }
+
+      result = EmailNotifier.atomize_keys(input)
+
+      assert result.outer.inner == "v"
+      assert [first, second] = result.items
+      assert first.a == 1
+      assert second.b == 2
+    end
+
+    test "keeps string keys that are not existing atoms" do
+      weird_key = "zz_unknown_atom_key_#{System.unique_integer()}"
+      result = EmailNotifier.atomize_keys(%{weird_key => "keep"})
+
+      assert Map.get(result, weird_key) == "keep"
+    end
+
+    test "passes through non-map, non-list values" do
+      assert EmailNotifier.atomize_keys(:atom) == :atom
+      assert EmailNotifier.atomize_keys(42) == 42
+    end
+  end
+
+  describe "perform/1 additional templates" do
+    setup do
+      user = user_fixture()
+      %{user: user}
+    end
+
+    test "sends password_changed template", %{user: user} do
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => "pwd_#{System.unique_integer()}",
+                 "subject" => "Your password was changed",
+                 "template" => "password_changed",
+                 "params" => %{"first_name" => "Pat"},
+                 "text_body" => "",
+                 "user_id" => user.id,
+                 "category" => "account"
+               })
+
+      assert_email_sent(subject: "Your password was changed")
     end
   end
 end

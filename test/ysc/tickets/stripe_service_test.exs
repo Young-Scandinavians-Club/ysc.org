@@ -33,6 +33,12 @@ defmodule Ysc.Tickets.StripeServiceTest do
       Ysc.Tickets.create_ticket_order(user.id, event.id, ticket_selections)
 
     # Configure Stripe client mock
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
     %{user: user, ticket_order: ticket_order}

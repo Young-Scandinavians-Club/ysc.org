@@ -1107,6 +1107,14 @@ defmodule Ysc.Ledgers do
     end
   end
 
+  defp ledger_refund_email_notifier do
+    Application.get_env(
+      :ysc,
+      :ledger_refund_email_notifier,
+      YscWeb.Emails.Notifier
+    )
+  end
+
   defp send_refund_email(refund, payment) do
     require Ysc.Logging
 
@@ -1270,7 +1278,7 @@ defmodule Ysc.Ledgers do
 
           # Schedule email
           result =
-            YscWeb.Emails.Notifier.schedule_email(
+            ledger_refund_email_notifier().schedule_email(
               ticket_order.user.email,
               idempotency_key,
               YscWeb.Emails.TicketOrderRefund.get_subject(),

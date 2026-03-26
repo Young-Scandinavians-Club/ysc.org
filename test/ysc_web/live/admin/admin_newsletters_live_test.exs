@@ -198,6 +198,70 @@ defmodule YscWeb.AdminNewslettersLiveTest do
   # Navigation
   # ---------------------------------------------------------------------------
 
+  describe "subscribers tab" do
+    setup [:create_admin]
+
+    test "loads subscribers list after async fetch", %{conn: conn} do
+      Newsletter.subscribe("sub-tab-#{System.unique_integer()}@example.com",
+        source: "test"
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=subscribers")
+      html = render_async(view)
+
+      assert html =~ "sub-tab-"
+      assert html =~ "Subscribers" or html =~ "subscriber"
+    end
+
+    test "switch-tab patches URL for editions", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=subscribers")
+
+      view
+      |> element(
+        "button[phx-click='switch-tab'][phx-value-tab='editions']",
+        "Editions"
+      )
+      |> render_click()
+
+      assert_patch(view, ~p"/admin/newsletters?tab=editions")
+    end
+  end
+
+  describe "edition broadcast" do
+    setup [:create_admin]
+
+    test "inserts edition into stream when edition_sent is broadcast", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin, %{"title" => "Broadcast Edition"})
+      edition = Newsletter.get_edition!(edition.id)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+
+      :ok = Newsletter.broadcast_edition_sent(edition)
+
+      html = render(view)
+      assert html =~ "Broadcast Edition"
+    end
+  end
+
+  describe "handle_async load_subscribers exit" do
+    setup [:create_admin]
+
+    test "handles subscriber load task exit without crashing", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=subscribers")
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, _socket} =
+               YscWeb.AdminNewslettersLive.handle_async(
+                 :load_subscribers,
+                 {:exit, :test_reason},
+                 socket
+               )
+    end
+  end
+
   describe "navigation" do
     setup [:create_admin]
 

@@ -128,6 +128,22 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
       assert reloaded.status == :sent
     end
 
+    test "processes a :sending edition the same as draft/scheduled", %{
+      edition: edition
+    } do
+      subscribe("sending-status@example.com")
+
+      {:ok, sending} =
+        Newsletter.update_edition(edition, %{"status" => :sending})
+
+      assert sending.status == :sending
+
+      assert :ok = perform_job(NewsletterSender, %{edition_id: edition.id})
+
+      reloaded = Newsletter.get_edition!(edition.id)
+      assert reloaded.status == :sent
+    end
+
     test "skips a :sent edition and does not double-send", %{edition: edition} do
       {:ok, _} = Newsletter.update_edition(edition, %{"status" => :sent})
       subscribe("member@example.com")
@@ -140,6 +156,15 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
 
     test "returns :ok when edition_id is missing" do
       assert :ok = perform_job(NewsletterSender, %{})
+    end
+
+    test "accepts edition_id as atom key in job args", %{edition: edition} do
+      subscribe("atom-key@example.com")
+
+      assert :ok = perform_job(NewsletterSender, %{edition_id: edition.id})
+
+      reloaded = Newsletter.get_edition!(edition.id)
+      assert reloaded.status == :sent
     end
 
     test "returns :ok when edition does not exist" do
@@ -164,6 +189,27 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
       :ok = perform_job(NewsletterSender, %{edition_id: edition.id})
 
       assert_email_sent(subject: "[YSC] This week")
+    end
+
+    test "handles nil intro_text in plain text fallback", %{edition: edition} do
+      {:ok, _} = Newsletter.update_edition(edition, %{"intro_text" => nil})
+      subscribe("nil-intro@example.com")
+
+      assert :ok = perform_job(NewsletterSender, %{edition_id: edition.id})
+
+      reloaded = Newsletter.get_edition!(edition.id)
+      assert reloaded.status == :sent
+    end
+
+    test "accepts edition_id as string key (JSON-style args)", %{
+      edition: edition
+    } do
+      subscribe("string-key-edition@example.com")
+
+      assert :ok =
+               perform_job(NewsletterSender, %{"edition_id" => edition.id})
+
+      assert Newsletter.get_edition!(edition.id).status == :sent
     end
   end
 

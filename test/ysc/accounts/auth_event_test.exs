@@ -431,6 +431,23 @@ defmodule Ysc.Accounts.AuthEventTest do
       refute changeset.valid?
       assert changeset.errors[:threat_indicators] != nil
     end
+
+    test "lists multiple invalid threat indicators in the error" do
+      attrs = %{
+        event_type: "login_success",
+        success: true,
+        email_attempted: "test@example.com",
+        ip_address: "127.0.0.1",
+        threat_indicators: ["bad_one", "bad_two"]
+      }
+
+      changeset = AuthEvent.changeset(%AuthEvent{}, attrs)
+
+      refute changeset.valid?
+      {msg, _} = changeset.errors[:threat_indicators]
+      assert msg =~ "bad_one"
+      assert msg =~ "bad_two"
+    end
   end
 
   describe "risk score calculation" do
@@ -797,6 +814,211 @@ defmodule Ysc.Accounts.AuthEventTest do
       assert session_timeframe.session_start == login_event.inserted_at
       assert session_timeframe.session_end == logout_event.inserted_at
       assert session_timeframe.is_active == false
+    end
+  end
+
+  describe "parse_user_agent/1" do
+    test "returns unknown for non-binary input" do
+      assert %{device_type: "unknown", browser: nil, operating_system: nil} ==
+               AuthEvent.parse_user_agent(nil)
+    end
+
+    test "classifies mobile user agents" do
+      parsed = AuthEvent.parse_user_agent("Mozilla/5.0 Mobile/15E148 Safari")
+
+      assert parsed.device_type == "mobile"
+      assert parsed.browser == "Safari"
+    end
+
+    test "classifies tablet user agents" do
+      parsed = AuthEvent.parse_user_agent("Mozilla/5.0 iPad")
+
+      assert parsed.device_type == "tablet"
+    end
+
+    test "detects Firefox and Windows from desktop user agent" do
+      parsed =
+        AuthEvent.parse_user_agent(
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0"
+        )
+
+      assert parsed.device_type == "desktop"
+      assert parsed.browser == "Firefox"
+      assert parsed.operating_system == "Windows"
+    end
+
+    test "detects Edge browser" do
+      parsed =
+        AuthEvent.parse_user_agent(
+          "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Edge/18.19041"
+        )
+
+      assert parsed.browser == "Edge"
+      assert parsed.operating_system == "Windows"
+    end
+
+    test "detects Opera browser" do
+      parsed =
+        AuthEvent.parse_user_agent(
+          "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Opera/77.0"
+        )
+
+      assert parsed.browser == "Opera"
+    end
+
+    test "uses Unknown browser when no known token matches" do
+      parsed = AuthEvent.parse_user_agent("CustomBot/1.0 (compatible)")
+      assert parsed.browser == "Unknown"
+    end
+
+    test "detects Linux on desktop user agent" do
+      parsed =
+        AuthEvent.parse_user_agent(
+          "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/115.0"
+        )
+
+      assert parsed.device_type == "desktop"
+      assert parsed.operating_system == "Linux"
+    end
+  end
+
+  describe "query helpers" do
+    test "recent_failed_attempts_query/2 returns matching rows from the database" do
+      user = user_fixture()
+
+      {:ok, _} =
+        AuthEvent.login_failure_changeset(%{
+          email_attempted: user.email,
+          ip_address: "198.51.100.10",
+          failure_reason: "invalid_credentials"
+        })
+        |> Repo.insert()
+
+      q = AuthEvent.recent_failed_attempts_query("198.51.100.10", 15)
+      rows = Repo.all(q)
+
+      assert length(rows) == 1
+      assert hd(rows).event_type == "login_failure"
+    end
+
+    test "recent_failed_attempts_query/2 returns a query" do
+      q = AuthEvent.recent_failed_attempts_query("203.0.113.1", 20)
+
+      assert %Ecto.Query{} = q
+    end
+
+    test "recent_failed_attempts_for_email_query/2 returns a query" do
+      q = AuthEvent.recent_failed_attempts_for_email_query("u@example.com", 5)
+
+      assert %Ecto.Query{} = q
+    end
+
+    test "user_login_history_query/2 returns a query" do
+      user = user_fixture()
+      q = AuthEvent.user_login_history_query(user, 10)
+
+      assert %Ecto.Query{} = q
+    end
+
+    test "suspicious_events_query/1 returns a query" do
+      q = AuthEvent.suspicious_events_query(25)
+
+      assert %Ecto.Query{} = q
+    end
+  end
+
+  describe "preset changesets" do
+    test "login_failure_changeset sets failure event fields" do
+      changeset =
+        AuthEvent.login_failure_changeset(%{
+          failure_reason: "invalid_credentials",
+          email_attempted: "nouser@example.com"
+        })
+
+      assert changeset.changes.event_type == "login_failure"
+      assert changeset.changes.success == false
+      assert changeset.valid?
+    end
+
+    test "login_success_changeset sets user and event fields" do
+      user = user_fixture()
+
+      changeset =
+        AuthEvent.login_success_changeset(user, %{ip_address: "192.168.1.1"})
+
+      assert changeset.valid?
+      assert changeset.changes.user_id == user.id
+      assert changeset.changes.event_type == "login_success"
+      assert changeset.changes.success == true
+      assert changeset.changes.email_attempted == user.email
+    end
+
+    test "password_reset_request_changeset sets event fields" do
+      user = user_fixture()
+      changeset = AuthEvent.password_reset_request_changeset(user)
+
+      assert changeset.valid?
+      assert changeset.changes.event_type == "password_reset_request"
+      assert changeset.changes.success == true
+    end
+
+    test "password_reset_success_changeset sets event fields" do
+      user = user_fixture()
+      changeset = AuthEvent.password_reset_success_changeset(user)
+
+      assert changeset.valid?
+      assert changeset.changes.event_type == "password_reset_success"
+    end
+
+    test "account_locked_changeset sets locked event and failure reason" do
+      user = user_fixture()
+      changeset = AuthEvent.account_locked_changeset(user)
+
+      assert changeset.valid?
+      assert changeset.changes.event_type == "account_locked"
+      assert changeset.changes.success == false
+      assert changeset.changes.failure_reason == "too_many_attempts"
+    end
+
+    test "suspicious_activity_changeset sets suspicious activity fields" do
+      changeset =
+        AuthEvent.suspicious_activity_changeset(%{
+          email_attempted: "a@b.com",
+          threat_indicators: ["unusual_location"]
+        })
+
+      assert changeset.changes.event_type == "suspicious_activity"
+      assert changeset.changes.is_suspicious == true
+      assert changeset.valid?
+    end
+  end
+
+  describe "changeset edge cases" do
+    test "sanitizes malformed UTF-8 in string fields" do
+      attrs = %{
+        event_type: "login_success",
+        success: true,
+        user_agent: "Mozilla/5.0" <> <<255>>
+      }
+
+      changeset = AuthEvent.changeset(%AuthEvent{}, attrs)
+
+      assert changeset.valid?
+      assert is_binary(changeset.changes.user_agent)
+    end
+
+    test "sanitizes incomplete UTF-8 in user_agent" do
+      incomplete = "Mozilla/5.0" <> <<226>>
+
+      changeset =
+        AuthEvent.changeset(%AuthEvent{}, %{
+          event_type: "login_success",
+          success: true,
+          user_agent: incomplete
+        })
+
+      assert changeset.valid?
+      assert is_binary(changeset.changes.user_agent)
     end
   end
 

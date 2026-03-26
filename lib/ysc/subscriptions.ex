@@ -1539,12 +1539,12 @@ defmodule Ysc.Subscriptions do
   def retry_failed_invoice(user, invoice_id) when is_binary(invoice_id) do
     require Ysc.Logging
 
-    # Retrieve the invoice from Stripe to verify it exists and belongs to the user
+    invoice_mod = stripe_invoice_module()
+
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Invoice.retrieve(invoice_id)
+           invoice_mod.retrieve(invoice_id)
          end) do
       {:ok, invoice} ->
-        # Verify the invoice belongs to the user
         customer_id = invoice.customer
 
         if customer_id != user.stripe_id do
@@ -1557,7 +1557,6 @@ defmodule Ysc.Subscriptions do
 
           {:error, :unauthorized}
         else
-          # Check if invoice is already paid
           if invoice.status == "paid" do
             Ysc.Logging.info("Invoice is already paid",
               user_id: user.id,
@@ -1566,7 +1565,6 @@ defmodule Ysc.Subscriptions do
 
             {:error, :already_paid}
           else
-            # Check if invoice is open and can be paid
             if invoice.status != "open" do
               Ysc.Logging.warning("Invoice is not in a payable state",
                 user_id: user.id,
@@ -1576,17 +1574,17 @@ defmodule Ysc.Subscriptions do
 
               {:error, :invalid_invoice_status}
             else
-              # Attempt to pay the invoice
               Ysc.Logging.info("Attempting to retry payment for invoice",
                 user_id: user.id,
                 invoice_id: invoice_id
               )
 
               case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                     Stripe.Invoice.pay(invoice_id, %{})
+                     invoice_mod.pay(invoice_id, %{})
                    end) do
                 {:ok, paid_invoice} ->
-                  Ysc.Logging.info("Successfully retried payment for invoice",
+                  Ysc.Logging.info(
+                    "Successfully retried payment for invoice",
                     user_id: user.id,
                     invoice_id: invoice_id,
                     invoice_status: paid_invoice.status
@@ -1628,6 +1626,10 @@ defmodule Ysc.Subscriptions do
 
   def retry_failed_invoice(_user, _invoice_id),
     do: {:error, :invalid_invoice_id}
+
+  defp stripe_invoice_module do
+    Application.get_env(:ysc, :stripe_invoice_module, Stripe.Invoice)
+  end
 
   ## PubSub Functions
 

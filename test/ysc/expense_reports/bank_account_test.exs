@@ -309,6 +309,83 @@ defmodule Ysc.ExpenseReports.BankAccountTest do
     end
   end
 
+  describe "get_decrypted_details/1 and to_safe_map/1" do
+    test "get_decrypted_details includes decrypted fields" do
+      user = user_fixture()
+
+      {:ok, account} =
+        %BankAccount{}
+        |> BankAccount.changeset(%{
+          user_id: user.id,
+          routing_number: "021000021",
+          account_number: "1234567890"
+        })
+        |> Ysc.Repo.insert()
+
+      details = BankAccount.get_decrypted_details(account)
+
+      assert details.account_number == "1234567890"
+      assert details.routing_number == "021000021"
+      assert details.account_number_last_4 == "7890"
+      assert details.user_id == user.id
+    end
+
+    test "to_safe_map omits sensitive account and routing numbers" do
+      user = user_fixture()
+
+      {:ok, account} =
+        %BankAccount{}
+        |> BankAccount.changeset(%{
+          user_id: user.id,
+          routing_number: "021000021",
+          account_number: "1234567890"
+        })
+        |> Ysc.Repo.insert()
+
+      safe = BankAccount.to_safe_map(account)
+
+      assert map_size(safe) == 5
+      refute Map.has_key?(safe, :account_number)
+      refute Map.has_key?(safe, :routing_number)
+      assert safe.account_number_last_4 == "7890"
+    end
+
+    test "rejects non-USD routing number type after cast" do
+      user = user_fixture()
+
+      changeset =
+        %BankAccount{}
+        |> BankAccount.changeset(%{
+          user_id: user.id,
+          routing_number: 123_456_789,
+          account_number: "1234567890"
+        })
+
+      refute changeset.valid?
+      assert has_error?(changeset, :routing_number)
+    end
+
+    test "accepts update without re-validating routing checksum when routing unchanged" do
+      user = user_fixture()
+
+      {:ok, account} =
+        %BankAccount{}
+        |> BankAccount.changeset(%{
+          user_id: user.id,
+          routing_number: "021000021",
+          account_number: "1234567890"
+        })
+        |> Ysc.Repo.insert()
+
+      cs =
+        BankAccount.changeset(account, %{
+          account_number_last_4: "7890"
+        })
+
+      assert cs.valid?
+    end
+  end
+
   # Helper function to check for errors
   defp has_error?(changeset, field) do
     Keyword.has_key?(changeset.errors, field)

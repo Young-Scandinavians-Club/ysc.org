@@ -4,6 +4,69 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
 
+  alias Ecto.Adapters.SQL.Sandbox
+  alias Ysc.Repo
+
+  describe "malformed query params" do
+    test "parses checkin and checkout when query string arrives as a single key",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 45)
+      checkout = Date.add(checkin, 3)
+
+      malformed_key =
+        "checkin_date=#{Date.to_iso8601(checkin)}&checkout_date=#{Date.to_iso8601(checkout)}"
+
+      path = "/bookings/clear-lake?" <> URI.encode_query([{malformed_key, ""}])
+
+      {:ok, view, _html} = live(conn, path)
+      state = :sys.get_state(view.pid)
+
+      assert state.socket.assigns.checkin_date == checkin
+      assert state.socket.assigns.checkout_date == checkout
+    end
+  end
+
+  describe "switch-info-tab" do
+    test "patches URL when changing information sub-tab", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/clear-lake?tab=information")
+
+      render_click(view, "switch-info-tab", %{"tab" => "rules"})
+      patched = assert_patch(view)
+      decoded = URI.decode(patched)
+      assert decoded =~ "info_tab" and decoded =~ "rules"
+    end
+
+    test "patches URL when switching information sub-tab back to general", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      path =
+        "/bookings/clear-lake?" <>
+          URI.encode_query(%{"tab" => "information", "info_tab" => "rules"})
+
+      {:ok, view, _html} = live(conn, path)
+
+      render_click(view, "switch-info-tab", %{"tab" => "general"})
+      patched = assert_patch(view)
+      decoded = URI.decode(patched)
+
+      assert decoded =~ "tab=information"
+      # Default info tab (:general) is omitted from the query string
+      refute decoded =~ "info_tab="
+    end
+  end
+
   describe "mount/3 - unauthenticated" do
     test "loads page successfully", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
@@ -712,6 +775,28 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       html = render(view)
       assert html =~ "Clear Lake"
+    end
+
+    test "handles date-changed with checkin and checkout in one change event",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      render_change(view, "date-changed", %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout)
+      })
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.checkin_date == checkin
+      assert state.socket.assigns.checkout_date == checkout
     end
   end
 
@@ -1960,6 +2045,292 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Summer" and html =~ "Winter"
       assert html =~ "sleeping lawn" or html =~ "under the stars"
       assert html =~ "Indoor beds"
+    end
+  end
+
+  describe "handle_params fragment, tab guards, and rules content" do
+    test "patching only the URL fragment updates scroll_to_section", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?tab=information")
+
+      render_patch(view, "/bookings/clear-lake?tab=information#amenities")
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.scroll_to_section == "amenities"
+    end
+
+    test "patching away from a fragment clears scroll_to_section", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?tab=information")
+
+      render_patch(view, "/bookings/clear-lake?tab=information#amenities")
+
+      assert :sys.get_state(view.pid).socket.assigns.scroll_to_section ==
+               "amenities"
+
+      render_patch(view, "/bookings/clear-lake?tab=information")
+
+      assert :sys.get_state(view.pid).socket.assigns.scroll_to_section == nil
+    end
+
+    test "user without membership cannot switch to booking tab", %{conn: conn} do
+      user = user_with_membership(:none)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      render_click(view, "switch-tab", %{"tab" => "booking"})
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.active_tab == :information
+    end
+
+    test "information rules sub-tab renders house rules content", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} =
+        live(conn, ~p"/bookings/clear-lake?tab=information&info_tab=rules")
+
+      assert html =~ "No Pets"
+    end
+
+    test "switch-tab with unknown tab value leaves active tab unchanged", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      before_tab = :sys.get_state(view.pid).socket.assigns.active_tab
+
+      render_click(view, "switch-tab", %{"tab" => "not-a-real-tab"})
+
+      assert :sys.get_state(view.pid).socket.assigns.active_tab == before_tab
+    end
+  end
+
+  describe "active bookings and booking UI" do
+    test "renders active complete Clear Lake bookings for the signed-in user",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      today = Date.utc_today()
+      checkin = Date.add(today, 3)
+      checkout = Date.add(today, 6)
+
+      {:ok, booking} =
+        %Ysc.Bookings.Booking{}
+        |> Ysc.Bookings.Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            booking_mode: :day,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            status: :complete,
+            guests_count: 2,
+            total_price: Money.new(100, :USD)
+          },
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      html = render(view)
+
+      assert html =~ "Active Bookings"
+      assert html =~ booking.reference_id
+    end
+
+    test "day mode with valid dates shows booking type and summary labels",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
+
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      html = render(view)
+
+      assert html =~ "Booking Type"
+      assert html =~ "A La Carte"
+    end
+
+    test "toggle-guests-dropdown flips guests_dropdown_open assign", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      assert :sys.get_state(view.pid).socket.assigns.guests_dropdown_open ==
+               false
+
+      render_click(view, "toggle-guests-dropdown", %{})
+
+      assert :sys.get_state(view.pid).socket.assigns.guests_dropdown_open ==
+               true
+
+      render_click(view, "toggle-guests-dropdown", %{})
+
+      assert :sys.get_state(view.pid).socket.assigns.guests_dropdown_open ==
+               false
+    end
+  end
+
+  describe "handle_info availability calendar" do
+    test "applies check-in and check-out from calendar self-message", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      send(
+        view.pid,
+        {:availability_calendar_date_changed,
+         %{checkin_date: checkin, checkout_date: checkout}}
+      )
+
+      _html = render(view)
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.checkin_date == checkin
+      assert state.socket.assigns.checkout_date == checkout
+    end
+
+    test "ignores availability calendar messages without both dates", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      before_assigns = :sys.get_state(view.pid).socket.assigns
+
+      send(view.pid, {:availability_calendar_date_changed, %{}})
+
+      _html = render(view)
+
+      after_assigns = :sys.get_state(view.pid).socket.assigns
+      assert after_assigns.checkin_date == before_assigns.checkin_date
+      assert after_assigns.checkout_date == before_assigns.checkout_date
+    end
+
+    test "ignores availability calendar messages that are not a date map", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      before_assigns = :sys.get_state(view.pid).socket.assigns
+
+      send(view.pid, {:availability_calendar_date_changed, :not_a_map})
+
+      _html = render(view)
+
+      after_assigns = :sys.get_state(view.pid).socket.assigns
+      assert after_assigns.checkin_date == before_assigns.checkin_date
+      assert after_assigns.checkout_date == before_assigns.checkout_date
+    end
+  end
+
+  describe "additional handlers and assertions" do
+    test "switch-info-tab with unknown tab defaults info_tab to general", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/clear-lake?tab=information&info_tab=rules")
+
+      render_click(view, "switch-info-tab", %{"tab" => "unknown-info-tab"})
+
+      assert :sys.get_state(view.pid).socket.assigns.info_tab == :general
+    end
+
+    test "switch-tab to the already-active tab is a no-op", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      assert :sys.get_state(view.pid).socket.assigns.active_tab == :booking
+
+      before_html = render(view)
+      render_click(view, "switch-tab", %{"tab" => "booking"})
+      after_html = render(view)
+
+      assert :sys.get_state(view.pid).socket.assigns.active_tab == :booking
+      assert before_html == after_html
+    end
+
+    test "reset-dates clears check-in and check-out", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
+        )
+
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      render_click(view, "reset-dates", %{})
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.checkin_date == nil
+      assert state.socket.assigns.checkout_date == nil
+    end
+
+    test "renders hero heading for logged-in members", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      assert has_element?(view, "h1", "Clear Lake Portal")
     end
   end
 

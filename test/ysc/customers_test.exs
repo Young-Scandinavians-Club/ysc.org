@@ -8,6 +8,15 @@ defmodule Ysc.CustomersTest do
   alias Ysc.Accounts.User
   import Ysc.AccountsFixtures
 
+  defp user_fixture_unique(attrs \\ %{}) do
+    email =
+      Map.get_lazy(attrs, :email, fn ->
+        "cu#{:erlang.unique_integer([:positive, :monotonic])}@example.com"
+      end)
+
+    user_fixture(Map.put(attrs, :email, email))
+  end
+
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
 
@@ -21,7 +30,7 @@ defmodule Ysc.CustomersTest do
 
   describe "customer_from_stripe_id/1" do
     test "returns user with matching stripe_id" do
-      user = user_fixture()
+      user = user_fixture_unique()
       user = update_user_stripe_id(user, "cus_test_123")
 
       found = Customers.customer_from_stripe_id("cus_test_123")
@@ -35,7 +44,7 @@ defmodule Ysc.CustomersTest do
 
   describe "subscriptions/1" do
     test "returns subscriptions for a user" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       # Create a subscription for the user
       {:ok, subscription} =
@@ -52,16 +61,58 @@ defmodule Ysc.CustomersTest do
       assert Enum.any?(subscriptions, &(&1.id == subscription.id))
     end
 
+    test "returns all subscriptions when user has several" do
+      user = user_fixture_unique()
+
+      for i <- 1..2 do
+        {:ok, _} =
+          Ysc.Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_multi_#{i}_#{System.unique_integer([:positive])}",
+            stripe_status: "active",
+            name: "Membership #{i}",
+            current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+          })
+      end
+
+      subs = Customers.subscriptions(user)
+      assert length(subs) >= 2
+    end
+
     test "returns empty list for user with no subscriptions" do
-      user = user_fixture()
+      user = user_fixture_unique()
       subscriptions = Customers.subscriptions(user)
       assert subscriptions == []
     end
   end
 
   describe "subscribed_to_price?/2" do
+    test "returns true for trialing subscription with matching price" do
+      user = user_fixture_unique()
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_trialing_#{System.unique_integer([:positive])}",
+          stripe_status: "trialing",
+          name: "Trial",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: "price_trialing_x",
+          stripe_product_id: "prod_x",
+          stripe_id: "si_trialing",
+          quantity: 1
+        })
+
+      assert Customers.subscribed_to_price?(user, "price_trialing_x")
+    end
+
     test "returns true when user is subscribed to price" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       {:ok, subscription} =
         Ysc.Subscriptions.create_subscription(%{
@@ -86,14 +137,38 @@ defmodule Ysc.CustomersTest do
     end
 
     test "returns false when user is not subscribed to price" do
-      user = user_fixture()
+      user = user_fixture_unique()
       assert Customers.subscribed_to_price?(user, "price_nonexistent") == false
+    end
+
+    test "returns false when subscription is not active" do
+      user = user_fixture_unique()
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_inactive",
+          stripe_status: "canceled",
+          name: "Old",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: "price_inactive",
+          stripe_product_id: "prod_x",
+          stripe_id: "si_inactive",
+          quantity: 1
+        })
+
+      refute Customers.subscribed_to_price?(user, "price_inactive")
     end
   end
 
   describe "default_payment_method/1" do
     test "returns default payment method for user" do
-      user = user_fixture()
+      user = user_fixture_unique()
 
       # Create payment method and set as default
       {:ok, _method} =
@@ -114,14 +189,40 @@ defmodule Ysc.CustomersTest do
     end
 
     test "returns nil when user has no default payment method" do
-      user = user_fixture()
+      user = user_fixture_unique()
+      refute Customers.default_payment_method(user)
+    end
+
+    test "returns nil when Stripe retrieve fails" do
+      user = user_fixture_unique()
+
+      {:ok, _} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_fail",
+          provider_customer_id: "cus_fail",
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      Mox.stub(Stripe.PaymentMethodMock, :retrieve, fn _id ->
+        {:error,
+         %Stripe.Error{
+           message: "no such pm",
+           source: :api,
+           code: :resource_missing
+         }}
+      end)
+
       refute Customers.default_payment_method(user)
     end
   end
 
   describe "payment_methods/1" do
     test "returns payment methods for user" do
-      user = user_fixture()
+      user = user_fixture_unique()
       # Create a Stripe customer for the user (required for payment_methods)
       {:ok, stripe_customer} = Ysc.Customers.create_stripe_customer(user)
       user = Ysc.Repo.get!(Ysc.Accounts.User, user.id)
@@ -141,13 +242,131 @@ defmodule Ysc.CustomersTest do
       methods = Customers.payment_methods(user)
       assert is_list(methods)
     end
+
+    test "returns card list from Stripe when list succeeds" do
+      user = user_fixture_unique() |> update_user_stripe_id("cus_pm_list")
+
+      Mox.stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [%Stripe.PaymentMethod{id: "pm_a", type: "card"}],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_methods"
+         }}
+      end)
+
+      pms = Customers.payment_methods(user)
+      assert [%Stripe.PaymentMethod{id: "pm_a"}] = pms
+    end
+
+    test "returns empty list when Stripe list returns an error" do
+      user = user_fixture_unique() |> update_user_stripe_id("cus_pm_err")
+
+      Mox.stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:error, %Stripe.Error{message: "bad", source: :api, code: :api_error}}
+      end)
+
+      assert Customers.payment_methods(user) == []
+    end
   end
 
   describe "invoices/1" do
+    test "returns empty list when user has no Stripe customer id" do
+      user = user_fixture_unique()
+      assert user.stripe_id == nil
+      assert Customers.invoices(user) == []
+    end
+
     test "returns invoices for user" do
-      user = user_fixture()
+      user = user_fixture_unique()
       invoices = Customers.invoices(user)
       assert is_list(invoices)
+    end
+
+    test "returns invoice data when Stripe list succeeds" do
+      user =
+        user_fixture_unique()
+        |> update_user_stripe_id(
+          "cus_inv_#{System.unique_integer([:positive])}"
+        )
+
+      Mox.stub(Stripe.InvoiceMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [%Stripe.Invoice{id: "in_test123", customer: user.stripe_id}],
+           has_more: false,
+           object: "list",
+           url: "/v1/invoices"
+         }}
+      end)
+
+      invoices = Customers.invoices(user)
+      assert [%Stripe.Invoice{id: "in_test123"}] = invoices
+    end
+
+    test "returns empty list when Stripe invoice list fails" do
+      user = user_fixture_unique() |> update_user_stripe_id("cus_inv_err")
+
+      Mox.stub(Stripe.InvoiceMock, :list, fn _params ->
+        {:error, %Stripe.Error{message: "fail", source: :api, code: :api_error}}
+      end)
+
+      assert Customers.invoices(user) == []
+    end
+  end
+
+  describe "create_stripe_customer/1 and update_stripe_customer/1" do
+    test "create_stripe_customer assigns stripe_id in test environment" do
+      user = user_fixture_unique()
+      assert user.stripe_id == nil
+
+      assert {:ok, %Stripe.Customer{} = c} =
+               Customers.create_stripe_customer(user)
+
+      user = Ysc.Repo.get!(User, user.id)
+      assert user.stripe_id == c.id
+      assert String.starts_with?(user.stripe_id, "cus_test_")
+    end
+
+    test "update_stripe_customer returns error when user has no stripe_id" do
+      user = user_fixture_unique()
+
+      assert Customers.update_stripe_customer(user) ==
+               {:error, :no_stripe_customer}
+    end
+
+    test "update_stripe_customer succeeds in test when stripe_id is set" do
+      user = user_fixture_unique() |> update_user_stripe_id("cus_update_test")
+
+      assert {:ok, %Stripe.Customer{id: "cus_update_test"}} =
+               Customers.update_stripe_customer(user)
+    end
+  end
+
+  describe "create_subscription/2" do
+    test "returns error for sub-accounts" do
+      primary = user_fixture_unique()
+
+      sub =
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: "sub#{System.unique_integer([:positive])}@example.com",
+            password: valid_user_password(),
+            first_name: "Sub",
+            last_name: "Account",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Ysc.Repo.insert!()
+
+      assert Customers.create_subscription(sub, %{}) ==
+               {:error, :sub_accounts_cannot_create_subscriptions}
     end
   end
 

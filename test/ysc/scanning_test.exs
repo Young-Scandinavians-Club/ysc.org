@@ -233,6 +233,30 @@ defmodule Ysc.ScanningTest do
       assert {:error, :invalid, _message} =
                Scanning.process_scan(session, "garbage-data")
     end
+
+    test "returns error when QR payload is not binary" do
+      session = scan_session_fixture()
+
+      assert {:error, :invalid, "Invalid scan data."} =
+               Scanning.process_scan(session, %{})
+    end
+
+    test "includes primary_user when sub-account has primary_user_id set" do
+      primary = make_active_member()
+      sub = user_fixture()
+
+      {:ok, sub} =
+        sub
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Ysc.Repo.update()
+
+      session = scan_session_fixture()
+      token = QrToken.sign_membership(sub.id)
+
+      assert {:ok, result} = Scanning.process_scan(session, token)
+      assert result.is_sub_account == true
+      assert result.primary_user.id == primary.id
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -302,6 +326,35 @@ defmodule Ysc.ScanningTest do
                Scanning.process_scan(session, token)
 
       assert info.ticket_id == ticket.id
+    end
+
+    test "returns group_prompt when scanned ticket is checked in but order has other unchecked tickets" do
+      Ysc.Ledgers.ensure_basic_accounts()
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_scan_session_fixture(event, admin)
+      member = make_active_member()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: member,
+          event: event,
+          ticket_selections: %{tier.id => 2}
+        })
+        |> confirm_tickets()
+
+      [checked, _unchecked] = order.tickets
+
+      checked
+      |> Ysc.Events.Ticket.check_in_changeset()
+      |> Ysc.Repo.update!()
+
+      token = QrToken.sign_ticket(checked.id)
+
+      assert {:ok, :group_prompt, info} = Scanning.process_scan(session, token)
+      assert info.partially_scanned == true
+      assert info.unchecked_tickets != []
     end
 
     test "returns cross_mode error when scanning ticket token in membership session" do
@@ -579,6 +632,7 @@ defmodule Ysc.ScanningTest do
       Scanning.process_scan(session, "bad-token")
 
       assert Scanning.get_session_scan_count(session.id) == 2
+      assert Scanning.count_scan_records(session.id) == 2
     end
   end
 
@@ -613,6 +667,24 @@ defmodule Ysc.ScanningTest do
       assert csv =~ "Ticket Reference"
       assert csv =~ "Check-in Type"
       refute csv =~ "Membership Status"
+    end
+
+    test "event session CSV includes ticket reference after check-in scan" do
+      Ysc.Ledgers.ensure_basic_accounts()
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_scan_session_fixture(event, admin)
+      member = make_active_member()
+      order = ticket_order_fixture(%{user: member, event: event})
+      order = confirm_tickets(order)
+      ticket = hd(order.tickets)
+
+      assert {:ok, _} =
+               Scanning.process_scan(session, QrToken.sign_ticket(ticket.id))
+
+      csv = Scanning.export_session_csv(session.id)
+      assert csv =~ (ticket.reference_id || "")
+      assert csv =~ member.email
     end
 
     test "exports empty session as headers only" do

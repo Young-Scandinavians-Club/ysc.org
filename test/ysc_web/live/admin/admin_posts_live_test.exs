@@ -1,5 +1,5 @@
 defmodule YscWeb.AdminPostsLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -57,6 +57,65 @@ defmodule YscWeb.AdminPostsLiveTest do
       # Since we don't know the ID exactly, we can check for a redirect and then verify if it's the right path pattern
       {path, _flash} = assert_redirect(view)
       assert path =~ ~r"/admin/posts/.*"
+    end
+
+    test "search patches URL with title filter", %{conn: conn, admin: admin} do
+      post_fixture(admin, %{title: "Unique Viking Headline XYZ"})
+
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+
+      _ =
+        view
+        |> form("#posts-search-form", q: "Unique Viking")
+        |> render_change()
+
+      assert_patch(
+        view,
+        ~p"/admin/posts?#{%{"filters" => %{"0" => %{"field" => "title", "op" => "ilike", "value" => "Unique Viking"}}}}"
+      )
+    end
+
+    test "toggles featured post", %{conn: conn, admin: admin} do
+      p1 =
+        post_fixture(admin, %{title: "Featured Candidate", featured_post: false})
+
+      _p2 = post_fixture(admin, %{title: "Other Post", featured_post: false})
+
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+
+      _ =
+        view
+        |> element(
+          "div.hidden.md\\:block button[phx-click='toggle-featured'][phx-value-id='#{p1.id}']"
+        )
+        |> render_click()
+
+      updated = Ysc.Posts.get_post!(p1.id)
+      assert updated.featured_post == true
+    end
+
+    test "toggling featured on one post clears featured on another", %{
+      conn: conn,
+      admin: admin
+    } do
+      p1 = post_fixture(admin, %{title: "Pin A", featured_post: false})
+      p2 = post_fixture(admin, %{title: "Pin B", featured_post: true})
+
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+
+      view
+      |> element(
+        "div.hidden.md\\:block button[phx-click='toggle-featured'][phx-value-id='#{p1.id}']"
+      )
+      |> render_click()
+
+      assert Ysc.Posts.get_post!(p1.id).featured_post == true
+      assert Ysc.Posts.get_post!(p2.id).featured_post == false
+    end
+
+    test "invalid flop params redirect to default posts list", %{conn: conn} do
+      assert {:error, {:live_redirect, %{to: "/admin/posts"}}} =
+               live(conn, ~p"/admin/posts?order_by=not_a_real_field")
     end
   end
 end

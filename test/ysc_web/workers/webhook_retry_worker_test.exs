@@ -1,5 +1,5 @@
 defmodule YscWeb.Workers.WebhookRetryWorkerTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: false
 
   alias YscWeb.Workers.WebhookRetryWorker
   alias Ysc.Webhooks.WebhookEvent
@@ -284,6 +284,7 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           payload: nil
         })
 
+      require Logger
       Logger.put_module_level(WebhookRetryWorker, :none)
       result = WebhookRetryWorker.retry_webhook(webhook)
       Logger.put_module_level(WebhookRetryWorker, :error)
@@ -295,9 +296,214 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       updated = Repo.get!(WebhookEvent, webhook.id)
       assert updated.state == :failed
     end
+
+    test "marks webhook failed and skips when Stripe event is too old to process" do
+      old_created =
+        DateTime.to_unix(DateTime.add(DateTime.utc_now(), -600, :second))
+
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          event_type: "customer.created",
+          payload: %{
+            "created" => old_created,
+            "data" => %{"object" => %{"id" => "cus_old"}}
+          }
+        })
+
+      assert {:ok, :skipped} = WebhookRetryWorker.retry_webhook(webhook)
+      updated = Repo.get!(WebhookEvent, webhook.id)
+      assert updated.state == :failed
+    end
+
+    test "returns error for unsupported provider" do
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          provider: "quickbooks",
+          payload: %{}
+        })
+
+      assert {:error, {:unsupported_provider, :quickbooks}} =
+               WebhookRetryWorker.retry_webhook(webhook)
+    end
+
+    test "parses provider :stripe atom same as string" do
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          provider: :stripe,
+          event_type: "customer.created",
+          payload: %{
+            "created" => DateTime.to_unix(DateTime.utc_now()),
+            "data" => %{"object" => %{}}
+          }
+        })
+
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
+    end
+
+    test "returns parse error when payload shape cannot be converted to Stripe event" do
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          event_type: "customer.created",
+          payload: %{"data" => 123}
+        })
+
+      require Logger
+      Logger.put_module_level(WebhookRetryWorker, :none)
+
+      assert {:error, {:parse_error, _}} =
+               WebhookRetryWorker.retry_webhook(webhook)
+
+      Logger.put_module_level(WebhookRetryWorker, :error)
+
+      updated = Repo.get!(WebhookEvent, webhook.id)
+      assert updated.state == :failed
+    end
+
+    test "resets failed state to pending before retrying" do
+      old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
+
+      webhook =
+        insert_webhook_event(%{
+          state: :failed,
+          inserted_at: old_time,
+          updated_at: old_time,
+          event_type: "customer.created",
+          payload: %{
+            "created" => DateTime.to_unix(DateTime.utc_now()),
+            "data" => %{
+              "object" => %{"id" => "cus_retry_failed", "email" => "x@y.com"}
+            }
+          }
+        })
+
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
+
+    test "resets stuck processing state to pending before retrying" do
+      old_time = DateTime.add(DateTime.utc_now(), -90, :minute)
+
+      webhook =
+        insert_webhook_event(%{
+          state: :processing,
+          inserted_at: old_time,
+          updated_at: old_time,
+          event_type: "invoice.payment_succeeded",
+          payload: %{
+            "created" => DateTime.to_unix(DateTime.utc_now()),
+            "data" => %{
+              "object" => %{
+                "id" => "in_retry_#{System.unique_integer([:positive])}",
+                "customer" => "cus_x",
+                "subscription" => nil,
+                "amount_paid" => 1000
+              }
+            }
+          }
+        })
+
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
+
+    test "retries payment_intent.succeeded payload shape" do
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          event_type: "payment_intent.succeeded",
+          payload: %{
+            "created" => DateTime.to_unix(DateTime.utc_now()),
+            "data" => %{
+              "object" => %{
+                "id" => "pi_#{System.unique_integer([:positive])}",
+                "customer" => "cus_pi",
+                "amount" => 2000,
+                "status" => "succeeded",
+                "metadata" => %{}
+              }
+            }
+          }
+        })
+
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
   end
 
   describe "perform/1" do
+    test "emits webhook_retry_completed telemetry" do
+      parent = self()
+
+      ref =
+        :telemetry.attach(
+          "webhook-retry-telemetry-test",
+          [:ysc, :workers, :webhook_retry_completed],
+          fn event, measurements, meta, _ ->
+            send(parent, {:telemetry_webhook_retry, event, measurements, meta})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert :ok = perform_job(WebhookRetryWorker, %{})
+
+      assert_receive {:telemetry_webhook_retry,
+                      [:ysc, :workers, :webhook_retry_completed], measurements,
+                      meta}
+
+      assert measurements.duration >= 0
+      assert measurements.total == 0
+      assert measurements.success == 0
+      assert map_size(meta) == 0
+    end
+
+    test "telemetry includes failed count when parse or processing returns error" do
+      old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
+      parent = self()
+
+      insert_webhook_event(%{
+        state: :pending,
+        inserted_at: old_time,
+        updated_at: old_time,
+        event_type: "customer.created",
+        payload: %{"data" => 123}
+      })
+
+      ref =
+        :telemetry.attach(
+          "webhook-retry-telemetry-failed",
+          [:ysc, :workers, :webhook_retry_completed],
+          fn _event, measurements, _meta, _ ->
+            send(parent, {:telemetry_failed, measurements})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert :ok = perform_job(WebhookRetryWorker, %{})
+
+      assert_receive {:telemetry_failed, measurements}
+      assert measurements.failed >= 1
+      assert measurements.total >= 1
+    end
+
+    test "completes with no webhooks to retry" do
+      assert :ok = perform_job(WebhookRetryWorker, %{})
+
+      pending =
+        WebhookEvent
+        |> where([w], w.state == :pending)
+        |> Repo.aggregate(:count)
+
+      assert pending == 0
+    end
+
     test "processes multiple pending webhooks" do
       old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
 
@@ -322,8 +528,7 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       end
 
       # Execute worker
-      job = %Oban.Job{args: %{}}
-      assert :ok = WebhookRetryWorker.perform(job)
+      assert :ok = perform_job(WebhookRetryWorker, %{})
 
       # Verify all webhooks were processed
       pending_count =
@@ -401,8 +606,7 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       })
 
       # Execute worker
-      job = %Oban.Job{args: %{}}
-      assert :ok = WebhookRetryWorker.perform(job)
+      assert :ok = perform_job(WebhookRetryWorker, %{})
 
       # Verify webhook was not processed (still pending)
       pending_count =
@@ -429,8 +633,7 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       })
 
       # Execute worker
-      job = %Oban.Job{args: %{}}
-      assert :ok = WebhookRetryWorker.perform(job)
+      assert :ok = perform_job(WebhookRetryWorker, %{})
 
       # Verify webhook was processed
       processing_count =
@@ -446,6 +649,60 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
         |> Repo.aggregate(:count)
 
       assert processed_count == 1
+    end
+  end
+
+  describe "retry_webhook/1 — parse and provider edge cases" do
+    test "nil payload data navigates to empty object and processes (Elixir Access on nil)" do
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          event_type: "customer.created",
+          payload: %{
+            "created" => DateTime.to_unix(DateTime.utc_now()),
+            "data" => nil
+          }
+        })
+
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
+
+    test "telemetry counts skipped when webhook is too old for handler" do
+      old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
+
+      old_created =
+        DateTime.to_unix(DateTime.add(DateTime.utc_now(), -600, :second))
+
+      insert_webhook_event(%{
+        state: :pending,
+        inserted_at: old_time,
+        updated_at: old_time,
+        event_type: "customer.created",
+        payload: %{
+          "created" => old_created,
+          "data" => %{"object" => %{"id" => "cus_skip_telemetry"}}
+        }
+      })
+
+      parent = self()
+
+      ref =
+        :telemetry.attach(
+          "webhook-retry-skipped-telemetry",
+          [:ysc, :workers, :webhook_retry_completed],
+          fn _event, measurements, _meta, _ ->
+            send(parent, {:telemetry_skipped, measurements})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert :ok = perform_job(WebhookRetryWorker, %{})
+
+      assert_receive {:telemetry_skipped, measurements}
+      assert measurements.skipped >= 1
     end
   end
 
@@ -496,5 +753,74 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       end
 
     Repo.insert!(changeset)
+  end
+
+  defmodule WebhooksReturnNilForDuplicateLookup do
+    @moduledoc false
+    def get_webhook_event_by_provider_and_event_id(provider, event_id) do
+      if provider == "stripe" and
+           event_id ==
+             Application.get_env(:ysc, :webhook_retry_nil_lookup_event_id) do
+        nil
+      else
+        Ysc.Webhooks.get_webhook_event_by_provider_and_event_id(
+          provider,
+          event_id
+        )
+      end
+    end
+  end
+
+  describe "retry_webhook/1 — Stripe handler returns generic error" do
+    test "returns webhook_not_found_after_duplicate when duplicate insert races with nil lookup" do
+      require Logger
+      event_id = "evt_dup_nil_#{System.unique_integer([:positive])}"
+      old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
+
+      insert_webhook_event(%{
+        state: :pending,
+        inserted_at: old_time,
+        updated_at: old_time,
+        event_id: event_id,
+        event_type: "customer.created",
+        payload: %{
+          "created" => DateTime.to_unix(DateTime.utc_now()),
+          "data" => %{"object" => %{"id" => "cus_dup_nil"}}
+        }
+      })
+
+      Application.put_env(
+        :ysc,
+        :webhooks_context,
+        WebhooksReturnNilForDuplicateLookup
+      )
+
+      Application.put_env(:ysc, :webhook_retry_nil_lookup_event_id, event_id)
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :webhooks_context)
+        Application.delete_env(:ysc, :webhook_retry_nil_lookup_event_id)
+      end)
+
+      webhook = Repo.get_by!(WebhookEvent, event_id: event_id)
+
+      Logger.put_module_level(WebhookRetryWorker, :none)
+
+      assert {:error, :webhook_not_found_after_duplicate} =
+               WebhookRetryWorker.retry_webhook(webhook)
+
+      Logger.put_module_level(WebhookRetryWorker, :error)
+    end
+
+    test "parses Stripe payload when data key is omitted (object defaults to empty map)" do
+      webhook =
+        insert_webhook_event(%{
+          state: :pending,
+          event_type: "customer.created",
+          payload: %{"created" => DateTime.to_unix(DateTime.utc_now())}
+        })
+
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
+    end
   end
 end

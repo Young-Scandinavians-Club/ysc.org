@@ -67,9 +67,9 @@ defmodule Ysc.Accounts.EmailCategories do
     "account_setup_verification" => :account,
     "family_invite" => :account,
     "family_invite_cancelled" => :account,
-    "family_member_removed" => :account
-    # Newsletter notifications (can be disabled)
-    # Note: Newsletter emails are handled by the in-house newsletter system (Ysc.Newsletter), not through this system
+    "family_member_removed" => :account,
+    # Newsletter (preference checked via newsletter_subscribers when sent through EmailNotifier)
+    "newsletter_edition" => :newsletter
   }
 
   @doc """

@@ -1,6 +1,9 @@
 defmodule YscWeb.Emails.NewsletterEditionTest do
-  use ExUnit.Case, async: true
+  use Ysc.DataCase, async: true
 
+  import Ysc.EventsFixtures
+
+  alias Ysc.Repo
   alias YscWeb.Emails.NewsletterEdition
 
   # ---------------------------------------------------------------------------
@@ -253,6 +256,532 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
         )
 
       assert assigns.cover_image_url == "https://cdn.example.com/image.jpg"
+    end
+  end
+
+  describe "build_archive_assigns/3" do
+    test "builds assigns without subscriber (archive)" do
+      edition = %{
+        title: "Archive Title",
+        intro_text: "<p>Archived intro</p>",
+        cover_image: nil
+      }
+
+      assigns = NewsletterEdition.build_archive_assigns(edition, [], [])
+
+      assert assigns.edition_title == "Archive Title"
+      assert assigns.first_name == "there"
+      assert assigns.unsubscribe_url =~ "preview"
+    end
+  end
+
+  describe "email_safe_html/1 — extra branches" do
+    test "converts non-image file figure to download link" do
+      html = """
+      <figure>
+        <a href="/files/notes.pdf">
+          <span class="attachment__name">notes.pdf</span>
+          <span class="attachment__size">12 KB</span>
+        </a>
+      </figure>
+      """
+
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "notes.pdf"
+      assert result =~ "href=\"/files/notes.pdf\""
+      refute result =~ "class="
+    end
+
+    test "converts Trix div with only br to br output" do
+      html = "<div><br></div>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "br"
+    end
+
+    test "figure with img but no src omits img and keeps non-empty caption" do
+      html = """
+      <figure>
+        <img alt="x" />
+        <figcaption>Caption only</figcaption>
+      </figure>
+      """
+
+      result = NewsletterEdition.email_safe_html(html)
+      assert result =~ "Caption only"
+    end
+
+    test "non-image figure without href falls back to filename-only label" do
+      html = """
+      <figure>
+        <span class="attachment__name">doc.pdf</span>
+      </figure>
+      """
+
+      result = NewsletterEdition.email_safe_html(html)
+      assert result =~ "doc.pdf"
+      refute result =~ "href="
+    end
+
+    test "non-image figure with no link metadata yields empty output" do
+      html = "<figure><span>orphan</span></figure>"
+      result = NewsletterEdition.email_safe_html(html)
+      assert result == ""
+    end
+
+    test "non-image figure with href but no filename uses Download file label" do
+      html = """
+      <figure>
+        <a href="/files/attachment.bin">x</a>
+      </figure>
+      """
+
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Download file"
+      assert result =~ ~s(href="/files/attachment.bin")
+    end
+
+    test "non-image attachment uses filename only when size span is absent" do
+      html = """
+      <figure>
+        <a href="/files/report.pdf">
+          <span class="attachment__name">report.pdf</span>
+        </a>
+      </figure>
+      """
+
+      result = NewsletterEdition.email_safe_html(html)
+      assert result =~ "report.pdf"
+      refute result =~ "KB"
+    end
+  end
+
+  describe "get_template_name/0 and render/1" do
+    test "exposes template name and renders built assigns" do
+      assert NewsletterEdition.get_template_name() == "newsletter_edition"
+
+      assigns =
+        NewsletterEdition.build_preview_assigns(
+          "Weekly",
+          "<p>Hi</p>",
+          nil,
+          [],
+          []
+        )
+
+      html = NewsletterEdition.render(assigns)
+      assert html =~ "Weekly"
+      assert html =~ "Hi"
+    end
+  end
+
+  describe "build_assigns/4 with images and posts" do
+    test "prefers optimized cover image URL when present" do
+      edition = %{
+        title: "E",
+        intro_text: "",
+        cover_image: %{
+          optimized_image_path: "https://cdn.example.com/opt.jpg",
+          raw_image_path: "https://cdn.example.com/raw.jpg"
+        }
+      }
+
+      subscriber = %{
+        first_name: "Sam",
+        email: "s@example.com",
+        subscription_token: "tok"
+      }
+
+      assigns = NewsletterEdition.build_assigns(edition, subscriber, [], [])
+      assert assigns.cover_image_url == "https://cdn.example.com/opt.jpg"
+    end
+
+    test "uses raw image path when optimized is nil" do
+      edition = %{
+        title: "E",
+        intro_text: "",
+        cover_image: %{
+          optimized_image_path: nil,
+          raw_image_path: "https://x/r.jpg"
+        }
+      }
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          edition,
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          []
+        )
+
+      assert assigns.cover_image_url == "https://x/r.jpg"
+    end
+
+    test "uses raw_body for preview when preview_text is nil" do
+      long_raw = String.duplicate("word ", 80)
+
+      post = %{
+        title: "P",
+        preview_text: nil,
+        raw_body: "<p>" <> long_raw <> "</p>",
+        url_name: "p",
+        featured_image: nil
+      }
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "E", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [post],
+          []
+        )
+
+      [mapped] = assigns.posts
+      assert String.length(mapped.preview_text) <= 200
+    end
+  end
+
+  describe "build_assigns/4 with events from database" do
+    test "maps event fields including long description truncation" do
+      event =
+        event_fixture(%{
+          description: String.duplicate("D", 200),
+          location_name: "Hall"
+        })
+
+      event = Repo.preload(event, :cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      [em] = assigns.events
+      assert em.title == event.title
+      assert em.location_name == "Hall"
+      assert String.ends_with?(em.short_description, "...")
+    end
+
+    test "includes tickets on sale line when tier has start_date" do
+      event = event_fixture()
+
+      sale_start =
+        DateTime.utc_now()
+        |> DateTime.add(7, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id,
+          start_date: sale_start
+        })
+
+      event = Repo.preload(event, :cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      [em] = assigns.events
+      assert em.tickets_on_sale_str =~ "Tickets on sale"
+    end
+
+    test "uses empty date string when event has no start_date" do
+      event = event_fixture()
+
+      {:ok, event} =
+        event |> Ecto.Changeset.change(%{start_date: nil}) |> Repo.update()
+
+      event = Repo.preload(event, :cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      [em] = assigns.events
+      assert em.date_str == ""
+    end
+
+    test "formats date_str with clock time when start_time is set" do
+      event = event_fixture()
+
+      {:ok, event} =
+        event
+        |> Ecto.Changeset.change(%{start_time: ~T[15:30:00]})
+        |> Repo.update()
+
+      event = Repo.preload(event, :cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      [em] = assigns.events
+      assert em.date_str =~ " at "
+      assert em.date_str =~ "15:30"
+    end
+
+    test "short_description is nil when event description is nil" do
+      event =
+        event_fixture()
+        |> Ecto.Changeset.change(%{description: nil})
+        |> Repo.update!()
+
+      event = Repo.preload(event, :cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      [em] = assigns.events
+      assert em.short_description == nil
+    end
+  end
+
+  describe "post image URL mapping" do
+    test "uses raw_image_path when optimized is absent" do
+      post = %{
+        title: "P",
+        preview_text: "Hi",
+        raw_body: nil,
+        url_name: "p",
+        featured_image: %{
+          optimized_image_path: nil,
+          raw_image_path: "https://cdn.example.com/r.jpg"
+        }
+      }
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "E", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [post],
+          []
+        )
+
+      [mapped] = assigns.posts
+      assert mapped.image_url == "https://cdn.example.com/r.jpg"
+    end
+  end
+
+  describe "build_assigns/4 event save_the_date and post image branches" do
+    test "sets save_the_date when event has tickets_tbd" do
+      event =
+        event_fixture()
+        |> Ecto.Changeset.change(%{tickets_tbd: true})
+        |> Repo.update!()
+
+      event = Repo.preload(event, :cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      assert hd(assigns.events).save_the_date == true
+    end
+
+    test "post featured_image uses optimized path when set" do
+      post = %{
+        title: "P",
+        preview_text: "Hi",
+        raw_body: nil,
+        url_name: "p",
+        featured_image: %{
+          optimized_image_path: "https://cdn.example.com/o.jpg",
+          raw_image_path: "https://cdn.example.com/r.jpg"
+        }
+      }
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "E", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [post],
+          []
+        )
+
+      assert hd(assigns.posts).image_url == "https://cdn.example.com/o.jpg"
+    end
+
+    test "clean_preview_text returns empty for whitespace-only preview" do
+      post = %{
+        title: "P",
+        preview_text: "   \n  ",
+        raw_body: nil,
+        url_name: "p",
+        featured_image: nil
+      }
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "E", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [post],
+          []
+        )
+
+      assert hd(assigns.posts).preview_text == ""
+    end
+
+    test "event short_description is full string when description is short" do
+      event =
+        event_fixture(%{description: "Short blurb"})
+        |> Repo.preload(:cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      assert hd(assigns.events).short_description == "Short blurb"
+    end
+  end
+
+  describe "NewsletterEdition template and build_assigns — extended coverage" do
+    test "render includes optimized post image URL (Open Graph–style CDN path)" do
+      og_url = "https://images.example.com/og/vacation-photo-1200x630.jpg"
+
+      post = %{
+        title: "Lake Day",
+        preview_text: "Short preview",
+        raw_body: nil,
+        url_name: "lake-day",
+        featured_image: %{
+          optimized_image_path: og_url,
+          raw_image_path: "https://images.example.com/raw/vacation.jpg"
+        }
+      }
+
+      assigns =
+        NewsletterEdition.build_preview_assigns(
+          "Summer news",
+          "",
+          nil,
+          [post],
+          []
+        )
+
+      html = NewsletterEdition.render(assigns)
+      assert html =~ og_url
+      assert html =~ "Lake Day"
+    end
+
+    test "post assigns prefer preview_text when both preview_text and raw_body differ" do
+      post = %{
+        title: "P",
+        preview_text: "From preview field",
+        raw_body: "<p>From raw body which is different</p>",
+        url_name: "p",
+        featured_image: nil,
+        published_on: ~U[2023-03-15 10:00:00Z],
+        inserted_at: ~U[2024-01-01 10:00:00Z]
+      }
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "E", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [post],
+          []
+        )
+
+      assert hd(assigns.posts).preview_text =~ "From preview field"
+    end
+
+    test "render with nil edition title omits title block and empty intro uses spacer path" do
+      assigns =
+        NewsletterEdition.build_preview_assigns(
+          nil,
+          nil,
+          nil,
+          [],
+          []
+        )
+
+      html = NewsletterEdition.render(assigns)
+      assert is_binary(html)
+      refute html =~ "undefined"
+    end
+
+    test "render with post lacking featured_image still produces Read more link" do
+      post = %{
+        title: "No image",
+        preview_text: nil,
+        raw_body: "Body only",
+        url_name: "no-img",
+        featured_image: nil
+      }
+
+      assigns =
+        NewsletterEdition.build_preview_assigns("T", "", nil, [post], [])
+
+      html = NewsletterEdition.render(assigns)
+      assert html =~ "Read more"
+      assert html =~ "No image"
+    end
+
+    test "render hits cover image, event overlay badges, and hides unsubscribe for #" do
+      event = %{
+        title: "Fest",
+        description: "Hi",
+        short_description: "Short",
+        date_str: "Jan 1",
+        save_the_date: false,
+        selling_fast: true,
+        pricing_str: "$10",
+        tickets_on_sale_str: nil,
+        location_name: "Hall",
+        url: "https://example.com/e/1",
+        image_url: "https://images.example.com/banner.jpg"
+      }
+
+      assigns = %{
+        first_name: "there",
+        edition_title: "Weekly",
+        intro_text: Phoenix.HTML.raw("<p>x</p>"),
+        intro_text?: true,
+        cover_image_url: "https://cdn.example.com/cover.jpg",
+        posts: [],
+        events: [event],
+        unsubscribe_url: "#"
+      }
+
+      html = NewsletterEdition.render(assigns)
+      assert html =~ "https://cdn.example.com/cover.jpg"
+      assert html =~ "GOING FAST!"
+      refute html =~ "Unsubscribe from newsletters"
     end
   end
 end

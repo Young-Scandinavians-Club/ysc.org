@@ -13,6 +13,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Repo
+  alias YscWeb.Emails.{MembershipRenewalPaymentMethodReminder, Notifier}
 
   import Ysc.AccountsFixtures
 
@@ -28,6 +29,10 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
       assert :ok = MembershipRenewalPaymentMethodCheckerWorker.perform(job)
     end
 
+    test "perform_job completes with no subscriptions" do
+      assert :ok = perform_job(MembershipRenewalPaymentMethodCheckerWorker, %{})
+    end
+
     test "runs successfully with subscription expiring in 14 days" do
       user = user_fixture()
       renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
@@ -35,6 +40,49 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
 
       job = build_job()
       assert :ok = MembershipRenewalPaymentMethodCheckerWorker.perform(job)
+    end
+
+    test "perform completes when payment method reminder job already exists (duplicate Oban insert)" do
+      user = user_fixture()
+      renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
+      sub = insert_subscription(user, renewal_date)
+
+      email_data =
+        MembershipRenewalPaymentMethodReminder.prepare_email_data(user, sub)
+
+      renewal_date_only = DateTime.to_date(sub.current_period_end)
+
+      idempotency_key =
+        "membership_renewal_payment_method_reminder_#{user.id}_#{renewal_date_only}"
+
+      assert %Oban.Job{} =
+               Notifier.schedule_email(
+                 user.email,
+                 idempotency_key,
+                 MembershipRenewalPaymentMethodReminder.get_subject(),
+                 MembershipRenewalPaymentMethodReminder.get_template_name(),
+                 email_data,
+                 "",
+                 user.id
+               )
+
+      assert :ok =
+               MembershipRenewalPaymentMethodCheckerWorker.perform(build_job())
+    end
+
+    test "enqueues email notifier job when subscriber has no payment method" do
+      user = user_fixture()
+      renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
+      insert_subscription(user, renewal_date)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 MembershipRenewalPaymentMethodCheckerWorker.perform(
+                   build_job()
+                 )
+
+        assert_enqueued(worker: YscWeb.Workers.EmailNotifier)
+      end)
     end
 
     test "runs successfully with multiple subscriptions" do

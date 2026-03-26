@@ -540,7 +540,8 @@ defmodule Ysc.Accounts do
     end
   end
 
-  defp create_billing_address_from_signup(user) do
+  @doc false
+  def create_billing_address_from_signup(user) do
     # Check if registration_form is loaded and available
     cond do
       # Association is loaded and has data

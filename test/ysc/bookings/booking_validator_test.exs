@@ -916,6 +916,111 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     end
   end
 
+  describe "lifetime membership (Tahoe)" do
+    test "lifetime member: rejects third overlapping booking like family", %{
+      user: user,
+      rooms: rooms
+    } do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+        |> Repo.preload(:subscriptions)
+
+      attrs1 = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2025-07-08],
+        checkout_date: ~D[2025-07-10],
+        booking_mode: :room,
+        rooms: [rooms.tahoe_room1],
+        guests_count: 2,
+        status: :complete,
+        total_price: Money.new(400, :USD)
+      }
+
+      {:ok, _booking1} = Bookings.create_booking(attrs1)
+
+      attrs2 = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2025-07-09],
+        checkout_date: ~D[2025-07-11],
+        booking_mode: :room,
+        rooms: [rooms.tahoe_room2],
+        guests_count: 2,
+        status: :complete,
+        total_price: Money.new(400, :USD)
+      }
+
+      {:ok, _booking2} = Bookings.create_booking(attrs2)
+
+      attrs3 = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2025-07-09],
+        checkout_date: ~D[2025-07-11],
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(400, :USD)
+      }
+
+      changeset = Booking.changeset(%Booking{}, attrs3, user: user)
+
+      refute changeset.valid?
+    end
+  end
+
+  describe "advance booking limit (Tahoe)" do
+    test "adds error when check-in is beyond season advance_booking_days", %{
+      user: user,
+      rooms: rooms
+    } do
+      summer =
+        Repo.get_by!(Season,
+          name: "Summer",
+          property: :tahoe
+        )
+
+      old_advance = summer.advance_booking_days
+
+      on_exit(fn ->
+        Repo.update!(
+          Ecto.Changeset.change(summer, advance_booking_days: old_advance)
+        )
+      end)
+
+      Repo.update!(Ecto.Changeset.change(summer, advance_booking_days: 7))
+
+      checkin = ~D[2026-07-13]
+      checkout = ~D[2026-07-15]
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(400, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :checkin_date)
+      {msg, _} = Keyword.fetch!(changeset.errors, :checkin_date)
+      assert msg =~ "advance" or msg =~ "days"
+    end
+  end
+
   describe "skip_validation option" do
     test "skips all validations when skip_validation is true", %{user: user} do
       # Create conditions that would normally fail validation

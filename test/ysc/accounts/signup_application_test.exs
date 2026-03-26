@@ -754,6 +754,61 @@ defmodule Ysc.Accounts.SignupApplicationTest do
     end
   end
 
+  describe "migration_changeset/2" do
+    test "casts without signup-only validations" do
+      attrs = %{
+        address: "Imported St",
+        country: "NO",
+        birth_date: ~D[1955-05-05]
+      }
+
+      changeset =
+        SignupApplication.migration_changeset(%SignupApplication{}, attrs)
+
+      assert changeset.valid?
+      assert changeset.changes.address == "Imported St"
+    end
+
+    test "skips birth_date validation when birth_date is nil" do
+      attrs = %{address: "Imported St", country: "NO"}
+
+      changeset =
+        SignupApplication.migration_changeset(%SignupApplication{}, attrs)
+
+      assert changeset.valid?
+    end
+
+    test "rejects birth_date before 1900" do
+      attrs = %{
+        address: "Imported St",
+        country: "NO",
+        birth_date: ~D[1899-12-31]
+      }
+
+      changeset =
+        SignupApplication.migration_changeset(%SignupApplication{}, attrs)
+
+      refute changeset.valid?
+      assert "must be after 1900" in errors_on(changeset).birth_date
+    end
+
+    test "rejects birth_date in the future" do
+      future = Date.add(Date.utc_today(), 1)
+
+      attrs = %{
+        address: "Imported St",
+        country: "NO",
+        birth_date: future
+      }
+
+      changeset =
+        SignupApplication.migration_changeset(%SignupApplication{}, attrs)
+
+      refute changeset.valid?
+      assert "cannot be in the future" in errors_on(changeset).birth_date
+    end
+  end
+
   # Helper function to create valid application attributes
   defp valid_application_attrs(overrides \\ %{}) do
     Enum.into(overrides, %{

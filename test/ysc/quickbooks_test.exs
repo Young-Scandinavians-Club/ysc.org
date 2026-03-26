@@ -372,6 +372,79 @@ defmodule Ysc.QuickbooksTest do
                  memo: "Event ticket"
                })
     end
+
+    test "uses Administration class fallback when query_class_by_name fails" do
+      Logger.put_module_level(Ysc.Quickbooks, :none)
+
+      stub(ClientMock, :query_class_by_name, fn "Administration" ->
+        {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        assert [line] = params.line
+
+        assert line.sales_item_line_detail.class_ref == %{
+                 value: "Administration",
+                 name: "Administration"
+               }
+
+        {:ok, %{"Id" => "sr_fb"}}
+      end)
+
+      try do
+        assert {:ok, %{"Id" => "sr_fb"}} =
+                 Quickbooks.create_purchase_sales_receipt(%{
+                   customer_id: "c",
+                   item_id: "i",
+                   quantity: 1,
+                   unit_price: Decimal.new("10.00")
+                 })
+      after
+        Logger.delete_module_level(Ysc.Quickbooks)
+      end
+    end
+
+    test "includes optional purchase fields on sales receipt" do
+      stub(ClientMock, :query_class_by_name, fn "Administration" ->
+        {:ok, "adm"}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        assert [line] = params.line
+        assert line.sales_item_line_detail.quantity == Decimal.new(3)
+        assert params.payment_method_ref == %{value: "pm_1"}
+
+        assert params.deposit_to_account_ref == %{
+                 value: "dep",
+                 name: "Checking"
+               }
+
+        assert params.private_note == "priv"
+        assert line.sales_item_line_detail.tax_code_ref == %{value: "TAX"}
+
+        assert line.description == "Line desc"
+
+        {:ok, %{"Id" => "sr_full"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_purchase_sales_receipt(
+                 %{
+                   customer_id: "c",
+                   item_id: "i",
+                   quantity: 3,
+                   unit_price: Decimal.new("4.00"),
+                   payment_method_id: "pm_1",
+                   deposit_to_account_id: "dep",
+                   deposit_to_account_name: "Checking",
+                   description: "Line desc",
+                   private_note: "priv",
+                   tax_code_ref: "TAX",
+                   txn_date: "2024-01-20"
+                 },
+                 timeout: 5_000
+               )
+    end
   end
 
   describe "create_refund_sales_receipt/1" do
@@ -445,6 +518,31 @@ defmodule Ysc.QuickbooksTest do
                  refund_from_account_id: "undeposited_1"
                })
     end
+
+    test "includes refund_from account name and line description" do
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        assert params.refund_from_account_ref == %{
+                 value: "uf",
+                 name: "Undeposited"
+               }
+
+        assert [line] = params.line
+        assert line.sales_item_line_detail.quantity == Decimal.new(2)
+        assert line.description == "Refund line"
+        {:ok, %{"Id" => "rr_2"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 2,
+                 unit_price: Decimal.new("4.00"),
+                 refund_from_account_id: "uf",
+                 refund_from_account_name: "Undeposited",
+                 description: "Refund line"
+               })
+    end
   end
 
   describe "create_stripe_payout_deposit/1" do
@@ -490,6 +588,154 @@ defmodule Ysc.QuickbooksTest do
                  txn_date: ~D[2024-12-01],
                  private_note: "Payout for November",
                  class_ref: %{value: "class_payout", name: "Administration"}
+               })
+    end
+
+    test "uses custom description when provided" do
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        assert [line] = params.line
+        assert line.description == "Custom payout note"
+        {:ok, %{"Id" => "dep_3"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_stripe_payout_deposit(%{
+                 bank_account_id: "b",
+                 undeposited_funds_account_id: "u",
+                 amount: 1.0,
+                 description: "Custom payout note"
+               })
+    end
+  end
+
+  describe "get_or_create_customer/1 edge cases" do
+    test "returns error when QuickBooks response has no Id" do
+      user = user_fixture()
+
+      user
+      |> User.update_user_changeset(%{quickbooks_customer_id: nil})
+      |> Repo.update!()
+
+      user = Repo.reload!(user)
+
+      expect(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"DisplayName" => "x"}}
+      end)
+
+      assert {:error, :invalid_customer_response} =
+               Quickbooks.get_or_create_customer(user)
+    end
+
+    test "returns atom error from create_customer" do
+      user = user_fixture()
+
+      user
+      |> User.update_user_changeset(%{quickbooks_customer_id: nil})
+      |> Repo.update!()
+
+      user = Repo.reload!(user)
+
+      expect(ClientMock, :create_customer, fn _params ->
+        {:error, :rate_limited}
+      end)
+
+      assert {:error, :rate_limited} = Quickbooks.get_or_create_customer(user)
+    end
+
+    test "duplicate retry returns error when second create fails" do
+      user = user_fixture()
+
+      user
+      |> User.update_user_changeset(%{quickbooks_customer_id: nil})
+      |> Repo.update!()
+
+      user = Repo.reload!(user)
+      name = "#{user.first_name} #{user.last_name}"
+
+      expect(ClientMock, :create_customer, 1, fn p ->
+        assert p.display_name == name
+        {:error, "Duplicate Name Exists Error"}
+      end)
+
+      expect(ClientMock, :create_customer, 1, fn _p ->
+        {:error, "still bad"}
+      end)
+
+      assert {:error, "still bad"} = Quickbooks.get_or_create_customer(user)
+    end
+
+    test "duplicate retry returns invalid_customer_response when retry has no Id" do
+      user = user_fixture()
+
+      user
+      |> User.update_user_changeset(%{quickbooks_customer_id: nil})
+      |> Repo.update!()
+
+      user = Repo.reload!(user)
+      name = "#{user.first_name} #{user.last_name}"
+
+      expect(ClientMock, :create_customer, 1, fn p ->
+        assert p.display_name == name
+        {:error, "6240: Duplicate Name Exists Error"}
+      end)
+
+      expect(ClientMock, :create_customer, 1, fn p ->
+        assert p.display_name != name
+        {:ok, %{}}
+      end)
+
+      assert {:error, :invalid_customer_response} =
+               Quickbooks.get_or_create_customer(user)
+    end
+  end
+
+  describe "format_date/1 (via txn_date) and refund amount edge cases" do
+    test "create_stripe_payout_deposit sets txn_date to nil when value is DateTime (unsupported)" do
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        assert params.txn_date == nil
+        {:ok, %{"Id" => "dep_dt"}}
+      end)
+
+      assert {:ok, %{"Id" => "dep_dt"}} =
+               Quickbooks.create_stripe_payout_deposit(%{
+                 bank_account_id: "bank_1",
+                 undeposited_funds_account_id: "uf_1",
+                 amount: 10.0,
+                 txn_date: ~U[2024-06-15 12:00:00Z]
+               })
+    end
+
+    test "create_refund_sales_receipt uses abs on negative unit_price" do
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        assert params.total_amt == Decimal.new("25.00")
+        assert [line] = params.line
+        assert line.sales_item_line_detail.unit_price == Decimal.new("25.00")
+        {:ok, %{"Id" => "sr_neg"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_sales_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("-25.00")
+               })
+    end
+
+    test "create_refund_receipt omits line description when description is absent" do
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        assert [line] = params.line
+        refute Map.has_key?(line, :description)
+        {:ok, %{"Id" => "rr_no_desc"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("3.00"),
+                 refund_from_account_id: "uf"
                })
     end
   end

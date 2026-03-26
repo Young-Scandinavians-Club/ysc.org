@@ -414,4 +414,101 @@ defmodule Ysc.Bookings.RefundPolicyCacheTest do
       assert Decimal.equal?(Enum.at(percentages, 3), Decimal.new("0.0"))
     end
   end
+
+  describe "cache format and version branches" do
+    test "upgrades legacy cache entry without version metadata" do
+      policy =
+        create_refund_policy(%{
+          name: "Legacy Policy",
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true
+        })
+
+      create_refund_policy_rule(policy.id, 14, "100.0")
+
+      RefundPolicyCache.get_active(:tahoe, :room)
+
+      cache_key = "refund_policy:property:tahoe:booking_mode:room"
+      {:ok, {:version, _, cached_policy}} = Cachex.get(:ysc_cache, cache_key)
+
+      Cachex.put(:ysc_cache, cache_key, cached_policy)
+
+      cached = RefundPolicyCache.get_active(:tahoe, :room)
+
+      assert cached.id == policy.id
+      {:ok, stored} = Cachex.get(:ysc_cache, cache_key)
+      assert match?({:version, _, _}, stored)
+    end
+
+    test "initializes version key when absent before caching" do
+      Cachex.del(:ysc_cache, "refund_policy:version")
+
+      create_refund_policy(%{
+        name: "Version Init",
+        property: :tahoe,
+        booking_mode: :room,
+        is_active: true
+      })
+
+      RefundPolicyCache.get_active(:tahoe, :room)
+
+      {:ok, v} = Cachex.get(:ysc_cache, "refund_policy:version")
+      assert is_integer(v)
+    end
+
+    test "refetches when cached policy version does not match global version" do
+      policy =
+        create_refund_policy(%{
+          name: "Stale Cached",
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true
+        })
+
+      create_refund_policy_rule(policy.id, 14, "100.0")
+
+      RefundPolicyCache.get_active(:tahoe, :room)
+
+      cache_key = "refund_policy:property:tahoe:booking_mode:room"
+
+      {:ok, {:version, _v, cached_policy}} = Cachex.get(:ysc_cache, cache_key)
+
+      Cachex.put(
+        :ysc_cache,
+        cache_key,
+        {:version, 999_999_999_999, cached_policy}
+      )
+
+      {:ok, updated} =
+        policy
+        |> RefundPolicy.changeset(%{name: "Stale Cached Updated"})
+        |> Repo.update()
+
+      result = RefundPolicyCache.get_active(:tahoe, :room)
+
+      assert result.id == updated.id
+      assert result.name == "Stale Cached Updated"
+    end
+
+    test "get_active initializes version key and caches policy when version was absent" do
+      Cachex.del(:ysc_cache, "refund_policy:version")
+
+      policy =
+        create_refund_policy(%{
+          name: "Post-Delete Version",
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true
+        })
+
+      create_refund_policy_rule(policy.id, 14, "100.0")
+
+      cached = RefundPolicyCache.get_active(:tahoe, :room)
+
+      assert cached.id == policy.id
+      {:ok, v} = Cachex.get(:ysc_cache, "refund_policy:version")
+      assert is_integer(v)
+    end
+  end
 end

@@ -5,6 +5,19 @@ defmodule YscWeb.UserTicketsLiveTest do
   import Ysc.AccountsFixtures
 
   describe "mount/3" do
+    test "shows upcoming ticket order when user has completed order", %{
+      conn: conn
+    } do
+      data = Ysc.TestDataFactory.complete_ticket_order()
+      conn = log_in_user(conn, data.user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      html = render(view)
+
+      assert html =~ data.event.title
+      assert has_element?(view, "#ticket-orders-list")
+    end
+
     test "loads tickets page successfully", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)

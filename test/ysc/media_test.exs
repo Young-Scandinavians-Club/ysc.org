@@ -125,6 +125,10 @@ defmodule Ysc.MediaTest do
       assert is_list(images)
     end
 
+    test "limit 0 returns empty list" do
+      assert Media.list_images_cursor(limit: 0) == []
+    end
+
     test "filters by search on title", %{user: user} do
       {:ok, _img} =
         %Image{
@@ -235,6 +239,69 @@ defmodule Ysc.MediaTest do
       result = Media.list_images_per_year()
       # Function returns a map with year as keys and lists of images as values
       assert is_map(result)
+    end
+  end
+
+  describe "add_new_image/2, update_image/3, delete_image/2" do
+    test "admin can create, update, and delete an image" do
+      admin = user_fixture(%{role: "admin"})
+
+      assert {:ok, image} =
+               Media.add_new_image(
+                 %{
+                   user_id: admin.id,
+                   raw_image_path: "https://example.com/new.jpg",
+                   title: "Original title"
+                 },
+                 admin
+               )
+
+      assert {:ok, updated} =
+               Media.update_image(image, %{title: "Updated title"}, admin)
+
+      assert updated.title == "Updated title"
+
+      assert {:ok, _} = Media.delete_image(updated, admin)
+      assert Media.fetch_image(updated.id) == nil
+    end
+
+    test "member cannot create an image", %{user: user} do
+      assert {:error, _} =
+               Media.add_new_image(
+                 %{
+                   user_id: user.id,
+                   raw_image_path: "https://example.com/denied.jpg"
+                 },
+                 user
+               )
+    end
+  end
+
+  describe "update_processed_image/2" do
+    test "updates image processing fields", %{user: user} do
+      {:ok, image} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/raw.jpg",
+          processing_state: :processing
+        }
+        |> Repo.insert()
+
+      updated =
+        Media.update_processed_image(image, %{
+          optimized_image_path: "https://cdn.example.com/opt.jpg",
+          thumbnail_path: "https://cdn.example.com/thumb.jpg",
+          blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+          width: 800,
+          height: 600,
+          processing_state: "completed"
+        })
+
+      assert updated.optimized_image_path =~ "opt.jpg"
+      assert updated.thumbnail_path =~ "thumb.jpg"
+      assert updated.width == 800
+      assert updated.height == 600
+      assert updated.processing_state == :completed
     end
   end
 end

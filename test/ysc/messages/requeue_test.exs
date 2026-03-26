@@ -10,6 +10,37 @@ defmodule Ysc.Messages.RequeueTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Messages.Requeue
+  alias YscWeb.Workers.EmailNotifier
+
+  import Ysc.AccountsFixtures
+
+  defp insert_discarded_email_job(user_id, email) do
+    args = %{
+      "recipient" => email,
+      "idempotency_key" => "requeue_test_#{System.unique_integer([:positive])}",
+      "subject" => "Requeue test",
+      "template" => "booking_confirmation",
+      "params" => %{"x" => 1},
+      "text_body" => "hello",
+      "user_id" => user_id,
+      "category" => "bookings"
+    }
+
+    {:ok, job} =
+      args
+      |> EmailNotifier.new()
+      |> Repo.insert()
+
+    {:ok, job} =
+      job
+      |> Ecto.Changeset.change(
+        state: "discarded",
+        discarded_at: DateTime.utc_now() |> DateTime.truncate(:microsecond)
+      )
+      |> Repo.update()
+
+    job
+  end
 
   describe "list_failed_jobs/1" do
     test "returns empty list when no failed jobs exist" do
@@ -27,6 +58,14 @@ defmodule Ysc.Messages.RequeueTest do
       since = DateTime.add(DateTime.utc_now(), -1, :day)
       jobs = Requeue.list_failed_jobs(since: since)
       assert is_list(jobs)
+    end
+
+    test "returns discarded email notifier jobs" do
+      user = user_fixture()
+      job = insert_discarded_email_job(user.id, user.email)
+
+      jobs = Requeue.list_failed_jobs()
+      assert Enum.any?(jobs, &(&1.id == job.id))
     end
   end
 
@@ -55,6 +94,14 @@ defmodule Ysc.Messages.RequeueTest do
       assert stats.retryable >= 0
       assert stats.recent_failures_24h >= 0
     end
+
+    test "includes by_template frequencies for failed jobs" do
+      user = user_fixture()
+      insert_discarded_email_job(user.id, user.email)
+
+      stats = Requeue.get_stats()
+      assert stats.by_template["booking_confirmation"] >= 1
+    end
   end
 
   describe "requeue_job_by_id/1" do
@@ -69,6 +116,26 @@ defmodule Ysc.Messages.RequeueTest do
       fake_id = 999_999_998
       result = Requeue.requeue_job_by_id(fake_id)
       assert result == {:error, :not_found}
+    end
+
+    test "requeues a discarded EmailNotifier job" do
+      user = user_fixture()
+      job = insert_discarded_email_job(user.id, user.email)
+
+      assert {:ok, %Oban.Job{}} = Requeue.requeue_job_by_id(job.id)
+    end
+
+    test "returns not_an_email_job when worker is not EmailNotifier" do
+      user = user_fixture()
+      job = insert_discarded_email_job(user.id, user.email)
+
+      {:ok, wrong_worker_job} =
+        job
+        |> Ecto.Changeset.change(worker: "Ysc.Tickets.TimeoutWorker")
+        |> Repo.update()
+
+      assert {:error, :not_an_email_job} =
+               Requeue.requeue_job_by_id(wrong_worker_job.id)
     end
   end
 
@@ -106,6 +173,17 @@ defmodule Ysc.Messages.RequeueTest do
       result = Requeue.requeue_all(limit: 10, since: since, dry_run: true)
       assert is_map(result)
       assert result.total_found >= 0
+    end
+
+    test "requeues failed jobs when dry_run is false" do
+      user = user_fixture()
+      insert_discarded_email_job(user.id, user.email)
+
+      result = Requeue.requeue_all(limit: 5, dry_run: false)
+
+      assert result.total_found >= 1
+      assert result.successful >= 1
+      assert result.failed == 0
     end
   end
 end

@@ -5,6 +5,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
 
+  alias Ysc.Repo
+
   describe "mount/3 - authentication and security" do
     test "redirects to home when user is not authenticated", %{conn: conn} do
       booking = booking_fixture()
@@ -532,6 +534,477 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert page_title(view) =~ "Booking Confirmation"
     end
+  end
+
+  describe "greeting and stay copy" do
+    test "uses Member when user has no first name", %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, user} =
+        user |> Ecto.Changeset.change(%{first_name: nil}) |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "See you at the Cabin, Member"
+    end
+
+    test "buyout booking shows Full Buyout when no rooms linked", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :buyout
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "Full Buyout"
+    end
+
+    test "displays Clear Lake in copy", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :clear_lake
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "Clear Lake" or html =~ "clear"
+    end
+
+    test "shows singular Night for one-night stay", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      today = Date.utc_today()
+      checkin = Date.add(today, 40) |> first_weekday_on_or_after(1)
+      checkout = Date.add(checkin, 1)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "1"
+      assert html =~ "Night"
+      refute html =~ "1 Nights"
+    end
+
+    test "shows plural Nights for multi-night stay", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      today = Date.utc_today()
+      checkin = Date.add(today, 35)
+      checkin = first_weekday_on_or_after(checkin, 1)
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "Nights"
+    end
+  end
+
+  describe "stripe redirect params" do
+    test "succeeded without payment_intent does not break mount", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded"
+        )
+
+      assert html =~ "Booking Confirmation"
+    end
+
+    test "unknown redirect_status loads page", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking.id}/receipt?redirect_status=processing"
+        )
+
+      assert html =~ "Booking Confirmation"
+    end
+  end
+
+  describe "confirm-cancel" do
+    test "submits cancellation for future booking with payment on file", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      booking = future_booking_for_cancel(user)
+      create_payment_for_booking(booking, Money.new(10_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_click(view, "show-cancel-modal")
+      render_async(view)
+
+      result =
+        view
+        |> form("#cancel-booking-form", %{"reason" => "Integration test cancel"})
+        |> render_submit()
+
+      case result do
+        {:error, {:live_redirect, %{to: to}}} ->
+          assert to =~ "/bookings/#{booking.id}/receipt"
+
+        html when is_binary(html) ->
+          assert html =~ booking.reference_id
+      end
+    end
+  end
+
+  describe "handle_async load_receipt_data exit" do
+    test "marks async data loaded when async task exits", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.BookingReceiptLive.handle_async(
+                 :load_receipt_data,
+                 {:exit, :test_reason},
+                 socket
+               )
+
+      assert new_socket.assigns.async_data_loaded == true
+    end
+  end
+
+  describe "cancel modal input variants" do
+    test "update-cancel-reason accepts value key", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = future_booking_for_cancel(user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_click(view, "show-cancel-modal")
+
+      html =
+        render_click(view, "update-cancel-reason", %{"value" => "Travel change"})
+
+      assert html =~ booking.reference_id
+    end
+
+    test "hide-cancel-modal after show returns to main view", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = future_booking_for_cancel(user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_click(view, "show-cancel-modal")
+      html = render_click(view, "hide-cancel-modal")
+      assert html =~ booking.reference_id
+    end
+  end
+
+  describe "booking references and status" do
+    test "hold status still renders receipt shell", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :hold})
+
+      {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert has_element?(view, "#booking-receipt")
+      assert html =~ booking.reference_id
+    end
+
+    test "displays children count line when children present", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room,
+          children_count: 2
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "Children" or html =~ "children"
+    end
+  end
+
+  describe "property and layout details" do
+    test "Tahoe booking mentions Lake Tahoe", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "Lake Tahoe" or html =~ "Tahoe"
+    end
+
+    test "shows confetti disabled without query param", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert has_element?(view, ~s([data-show-confetti="false"]))
+    end
+
+    test "room mode without preloaded rooms shows Per Guest label", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "Per Guest"
+    end
+  end
+
+  describe "pricing_items breakdown in payment summary" do
+    test "renders buyout line items when pricing_items stored on booking", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :buyout
+        })
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "buyout",
+            "nights" => 3,
+            "price_per_night" => %{"amount" => "100", "currency" => "USD"}
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(10_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view)
+      html = render(view)
+
+      assert html =~ "Full Buyout"
+      assert html =~ "× 3"
+    end
+
+    test "renders room breakdown with children line when pricing_items include room rooms",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room,
+          children_count: 1
+        })
+
+      room_item = %{
+        "type" => "room",
+        "room_id" => "r1",
+        "room_name" => "Pine",
+        "nights" => 2,
+        "guests_count" => 2,
+        "children_count" => 1,
+        "base" => %{"amount" => "200", "currency" => "USD"},
+        "adult_price_per_night" => %{"amount" => "100", "currency" => "USD"},
+        "children" => %{"amount" => "40", "currency" => "USD"},
+        "billable_people" => 2
+      }
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "room",
+            "nights" => 2,
+            "guests_count" => 2,
+            "children_count" => 1,
+            "rooms" => [room_item]
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(25_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view)
+      html = render(view)
+
+      assert html =~ "Children"
+      assert html =~ "Base Price"
+    end
+
+    test "renders per-guest line when pricing_items type is per_guest", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :day,
+          guests_count: 2
+        })
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "per_guest",
+            "nights" => 2,
+            "guests_count" => 2,
+            "price_per_guest_per_night" => %{
+              "amount" => "50",
+              "currency" => "USD"
+            }
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(10_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view)
+      html = render(view)
+
+      assert html =~ "Spot Rental"
+      assert html =~ "2 × 2 night"
+    end
+  end
+
+  describe "async loading" do
+    test "render_async completes payment section for paid booking", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+      create_payment_for_booking(booking, Money.new(10_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view)
+      html = render(view)
+      assert html =~ "Payment Summary" or html =~ "$100.00"
+    end
+
+    test "async_data_loaded after render_async", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view)
+      html = render(view)
+      assert html =~ booking.reference_id
+    end
+  end
+
+  # Helper functions
+
+  defp first_weekday_on_or_after(date, target_dow) do
+    dow = Date.day_of_week(date, :monday)
+    days = rem(target_dow - dow + 7, 7)
+    Date.add(date, days)
+  end
+
+  defp future_booking_for_cancel(user) do
+    today = Date.utc_today()
+    days_to_friday = 5 - Date.day_of_week(today, :monday)
+
+    days_to_friday =
+      if days_to_friday < 0, do: days_to_friday + 7, else: days_to_friday
+
+    checkin_date = Date.add(today, days_to_friday + 7)
+    checkout_date = Date.add(checkin_date, 3)
+
+    booking_fixture(%{
+      user_id: user.id,
+      status: :complete,
+      checkin_date: checkin_date,
+      checkout_date: checkout_date
+    })
   end
 
   # Helper function to create a payment for a booking

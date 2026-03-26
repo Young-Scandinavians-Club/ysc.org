@@ -1,11 +1,19 @@
 defmodule YscWeb.AdminDashboardLiveTest do
-  use YscWeb.ConnCase
+  # LiveView + connected?/async can race; keep this module sync for stable WS.
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Repo
+
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
+    %{conn: log_in_user(conn, user), user: user}
+  end
+
+  defp create_volunteer(%{conn: conn}) do
+    user = user_fixture(%{role: "volunteer"})
     %{conn: log_in_user(conn, user), user: user}
   end
 
@@ -19,8 +27,13 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert html =~ "Total Revenue"
     end
 
+    test "shows admin stats row for admin users", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#admin-stats-row")
+      refute has_element?(view, "#volunteer-stats-row")
+    end
+
     test "navigates to user review from pending applications", %{conn: conn} do
-      # Create a pending user
       pending_user =
         user_fixture(%{
           state: "pending_approval",
@@ -28,15 +41,12 @@ defmodule YscWeb.AdminDashboardLiveTest do
           last_name: "User"
         })
 
-      # We need to ensure the user has a registration form if the dashboard expects it for some UI elements,
-      # but let's see if it renders without it first.
-
       {:ok, view, _html} = live(conn, ~p"/admin")
 
       assert render(view) =~ "Pending User"
 
       view
-      |> element("button", "Review")
+      |> element("#review-applications-section button", "Review")
       |> render_click()
 
       params = %{
@@ -54,6 +64,71 @@ defmodule YscWeb.AdminDashboardLiveTest do
         view,
         ~p"/admin/users/#{pending_user.id}/review?#{params}"
       )
+    end
+
+    test "shows empty pending applications state when queue is empty", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      html = render(view)
+
+      assert html =~ "Review Applications"
+      assert html =~ "No pending applications"
+    end
+
+    test "shows overdue application styling when signup was completed long ago",
+         %{
+           conn: conn
+         } do
+      pending =
+        oauth_user_fixture(%{
+          state: :pending_approval,
+          first_name: "Slow",
+          last_name: "Applicant"
+        })
+
+      app = signup_application_fixture(pending)
+
+      hours_ago =
+        DateTime.utc_now()
+        |> DateTime.add(-80, :hour)
+        |> DateTime.truncate(:second)
+
+      app
+      |> Ecto.Changeset.change(%{completed: hours_ago})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      _ = render(view)
+      html = render(view)
+
+      assert html =~ "Slow Applicant"
+      assert html =~ "Review Now"
+      assert html =~ "Overdue"
+    end
+  end
+
+  describe "volunteer dashboard" do
+    setup [:create_volunteer]
+
+    test "shows volunteer stats row instead of admin metrics", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#volunteer-stats-row")
+      refute has_element?(view, "#admin-stats-row")
+    end
+
+    test "shows volunteer shortcuts to events, posts, and newsletters", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      html = render(view)
+
+      assert html =~ "Upcoming Events"
+      assert html =~ "News &amp; Posts"
+      assert html =~ "Newsletters"
+      assert html =~ "Manage events"
+      assert html =~ "Manage posts"
+      assert html =~ "Manage newsletters"
     end
   end
 end

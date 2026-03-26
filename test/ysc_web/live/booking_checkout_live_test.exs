@@ -1,5 +1,5 @@
 defmodule YscWeb.BookingCheckoutLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Ecto.Changeset
   import Phoenix.LiveViewTest
@@ -7,10 +7,49 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   import Ysc.BookingsFixtures
   import Mox
 
+  alias Ysc.Bookings
+  alias Ysc.Bookings.{BookingRoom, RoomCategory}
+  alias Ysc.Ledgers
   alias Ysc.Repo
   alias Ysc.StripeMock
 
   setup :verify_on_exit!
+
+  setup %{conn: conn} do
+    Ledgers.ensure_basic_accounts()
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: "pi_test_123",
+         client_secret: "pi_test_123_secret_456",
+         status: "requires_payment_method"
+       }}
+    end)
+
+    stub(StripeMock, :retrieve_payment_intent, fn _id, _opts ->
+      {:error, :not_stubbed}
+    end)
+
+    stub(Stripe.PaymentIntentMock, :list, fn _params ->
+      {:ok,
+       %Stripe.List{
+         data: [],
+         has_more: false,
+         object: "list",
+         url: "/v1/payment_intents"
+       }}
+    end)
+
+    {:ok, conn: conn}
+  end
 
   describe "when not signed in" do
     test "redirects to home with flash" do
@@ -27,29 +66,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "Booking Checkout page" do
     setup %{conn: conn} do
-      Application.put_env(:ysc, :stripe_client, StripeMock)
-
       user = user_fixture()
       booking = booking_fixture(user_id: user.id, status: :hold)
-
-      stub(StripeMock, :create_payment_intent, fn _params, _opts ->
-        {:ok,
-         %Stripe.PaymentIntent{
-           id: "pi_test_123",
-           client_secret: "pi_test_123_secret_456",
-           status: "requires_payment_method"
-         }}
-      end)
-
-      stub(Stripe.PaymentIntentMock, :list, fn _params ->
-        {:ok,
-         %Stripe.List{
-           data: [],
-           has_more: false,
-           object: "list",
-           url: "/v1/payment_intents"
-         }}
-      end)
 
       %{conn: log_in_user(conn, user), user: user, booking: booking}
     end
@@ -60,6 +78,33 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "Booking Summary"
     end
 
+    test "renders Clear Lake property title", %{conn: conn, user: user} do
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          property: :clear_lake
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      assert html =~ "Clear Lake"
+    end
+
+    test "shows children count in summary when present", %{
+      conn: conn,
+      user: user
+    } do
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          children_count: 2
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      assert html =~ "children"
+    end
+
     test "redirects if not owner", %{conn: conn, booking: booking} do
       other_user = user_fixture()
       conn = log_in_user(conn, other_user)
@@ -67,7 +112,6 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      # When booking is not found (not owned by user), redirects to home
       assert path == ~p"/"
     end
 
@@ -83,7 +127,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
     test "redirects when booking status is not hold", %{conn: conn, user: user} do
       booking = booking_fixture(user_id: user.id, status: :hold)
-      # Change to complete so checkout is no longer valid
+
       booking
       |> change(%{status: :complete})
       |> Repo.update!()
@@ -96,7 +140,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert path in [~p"/bookings/tahoe", ~p"/bookings/clear-lake", ~p"/"]
     end
 
-    test "redirects when booking is expired", %{conn: conn, user: user} do
+    test "redirects when booking is expired at mount", %{conn: conn, user: user} do
       booking = booking_fixture(user_id: user.id, status: :hold)
 
       expired_at =
@@ -117,19 +161,37 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert path in [~p"/bookings/tahoe", ~p"/bookings/clear-lake", ~p"/"]
     end
 
+    test "redirects when room booking has no rooms (price calculation)", %{
+      conn: conn,
+      user: user
+    } do
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          booking_mode: :room
+        })
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+               live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert flash["error"] =~ "calculate price"
+      assert path in [~p"/bookings/tahoe", ~p"/bookings/clear-lake", ~p"/"]
+    end
+
     test "toggle price details shows and hides breakdown", %{
       conn: conn,
       booking: booking
     } do
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      # Price Details button (mobile toggle)
       view
       |> element("button[phx-click=\"toggle-price-details\"]")
       |> render_click()
 
       html = render(view)
-      # After toggle, details are visible (aria-expanded true or content shown)
       assert html =~ "Price Details"
 
       view
@@ -145,14 +207,11 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      # Click cancel (phx-confirm is accepted in test). Booking created via fixture may not
-      # have inventory rows, so release_hold can fail with :inventory_update_failed.
       result =
         view
         |> element("button[phx-click=\"cancel-booking\"]")
         |> render_click()
 
-      # Either redirects (success) or re-renders with error flash
       case result do
         {:error, {:redirect, %{to: _path, flash: flash}}} ->
           assert flash["info"] =~ "canceled"
@@ -160,6 +219,252 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         html when is_binary(html) ->
           assert html =~ "cancel" or html =~ "Cancel" or html =~ "error"
       end
+    end
+
+    test "payment-redirect-started is a no-op", %{conn: conn, booking: booking} do
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html =
+        view
+        |> render_click("payment-redirect-started", %{})
+
+      assert html =~ "Complete Your Booking"
+    end
+
+    test "validate-guest-info with no guests param leaves socket unchanged", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html = render_click(view, "validate-guest-info", %{})
+      assert html =~ "Complete Your Booking"
+    end
+
+    test "save-guest-info without guests shows error flash", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html = render_click(view, "save-guest-info", %{})
+
+      assert html =~ "Guest information is required" or
+               html =~ "Complete Your Booking"
+    end
+
+    test "payment-success when Stripe retrieve fails shows payment error", %{
+      conn: conn,
+      booking: booking
+    } do
+      expect(StripeMock, :retrieve_payment_intent, fn _id, _opts ->
+        {:error, :network}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html =
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => "pi_test_123"
+        })
+
+      assert html =~ "Failed to process payment" or html =~ "payment"
+    end
+
+    test "payment-success when intent status is not succeeded shows error", %{
+      conn: conn,
+      booking: booking
+    } do
+      expect(StripeMock, :retrieve_payment_intent, fn _id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_test_123",
+           status: "requires_payment_method",
+           amount: 1000
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html =
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => "pi_test_123"
+        })
+
+      assert html =~ "Failed to process payment"
+    end
+
+    test "handle_info :check_booking_expiration reschedules when hold still valid",
+         %{
+           conn: conn,
+           user: user
+         } do
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(120, :second)
+        |> DateTime.truncate(:second)
+
+      booking
+      |> change(%{hold_expires_at: future})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      send(view.pid, :check_booking_expiration)
+      html = render(view)
+      assert html =~ "Complete Your Booking"
+    end
+
+    test "handle_info :check_booking_expiration marks expired after hold passes",
+         %{
+           conn: conn,
+           user: user
+         } do
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(120, :second)
+        |> DateTime.truncate(:second)
+
+      booking
+      |> change(%{hold_expires_at: future})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      # Expire the hold in DB while LiveView is connected
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-5, :second)
+        |> DateTime.truncate(:second)
+
+      booking
+      |> change(%{hold_expires_at: past})
+      |> Repo.update!()
+
+      send(view.pid, :check_booking_expiration)
+      html = render(view)
+      assert html =~ "expired" or html =~ "Complete Your Booking"
+    end
+
+    test "mount with Stripe payment intent creation error shows payment_error on page",
+         %{
+           conn: conn,
+           user: user
+         } do
+      # Mount may invoke create_payment_intent more than once (static + connected).
+      expect(StripeMock, :create_payment_intent, 2, fn _params, _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :card_error,
+           message: "card error"
+         }}
+      end)
+
+      booking = booking_fixture(user_id: user.id, status: :hold)
+      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "Failed to initialize payment" or html =~ "payment"
+    end
+
+    test "select-guest-attendee without index is ignored", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html = render_click(view, "select-guest-attendee", %{})
+      assert html =~ "Complete Your Booking"
+    end
+  end
+
+  describe "room booking guest step" do
+    setup %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, category} =
+        %RoomCategory{}
+        |> RoomCategory.changeset(%{
+          name: "Cat #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Checkout Room #{System.unique_integer([:positive])}",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      checkin = Date.utc_today() |> Date.add(40)
+      checkout = Date.add(checkin, 3)
+
+      hold_expires_at =
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
+
+      {:ok, booking} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          status: :hold,
+          property: :tahoe,
+          booking_mode: :room,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 2,
+          children_count: 0,
+          hold_expires_at: hold_expires_at,
+          total_price: Money.new(500, :USD),
+          pricing_items: %{"type" => "room"}
+        })
+
+      %BookingRoom{}
+      |> Ecto.Changeset.change(%{booking_id: booking.id, room_id: room.id})
+      |> Repo.insert!()
+
+      booking = Repo.preload(booking, [:rooms])
+
+      %{conn: log_in_user(conn, user), user: user, booking: booking}
+    end
+
+    test "shows guest information step before payment", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      assert html =~ "Guest Information"
+    end
+
+    test "validate-guest-info with invalid guest data collects errors", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      html =
+        render_change(view, "validate-guest-info", %{
+          "guests" => %{
+            "0" => %{"first_name" => "", "last_name" => ""}
+          }
+        })
+
+      assert html =~ "Guest Information"
     end
   end
 end

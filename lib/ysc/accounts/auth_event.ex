@@ -55,7 +55,8 @@ defmodule Ysc.Accounts.AuthEvent do
     "bot_behavior",
     "known_attacker",
     "geolocation_mismatch",
-    "unusual_time"
+    "unusual_time",
+    "too_many_attempts"
   ]
 
   schema "auth_events" do

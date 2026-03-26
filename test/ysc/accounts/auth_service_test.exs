@@ -21,6 +21,7 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
   import Ysc.AccountsFixtures
   import Ecto.Query
+  import Plug.Conn
 
   alias Ysc.Accounts.{AuthService, AuthEvent}
   alias Ysc.Repo
@@ -100,6 +101,18 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       assert is_map(auth_event.metadata)
       assert auth_event.metadata[:auth_method] != nil
+    end
+
+    test "stores session_id from non-binary user_token" do
+      user = user_fixture()
+
+      conn =
+        mock_conn()
+        |> Plug.Test.init_test_session(%{})
+        |> put_session(:user_token, 12_345)
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+      assert auth_event.session_id == "12345"
     end
   end
 
@@ -286,6 +299,14 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_data.metadata.auth_method == "google"
     end
 
+    test "extracts auth method from atom method key" do
+      conn = mock_conn()
+
+      auth_data = AuthService.extract_auth_data(conn, %{method: "google"})
+
+      assert auth_data.metadata.auth_method == "google"
+    end
+
     test "extracts provider from params" do
       conn = mock_conn()
 
@@ -317,6 +338,26 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_data.metadata.origin == "https://example.com"
       assert auth_data.metadata.referer == "https://example.com/login"
     end
+
+    test "uses embedded conn from LiveView assigns when present" do
+      conn = mock_conn()
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{live_socket: %{conn: conn}}
+      }
+
+      auth_data = AuthService.extract_auth_data(socket)
+
+      assert auth_data.ip_address == "203.0.113.1"
+    end
+
+    test "uses default loopback IP for LiveView socket without embedded conn" do
+      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+
+      auth_data = AuthService.extract_auth_data(socket)
+
+      assert auth_data.ip_address == "127.0.0.1"
+    end
   end
 
   describe "check_suspicious_activity/1" do
@@ -341,6 +382,25 @@ defmodule Ysc.Accounts.AuthServiceTest do
       updated_event = Repo.get(AuthEvent, auth_event.id)
       assert updated_event.is_suspicious == true
       assert "rapid_attempts" in updated_event.threat_indicators
+    end
+
+    test "flags suspicious_ip when failed attempts from IP exceed threshold" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      for i <- 1..11 do
+        AuthService.log_login_failure(
+          "ip_brute_#{i}@example.com",
+          conn,
+          "invalid_credentials"
+        )
+      end
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+
+      updated_event = Repo.get(AuthEvent, auth_event.id)
+      assert updated_event.is_suspicious == true
+      assert "suspicious_ip" in updated_event.threat_indicators
     end
 
     test "detects unusual login times" do
@@ -400,6 +460,46 @@ defmodule Ysc.Accounts.AuthServiceTest do
       # Verify suspicious activity was logged
       suspicious_events = AuthService.get_suspicious_events(10)
       refute suspicious_events == []
+    end
+
+    test "logs suspicious activity when lockout threshold met and user exists" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      for _ <- 1..5 do
+        attrs = %{
+          ip_address: "203.0.113.1",
+          user_agent: "Mozilla/5.0",
+          email_attempted: user.email,
+          failure_reason: "invalid_credentials"
+        }
+
+        attrs
+        |> AuthEvent.login_failure_changeset()
+        |> Repo.insert!()
+      end
+
+      suspicious_before =
+        Repo.aggregate(
+          from(ae in AuthEvent,
+            where: ae.event_type == "suspicious_activity"
+          ),
+          :count,
+          :id
+        )
+
+      AuthService.check_account_lockout(user.email, conn)
+
+      suspicious_after =
+        Repo.aggregate(
+          from(ae in AuthEvent,
+            where: ae.event_type == "suspicious_activity"
+          ),
+          :count,
+          :id
+        )
+
+      assert suspicious_after == suspicious_before + 1
     end
   end
 
@@ -638,6 +738,54 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       assert timeframe == nil
     end
+
+    test "returns only logout when no login event exists" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, logout_event} = AuthService.log_logout(user, conn)
+
+      _ =
+        Repo.delete_all(
+          from ae in AuthEvent,
+            where: ae.user_id == ^user.id,
+            where: ae.event_type == "login_success"
+        )
+
+      timeframe = AuthService.get_last_session_timeframe(user)
+
+      assert timeframe.session_start == nil
+
+      assert DateTime.diff(
+               timeframe.session_end,
+               logout_event.inserted_at,
+               :second
+             ) == 0
+
+      assert timeframe.is_active == false
+    end
+
+    test "returns active session when login is more recent than logout" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, logout_ev} = AuthService.log_logout(user, conn)
+      {:ok, login_ev} = AuthService.log_login_success(user, conn)
+
+      login_at = DateTime.add(logout_ev.inserted_at, 60, :second)
+
+      {1, _} =
+        Repo.update_all(
+          from(ae in AuthEvent, where: ae.id == ^login_ev.id),
+          set: [inserted_at: login_at]
+        )
+
+      timeframe = AuthService.get_last_session_timeframe(user)
+
+      assert timeframe.is_active == true
+      assert timeframe.session_end == nil
+      assert DateTime.diff(timeframe.session_start, login_at, :second) == 0
+    end
   end
 
   describe "sanitize_utf8/1" do
@@ -677,6 +825,13 @@ defmodule Ysc.Accounts.AuthServiceTest do
     test "passes through non-string values" do
       assert AuthService.sanitize_utf8(123) == 123
       assert AuthService.sanitize_utf8(%{key: "value"}) == %{key: "value"}
+    end
+
+    test "replaces invalid UTF-8 byte sequences" do
+      invalid = <<139, 155, 255, 128>>
+      result = AuthService.sanitize_utf8(invalid)
+      assert is_binary(result)
+      assert String.valid?(result)
     end
   end
 

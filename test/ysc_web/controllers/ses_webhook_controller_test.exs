@@ -7,13 +7,122 @@ defmodule YscWeb.SesWebhookControllerTest do
   """
   use YscWeb.ConnCase, async: true
 
+  import Ysc.AccountsFixtures
+
+  defmodule SubscriptionConfirm200Plug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      conn
+      |> put_resp_content_type("text/plain")
+      |> send_resp(200, "confirmed")
+    end
+  end
+
+  defmodule SubscriptionConfirm404Plug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      conn
+      |> put_resp_content_type("text/plain")
+      |> send_resp(404, "missing")
+    end
+  end
+
   alias Ysc.Newsletter
   alias Ysc.Newsletter.EmailEvent
   alias Ysc.Repo
 
   # Signature verification is skipped in test via config :ysc, :sns_skip_signature_verification, true
 
+  describe "webhook/2 - SubscriptionConfirmation (SubscribeURL HTTP outcomes)" do
+    test "logs success when Req.get to SubscribeURL returns 2xx", %{conn: conn} do
+      port = start_subscription_http_server(SubscriptionConfirm200Plug)
+
+      payload =
+        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1:#{port}/confirm",
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "logs warning when Req.get to SubscribeURL returns non-2xx", %{
+      conn: conn
+    } do
+      port = start_subscription_http_server(SubscriptionConfirm404Plug)
+
+      payload =
+        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1:#{port}/missing",
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "logs warning when Req.get to SubscribeURL fails (connection refused)",
+         %{
+           conn: conn
+         } do
+      payload =
+        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1:1/confirm",
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+  end
+
   describe "webhook/2 - SubscriptionConfirmation" do
+    test "returns 200 when SubscribeURL is missing (still acknowledges)", %{
+      conn: conn
+    } do
+      payload =
+        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
+        })
+        |> Map.delete("SubscribeURL")
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
     test "confirms SNS subscription by fetching SubscribeURL", %{conn: conn} do
       # Req.get is called for the SubscribeURL in production, but in tests we
       # don't have a real URL to confirm. We just verify the endpoint returns 200.
@@ -36,6 +145,27 @@ defmodule YscWeb.SesWebhookControllerTest do
   end
 
   describe "webhook/2 - Notification - open event" do
+    test "stores event_timestamp from mail timestamp", %{conn: conn} do
+      {:ok, _subscriber} = Newsletter.subscribe("timestamp-open@example.com")
+
+      ses_event =
+        build_ses_event("Open",
+          email: "timestamp-open@example.com",
+          env: "test"
+        )
+        |> put_in(["mail", "timestamp"], "2026-03-19T15:30:00.000Z")
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "timestamp-open@example.com",
+          event_type: "open"
+        )
+
+      assert event.event_timestamp == ~U[2026-03-19 15:30:00Z]
+    end
+
     test "records an open event in the database", %{conn: conn} do
       {:ok, subscriber} = Newsletter.subscribe("opener@example.com")
 
@@ -83,6 +213,29 @@ defmodule YscWeb.SesWebhookControllerTest do
     end
   end
 
+  describe "webhook/2 - missing SNS message type header" do
+    test "returns 200 and acknowledges when x-amz-sns-message-type is absent",
+         %{
+           conn: conn
+         } do
+      ses_event =
+        build_ses_event("Open",
+          email: "no-header-type@example.com",
+          env: "test"
+        )
+
+      payload = build_sns_wrapper("Notification", ses_event)
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+  end
+
   describe "webhook/2 - Notification - click event" do
     test "records a click event with the clicked URL", %{conn: conn} do
       ses_event =
@@ -102,6 +255,71 @@ defmodule YscWeb.SesWebhookControllerTest do
 
       assert event != nil
       assert event.link_url == "https://ysc.org/events"
+    end
+  end
+
+  describe "webhook/2 - Notification - send and delivery events" do
+    test "records a send event", %{conn: conn} do
+      ses_event =
+        build_ses_event("Send",
+          email: "send-event@example.com",
+          env: "test"
+        )
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "send-event@example.com",
+          event_type: "send"
+        )
+
+      assert event != nil
+      assert event.environment == "test"
+    end
+
+    test "records a delivery event", %{conn: conn} do
+      ses_event =
+        build_ses_event("Delivery",
+          email: "delivery-event@example.com",
+          env: "test"
+        )
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "delivery-event@example.com",
+          event_type: "delivery"
+        )
+
+      assert event != nil
+      assert event.environment == "test"
+    end
+  end
+
+  describe "webhook/2 - Notification - complaint event" do
+    test "records a complaint event in the database", %{conn: conn} do
+      ses_event =
+        build_ses_event("Complaint",
+          email: "complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "complainer@example.com",
+          event_type: "complaint"
+        )
+
+      assert event != nil
+      assert event.environment == "test"
     end
   end
 
@@ -135,6 +353,30 @@ defmodule YscWeb.SesWebhookControllerTest do
   end
 
   describe "webhook/2 - Notification - bounce event (hard)" do
+    test "records bounce with user_id tag from mail.tags", %{conn: conn} do
+      user = user_fixture()
+      {:ok, _subscriber} = Newsletter.subscribe("bounce-userid-tag@example.com")
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "bounce-userid-tag@example.com",
+          env: "test",
+          bounce_type: "Permanent",
+          bounce_sub_type: "General"
+        )
+        |> put_in(["mail", "tags", "user_id"], [to_string(user.id)])
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "bounce-userid-tag@example.com",
+          event_type: "bounce"
+        )
+
+      assert event.user_id == user.id
+    end
+
     test "records a hard bounce and unsubscribes the subscriber", %{conn: conn} do
       {:ok, subscriber} = Newsletter.subscribe("hardbounce@example.com")
       assert subscriber.subscribed == true
@@ -204,6 +446,273 @@ defmodule YscWeb.SesWebhookControllerTest do
     end
   end
 
+  describe "webhook/2 - Notification - invalid SES event type" do
+    test "returns 200 but does not persist when event_type is not allowed", %{
+      conn: conn
+    } do
+      ses_event =
+        build_ses_event("Open",
+          email: "invalid-type@example.com",
+          env: "test"
+        )
+        |> Map.put("eventType", "UnknownSesType")
+
+      post_notification(conn, ses_event)
+
+      refute Repo.get_by(EmailEvent, email: "invalid-type@example.com")
+    end
+  end
+
+  describe "webhook/2 - Notification - multiple recipients" do
+    test "uses first destination address for stored email field", %{conn: conn} do
+      ses_event =
+        build_ses_event("Open",
+          email: "first@example.com",
+          env: "test"
+        )
+        |> put_in(["mail", "destination"], [
+          "first@example.com",
+          "second@example.com"
+        ])
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent, event_type: "open", email: "first@example.com")
+
+      assert event != nil
+    end
+  end
+
+  describe "webhook/2 - Notification - record_email_event failure" do
+    test "returns 200 when email exceeds max length and event is not persisted",
+         %{
+           conn: conn
+         } do
+      long_email = String.duplicate("a", 300) <> "@example.com"
+
+      ses_event =
+        build_ses_event("Open",
+          email: long_email,
+          env: "test"
+        )
+
+      conn = post_notification(conn, ses_event)
+
+      assert conn.status == 200
+      assert Repo.get_by(EmailEvent, email: long_email) == nil
+    end
+
+    test "returns 200 when edition_id tag does not exist (FK) for short local email",
+         %{conn: conn} do
+      # Triggers record_email_event {:error, changeset} and mask_email/1 one-char local branch.
+      bogus_edition = Ecto.ULID.generate()
+
+      ses_event =
+        build_ses_event("Open",
+          email: "a@y.co",
+          env: "test"
+        )
+        |> put_in(["mail", "tags", "edition_id"], [bogus_edition])
+
+      conn = post_notification(conn, ses_event)
+
+      assert conn.status == 200
+      assert Repo.get_by(EmailEvent, email: "a@y.co") == nil
+    end
+
+    test "returns 200 when edition_id tag does not exist (FK) for two-char local email",
+         %{conn: conn} do
+      bogus_edition = Ecto.ULID.generate()
+
+      ses_event =
+        build_ses_event("Open",
+          email: "ab@example.com",
+          env: "test"
+        )
+        |> put_in(["mail", "tags", "edition_id"], [bogus_edition])
+
+      conn = post_notification(conn, ses_event)
+
+      assert conn.status == 200
+      assert Repo.get_by(EmailEvent, email: "ab@example.com") == nil
+    end
+
+    test "returns 200 when edition_id tag does not exist (FK) for email without @",
+         %{conn: conn} do
+      bogus_edition = Ecto.ULID.generate()
+
+      ses_event =
+        build_ses_event("Open",
+          email: "no-at-sign",
+          env: "test"
+        )
+        |> put_in(["mail", "tags", "edition_id"], [bogus_edition])
+
+      conn = post_notification(conn, ses_event)
+
+      assert conn.status == 200
+      assert Repo.get_by(EmailEvent, email: "no-at-sign") == nil
+    end
+
+    test "returns 200 when destination is a nested empty list (invalid email) and mask_email uses inspect/1",
+         %{conn: conn} do
+      bogus_edition = Ecto.ULID.generate()
+
+      ses_event =
+        build_ses_event("Open",
+          email: "ignored@example.com",
+          env: "test"
+        )
+        |> put_in(["mail", "destination"], [[]])
+        |> put_in(["mail", "tags", "edition_id"], [bogus_edition])
+
+      conn = post_notification(conn, ses_event)
+
+      assert conn.status == 200
+      refute Repo.get_by(EmailEvent, edition_id: bogus_edition)
+    end
+  end
+
+  describe "webhook/2 - Notification - timestamp parsing" do
+    test "stores event_timestamp from bounce when mail timestamp is absent", %{
+      conn: conn
+    } do
+      ses_event =
+        build_ses_event("Bounce",
+          email: "bounce-ts-only@example.com",
+          env: "test",
+          bounce_type: "Transient",
+          bounce_sub_type: "General"
+        )
+        |> update_in(["mail"], &Map.delete(&1, "timestamp"))
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "bounce-ts-only@example.com",
+          event_type: "bounce"
+        )
+
+      assert event.event_timestamp == ~U[2026-03-19 12:00:00Z]
+    end
+
+    test "stores event_timestamp from complaint when mail timestamp is absent",
+         %{
+           conn: conn
+         } do
+      ses_event =
+        build_ses_event("Complaint",
+          email: "complaint-ts@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-20T08:15:00.000Z"
+        })
+        |> update_in(["mail"], &Map.delete(&1, "timestamp"))
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "complaint-ts@example.com",
+          event_type: "complaint"
+        )
+
+      assert event.event_timestamp == ~U[2026-03-20 08:15:00Z]
+    end
+
+    test "stores nil event_timestamp when mail timestamp is invalid ISO8601", %{
+      conn: conn
+    } do
+      ses_event =
+        build_ses_event("Open",
+          email: "bad-ts@example.com",
+          env: "test"
+        )
+        |> put_in(["mail", "timestamp"], "not-a-valid-timestamp")
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "bad-ts@example.com",
+          event_type: "open"
+        )
+
+      assert event.event_timestamp == nil
+    end
+
+    test "stores event_timestamp from open when mail timestamp is absent", %{
+      conn: conn
+    } do
+      ses_event =
+        build_ses_event("Open",
+          email: "open-only-ts@example.com",
+          env: "test"
+        )
+        |> update_in(["mail"], &Map.delete(&1, "timestamp"))
+        |> Map.put("open", %{"timestamp" => "2026-03-19T16:45:00.000Z"})
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "open-only-ts@example.com",
+          event_type: "open"
+        )
+
+      assert event.event_timestamp == ~U[2026-03-19 16:45:00Z]
+    end
+
+    test "stores event_timestamp from click when mail timestamp is absent", %{
+      conn: conn
+    } do
+      ses_event =
+        build_ses_event("Click",
+          email: "click-only-ts@example.com",
+          env: "test",
+          link_url: "https://ysc.org/x"
+        )
+        |> update_in(["mail"], &Map.delete(&1, "timestamp"))
+        |> put_in(["click", "timestamp"], "2026-03-19T18:15:30.000Z")
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "click-only-ts@example.com",
+          event_type: "click"
+        )
+
+      assert event.event_timestamp == ~U[2026-03-19 18:15:30Z]
+    end
+
+    test "stores nil event_timestamp when no mail, open, click, bounce, or complaint timestamps exist",
+         %{conn: conn} do
+      {:ok, _subscriber} = Newsletter.subscribe("nil-ts-all@example.com")
+
+      ses_event =
+        build_ses_event("Open",
+          email: "nil-ts-all@example.com",
+          env: "test"
+        )
+        |> update_in(["mail"], &Map.delete(&1, "timestamp"))
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "nil-ts-all@example.com",
+          event_type: "open"
+        )
+
+      assert event.event_timestamp == nil
+    end
+  end
+
   describe "webhook/2 - environment filtering" do
     test "skips events from a different environment (no DB insert)", %{
       conn: conn
@@ -263,6 +772,113 @@ defmodule YscWeb.SesWebhookControllerTest do
     end
   end
 
+  describe "webhook/2 - Notification - malformed inner Message JSON" do
+    test "still returns 200 when SES Message JSON is invalid", %{conn: conn} do
+      payload = build_sns_wrapper("Notification", %{})
+
+      payload =
+        Map.put(payload, "Message", "not valid json {{{")
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 200
+    end
+  end
+
+  describe "webhook/2 - raw body (text/plain)" do
+    test "parses SNS JSON from raw body when params are empty", %{conn: conn} do
+      {:ok, _subscriber} = Newsletter.subscribe("rawbody@example.com")
+
+      ses_event =
+        build_ses_event("Open",
+          email: "rawbody@example.com",
+          env: "test"
+        )
+
+      body =
+        Jason.encode!(%{
+          "Type" => "Notification",
+          "MessageId" => "raw-msg-#{System.unique_integer()}",
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events",
+          "Message" => Jason.encode!(ses_event),
+          "Timestamp" => "2026-03-19T12:00:00.000Z",
+          "SigningCertURL" => "https://sns.amazonaws.com/cert.pem",
+          "Signature" => "test-signature"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "text/plain; charset=UTF-8")
+        |> post("/webhooks/ses", body)
+
+      assert conn.status == 200
+
+      assert Repo.get_by(EmailEvent,
+               email: "rawbody@example.com",
+               event_type: "open"
+             )
+    end
+  end
+
+  describe "webhook/2 - signature verification" do
+    test "returns 403 when SNS signature verification fails", %{conn: conn} do
+      prev = Application.get_env(:ysc, :sns_skip_signature_verification)
+      Application.put_env(:ysc, :sns_skip_signature_verification, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_skip_signature_verification, prev)
+      end)
+
+      ses_event =
+        build_ses_event("Open",
+          email: "sigfail@example.com",
+          env: "test"
+        )
+
+      payload =
+        build_sns_wrapper("Notification", ses_event, %{
+          "SigningCertURL" => "https://evil.example.com/cert.pem"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      assert conn.resp_body == "Forbidden"
+    end
+  end
+
+  describe "webhook/2 - tag extraction" do
+    test "flattens non-list tag values to a single string", %{conn: conn} do
+      {:ok, _subscriber} = Newsletter.subscribe("flat-tags@example.com")
+
+      ses_event =
+        build_ses_event("Open",
+          email: "flat-tags@example.com",
+          env: "test"
+        )
+        |> put_in(["mail", "tags"], %{"env" => "test"})
+
+      post_notification(conn, ses_event)
+
+      event =
+        Repo.get_by(EmailEvent,
+          email: "flat-tags@example.com",
+          event_type: "open"
+        )
+
+      assert event.environment == "test"
+    end
+  end
+
   describe "webhook/2 - invalid payloads" do
     test "returns 400 for invalid JSON", %{conn: conn} do
       conn =
@@ -270,6 +886,16 @@ defmodule YscWeb.SesWebhookControllerTest do
         |> put_req_header("x-amz-sns-message-type", "Notification")
         |> put_req_header("content-type", "text/plain")
         |> post("/webhooks/ses", "not-json-at-all{{{")
+
+      assert conn.status == 400
+    end
+
+    test "returns 400 when JSON body is empty object", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", "{}")
 
       assert conn.status == 400
     end
@@ -386,6 +1012,22 @@ defmodule YscWeb.SesWebhookControllerTest do
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
+
+  defp start_subscription_http_server(plug_module) do
+    {:ok, socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+
+    ref = :"ses_sub_http_#{port}_#{System.unique_integer([:positive])}"
+
+    {:ok, _} = Plug.Cowboy.http(plug_module, [], port: port, ref: ref)
+
+    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
+
+    port
+  end
 
   defp post_notification(conn, ses_event) do
     payload = build_sns_wrapper("Notification", ses_event)

@@ -386,6 +386,22 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
   describe "check-in toggle" do
     setup [:create_admin]
 
+    test "toggle-check-in with unknown ticket id shows error flash", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      html =
+        render_click(view, "toggle-check-in", %{
+          "ticket-id" => Ecto.ULID.generate()
+        })
+
+      assert html =~ "Ticket not found"
+    end
+
     test "checking in a ticket moves it to the checked-in section", %{
       conn: conn,
       admin: admin
@@ -830,6 +846,26 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       assert html_all =~ "0 / 1"
     end
 
+    test "clear-search event removes query and reloads tickets", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event} = setup_event_with_tickets(admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=filterxyz")
+
+      assert render(view) =~ "No tickets match your search"
+
+      html_after =
+        render_click(view, "clear-search", %{
+          "input-id" => "check-in-search-input"
+        })
+
+      refute html_after =~ "No tickets match your search"
+      assert html_after =~ "0 / 1"
+    end
+
     test "search does not affect total counter — only filtered results change",
          %{
            conn: conn,
@@ -1164,6 +1200,77 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       )
 
       assert render(view) =~ "0 / 1"
+    end
+  end
+
+  describe "check-in-order error handling" do
+    setup [:create_admin]
+
+    test "shows flash when order id does not exist", %{conn: conn, admin: admin} do
+      %{event: event} = setup_event_with_tickets(admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      html =
+        render_click(view, "check-in-order", %{
+          "order-id" => Ecto.ULID.generate()
+        })
+
+      assert html =~ "Order not found"
+    end
+  end
+
+  describe "PubSub TicketCheckInUndone different event" do
+    setup [:create_admin]
+
+    test "ignores TicketCheckInUndone broadcast for another event", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event, order: order} = setup_event_with_tickets(admin)
+      ticket = List.first(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(
+        checked_in: true,
+        checked_in_at: DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Repo.update!()
+
+      other_event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      assert render(view) =~ "1 / 1"
+
+      reloaded =
+        Repo.get!(Ysc.Events.Ticket, ticket.id)
+        |> Repo.preload([
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      undone =
+        reloaded
+        |> Ecto.Changeset.change(checked_in: false, checked_in_at: nil)
+        |> Repo.update!()
+        |> Repo.preload([
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        other_event.id,
+        %Ysc.MessagePassingEvents.TicketCheckInUndone{
+          ticket: undone,
+          event_id: other_event.id
+        }
+      )
+
+      assert render(view) =~ "1 / 1"
     end
   end
 end

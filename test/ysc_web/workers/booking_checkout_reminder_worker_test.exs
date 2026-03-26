@@ -5,6 +5,7 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorkerTest do
   use Ysc.DataCase, async: false
 
   alias YscWeb.Workers.BookingCheckoutReminderWorker
+  alias YscWeb.Emails.{BookingCheckoutReminder, Notifier}
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
 
@@ -16,6 +17,13 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorkerTest do
   end
 
   describe "perform/1" do
+    test "perform_job runs the worker", %{booking: booking} do
+      assert :ok =
+               perform_job(BookingCheckoutReminderWorker, %{
+                 "booking_id" => booking.id
+               })
+    end
+
     test "sends checkout reminder for active booking", %{booking: booking} do
       job = %Oban.Job{
         id: 1,
@@ -77,6 +85,38 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorkerTest do
       assert result == :ok
     end
 
+    test "perform completes when checkout email idempotency already exists (duplicate Oban insert)" do
+      user = user_fixture(%{email: "dup_checkout@example.com"})
+
+      booking =
+        booking_fixture(%{user_id: user.id, status: :complete})
+        |> Ysc.Repo.preload([:user, :rooms])
+
+      email_data = BookingCheckoutReminder.prepare_email_data(booking)
+
+      assert %Oban.Job{} =
+               Notifier.schedule_email(
+                 booking.user.email,
+                 "booking_checkout_reminder_#{booking.id}",
+                 BookingCheckoutReminder.get_subject(),
+                 BookingCheckoutReminder.get_template_name(),
+                 email_data,
+                 "",
+                 booking.user_id
+               )
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckoutReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckoutReminderWorker.perform(job)
+    end
+
     test "handles missing booking gracefully" do
       job = %Oban.Job{
         id: 1,
@@ -111,6 +151,44 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorkerTest do
         BookingCheckoutReminderWorker.schedule_reminder(booking.id, today)
 
       assert result == :ok
+    end
+
+    test "immediate path returns ok when booking does not exist" do
+      missing_id = Ecto.ULID.generate()
+
+      assert :ok ==
+               BookingCheckoutReminderWorker.schedule_reminder(
+                 missing_id,
+                 Date.utc_today()
+               )
+    end
+
+    test "immediate path skips when booking is not complete", %{user: user} do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+
+      booking =
+        %Ysc.Bookings.Booking{}
+        |> Ysc.Bookings.Booking.changeset(
+          %{
+            user_id: user.id,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            property: :tahoe,
+            booking_mode: :buyout,
+            status: :draft,
+            total_price: Money.new(200, :USD)
+          },
+          skip_validation: true
+        )
+        |> Ysc.Repo.insert!()
+
+      assert :ok ==
+               BookingCheckoutReminderWorker.schedule_reminder(
+                 booking.id,
+                 Date.utc_today()
+               )
     end
   end
 end

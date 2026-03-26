@@ -1,11 +1,100 @@
 defmodule Ysc.AccountsTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: false
 
   alias Ysc.Accounts
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
   alias Ysc.Accounts.{User, UserPasskey, UserToken}
+  alias Ysc.Payments.PaymentMethod
+  alias Ysc.Subscriptions
+  alias Ysc.Newsletter
+
+  defp user_with_lifetime_membership(attrs) do
+    user_fixture(attrs)
+    |> Ecto.Changeset.change(
+      lifetime_membership_awarded_at:
+        DateTime.truncate(DateTime.utc_now(), :second)
+    )
+    |> Repo.update!()
+  end
+
+  defp user_with_family_subscription(attrs) do
+    user = user_fixture(attrs)
+
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+    if family_plan do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_test_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Family Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: family_plan.stripe_price_id,
+          stripe_product_id: "prod_test_#{System.unique_integer()}",
+          stripe_id: "si_test_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      Accounts.get_user!(user.id, [:subscriptions])
+    else
+      user
+    end
+  end
+
+  defp user_with_single_subscription(attrs) do
+    user = user_fixture(attrs)
+
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+    if single_plan do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_test_single_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_test_single_#{System.unique_integer()}",
+          stripe_id: "si_test_single_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      Accounts.get_user!(user.id, [:subscriptions])
+    else
+      user
+    end
+  end
+
+  defp primary_with_active_subscription_no_items(attrs) do
+    user = user_fixture(attrs)
+
+    {:ok, _subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_no_items_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    Accounts.get_user!(user.id, [:subscriptions])
+  end
 
   describe "get_user_by_email/1" do
     test "does not return the user if the email does not exist" do
@@ -48,6 +137,13 @@ defmodule Ysc.AccountsTest do
       %{id: id} = user_fixture(%{phone_number: "+46701234567"})
       assert %User{id: ^id} = Accounts.get_user_by_phone_number("+46701234567")
       assert %User{id: ^id} = Accounts.get_user_by_phone_number("070-123 45 67")
+    end
+
+    test "returns user when exact DB match fails but a normalized variant matches (Finnish)" do
+      %{id: id} = user_fixture(%{phone_number: "+358401234567"})
+
+      # Covers find_user_by_normalized_phone/1 success path (accounts.ex ~75-85).
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number("040 123 4567")
     end
   end
 
@@ -162,6 +258,12 @@ defmodule Ysc.AccountsTest do
       user = user_fixture(%{phone_number: "+14159098280"})
       Accounts.store_email_verification_code(user, "123456", 600)
       assert Accounts.get_email_verification_code(user) == "123456"
+    end
+
+    test "get_email_verification_code returns nil when no code is stored",
+         %{} do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+      assert Accounts.get_email_verification_code(user) == nil
     end
 
     test "verify_email_verification_code returns ok when code matches", %{} do
@@ -529,6 +631,19 @@ defmodule Ysc.AccountsTest do
       assert Enum.any?(users, &(&1.id == user.id))
     end
 
+    test "empty search term delegates to list_paginated_users/1" do
+      _user = user_fixture(%{phone_number: "+14159098271"})
+      params = %{page: 1, page_size: 10}
+
+      assert {:ok, {users_a, meta_a}} = Accounts.list_paginated_users(params)
+
+      assert {:ok, {users_b, meta_b}} =
+               Accounts.list_paginated_users(params, "")
+
+      assert length(users_a) == length(users_b)
+      assert meta_a.total_count == meta_b.total_count
+    end
+
     test "multi-column order_by with membership_type restores sort metadata at original index" do
       _user = user_fixture(%{phone_number: "+14159098268"})
 
@@ -564,6 +679,26 @@ defmodule Ysc.AccountsTest do
       # prepended at index 0 to reflect the user's original sort intent.
       assert meta.flop.order_by == [:membership_type, :first_name, :last_name]
       assert meta.flop.order_directions == [:asc, :asc, :asc]
+    end
+
+    test "list_paginated_users/1 returns error for invalid Flop params" do
+      assert {:error, %Flop.Meta{errors: errors}} =
+               Accounts.list_paginated_users(%{"limit" => "not_a_number"})
+
+      assert Keyword.has_key?(errors, :limit)
+    end
+
+    test "list_paginated_users/2 with nil search_term delegates to list_paginated_users/1" do
+      _user = user_fixture(%{phone_number: "+14159098273"})
+      params = %{page: 1, page_size: 10}
+
+      assert {:ok, {users_a, meta_a}} = Accounts.list_paginated_users(params)
+
+      assert {:ok, {users_b, meta_b}} =
+               Accounts.list_paginated_users(params, nil)
+
+      assert length(users_a) == length(users_b)
+      assert meta_a.total_count == meta_b.total_count
     end
   end
 
@@ -1415,6 +1550,1456 @@ defmodule Ysc.AccountsTest do
       assert length(history) == 1
       assert hd(history).position == :secretary
       assert hd(history).ended_on == Date.utc_today()
+    end
+  end
+
+  describe "user_has_password_in_db?/1" do
+    test "returns true when user has a hashed password stored" do
+      user = user_fixture(%{phone_number: "+14159098300"})
+      assert Accounts.user_has_password_in_db?(user)
+      assert Accounts.user_has_password_in_db?(user.id)
+    end
+
+    test "returns false for OAuth user without password" do
+      user = oauth_user_fixture(%{phone_number: "+14159098301"})
+      refute Accounts.user_has_password_in_db?(user)
+    end
+  end
+
+  describe "get_user_by_email_for_passkey/1" do
+    test "returns nil when email is unknown" do
+      refute Accounts.get_user_by_email_for_passkey(
+               "nope-#{System.unique_integer()}@example.com"
+             )
+    end
+
+    test "returns user with passkeys preloaded" do
+      user = user_fixture(%{phone_number: "+14159098302"})
+
+      {:ok, _} =
+        Accounts.create_user_passkey(user, %{
+          external_id: "pk-email-test",
+          public_key: <<1>>
+        })
+
+      found = Accounts.get_user_by_email_for_passkey(user.email)
+      assert found.id == user.id
+      assert Ecto.assoc_loaded?(found.passkeys)
+      assert length(found.passkeys) == 1
+    end
+  end
+
+  describe "should_show_passkey_prompt?/1 dismissal cooldown" do
+    test "returns true when prompt was dismissed more than 30 days ago and user has no passkeys" do
+      user = user_fixture(%{phone_number: "+14159098303"})
+      assert {:ok, user} = Accounts.dismiss_passkey_prompt(user)
+
+      old =
+        user
+        |> Ecto.Changeset.change(%{
+          passkey_prompt_dismissed_at:
+            DateTime.utc_now()
+            |> DateTime.add(-31, :day)
+            |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      assert Accounts.should_show_passkey_prompt?(old) == true
+    end
+  end
+
+  describe "list_bod_members/0" do
+    test "returns board members with ordering fields" do
+      u1 = user_fixture(%{phone_number: "+14159098304", last_name: "Alpha"})
+      u2 = user_fixture(%{phone_number: "+14159098305", last_name: "Beta"})
+      {:ok, _} = Accounts.assign_board_position(u1, :president)
+      {:ok, _} = Accounts.assign_board_position(u2, :secretary)
+
+      bod = Accounts.list_bod_members()
+      emails = Enum.map(bod, & &1.email)
+      assert u1.email in emails
+      assert u2.email in emails
+      assert Enum.all?(bod, &Map.has_key?(&1, :board_position))
+    end
+  end
+
+  describe "get_pending_approval_users/0" do
+    test "returns users in pending_approval state with registration_form preloaded" do
+      pending =
+        oauth_user_fixture(%{
+          phone_number: "+14159098306",
+          state: :pending_approval
+        })
+
+      users = Accounts.get_pending_approval_users()
+      assert Enum.any?(users, &(&1.id == pending.id))
+      assert Enum.all?(users, &(&1.state == :pending_approval))
+    end
+  end
+
+  describe "revoke_user_session_by_id/2" do
+    test "revokes session when encoded id matches a session token" do
+      user = user_fixture(%{phone_number: "+14159098307"})
+      token = Accounts.generate_user_session_token(user)
+      encoded = Base.encode64(token)
+      assert Accounts.revoke_user_session_by_id(user, encoded) == :ok
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "returns error for invalid base64" do
+      user = user_fixture(%{phone_number: "+14159098308"})
+      assert Accounts.revoke_user_session_by_id(user, "@@@") == :error
+    end
+  end
+
+  describe "mark_email_verified/1, mark_phone_verified/1, mark_password_set/1" do
+    test "sets verification and password timestamps" do
+      user = user_fixture(%{phone_number: "+14159098309"})
+
+      assert {:ok, u1} = Accounts.mark_email_verified(user)
+      assert u1.email_verified_at
+
+      assert {:ok, u2} = Accounts.mark_phone_verified(u1)
+      assert u2.phone_verified_at
+
+      assert {:ok, u3} = Accounts.mark_password_set(u2)
+      assert u3.password_set_at
+    end
+  end
+
+  describe "post-migration onboarding" do
+    test "needs_post_migration_onboarding? and complete_post_migration_onboarding/1" do
+      user = oauth_user_fixture(%{phone_number: "+14159098310"})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          post_migration_onboarding_completed_at: nil,
+          email_verified_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      assert Accounts.needs_post_migration_onboarding?(user)
+
+      assert {:ok, done} = Accounts.complete_post_migration_onboarding(user)
+      assert done.post_migration_onboarding_completed_at
+      refute Accounts.needs_post_migration_onboarding?(done)
+    end
+  end
+
+  describe "user notes" do
+    test "create_user_note, list_user_notes, and list_user_notes_by_category" do
+      admin = user_fixture(%{phone_number: "+14159098311", role: :admin})
+      subject = user_fixture(%{phone_number: "+14159098312"})
+
+      assert {:ok, note} =
+               Accounts.create_user_note(
+                 subject,
+                 %{
+                   "note" => "Reviewed application",
+                   "category" => "general"
+                 },
+                 admin
+               )
+
+      assert note.user_id == subject.id
+
+      notes = Accounts.list_user_notes(subject.id)
+      assert length(notes) == 1
+      assert hd(notes).id == note.id
+
+      assert {:ok, _} =
+               Accounts.create_user_note(
+                 subject,
+                 %{"note" => "Rejected", "category" => "rejection"},
+                 admin
+               )
+
+      all_notes = Accounts.list_user_notes(subject.id)
+      assert length(all_notes) == 2
+
+      rejection_only =
+        Accounts.list_user_notes_by_category(subject.id, :rejection)
+
+      assert length(rejection_only) == 1
+      assert hd(rejection_only).category == :rejection
+    end
+  end
+
+  describe "get_signup_application_submission_date/1" do
+    test "returns submit date and timezone from signup application" do
+      user = user_fixture(%{phone_number: "+14159098313"})
+
+      %{completed: completed} =
+        signup_application_fixture(user, %{
+          browser_timezone: "America/Los_Angeles"
+        })
+
+      assert %{submit_date: ^completed, timezone: "America/Los_Angeles"} =
+               Accounts.get_signup_application_submission_date(user.id)
+    end
+
+    test "returns nil when user has no signup application" do
+      user = user_fixture(%{phone_number: "+14159098314"})
+      refute Accounts.get_signup_application_submission_date(user.id)
+    end
+  end
+
+  describe "leave_family_membership/1" do
+    test "clears primary link for a sub-account" do
+      primary = user_fixture(%{phone_number: "+14159098315"})
+      sub = user_fixture(%{phone_number: "+14159098316"})
+
+      {:ok, sub} =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update()
+
+      assert {:ok, left} = Accounts.leave_family_membership(sub)
+      assert is_nil(left.primary_user_id)
+      assert is_nil(left.family_relationship)
+    end
+
+    test "returns error when user is not a sub-account" do
+      primary = user_fixture(%{phone_number: "+14159098317"})
+
+      assert Accounts.leave_family_membership(primary) ==
+               {:error, :not_sub_account}
+    end
+  end
+
+  describe "list_memberships/1 and get_membership_stats/0" do
+    test "list_memberships returns a list" do
+      assert is_list(Accounts.list_memberships())
+    end
+
+    test "list_memberships accepts type and pagination options" do
+      assert is_list(
+               Accounts.list_memberships(type: :family, limit: 3, offset: 0)
+             )
+    end
+
+    test "get_membership_stats returns counts by category" do
+      stats = Accounts.get_membership_stats()
+
+      assert %{
+               total: _,
+               single: _,
+               family: _,
+               lifetime: _
+             } = stats
+    end
+
+    test "get_membership_stats and list_memberships include lifetime and family primaries" do
+      lifetime_primary =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      family_primary =
+        user_with_family_subscription(%{phone_number: unique_user_phone()})
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      stats = Accounts.get_membership_stats()
+      assert stats.lifetime >= 1
+      if family_plan, do: assert(stats.family >= 1)
+
+      memberships = Accounts.list_memberships(limit: 500)
+
+      assert Enum.any?(memberships, fn m ->
+               m.primary_user.id == lifetime_primary.id and m.type == :lifetime
+             end)
+
+      if family_plan do
+        assert Enum.any?(memberships, fn m ->
+                 m.primary_user.id == family_primary.id and m.type == :family
+               end)
+
+        family_only = Accounts.list_memberships(type: :family, limit: 500)
+
+        assert Enum.any?(family_only, fn m ->
+                 m.primary_user.id == family_primary.id
+               end)
+
+        refute Enum.any?(family_only, fn m ->
+                 m.primary_user.id == lifetime_primary.id
+               end)
+      end
+    end
+
+    test "list_memberships classifies active subscription without items as single type" do
+      primary =
+        primary_with_active_subscription_no_items(%{
+          phone_number: unique_user_phone()
+        })
+
+      assert Enum.any?(Accounts.list_memberships(limit: 500), fn m ->
+               m.primary_user.id == primary.id and m.type == :single
+             end)
+    end
+  end
+
+  describe "coverage: confirmation, search state, sessions, family branches" do
+    test "deliver_user_confirmation_instructions/2 returns already_confirmed when user is confirmed" do
+      user = user_fixture(%{phone_number: "+14159098400"})
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{
+          confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      assert {:error, :already_confirmed} =
+               Accounts.deliver_user_confirmation_instructions(user, fn _ ->
+                 "http://example.test/confirm"
+               end)
+    end
+
+    test "search_users/2 with state: :pending_approval finds pending users only" do
+      pending =
+        oauth_user_fixture(%{
+          phone_number: "+14159098401",
+          first_name: "ZetaPendingSearch",
+          state: :pending_approval
+        })
+
+      refute Enum.any?(
+               Accounts.search_users("ZetaPendingSearch"),
+               &(&1.id == pending.id)
+             )
+
+      assert Enum.any?(
+               Accounts.search_users("ZetaPendingSearch",
+                 state: :pending_approval
+               ),
+               &(&1.id == pending.id)
+             )
+    end
+
+    test "revoke_user_session_by_id/2 returns error when token belongs to another user" do
+      user_a = user_fixture(%{phone_number: "+14159098402"})
+      user_b = user_fixture(%{phone_number: "+14159098403"})
+      token = Accounts.generate_user_session_token(user_a)
+      encoded = Base.encode64(token)
+
+      assert Accounts.revoke_user_session_by_id(user_b, encoded) == :error
+      assert Accounts.get_user_by_session_token(token).id == user_a.id
+    end
+
+    test "has_active_membership?/1 is true for sub-account when primary has lifetime membership" do
+      primary =
+        oauth_user_fixture(%{phone_number: "+14159098404"})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      sub =
+        oauth_user_fixture(%{phone_number: "+14159098405"})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      assert Accounts.has_active_membership?(sub)
+    end
+
+    test "has_active_membership?/1 is true for sub-account when primary has active subscription" do
+      primary = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: primary.id,
+          stripe_id:
+            "sub_primary_subacct_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      assert {:ok, _} =
+               Subscriptions.create_subscription_item(%{
+                 subscription_id: subscription.id,
+                 stripe_price_id: "price_primary_subacct",
+                 stripe_product_id: "prod_primary_subacct",
+                 stripe_id:
+                   "si_primary_subacct_#{System.unique_integer([:positive])}",
+                 quantity: 1
+               })
+
+      sub =
+        user_fixture(%{phone_number: unique_user_phone()})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      assert Accounts.has_active_membership?(sub)
+    end
+
+    test "get_primary_user/1 returns nil for a primary account" do
+      primary = user_fixture(%{phone_number: "+14159098406"})
+      assert Accounts.get_primary_user(primary) == nil
+    end
+
+    test "get_sub_accounts/1 queries DB when sub_accounts association is not loaded" do
+      primary = user_fixture(%{phone_number: "+14159098407"})
+
+      sub =
+        oauth_user_fixture(%{phone_number: "+14159098408"})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      primary_fresh = Repo.get!(User, primary.id)
+      refute Ecto.assoc_loaded?(primary_fresh.sub_accounts)
+
+      ids = Enum.map(Accounts.get_sub_accounts(primary_fresh), & &1.id)
+      assert sub.id in ids
+    end
+
+    test "admin_link_user_to_family/3 returns cannot_link_self" do
+      primary = user_fixture(%{phone_number: "+14159098409"})
+      other = user_fixture(%{phone_number: "+14159098410"})
+
+      assert {:error, :cannot_link_self} =
+               Accounts.admin_link_user_to_family(primary, primary)
+
+      assert {:error, :cannot_link_self} =
+               Accounts.admin_link_user_to_family(other, other)
+    end
+
+    test "admin_link_user_to_family/3 returns not_primary_user when first user is a sub-account" do
+      primary = user_fixture(%{phone_number: "+14159098411"})
+
+      sub =
+        oauth_user_fixture(%{phone_number: "+14159098412"})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      victim = user_fixture(%{phone_number: "+14159098413"})
+
+      assert {:error, :not_primary_user} =
+               Accounts.admin_link_user_to_family(sub, victim)
+    end
+
+    test "admin_link_user_to_family/3 returns already_linked_to_family when target is a sub-account" do
+      primary = user_fixture(%{phone_number: "+14159098414"})
+
+      already_sub =
+        oauth_user_fixture(%{phone_number: "+14159098415"})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      other_primary = user_fixture(%{phone_number: "+14159098416"})
+
+      assert {:error, :already_linked_to_family} =
+               Accounts.admin_link_user_to_family(other_primary, already_sub)
+    end
+
+    test "admin_link_user_to_family/3 returns primary_must_have_family_or_lifetime when primary has no membership" do
+      primary = user_fixture(%{phone_number: "+14159098500"})
+      victim = user_fixture(%{phone_number: "+14159098501"})
+
+      assert {:error, :primary_must_have_family_or_lifetime} =
+               Accounts.admin_link_user_to_family(primary, victim)
+    end
+
+    test "admin_link_user_to_family/3 links child when primary has lifetime membership" do
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098502"})
+      victim = user_fixture(%{phone_number: "+14159098503"})
+
+      assert {:ok, linked} = Accounts.admin_link_user_to_family(primary, victim)
+      assert linked.primary_user_id == primary.id
+      assert linked.family_relationship == :child
+    end
+
+    test "admin_link_user_to_family/3 links child when primary has family subscription" do
+      primary = user_with_family_subscription(%{phone_number: "+14159098504"})
+      victim = user_fixture(%{phone_number: "+14159098505"})
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      if family_plan do
+        assert {:ok, linked} =
+                 Accounts.admin_link_user_to_family(primary, victim)
+
+        assert linked.primary_user_id == primary.id
+      else
+        assert {:error, :primary_must_have_family_or_lifetime} =
+                 Accounts.admin_link_user_to_family(primary, victim)
+      end
+    end
+
+    test "admin_link_user_to_family/3 returns max_spouses_reached when a spouse already exists" do
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098506"})
+      s1 = user_fixture(%{phone_number: "+14159098507"})
+      s2 = user_fixture(%{phone_number: "+14159098508"})
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(primary, s1,
+                 relationship: :spouse
+               )
+
+      assert {:error, :max_spouses_reached} =
+               Accounts.admin_link_user_to_family(primary, s2,
+                 relationship: :spouse
+               )
+    end
+
+    test "admin_link_user_to_family/3 returns max_sub_accounts_reached when primary has 10 children" do
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098509"})
+
+      for i <- 1..10 do
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: "sub#{i}_#{System.unique_integer()}@example.com",
+            password: "password123456",
+            first_name: "Sub",
+            last_name: "User#{i}",
+            phone_number:
+              "+1415555#{String.pad_leading(Integer.to_string(4000 + i), 4, "0")}",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+      end
+
+      eleventh = user_fixture(%{phone_number: "+14159098620"})
+
+      assert {:error, :max_sub_accounts_reached} =
+               Accounts.admin_link_user_to_family(primary, eleventh)
+    end
+
+    test "search_users matches full name via first_name || last_name fragment" do
+      user =
+        user_fixture(%{
+          first_name: "Bjorn",
+          last_name: "Ironside",
+          phone_number: "+14159098510"
+        })
+
+      assert Enum.any?(
+               Accounts.search_users("Bjorn Ironside"),
+               &(&1.id == user.id)
+             )
+    end
+
+    test "update_newsletter_on_email_change unsubscribes old and subscribes new when old was subscribed" do
+      user = user_fixture(%{phone_number: "+14159098511"})
+      old_email = user.email
+      new_email = unique_user_email()
+
+      assert {:ok, _} =
+               Newsletter.subscribe(old_email,
+                 user_id: user.id,
+                 first_name: user.first_name,
+                 last_name: user.last_name,
+                 source: "test",
+                 metadata: %{}
+               )
+
+      assert Accounts.update_newsletter_on_email_change(
+               user,
+               old_email,
+               new_email
+             ) == :ok
+
+      refute Newsletter.get_subscriber_by_email(old_email).subscribed
+      subscriber = Newsletter.get_subscriber_by_email(new_email)
+      assert subscriber.subscribed
+      assert subscriber.user_id == user.id
+    end
+
+    test "update_newsletter_on_email_change skips new subscribe when old was not subscribed" do
+      user = user_fixture(%{phone_number: "+14159098512"})
+      old_email = user.email
+      new_email = unique_user_email()
+
+      # register_user subscribes the email; unsubscribe so was_subscribed is false
+      assert {:ok, _} = Newsletter.unsubscribe(old_email)
+
+      assert Accounts.update_newsletter_on_email_change(
+               user,
+               old_email,
+               new_email
+             ) == :ok
+
+      refute match?(
+               %{subscribed: true},
+               Newsletter.get_subscriber_by_email(new_email)
+             )
+    end
+
+    test "set_user_initial_password/2 sets password for user without current password" do
+      user = oauth_user_fixture(%{phone_number: "+14159098513"})
+
+      assert {:ok, updated} =
+               Accounts.set_user_initial_password(user, %{
+                 "password" => "new valid password",
+                 "password_confirmation" => "new valid password"
+               })
+
+      assert Accounts.get_user_by_email_and_password(
+               user.email,
+               "new valid password"
+             ).id ==
+               updated.id
+    end
+  end
+
+  describe "change_notification_preferences, change_billing_address, and auth delegates" do
+    test "change_notification_preferences/2 returns a changeset" do
+      user = user_fixture(%{phone_number: "+14159098600"})
+
+      cs = Accounts.change_notification_preferences(user, %{})
+
+      assert %Ecto.Changeset{} = cs
+      assert cs.data.id == user.id
+    end
+
+    test "change_billing_address/2 merges user_id for address changeset" do
+      user = user_fixture(%{phone_number: "+14159098601"})
+
+      cs =
+        Accounts.change_billing_address(user, %{
+          "address" => "1 Test Way",
+          "city" => "SF"
+        })
+
+      assert Ecto.Changeset.get_field(cs, :user_id) == user.id
+    end
+
+    test "get_billing_address/1 returns persisted address after update_billing_address/2" do
+      user = user_fixture(%{phone_number: "+14159098602"})
+
+      assert {:ok, _} =
+               Accounts.update_billing_address(user, %{
+                 "address" => "99 Billing Rd",
+                 "city" => "Oakland",
+                 "postal_code" => "94607",
+                 "country" => "US"
+               })
+
+      user = Accounts.get_user!(user.id, [:billing_address])
+      addr = Accounts.get_billing_address(user)
+      assert addr != nil
+      assert addr.address == "99 Billing Rd"
+    end
+
+    test "get_user_auth_history/2 delegates to AuthService and returns a list" do
+      user = user_fixture(%{phone_number: "+14159098603"})
+      assert [] = Accounts.get_user_auth_history(user, 10)
+    end
+
+    test "get_last_successful_login_datetime/1 returns nil when user has no login events" do
+      user = user_fixture(%{phone_number: "+14159098604"})
+      assert Accounts.get_last_successful_login_datetime(user) == nil
+    end
+
+    test "get_last_session_timeframe/1 returns nil when there is no session history" do
+      user = user_fixture(%{phone_number: "+14159098605"})
+      assert Accounts.get_last_session_timeframe(user) == nil
+    end
+
+    test "can_send_family_invite?/1 is false without family or lifetime membership" do
+      user = user_fixture(%{phone_number: "+14159098606"})
+      refute Accounts.can_send_family_invite?(user)
+    end
+
+    test "can_send_family_invite?/1 is true for primary user with lifetime membership" do
+      user = user_with_lifetime_membership(%{phone_number: "+14159098607"})
+      assert Accounts.can_send_family_invite?(user)
+    end
+
+    test "update_user_phone_and_sms/2 updates phone number" do
+      user = user_fixture(%{phone_number: "+14159098608"})
+
+      assert {:ok, updated} =
+               Accounts.update_user_phone_and_sms(user, %{
+                 "phone_number" => "+14155559876"
+               })
+
+      assert updated.phone_number == "+14155559876"
+    end
+  end
+
+  describe "authorization and signup application access" do
+    test "update_user/3 returns unauthorized when member updates another user" do
+      member = user_fixture(%{phone_number: unique_user_phone()})
+      other = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, :unauthorized} =
+               Accounts.update_user(other, %{"first_name" => "X"}, member)
+    end
+
+    test "update_user_with_address/3 returns unauthorized when member updates another user" do
+      member = user_fixture(%{phone_number: unique_user_phone()})
+      other = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, :unauthorized} =
+               Accounts.update_user_with_address(
+                 other,
+                 %{"first_name" => "Y"},
+                 member
+               )
+    end
+
+    test "get_signup_application_from_user_id!/3 returns application for admin" do
+      subject = user_fixture(%{phone_number: unique_user_phone()})
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      _app = signup_application_fixture(subject)
+
+      assert %Ysc.Accounts.SignupApplication{} =
+               Accounts.get_signup_application_from_user_id!(
+                 subject.id,
+                 admin,
+                 []
+               )
+    end
+
+    test "get_signup_application_from_user_id!/3 preloads requested associations" do
+      subject = user_fixture(%{phone_number: unique_user_phone()})
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      _app = signup_application_fixture(subject)
+
+      app =
+        Accounts.get_signup_application_from_user_id!(subject.id, admin, [
+          :user
+        ])
+
+      assert app.user_id == subject.id
+      assert Ecto.assoc_loaded?(app.user)
+      assert app.user.id == subject.id
+    end
+
+    test "get_signup_application_from_user_id!/3 returns error when member requests another user's application" do
+      subject = user_fixture(%{phone_number: unique_user_phone()})
+      member = user_fixture(%{phone_number: unique_user_phone()})
+      _app = signup_application_fixture(subject)
+
+      assert {:error, :unauthorized} =
+               Accounts.get_signup_application_from_user_id!(
+                 subject.id,
+                 member,
+                 []
+               )
+    end
+  end
+
+  describe "deliver_application_submitted_notification/1" do
+    test "inserts EmailNotifier job for application_submitted template", %{} do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert %Oban.Job{args: args} =
+               Accounts.deliver_application_submitted_notification(user)
+
+      assert args["template"] == "application_submitted"
+      assert args["recipient"] == user.email
+    end
+  end
+
+  describe "create_user_note/3 validation" do
+    test "returns error when note is empty", %{} do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      subject = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Accounts.create_user_note(
+                 subject,
+                 %{"note" => "", "category" => "general"},
+                 admin
+               )
+
+      refute cs.valid?
+    end
+  end
+
+  describe "set_user_initial_password/2 errors" do
+    test "returns changeset error for password too short", %{} do
+      user = oauth_user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Accounts.set_user_initial_password(user, %{
+                 "password" => "short",
+                 "password_confirmation" => "short"
+               })
+
+      assert cs.errors[:password]
+    end
+  end
+
+  describe "list_paginated_users/1 membership filter" do
+    test "filters to lifetime members when membership_type filter is lifetime" do
+      phone = unique_user_phone()
+      _lifetime = user_with_lifetime_membership(%{phone_number: phone})
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "filters" => %{
+          "0" => %{"field" => "membership_type", "value" => "lifetime"}
+        }
+      }
+
+      assert {:ok, {users, _meta}} = Accounts.list_paginated_users(params)
+
+      assert Enum.any?(users, fn u ->
+               not is_nil(u.lifetime_membership_awarded_at)
+             end)
+    end
+
+    test "filters to single-plan members when membership_type filter is single" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      if single_plan do
+        single_user =
+          user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+        params = %{
+          "page" => "1",
+          "page_size" => "50",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "single"}
+          }
+        }
+
+        assert {:ok, {users, _meta}} = Accounts.list_paginated_users(params)
+
+        assert Enum.any?(users, &(&1.id == single_user.id))
+      end
+    end
+
+    test "membership_type filter accepts a list of types (OR)" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      lifetime_user =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      family_user =
+        user_with_family_subscription(%{phone_number: unique_user_phone()})
+
+      params = %{
+        "page" => "1",
+        "page_size" => "100",
+        "filters" => %{
+          "0" => %{
+            "field" => "membership_type",
+            "value" => ["lifetime", "family"]
+          }
+        }
+      }
+
+      assert {:ok, {users, _meta}} = Accounts.list_paginated_users(params)
+
+      assert Enum.any?(users, &(&1.id == lifetime_user.id))
+
+      if family_plan do
+        assert Enum.any?(users, &(&1.id == family_user.id))
+      end
+    end
+  end
+
+  describe "list_paginated_users/2 sub-account primary_user preload" do
+    test "preloads primary user and subscriptions for sub-accounts when primary has family membership" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      if family_plan do
+        primary =
+          user_with_family_subscription(%{
+            phone_number: unique_user_phone(),
+            first_name: "PrimarySubPreload"
+          })
+
+        sub =
+          user_fixture(%{
+            phone_number: unique_user_phone(),
+            first_name: "SubPreloadSearch"
+          })
+          |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+          |> Repo.update!()
+
+        params = %{page: 1, page_size: 50}
+
+        assert {:ok, {users, _meta}} =
+                 Accounts.list_paginated_users(params, "SubPreloadSearch")
+
+        found = Enum.find(users, &(&1.id == sub.id))
+        assert found != nil
+        assert %User{} = found.primary_user
+        assert found.primary_user.id == primary.id
+        assert Ecto.assoc_loaded?(found.primary_user.subscriptions)
+      end
+    end
+  end
+
+  describe "has_active_membership?/1 subscriptions not loaded" do
+    test "loads subscriptions when struct has NotLoaded subscriptions" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cov_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      assert {:ok, _} =
+               Subscriptions.create_subscription_item(%{
+                 subscription_id: subscription.id,
+                 stripe_price_id: "price_test_cov",
+                 stripe_product_id: "prod_test_cov",
+                 stripe_id: "si_cov_#{System.unique_integer()}",
+                 quantity: 1
+               })
+
+      fresh = Repo.get!(User, user.id)
+      assert match?(%Ecto.Association.NotLoaded{}, fresh.subscriptions)
+      assert Accounts.has_active_membership?(fresh)
+    end
+  end
+
+  describe "update_default_payment_method/2" do
+    test "sets the given payment method as the user's default" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      pm_a =
+        %PaymentMethod{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_default_a_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_default_#{System.unique_integer([:positive])}",
+          provider_type: "card",
+          type: :card,
+          last_four: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          display_brand: "visa",
+          is_default: true
+        }
+        |> Repo.insert!()
+
+      pm_b =
+        %PaymentMethod{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_default_b_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_default_#{System.unique_integer([:positive])}",
+          provider_type: "card",
+          type: :card,
+          last_four: "0005",
+          exp_month: 11,
+          exp_year: 2031,
+          display_brand: "mastercard",
+          is_default: false
+        }
+        |> Repo.insert!()
+
+      assert pm_a.is_default
+      refute pm_b.is_default
+
+      assert {:ok, _} = Accounts.update_default_payment_method(user, pm_b.id)
+
+      pm_a = Repo.get!(PaymentMethod, pm_a.id)
+      pm_b = Repo.get!(PaymentMethod, pm_b.id)
+      refute pm_a.is_default
+      assert pm_b.is_default
+    end
+  end
+
+  describe "record_application_outcome/4" do
+    test "approves pending application and activates user" do
+      applicant =
+        oauth_user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      application = signup_application_fixture(applicant)
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      assert {:ok, _} =
+               Accounts.record_application_outcome(
+                 :approved,
+                 applicant,
+                 application,
+                 admin
+               )
+
+      assert Repo.get!(User, applicant.id).state == :active
+
+      reviewed =
+        Repo.get!(Ysc.Accounts.SignupApplication, application.id)
+
+      assert reviewed.review_outcome == :approved
+      assert reviewed.reviewed_by_user_id == admin.id
+    end
+
+    test "rejects pending application" do
+      applicant =
+        oauth_user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      application = signup_application_fixture(applicant)
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      assert :ok =
+               Accounts.record_application_outcome(
+                 :rejected,
+                 applicant,
+                 application,
+                 admin
+               )
+
+      assert Repo.get!(User, applicant.id).state == :rejected
+
+      reviewed =
+        Repo.get!(Ysc.Accounts.SignupApplication, application.id)
+
+      assert reviewed.review_outcome == :rejected
+    end
+  end
+
+  describe "list_paginated_users/2 multi-word fuzzy search" do
+    test "finds users by two-word full name (John Doe)" do
+      user =
+        user_fixture(%{
+          first_name: "John",
+          last_name: "Doe",
+          phone_number: unique_user_phone()
+        })
+
+      _other =
+        user_fixture(%{
+          first_name: "Jane",
+          last_name: "Doe",
+          phone_number: unique_user_phone()
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {users, _meta}} =
+               Accounts.list_paginated_users(params, "John Doe")
+
+      assert Enum.any?(users, &(&1.id == user.id))
+    end
+  end
+
+  describe "register_user/1 with signup application (birth_date and billing address)" do
+    test "persists date of birth from signup application and creates billing address" do
+      email = unique_user_email()
+      phone = unique_user_phone()
+
+      attrs =
+        valid_user_attributes(%{
+          email: email,
+          phone_number: phone,
+          registration_form: %{
+            membership_type: "single",
+            membership_eligibility: ["born_in_scandinavia"],
+            occupation: "Developer",
+            birth_date: ~D[1991-06-15],
+            address: "456 Nordic Ln",
+            country: "USA",
+            city: "Seattle",
+            postal_code: "98101",
+            place_of_birth: "Bergen",
+            citizenship: "Norwegian",
+            most_connected_nordic_country: "Norway",
+            agreed_to_bylaws: true,
+            completed: DateTime.utc_now()
+          }
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Repo.get!(User, user.id)
+
+      assert user.date_of_birth == ~D[1991-06-15]
+
+      assert %Ysc.Accounts.Address{} =
+               address = Accounts.get_billing_address(user)
+
+      assert address.address == "456 Nordic Ln"
+      assert address.city == "Seattle"
+    end
+  end
+
+  describe "has_active_membership?/1 sub-account without primary" do
+    test "returns false when primary user cannot be loaded" do
+      missing_primary_id = Ecto.ULID.generate()
+
+      user = %User{
+        id: Ecto.ULID.generate(),
+        primary_user_id: missing_primary_id,
+        primary_user: %Ecto.Association.NotLoaded{}
+      }
+
+      refute Accounts.has_active_membership?(user)
+    end
+  end
+
+  describe "coverage — get_user_by_phone_number normalization edge cases" do
+    test "returns nil when no user matches after normalization variants" do
+      assert Accounts.get_user_by_phone_number("+999999999999999") == nil
+    end
+  end
+
+  describe "coverage — register_user billing address from signup" do
+    test "continues registration when billing address insert fails (city too long for Address schema)" do
+      email = unique_user_email()
+      long_city = String.duplicate("C", 101)
+
+      attrs =
+        valid_user_attributes(%{
+          email: email,
+          phone_number: unique_user_phone(),
+          registration_form: %{
+            membership_type: "single",
+            membership_eligibility: ["born_in_scandinavia"],
+            occupation: "Developer",
+            birth_date: ~D[1991-06-15],
+            address: "456 Nordic Ln",
+            country: "USA",
+            city: long_city,
+            postal_code: "98101",
+            place_of_birth: "Bergen",
+            citizenship: "Norwegian",
+            most_connected_nordic_country: "Norway",
+            agreed_to_bylaws: true,
+            completed: DateTime.utc_now()
+          }
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      assert user.email == email
+      assert Accounts.get_billing_address(user) == nil
+    end
+  end
+
+  describe "coverage — has_active_membership? unexpected subscription assoc shape" do
+    test "returns false when subscriptions is not loaded and not a list" do
+      user = %User{
+        id: Ecto.ULID.generate(),
+        subscriptions: %{},
+        lifetime_membership_awarded_at: nil
+      }
+
+      refute Accounts.has_active_membership?(user)
+    end
+  end
+
+  describe "update_user/3 and update_user_with_address/3 validation errors" do
+    test "returns changeset error when admin submits empty first_name" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Accounts.update_user(user, %{"first_name" => ""}, admin)
+
+      assert cs.errors[:first_name]
+    end
+
+    test "returns changeset error when admin submits phone_number over max length" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "phone_number" => String.duplicate("1", 30)
+                 },
+                 admin
+               )
+
+      assert cs.errors[:phone_number]
+    end
+  end
+
+  describe "update_user_profile/2 validation" do
+    test "returns error when first_name is empty" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Accounts.update_user_profile(user, %{
+                 first_name: "",
+                 last_name: "Doe"
+               })
+
+      assert cs.errors[:first_name]
+    end
+  end
+
+  describe "update_billing_address/2 validation" do
+    test "returns error when city exceeds max length" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Accounts.update_billing_address(user, %{
+                 "address" => "123 St",
+                 "city" => String.duplicate("Y", 101),
+                 "postal_code" => "94105",
+                 "country" => "US"
+               })
+
+      assert cs.errors[:city]
+    end
+  end
+
+  describe "get_user_by_session_token/1 membership cache" do
+    test "skips subscription preload when membership cache has a value", %{} do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+      token = Accounts.generate_user_session_token(user)
+
+      assert {:ok, true} =
+               Cachex.put(:ysc_cache, "membership:#{user.id}:active", :cached)
+
+      on_exit(fn -> Cachex.del(:ysc_cache, "membership:#{user.id}:active") end)
+
+      loaded = Accounts.get_user_by_session_token(token)
+      assert loaded.id == user.id
+      assert match?(%Ecto.Association.NotLoaded{}, loaded.subscriptions)
+    end
+  end
+
+  describe "get_primary_user/1 with preloaded association" do
+    test "returns primary struct when primary_user is already loaded", %{} do
+      primary = user_fixture(%{phone_number: unique_user_phone()})
+
+      sub =
+        user_fixture(%{phone_number: unique_user_phone()})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      sub = Repo.preload(sub, :primary_user)
+      assert %User{id: id} = Accounts.get_primary_user(sub)
+      assert id == primary.id
+    end
+  end
+
+  describe "send_email_verification_code/4 and send_phone_verification_code/4" do
+    test "uses target email and resend suffix in idempotency key for email",
+         %{} do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+      other_email = unique_user_email()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Accounts.send_email_verification_code(
+          user,
+          "123456",
+          "retry1",
+          other_email
+        )
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "recipient" => other_email,
+            "idempotency_key" => "account_setup_verification_#{user.id}_retry1",
+            "template" => "account_setup_verification"
+          }
+        )
+      end)
+    end
+
+    test "uses to_phone and resend suffix for SMS verification", %{} do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Accounts.send_phone_verification_code(
+          user,
+          "999999",
+          "sms2",
+          "+12065550001"
+        )
+
+        assert_enqueued(
+          worker: YscWeb.Workers.SmsNotifier,
+          args: %{
+            "phone_number" => "12065550001",
+            "idempotency_key" => "phone_verification_#{user.id}_sms2",
+            "template" => "phone_verification"
+          }
+        )
+      end)
+    end
+  end
+
+  describe "list_paginated_users/1 membership filter none" do
+    test "filters to users without active subscription when membership_type is none" do
+      phone = unique_user_phone()
+      _no_sub = user_fixture(%{phone_number: phone})
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "filters" => %{
+          "0" => %{"field" => "membership_type", "value" => "none"}
+        }
+      }
+
+      assert {:ok, {users, _meta}} = Accounts.list_paginated_users(params)
+
+      assert Enum.all?(users, fn u ->
+               is_nil(u.lifetime_membership_awarded_at) and
+                 (u.subscriptions == [] or
+                    not Enum.any?(u.subscriptions, &Ysc.Subscriptions.valid?/1))
+             end)
+    end
+  end
+
+  describe "list_paginated_users/2 multi-word search with explicit sort" do
+    test "uses fuzzy multi-word query without rank when order_by is explicit" do
+      user =
+        user_fixture(%{
+          first_name: "Alice",
+          last_name: "Wonderland",
+          phone_number: unique_user_phone()
+        })
+
+      params = %{
+        "page" => "1",
+        "page_size" => "20",
+        "order_by" => ["last_name"],
+        "order_directions" => ["asc"]
+      }
+
+      assert {:ok, {users, _meta}} =
+               Accounts.list_paginated_users(params, "Alice Wonderland")
+
+      assert Enum.any?(users, &(&1.id == user.id))
+    end
+  end
+
+  describe "coverage — get_user_by_phone_number/1 and update_newsletter_on_email_change/3" do
+    test "matches via normalize_phone_number_variants when lookup omits country code (E.164 first variant)" do
+      phone = unique_user_phone()
+      %{id: id} = user_fixture(%{phone_number: phone})
+      national = String.slice(phone, 2..-1//1)
+
+      assert %User{id: ^id} = Accounts.get_user_by_phone_number(national)
+    end
+
+    test "update_newsletter_on_email_change: old email with no subscriber row is treated as not subscribed" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      old_email =
+        "never-subscribed-#{System.unique_integer([:positive])}@example.com"
+
+      new_email = unique_user_email()
+
+      assert Accounts.update_newsletter_on_email_change(
+               user,
+               old_email,
+               new_email
+             ) == :ok
+
+      refute Newsletter.get_subscriber_by_email(old_email)
+    end
+  end
+
+  describe "create_billing_address_from_signup/1" do
+    test "returns {:ok, nil} when signup application is missing required address fields" do
+      email = unique_user_email()
+
+      attrs =
+        valid_user_attributes(%{
+          email: email,
+          phone_number: unique_user_phone(),
+          registration_form: %{
+            membership_type: "single",
+            membership_eligibility: ["born_in_scandinavia"],
+            occupation: "Developer",
+            birth_date: ~D[1991-06-15],
+            address: "456 Nordic Ln",
+            country: "USA",
+            city: "Seattle",
+            postal_code: "98101",
+            place_of_birth: "Bergen",
+            citizenship: "Norwegian",
+            most_connected_nordic_country: "Norway",
+            agreed_to_bylaws: true,
+            completed: DateTime.utc_now()
+          }
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+
+      user = Accounts.get_user!(user.id, [:registration_form, :billing_address])
+
+      if addr = user.billing_address do
+        Repo.delete!(addr)
+      end
+
+      # DB enforces NOT NULL on city; simulate incomplete data the function still handles.
+      form = %{user.registration_form | city: nil}
+      user = %{user | registration_form: form}
+
+      assert Accounts.create_billing_address_from_signup(user) == {:ok, nil}
+    end
+
+    test "loads registration_form when association was not preloaded" do
+      email = unique_user_email()
+
+      attrs =
+        valid_user_attributes(%{
+          email: email,
+          phone_number: unique_user_phone(),
+          registration_form: %{
+            membership_type: "single",
+            membership_eligibility: ["born_in_scandinavia"],
+            occupation: "Developer",
+            birth_date: ~D[1991-06-15],
+            address: "789 Nordic Ln",
+            country: "USA",
+            city: "Seattle",
+            postal_code: "98101",
+            place_of_birth: "Bergen",
+            citizenship: "Norwegian",
+            most_connected_nordic_country: "Norway",
+            agreed_to_bylaws: true,
+            completed: DateTime.utc_now()
+          }
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      assert %Ysc.Accounts.Address{} = Accounts.get_billing_address(user)
+
+      user = Repo.get!(User, user.id)
+      refute Ecto.assoc_loaded?(user.registration_form)
+
+      assert {:ok, %Ysc.Accounts.Address{}} =
+               Accounts.create_billing_address_from_signup(user)
+    end
+
+    test "returns {:ok, nil} when registration_form is nil after preload" do
+      user = oauth_user_fixture(%{phone_number: unique_user_phone()})
+      user = Accounts.get_user!(user.id, [:registration_form])
+      assert user.registration_form == nil
+      assert Accounts.create_billing_address_from_signup(user) == {:ok, nil}
+    end
+
+    test "preloads and returns {:ok, nil} when user has no signup application (association not loaded)" do
+      user = oauth_user_fixture(%{phone_number: unique_user_phone()})
+      user = Repo.get!(User, user.id)
+      refute Ecto.assoc_loaded?(user.registration_form)
+      assert Accounts.create_billing_address_from_signup(user) == {:ok, nil}
     end
   end
 end

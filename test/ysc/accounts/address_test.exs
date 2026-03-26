@@ -279,4 +279,70 @@ defmodule Ysc.Accounts.AddressTest do
       assert "should be at most 255 character(s)" in errors_on(changeset).address
     end
   end
+
+  describe "optional_changeset/2" do
+    test "valid with no fields set" do
+      changeset = Address.optional_changeset(%Address{}, %{})
+
+      assert changeset.valid?
+    end
+
+    test "rejects address longer than max length" do
+      changeset =
+        Address.optional_changeset(%Address{}, %{
+          address: String.duplicate("a", 256)
+        })
+
+      refute changeset.valid?
+
+      assert "should be at most 255 character(s)" in errors_on(changeset).address
+    end
+
+    test "rejects city longer than max length" do
+      changeset =
+        Address.optional_changeset(%Address{}, %{
+          city: String.duplicate("a", 101)
+        })
+
+      refute changeset.valid?
+      assert "should be at most 100 character(s)" in errors_on(changeset).city
+    end
+
+    test "rejects country longer than max length" do
+      changeset =
+        Address.optional_changeset(%Address{}, %{
+          country: String.duplicate("a", 101)
+        })
+
+      refute changeset.valid?
+
+      assert "should be at most 100 character(s)" in errors_on(changeset).country
+    end
+  end
+
+  describe "migration_changeset/2" do
+    test "requires address and country only" do
+      changeset =
+        Address.migration_changeset(%Address{}, %{
+          address: "1 Road",
+          country: "US"
+        })
+
+      assert changeset.valid?
+    end
+
+    test "invalid without country" do
+      changeset = Address.migration_changeset(%Address{}, %{address: "1 Road"})
+
+      refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).country
+    end
+
+    test "invalid without address" do
+      changeset = Address.migration_changeset(%Address{}, %{country: "US"})
+
+      refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).address
+    end
+  end
 end

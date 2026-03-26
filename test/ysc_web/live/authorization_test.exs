@@ -70,6 +70,12 @@ defmodule YscWeb.AuthorizationTest do
       import Mox
       alias Ysc.StripeMock
 
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
       Application.put_env(:ysc, :stripe_client, StripeMock)
 
       stub(StripeMock, :create_payment_intent, fn _params, _opts ->

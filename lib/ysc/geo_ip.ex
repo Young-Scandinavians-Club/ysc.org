@@ -37,6 +37,15 @@ defmodule Ysc.GeoIP do
 
   def lookup(_), do: %{}
 
+  @doc """
+  Parses a raw MaxMind GeoLite2-style map (as returned by `:locus`) into the
+  compact map used by `lookup/1`.
+
+  Exposed for unit tests and for callers that already have an entry map.
+  """
+  def parse_locus_entry(entry) when is_map(entry), do: parse_entry(entry)
+  def parse_locus_entry(_), do: %{}
+
   # Private
 
   defp do_lookup(ip_address) do

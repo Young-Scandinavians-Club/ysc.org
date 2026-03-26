@@ -187,6 +187,58 @@ defmodule YscWeb.ContactLiveTest do
     end
   end
 
+  describe "save (authenticated)" do
+    test "submits contact form without Turnstile when logged in", %{conn: conn} do
+      user =
+        user_fixture(%{
+          first_name: "Contact",
+          last_name: "Tester",
+          email: "contact_tester#{System.unique_integer()}@example.com"
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      view
+      |> form("#contact-form",
+        contact_form: %{
+          subject: "General Inquiry",
+          message: "Hello from LiveView test message body."
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Thank you! Your message has been sent"
+    end
+
+    test "keeps form visible when validation fails for logged-in user", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      view
+      |> form("#contact-form",
+        contact_form: %{
+          subject: "General Inquiry",
+          message: "short"
+        }
+      )
+      |> render_submit()
+
+      assert has_element?(view, "#contact-form")
+
+      refute has_element?(
+               view,
+               "span",
+               "Thank you! Your message has been sent"
+             )
+    end
+  end
+
   describe "form validation" do
     test "validates form on change", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/contact")

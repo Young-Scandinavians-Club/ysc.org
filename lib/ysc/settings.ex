@@ -231,7 +231,7 @@ defmodule Ysc.Settings do
               Ysc.Logging.error("[Settings] Exception while creating setting",
                 name: name,
                 error: error_message,
-                stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+                stacktrace: __STACKTRACE__
               )
 
               default_value

@@ -4,8 +4,21 @@ defmodule YscWeb.NewsLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Media.Image
   alias Ysc.Posts
   alias Ysc.Repo
+
+  defp image_fixture(user_id) do
+    {:ok, image} =
+      %Image{}
+      |> Image.add_image_changeset(%{
+        raw_image_path: "/test/raw/hero-#{System.unique_integer()}.jpg",
+        user_id: user_id
+      })
+      |> Repo.insert()
+
+    image
+  end
 
   # Helper to create a post. When author has board_position and post is published,
   # sets board_position_at_publish so the UI shows the historic role.
@@ -37,14 +50,19 @@ defmodule YscWeb.NewsLiveTest do
   end
 
   defp maybe_set_board_position_at_publish(attrs, author) do
-    if attrs[:state] == :published && author.board_position do
-      Map.put(
-        attrs,
-        :board_position_at_publish,
-        to_string(author.board_position)
-      )
-    else
-      attrs
+    cond do
+      Map.has_key?(attrs, :board_position_at_publish) ->
+        attrs
+
+      attrs[:state] == :published && author.board_position ->
+        Map.put(
+          attrs,
+          :board_position_at_publish,
+          to_string(author.board_position)
+        )
+
+      true ->
+        attrs
     end
   end
 
@@ -260,6 +278,184 @@ defmodule YscWeb.NewsLiveTest do
 
       html = render(view)
       assert html =~ "Club News"
+    end
+  end
+
+  describe "post body and metadata rendering" do
+    test "uses scrubbed raw_body when preview_text is nil", %{conn: conn} do
+      create_post(%{
+        title: "Preview From Raw",
+        preview_text: nil,
+        raw_body: "<p>UniqueRawSnippet#{System.unique_integer()}</p>"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "UniqueRawSnippet"
+    end
+
+    test "uses rendered_body for reading time when present", %{conn: conn} do
+      long_html = "<p>" <> String.duplicate("word ", 500) <> "</p>"
+
+      create_post(%{
+        title: "Rendered Body Post",
+        raw_body: "<p>short</p>",
+        rendered_body: long_html,
+        preview_text: nil
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "min read"
+    end
+
+    test "shows default reading time when bodies are empty", %{conn: conn} do
+      create_post(%{
+        title: "Empty Body Post",
+        raw_body: "",
+        rendered_body: nil,
+        preview_text: nil
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "1 min read"
+    end
+
+    test "formats unknown board position strings via title case fallback", %{
+      conn: conn
+    } do
+      create_post(%{
+        title: "Unknown Role Post",
+        board_position_at_publish: "zz_unknown_role"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "YSC Zz_unknown_role"
+    end
+
+    test "uses raw image path when optimized image is not available", %{
+      conn: conn
+    } do
+      author = user_fixture()
+      image = image_fixture(author.id)
+
+      create_post(%{
+        title: "Image Grid Post",
+        author: author,
+        image_id: image.id
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      html = render(view)
+      assert html =~ image.raw_image_path
+    end
+  end
+
+  describe "pagination edge cases" do
+    test "next-page when no older posts marks end of timeline", %{conn: conn} do
+      base = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      for i <- 0..9 do
+        create_post(%{
+          title: "Pag Post #{i}",
+          url_name: "pag-post-#{i}-#{System.unique_integer()}",
+          published_on: DateTime.add(base, i, :second)
+        })
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      render_click(view, "next-page")
+
+      html = render(view)
+      assert html =~ "Club News"
+    end
+
+    test "next-page when cursor is exhausted returns empty batch", %{conn: conn} do
+      for i <- 1..11 do
+        create_post(%{
+          title: "Timeline End #{i}",
+          url_name: "tl-end-#{i}-#{System.unique_integer()}"
+        })
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      render_click(view, "next-page")
+
+      rendered = :sys.get_state(view.pid)
+      assert rendered.socket.assigns.end_of_timeline?
+
+      html = render_click(view, "next-page")
+      assert html =~ "Club News"
+    end
+  end
+
+  describe "reading time branches" do
+    test "uses preview_text for reading time when bodies are empty", %{
+      conn: conn
+    } do
+      html_preview =
+        "<p>" <> String.duplicate("alpha ", 400) <> "</p>"
+
+      create_post(%{
+        title: "Preview Time",
+        raw_body: "",
+        rendered_body: nil,
+        preview_text: html_preview
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "min read"
+    end
+  end
+
+  describe "handle_async load_news_data exit" do
+    test "marks async loaded when async task exits", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/news")
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.NewsLive.handle_async(
+                 :load_news_data,
+                 {:exit, :test_reason},
+                 socket
+               )
+
+      assert new_socket.assigns.async_data_loaded == true
+    end
+  end
+
+  describe "board position title lookup" do
+    test "renders historic board role from string matching lookup atom", %{
+      conn: conn
+    } do
+      create_post(%{
+        title: "President Column",
+        board_position_at_publish: "president"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      assert render(view) =~ "YSC President"
     end
   end
 end

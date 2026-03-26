@@ -12,6 +12,9 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
   alias YscWeb.Workers.BookingCheckinReminderWorker
   alias Ysc.Bookings.Booking
   alias Ysc.Repo
+  alias YscWeb.Emails.{BookingCheckinReminder, Notifier}
+  alias YscWeb.Sms.BookingCheckinReminder, as: SmsBookingCheckinReminder
+  alias YscWeb.Sms.Notifier, as: SmsNotifier
 
   setup do
     # Clear SMS rate limit cache
@@ -24,6 +27,16 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
   end
 
   describe "perform/1" do
+    test "perform_job runs the worker" do
+      user = user_fixture(%{email: "perform-job-checkin@example.com"})
+      booking = create_complete_booking(user)
+
+      assert :ok =
+               perform_job(BookingCheckinReminderWorker, %{
+                 "booking_id" => booking.id
+               })
+    end
+
     test "sends email reminder for active booking" do
       user = user_fixture(%{email: "test@example.com"})
       booking = create_complete_booking(user)
@@ -200,9 +213,170 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       result = BookingCheckinReminderWorker.perform(job)
       assert result == :ok
     end
+
+    test "sends reminder for Clear Lake complete booking" do
+      user = user_fixture(%{email: "clear_lake_checkin@example.com"})
+      booking = create_complete_booking(user, property: :clear_lake)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+    end
+
+    test "perform sends for complete booking whose check-in date is already past" do
+      user = user_fixture(%{email: "past_checkin@example.com"})
+      past_in = Date.add(Date.utc_today(), -2)
+      past_out = Date.add(past_in, 2)
+
+      booking =
+        %Booking{
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :buyout,
+          checkin_date: past_in,
+          checkout_date: past_out,
+          guests_count: 2,
+          status: :complete,
+          total_price: Money.new(500, :USD),
+          reference_id: "BK-PAST-#{System.unique_integer([:positive])}"
+        }
+        |> Repo.insert!()
+        |> Repo.preload([:user, :rooms])
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+    end
+
+    test "perform still completes when email Notifier returns duplicate Oban insert (unique job)" do
+      user =
+        user_fixture(%{email: "dup_email_checkin@example.com"})
+        |> Ecto.Changeset.change(account_notifications_sms: false)
+        |> Repo.update!()
+
+      booking = create_complete_booking(user)
+
+      email_data = BookingCheckinReminder.prepare_email_data(booking)
+
+      assert %Oban.Job{} =
+               Notifier.schedule_email(
+                 booking.user.email,
+                 "booking_checkin_reminder_#{booking.id}",
+                 BookingCheckinReminder.get_subject(booking),
+                 BookingCheckinReminder.get_template_name(),
+                 email_data,
+                 "",
+                 booking.user_id
+               )
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+    end
+
+    test "perform completes when SMS schedule hits duplicate Oban insert (covers generic SMS error branch)" do
+      user =
+        user_fixture(%{
+          email: "dup_sms_checkin@example.com",
+          phone_number: "+14155551234"
+        })
+        |> Ecto.Changeset.change(account_notifications_sms: true)
+        |> Repo.update!()
+
+      booking = create_complete_booking(user)
+      sms_data = SmsBookingCheckinReminder.prepare_sms_data(booking)
+      template = SmsBookingCheckinReminder.get_template_name()
+      sms_key = "booking_checkin_reminder_sms_#{booking.id}"
+
+      assert {:ok, %Oban.Job{}} =
+               SmsNotifier.schedule_sms(
+                 user.phone_number,
+                 sms_key,
+                 template,
+                 sms_data,
+                 user.id
+               )
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+    end
+
+    test "perform uses unique phone from AccountsFixtures helper for SMS-enabled user" do
+      phone = unique_user_phone()
+
+      user =
+        user_fixture(%{
+          email: "unique_phone_checkin@example.com",
+          phone_number: phone
+        })
+        |> Ecto.Changeset.change(account_notifications_sms: true)
+        |> Repo.update!()
+
+      booking = create_complete_booking(user)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = BookingCheckinReminderWorker.perform(job)
+    end
   end
 
   describe "schedule_reminder/2" do
+    test "schedules Oban job when reminder time is in the future" do
+      booking_id = Ecto.ULID.generate()
+      checkin_date = Date.add(Date.utc_today(), 10)
+
+      # schedule_reminder/2 returns :ok after insert (and logging), not {:ok, job}
+      assert :ok =
+               BookingCheckinReminderWorker.schedule_reminder(
+                 booking_id,
+                 checkin_date
+               )
+    end
+
+    test "returns :ok immediately when booking id does not exist and check-in is soon" do
+      assert :ok =
+               BookingCheckinReminderWorker.schedule_reminder(
+                 Ecto.ULID.generate(),
+                 Date.add(Date.utc_today(), 1)
+               )
+    end
+
     test "schedules reminder 3 days before check-in" do
       booking_id = Ecto.ULID.generate()
       # Check-in date is 5 days from now
@@ -228,6 +402,19 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
 
       # Should return :ok (sent immediately)
       assert result == :ok
+    end
+
+    test "immediate schedule path skips non-complete booking" do
+      user = user_fixture(%{email: "immediate_skip@example.com"})
+      booking = create_booking_with_status(user, :canceled)
+
+      tomorrow = Date.add(Date.utc_today(), 1)
+
+      assert :ok =
+               BookingCheckinReminderWorker.schedule_reminder(
+                 booking.id,
+                 tomorrow
+               )
     end
   end
 
@@ -422,13 +609,17 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
 
   # Helper functions
 
-  defp create_complete_booking(user) do
-    checkin_date = Date.add(Date.utc_today(), 7)
+  defp create_complete_booking(user, opts \\ []) do
+    property = Keyword.get(opts, :property, :tahoe)
+
+    checkin_date =
+      Keyword.get(opts, :checkin_date, Date.add(Date.utc_today(), 7))
+
     checkout_date = Date.add(checkin_date, 2)
 
     %Booking{
       user_id: user.id,
-      property: :tahoe,
+      property: property,
       booking_mode: :buyout,
       checkin_date: checkin_date,
       checkout_date: checkout_date,

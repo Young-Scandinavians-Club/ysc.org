@@ -1,11 +1,171 @@
 defmodule YscWeb.Workers.SmsNotifierTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: false
 
   alias YscWeb.Workers.SmsNotifier
   import Ysc.AccountsFixtures
   import Ecto.Query
 
   describe "perform/1" do
+    test "invalid args with only phone_number hits legacy branch then error" do
+      assert {:error, "Invalid job args: missing required fields"} =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234"
+               })
+    end
+
+    test "raises ArgumentError when params use a string key that is not an existing atom" do
+      user = user_fixture()
+
+      {:ok, updated_user} =
+        Ysc.Accounts.update_user_profile(user, %{
+          phone_number: "+12065551234"
+        })
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(updated_user, %{
+          account_notifications_sms: true
+        })
+
+      user = Ysc.Repo.reload!(updated_user)
+      Cachex.clear(:ysc_cache)
+
+      assert_raise ArgumentError, fn ->
+        perform_job(SmsNotifier, %{
+          "phone_number" => "12065551234",
+          "idempotency_key" => "sms_bad_atom_key_#{System.unique_integer()}",
+          "template" => "booking_checkin_reminder",
+          "params" => %{
+            "first_name" => "x",
+            "zzzz_nonexistent_atom_key_for_test" => "y"
+          },
+          "user_id" => user.id,
+          "category" => "bookings"
+        })
+      end
+    end
+
+    test "returns error for invalid job args" do
+      assert {:error, "Invalid job args: missing required fields"} =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "template" => "booking_checkin_reminder"
+               })
+    end
+
+    test "sends SMS when user exists but is loaded without phone (nil path still reaches send with provided number)" do
+      user = user_fixture()
+
+      {:ok, user_no_phone} =
+        user
+        |> Ecto.Changeset.change(phone_number: nil)
+        |> Ysc.Repo.update()
+
+      Cachex.clear(:ysc_cache)
+
+      params = %{
+        first_name: "NoPhone",
+        property_name: "Tahoe",
+        checkin_date: "Jan 1, 2024",
+        door_code: "1234",
+        checkin_time: "3:00 PM"
+      }
+
+      assert :ok =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "idempotency_key" =>
+                   "sms_explicit_phone_#{System.unique_integer([:positive])}",
+                 "template" => "booking_checkin_reminder",
+                 "params" => params,
+                 "user_id" => user_no_phone.id,
+                 "category" => "bookings"
+               })
+    end
+
+    test "sends SMS with user_id nil using full category args" do
+      idempotency_key = "sms_guest_#{System.unique_integer([:positive])}"
+      params = %{"code" => "123456"}
+
+      assert :ok =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "idempotency_key" => idempotency_key,
+                 "template" => "phone_verification",
+                 "params" => params,
+                 "user_id" => nil,
+                 "category" => "account"
+               })
+
+      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: idempotency_key
+             ) != nil
+    end
+
+    test "returns error when user_id does not exist (FK on idempotency user reference)" do
+      params = %{
+        first_name: "Ghost",
+        property_name: "Tahoe",
+        checkin_date: "Jan 1, 2024",
+        door_code: "1234",
+        checkin_time: "3:00 PM"
+      }
+
+      missing_id = Ecto.ULID.generate()
+
+      assert {:error, "failed to send SMS"} =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "idempotency_key" =>
+                   "sms_missing_user_#{System.unique_integer([:positive])}",
+                 "template" => "booking_checkin_reminder",
+                 "params" => params,
+                 "user_id" => missing_id,
+                 "category" => "bookings"
+               })
+    end
+
+    test "atomizes nested params including lists" do
+      user = user_fixture()
+
+      {:ok, updated_user} =
+        Ysc.Accounts.update_user_profile(user, %{
+          phone_number: "+12065551234"
+        })
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(updated_user, %{
+          account_notifications_sms: true
+        })
+
+      user = Ysc.Repo.reload!(updated_user)
+      Cachex.clear(:ysc_cache)
+
+      idempotency_key = "sms_nested_#{System.unique_integer([:positive])}"
+
+      params = %{
+        "first_name" => "Nested",
+        "property_name" => "Tahoe",
+        "checkin_date" => "Jan 1, 2024",
+        "door_code" => "1234",
+        "checkin_time" => "3:00 PM",
+        "lines" => [%{"a" => "1"}, %{"a" => "2"}]
+      }
+
+      assert :ok =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "idempotency_key" => idempotency_key,
+                 "template" => "booking_checkin_reminder",
+                 "params" => params,
+                 "user_id" => user.id,
+                 "category" => "bookings"
+               })
+
+      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: idempotency_key
+             ) != nil
+    end
+
     setup do
       user = user_fixture()
       # Ensure user has phone number
@@ -385,6 +545,29 @@ defmodule YscWeb.Workers.SmsNotifierTest do
                  where: m.idempotency_key == ^"#{key}_b",
                  select: count()
              ) == 1
+    end
+
+    test "atomize_keys keeps atom keys in params (non-binary map keys branch)",
+         %{user: user} do
+      params =
+        %{
+          first_name: "John",
+          property_name: "Tahoe",
+          checkin_date: "Jan 1, 2024",
+          door_code: "1234",
+          checkin_time: "3:00 PM"
+        }
+        |> Map.put(:meta, "extra")
+
+      assert :ok =
+               perform_job(SmsNotifier, %{
+                 "phone_number" => "12065551234",
+                 "idempotency_key" => "sms_atom_key_#{System.unique_integer()}",
+                 "template" => "booking_checkin_reminder",
+                 "params" => params,
+                 "user_id" => user.id,
+                 "category" => "bookings"
+               })
     end
   end
 end

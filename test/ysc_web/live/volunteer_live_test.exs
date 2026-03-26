@@ -336,4 +336,56 @@ defmodule YscWeb.VolunteerLiveTest do
       assert html =~ "volunteer[email]"
     end
   end
+
+  describe "handle_event save and validate" do
+    test "submits volunteer application when logged in", %{conn: conn} do
+      user =
+        user_fixture(%{
+          first_name: "Pat",
+          last_name: "Volunteer",
+          email: "pat.volunteer.#{System.unique_integer()}@example.com"
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      html =
+        view
+        |> form("#volunteer-form",
+          volunteer: %{
+            "name" => "Pat Volunteer",
+            "email" => user.email,
+            "interest_events" => "true",
+            "interest_activities" => "false",
+            "interest_clear_lake" => "false",
+            "interest_tahoe" => "false",
+            "interest_marketing" => "false",
+            "interest_website" => "false"
+          }
+        )
+        |> render_submit()
+
+      assert html =~ "Välkommen"
+      assert html =~ "board members will reach out"
+    end
+
+    test "validate event updates form on change", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      html =
+        view
+        |> form("#volunteer-form",
+          volunteer: %{
+            "name" => "Valid User",
+            "email" => "valid@example.com",
+            "interest_marketing" => "true"
+          }
+        )
+        |> render_change()
+
+      assert html =~ "volunteer-form"
+      assert html =~ "Marketing"
+    end
+  end
 end

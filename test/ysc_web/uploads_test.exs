@@ -1,5 +1,5 @@
 defmodule YscWeb.UploadsTest do
-  use YscWeb.ConnCase, async: true
+  use ExUnit.Case, async: true
 
   alias YscWeb.Uploads
 

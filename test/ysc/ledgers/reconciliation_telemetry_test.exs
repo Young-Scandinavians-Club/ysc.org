@@ -9,6 +9,8 @@ defmodule Ysc.Ledgers.ReconciliationTelemetryTest do
 
   alias Ysc.Ledgers
   alias Ysc.Ledgers.Reconciliation
+  alias Ysc.Ledgers.LedgerEntry
+  alias Ysc.Repo
 
   import Ysc.AccountsFixtures
 
@@ -102,6 +104,85 @@ defmodule Ysc.Ledgers.ReconciliationTelemetryTest do
       assert metadata.has_errors == false
 
       :telemetry.detach("test-reconciliation-success")
+    end
+
+    test "emits reconciliation_errors telemetry when reconciliation fails", %{
+      user: user
+    } do
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-reconciliation-fail",
+        [:ysc, :ledgers, :reconciliation_completed],
+        fn event_name, measurements, metadata, _config ->
+          send(
+            test_pid,
+            {:telemetry_completed, event_name, measurements, metadata}
+          )
+        end,
+        nil
+      )
+
+      :telemetry.attach(
+        "test-reconciliation-error-count",
+        [:ysc, :ledgers, :reconciliation_errors],
+        fn event_name, measurements, metadata, _config ->
+          send(
+            test_pid,
+            {:telemetry_errors, event_name, measurements, metadata}
+          )
+        end,
+        nil
+      )
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_telemetry_fail",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "Telemetry imbalance",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+
+      Repo.insert!(%LedgerEntry{
+        account_id: stripe_account.id,
+        amount: Money.new(5000, :USD),
+        description: "Extra debit for telemetry",
+        payment_id: payment.id,
+        debit_credit: :debit
+      })
+
+      {:ok, report} = Reconciliation.run_full_reconciliation()
+
+      assert report.overall_status == :error
+
+      assert_receive {:telemetry_completed,
+                      [:ysc, :ledgers, :reconciliation_completed], measurements,
+                      metadata},
+                     2000
+
+      assert measurements.count == 1
+      assert metadata.status == "error"
+      assert metadata.has_errors == true
+
+      assert_receive {:telemetry_errors,
+                      [:ysc, :ledgers, :reconciliation_errors],
+                      err_measurements, err_metadata},
+                     2000
+
+      assert err_measurements.count >= 1
+      assert err_metadata == %{}
+
+      :telemetry.detach("test-reconciliation-fail")
+      :telemetry.detach("test-reconciliation-error-count")
     end
   end
 end

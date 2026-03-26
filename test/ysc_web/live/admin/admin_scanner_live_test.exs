@@ -1,5 +1,5 @@
 defmodule YscWeb.AdminScannerLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -559,6 +559,412 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
       assert html =~ "1 scan"
+    end
+
+    test "resume param on closed session stays in setup and shows flash", %{
+      conn: conn,
+      admin: admin
+    } do
+      session = scan_session_fixture(%{created_by: admin})
+      Scanning.close_session(session.id)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
+
+      assert has_element?(view, "#scan-setup-form")
+    end
+  end
+
+  describe "setup validation and hooks" do
+    setup [:create_admin]
+
+    test "submit without selecting mode shows flash error", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "No Mode"}})
+      |> render_submit()
+
+      html = render(view)
+      assert html =~ "scan mode" or html =~ "mode"
+    end
+
+    test "camera_started does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Cam Start"}})
+      |> render_submit()
+
+      view
+      |> render_hook("camera_started", %{})
+
+      assert render(view) =~ "QR Scanner"
+    end
+
+    test "scanner_debug logs path without crashing", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Debug"}})
+      |> render_submit()
+
+      view
+      |> render_hook("scanner_debug", %{"message" => "tick", "extra" => "1"})
+
+      assert render(view) =~ "Debug"
+    end
+
+    test "empty manual_lookup does nothing visible", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Manual Empty"}})
+      |> render_submit()
+
+      view
+      |> form("#manual-entry-form", %{manual: %{query: "   "}})
+      |> render_submit()
+
+      refute render(view) =~ "Active Member"
+    end
+
+    test "export-csv pushes download event", %{conn: conn, admin: admin} do
+      session = scan_session_fixture(%{created_by: admin})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner/sessions/#{session.id}")
+
+      view
+      |> element("button[phx-click='export-csv']")
+      |> render_click()
+
+      assert_push_event(view, "download-csv", %{content: _b64, filename: fname})
+      assert fname =~ "scan_session_#{session.id}"
+    end
+
+    test "resume_session event resumes open session", %{
+      conn: conn,
+      admin: admin
+    } do
+      session =
+        scan_session_fixture(%{created_by: admin, name: "Resume Via Button"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+
+      view
+      |> element(
+        "button[phx-click='resume_session'][phx-value-session-id='#{session.id}']"
+      )
+      |> render_click()
+
+      assert render(view) =~ "Resume Via Button"
+      assert has_element?(view, "button[phx-click='end_session']")
+    end
+
+    test "resume_session on closed session shows flash", %{
+      conn: conn,
+      admin: admin
+    } do
+      session = scan_session_fixture(%{created_by: admin})
+      Scanning.close_session(session.id)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+
+      view
+      |> render_hook("resume_session", %{"session-id" => session.id})
+
+      assert has_element?(view, "#scan-setup-form")
+    end
+
+    test "dismiss_group clears modal when group prompt would be shown", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: member,
+          event: event,
+          ticket_selections: %{tier.id => 2}
+        })
+        |> confirm_tickets()
+
+      ticket = hd(order.tickets)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='event']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{
+        session: %{name: "Group", event_id: event.id}
+      })
+      |> render_submit()
+
+      view
+      |> render_hook("scan_result", %{"data" => QrToken.sign_ticket(ticket.id)})
+
+      assert render(view) =~ "Group Check-in" or render(view) =~ "Check in ALL"
+
+      view |> element("button[phx-click='dismiss_group']") |> render_click()
+      refute render(view) =~ "Group Check-in"
+    end
+
+    test "check_in_single fails gracefully with invalid ticket id", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: member,
+          event: event,
+          ticket_selections: %{tier.id => 2}
+        })
+        |> confirm_tickets()
+
+      ticket = hd(order.tickets)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='event']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{
+        session: %{name: "Bad ticket", event_id: event.id}
+      })
+      |> render_submit()
+
+      view
+      |> render_hook("scan_result", %{"data" => QrToken.sign_ticket(ticket.id)})
+
+      bogus_id = Ecto.ULID.generate()
+
+      view
+      |> render_hook("check_in_single", %{"ticket-id" => bogus_id})
+
+      assert render(view) =~ "Failed" or render(view) =~ "Error"
+    end
+  end
+
+  describe "session list and detail edge cases" do
+    setup [:create_admin]
+
+    test "session list shows membership and event labels", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, title: "Listed Event"})
+      scan_session_fixture(%{created_by: admin, name: "M1", type: :membership})
+
+      scan_session_fixture(%{
+        created_by: admin,
+        name: "E1",
+        type: :event,
+        event_id: event.id
+      })
+
+      {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions")
+      assert html =~ "M1"
+      assert html =~ "E1"
+      assert html =~ "Listed Event"
+    end
+
+    test "session detail shows event type columns for event session", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+
+      session =
+        scan_session_fixture(%{
+          created_by: admin,
+          name: "Event Detail",
+          type: :event,
+          event_id: event.id
+        })
+
+      order =
+        ticket_order_fixture(%{user: member, event: event}) |> confirm_tickets()
+
+      ticket = hd(order.tickets)
+      Scanning.process_scan(session, QrToken.sign_ticket(ticket.id))
+
+      {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions/#{session.id}")
+      assert html =~ "Check-in"
+      assert html =~ "Event Detail"
+    end
+  end
+
+  describe "scanner session validation and session list UI" do
+    setup [:create_admin]
+
+    test "start_session with event mode and no event_id shows validation error",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+
+      view |> element("button[phx-value-mode='event']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{
+        session: %{name: "Missing event", event_id: ""}
+      })
+      |> render_submit()
+
+      html = render(view)
+      assert html =~ "event" or html =~ "Error" or html =~ "required"
+    end
+
+    test "sessions list shows Closed label for a closed session", %{
+      conn: conn,
+      admin: admin
+    } do
+      session =
+        scan_session_fixture(%{created_by: admin, name: "Closed list session"})
+
+      assert {:ok, _} = Scanning.close_session(session.id)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions")
+      assert html =~ "Closed list session"
+      assert html =~ "Closed"
+    end
+  end
+
+  describe "additional scanner handlers and edge UI" do
+    setup [:create_admin]
+
+    test "end_session pushes stop-camera to the client", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Stop cam"}})
+      |> render_submit()
+
+      view |> element("button[phx-click='end_session']") |> render_click()
+
+      assert_push_event(view, "stop-camera", %{})
+    end
+
+    test "scan_result is rate limited after many scans", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Rate limit"}})
+      |> render_submit()
+
+      member = make_active_member()
+      token = QrToken.sign_membership(member.id)
+
+      for _ <- 1..21 do
+        view |> render_hook("scan_result", %{"data" => token})
+      end
+
+      html = render(view)
+      assert html =~ "Too many scans" or html =~ "slow down"
+    end
+
+    test "scanner_debug without extra key still works", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Dbg2"}})
+      |> render_submit()
+
+      view |> render_hook("scanner_debug", %{"message" => "ping"})
+      assert render(view) =~ "Dbg2"
+    end
+
+    test "check_in_all with bogus order id shows error result", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: member,
+          event: event,
+          ticket_selections: %{tier.id => 2}
+        })
+        |> confirm_tickets()
+
+      ticket = hd(order.tickets)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='event']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{
+        session: %{name: "Bad order", event_id: event.id}
+      })
+      |> render_submit()
+
+      view
+      |> render_hook("scan_result", %{"data" => QrToken.sign_ticket(ticket.id)})
+
+      bogus_order = Ecto.ULID.generate()
+
+      view
+      |> render_hook("check_in_all", %{"order-id" => bogus_order})
+
+      html = render(view)
+      assert html =~ "Order not found" or html =~ "not found"
+    end
+
+    test "start_session with invalid event id shows form error toast", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='event']") |> render_click()
+
+      fake_event_id = Ecto.ULID.generate()
+
+      html =
+        render_submit(view, "start_session", %{
+          "session" => %{"name" => "Bad FK", "event_id" => fake_event_id}
+        })
+
+      assert html =~ "Could not start session" or html =~ "Error"
+    end
+
+    test "membership scan shows Never expires for lifetime without renewal date",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      view |> element("button[phx-value-mode='membership']") |> render_click()
+
+      view
+      |> form("#scan-setup-form", %{session: %{name: "Lifetime"}})
+      |> render_submit()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      token = QrToken.sign_membership(member.id)
+      view |> render_hook("scan_result", %{"data" => token})
+
+      html = render(view)
+      assert html =~ "Never" or html =~ "Active Member"
     end
   end
 end

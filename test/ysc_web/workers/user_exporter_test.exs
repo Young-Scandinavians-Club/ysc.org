@@ -5,6 +5,7 @@ defmodule YscWeb.Workers.UserExporterTest do
   use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
+  import Ysc.TestDataFactory, only: [user_with_membership: 1]
 
   alias YscWeb.Workers.UserExporter
   alias Ysc.Subscriptions
@@ -163,6 +164,67 @@ defmodule YscWeb.Workers.UserExporterTest do
   end
 
   describe "only_subscribed filter" do
+    test "includes sub-account when primary has lifetime membership (only_subscribed)",
+         %{
+           channel: channel
+         } do
+      primary = user_with_membership(:lifetime)
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], true))
+      rows = parse_csv(path)
+      exported_ids = Enum.map(rows, & &1["id"])
+
+      assert primary.id in exported_ids
+      assert sub.id in exported_ids
+    end
+
+    test "includes user with trialing subscription when only_subscribed is true",
+         %{
+           channel: channel
+         } do
+      user = user_fixture()
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          name: "Test Subscription",
+          stripe_id: "sub_trialing_#{System.unique_integer([:positive])}",
+          stripe_status: "trialing",
+          user_id: user.id,
+          current_period_end: @renewal_utc
+        })
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], true))
+      rows = parse_csv(path)
+
+      assert Enum.any?(rows, &(&1["id"] == user.id))
+    end
+
+    test "includes user with past_due subscription when only_subscribed is true",
+         %{
+           channel: channel
+         } do
+      user = user_fixture()
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          name: "Test Subscription",
+          stripe_id: "sub_past_due_#{System.unique_integer([:positive])}",
+          stripe_status: "past_due",
+          user_id: user.id,
+          current_period_end: @renewal_utc
+        })
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], true))
+      rows = parse_csv(path)
+
+      assert Enum.any?(rows, &(&1["id"] == user.id))
+    end
+
     test "excludes users without active subscriptions when only_subscribed is true",
          %{
            channel: channel
@@ -177,6 +239,76 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       assert subscribed_user.id in exported_ids
       refute unsubscribed_user.id in exported_ids
+    end
+
+    test "includes lifetime member without Stripe subscription when only_subscribed is true",
+         %{
+           channel: channel
+         } do
+      user = user_fixture()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update()
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], true))
+      rows = parse_csv(path)
+
+      assert Enum.any?(rows, &(&1["id"] == user.id))
+    end
+  end
+
+  describe "sub-accounts and inheritance columns" do
+    test "marks membership inherited and primary user fields for sub-account under lifetime primary",
+         %{
+           channel: channel
+         } do
+      primary = user_with_membership(:lifetime)
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == sub.id))
+
+      assert row["membership_inherited"] == "Yes"
+      assert row["primary_user_email"] == primary.email
+      assert row["primary_user_id"] == to_string(primary.id)
+    end
+  end
+
+  describe "export progress" do
+    test "broadcasts user_export:progress before user_export:complete", %{
+      channel: channel
+    } do
+      _user = user_fixture()
+
+      YscWeb.Endpoint.subscribe(channel)
+
+      job = oban_job(channel, ["id"], false)
+
+      assert :ok = UserExporter.perform(job)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+                       event: "user_export:progress",
+                       payload: percent
+                     },
+                     15_000
+
+      assert percent in 0..100
+
+      assert_receive %Phoenix.Socket.Broadcast{
+                       event: "user_export:complete",
+                       payload: _path
+                     },
+                     15_000
     end
   end
 
@@ -272,6 +404,180 @@ defmodule YscWeb.Workers.UserExporterTest do
       refute Map.has_key?(row, "region")
       refute Map.has_key?(row, "postal_code")
       refute Map.has_key?(row, "country")
+    end
+  end
+
+  describe "field names and membership label edge cases" do
+    test "accepts field names as atoms (Admin-style args)", %{channel: channel} do
+      _user = user_fixture()
+
+      path =
+        run_export(
+          channel,
+          oban_job(channel, [:id, :email], false)
+        )
+
+      [row | _] = parse_csv(path)
+      assert row["id"]
+      assert row["email"]
+    end
+
+    test "membership_type uses configured plan name when stripe_price_id matches Single plan",
+         %{channel: channel} do
+      user = user_fixture()
+
+      single =
+        Enum.find(
+          Application.fetch_env!(:ysc, :membership_plans),
+          &(&1.id == :single)
+        )
+
+      {:ok, sub} =
+        Subscriptions.create_subscription(%{
+          name: "Test Subscription",
+          stripe_id: "sub_single_named_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id,
+          current_period_end: @renewal_utc
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_single_test",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1,
+          subscription_id: sub.id
+        })
+
+      path = run_export(channel, oban_job(channel, ["id"], false))
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == user.id))
+
+      assert row["membership_type"] == "Single"
+    end
+
+    test "accepts field names as strings (to_existing_atom)", %{
+      channel: channel
+    } do
+      _user = user_fixture()
+
+      path =
+        run_export(
+          channel,
+          oban_job(channel, ["id", "email"], false)
+          |> then(fn job ->
+            %{job | args: Map.put(job.args, "fields", ["id", "email"])}
+          end)
+        )
+
+      [row | _] = parse_csv(path)
+      assert row["id"]
+      assert row["email"]
+    end
+
+    test "membership type is empty when stripe price id does not match any membership plan",
+         %{channel: channel} do
+      user = user_fixture()
+
+      {:ok, sub} =
+        Subscriptions.create_subscription(%{
+          name: "Test",
+          stripe_id: "sub_unknown_plan_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id,
+          current_period_end: @renewal_utc
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_x",
+          stripe_price_id:
+            "price_not_in_config_#{System.unique_integer([:positive])}",
+          quantity: 1,
+          subscription_id: sub.id
+        })
+
+      plans = Application.get_env(:ysc, :membership_plans)
+
+      try do
+        Application.put_env(:ysc, :membership_plans, [
+          %{id: :other_plan, name: "Other", stripe_price_id: "price_unused"}
+        ])
+
+        path = run_export(channel, oban_job(channel, ["id"], false))
+        rows = parse_csv(path)
+        row = Enum.find(rows, &(&1["id"] == user.id))
+
+        assert row["membership_type"] in [nil, ""]
+      after
+        Application.put_env(:ysc, :membership_plans, plans)
+      end
+    end
+
+    test "membership_type is Unknown when plan matches id but entry has no name field",
+         %{channel: channel} do
+      user = user_fixture()
+
+      single =
+        Enum.find(
+          Application.fetch_env!(:ysc, :membership_plans),
+          &(&1.id == :single)
+        )
+
+      {:ok, sub} =
+        Subscriptions.create_subscription(%{
+          name: "Test Subscription",
+          stripe_id: "sub_unknown_name_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id,
+          current_period_end: @renewal_utc
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_single_test",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1,
+          subscription_id: sub.id
+        })
+
+      plans = Application.get_env(:ysc, :membership_plans)
+
+      try do
+        # Plan map matches Enum.find on id but does not match %{name: name} in case
+        Application.put_env(:ysc, :membership_plans, [
+          Map.drop(single, [:name])
+        ])
+
+        path = run_export(channel, oban_job(channel, ["id"], false))
+        rows = parse_csv(path)
+        row = Enum.find(rows, &(&1["id"] == user.id))
+
+        assert row["membership_type"] == "Unknown"
+      after
+        Application.put_env(:ysc, :membership_plans, plans)
+      end
+    end
+
+    test "sub-account whose primary has no membership shows inherited No and primary email",
+         %{channel: channel} do
+      primary = user_fixture()
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      path = run_export(channel, oban_job(channel, ["id", "email"], false))
+      rows = parse_csv(path)
+      row = Enum.find(rows, &(&1["id"] == sub.id))
+
+      assert row["membership_inherited"] == "No"
+      assert row["primary_user_email"] == primary.email
+      assert row["primary_user_id"] == to_string(primary.id)
     end
   end
 end

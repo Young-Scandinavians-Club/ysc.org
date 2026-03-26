@@ -73,7 +73,8 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
     |> Enum.map(fn {type, accounts} ->
       total_balance =
         Enum.reduce(accounts, Money.new(0, :USD), fn {_account, balance}, acc ->
-          Money.add(acc, balance)
+          {:ok, sum} = Money.add(acc, balance)
+          sum
         end)
 
       {type, length(accounts), total_balance}

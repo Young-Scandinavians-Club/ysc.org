@@ -167,12 +167,14 @@ defmodule YscWeb.FlowrouteWebhookController do
               status_code: delivery_receipt.status_code
             )
 
-            # Try to link to SMS message
-            Sms.link_delivery_receipt_to_message(delivery_receipt)
+            # Try to link to SMS message (returns updated struct with sms_message_id set)
+            case Sms.link_delivery_receipt_to_message(delivery_receipt) do
+              {:ok, linked_receipt}
+              when not is_nil(linked_receipt.sms_message_id) ->
+                update_sms_message_status_from_dlr(linked_receipt)
 
-            # Update SMS message status if linked
-            if delivery_receipt.sms_message_id do
-              update_sms_message_status_from_dlr(delivery_receipt)
+              _ ->
+                :ok
             end
 
             send_resp(conn, 200, "OK")

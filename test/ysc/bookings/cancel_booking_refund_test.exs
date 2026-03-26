@@ -27,6 +27,12 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
   setup do
     Ledgers.ensure_basic_accounts()
     user = user_fixture()
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
     stub(Stripe.PaymentIntentMock, :list, fn _params ->

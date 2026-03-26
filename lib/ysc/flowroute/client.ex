@@ -232,7 +232,35 @@ defmodule Ysc.Flowroute.Client do
     end
   end
 
+  # Test-only hook: `Application.put_env(:ysc, :flowroute_test_raise, {:runtime, "msg"})` or
+  # `{:constraint, "constraint_name", :unique}` — cleared in `on_exit` in tests.
+  defp flowroute_test_maybe_raise! do
+    if Application.get_env(:ysc, :flowroute_test_inject_enabled) do
+      case Application.get_env(:ysc, :flowroute_test_raise) do
+        nil ->
+          :ok
+
+        {:runtime, message} ->
+          raise RuntimeError, message
+
+        {:constraint, name, type} ->
+          cs = Ecto.Changeset.change({%{}, %{}})
+
+          raise Ecto.ConstraintError.exception(
+                  type: type,
+                  constraint: name,
+                  changeset: cs,
+                  action: :insert
+                )
+      end
+    else
+      :ok
+    end
+  end
+
   defp handle_noop_response(to, from, body, opts) do
+    flowroute_test_maybe_raise!()
+
     # Generate a fake message ID in the same format as FlowRoute
     fake_message_id = "mdr2-#{generate_fake_id()}"
 

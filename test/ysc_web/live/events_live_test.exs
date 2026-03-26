@@ -6,7 +6,10 @@ defmodule YscWeb.EventsLiveTest do
 
   alias Ysc.Events
   alias Ysc.Media
+  alias Ysc.MessagePassingEvents
   alias Ysc.Repo
+
+  import Ysc.EventsFixtures, only: [ticket_tier_fixture: 1]
 
   # Helper to create an image
   defp create_image do
@@ -276,8 +279,15 @@ defmodule YscWeb.EventsLiveTest do
     end
 
     test "increases past events limit when clicking Show More", %{conn: conn} do
+      organizer = user_fixture()
+
       for i <- 1..20 do
-        create_event(%{title: "Past Event #{i}", past: true})
+        create_event(%{
+          title: "Past Event #{i}",
+          past: true,
+          with_image: false,
+          organizer: organizer
+        })
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
@@ -293,10 +303,14 @@ defmodule YscWeb.EventsLiveTest do
     end
 
     test "limits maximum past events to 50", %{conn: conn} do
+      organizer = user_fixture()
+
       for i <- 1..60 do
         create_event(%{
           title: "Past Event #{i}",
           past: true,
+          with_image: false,
+          organizer: organizer,
           reference_id: "EVT-TEST-#{i}-#{System.unique_integer()}"
         })
       end
@@ -319,6 +333,184 @@ defmodule YscWeb.EventsLiveTest do
 
       # View should be subscribed (connection established)
       assert view.pid
+    end
+  end
+
+  describe "handle_info pubsub" do
+    test "handles EventAdded without crashing", %{conn: conn} do
+      event = create_event(%{title: "PubSub Event", past: false})
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.EventAdded{event: event}}
+      )
+
+      html = render(view)
+      assert html =~ "Events"
+    end
+
+    test "handles EventUpdated without crashing", %{conn: conn} do
+      event = create_event(%{title: "Updated Via PubSub", past: false})
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.EventUpdated{event: event}}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketTierAdded when event is missing", %{conn: conn} do
+      fake_tier = %Ysc.Events.TicketTier{
+        id: Ecto.ULID.generate(),
+        event_id: Ecto.ULID.generate()
+      }
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events,
+         %MessagePassingEvents.TicketTierAdded{ticket_tier: fake_tier}}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketTierAdded when event exists", %{conn: conn} do
+      event = create_event(%{title: "Tier Parent", past: false})
+      tier = ticket_tier_fixture(%{event_id: event.id, name: "VIP"})
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.TicketTierAdded{ticket_tier: tier}}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketReservationCreated when ticket tier is missing", %{
+      conn: conn
+    } do
+      reservation = %Ysc.Events.TicketReservation{
+        ticket_tier_id: Ecto.ULID.generate()
+      }
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events,
+         %MessagePassingEvents.TicketReservationCreated{
+           ticket_reservation: reservation
+         }}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketReservationFulfilled when tier and event exist", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      event = create_event(%{title: "Res Event", past: false})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      reservation =
+        %Ysc.Events.TicketReservation{}
+        |> Ysc.Events.TicketReservation.changeset(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          created_by_id: user.id,
+          quantity: 1,
+          expires_at: DateTime.add(DateTime.utc_now(), 1, :day)
+        })
+        |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events,
+         %MessagePassingEvents.TicketReservationFulfilled{
+           ticket_reservation: reservation
+         }}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketReservationCancelled", %{conn: conn} do
+      user = user_fixture()
+      event = create_event(%{title: "Cancel Event", past: false})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      reservation =
+        %Ysc.Events.TicketReservation{}
+        |> Ysc.Events.TicketReservation.changeset(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          created_by_id: user.id,
+          quantity: 1,
+          expires_at: DateTime.add(DateTime.utc_now(), 1, :day)
+        })
+        |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events,
+         %MessagePassingEvents.TicketReservationCancelled{
+           ticket_reservation: reservation
+         }}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketTierUpdated and TicketTierDeleted", %{conn: conn} do
+      event = create_event(%{title: "Update Delete", past: false})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.TicketTierUpdated{ticket_tier: tier}}
+      )
+
+      assert render(view) =~ "Events"
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.TicketTierDeleted{ticket_tier: tier}}
+      )
+
+      assert render(view) =~ "Events"
     end
   end
 
@@ -426,6 +618,46 @@ defmodule YscWeb.EventsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/events")
 
       assert html =~ "discord.gg"
+    end
+  end
+
+  describe "handle_async load_events_data exit" do
+    test "marks async loaded when async task exits", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/events")
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.EventsLive.handle_async(
+                 :load_events_data,
+                 {:exit, :test_reason},
+                 socket
+               )
+
+      assert new_socket.assigns.async_data_loaded == true
+    end
+  end
+
+  describe "TicketReservationFulfilled without tier" do
+    test "handles TicketReservationFulfilled when ticket tier was deleted", %{
+      conn: conn
+    } do
+      reservation = %Ysc.Events.TicketReservation{
+        ticket_tier_id: Ecto.ULID.generate()
+      }
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events,
+         %MessagePassingEvents.TicketReservationFulfilled{
+           ticket_reservation: reservation
+         }}
+      )
+
+      assert render(view) =~ "Events"
     end
   end
 end

@@ -768,18 +768,22 @@ defmodule Ysc.Tickets.BookingLocker do
         non_reserved_count = max(0, requested_count - fulfilled_count)
 
         non_reserved_tickets =
-          Enum.map(1..non_reserved_count, fn _ ->
-            %Ticket{}
-            |> Ticket.changeset(%{
-              event_id: ticket_order.event_id,
-              ticket_tier_id: tier_id,
-              user_id: ticket_order.user_id,
-              ticket_order_id: ticket_order.id,
-              status: :pending,
-              expires_at: ticket_order.expires_at,
-              discount_amount: Money.new(0, :USD)
-            })
-          end)
+          if non_reserved_count <= 0 do
+            []
+          else
+            Enum.map(1..non_reserved_count, fn _ ->
+              %Ticket{}
+              |> Ticket.changeset(%{
+                event_id: ticket_order.event_id,
+                ticket_tier_id: tier_id,
+                user_id: ticket_order.user_id,
+                ticket_order_id: ticket_order.id,
+                status: :pending,
+                expires_at: ticket_order.expires_at,
+                discount_amount: Money.new(0, :USD)
+              })
+            end)
+          end
 
         reserved_tickets ++ non_reserved_tickets
       end)

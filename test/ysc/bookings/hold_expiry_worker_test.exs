@@ -38,6 +38,52 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
   end
 
   describe "expire_expired_holds/0" do
+    test "logs error when release_hold fails due to missing inventory", %{
+      user: user
+    } do
+      import ExUnit.CaptureLog
+
+      Logger.configure(level: :info)
+
+      checkin_date = Date.add(Date.utc_today(), 205)
+      checkout_date = Date.add(checkin_date, 2)
+
+      # Buyout hold without property_inventory rows: release_hold cannot clear buyout_held.
+      booking =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            booking_mode: :buyout,
+            checkin_date: checkin_date,
+            checkout_date: checkout_date,
+            guests_count: 4,
+            status: :hold,
+            hold_expires_at:
+              DateTime.add(
+                DateTime.utc_now() |> DateTime.truncate(:second),
+                -2,
+                :hour
+              ),
+            total_price: Money.new(100, :USD)
+          },
+          skip_validation: true
+        )
+        |> Repo.insert!()
+
+      log =
+        capture_log(fn ->
+          HoldExpiryWorker.expire_expired_holds()
+        end)
+
+      Logger.configure(level: :error)
+
+      assert log =~ "Failed to expire booking hold"
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.status == :hold
+    end
+
     test "expires bookings with expired holds", %{user: user} do
       # Create a booking with an expired hold by inserting directly
       checkin_date = Date.add(Date.utc_today(), 7)

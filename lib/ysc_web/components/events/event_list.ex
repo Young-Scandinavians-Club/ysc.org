@@ -292,10 +292,14 @@ defmodule YscWeb.EventsListLive do
     upcoming = Map.get(assigns, :upcoming) || socket.assigns[:upcoming] || true
     limit = Map.get(assigns, :limit) || socket.assigns[:limit]
 
+    defer_load =
+      Map.get(assigns, :defer_load, socket.assigns[:defer_load]) || false
+
     socket
     |> assign(:show_hero, show_hero)
     |> assign(:upcoming, upcoming)
     |> assign(:limit, limit)
+    |> assign(:defer_load, defer_load)
   end
 
   # Ensure stream is initialized when handling event messages

@@ -5,7 +5,9 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
   use Ysc.DataCase, async: false
 
   alias YscWeb.Workers.EventNotificationWorker
+  alias Ysc.Events
   alias Ysc.Events.Event
+  alias YscWeb.Emails.{EventNotification, Notifier}
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
@@ -69,6 +71,102 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
       assert result == :ok
     end
 
+    test "skips notifications for cancelled event", %{event: event} do
+      event
+      |> Event.changeset(%{state: :cancelled})
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_id" => event.id},
+        worker: "YscWeb.Workers.EventNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert EventNotificationWorker.perform(job) == :ok
+    end
+
+    test "skips notifications when start time is missing (cannot determine future start)",
+         %{event: event} do
+      future_date = DateTime.add(DateTime.utc_now(), 86400, :second)
+
+      event
+      |> Event.changeset(%{
+        state: :published,
+        start_date: future_date,
+        start_time: nil
+      })
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_id" => event.id},
+        worker: "YscWeb.Workers.EventNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert EventNotificationWorker.perform(job) == :ok
+    end
+
+    test "skips notifications when start_date is nil (cannot combine date and time)",
+         %{
+           event: event
+         } do
+      assert {:ok, event} =
+               Events.update_event(event, %{
+                 state: :published,
+                 start_date: nil,
+                 start_time: ~T[10:00:00]
+               })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_id" => event.id},
+        worker: "YscWeb.Workers.EventNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert EventNotificationWorker.perform(job) == :ok
+    end
+
+    test "sends notifications when published event has future UTC start (date + time)",
+         %{event: event} do
+      future_start =
+        DateTime.utc_now()
+        |> DateTime.add(86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+          event_notifications: true,
+          account_notifications: true
+        })
+
+      assert {:ok, _} =
+               Events.update_event(event, %{
+                 state: :published,
+                 start_date: future_start,
+                 start_time: ~T[15:30:00]
+               })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_id" => event.id},
+        worker: "YscWeb.Workers.EventNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert EventNotificationWorker.perform(job) == :ok
+    end
+
     test "skips notifications for published event with past start date (retroactive)",
          %{
            event: event
@@ -102,10 +200,13 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
     test "schedules notifications for future publish time", %{event: event} do
       future_time = DateTime.add(DateTime.utc_now(), 3600, :second)
 
-      result =
-        EventNotificationWorker.schedule_notifications(event.id, future_time)
+      assert :ok =
+               EventNotificationWorker.schedule_notifications(
+                 event.id,
+                 future_time
+               )
 
-      assert result == :ok
+      # Oban test mode is :inline — jobs run immediately and are not left in oban_jobs.
     end
 
     test "sends immediately if 1 hour has passed", %{event: event} do
@@ -120,6 +221,174 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
         EventNotificationWorker.schedule_notifications(event.id, past_time)
 
       assert result == :ok
+    end
+
+    test "immediate path returns :ok when event does not exist" do
+      past_time = DateTime.add(DateTime.utc_now(), -7200, :second)
+      missing_id = Ecto.ULID.generate()
+
+      assert :ok =
+               EventNotificationWorker.schedule_notifications(
+                 missing_id,
+                 past_time
+               )
+    end
+
+    test "immediate path skips when event is not published", %{event: event} do
+      past_time = DateTime.add(DateTime.utc_now(), -7200, :second)
+
+      event
+      |> Event.changeset(%{state: :draft})
+      |> Ysc.Repo.update!()
+
+      assert :ok =
+               EventNotificationWorker.schedule_notifications(
+                 event.id,
+                 past_time
+               )
+    end
+
+    test "immediate path skips retroactive event", %{event: event} do
+      past_time = DateTime.add(DateTime.utc_now(), -7200, :second)
+      past_start = DateTime.add(DateTime.utc_now(), -86400 * 2, :second)
+
+      event
+      |> Event.changeset(%{
+        state: :published,
+        start_date: past_start,
+        start_time: ~T[12:00:00]
+      })
+      |> Ysc.Repo.update!()
+
+      assert :ok =
+               EventNotificationWorker.schedule_notifications(
+                 event.id,
+                 past_time
+               )
+    end
+
+    test "immediate path sends when publish lag exceeded but event start is still in the future",
+         %{event: event} do
+      past_publish = DateTime.add(DateTime.utc_now(), -7200, :second)
+
+      future_start =
+        DateTime.utc_now()
+        |> DateTime.add(86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+          event_notifications: true,
+          account_notifications: true
+        })
+
+      assert {:ok, _} =
+               Events.update_event(event, %{
+                 state: :published,
+                 start_date: future_start,
+                 start_time: ~T[09:00:00]
+               })
+
+      assert :ok =
+               EventNotificationWorker.schedule_notifications(
+                 event.id,
+                 past_publish
+               )
+    end
+  end
+
+  describe "send_event_notifications/1 duplicate email job" do
+    test "still returns :ok when Notifier duplicate blocks a user (logs failure count)",
+         %{event: event} do
+      future_start = DateTime.add(DateTime.utc_now(), 3_600, :second)
+      subscriber = user_fixture()
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(subscriber, %{
+          event_notifications: true,
+          account_notifications: true
+        })
+
+      event =
+        event
+        |> Event.changeset(%{state: :published, start_date: future_start})
+        |> Ysc.Repo.update!()
+
+      email_data = EventNotification.prepare_email_data(event, subscriber)
+
+      assert %Oban.Job{} =
+               Notifier.schedule_email(
+                 subscriber.email,
+                 "event_notification_#{event.id}_#{subscriber.id}",
+                 EventNotification.get_subject(event),
+                 EventNotification.get_template_name(),
+                 email_data,
+                 "",
+                 subscriber.id
+               )
+
+      assert :ok = EventNotificationWorker.send_event_notifications(event)
+    end
+  end
+
+  describe "send_event_notifications/1" do
+    test "schedules one mailer job per user with event notifications enabled",
+         %{
+           event: event,
+           organizer: organizer
+         } do
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(organizer, %{
+          event_notifications: false,
+          account_notifications: true
+        })
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+          event_notifications: true,
+          account_notifications: true
+        })
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+          event_notifications: true,
+          account_notifications: true
+        })
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+          event_notifications: false,
+          account_notifications: true
+        })
+
+      event =
+        event
+        |> Event.changeset(%{state: :published})
+        |> Ysc.Repo.update!()
+
+      assert :ok = EventNotificationWorker.send_event_notifications(event)
+
+      import Ecto.Query
+
+      assert 2 ==
+               Repo.one(
+                 from m in Ysc.Messages.MessageIdempotency,
+                   where: ilike(m.idempotency_key, "event_notification_%"),
+                   select: count()
+               )
+    end
+  end
+
+  describe "perform/1 via Oban.Testing" do
+    test "runs worker with perform_job helper", %{event: event} do
+      future_start = DateTime.add(DateTime.utc_now(), 86400, :second)
+
+      event
+      |> Event.changeset(%{state: :published, start_date: future_start})
+      |> Ysc.Repo.update!()
+
+      assert :ok =
+               perform_job(EventNotificationWorker, %{"event_id" => event.id})
     end
   end
 end

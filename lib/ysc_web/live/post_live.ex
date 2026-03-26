@@ -345,7 +345,8 @@ defmodule YscWeb.PostLive do
        |> assign(:loading, false)
        |> assign_form(new_comment_changeset)}
     else
-      {:noreply, new_socket}
+      # temporary_assigns clears :form after each render; re-assign for comment/reply UI
+      {:noreply, assign_form(new_socket, new_comment_changeset)}
     end
   end
 

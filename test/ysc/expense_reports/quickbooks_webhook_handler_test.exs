@@ -183,6 +183,47 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandlerTest do
       result = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
       assert result == :ok or match?({:error, _}, result)
     end
+
+    test "processes only the first event notification" do
+      payload = %{
+        "eventNotifications" => [
+          %{
+            "realmId" => "123456789",
+            "dataChangeEvent" => %{
+              "entities" => [
+                %{"name" => "Invoice", "id" => "inv_1", "operation" => "Create"}
+              ]
+            }
+          },
+          %{
+            "realmId" => "123456789",
+            "dataChangeEvent" => %{
+              "entities" => [
+                %{
+                  "name" => "BillPayment",
+                  "id" => "bp_ignored",
+                  "operation" => "Create"
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "multi:notification:test",
+          event_type: "mixed",
+          payload: payload
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      refute_enqueued(
+        worker: YscWeb.Workers.QuickbooksBillPaymentProcessorWorker
+      )
+    end
   end
 
   # Helper functions
