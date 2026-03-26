@@ -15,7 +15,8 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+                sans: ["system-ui", "-apple-system", '"Segoe UI"', "Roboto", '"Helvetica Neue"', "Arial", "sans-serif"],
+                serif: ['"Source Serif 4"', "Georgia", '"Times New Roman"', "serif"],
             },
             colors: {
                 brand: "#1b1b52",

@@ -121,7 +121,7 @@ defmodule YscWeb.PostLive do
         <article class="prose prose-zinc prose-lg lg:prose-xl prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-3xl mx-auto py-12 bg-zinc-50/50 rounded-xl px-8 md:px-12">
           <div
             id="article-body"
-            class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-light border-l border-zinc-100 ml-[-2rem] pl-8"
+            class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-normal border-l border-zinc-100 ml-[-2rem] pl-8"
             phx-hook="GLightboxHook"
           >
             {raw(@post.raw_body)}

@@ -104,7 +104,7 @@ defmodule YscWeb.EventDetailsLive do
 
                 <p
                   :if={@event.description != nil && @event.description != ""}
-                  class="hidden sm:block text-lg text-zinc-600 font-light leading-relaxed"
+                  class="hidden sm:block text-lg text-zinc-600 font-normal leading-relaxed"
                 >
                   {HtmlSanitizeEx.strip_tags(@event.description)}
                 </p>
@@ -349,7 +349,7 @@ defmodule YscWeb.EventDetailsLive do
                 <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-2">
                   When
                 </p>
-                <p class="font-black text-xl text-zinc-900 tracking-tighter leading-none">
+                <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
                   <%= if @event.start_date != nil do %>
                     {Timex.format!(@event.start_date, "{Mshort} {D}")}
                   <% else %>
@@ -387,7 +387,7 @@ defmodule YscWeb.EventDetailsLive do
                 <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-2">
                   Where
                 </p>
-                <p class="font-black text-xl text-zinc-900 tracking-tighter leading-none">
+                <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
                   <%= if @event.location_name != nil && @event.location_name != "" do %>
                     {@event.location_name}
                   <% else %>
@@ -407,7 +407,7 @@ defmodule YscWeb.EventDetailsLive do
                   <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
                     Duration
                   </p>
-                  <p class="font-black text-xl text-zinc-900 tracking-tighter leading-none">
+                  <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
                     {case {format_time(@event.start_time),
                            format_time(@event.end_time)} do
                       {%Time{} = start_time, %Time{} = end_time} ->
@@ -578,7 +578,7 @@ defmodule YscWeb.EventDetailsLive do
                           </h4>
                           <p
                             :if={agenda_item.description != nil}
-                            class="text-sm text-zinc-500 font-light mt-2 leading-relaxed"
+                            class="text-sm text-zinc-500 font-normal mt-2 leading-relaxed"
                           >
                             {agenda_item.description}
                           </p>
@@ -595,7 +595,7 @@ defmodule YscWeb.EventDetailsLive do
               <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
-              <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-light leading-relaxed">
+              <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-normal leading-relaxed">
                 <div id="article-body" class="post-render" phx-hook="GLightboxHook">
                   {raw(event_body(@event))}
                 </div>
@@ -980,7 +980,7 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 mb-0.5">
                         <p class={[
-                          "font-black text-2xl text-zinc-900 tracking-tighter leading-none",
+                          "font-black text-2xl text-zinc-900 tracking-tight leading-none",
                           if @event_at_capacity do
                             "line-through"
                           else
@@ -2629,7 +2629,7 @@ defmodule YscWeb.EventDetailsLive do
         <%= if Enum.any?(tickets_requiring_registration) do %>
           <div class="space-y-3 border-t border-zinc-200 pt-6">
             <h3 class="font-semibold text-lg mb-1">Ticket Registration</h3>
-            <p class="text-sm text-zinc-600 mb-4">
+            <p class="text-base text-zinc-600 mb-4">
               Please provide details for each ticket that requires registration.
             </p>
 

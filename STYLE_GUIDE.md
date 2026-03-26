@@ -6,11 +6,35 @@ Canonical design reference for the YSC web application. All UI changes must foll
 
 ## Typography
 
+### Font stack
+
+**Sans (UI, forms, tables, navigation — everything by default):**
+
+```
+system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif
+```
+
+Renders as the OS native sans: SF Pro on Apple, Segoe UI on Windows, Roboto on Android/Linux. Zero latency, no FOUT, tuned for legibility on each platform.
+
+**Serif (optional, long-form editorial prose only):**
+
+```
+"Source Serif 4", Georgia, "Times New Roman", serif
+```
+
+Use only with `font-serif` on multi-paragraph reading blocks (articles, long descriptions). Do **not** use globally. Do **not** mix more than two families on the same page.
+
+**Banned:** do not import or reference `Inter`, custom web fonts, or Google Fonts unless explicitly approved. The system stack is intentional.
+
+---
+
+### Size scale
+
 | Token                 | Size    | Usage                                                                                    |
 | --------------------- | ------- | ---------------------------------------------------------------------------------------- |
 | `text-xs`             | 12px    | Badge overlays, map markers, decorative labels with tight space constraints              |
-| `text-sm`             | 14px    | **Minimum for readable content.** Body text, form labels, metadata, captions, sub-labels |
-| `text-base`           | 16px    | Default prose, card descriptions                                                         |
+| `text-sm`             | 14px    | Navigation, form labels, metadata, captions, dense table cells, sub-labels              |
+| `text-base`           | 16px    | **Minimum for primary prose.** Card descriptions, booking flows, settings copy, legal text |
 | `text-lg`             | 18px    | Section sub-headings                                                                     |
 | `text-xl`–`text-3xl`  | 20–30px | Section headings, stats                                                                  |
 | `text-4xl`–`text-9xl` | 36px+   | Page heroes (responsive scale)                                                           |
@@ -23,6 +47,9 @@ Canonical design reference for the YSC web application. All UI changes must foll
 - `font-bold` — CTA buttons, section headings
 - `font-semibold` — component buttons, labels, column headers
 - `font-medium` — table cells, list items, secondary labels
+- `font-normal` — paragraph body text; **avoid `font-light` on paragraph body** — too thin for the full age range of members
+
+**Line spacing:** use `leading-relaxed` on all multi-line prose. Hero display text may use tighter leading, but should not use `tracking-tighter` on body-level copy.
 
 ---
 
@@ -333,7 +360,8 @@ Use Tailwind's default spacing scale. Prefer `gap-*` for flex/grid layouts over 
 
 ## Accessibility Checklist
 
-- `text-sm` minimum for all readable text (labels, descriptions, metadata)
+- `text-base` (16px) minimum for all primary prose (booking flows, descriptions, settings, legal text)
+- `text-sm` for navigation, labels, metadata, and dense UI elements
 - `text-xs` only for badge overlays, map markers, and space-constrained decorative elements
 - `min-h-[44px]` minimum touch target for all interactive elements
 - Every interactive element has a `focus-visible:ring-2` ring

@@ -52,7 +52,7 @@ defmodule YscWeb.UserSettingsLive do
               </p>
             </div>
 
-            <p class="text-sm text-zinc-600 mb-4">
+            <p class="text-base text-zinc-600 mb-4">
               We sent a verification code via text message to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@pending_phone_number) || @pending_phone_number %></strong>.
               Please enter it below to confirm your phone number.
             </p>
@@ -146,7 +146,7 @@ defmodule YscWeb.UserSettingsLive do
               </p>
             </div>
 
-            <p class="text-sm text-zinc-600 mb-4">
+            <p class="text-base text-zinc-600 mb-4">
               We sent a verification code to <strong><%= @pending_email %></strong>.
               Please enter it below to confirm your new email address.
             </p>
@@ -214,7 +214,7 @@ defmodule YscWeb.UserSettingsLive do
             Verify Your Identity
           </h2>
 
-          <p class="text-sm text-zinc-600 mb-6">
+          <p class="text-base text-zinc-600 mb-6">
             For security reasons, please verify your identity before changing your email address.
           </p>
 

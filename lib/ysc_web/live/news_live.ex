@@ -241,12 +241,12 @@ defmodule YscWeb.NewsLive do
 
               <.link
                 navigate={~p"/posts/#{post.url_name}"}
-                class="text-2xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
+                class="text-2xl font-black text-zinc-900 tracking-tight leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
               >
                 {post.title}
               </.link>
 
-              <article class="text-zinc-500 text-sm leading-relaxed line-clamp-3 mb-8">
+              <article class="text-zinc-500 text-base leading-relaxed line-clamp-3 mb-8">
                 {raw(preview_text(post))}
               </article>
 

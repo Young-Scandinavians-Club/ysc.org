@@ -1075,6 +1075,120 @@ defmodule YscWeb.AdminBookingsLive do
           </:actions>
         </.simple_form>
       </.modal>
+      <!-- Day Guests Modal -->
+      <.modal
+        :if={@show_day_guests_modal}
+        id="day-guests-modal"
+        on_cancel={JS.push("close-day-guests-modal")}
+        show
+        max_width="max-w-2xl"
+      >
+        <.header>
+          <div class="flex flex-col gap-1">
+            <span class="font-semibold">
+              Guests on {if @day_guests_date,
+                do: Calendar.strftime(@day_guests_date, "%B %d, %Y"),
+                else: ""}
+            </span>
+            <span class="text-sm font-normal text-zinc-500">
+              {length(@day_guests_bookings)} {if length(@day_guests_bookings) == 1,
+                do: "booking",
+                else: "bookings"} active
+            </span>
+          </div>
+        </.header>
+
+        <div class="mt-4 space-y-3 max-h-[60vh] overflow-y-auto overscroll-contain pr-1 -mr-1">
+          <%= if @day_guests_bookings == [] do %>
+            <p class="text-sm text-zinc-500 text-center py-8">
+              No bookings found for this date.
+            </p>
+          <% else %>
+            <%= for booking <- @day_guests_bookings do %>
+              <div class="bg-zinc-50 rounded-lg p-4 border border-zinc-200 hover:bg-zinc-100 transition-colors">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <% user_initials =
+                      if booking.user && booking.user.first_name &&
+                           booking.user.last_name do
+                        "#{String.first(booking.user.first_name)}#{String.first(booking.user.last_name)}"
+                      else
+                        "?"
+                      end %>
+                    <div class="flex-shrink-0 w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm">
+                      {user_initials}
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-zinc-900 truncate">
+                        {if booking.user do
+                          if booking.user.first_name && booking.user.last_name do
+                            "#{booking.user.first_name} #{booking.user.last_name}"
+                          else
+                            booking.user.email || "Unknown User"
+                          end
+                        else
+                          "Unknown User"
+                        end}
+                      </p>
+                      <p
+                        :if={booking.user && booking.user.email}
+                        class="text-xs text-zinc-500 truncate"
+                      >
+                        {booking.user.email}
+                      </p>
+                      <div class="flex items-center gap-3 mt-1 text-xs text-zinc-600">
+                        <span>
+                          {Calendar.strftime(booking.checkin_date, "%b %d")} → {Calendar.strftime(
+                            booking.checkout_date,
+                            "%b %d, %Y"
+                          )}
+                        </span>
+                        <span>
+                          {booking.guests_count} {if booking.guests_count == 1,
+                            do: "adult",
+                            else: "adults"}
+                          {if (booking.children_count || 0) > 0,
+                            do:
+                              ", #{booking.children_count} #{if booking.children_count == 1, do: "child", else: "children"}",
+                            else: ""}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <% badge_type =
+                      case booking.status do
+                        :complete -> "green"
+                        :canceled -> "red"
+                        :refunded -> "yellow"
+                        :hold -> "sky"
+                        :draft -> "dark"
+                        _ -> "dark"
+                      end %>
+                    <.badge type={badge_type}>
+                      {String.upcase(to_string(booking.status))}
+                    </.badge>
+                    <button
+                      type="button"
+                      phx-click="view-booking"
+                      phx-value-booking-id={booking.id}
+                      class="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+
+        <div class="flex justify-end mt-6 pt-4 border-t border-zinc-200">
+          <.button phx-click="close-day-guests-modal" type="button">
+            Close
+          </.button>
+        </div>
+      </.modal>
       <!-- New/Edit Refund Policy Modal -->
       <.modal
         :if={@live_action in [:new_refund_policy, :edit_refund_policy]}
@@ -1972,9 +2086,20 @@ defmodule YscWeb.AdminBookingsLive do
                         class="flex items-center justify-center h-12"
                         style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
                       >
-                        <span class={"text-sm font-semibold #{if availability_info.day_bookings_count > 0, do: "text-amber-600", else: "text-zinc-400"}"}>
-                          {availability_info.day_bookings_count} guests
-                        </span>
+                        <%= if availability_info.day_bookings_count > 0 do %>
+                          <button
+                            type="button"
+                            phx-click="show-day-guests"
+                            phx-value-date={Date.to_string(date)}
+                            class="text-sm font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer transition-colors"
+                          >
+                            {availability_info.day_bookings_count} guests
+                          </button>
+                        <% else %>
+                          <span class="text-sm font-semibold text-zinc-400">
+                            0 guests
+                          </span>
+                        <% end %>
                       </div>
                     <% end %>
                   <% end %>
@@ -3281,6 +3406,9 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:room_form, nil)
       |> assign(:selected_room_image, nil)
       |> assign(:daily_availability, %{})
+      |> assign(:show_day_guests_modal, false)
+      |> assign(:day_guests_date, nil)
+      |> assign(:day_guests_bookings, [])
       |> assign(
         :reservations_path,
         ~p"/admin/bookings?property=#{selected_property}&section=reservations"
@@ -4854,6 +4982,32 @@ defmodule YscWeb.AdminBookingsLive do
 
   def handle_event("close-booking-refund-modal", _params, socket) do
     {:noreply, assign(socket, :show_refund_modal, false)}
+  end
+
+  def handle_event("show-day-guests", %{"date" => date_str}, socket) do
+    date = Date.from_iso8601!(date_str)
+
+    bookings =
+      Bookings.list_bookings(:clear_lake, date, date, preload: [:user, :rooms])
+      |> Enum.filter(fn b ->
+        b.status not in [:canceled, :refunded] &&
+          Date.compare(b.checkin_date, date) != :gt &&
+          Date.compare(b.checkout_date, date) == :gt
+      end)
+
+    {:noreply,
+     socket
+     |> assign(:show_day_guests_modal, true)
+     |> assign(:day_guests_date, date)
+     |> assign(:day_guests_bookings, bookings)}
+  end
+
+  def handle_event("close-day-guests-modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_day_guests_modal, false)
+     |> assign(:day_guests_date, nil)
+     |> assign(:day_guests_bookings, [])}
   end
 
   def handle_event(

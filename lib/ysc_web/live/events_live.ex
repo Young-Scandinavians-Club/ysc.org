@@ -53,7 +53,7 @@ defmodule YscWeb.EventsLive do
               <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Get Involved
               </h4>
-              <p class="text-sm text-zinc-700 leading-relaxed mb-4">
+              <p class="text-base text-zinc-700 leading-relaxed mb-4">
                 Have an idea for an event? We'd love to help you host it! Reach out through our contact page.
               </p>
               <.link
@@ -69,7 +69,7 @@ defmodule YscWeb.EventsLive do
               <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Stay Connected
               </h4>
-              <p class="text-sm text-zinc-600 leading-relaxed mb-4">
+              <p class="text-base text-zinc-600 leading-relaxed mb-4">
                 Join our community to see what members are planning informally.
               </p>
               <div class="space-y-3">

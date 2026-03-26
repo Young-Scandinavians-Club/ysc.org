@@ -230,7 +230,7 @@ defmodule YscWeb.UserTicketsLive do
                     <.icon name="hero-check-badge" class="w-5 h-5 text-zinc-300" />
                   </div>
 
-                  <h4 class="text-xl font-black text-zinc-900 tracking-tighter mb-1">
+                  <h4 class="text-xl font-black text-zinc-900 tracking-tight mb-1">
                     {item.title}
                   </h4>
                   <p class="text-xs font-medium text-zinc-400 flex items-center gap-1 mb-4">

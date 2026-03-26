@@ -266,7 +266,7 @@ defmodule YscWeb.HomeLive do
             </h1>
           </div>
 
-          <p class="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto text-white/85 font-light leading-relaxed drop-shadow-md px-0">
+          <p class="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto text-white/85 font-normal leading-relaxed drop-shadow-md px-0">
             A vibrant community for Scandinavians and Scandinavian-Americans in and around the San Francisco Bay Area
           </p>
 
@@ -508,7 +508,7 @@ defmodule YscWeb.HomeLive do
               The Cabin Legacy.
             </h2>
           </div>
-          <p class="text-zinc-500 text-base sm:text-lg lg:max-w-xs font-light leading-relaxed">
+          <p class="text-zinc-500 text-base sm:text-lg lg:max-w-xs font-normal leading-relaxed">
             Membership unlocks year-round access to our two historic, member-run sanctuaries.
           </p>
         </div>
@@ -523,7 +523,7 @@ defmodule YscWeb.HomeLive do
               <h3 class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight mb-3 sm:mb-4">
                 The Alpine Retreat
               </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-light">
+              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
                 Ski in winter, hike in summer, and relax year-round. Perfectly positioned for alpine adventures and cozy
                 <em>hygge</em>
                 evenings by the fire.
@@ -586,7 +586,7 @@ defmodule YscWeb.HomeLive do
               <h3 class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight mb-3 sm:mb-4">
                 The Waterfront Sanctuary
               </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-light">
+              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
                 Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
               </p>
               <ul class="space-y-4 mb-8">
@@ -843,7 +843,7 @@ defmodule YscWeb.HomeLive do
               Stay Informed.
             </h2>
           </div>
-          <p class="text-zinc-500 text-base sm:text-lg font-light lg:max-w-xs">
+          <p class="text-zinc-500 text-base sm:text-lg font-normal lg:max-w-xs">
             Member updates, seasonal news, and club stories.
           </p>
         </div>
@@ -906,7 +906,7 @@ defmodule YscWeb.HomeLive do
               <time class="text-xs font-black text-blue-600 uppercase tracking-widest">
                 {format_post_date(post.published_on)} · {reading_time_for_news(post)} min read
               </time>
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tighter mt-3 group-hover:text-blue-600 transition-colors leading-none">
+              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mt-3 group-hover:text-blue-600 transition-colors leading-none">
                 {post.title}
               </h3>
               <%= if post.preview_text || post.rendered_body do %>
@@ -1380,7 +1380,7 @@ defmodule YscWeb.HomeLive do
                         <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
                           Destination
                         </p>
-                        <p class="font-black text-2xl text-zinc-900 tracking-tighter">
+                        <p class="font-black text-2xl text-zinc-900 tracking-tight">
                           {format_property_name(booking.property)}
                         </p>
                         <p class="text-xs font-mono text-zinc-400">
@@ -1647,7 +1647,7 @@ defmodule YscWeb.HomeLive do
                   )}
                 </h2>
                 <p class={[
-                  "text-sm leading-relaxed mb-8",
+                  "text-base leading-relaxed mb-8",
                   if @active_membership? do
                     "text-zinc-300"
                   else
