@@ -261,17 +261,28 @@ defmodule YscWeb.TicketQrLive do
 
             <%!-- Order reference: 14px, zinc-300 on zinc-900 (~5.5:1) --%>
             <div class="mt-8 text-center px-4">
-              <p class="text-sm text-zinc-300">
-                Order&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
-              </p>
-              <.link
-                id="confirmation-link"
-                navigate={~p"/orders/#{@order_id}/confirmation"}
-                class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
-              >
-                View full order details
-                <.icon name="hero-arrow-right" class="w-4 h-4" />
-              </.link>
+              <%= if @order_id do %>
+                <p class="text-sm text-zinc-300">
+                  Order&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
+                </p>
+                <.link
+                  id="confirmation-link"
+                  navigate={~p"/orders/#{@order_id}/confirmation"}
+                  class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
+                >
+                  View full order details
+                  <.icon name="hero-arrow-right" class="w-4 h-4" />
+                </.link>
+              <% else %>
+                <.link
+                  id="all-orders-link"
+                  navigate={~p"/users/tickets"}
+                  class="inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
+                >
+                  View all ticket orders
+                  <.icon name="hero-arrow-right" class="w-4 h-4" />
+                </.link>
+              <% end %>
             </div>
         <% end %>
       </div>
@@ -315,6 +326,34 @@ defmodule YscWeb.TicketQrLive do
     {:ok, socket}
   end
 
+  def mount(%{"event_id" => event_id} = params, _session, socket) do
+    user = socket.assigns.current_user
+    return_to = safe_return_to(Map.get(params, "return_to"))
+
+    socket =
+      socket
+      |> assign(:return_to, return_to)
+      |> assign(:page_title, "Ticket QR")
+      |> assign(:loading, true)
+      |> assign(:load_error, false)
+      |> assign(:event, nil)
+      |> assign(:tickets, [])
+      |> assign(:ticket_count, 0)
+      |> assign(:order_id, nil)
+      |> assign(:order_reference, nil)
+
+    socket =
+      if connected?(socket) do
+        start_async(socket, :load_ticket_data, fn ->
+          load_event_ticket_data(user.id, event_id)
+        end)
+      else
+        socket
+      end
+
+    {:ok, socket}
+  end
+
   @impl true
   def handle_async(:load_ticket_data, {:ok, :not_found}, socket) do
     {:noreply,
@@ -349,6 +388,52 @@ defmodule YscWeb.TicketQrLive do
   end
 
   # --- Private ---
+
+  defp load_event_ticket_data(user_id, event_id) do
+    tickets = Tickets.list_user_tickets_for_event(user_id, event_id)
+
+    confirmed_tickets =
+      tickets
+      |> Enum.map(fn ticket ->
+        holder =
+          case ticket do
+            %{registration: %{first_name: first, last_name: last}}
+            when not is_nil(first) ->
+              "#{first} #{last}"
+
+            _ ->
+              nil
+          end
+
+        %{
+          id: ticket.id,
+          reference_id: ticket.reference_id,
+          tier_name: ticket.ticket_tier.name,
+          holder_name: holder,
+          qr_token: QrToken.sign_ticket(ticket.id)
+        }
+      end)
+
+    if confirmed_tickets == [] do
+      :no_confirmed_tickets
+    else
+      event = List.first(tickets).event
+
+      %{
+        event: %{
+          title: event.title,
+          start_date: event.start_date,
+          start_time: event.start_time,
+          location_name: event.location_name,
+          address: event.address
+        },
+        order_id: nil,
+        order_reference: nil,
+        tickets: confirmed_tickets,
+        ticket_count: length(confirmed_tickets)
+      }
+    end
+  end
 
   defp load_ticket_data(user_id, order_id) do
     case Tickets.get_user_ticket_order(user_id, order_id) do

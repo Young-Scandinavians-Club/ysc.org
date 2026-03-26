@@ -20,7 +20,7 @@ defmodule YscWeb.UserTicketsLive do
           </div>
           <.link
             href={~p"/events"}
-            class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition shadow-lg shadow-zinc-200"
+            class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition"
           >
             <.icon name="hero-plus" class="w-4 h-4" /> Find More Events
           </.link>
@@ -45,7 +45,7 @@ defmodule YscWeb.UserTicketsLive do
             </p>
             <.link
               href={~p"/events"}
-              class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition shadow-lg"
+              class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition"
             >
               <.icon name="hero-plus" class="w-4 h-4" /> Browse Events
             </.link>
@@ -54,14 +54,14 @@ defmodule YscWeb.UserTicketsLive do
           <%= for {id, ticket_order} <- @streams.ticket_orders do %>
             <div
               id={id}
-              class="relative group bg-white border border-zinc-200 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300"
+              class="relative group bg-white border border-zinc-200 rounded-2xl hover:ring-2 hover:ring-zinc-300 transition-all duration-200"
             >
               <%!-- Event Header Section --%>
               <div class="p-8">
                 <div class="flex justify-between items-start mb-6">
                   <.status_badge status={ticket_order.status} />
                   <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] leading-none">
-                    Order #{ticket_order.reference_id}
+                    {ticket_order.reference_id}
                   </p>
                 </div>
 
@@ -131,18 +131,14 @@ defmodule YscWeb.UserTicketsLive do
 
                 <%!-- Ticket Manifest Section --%>
                 <div class="p-8 bg-zinc-50/50 rounded-b-3xl">
-                  <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4">
-                    Manifest
-                  </h4>
-
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <%= for ticket <- ticket_order.tickets do %>
-                      <div class="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm">
+                      <div class="bg-white p-4 rounded-2xl border border-zinc-200">
                         <p class="text-xs font-black text-zinc-900">
                           {ticket.ticket_tier.name}
                         </p>
                         <p class="text-xs font-mono text-zinc-400 mt-1">
-                          #{ticket.reference_id}
+                          {ticket.reference_id}
                         </p>
                         <div class="mt-3 pt-3 border-t border-zinc-50 flex justify-between items-center">
                           <span class="text-xs font-bold text-teal-600 uppercase">
@@ -167,15 +163,6 @@ defmodule YscWeb.UserTicketsLive do
                             <% end %>
                           </span>
                         </div>
-                        <.link
-                          :if={ticket.status == :confirmed}
-                          navigate={
-                            ~p"/tickets/#{ticket_order.id}/qr?return_to=/users/tickets"
-                          }
-                          class="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          <.icon name="hero-qr-code" class="w-3.5 h-3.5" /> Show QR
-                        </.link>
                       </div>
                     <% end %>
                   </div>
@@ -189,12 +176,28 @@ defmodule YscWeb.UserTicketsLive do
                         {format_price(ticket_order.total_amount)}
                       </p>
                     </div>
-                    <.link
-                      navigate={~p"/orders/#{ticket_order.id}/confirmation"}
-                      class="px-6 py-3 bg-white border border-zinc-200 text-zinc-900 font-bold rounded hover:bg-zinc-50 transition shadow-sm"
-                    >
-                      View Order
-                    </.link>
+                    <div class="flex items-center gap-2">
+                      <.link
+                        :if={
+                          Enum.any?(
+                            ticket_order.tickets,
+                            &(&1.status == :confirmed)
+                          )
+                        }
+                        navigate={
+                          ~p"/tickets/#{ticket_order.id}/qr?return_to=/users/tickets"
+                        }
+                        class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-zinc-100 bg-zinc-900 hover:bg-zinc-800 rounded transition-colors"
+                      >
+                        <.icon name="hero-qr-code" class="w-4 h-4" /> QR Codes
+                      </.link>
+                      <.link
+                        navigate={~p"/orders/#{ticket_order.id}/confirmation"}
+                        class="px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 text-sm font-semibold rounded hover:bg-zinc-50 transition"
+                      >
+                        View Order
+                      </.link>
+                    </div>
                   </div>
                 </div>
               <% end %>
@@ -219,7 +222,7 @@ defmodule YscWeb.UserTicketsLive do
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <%= for item <- @past_items do %>
-                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500 hover:bg-white hover:shadow-lg">
+                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
                   <div class="flex justify-between items-start mb-4">
                     <span class="text-xs font-black text-zinc-400 uppercase tracking-widest border border-zinc-200 px-2 py-0.5 rounded">
                       {format_visited_date(item)}
