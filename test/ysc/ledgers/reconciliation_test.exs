@@ -1,5 +1,7 @@
 defmodule Ysc.Ledgers.ReconciliationTest do
-  use Ysc.DataCase, async: true
+  # async: false required — with_trigger_disabled/1 runs ALTER TABLE DDL which takes a
+  # ShareRowExclusiveLock on ledger_entries; concurrent tests deadlock on that lock.
+  use Ysc.DataCase, async: false
 
   alias Ysc.Ledgers
   alias Ysc.Ledgers.Reconciliation
