@@ -75,7 +75,7 @@ defmodule YscWeb.Components.News.NewsCard do
 
         <.link
           navigate={~p"/posts/#{@post.url_name}"}
-          class="text-2xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
+          class="text-2xl font-black text-zinc-900 tracking-tight leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
         >
           {@post.title}
         </.link>

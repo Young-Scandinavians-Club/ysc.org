@@ -251,12 +251,6 @@ defmodule YscWeb.HomeLive do
       >
         <%!-- Constrained content block on mobile for balanced measure and centering --%>
         <div class="mx-auto w-full max-w-2xl md:max-w-none flex flex-col items-center">
-          <div class="mb-4 sm:mb-6 pt-8 sm:pt-10 md:pt-4">
-            <span class="inline-block px-4 py-1.5 text-sm font-semibold tracking-widest uppercase bg-white/10 backdrop-blur-sm rounded-full border border-white/20 text-white/90">
-              Est. 1950 · San Francisco
-            </span>
-          </div>
-
           <div class="max-w-full">
             <span class="block font-serif italic text-xl sm:text-2xl md:text-2xl lg:text-4xl mb-3 sm:mb-4 text-white/80 font-light tracking-tight">
               Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years of
@@ -266,7 +260,7 @@ defmodule YscWeb.HomeLive do
             </h1>
           </div>
 
-          <p class="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto text-white/85 font-light leading-relaxed drop-shadow-md px-0">
+          <p class="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto text-white/85 font-normal leading-relaxed drop-shadow-md px-0">
             A vibrant community for Scandinavians and Scandinavian-Americans in and around the San Francisco Bay Area
           </p>
 
@@ -290,31 +284,23 @@ defmodule YscWeb.HomeLive do
           </div>
 
           <%!-- Stats as a single grouped unit on mobile for visual balance --%>
-          <div class="mt-10 sm:mt-12 md:mt-16 w-full max-w-md sm:max-w-none mx-auto rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 sm:border-transparent sm:bg-transparent sm:backdrop-blur-none px-6 py-5 sm:px-0 sm:py-0">
+          <div class="mt-10 sm:mt-12 md:mt-16 w-full max-w-none mx-auto px-0 py-0">
             <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:gap-8 text-white/70">
-              <div class="text-center min-w-0 flex-1 sm:flex-none basis-[calc(33.333%-0.5rem)] sm:basis-auto">
+              <div class="text-center min-w-0 flex-none basis-auto">
                 <div class="text-2xl sm:text-3xl font-bold text-white">500+</div>
                 <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
                   Members
                 </div>
               </div>
-              <div
-                class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 hidden sm:block"
-                aria-hidden="true"
-              >
-              </div>
-              <div class="text-center min-w-0 flex-1 sm:flex-none basis-[calc(33.333%-0.5rem)] sm:basis-auto">
+              <div class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 block"></div>
+              <div class="text-center min-w-0 flex-none basis-auto">
                 <div class="text-2xl sm:text-3xl font-bold text-white">2</div>
                 <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
                   Properties
                 </div>
               </div>
-              <div
-                class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 hidden sm:block"
-                aria-hidden="true"
-              >
-              </div>
-              <div class="text-center min-w-0 flex-1 sm:flex-none basis-[calc(33.333%-0.5rem)] sm:basis-auto">
+              <div class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 block"></div>
+              <div class="text-center min-w-0 flex-none basis-auto">
                 <div class="text-2xl sm:text-3xl font-bold text-white">
                   {div(Date.utc_today().year - 1950, 5) * 5}+
                 </div>
@@ -508,7 +494,7 @@ defmodule YscWeb.HomeLive do
               The Cabin Legacy.
             </h2>
           </div>
-          <p class="text-zinc-500 text-base sm:text-lg lg:max-w-xs font-light leading-relaxed">
+          <p class="text-zinc-500 text-base sm:text-lg lg:max-w-xs font-normal leading-relaxed">
             Membership unlocks year-round access to our two historic, member-run sanctuaries.
           </p>
         </div>
@@ -523,7 +509,7 @@ defmodule YscWeb.HomeLive do
               <h3 class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight mb-3 sm:mb-4">
                 The Alpine Retreat
               </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-light">
+              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
                 Ski in winter, hike in summer, and relax year-round. Perfectly positioned for alpine adventures and cozy
                 <em>hygge</em>
                 evenings by the fire.
@@ -586,7 +572,7 @@ defmodule YscWeb.HomeLive do
               <h3 class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight mb-3 sm:mb-4">
                 The Waterfront Sanctuary
               </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-light">
+              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
                 Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
               </p>
               <ul class="space-y-4 mb-8">
@@ -843,7 +829,7 @@ defmodule YscWeb.HomeLive do
               Stay Informed.
             </h2>
           </div>
-          <p class="text-zinc-500 text-base sm:text-lg font-light lg:max-w-xs">
+          <p class="text-zinc-500 text-base sm:text-lg font-normal lg:max-w-xs">
             Member updates, seasonal news, and club stories.
           </p>
         </div>
@@ -906,7 +892,7 @@ defmodule YscWeb.HomeLive do
               <time class="text-xs font-black text-blue-600 uppercase tracking-widest">
                 {format_post_date(post.published_on)} · {reading_time_for_news(post)} min read
               </time>
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tighter mt-3 group-hover:text-blue-600 transition-colors leading-none">
+              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mt-3 group-hover:text-blue-600 transition-colors leading-none">
                 {post.title}
               </h3>
               <%= if post.preview_text || post.rendered_body do %>
@@ -1380,7 +1366,7 @@ defmodule YscWeb.HomeLive do
                         <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
                           Destination
                         </p>
-                        <p class="font-black text-2xl text-zinc-900 tracking-tighter">
+                        <p class="font-black text-2xl text-zinc-900 tracking-tight">
                           {format_property_name(booking.property)}
                         </p>
                         <p class="text-xs font-mono text-zinc-400">
@@ -1647,7 +1633,7 @@ defmodule YscWeb.HomeLive do
                   )}
                 </h2>
                 <p class={[
-                  "text-sm leading-relaxed mb-8",
+                  "text-base leading-relaxed mb-8",
                   if @active_membership? do
                     "text-zinc-300"
                   else

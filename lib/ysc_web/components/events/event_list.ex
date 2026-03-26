@@ -37,7 +37,7 @@ defmodule YscWeb.EventsListLive do
         <div id="hero-event" class="group">
           <.link
             navigate={~p"/events/#{@hero_event.id}"}
-            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent"
+            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
           >
             <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden sm:border sm:border-zinc-100">
               <%!-- Image container --%>

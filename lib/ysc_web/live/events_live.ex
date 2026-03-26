@@ -53,14 +53,14 @@ defmodule YscWeb.EventsLive do
               <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Get Involved
               </h4>
-              <p class="text-sm text-zinc-700 leading-relaxed mb-4">
+              <p class="text-base text-zinc-700 leading-relaxed mb-4">
                 Have an idea for an event? We'd love to help you host it! Reach out through our contact page.
               </p>
               <.link
                 navigate={
                   ~p"/contact?subject=Events&message=Hi%2C%20I%20have%20an%20idea%20for%20an%20event%20I%27d%20love%20to%20host%20with%20YSC.%20Here%27s%20what%20I%20had%20in%20mind%3A%20"
                 }
-                class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
               >
                 Contact Us <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
               </.link>
@@ -69,7 +69,7 @@ defmodule YscWeb.EventsLive do
               <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Stay Connected
               </h4>
-              <p class="text-sm text-zinc-600 leading-relaxed mb-4">
+              <p class="text-base text-zinc-600 leading-relaxed mb-4">
                 Join our community to see what members are planning informally.
               </p>
               <div class="space-y-3">
@@ -89,7 +89,7 @@ defmodule YscWeb.EventsLive do
                       href={@site_setting_socials_discord}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-blue-600 transition-colors"
+                      class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <.icon
                         name="hero-chat-bubble-left-right"
@@ -101,7 +101,7 @@ defmodule YscWeb.EventsLive do
                       href={@site_setting_socials_whatsapp}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="inline-flex items-center text-sm font-bold text-zinc-900 hover:text-green-600 transition-colors"
+                      class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
                       WhatsApp
@@ -145,7 +145,7 @@ defmodule YscWeb.EventsLive do
               <div
                 :for={{id, event} <- @streams.past_events}
                 id={id}
-                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-300 ring-1 ring-zinc-200 hover:ring-zinc-300 bg-white p-1"
+                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-300 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-500 bg-white p-1"
               >
                 <.link
                   navigate={~p"/events/#{event.id}"}

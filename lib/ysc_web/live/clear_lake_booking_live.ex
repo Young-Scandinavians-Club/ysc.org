@@ -626,7 +626,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </span>
                   Choose Booking Type
                 </h2>
-                <p class="text-sm text-zinc-600 mb-6">
+                <p class="text-base text-zinc-600 mb-6">
                   Select how you'd like to book the Clear Lake cabin:
                 </p>
                 <fieldset>
@@ -1736,7 +1736,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <h3 class="font-bold text-zinc-900 mb-3 mt-6">
                           From the Bay Area
                         </h3>
-                        <p class="text-sm text-zinc-600 mb-4">
+                        <p class="text-base text-zinc-600 mb-4">
                           Public transportation is very limited — <strong>driving is essential</strong>. Follow the step-by-step directions below for full details.
                         </p>
                       </div>
@@ -1749,7 +1749,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           />
                         </summary>
                         <div class="p-4 border-t border-zinc-100 bg-white">
-                          <p class="text-sm text-zinc-600 mb-4">
+                          <p class="text-base text-zinc-600 mb-4">
                             Public transportation options are very limited — <strong>driving is essential</strong>. See the map in the Getting There section (right column) for location.
                           </p>
                           <!-- Vertical Trail Directions -->
@@ -2468,7 +2468,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-3 sm:mb-4 drop-shadow-lg">
               YSC Clear Lake Cabin
             </h1>
-            <p class="text-base sm:text-lg md:text-xl lg:text-2xl text-zinc-100 max-w-2xl font-light">
+            <p class="text-base sm:text-lg md:text-xl lg:text-2xl text-zinc-100 max-w-2xl font-normal">
               Owned and operated by our community since 1963. A year-round gateway to California's oldest natural lake.
             </p>
           </div>

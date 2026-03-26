@@ -809,7 +809,7 @@ defmodule YscWeb.BookingCheckoutLive do
               </span>
             </div>
             <p class={[
-              "text-sm leading-relaxed",
+              "text-base leading-relaxed",
               if(remaining_minutes(@booking.hold_expires_at) < 5,
                 do: "text-rose-700",
                 else: "text-blue-700"
