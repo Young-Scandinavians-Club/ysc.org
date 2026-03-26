@@ -1335,6 +1335,8 @@ defmodule YscWeb.AdminScannerLive do
       Scanning.close_session(socket.assigns.active_session.id)
     end
 
+    open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+
     socket =
       socket
       |> assign(:phase, :setup)
@@ -1343,6 +1345,7 @@ defmodule YscWeb.AdminScannerLive do
       |> assign(:scan_count, 0)
       |> assign(:camera_error, nil)
       |> assign(:group_prompt, nil)
+      |> assign(:open_sessions, open_sessions)
       |> push_event("stop-camera", %{})
 
     {:noreply, socket}

@@ -829,13 +829,13 @@ defmodule YscWeb.UserSettingsLive do
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
-              <button
+              <.button
                 :if={@current_membership != nil}
                 phx-click="show_membership_qr"
-                class="mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
               >
-                <.icon name="hero-qr-code" class="w-4 h-4" /> My Membership QR
-              </button>
+                <.icon name="hero-qr-code" class="w-4 h-4 mr-1.5" />
+                My Membership QR
+              </.button>
               <div
                 :if={@pending_family_invites != []}
                 class="mt-6 border-t border-zinc-100 pt-4"
@@ -882,12 +882,10 @@ defmodule YscWeb.UserSettingsLive do
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
               />
-              <button
-                phx-click="show_membership_qr"
-                class="mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <.icon name="hero-qr-code" class="w-4 h-4" /> My Membership QR
-              </button>
+              <.button phx-click="show_membership_qr">
+                <.icon name="hero-qr-code" class="w-4 h-4 mr-1.5" />
+                My Membership QR
+              </.button>
               <.link
                 navigate={~p"/users/settings/family"}
                 class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 ms-2"
@@ -1255,18 +1253,9 @@ defmodule YscWeb.UserSettingsLive do
                   is_sub_account={@is_sub_account}
                 />
 
-                <.link
-                  :if={@active_plan_type == :family}
-                  navigate={~p"/users/settings/family"}
-                  class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
-                >
-                  <.icon name="hero-user-group" class="w-4 h-4" />
-                  Add family members to your membership
-                </.link>
-
                 <div
                   :if={@pending_family_invites != []}
-                  class="mt-6 border-t border-zinc-100 pt-4"
+                  class="border-t border-zinc-100 pt-4"
                 >
                   <h3 class="text-sm font-semibold text-zinc-900">
                     Pending Family Invitations
@@ -1342,7 +1331,11 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
 
-                <div class="flex flex-wrap gap-3 pt-2 border-t border-zinc-100">
+                <div class="flex flex-wrap items-center gap-3 pt-4 border-t border-zinc-100">
+                  <.button phx-click="show_membership_qr">
+                    <.icon name="hero-qr-code" class="w-4 h-4 mr-1.5" />
+                    My Membership QR
+                  </.button>
                   <.button
                     phx-click={JS.patch(~p"/users/membership/payment-method")}
                     variant="outline"
@@ -1350,7 +1343,20 @@ defmodule YscWeb.UserSettingsLive do
                     <.icon name="hero-credit-card" class="w-4 h-4 mr-1.5" />
                     Change Payment Method
                   </.button>
-
+                  <.button
+                    :if={
+                      @current_membership != nil &&
+                        Subscriptions.scheduled_for_cancellation?(
+                          @current_membership
+                        )
+                    }
+                    phx-click="reactivate-membership"
+                    phx-disable-with="Reactivating..."
+                    color="green"
+                    disabled={!@user_is_active}
+                  >
+                    Reactivate Membership
+                  </.button>
                   <.button
                     :if={
                       @current_membership != nil &&
@@ -1372,21 +1378,6 @@ defmodule YscWeb.UserSettingsLive do
                     data-confirm="Are you sure you want to cancel your membership?"
                   >
                     Cancel Membership
-                  </.button>
-
-                  <.button
-                    :if={
-                      @current_membership != nil &&
-                        Subscriptions.scheduled_for_cancellation?(
-                          @current_membership
-                        )
-                    }
-                    phx-click="reactivate-membership"
-                    phx-disable-with="Reactivating..."
-                    color="green"
-                    disabled={!@user_is_active}
-                  >
-                    Reactivate Membership
                   </.button>
                 </div>
               </div>
