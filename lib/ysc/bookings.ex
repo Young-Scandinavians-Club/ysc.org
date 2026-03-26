@@ -1611,10 +1611,9 @@ defmodule Ysc.Bookings do
          room_id,
          room_category_id
        ) do
-    # Simple fallback hierarchy:
-    # 1. Try room-specific pricing rule (booking_mode = :room)
-    # 2. Try category-level pricing rule (booking_mode = :room)
-    # 3. Try property-level buyout pricing (as fallback)
+    # Fallback hierarchy (room mode only — never falls back to buyout pricing):
+    # 1. Room-specific rule
+    # 2. Category-level rule
     PricingRule.find_most_specific(
       property,
       season_id,
@@ -1630,14 +1629,6 @@ defmodule Ysc.Bookings do
         room_category_id,
         :room,
         :per_person_per_night
-      ) ||
-      PricingRule.find_most_specific(
-        property,
-        season_id,
-        nil,
-        nil,
-        :buyout,
-        :buyout_fixed
       )
   end
 
