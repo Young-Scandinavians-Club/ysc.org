@@ -27,11 +27,7 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
     end)
 
     on_exit(fn ->
-      if previous_stripe_client do
-        Application.put_env(:ysc, :stripe_client, previous_stripe_client)
-      else
-        Application.delete_env(:ysc, :stripe_client)
-      end
+      Application.put_env(:ysc, :stripe_client, previous_stripe_client)
     end)
 
     user = user_with_membership(:lifetime)

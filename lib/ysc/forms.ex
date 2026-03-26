@@ -8,6 +8,10 @@ defmodule Ysc.Forms do
   import Ecto.Query, warn: false
   alias Ysc.Repo
 
+  defp email_notifier do
+    Application.get_env(:ysc, :forms_email_notifier, YscWeb.Emails.Notifier)
+  end
+
   def create_volunteer(changeset) do
     case Repo.insert(changeset) do
       {:ok, volunteer} ->
@@ -106,7 +110,7 @@ defmodule Ysc.Forms do
       )
 
       confirmation_result =
-        YscWeb.Emails.Notifier.schedule_email(
+        email_notifier().schedule_email(
           report.email,
           confirmation_idempotency_key,
           YscWeb.Emails.ConductViolationConfirmation.get_subject(),
@@ -157,7 +161,7 @@ defmodule Ysc.Forms do
       )
 
       board_result =
-        YscWeb.Emails.Notifier.schedule_email_to_board(
+        email_notifier().schedule_email_to_board(
           board_idempotency_key,
           YscWeb.Emails.ConductViolationBoardNotification.get_subject(),
           "conduct_violation_board_notification",
@@ -215,7 +219,7 @@ defmodule Ysc.Forms do
       )
 
       confirmation_result =
-        YscWeb.Emails.Notifier.schedule_email(
+        email_notifier().schedule_email(
           volunteer.email,
           confirmation_idempotency_key,
           YscWeb.Emails.VolunteerConfirmation.get_subject(),
@@ -258,7 +262,7 @@ defmodule Ysc.Forms do
       )
 
       board_result =
-        YscWeb.Emails.Notifier.schedule_email_to_board(
+        email_notifier().schedule_email_to_board(
           board_idempotency_key,
           YscWeb.Emails.VolunteerBoardNotification.get_subject(),
           "volunteer_board_notification",
@@ -319,7 +323,7 @@ defmodule Ysc.Forms do
       )
 
       board_result =
-        YscWeb.Emails.Notifier.schedule_email_to_board(
+        email_notifier().schedule_email_to_board(
           board_idempotency_key,
           "New Contact Form: #{contact_form.subject}",
           "contact_form_board_notification",

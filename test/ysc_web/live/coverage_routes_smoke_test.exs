@@ -84,6 +84,12 @@ defmodule YscWeb.CoverageRoutesSmokeTest do
       booking =
         BookingsFixtures.booking_fixture(%{user_id: user.id, status: :hold})
 
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
       stub(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->

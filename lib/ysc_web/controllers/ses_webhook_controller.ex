@@ -71,7 +71,7 @@ defmodule YscWeb.SesWebhookController do
     subscribe_url = sns_message["SubscribeURL"]
 
     if is_binary(subscribe_url) do
-      case Req.get(subscribe_url) do
+      case Req.get(subscribe_url, retry: false, receive_timeout: 10_000) do
         {:ok, %Req.Response{status: status}} when status in 200..299 ->
           Ysc.Logging.info("SES webhook: SNS subscription confirmed",
             topic_arn: sns_message["TopicArn"]

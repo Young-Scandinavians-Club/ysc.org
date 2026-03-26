@@ -1,5 +1,5 @@
 defmodule YscWeb.AdminUsersLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -7,6 +7,15 @@ defmodule YscWeb.AdminUsersLiveTest do
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
     %{conn: log_in_user(conn, user), admin: user}
+  end
+
+  describe "access control" do
+    test "redirects non-admin members away from users list", %{conn: conn} do
+      member = user_fixture(%{role: "member"})
+      conn = log_in_user(conn, member)
+
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/admin/users")
+    end
   end
 
   describe "Admin Users" do
@@ -88,6 +97,49 @@ defmodule YscWeb.AdminUsersLiveTest do
       # Verify user state in DB
       updated_user = Ysc.Accounts.get_user!(pending_user.id)
       assert updated_user.state == :rejected
+    end
+
+    test "submits CSV export form", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+
+      html =
+        view
+        |> form("form[phx-submit=export-csv]", %{
+          "csv_export" => %{
+            "id" => "true",
+            "email" => "false",
+            "first_name" => "false",
+            "last_name" => "false",
+            "phone_number" => "false",
+            "state" => "false",
+            "address" => "false",
+            "only_subscribers" => "false"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Export" || html =~ "progress" || html =~ "spinner"
+    end
+
+    test "clear-search patches away search params", %{conn: conn} do
+      _u = user_fixture(%{first_name: "Findable", last_name: "User"})
+
+      qs = Plug.Conn.Query.encode(%{"search" => %{"query" => "Findable"}})
+      {:ok, view, _html} = live(conn, "/admin/users?" <> qs)
+
+      render_click(view, "clear-search", %{"input-id" => "user-search"})
+      patched = assert_patch(view)
+      refute String.contains?(patched, "search")
+    end
+
+    test "change event accepts flat search query param", %{conn: conn} do
+      user_fixture(%{first_name: "FlatSearch", last_name: "Hit"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+
+      render_change(view, "change", %{"search" => "FlatSearch"})
+      patched = assert_patch(view)
+      assert patched =~ "FlatSearch"
     end
   end
 end

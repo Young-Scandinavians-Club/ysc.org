@@ -7,6 +7,55 @@ defmodule YscWeb.AccountSetupLiveTest do
   alias Ysc.Accounts
 
   describe "Account setup flow" do
+    test "verify_code with invalid digits shows error toast", %{conn: conn} do
+      user =
+        user_fixture(%{
+          state: :pending_approval,
+          email_verified_at: nil,
+          password_set_at: nil,
+          phone_verified_at: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      render(view)
+
+      invalid_otp = %{
+        "0" => "1",
+        "1" => "1",
+        "2" => "1",
+        "3" => "1",
+        "4" => "1",
+        "5" => "1"
+      }
+
+      view
+      |> form("#email_form", %{"verification_code" => invalid_otp})
+      |> render_submit()
+
+      assert render(view) =~ "Invalid verification code"
+    end
+
+    test "update_resend_timers and resend_timer_expired do not crash", %{
+      conn: conn
+    } do
+      user =
+        user_fixture(%{
+          state: :pending_approval,
+          email_verified_at: nil,
+          password_set_at: nil,
+          phone_verified_at: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      render(view)
+
+      render_click(view, "update_resend_timers", %{})
+      render_click(view, "resend_timer_expired", %{"type" => "email"})
+      render_click(view, "resend_timer_expired", %{"type" => "sms"})
+
+      assert has_element?(view, "#email_form")
+    end
+
     test "shows correct stepper steps", %{conn: conn} do
       # Create a user who has submitted an application but not completed account setup
       user =

@@ -96,5 +96,54 @@ defmodule Ysc.ResendRateLimiterTest do
 
       assert remaining in [1, 2]
     end
+
+    test "resend_seconds_remaining/2 returns 0 when disabled_until is in the past" do
+      past = DateTime.add(DateTime.utc_now(), -5, :second)
+
+      assert ResendRateLimiter.resend_seconds_remaining(
+               %{email_resend_disabled_until: past},
+               :email
+             ) == 0
+
+      assert ResendRateLimiter.resend_seconds_remaining(
+               %{sms_resend_disabled_until: past},
+               :sms
+             ) == 0
+    end
+  end
+end
+
+defmodule Ysc.ResendRateLimiterCacheFailureTest do
+  use ExUnit.Case, async: false
+
+  alias Ysc.ResendRateLimiter
+
+  setup do
+    on_exit(fn ->
+      if Process.whereis(:ysc_cache) == nil do
+        assert {:ok, _} =
+                 Supervisor.start_child(
+                   Ysc.Supervisor,
+                   {Cachex, name: :ysc_cache}
+                 )
+      end
+    end)
+
+    :ok
+  end
+
+  test "record_resend/3 returns ok when Cachex.put fails" do
+    assert :ok = Supervisor.terminate_child(Ysc.Supervisor, Cachex)
+    assert :ok = Supervisor.delete_child(Ysc.Supervisor, Cachex)
+
+    try do
+      assert :ok = ResendRateLimiter.record_resend(999_001, :email, 60)
+    after
+      assert {:ok, _} =
+               Supervisor.start_child(
+                 Ysc.Supervisor,
+                 {Cachex, name: :ysc_cache}
+               )
+    end
   end
 end

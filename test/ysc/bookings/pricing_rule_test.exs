@@ -13,7 +13,10 @@ defmodule Ysc.Bookings.PricingRuleTest do
   """
   use Ysc.DataCase, async: false
 
-  alias Ysc.Bookings.{PricingRule, Room, RoomCategory, Season}
+  import Ecto.Query, only: [from: 2]
+
+  alias Ysc.Bookings
+  alias Ysc.Bookings.{PricingRule, PricingRuleCache, Room, RoomCategory, Season}
   alias Ysc.Repo
 
   setup do
@@ -55,6 +58,11 @@ defmodule Ysc.Bookings.PricingRuleTest do
   end
 
   describe "changeset/2" do
+    test "uses default empty attrs when second argument omitted" do
+      changeset = PricingRule.changeset(%PricingRule{})
+      refute changeset.valid?
+    end
+
     test "creates valid changeset with all required fields" do
       attrs = %{
         amount: Money.new(10_000, :USD),
@@ -203,6 +211,22 @@ defmodule Ysc.Bookings.PricingRuleTest do
       refute changeset.valid?
       assert changeset.errors[:amount] != nil
       {message, _} = changeset.errors[:amount]
+      assert message =~ "must be in USD"
+    end
+
+    test "rejects non-USD currency for children_amount" do
+      attrs = %{
+        amount: Money.new(10_000, :USD),
+        children_amount: Money.new(5000, :GBP),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe
+      }
+
+      changeset = PricingRule.changeset(%PricingRule{}, attrs)
+
+      refute changeset.valid?
+      {message, _} = changeset.errors[:children_amount]
       assert message =~ "must be in USD"
     end
 
@@ -721,6 +745,391 @@ defmodule Ysc.Bookings.PricingRuleTest do
       assert summer_rule.amount == Money.new(12_000, :USD)
       assert is_nil(base_rule.season_id)
       assert summer_rule.season_id == season.id
+    end
+  end
+
+  describe "find_most_specific_db/6 and find_children_pricing_rule_db/6" do
+    setup do
+      Ysc.Ledgers.ensure_basic_accounts()
+      Ysc.Bookings.SeasonCache.invalidate()
+      Cachex.clear(:ysc_cache)
+      :ok
+    end
+
+    test "returns property-level rule when no room or category filters apply",
+         %{
+           season: season
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 99),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_most_specific_db(
+          :tahoe,
+          season.id,
+          nil,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.amount == Money.new(:USD, 99)
+      assert is_nil(found.room_id)
+      assert is_nil(found.room_category_id)
+    end
+
+    test "prefers room-specific rule over property-level rule", %{
+      season: season,
+      room: room,
+      category: category
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 50),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: season.id,
+          room_category_id: category.id
+        })
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 200),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_id: room.id,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_most_specific_db(
+          :tahoe,
+          season.id,
+          room.id,
+          category.id,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.room_id == room.id
+      assert found.amount == Money.new(:USD, 200)
+    end
+
+    test "returns nil when no rules exist for the property and mode", %{
+      season: season
+    } do
+      assert is_nil(
+               PricingRule.find_most_specific_db(
+                 :clear_lake,
+                 season.id,
+                 nil,
+                 nil,
+                 :buyout,
+                 :buyout_fixed
+               )
+             )
+    end
+
+    test "find_children_pricing_rule_db returns rule with children_amount set",
+         %{
+           season: season,
+           room: room
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          children_amount: Money.new(:USD, 40),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_id: room.id,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_children_pricing_rule_db(
+          :tahoe,
+          season.id,
+          room.id,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.children_amount == Money.new(:USD, 40)
+    end
+
+    test "find_children_pricing_rule_db returns nil when no children pricing exists",
+         %{
+           season: season,
+           room: room
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_id: room.id,
+          season_id: season.id
+        })
+
+      assert is_nil(
+               PricingRule.find_children_pricing_rule_db(
+                 :tahoe,
+                 season.id,
+                 room.id,
+                 nil,
+                 :room,
+                 :per_person_per_night
+               )
+             )
+    end
+
+    test "matches category-level rule when no room_id is provided", %{
+      season: season,
+      category: category
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 77),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_category_id: category.id,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_most_specific_db(
+          :tahoe,
+          season.id,
+          nil,
+          category.id,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.amount == Money.new(:USD, 77)
+      assert is_nil(found.room_id)
+      assert found.room_category_id == category.id
+    end
+
+    test "uses property fallback when season_id is nil", %{season: _season} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 33),
+          booking_mode: :day,
+          price_unit: :per_guest_per_day,
+          property: :clear_lake,
+          season_id: nil
+        })
+
+      found =
+        PricingRule.find_most_specific_db(
+          :clear_lake,
+          nil,
+          nil,
+          nil,
+          :day,
+          :per_guest_per_day
+        )
+
+      assert found.amount == Money.new(:USD, 33)
+      assert is_nil(found.season_id)
+    end
+
+    test "find_most_specific/6 returns same rule as find_most_specific_db/6 via cache",
+         %{
+           season: season,
+           category: category
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 88),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_category_id: category.id,
+          season_id: season.id
+        })
+
+      PricingRuleCache.invalidate()
+
+      via_public =
+        PricingRule.find_most_specific(
+          :tahoe,
+          season.id,
+          nil,
+          category.id,
+          :room,
+          :per_person_per_night
+        )
+
+      via_db =
+        PricingRule.find_most_specific_db(
+          :tahoe,
+          season.id,
+          nil,
+          category.id,
+          :room,
+          :per_person_per_night
+        )
+
+      assert via_public.id == via_db.id
+      assert via_public.amount == Money.new(:USD, 88)
+    end
+
+    test "find_children_pricing_rule/6 returns same rule as find_children_pricing_rule_db/6",
+         %{
+           season: season,
+           room: room
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 120),
+          children_amount: Money.new(:USD, 55),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_id: room.id,
+          season_id: season.id
+        })
+
+      PricingRuleCache.invalidate()
+
+      via_public =
+        PricingRule.find_children_pricing_rule(
+          :tahoe,
+          season.id,
+          room.id,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      via_db =
+        PricingRule.find_children_pricing_rule_db(
+          :tahoe,
+          season.id,
+          room.id,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      assert via_public.id == via_db.id
+      assert via_public.children_amount == Money.new(:USD, 55)
+    end
+
+    test "find_children_pricing_rule_db logs branch when a children rule is found",
+         %{
+           season: season,
+           room: room
+         } do
+      {:ok, r} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 200),
+          children_amount: Money.new(:USD, 90),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_id: room.id,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_children_pricing_rule_db(
+          :tahoe,
+          season.id,
+          room.id,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.id == r.id
+      assert found.children_amount == Money.new(:USD, 90)
+    end
+
+    test "find_most_specific_db runs diagnostic counts when no rule matches", %{
+      season: season
+    } do
+      assert is_nil(
+               PricingRule.find_most_specific_db(
+                 :tahoe,
+                 season.id,
+                 nil,
+                 nil,
+                 :buyout,
+                 :buyout_fixed
+               )
+             )
+    end
+
+    test "find_children_pricing_rule_db returns category-level rule when room_id is nil",
+         %{
+           season: season,
+           category: category
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          children_amount: Money.new(:USD, 42),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_category_id: category.id,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_children_pricing_rule_db(
+          :tahoe,
+          season.id,
+          nil,
+          category.id,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.children_amount == Money.new(:USD, 42)
+      assert is_nil(found.room_id)
+      assert found.room_category_id == category.id
+    end
+
+    test "find_most_specific_db returns row when rule matches (no diagnostic branch)",
+         %{
+           season: season,
+           room: room
+         } do
+      {:ok, inserted} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 301),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          room_id: room.id,
+          season_id: season.id
+        })
+
+      found =
+        PricingRule.find_most_specific_db(
+          :tahoe,
+          season.id,
+          room.id,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      assert found.id == inserted.id
+      assert found.amount == Money.new(:USD, 301)
+
+      # Sanity-check the same rule is visible via a direct query
+      assert Repo.exists?(
+               from pr in PricingRule,
+                 where: pr.id == ^inserted.id
+             )
     end
   end
 end

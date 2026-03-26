@@ -2,9 +2,12 @@ defmodule Ysc.NewsletterTest do
   use Ysc.DataCase
 
   alias Ysc.Newsletter
+  alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.Subscriber
+  alias Ysc.Repo
 
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
 
   describe "subscribe/2" do
     test "creates a new subscriber with email and source" do
@@ -187,6 +190,294 @@ defmodule Ysc.NewsletterTest do
       assert "active@example.com" in emails
       refute "inactive@example.com" in emails
     end
+
+    test "filters by subscribed: false" do
+      Newsletter.subscribe("gone@example.com", source: "public_signup")
+      {:ok, _} = Newsletter.unsubscribe("gone@example.com")
+
+      list = Newsletter.list_subscribers(subscribed: false)
+      assert Enum.any?(list, &(&1.email == "gone@example.com"))
+    end
+
+    test "filters by source" do
+      Newsletter.subscribe("by-source@example.com", source: "public_signup")
+
+      list = Newsletter.list_subscribers(source: "public_signup")
+      assert Enum.any?(list, &(&1.email == "by-source@example.com"))
+    end
+  end
+
+  describe "list_paginated_subscribers/1" do
+    test "returns paginated rows" do
+      Newsletter.subscribe("paged@example.com", source: "public_signup")
+
+      assert {:ok, {rows, meta}} =
+               Newsletter.list_paginated_subscribers(%{page: 1, page_size: 10})
+
+      assert is_list(rows)
+      assert meta.page_size == 10
+    end
+  end
+
+  describe "editions" do
+    test "list_editions includes created editions" do
+      user = user_fixture()
+
+      {:ok, _} =
+        Newsletter.create_edition(
+          %{"title" => "List test", "subject" => "Subj"},
+          created_by_id: user.id
+        )
+
+      editions = Newsletter.list_editions()
+      assert Enum.any?(editions, &(&1.title == "List test"))
+    end
+
+    test "get_all_creators lists users who created editions" do
+      user = user_fixture()
+
+      {:ok, _} =
+        Newsletter.create_edition(
+          %{"title" => "Creator ed", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      creators = Newsletter.get_all_creators()
+      assert Enum.any?(creators, fn {_name, id} -> id == user.id end)
+    end
+
+    test "get_sent_edition returns nil for draft edition" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Draft only", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      assert Newsletter.get_sent_edition(edition.id) == nil
+    end
+
+    test "store_archive_html updates archived_html" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Archive", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      html = "<html><body>archived</body></html>"
+      assert {:ok, updated} = Newsletter.store_archive_html(edition, html)
+      assert updated.archived_html == html
+    end
+
+    test "delete_edition returns already_sent for sent editions" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Sent del", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      {:ok, sent} =
+        edition
+        |> Ecto.Changeset.change(%{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      assert {:error, :already_sent} = Newsletter.delete_edition(sent)
+    end
+
+    test "send_edition returns already_sent when edition is sent" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Sent send", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      {:ok, sent} =
+        edition
+        |> Ecto.Changeset.change(%{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      assert {:error, :already_sent} = Newsletter.send_edition(sent)
+    end
+
+    test "broadcast_edition_sent notifies subscribers" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Broadcast", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      :ok = Newsletter.subscribe_to_edition_updates()
+      :ok = Newsletter.broadcast_edition_sent(edition)
+
+      assert_receive {:edition_sent, received}, 200
+      assert received.id == edition.id
+    end
+
+    test "schedule_edition persists scheduled_at and scheduled status" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Scheduled", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      at =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, updated} = Newsletter.schedule_edition(edition, at)
+      assert updated.status == :scheduled
+      assert DateTime.compare(updated.scheduled_at, at) == :eq
+    end
+  end
+
+  describe "list_paginated_editions/2" do
+    test "accepts date_from and date_to filters" do
+      user = user_fixture()
+
+      {:ok, _} =
+        Newsletter.create_edition(
+          %{"title" => "Dated", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      today = Date.utc_today() |> Date.to_iso8601()
+
+      assert {:ok, {_rows, _meta}} =
+               Newsletter.list_paginated_editions(
+                 %{page: 1, page_size: 10},
+                 date_from: today,
+                 date_to: today
+               )
+    end
+  end
+
+  describe "email events and bounces" do
+    setup do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Events", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      %{user: user, edition: edition}
+    end
+
+    test "record_email_event inserts an event", %{edition: edition} do
+      assert {:ok, event} =
+               Newsletter.record_email_event(%{
+                 event_type: "open",
+                 email: "track@example.com",
+                 environment: "test",
+                 edition_id: edition.id
+               })
+
+      assert event.event_type == "open"
+    end
+
+    test "list_email_events_for_edition orders by inserted_at desc", %{
+      edition: edition
+    } do
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "open",
+          email: "o1@example.com",
+          environment: "test",
+          edition_id: edition.id
+        })
+
+      list = Newsletter.list_email_events_for_edition(edition.id)
+      refute list == []
+    end
+
+    test "count_email_events_by_type groups opens distinctly per email", %{
+      edition: edition
+    } do
+      for email <- ["u1@example.com", "u2@example.com"] do
+        {:ok, _} =
+          Newsletter.record_email_event(%{
+            event_type: "open",
+            email: email,
+            environment: "test",
+            edition_id: edition.id
+          })
+      end
+
+      counts = Newsletter.count_email_events_by_type(edition.id)
+      assert counts["open"] == 2
+    end
+
+    test "handle_hard_bounce returns not_subscribed for unknown email" do
+      assert {:ok, :not_subscribed} =
+               Newsletter.handle_hard_bounce(
+                 "nobody-#{System.unique_integer([:positive])}@example.com"
+               )
+    end
+
+    test "handle_hard_bounce returns not_subscribed when already unsubscribed" do
+      Newsletter.subscribe("already-out@example.com", source: "public_signup")
+      {:ok, _} = Newsletter.unsubscribe("already-out@example.com")
+
+      assert {:ok, :not_subscribed} =
+               Newsletter.handle_hard_bounce("already-out@example.com")
+    end
+
+    test "handle_hard_bounce unsubscribes active subscriber" do
+      {:ok, sub} =
+        Newsletter.subscribe("hard-bounce@example.com", source: "public_signup")
+
+      assert {:ok, updated} =
+               Newsletter.handle_hard_bounce("hard-bounce@example.com")
+
+      assert updated.id == sub.id
+      refute updated.subscribed
+      assert updated.metadata["unsubscribe_reason"] == "hard_bounce"
+    end
+  end
+
+  describe "count_clicks_by_link/1" do
+    test "classifies post URLs and returns click counts" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Clicks", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      base = YscWeb.Endpoint.url() |> String.trim_trailing("/")
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "click",
+          email: "c@example.com",
+          environment: "test",
+          edition_id: edition.id,
+          link_url: "#{base}/posts/my-post-slug"
+        })
+
+      rows = Newsletter.count_clicks_by_link(edition.id)
+      assert [%{type: :post, clicks: 1} | _] = rows
+    end
   end
 
   describe "Subscriber.generate_subscription_token/0" do
@@ -195,6 +486,146 @@ defmodule Ysc.NewsletterTest do
       assert is_binary(token)
       assert byte_size(token) > 0
       refute String.contains?(token, ["+", "/", "="])
+    end
+  end
+
+  describe "subscribe edge cases and edition helpers" do
+    test "re-subscribe while still subscribed preserves subscribed_at" do
+      {:ok, first} =
+        Newsletter.subscribe("preserve-at@example.com", source: "public_signup")
+
+      at = first.subscribed_at
+
+      {:ok, second} =
+        Newsletter.subscribe("preserve-at@example.com", source: "public_signup")
+
+      assert DateTime.compare(second.subscribed_at, at) == :eq
+    end
+
+    test "get_edition!/1 returns the edition" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Get edition!", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      loaded = Newsletter.get_edition!(edition.id)
+      assert loaded.id == edition.id
+      assert loaded.title == "Get edition!"
+    end
+
+    test "list_sent_editions/0 lists editions with status sent" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Sent list", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      sent_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        edition
+        |> Ecto.Changeset.change(%{status: :sent, sent_at: sent_at})
+        |> Repo.update()
+
+      titles = Newsletter.list_sent_editions() |> Enum.map(& &1.title)
+      assert "Sent list" in titles
+    end
+
+    test "delete_edition/1 removes a draft edition" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "To delete", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      assert {:ok, _} = Newsletter.delete_edition(edition)
+      assert Repo.get(Edition, edition.id) == nil
+    end
+
+    test "list_paginated_editions/2 ignores invalid date_from filter" do
+      user = user_fixture()
+
+      {:ok, _} =
+        Newsletter.create_edition(
+          %{"title" => "Invalid date filter", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      assert {:ok, {_rows, _meta}} =
+               Newsletter.list_paginated_editions(
+                 %{page: 1, page_size: 10},
+                 date_from: "not-a-valid-date"
+               )
+    end
+
+    test "list_paginated_subscribers/1 returns error for invalid Flop params" do
+      assert {:error, _} =
+               Newsletter.list_paginated_subscribers(%{page: "not-an-integer"})
+    end
+
+    test "subscribe_to_edition_updates/0 subscribes the process to PubSub" do
+      :ok = Newsletter.subscribe_to_edition_updates()
+    end
+
+    test "count_clicks_by_link/1 classifies event URLs and resolves titles" do
+      user = user_fixture()
+      event = event_fixture(%{title: "Newsletter Click Event"})
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Clicks ev", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      base = YscWeb.Endpoint.url() |> String.trim_trailing("/")
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "click",
+          email: "ev-click@example.com",
+          environment: "test",
+          edition_id: edition.id,
+          link_url: "#{base}/events/#{event.id}"
+        })
+
+      rows = Newsletter.count_clicks_by_link(edition.id)
+
+      assert Enum.any?(rows, fn row ->
+               row.type == :event and row.title == "Newsletter Click Event"
+             end)
+    end
+
+    test "count_clicks_by_link/1 excludes bare site root clicks" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Base URL", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      base = YscWeb.Endpoint.url() |> String.trim_trailing("/")
+
+      for url <- [base, base <> "/"] do
+        {:ok, _} =
+          Newsletter.record_email_event(%{
+            event_type: "click",
+            email: "root@example.com",
+            environment: "test",
+            edition_id: edition.id,
+            link_url: url
+          })
+      end
+
+      rows = Newsletter.count_clicks_by_link(edition.id)
+      refute Enum.any?(rows, fn row -> row.url in [base, base <> "/"] end)
     end
   end
 end

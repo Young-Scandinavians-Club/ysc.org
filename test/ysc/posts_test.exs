@@ -51,6 +51,23 @@ defmodule Ysc.PostsTest do
       assert result.id == post.id
     end
 
+    test "preloads associations when requested", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "preload-get-post"
+          },
+          author
+        )
+
+      result = Posts.get_post(post.id, [:author, :featured_image])
+      assert result.id == post.id
+      assert Ecto.assoc_loaded?(result.author)
+      assert Ecto.assoc_loaded?(result.featured_image)
+    end
+
     test "returns nil for non-existent post" do
       assert Posts.get_post(Ecto.ULID.generate()) == nil
     end
@@ -94,6 +111,28 @@ defmodule Ysc.PostsTest do
     test "returns nil for non-existent url_name" do
       assert Posts.get_post_by_url_name("nonexistent-slug") == nil
     end
+
+    test "preloads associations when requested", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "preload-url-name"
+          },
+          author
+        )
+
+      result =
+        Posts.get_post_by_url_name("preload-url-name", [
+          :author,
+          :featured_image
+        ])
+
+      assert result.id == post.id
+      assert Ecto.assoc_loaded?(result.author)
+      assert Ecto.assoc_loaded?(result.featured_image)
+    end
   end
 
   describe "get_post_by_id_or_url_name/1" do
@@ -108,9 +147,20 @@ defmodule Ysc.PostsTest do
       assert result.id == post.id
     end
 
-    # Note: url_name search only works when the value is a valid ULID format
-    # Since url_name is not in ULID format, this test is commented out
-    # test "returns post by url_name" - would fail with CastError
+    test "returns post by ULID-shaped url_name when id differs", %{
+      author: author
+    } do
+      ulid_slug = Ecto.ULID.generate()
+
+      {:ok, post} =
+        Posts.create_post(
+          %{"title" => "Test", "body" => "Body", "url_name" => ulid_slug},
+          author
+        )
+
+      refute to_string(post.id) == ulid_slug
+      assert Posts.get_post_by_id_or_url_name(ulid_slug).id == post.id
+    end
   end
 
   describe "update_post/4" do
@@ -172,6 +222,107 @@ defmodule Ysc.PostsTest do
 
       assert published.state == :published
       assert published.board_position_at_publish == nil
+    end
+
+    test "sets board_position_at_publish from author when publishing", %{
+      author: author
+    } do
+      {:ok, author} =
+        author
+        |> Ecto.Changeset.change(%{board_position: :president})
+        |> Repo.update()
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Board snapshot",
+            "body" => "Body",
+            "url_name" => "board-snapshot",
+            "state" => "draft"
+          },
+          author
+        )
+
+      published_on = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, published} =
+               Posts.update_post(
+                 post,
+                 %{
+                   "state" => "published",
+                   "published_on" => published_on
+                 },
+                 author
+               )
+
+      assert published.state == :published
+      assert published.board_position_at_publish == "president"
+    end
+
+    test "does not override board_position_at_publish when already provided", %{
+      author: author
+    } do
+      {:ok, author} =
+        author
+        |> Ecto.Changeset.change(%{board_position: :president})
+        |> Repo.update()
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Manual board field",
+            "body" => "Body",
+            "url_name" => "board-manual",
+            "state" => "draft"
+          },
+          author
+        )
+
+      published_on = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, published} =
+               Posts.update_post(
+                 post,
+                 %{
+                   "state" => "published",
+                   "published_on" => published_on,
+                   "board_position_at_publish" => "treasurer"
+                 },
+                 author
+               )
+
+      assert published.board_position_at_publish == "treasurer"
+    end
+
+    test "uses atom keys for board snapshot when params use atom state", %{
+      author: author
+    } do
+      {:ok, author} =
+        author
+        |> Ecto.Changeset.change(%{board_position: :secretary})
+        |> Repo.update()
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Atom keys",
+            "body" => "Body",
+            "url_name" => "board-atoms",
+            "state" => "draft"
+          },
+          author
+        )
+
+      published_on = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, published} =
+               Posts.update_post(
+                 post,
+                 %{state: :published, published_on: published_on},
+                 author
+               )
+
+      assert published.board_position_at_publish == "secretary"
     end
   end
 
@@ -275,6 +426,27 @@ defmodule Ysc.PostsTest do
       updated = Posts.get_post!(post.id)
       assert updated.comment_count == 2
     end
+
+    test "returns error changeset when comment is invalid", %{
+      author: author,
+      regular_user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "comment-invalid"
+          },
+          author
+        )
+
+      assert {:error, %Ecto.Changeset{}} =
+               Posts.add_comment_to_post(
+                 %{"post_id" => post.id, "text" => ""},
+                 user
+               )
+    end
   end
 
   describe "get_comments_for_post/2" do
@@ -298,6 +470,30 @@ defmodule Ysc.PostsTest do
       comments = Posts.get_comments_for_post(post.id)
       assert length(comments) == 2
     end
+
+    test "preloads associations when requested", %{
+      author: author,
+      regular_user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "list-comments-pre"
+          },
+          author
+        )
+
+      Posts.add_comment_to_post(
+        %{"post_id" => post.id, "text" => "Comment 1"},
+        user
+      )
+
+      [c] = Posts.get_comments_for_post(post.id, [:author])
+      assert c.text == "Comment 1"
+      assert Ecto.assoc_loaded?(c.author)
+    end
   end
 
   describe "sort_comments_for_render/1" do
@@ -310,6 +506,14 @@ defmodule Ysc.PostsTest do
 
       # Parent should come first, followed by reply
       assert length(sorted) == 2
+    end
+
+    test "orders reply before parent when reply appears first in input" do
+      parent = %Comment{id: "p1", comment_id: nil, text: "Parent"}
+      reply = %Comment{id: "r1", comment_id: "p1", text: "Reply"}
+
+      sorted = Posts.sort_comments_for_render([reply, parent])
+      assert Enum.map(sorted, & &1.id) == ["p1", "r1"]
     end
   end
 
@@ -428,6 +632,101 @@ defmodule Ysc.PostsTest do
       # Should return at least the published and draft posts (not deleted)
       assert meta.total_count >= 1
       assert entries != []
+    end
+
+    test "filters by search_term using fuzzy search", %{author: author} do
+      {:ok, _} =
+        Posts.create_post(
+          %{
+            "title" => "UniqueSearchableTitleXYZ",
+            "body" => "Body",
+            "url_name" => "search-fuzzy-1",
+            "state" => "published"
+          },
+          author
+        )
+
+      params = %{limit: 20, offset: 0}
+
+      {:ok, {entries, _meta}} =
+        Posts.list_posts_paginated(params,
+          search_term: "UniqueSearchableTitleXYZ"
+        )
+
+      assert Enum.any?(entries, &(&1.title == "UniqueSearchableTitleXYZ"))
+    end
+
+    test "normalizes a bare search string as opts", %{author: author} do
+      {:ok, _} =
+        Posts.create_post(
+          %{
+            "title" => "BareStringSearchToken",
+            "body" => "Body",
+            "url_name" => "search-bare-1",
+            "state" => "published"
+          },
+          author
+        )
+
+      params = %{limit: 20, offset: 0}
+
+      {:ok, {entries, _meta}} =
+        Posts.list_posts_paginated(params, "BareStringSearchToken")
+
+      assert Enum.any?(entries, &(&1.title == "BareStringSearchToken"))
+    end
+
+    test "applies date_from and date_to when valid ISO dates", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "DateFiltered",
+            "body" => "Body",
+            "url_name" => "date-filter-1",
+            "state" => "published"
+          },
+          author
+        )
+
+      day = DateTime.to_date(post.inserted_at)
+      date_from = Date.to_iso8601(Date.add(day, -1))
+      date_to = Date.to_iso8601(Date.add(day, 1))
+
+      params = %{limit: 50, offset: 0}
+
+      {:ok, {entries, _meta}} =
+        Posts.list_posts_paginated(params,
+          date_from: date_from,
+          date_to: date_to
+        )
+
+      ids = Enum.map(entries, & &1.id)
+      assert post.id in ids
+    end
+
+    test "ignores invalid date strings for date filters", %{author: author} do
+      {:ok, _} =
+        Posts.create_post(
+          %{
+            "title" => "InvalidDateFilter",
+            "body" => "Body",
+            "url_name" => "date-bad-1",
+            "state" => "published"
+          },
+          author
+        )
+
+      params = %{limit: 50, offset: 0}
+
+      assert {:ok, {_entries, _meta}} =
+               Posts.list_posts_paginated(params,
+                 date_from: "not-a-date",
+                 date_to: "also-bad"
+               )
+    end
+
+    test "returns error when Flop params exceed configured limits" do
+      assert {:error, _} = Posts.list_posts_paginated(%{limit: 9999, offset: 0})
     end
   end
 
@@ -586,6 +885,35 @@ defmodule Ysc.PostsTest do
 
       found = Posts.get_comment!(comment.id)
       assert found.id == comment.id
+    end
+
+    test "preloads associations when requested", %{
+      author: author,
+      regular_user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "get-comment-pre"
+          },
+          author
+        )
+
+      {:ok, comment} =
+        Posts.add_comment_to_post(
+          %{"post_id" => post.id, "text" => "Test comment"},
+          user
+        )
+
+      found = Posts.get_comment!(comment.id, [:author, :post])
+      assert Ecto.assoc_loaded?(found.author)
+      assert Ecto.assoc_loaded?(found.post)
+    end
+
+    test "returns nil for missing comment id" do
+      assert Posts.get_comment!(Ecto.ULID.generate()) == nil
     end
   end
 

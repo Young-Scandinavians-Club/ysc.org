@@ -318,8 +318,8 @@ defmodule Ysc.Messages do
     Ysc.Logging.error("Email transaction raised exception",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
-      error: inspect(error),
-      stacktrace: Exception.format_stacktrace(stacktrace)
+      error: error,
+      stacktrace: stacktrace
     )
 
     emit_email_send_failed_telemetry(email, attrs, %{error: inspect(error)})
@@ -545,8 +545,8 @@ defmodule Ysc.Messages do
     Ysc.Logging.error("SMS transaction raised exception",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
-      error: inspect(error),
-      stacktrace: Exception.format_stacktrace(stacktrace)
+      error: error,
+      stacktrace: stacktrace
     )
 
     emit_send_failed_telemetry(phone_number, attrs, %{error: inspect(error)})

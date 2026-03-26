@@ -12,7 +12,51 @@ defmodule Ysc.SettingsTest do
     :ok
   end
 
+  describe "init/1" do
+    test "warms Cachex with all site settings from the database" do
+      name = "init_warm_#{System.unique_integer([:positive])}"
+      %SiteSetting{name: name, value: "v", group: "g"} |> Repo.insert!()
+      Settings.clear_cache()
+
+      assert {:ok, %{}} = Settings.init(%{})
+
+      assert {:ok, _} = Cachex.get(:ysc_cache, "all-site-settings")
+      assert Settings.get_setting(name) == "v"
+    end
+  end
+
+  describe "start_link/0" do
+    test "starts the settings GenServer and runs init/1 cache warm-up" do
+      name = "start_link_warm_#{System.unique_integer([:positive])}"
+
+      %SiteSetting{name: name, value: "from_start_link", group: "g"}
+      |> Repo.insert!()
+
+      Settings.clear_cache()
+
+      assert {:ok, pid} = Settings.start_link()
+      assert Process.alive?(pid)
+      assert Settings.get_setting(name) == "from_start_link"
+
+      GenServer.stop(pid)
+    end
+  end
+
   describe "settings/0" do
+    test "loads from database when aggregate cache is empty" do
+      Repo.delete_all(SiteSetting)
+      Settings.clear_cache()
+
+      %SiteSetting{name: "cold_cache_a", value: "1"} |> Repo.insert!()
+      %SiteSetting{name: "cold_cache_b", value: "2"} |> Repo.insert!()
+
+      settings = Settings.settings()
+      assert length(settings) == 2
+      names = Enum.map(settings, & &1.name) |> MapSet.new()
+      assert MapSet.member?(names, "cold_cache_a")
+      assert MapSet.member?(names, "cold_cache_b")
+    end
+
     test "returns all settings ordered by id desc" do
       Settings.clear_cache()
 
@@ -52,6 +96,16 @@ defmodule Ysc.SettingsTest do
   end
 
   describe "get_setting/1" do
+    test "loads from DB and writes per-key cache when aggregate cache was cleared" do
+      name = "per_key_cache_#{System.unique_integer([:positive])}"
+      %SiteSetting{name: name, value: "from_db", group: "g"} |> Repo.insert!()
+      Settings.clear_cache()
+
+      assert Cachex.get(:ysc_cache, "site-settings:#{name}") == {:ok, nil}
+      assert Settings.get_setting(name) == "from_db"
+      assert Cachex.get(:ysc_cache, "site-settings:#{name}") == {:ok, "from_db"}
+    end
+
     test "returns setting value" do
       %SiteSetting{name: "test_setting", value: "test_value"} |> Repo.insert!()
       assert Settings.get_setting("test_setting") == "test_value"
@@ -108,6 +162,29 @@ defmodule Ysc.SettingsTest do
       assert Settings.get_setting("cached") == "new"
       assert [%{value: "new"}] = Settings.settings()
     end
+
+    test "updates value when only per-key cache was populated (aggregate list cache empty)" do
+      %SiteSetting{name: "partial_cache", value: "before"} |> Repo.insert!()
+      Settings.clear_cache()
+
+      assert Settings.get_setting("partial_cache") == "before"
+
+      assert {:ok, updated} = Settings.update_setting("partial_cache", "after")
+      assert updated.value == "after"
+      assert Settings.get_setting("partial_cache") == "after"
+      assert Repo.get_by!(SiteSetting, name: "partial_cache").value == "after"
+    end
+
+    test "succeeds when aggregate settings cache is malformed (non-list)" do
+      %SiteSetting{name: "malformed_agg", value: "x"} |> Repo.insert!()
+      Settings.clear_cache()
+
+      assert Settings.get_setting("malformed_agg") == "x"
+      Cachex.put(:ysc_cache, "all-site-settings", :not_a_list)
+
+      assert {:ok, _} = Settings.update_setting("malformed_agg", "y")
+      assert Settings.get_setting("malformed_agg") == "y"
+    end
   end
 
   describe "get_or_create_setting/3" do
@@ -131,6 +208,20 @@ defmodule Ysc.SettingsTest do
       assert setting.group == "test"
     end
 
+    test "creates setting with nil default when requested" do
+      name = "nil_default_#{System.unique_integer([:positive])}"
+
+      assert Settings.get_or_create_setting(name, "test", nil) == nil
+      assert Repo.get_by!(SiteSetting, name: name).value == nil
+    end
+
+    test "two-argument form defaults missing value to nil" do
+      name = "two_arg_default_#{System.unique_integer([:positive])}"
+
+      assert Settings.get_or_create_setting(name, "test") == nil
+      assert Repo.get_by!(SiteSetting, name: name).value == nil
+    end
+
     test "handles race condition when multiple processes create same setting" do
       # This test verifies the race condition handling in get_or_create_setting
       # by attempting to create the same setting multiple times
@@ -146,6 +237,48 @@ defmodule Ysc.SettingsTest do
 
       assert length(settings) == 1
     end
+
+    test "returns default when insert raises a non-unique database exception" do
+      long_name = String.duplicate("x", 500)
+
+      assert Settings.get_or_create_setting(
+               long_name,
+               "test",
+               "fallback_default"
+             ) ==
+               "fallback_default"
+
+      assert Repo.get_by(SiteSetting, name: long_name) == nil
+    end
+
+    test "concurrent get_or_create_setting calls leave a single row for a new name",
+         %{
+           sandbox_owner: owner
+         } do
+      name = "race_concurrent_#{System.unique_integer([:positive])}"
+
+      t1 =
+        Task.async(fn ->
+          Ysc.DataCase.allow_sandbox(self(), owner)
+          Settings.get_or_create_setting(name, "test", "v1")
+        end)
+
+      t2 =
+        Task.async(fn ->
+          Ysc.DataCase.allow_sandbox(self(), owner)
+          Settings.get_or_create_setting(name, "test", "v2")
+        end)
+
+      assert v1 = Task.await(t1)
+      assert v2 = Task.await(t2)
+      assert v1 == v2
+
+      assert Repo.aggregate(
+               from(s in SiteSetting, where: s.name == ^name),
+               :count
+             ) ==
+               1
+    end
   end
 
   describe "get_setting_safe/1" do
@@ -156,6 +289,15 @@ defmodule Ysc.SettingsTest do
 
     test "returns nil when setting does not exist" do
       assert Settings.get_setting_safe("nonexistent") == nil
+    end
+
+    test "loads from database when per-key cache entry is missing" do
+      Repo.delete_all(SiteSetting)
+      Settings.clear_cache()
+
+      %SiteSetting{name: "safe_cold", value: "from_db"} |> Repo.insert!()
+
+      assert Settings.get_setting_safe("safe_cold") == "from_db"
     end
 
     test "uses cache when available" do
@@ -194,6 +336,25 @@ defmodule Ysc.SettingsTest do
       assert length(grouped["group1"]) == 2
       assert length(grouped["group2"]) == 1
     end
+
+    test "maps nil group to general" do
+      %SiteSetting{name: "nil_group_setting", value: "v", group: nil}
+      |> Repo.insert!()
+
+      Settings.clear_cache()
+      grouped = Settings.settings_grouped_by_scope()
+
+      assert Map.has_key?(grouped, "general")
+      names = Enum.map(grouped["general"], & &1.name)
+      assert "nil_group_setting" in names
+    end
+
+    test "returns empty map when there are no site settings" do
+      Repo.delete_all(SiteSetting)
+      Settings.clear_cache()
+
+      assert Settings.settings_grouped_by_scope() == %{}
+    end
   end
 
   describe "setting_scopes/0" do
@@ -208,6 +369,22 @@ defmodule Ysc.SettingsTest do
       assert length(scopes) == 2
       assert Enum.member?(scopes, "scope1")
       assert Enum.member?(scopes, "scope2")
+    end
+
+    test "treats nil group as general" do
+      %SiteSetting{name: "scope_nil", value: "v", group: nil} |> Repo.insert!()
+
+      Settings.clear_cache()
+      scopes = Settings.setting_scopes()
+
+      assert "general" in scopes
+    end
+
+    test "returns empty list when there are no site settings" do
+      Repo.delete_all(SiteSetting)
+      Settings.clear_cache()
+
+      assert Settings.setting_scopes() == []
     end
   end
 
@@ -226,6 +403,16 @@ defmodule Ysc.SettingsTest do
       # We can't directly verify cache is empty, but we can verify
       # that settings are still accessible (they'll be re-cached)
       assert Settings.get_setting("cache_test") == "value"
+    end
+
+    test "after clear_cache, settings/0 reloads rows from the database" do
+      name = "after_clear_#{System.unique_integer([:positive])}"
+      %SiteSetting{name: name, value: "v", group: "g"} |> Repo.insert!()
+
+      Settings.clear_cache()
+
+      loaded = Settings.settings()
+      assert Enum.any?(loaded, &(&1.name == name))
     end
   end
 
@@ -248,6 +435,19 @@ defmodule Ysc.SettingsTest do
       # Should not have changed
       setting = Repo.get_by!(SiteSetting, name: "site_name")
       assert setting.value == "Custom Name"
+    end
+  end
+
+  describe "settings/0 cache miss fallback" do
+    test "loads from database when aggregate cache key is missing" do
+      Repo.delete_all(SiteSetting)
+      Settings.clear_cache()
+
+      %SiteSetting{name: "only_agg", value: "x", group: "g"} |> Repo.insert!()
+
+      out = Settings.settings()
+      assert length(out) == 1
+      assert hd(out).name == "only_agg"
     end
   end
 end

@@ -268,4 +268,158 @@ defmodule Ysc.WebhooksTest do
                Webhooks.get_and_lock_webhook(Ecto.ULID.generate())
     end
   end
+
+  describe "lock_webhook_event_by_provider_and_event_id/2" do
+    test "locks pending event and sets state to processing" do
+      attrs = %{
+        provider: :stripe,
+        event_id: "evt_lock_by_provider",
+        event_type: "charge.succeeded",
+        payload: %{"id" => "ch_1"},
+        state: :pending
+      }
+
+      event = Webhooks.create_webhook_event!(attrs)
+
+      assert {:ok, locked} =
+               Webhooks.lock_webhook_event_by_provider_and_event_id(
+                 :stripe,
+                 "evt_lock_by_provider"
+               )
+
+      assert locked.id == event.id
+      assert Webhooks.get_webhook_event(event.id).state == :processing
+    end
+
+    test "returns not_found when provider and event_id do not exist" do
+      assert {:error, :not_found} =
+               Webhooks.lock_webhook_event_by_provider_and_event_id(
+                 :stripe,
+                 "evt_missing"
+               )
+    end
+
+    test "returns already_processing when event is not pending" do
+      attrs = %{
+        provider: :stripe,
+        event_id: "evt_processing_provider",
+        event_type: "charge.succeeded",
+        payload: %{},
+        state: :processing
+      }
+
+      _event = Webhooks.create_webhook_event!(attrs)
+
+      assert {:error, :already_processing} =
+               Webhooks.lock_webhook_event_by_provider_and_event_id(
+                 :stripe,
+                 "evt_processing_provider"
+               )
+    end
+  end
+
+  describe "list_webhook_events/1" do
+    test "filters by provider and state" do
+      Webhooks.create_webhook_event!(%{
+        provider: :stripe,
+        event_id: "evt_list_a",
+        event_type: "t.a",
+        payload: %{},
+        state: :processed
+      })
+
+      Webhooks.create_webhook_event!(%{
+        provider: :stripe,
+        event_id: "evt_list_b",
+        event_type: "t.b",
+        payload: %{},
+        state: :failed
+      })
+
+      processed =
+        Webhooks.list_webhook_events(
+          provider: :stripe,
+          state: :processed,
+          limit: 50
+        )
+
+      assert Enum.any?(processed, &(&1.event_id == "evt_list_a"))
+      refute Enum.any?(processed, &(&1.event_id == "evt_list_b"))
+    end
+
+    test "orders by inserted_at ascending when requested" do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      a =
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: "evt_order_a",
+          event_type: "t",
+          payload: %{},
+          state: :pending
+        })
+
+      b =
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: "evt_order_b",
+          event_type: "t",
+          payload: %{},
+          state: :pending
+        })
+
+      {:ok, a} =
+        a
+        |> Ecto.Changeset.change(%{
+          inserted_at: DateTime.add(now, -60, :second)
+        })
+        |> Ysc.Repo.update()
+
+      {:ok, b} =
+        b
+        |> Ecto.Changeset.change(%{
+          inserted_at: DateTime.add(now, -30, :second)
+        })
+        |> Ysc.Repo.update()
+
+      ordered =
+        Webhooks.list_webhook_events(
+          provider: :stripe,
+          order_by: :asc,
+          limit: 200
+        )
+
+      ids = Enum.map(ordered, & &1.id)
+      pos_a = Enum.find_index(ids, &(&1 == a.id))
+      pos_b = Enum.find_index(ids, &(&1 == b.id))
+      assert pos_a < pos_b
+    end
+
+    test "filters by start_date and end_date on inserted_at" do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      event =
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: "evt_range",
+          event_type: "t",
+          payload: %{},
+          state: :pending
+        })
+
+      {:ok, event} =
+        event
+        |> Ecto.Changeset.change(%{inserted_at: DateTime.add(now, -5, :day)})
+        |> Ysc.Repo.update()
+
+      in_range =
+        Webhooks.list_webhook_events(
+          start_date: DateTime.add(now, -10, :day),
+          end_date: DateTime.add(now, -1, :day),
+          limit: 200
+        )
+
+      assert Enum.any?(in_range, &(&1.id == event.id))
+    end
+  end
 end

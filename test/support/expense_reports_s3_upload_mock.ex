@@ -8,3 +8,8 @@ defmodule Ysc.ExpenseReports.S3UploadMock do
     %{body: %{key: unique_key}}
   end
 end
+
+defmodule Ysc.ExpenseReports.S3UploadMockEmptyBodyKey do
+  @moduledoc false
+  def upload(_path, _bucket_name, _unique_key), do: %{body: %{}}
+end

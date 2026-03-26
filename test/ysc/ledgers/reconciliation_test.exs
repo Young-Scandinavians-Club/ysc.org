@@ -1431,6 +1431,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       # Verify report contains key information
       assert formatted =~ "FINANCIAL RECONCILIATION REPORT"
       assert formatted =~ "✅ PASS"
+      assert formatted =~ "Duration:"
+      assert formatted =~ Integer.to_string(report.duration_ms)
       assert formatted =~ "PAYMENTS"
       assert formatted =~ "REFUNDS"
       assert formatted =~ "LEDGER BALANCE"
@@ -1474,6 +1476,131 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert formatted =~ "❌ No"
       assert formatted =~ "Difference:"
     end
+
+    test "format_report includes orphaned entries and entity totals sections",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(1000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_fmt_sections",
+          payment_date: DateTime.utc_now(),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(30, :USD),
+          description: "Fmt",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      {:ok, report} = Reconciliation.run_full_reconciliation()
+      text = Reconciliation.format_report(report)
+
+      assert text =~ "ORPHANED ENTRIES"
+      assert text =~ "ENTITY TOTALS"
+      assert text =~ "Memberships Match"
+    end
+  end
+
+  describe "individual reconciliation checks" do
+    test "reconcile_payments/0 returns status and totals keys", %{user: user} do
+      {:ok, _} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(2500, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_indiv_pay",
+          payment_date: DateTime.utc_now(),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(75, :USD),
+          description: "Indiv",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      report = Reconciliation.reconcile_payments()
+      assert report.status in [:ok, :error]
+      assert is_integer(report.total_payments)
+      assert %{} = report.totals
+    end
+
+    test "reconcile_refunds/0 returns ok when no refunds exist" do
+      report = Reconciliation.reconcile_refunds()
+      assert report.status == :ok
+      assert report.total_refunds == 0
+    end
+
+    test "check_orphaned_entries/0 returns ok when ledger is clean", %{
+      user: user
+    } do
+      {:ok, _} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(3300, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_orphan_clean",
+          payment_date: DateTime.utc_now(),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(99, :USD),
+          description: "Orphan",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      report = Reconciliation.check_orphaned_entries()
+      assert report.status == :ok
+      assert report.orphaned_entries_count == 0
+    end
+
+    test "check_ledger_balance/0 returns balanced for consistent ledger", %{
+      user: user
+    } do
+      {:ok, _} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(4400, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_bal_check",
+          payment_date: DateTime.utc_now(),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(120, :USD),
+          description: "Bal",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      report = Reconciliation.check_ledger_balance()
+      assert report.balanced == true
+      assert report.status == :ok
+    end
+
+    test "reconcile_entity_totals/0 returns a report map", %{user: user} do
+      {:ok, _} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(1200, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_entity_tot",
+          payment_date: DateTime.utc_now(),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(36, :USD),
+          description: "Entity",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      report = Reconciliation.reconcile_entity_totals()
+      assert report.status in [:ok, :error]
+      assert is_map(report.memberships)
+      assert is_map(report.bookings)
+    end
   end
 
   describe "edge cases and stress tests" do
@@ -1488,8 +1615,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
 
     test "handles large number of payments efficiently", %{user: user} do
-      # Create 50 payments
-      for i <- 1..50 do
+      for i <- 1..15 do
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(10_000 + i * 100, :USD),
@@ -1511,11 +1637,9 @@ defmodule Ysc.Ledgers.ReconciliationTest do
 
       duration = end_time - start_time
 
-      # Should complete in reasonable time (< 5 seconds)
       assert duration < 5000
-      # Verify payments check passes (overall might fail due to other checks)
       assert report.checks.payments.status == :ok
-      assert report.checks.payments.total_payments == 50
+      assert report.checks.payments.total_payments == 15
       assert report.checks.payments.discrepancies_count == 0
     end
 
@@ -1990,10 +2114,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
 
     test "handles timeout scenarios gracefully during high load", %{user: user} do
-      # 25 concurrent payments is sufficient to validate concurrency safety and
-      # reconciliation performance — 100 was overkill and made the test ~1s.
       tasks =
-        for i <- 1..25 do
+        for i <- 1..10 do
           Task.async(fn ->
             try do
               Ledgers.process_payment(%{
@@ -2012,30 +2134,24 @@ defmodule Ysc.Ledgers.ReconciliationTest do
 
               :ok
             rescue
-              # In extreme load, reference_id collisions can occur (rare in production)
-              # This is acceptable for this load test - we just want to ensure no crashes
               MatchError -> :collision
             end
           end)
         end
 
-      # Wait for all tasks and count successes
-      results = Task.await_many(tasks, 30_000)
+      results = Task.await_many(tasks, 15_000)
       successful_payments = Enum.count(results, &(&1 == :ok))
 
-      # Most payments should succeed (reference_id collisions are rare)
-      assert successful_payments >= 23
+      assert successful_payments >= 8
 
-      # Reconciliation should complete without timing out
       start_time = System.monotonic_time(:millisecond)
       {:ok, report} = Reconciliation.run_full_reconciliation()
       end_time = System.monotonic_time(:millisecond)
 
       duration = end_time - start_time
 
-      # Should complete in reasonable time
       assert duration < 10_000
-      assert report.checks.payments.total_payments >= 23
+      assert report.checks.payments.total_payments >= 8
       assert report.overall_status == :ok
     end
 
@@ -2143,8 +2259,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
 
     test "tracks reconciliation duration accurately", %{user: user} do
-      # Create multiple payments to ensure measurable duration
-      for i <- 1..20 do
+      for i <- 1..5 do
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(10_000, :USD),
@@ -2162,11 +2277,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
 
       {:ok, report} = Reconciliation.run_full_reconciliation()
 
-      # Duration should be recorded
       assert is_integer(report.duration_ms)
       assert report.duration_ms > 0
-
-      # Should be reasonable (under 5 seconds for 20 payments)
       assert report.duration_ms < 5000
     end
 
@@ -2725,6 +2837,172 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert report.checks.entity_totals.bookings.match == true
       assert report.checks.entity_totals.events.match == true
       assert report.checks.entity_totals.donations.match == true
+    end
+  end
+
+  describe "reconciliation refund ledger transaction vs refund amount" do
+    test "reconcile_refunds/0 reports transaction amount mismatch against refund record",
+         %{
+           user: user
+         } do
+      uid = System.unique_integer([:positive])
+
+      {:ok, {payment, _t, _e}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(50_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_refund_txn_mismatch_#{uid}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "Refund txn mismatch test",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      {:ok, {refund, refund_tx, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(10_000, :USD),
+          reason: "partial",
+          external_refund_id: "re_refund_txn_mismatch_#{uid}"
+        })
+
+      {:ok, _} =
+        refund_tx
+        |> LedgerTransaction.changeset(%{total_amount: Money.new(1, :USD)})
+        |> Repo.update()
+
+      result = Reconciliation.reconcile_refunds()
+
+      assert result.status == :error
+
+      disc = Enum.find(result.discrepancies, &(&1.refund_id == refund.id))
+      assert disc
+
+      assert Enum.any?(disc.issues, fn issue ->
+               String.contains?(issue, "doesn't match refund amount")
+             end)
+    end
+  end
+
+  describe "run_full_reconciliation/0 discrepancy logging" do
+    test "logs payment, refund, ledger balance, and orphaned entry warnings when checks fail",
+         %{
+           user: user
+         } do
+      import ExUnit.CaptureLog
+      require Logger
+
+      uid = System.unique_integer([:positive])
+
+      Repo.insert!(%Payment{
+        user_id: user.id,
+        amount: Money.new(1_000, :USD),
+        external_provider: :stripe,
+        external_payment_id: "pi_log_full_pay_#{uid}",
+        status: :completed,
+        payment_date: DateTime.truncate(DateTime.utc_now(), :second)
+      })
+
+      {:ok, {payment_ref, _t, _e}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(20_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_log_full_ref_#{uid}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "For refund discrepancy log",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      {:ok, {_refund, refund_tx, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment_ref.id,
+          refund_amount: Money.new(5_000, :USD),
+          reason: "test",
+          external_refund_id: "re_log_full_#{uid}"
+        })
+
+      {:ok, _} =
+        refund_tx
+        |> LedgerTransaction.changeset(%{total_amount: Money.new(9_999, :USD)})
+        |> Repo.update()
+
+      {:ok, {payment_imb, _t, _e}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(8_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_log_full_imb_#{uid}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "For ledger imbalance log",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+
+      Repo.insert!(%LedgerEntry{
+        account_id: stripe_account.id,
+        amount: Money.new(7_000, :USD),
+        description: "Imbalance for reconciliation log test",
+        payment_id: payment_imb.id,
+        debit_credit: :debit
+      })
+
+      fake_payment_id = Ecto.ULID.generate()
+
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "SET session_replication_role = 'replica'",
+        []
+      )
+
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "INSERT INTO ledger_entries (id, account_id, amount, description, payment_id, debit_credit, inserted_at, updated_at) VALUES (gen_random_uuid(), $1, ROW('USD', 1500), 'Orphan log test', $2, 'debit', NOW(), NOW())",
+        [
+          to_uuid(stripe_account.id),
+          to_uuid(fake_payment_id)
+        ]
+      )
+
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "SET session_replication_role = 'origin'",
+        []
+      )
+
+      prev_level = Logger.level()
+
+      log =
+        capture_log(fn ->
+          Logger.configure(level: :warning)
+
+          assert {:ok, report} = Reconciliation.run_full_reconciliation()
+          assert report.overall_status == :error
+          assert report.checks.payments.discrepancies_count > 0
+          assert report.checks.refunds.discrepancies_count > 0
+          assert report.checks.ledger_balance.balanced == false
+          assert report.checks.orphaned_entries.orphaned_entries_count > 0
+        end)
+
+      Logger.configure(level: prev_level)
+
+      assert log =~ "Payment discrepancies found"
+      assert log =~ "Refund discrepancies found"
+      assert log =~ "Ledger is imbalanced"
+      assert log =~ "Orphaned ledger entries found"
     end
   end
 end

@@ -188,6 +188,34 @@ defmodule YscWeb.AdminPostEditorLiveTest do
     end
   end
 
+  describe "publish validation" do
+    test "redirects to settings when publishing draft without featured image",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "No Image Post",
+            "url_name" => "no-image-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      html =
+        view
+        |> render_hook("publish-post", %{})
+
+      assert html
+      assert_patch(view, ~p"/admin/posts/#{post.id}/settings")
+    end
+  end
+
   describe "preview functionality" do
     test "displays preview button", %{conn: conn, user: user} do
       {:ok, post} =
@@ -204,6 +232,31 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
 
       assert html =~ "Preview"
+    end
+
+    test "phone preview button switches iframe layout on preview route", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Preview devices",
+            "url_name" => "preview-dev-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}/preview")
+
+      html =
+        view
+        |> element("button", "Phone preview")
+        |> render_click()
+
+      assert html =~ "phone_mockup" or html =~ "Phone preview"
     end
 
     test "can navigate to preview mode", %{conn: conn, user: user} do

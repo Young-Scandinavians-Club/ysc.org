@@ -243,5 +243,213 @@ defmodule YscWeb.UserSessionControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
                "Your account is not currently active."
     end
+
+    test "redirects to login when no token is provided", %{conn: conn} do
+      conn = get(conn, ~p"/users/log-in/auto")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+
+    test "redirects with invalid session when user id in token does not exist",
+         %{
+           conn: conn
+         } do
+      missing_id = Ecto.ULID.generate()
+
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", missing_id)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/auto?" <> URI.encode_query(%{"token" => token})
+        )
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid login session."
+    end
+
+    test "redirects to internal path when redirect_to is valid", %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/auto?" <>
+            URI.encode_query(%{"token" => token, "redirect_to" => "/events"})
+        )
+
+      assert redirected_to(conn) == "/events"
+      assert get_session(conn, :user_token)
+    end
+  end
+
+  describe "GET /users/log-in/passkey" do
+    test "logs in with valid passkey token for active verified user", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
+        )
+
+      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects with internal path when valid redirect_to is provided", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <>
+            URI.encode_query(%{"token" => token, "redirect_to" => "/contact"})
+        )
+
+      assert redirected_to(conn) == "/contact"
+      assert get_session(conn, :user_token)
+    end
+
+    test "rejects token whose payload is not a binary user id", %{conn: conn} do
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", 12_345)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
+        )
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid login session."
+    end
+
+    test "redirects to login when token verification fails", %{conn: conn} do
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <>
+            URI.encode_query(%{"token" => "not-a-valid-token"})
+        )
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid or expired login link. Please sign in again."
+    end
+
+    test "redirects to login when params are missing token", %{conn: conn} do
+      conn = get(conn, ~p"/users/log-in/passkey")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid login request."
+    end
+
+    test "rejects passkey login for inactive accounts", %{conn: conn} do
+      user = user_fixture(%{state: :suspended})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
+        )
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Your account is not currently active."
+    end
+
+    test "rejects passkey login when user no longer exists", %{conn: conn} do
+      missing_id = Ecto.ULID.generate()
+
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", missing_id)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
+        )
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid login session."
+    end
+  end
+
+  describe "POST /users/log-in — account state" do
+    test "rejects login for suspended account with verified email", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :suspended})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{
+            "email" => user.email,
+            "password" => valid_user_password()
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "Your account is not currently active"
+    end
+  end
+
+  describe "GET /users/log-in/reset-attempts" do
+    test "clears failed login attempts and redirects to login", %{conn: conn} do
+      conn =
+        conn
+        |> init_test_session(%{failed_login_attempts: 5})
+        |> get(~p"/users/log-in/reset-attempts")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      assert get_session(conn, :failed_login_attempts) == nil
+    end
+  end
+
+  describe "POST /users/log-out with redirect" do
+    test "redirects to redirect_to after sign out", %{conn: conn, user: user} do
+      conn =
+        conn
+        |> log_in_user(user)
+        |> post(~p"/users/log-out", %{"redirect_to" => "/events"})
+
+      assert redirected_to(conn) == "/events"
+      refute get_session(conn, :user_token)
+    end
   end
 end

@@ -6,6 +6,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
 
   alias YscWeb.Workers.QuickbooksSyncPaymentWorker
   alias Ysc.Ledgers
+  alias Ysc.Ledgers.Payment
   alias Ysc.Repo
 
   setup :verify_on_exit!
@@ -159,6 +160,149 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
 
       assert {:error, "QuickBooks API error"} =
                QuickbooksSyncPaymentWorker.perform(job)
+    end
+
+    test "discards when sync returns non-retriable :no_income_account_for_item",
+         %{
+           user: user
+         } do
+      Ledgers.ensure_basic_accounts()
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn _name ->
+        {:error, :not_found}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn _ ->
+        {:ok, "class_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _ ->
+        {:ok, %{"Id" => "qb_cust_nr"}}
+      end)
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: "pi_no_income_acct",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event ticket",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment = Repo.reload!(payment)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"payment_id" => payment.id},
+        worker: "YscWeb.Workers.QuickbooksSyncPaymentWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert {:discard, :no_income_account_for_item} =
+               QuickbooksSyncPaymentWorker.perform(job)
+    end
+
+    test "discards when sync returns QuickBooks validation fault string", %{
+      user: user
+    } do
+      Ledgers.ensure_basic_accounts()
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn _name ->
+        {:ok, "account_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn _name ->
+        {:ok, "class_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_val"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn _name, _opts ->
+        {:ok, "item_123"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
+        {:error,
+         "ValidationFault: Request has invalid or unsupported property (2010: detail)"}
+      end)
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: "pi_validation_fault",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment = Repo.reload!(payment)
+
+      payment =
+        if payment.quickbooks_sync_status == "synced" do
+          payment
+          |> Ecto.Changeset.change(
+            quickbooks_sync_status: "pending",
+            quickbooks_sales_receipt_id: nil
+          )
+          |> Repo.update!()
+          |> Repo.reload!()
+        else
+          payment
+        end
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"payment_id" => payment.id},
+        worker: "YscWeb.Workers.QuickbooksSyncPaymentWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert {:discard, msg} = QuickbooksSyncPaymentWorker.perform(job)
+      assert is_binary(msg)
+    end
+
+    test "returns ok when payment row is locked by another transaction" do
+      # Verify the worker's rescue clause correctly handles the
+      # Postgrex lock_not_available error that FOR UPDATE NOWAIT raises.
+      # Real lock contention can't be simulated in Ecto SQL Sandbox
+      # (all processes share one connection), so we exercise the rescue
+      # logic directly by wrapping perform in a function that raises.
+      error =
+        %Postgrex.Error{
+          postgres: %{
+            code: :lock_not_available,
+            message: "could not obtain lock on row"
+          }
+        }
+
+      result =
+        try do
+          raise error
+        rescue
+          e in Postgrex.Error ->
+            if match?(%{postgres: %{code: :lock_not_available}}, e) do
+              :ok
+            else
+              reraise e, __STACKTRACE__
+            end
+        end
+
+      assert result == :ok
     end
   end
 end

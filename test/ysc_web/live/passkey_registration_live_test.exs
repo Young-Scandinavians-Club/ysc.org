@@ -2,7 +2,7 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
   @moduledoc """
   Comprehensive tests for passkey registration flow.
   """
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
@@ -240,6 +240,85 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
 
       html = render(lv)
       refute html =~ "Create Passkey"
+    end
+
+    test "passkey_support_detected without supported key leaves defaults", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("passkey_support_detected", %{})
+
+      html = render(lv)
+      assert is_binary(html)
+    end
+
+    test "user_agent_received stores user agent for device nickname", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("user_agent_received", %{
+        "user_agent" => "Mozilla/5.0 (Test Browser)"
+      })
+
+      assert render(lv) =~ "Add a Passkey"
+    end
+
+    test "user_agent_received with empty params is a no-op", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("user_agent_received", %{})
+
+      assert render(lv) =~ "Add a Passkey"
+    end
+  end
+
+  describe "passkey_registration_error variants" do
+    setup :register_and_log_in_user
+
+    test "maps InvalidStateError to friendly message", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("passkey_registration_error", %{
+        "error" => "InvalidStateError",
+        "message" => "duplicate"
+      })
+
+      assert render(lv) =~ "already exist" or render(lv) =~ "device"
+    end
+
+    test "maps NotSupportedError to friendly message", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("passkey_registration_error", %{
+        "error" => "NotSupportedError",
+        "message" => "no webauthn"
+      })
+
+      assert render(lv) =~ "doesn't support" or render(lv) =~ "device"
+    end
+
+    test "fallback passkey_registration_error without structured fields", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("passkey_registration_error", %{"foo" => "bar"})
+
+      assert render(lv) =~ "error" or render(lv) =~ "registration"
     end
   end
 end

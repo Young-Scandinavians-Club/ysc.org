@@ -1,9 +1,9 @@
 defmodule Ysc.EventsTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: false
 
   alias Ysc.Agendas
   alias Ysc.Events
-  alias Ysc.Events.{FaqQuestion, Ticket}
+  alias Ysc.Events.{Event, FaqQuestion, Ticket, TicketTier}
   alias Ysc.Repo
   import Ysc.AccountsFixtures
 
@@ -274,6 +274,20 @@ defmodule Ysc.EventsTest do
       assert {:ok, %Ysc.Events.Event{} = event} = Events.create_event(attrs)
       assert event.title == "New Event"
       assert event.organizer_id == user.id
+    end
+
+    test "create_event/1 returns error changeset when required fields are missing",
+         %{
+           user: user
+         } do
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Events.create_event(%{
+                 organizer_id: user.id,
+                 start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+                 published_at: DateTime.utc_now()
+               })
+
+      assert cs.errors[:title]
     end
 
     test "update_event/2 updates an event", %{user: user} do
@@ -739,6 +753,13 @@ defmodule Ysc.EventsTest do
       assert found.id == event.id
     end
 
+    test "get_event_by_reference/1 returns nil for unknown reference_id" do
+      assert Events.get_event_by_reference(
+               "evt_missing_#{System.unique_integer([:positive])}"
+             ) ==
+               nil
+    end
+
     test "list_events/1 returns all events" do
       {:ok, event1} = create_event_fixture()
       {:ok, event2} = create_event_fixture()
@@ -759,6 +780,174 @@ defmodule Ysc.EventsTest do
       assert {:ok, {events, meta}} = result
       assert is_list(events)
       assert meta.current_page == 1
+    end
+
+    test "list_events_paginated/2 filters drafts tab" do
+      user = user_fixture()
+
+      {:ok, draft} =
+        Events.create_event(%{
+          title: "Draft only #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: :drafts)
+
+      assert Enum.any?(rows, &(&1.id == draft.id))
+    end
+
+    test "list_events_paginated/2 filters past tab" do
+      user = user_fixture()
+
+      {:ok, past} =
+        Events.create_event(%{
+          title: "Past event #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.utc_now()
+            |> DateTime.add(-2, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: :past)
+
+      assert Enum.any?(rows, &(&1.id == past.id))
+    end
+
+    test "list_events_paginated/2 filters upcoming tab" do
+      user = user_fixture()
+
+      {:ok, upcoming} =
+        Events.create_event(%{
+          title: "Upcoming tab #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 20, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: :upcoming)
+
+      assert Enum.any?(rows, &(&1.id == upcoming.id))
+    end
+
+    test "list_events_paginated/2 accepts tab as string and filters drafts" do
+      user = user_fixture()
+
+      {:ok, draft} =
+        Events.create_event(%{
+          title: "Draft str tab #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 40, :day)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: "drafts")
+
+      assert Enum.any?(rows, &(&1.id == draft.id))
+    end
+
+    test "list_events_paginated/2 filters by date_from and date_to" do
+      user = user_fixture()
+      day = Date.add(Date.utc_today(), 200)
+
+      {:ok, ev} =
+        Events.create_event(%{
+          title: "Date filter #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.new!(day, ~T[15:00:00], "Etc/UTC"),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      params = %{page: 1, page_size: 20}
+      from_str = Date.to_iso8601(Date.add(day, -1))
+      to_str = Date.to_iso8601(Date.add(day, 1))
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params,
+                 date_from: from_str,
+                 date_to: to_str
+               )
+
+      assert Enum.any?(rows, &(&1.id == ev.id))
+    end
+
+    test "list_events_paginated/2 with search string opts uses fuzzy search path" do
+      user = user_fixture()
+      q = "UniqueSearchTitle#{System.unique_integer()}"
+
+      {:ok, ev} =
+        Events.create_event(%{
+          title: q,
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 50, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} = Events.list_events_paginated(params, q)
+
+      assert Enum.any?(rows, &(&1.id == ev.id))
+    end
+
+    test "publish_event/1 returns missing_start_date when start_date is nil" do
+      user = user_fixture()
+
+      blank =
+        Repo.insert!(%Ysc.Events.Event{
+          title: "Has title",
+          reference_id: "EVT-NODATE-#{System.unique_integer([:positive])}",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: nil
+        })
+
+      assert Events.publish_event(blank) == {:error, :missing_start_date}
+    end
+
+    test "list_upcoming_events_paginated/1 clamps page_size to max 100" do
+      {rows, meta} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => "1",
+          "page_size" => "500"
+        })
+
+      assert meta.page_size == 100
+      assert is_list(rows)
+    end
+
+    test "list_events_paginated/2 returns error for invalid Flop params" do
+      _event = create_event_fixture()
+
+      assert {:error, %Flop.Meta{errors: errors}} =
+               Events.list_events_paginated(%{"limit" => "not_a_number"}, [])
+
+      assert Keyword.has_key?(errors, :limit)
     end
 
     test "count_published_events/0 returns count of published events" do
@@ -924,6 +1113,27 @@ defmodule Ysc.EventsTest do
 
       attendees = Events.list_unique_attendees_for_event(event.id)
       assert length(attendees) >= 2
+    end
+
+    test "get_ticket_counts_per_user/1 returns map of user_id to ticket count" do
+      {:ok, event} = create_event_fixture()
+      user = user_fixture()
+      {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id
+      })
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id
+      })
+
+      counts = Events.get_ticket_counts_per_user(event.id)
+      assert Map.get(counts, user.id) == 2
     end
   end
 
@@ -1116,6 +1326,47 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(events, fn event_map ->
                event_map.event.id == event.id
              end)
+    end
+
+    test "aggregates sold_tickets_count per tier for the dashboard query", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Sold count event",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 10,
+          event_id: event.id
+        })
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      rows = Events.get_upcoming_events_with_ticket_tier_counts()
+      row = Enum.find(rows, fn %{event: e} -> e.id == event.id end)
+      assert row
+      tier_row = Enum.find(row.ticket_tiers, fn t -> t.id == tier.id end)
+      assert tier_row.sold_tickets_count == 1
     end
   end
 
@@ -1710,6 +1961,902 @@ defmodule Ysc.EventsTest do
                  "save_the_date"
                )
              ) == 1
+    end
+  end
+
+  describe "publish, unpublish, cancel, and API helpers" do
+    setup %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Pub helpers",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 14, :day)
+        })
+
+      %{event: event}
+    end
+
+    test "publish_event promotes draft to published", %{event: event} do
+      assert {:ok, published} = Events.publish_event(event)
+      assert published.state == :published
+      assert published.published_at
+    end
+
+    test "publish_event returns invalid_state when not draft or scheduled", %{
+      user: user
+    } do
+      {:ok, live} =
+        Events.create_event(%{
+          title: "Already out",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 20, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert Events.publish_event(live) == {:error, :invalid_state}
+    end
+
+    test "publish_event returns missing_title when title is blank", %{
+      user: user
+    } do
+      blank =
+        Repo.insert!(%Ysc.Events.Event{
+          title: "",
+          reference_id: "EVT-BLANK-#{System.unique_integer([:positive])}",
+          state: :draft,
+          organizer_id: user.id,
+          start_date:
+            DateTime.utc_now()
+            |> DateTime.add(10, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      assert Events.publish_event(blank) == {:error, :missing_title}
+    end
+
+    test "unpublish_event and cancel_event update state", %{event: event} do
+      assert {:ok, published} = Events.publish_event(event)
+      assert {:ok, draft} = Events.unpublish_event(published)
+      assert draft.state == :draft
+
+      assert {:ok, published2} = Events.publish_event(draft)
+      assert {:ok, cancelled} = Events.cancel_event(published2)
+      assert cancelled.state == :cancelled
+    end
+
+    test "list_upcoming_events_paginated returns meta and events", %{user: user} do
+      {:ok, _} =
+        Events.create_event(%{
+          title: "Paginated upcoming",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {rows, meta} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => "1",
+          "page_size" => "10"
+        })
+
+      assert is_list(rows)
+      assert meta.page >= 1
+      assert meta.total_count >= 1
+    end
+
+    test "list_upcoming_events_with_preload loads events", %{user: user} do
+      {:ok, _} =
+        Events.create_event(%{
+          title: "Preload list",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 25, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      events = Events.list_upcoming_events_with_preload(5, [])
+      assert is_list(events)
+    end
+
+    test "event_pricing_display_string and event_earliest_tickets_sale_date", %{
+      event: event
+    } do
+      sale_start =
+        DateTime.utc_now()
+        |> DateTime.add(2, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Events.create_ticket_tier(%{
+          event_id: event.id,
+          name: "GA",
+          type: :paid,
+          price: Money.new(1500, :USD),
+          quantity: 100,
+          start_date: sale_start
+        })
+
+      loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
+
+      assert is_binary(Events.event_pricing_display_string(loaded))
+
+      assert DateTime.compare(
+               Events.event_earliest_tickets_sale_date(loaded),
+               sale_start
+             ) ==
+               :eq
+    end
+
+    test "subscribe/0 subscribes to events PubSub topic" do
+      assert :ok = Events.subscribe()
+    end
+
+    test "registration_required?/1 covers ticket and tier branches" do
+      tier = %Ysc.Events.TicketTier{requires_registration: true}
+      ticket = %Ysc.Events.Ticket{ticket_tier: tier}
+      assert Events.registration_required?(ticket)
+
+      tier2 = %Ysc.Events.TicketTier{requires_registration: false}
+
+      assert Events.registration_required?(%Ysc.Events.Ticket{
+               ticket_tier: tier2
+             }) ==
+               false
+
+      refute Events.registration_required?(Ecto.ULID.generate())
+      refute Events.registration_required?(:not_a_ticket)
+    end
+  end
+
+  describe "list_events_paginated tab and date filter edge cases" do
+    test "unknown tab string normalizes to :all so draft events are included" do
+      user = user_fixture()
+
+      {:ok, draft} =
+        Events.create_event(%{
+          title: "Draft invalid tab #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: "invalid_tab")
+
+      assert Enum.any?(rows, &(&1.id == draft.id))
+    end
+
+    test "invalid date_from and date_to strings are ignored without breaking the query" do
+      user = user_fixture()
+
+      {:ok, ev} =
+        Events.create_event(%{
+          title: "Bad date filter #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 25, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params,
+                 tab: :all,
+                 date_from: "not-a-date",
+                 date_to: "also-bad"
+               )
+
+      assert Enum.any?(rows, &(&1.id == ev.id))
+    end
+  end
+
+  describe "list_events applies organizer_id filter" do
+    test "returns only events for the given organizer", %{user: user} do
+      other = user_fixture()
+
+      {:ok, mine} =
+        Events.create_event(%{
+          title: "Mine #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 20, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, theirs} =
+        Events.create_event(%{
+          title: "Theirs #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: other.id,
+          start_date: DateTime.add(DateTime.utc_now(), 21, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      rows = Events.list_events(%{organizer_id: user.id})
+
+      ids = Enum.map(rows, & &1.id)
+      assert mine.id in ids
+      refute theirs.id in ids
+    end
+  end
+
+  describe "list_upcoming_events_paginated parse_page_param" do
+    test "coerces page 0 and negative numeric strings to at least 1" do
+      _user = user_fixture()
+
+      {_, meta0} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => "0",
+          "page_size" => "10"
+        })
+
+      assert meta0.page == 1
+
+      {_, meta_neg} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => "-3",
+          "page_size" => "10"
+        })
+
+      assert meta_neg.page == 1
+    end
+
+    test "non-integer page values fall back to default page 1" do
+      {_, meta} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => "12abc",
+          "page_size" => "10"
+        })
+
+      assert meta.page == 1
+    end
+
+    test "non-binary non-integer page values fall back to default" do
+      {_, meta} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => 1.5,
+          "page_size" => "10"
+        })
+
+      assert meta.page == 1
+    end
+  end
+
+  describe "event_pricing_display_string free and donation tiers" do
+    test "shows FREE when only free ticket tiers exist", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Free only #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 18, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, _} =
+        Events.create_ticket_tier(%{
+          name: "Freebie",
+          type: :free,
+          quantity: 100,
+          event_id: event.id
+        })
+
+      loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
+      assert Events.event_pricing_display_string(loaded) == "FREE"
+    end
+
+    test "shows From $0.00 when both free and paid tiers exist", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Mixed tiers #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 19, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, _} =
+        Events.create_ticket_tier(%{
+          name: "Free",
+          type: :free,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, _} =
+        Events.create_ticket_tier(%{
+          name: "Paid",
+          type: :paid,
+          price: Money.new(2500, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
+      assert Events.event_pricing_display_string(loaded) == "From $0.00"
+    end
+
+    test "shows FREE when only donation tiers exist (no priced paid tiers)", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Donation only #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 22, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, _} =
+        Events.create_ticket_tier(%{
+          name: "Pay what you want",
+          type: :donation,
+          quantity: 100,
+          event_id: event.id
+        })
+
+      loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
+      assert Events.event_pricing_display_string(loaded) == "FREE"
+    end
+  end
+
+  describe "schedule_event string formats and validation" do
+    test "parses datetime-local string via America/Los_Angeles to UTC", %{
+      user: user
+    } do
+      start_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Local schedule #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: start_at
+        })
+
+      publish_naive =
+        DateTime.utc_now()
+        |> DateTime.add(5, :day)
+        |> DateTime.to_naive()
+        |> NaiveDateTime.truncate(:second)
+
+      publish_str =
+        publish_naive
+        |> NaiveDateTime.to_iso8601()
+        |> String.slice(0, 16)
+
+      assert {:ok, scheduled} = Events.schedule_event(event, publish_str)
+      assert scheduled.state == :scheduled
+      assert scheduled.publish_at
+    end
+
+    test "raises ArgumentError for unparseable publish_at string", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Bad schedule #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert_raise ArgumentError, ~r/Invalid datetime format/, fn ->
+        Events.schedule_event(event, "totally-not-a-datetime")
+      end
+    end
+
+    test "returns error changeset when publish_at is after event start", %{
+      user: user
+    } do
+      start_at =
+        DateTime.add(DateTime.utc_now(), 10, :day) |> DateTime.truncate(:second)
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Late publish #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: start_at,
+          start_time: ~T[12:00:00]
+        })
+
+      late_publish =
+        DateTime.add(DateTime.utc_now(), 40, :day) |> DateTime.truncate(:second)
+
+      assert {:error, changeset} = Events.schedule_event(event, late_publish)
+      assert %{publish_at: _} = errors_on(changeset)
+    end
+  end
+
+  describe "create_ticket_tier and copy_event error paths" do
+    test "create_ticket_tier/1 returns error changeset when required fields are missing",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Tier errors #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 15, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Events.create_ticket_tier(%{
+                 type: :paid,
+                 price: Money.new(100, :USD),
+                 quantity: 10,
+                 event_id: event.id
+               })
+
+      assert cs.errors[:name]
+    end
+
+    test "copy_event/1 returns error when copied title exceeds max length", %{
+      user: user
+    } do
+      long_title = String.duplicate("x", 100)
+
+      {:ok, source} =
+        Events.create_event(%{
+          title: long_title,
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 12, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert {:error, %Ecto.Changeset{}} = Events.copy_event(source)
+    end
+  end
+
+  describe "list_events/1 state and title filters" do
+    test "filters by draft state", %{user: user} do
+      {:ok, draft} =
+        Events.create_event(%{
+          title: "Draft filter #{System.unique_integer()}",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 40, :day)
+        })
+
+      {:ok, published} =
+        Events.create_event(%{
+          title: "Pub filter #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 41, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      rows = Events.list_events(%{state: :draft})
+
+      ids = Enum.map(rows, & &1.id)
+      assert draft.id in ids
+      refute published.id in ids
+    end
+
+    test "filters by title substring", %{user: user} do
+      marker = "TitleFilter#{System.unique_integer()}"
+
+      {:ok, match_ev} =
+        Events.create_event(%{
+          title: "ZZZ #{marker} AAA",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 42, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Other #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 43, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      rows = Events.list_events(%{title: marker})
+
+      ids = Enum.map(rows, & &1.id)
+      assert match_ev.id in ids
+      refute other.id in ids
+    end
+  end
+
+  describe "error paths, pricing edge cases, and ticket detail CRUD" do
+    test "update_event/2 returns error changeset when title exceeds max length",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Valid title",
+          description: "D",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 20, :day)
+        })
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Events.update_event(event, %{title: String.duplicate("x", 101)})
+
+      assert cs.errors[:title]
+    end
+
+    test "list_upcoming_events_paginated/1 uses max(page,1) for integer page param" do
+      {_, meta} =
+        Events.list_upcoming_events_paginated(%{
+          "page" => 0,
+          "page_size" => 10
+        })
+
+      assert meta.page == 1
+    end
+
+    test "list_events/1 ignores unknown filter keys (apply_filters fallback)",
+         %{
+           user: user
+         } do
+      {:ok, ev} =
+        Events.create_event(%{
+          title: "Unknown filter #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 44, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      rows =
+        Events.list_events(%{organizer_id: user.id, not_a_real_filter: true})
+
+      ids = Enum.map(rows, & &1.id)
+      assert ev.id in ids
+    end
+
+    test "event_pricing_display_string/1 uses format_price fallback for non-Money tier price" do
+      tier = %TicketTier{type: :paid, price: %{amount: Decimal.new(100)}}
+
+      event = %Event{
+        tickets_tbd: false,
+        ticket_tiers: [tier]
+      }
+
+      assert Events.event_pricing_display_string(event) == "$0.00"
+    end
+
+    test "list_tickets_for_export/1 returns empty list and hits empty ticket_details map",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "No export tickets #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 45, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert Events.list_tickets_for_export(event.id) == []
+    end
+
+    test "list_tickets_for_export/1 attaches ticket_detail for confirmed tickets",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Export details #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 46, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(10, :USD),
+          quantity: 10,
+          event_id: event.id
+        })
+
+      ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      assert {:ok, detail} =
+               Events.create_ticket_detail(%{
+                 ticket_id: ticket.id,
+                 first_name: "Ada",
+                 last_name: "Lovelace",
+                 email: "ada@example.com"
+               })
+
+      [row] = Events.list_tickets_for_export(event.id)
+      assert row.ticket_detail.id == detail.id
+      assert row.ticket_detail.first_name == "Ada"
+    end
+
+    test "get_ticket_purchase_summary/1 uses Money.new(0,:USD) for donation tier with nil price",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Donation summary #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 47, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Donate",
+          type: :donation,
+          quantity: 100,
+          event_id: event.id
+        })
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id
+      })
+
+      [row] = Events.get_ticket_purchase_summary(event.id)
+      assert row.total_amount == Money.new(0, :USD)
+    end
+
+    test "create_ticket/1 returns error changeset when attrs are invalid", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Bad ticket #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 48, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Events.create_ticket(%{
+                 event_id: event.id,
+                 user_id: user.id,
+                 status: :confirmed
+               })
+
+      assert cs.errors[:ticket_tier_id] || cs.errors[:expires_at]
+    end
+
+    test "update_ticket_tier/2 returns error changeset when validation fails",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Tier bad #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 49, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "T",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Events.update_ticket_tier(tier, %{quantity: -1})
+
+      assert cs.errors[:quantity]
+    end
+
+    test "delete_ticket_tier/1 raises ConstraintError when tier is referenced by tickets",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Tier fk #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 50, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      _ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      assert_raise Ecto.ConstraintError, fn ->
+        Events.delete_ticket_tier(tier)
+      end
+    end
+
+    test "create_ticket_details/1 rolls back when one row is invalid", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Batch details #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 51, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      assert {:error, %Ecto.Changeset{}} =
+               Events.create_ticket_details([
+                 %{
+                   ticket_id: ticket.id,
+                   first_name: "A",
+                   last_name: "B",
+                   email: "bad-email"
+                 }
+               ])
+
+      refute Events.get_ticket_detail_for_ticket(ticket.id)
+    end
+
+    test "create_ticket_detail/1 returns error for invalid email", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Detail email #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 52, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Events.create_ticket_detail(%{
+                 ticket_id: ticket.id,
+                 first_name: "A",
+                 last_name: "B",
+                 email: "not-an-email"
+               })
+
+      assert cs.errors[:email]
+    end
+
+    test "create_registration/1 and update_registration/2 and delete_registration/1",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Reg flow #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 53, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      assert {:ok, reg} =
+               Events.create_registration(%{
+                 ticket_id: ticket.id,
+                 first_name: "Grace",
+                 last_name: "Hopper",
+                 email: "grace@example.com"
+               })
+
+      assert Events.get_registration_for_ticket(ticket.id).id == reg.id
+
+      assert {:ok, updated} =
+               Events.update_registration(reg, %{first_name: "Grace M."})
+
+      assert updated.first_name == "Grace M."
+
+      assert {:ok, _} = Events.delete_registration(updated)
+      assert Events.get_ticket_detail_for_ticket(ticket.id) == nil
     end
   end
 end

@@ -2,6 +2,7 @@ defmodule Ysc.PaymentsTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Payments
+  alias Ysc.Repo
   import Ecto.Query
   import Ysc.AccountsFixtures
 
@@ -13,6 +14,11 @@ defmodule Ysc.PaymentsTest do
 
       methods = Payments.list_payment_methods(user)
       assert length(methods) >= 2
+    end
+
+    test "returns empty list for user with no payment methods" do
+      user = user_fixture()
+      assert Payments.list_payment_methods(user) == []
     end
   end
 
@@ -101,6 +107,26 @@ defmodule Ysc.PaymentsTest do
 
       assert updated.is_default == true
     end
+
+    test "updates display metadata fields" do
+      method = create_payment_method_fixture()
+
+      assert {:ok, updated} =
+               Payments.update_payment_method(method, %{
+                 last_four: "9999",
+                 display_brand: "amex"
+               })
+
+      assert updated.last_four == "9999"
+      assert updated.display_brand == "amex"
+    end
+
+    test "returns error changeset for invalid attributes" do
+      method = create_payment_method_fixture()
+
+      assert {:error, %Ecto.Changeset{}} =
+               Payments.update_payment_method(method, %{exp_month: 13})
+    end
   end
 
   describe "delete_payment_method/1" do
@@ -111,6 +137,19 @@ defmodule Ysc.PaymentsTest do
       assert_raise Ecto.NoResultsError, fn ->
         Payments.get_payment_method!(method.id)
       end
+    end
+
+    test "deleting a non-default card does not promote another method" do
+      user = user_fixture()
+
+      default =
+        create_payment_method_fixture(%{user_id: user.id, is_default: true})
+
+      other =
+        create_payment_method_fixture(%{user_id: user.id, is_default: false})
+
+      assert {:ok, _} = Payments.delete_payment_method(other)
+      assert Payments.get_default_payment_method(user).id == default.id
     end
 
     test "sets new default when deleting default payment method" do
@@ -126,6 +165,17 @@ defmodule Ysc.PaymentsTest do
       # Reload other method
       updated = Payments.get_payment_method!(other.id)
       assert updated.is_default == true
+    end
+
+    test "deleting the only payment method leaves no default and empty list" do
+      user = user_fixture()
+
+      only =
+        create_payment_method_fixture(%{user_id: user.id, is_default: true})
+
+      assert {:ok, _} = Payments.delete_payment_method(only)
+      refute Payments.get_default_payment_method(user)
+      assert Payments.list_payment_methods(user) == []
     end
   end
 
@@ -261,6 +311,446 @@ defmodule Ysc.PaymentsTest do
     end
   end
 
+  describe "insert_payment_method/1 duplicate handling" do
+    test "returns changeset error when provider and provider_id already exist" do
+      user = user_fixture()
+      id = "pm_dup_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: id,
+        provider_customer_id: "cus_dup",
+        type: :card,
+        provider_type: "card",
+        is_default: false
+      }
+
+      assert {:ok, _} = Payments.insert_payment_method(attrs)
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Payments.insert_payment_method(attrs)
+
+      assert Keyword.has_key?(cs.errors, :provider) or
+               Keyword.has_key?(cs.errors, :provider_id)
+    end
+
+    test "returns changeset error when required fields are missing" do
+      assert {:error, %Ecto.Changeset{errors: errors}} =
+               Payments.insert_payment_method(%{provider: :stripe})
+
+      assert Keyword.has_key?(errors, :provider_id) or
+               Keyword.has_key?(errors, :user_id)
+    end
+
+    test "returns :duplicate_payment_method when unique constraint maps to provider_id error" do
+      user = user_fixture()
+      id = "pm_dup_atom_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: id,
+        provider_customer_id: "cus_dup_atom",
+        type: :card,
+        provider_type: "card",
+        is_default: false
+      }
+
+      assert {:ok, _} = Payments.insert_payment_method(attrs)
+
+      case Payments.insert_payment_method(attrs) do
+        {:error, :duplicate_payment_method} ->
+          :ok
+
+        {:error, %Ecto.Changeset{errors: errors}} ->
+          assert Keyword.has_key?(errors, :provider_id) or
+                   Keyword.has_key?(errors, :provider)
+      end
+    end
+  end
+
+  describe "upsert_payment_method_from_stripe/2 and sync_payment_method_from_stripe/2" do
+    test "upsert inserts a new payment method and may set default when none exists" do
+      user = user_fixture()
+      pm_id = "pm_upsert_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_upsert",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, %Ysc.Payments.PaymentMethod{} = method} =
+               Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+
+      assert method.provider_id == pm_id
+      assert method.last_four == "4242"
+      assert Payments.get_default_payment_method(user) != nil
+    end
+
+    test "upsert updates an existing payment method" do
+      user = user_fixture()
+      pm_id = "pm_update_#{System.unique_integer([:positive])}"
+
+      {:ok, existing} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: pm_id,
+          provider_customer_id: "cus_u",
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_u",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "9999",
+          exp_month: 1,
+          exp_year: 2040,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, updated} =
+               Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+
+      assert updated.id == existing.id
+      assert updated.last_four == "9999"
+    end
+
+    test "sync_payment_method_from_stripe inserts when missing" do
+      user = user_fixture()
+      pm_id = "pm_sync_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_sync",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "1111",
+          exp_month: 3,
+          exp_year: 2031,
+          brand: "mastercard"
+        }
+      }
+
+      assert {:ok, _} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert %Ysc.Payments.PaymentMethod{} =
+               Payments.get_payment_method_by_provider(:stripe, pm_id)
+    end
+
+    test "sync_payment_method_from_stripe updates existing without forcing default" do
+      user = user_fixture()
+      pm_id = "pm_sync2_#{System.unique_integer([:positive])}"
+
+      {:ok, _} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: pm_id,
+          provider_customer_id: "cus_s2",
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_s2",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "2222",
+          exp_month: 4,
+          exp_year: 2032,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.last_four == "2222"
+      refute m.is_default
+    end
+
+    test "sync_payment_method_from_stripe returns insert error when user_id is invalid" do
+      bad_user = %{user_fixture() | id: Ecto.ULID.generate()}
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: "pm_bad_user_#{System.unique_integer([:positive])}",
+        customer: "cus_x",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:error, %Ecto.Changeset{}} =
+               Payments.sync_payment_method_from_stripe(bad_user, stripe_pm)
+    end
+
+    test "sync_payment_method_from_stripe accepts a plain map (non-struct) payment method" do
+      user = user_fixture()
+      pm_id = "pm_plain_map_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_plain",
+        type: "card",
+        card: %{last4: "4242", exp_month: 11, exp_year: 2031, brand: "visa"},
+        us_bank_account: nil
+      }
+
+      assert {:ok, _} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert %Ysc.Payments.PaymentMethod{} =
+               Payments.get_payment_method_by_provider(:stripe, pm_id)
+    end
+
+    test "upsert_payment_method_from_stripe returns error when insert fails for invalid user" do
+      bad_user = %{user_fixture() | id: Ecto.ULID.generate()}
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: "pm_upsert_bad_#{System.unique_integer([:positive])}",
+        customer: "cus_u",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:error, %Ecto.Changeset{}} =
+               Payments.upsert_payment_method_from_stripe(bad_user, stripe_pm)
+    end
+  end
+
+  describe "Stripe type and metadata mapping" do
+    test "maps us_bank_account fields from Stripe" do
+      user = user_fixture()
+      pm_id = "pm_bank_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_bank",
+        type: "us_bank_account",
+        card: nil,
+        us_bank_account: %{
+          last4: "6789",
+          routing_number: "110000000",
+          bank_name: "Test Bank",
+          account_type: "checking"
+        }
+      }
+
+      assert {:ok, m} =
+               Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.type == :bank_account
+      assert m.last_four == "6789"
+      assert m.display_brand == "Test Bank"
+      assert m.routing_number == "110000000"
+      assert m.bank_name == "Test Bank"
+    end
+
+    test "Stripe type mapping covers non-card types (stored type may fail PaymentMethodType enum)" do
+      user = user_fixture()
+
+      for stripe_type <- [
+            "sepa_debit",
+            "link",
+            "paypal",
+            "affirm",
+            "klarna",
+            "cashapp"
+          ] do
+        pm_id = "pm_type_#{stripe_type}_#{System.unique_integer([:positive])}"
+
+        stripe_pm = %Stripe.PaymentMethod{
+          id: pm_id,
+          customer: "cus_types",
+          type: stripe_type,
+          card: nil
+        }
+
+        assert {:error, %Ecto.Changeset{}} =
+                 Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+      end
+    end
+
+    test "unknown Stripe provider_type maps through fallback before changeset rejects :other" do
+      user = user_fixture()
+      pm_id = "pm_other_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_other",
+        type: "crypto",
+        card: nil
+      }
+
+      assert {:error, %Ecto.Changeset{}} =
+               Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+    end
+
+    test "get_last_four and get_display_brand fall back to nil when absent" do
+      user = user_fixture()
+      pm_id = "pm_no_meta_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_nometa",
+        type: "card",
+        card: nil
+      }
+
+      assert {:ok, m} =
+               Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.last_four == nil
+      assert m.display_brand == nil
+    end
+  end
+
+  describe "upsert_and_set_default_payment_method_from_stripe/2" do
+    test "sets the upserted payment method as default" do
+      user = user_fixture()
+
+      _ =
+        create_payment_method_fixture(%{user_id: user.id, is_default: true})
+
+      pm_id = "pm_default_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_def",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "3333",
+          exp_month: 5,
+          exp_year: 2033,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, _} =
+               Payments.upsert_and_set_default_payment_method_from_stripe(
+                 user,
+                 stripe_pm
+               )
+
+      assert Payments.get_default_payment_method(user).provider_id == pm_id
+    end
+
+    test "returns error when upsert update fails validation" do
+      user = user_fixture()
+      pm_id = "pm_bad_last4_#{System.unique_integer([:positive])}"
+
+      assert {:ok, _} =
+               Payments.insert_payment_method(%{
+                 user_id: user.id,
+                 provider: :stripe,
+                 provider_id: pm_id,
+                 provider_customer_id: "cus_bad",
+                 type: :card,
+                 provider_type: "card",
+                 is_default: false
+               })
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_bad",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "12345",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:error, %Ecto.Changeset{}} =
+               Payments.upsert_and_set_default_payment_method_from_stripe(
+                 user,
+                 stripe_pm
+               )
+    end
+  end
+
+  describe "set_default_payment_method/2" do
+    test "marks one method default and clears previous default" do
+      user = user_fixture()
+
+      first =
+        create_payment_method_fixture(%{user_id: user.id, is_default: true})
+
+      second =
+        create_payment_method_fixture(%{user_id: user.id, is_default: false})
+
+      assert {:ok, _} = Payments.set_default_payment_method(user, second)
+
+      assert Payments.get_default_payment_method(user).id == second.id
+      refute Payments.get_payment_method!(first.id).is_default
+    end
+
+    test "raises when payment method no longer exists in the database (update_all matches no row)" do
+      user = user_fixture()
+      pm = create_payment_method_fixture(%{user_id: user.id})
+
+      Repo.delete!(pm)
+
+      assert_raise MatchError, fn ->
+        Payments.set_default_payment_method(user, pm)
+      end
+    end
+  end
+
+  describe "fix_missing_default_payment_methods/0" do
+    test "assigns a default when user has methods but none marked default" do
+      user = user_fixture()
+
+      create_payment_method_fixture(%{
+        user_id: user.id,
+        is_default: false,
+        provider_id: "pm_fix1_#{System.unique_integer([:positive])}"
+      })
+
+      create_payment_method_fixture(%{
+        user_id: user.id,
+        is_default: false,
+        provider_id: "pm_fix2_#{System.unique_integer([:positive])}"
+      })
+
+      refute Payments.get_default_payment_method(user)
+
+      assert {:ok, %{fixed_users: n, total_users: t}} =
+               Payments.fix_missing_default_payment_methods()
+
+      assert t >= 1
+      assert n >= 1
+      assert Payments.get_default_payment_method(user)
+    end
+  end
+
   describe "set_default_payment_method_if_none/2" do
     test "sets default when user has no default" do
       user = user_fixture()
@@ -289,6 +779,191 @@ defmodule Ysc.PaymentsTest do
 
       found = Payments.get_default_payment_method(user)
       assert found.id == existing_default.id
+    end
+  end
+
+  describe "sync_payment_methods_with_stripe/1" do
+    test "syncs Stripe card payment methods and sets default from customer invoice_settings" do
+      user = user_fixture()
+      cus_id = "cus_pm_sync_#{System.unique_integer([:positive])}"
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{stripe_id: cus_id})
+        |> Repo.update()
+
+      pm_id = "pm_sync_full_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: cus_id,
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [stripe_pm],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_methods"
+         }}
+      end)
+
+      stub(Stripe.CustomerMock, :retrieve, fn ^cus_id, _opts ->
+        {:ok,
+         %Stripe.Customer{
+           id: cus_id,
+           invoice_settings: %{default_payment_method: pm_id}
+         }}
+      end)
+
+      assert {:ok, methods} = Payments.sync_payment_methods_with_stripe(user)
+      assert Enum.any?(methods, &(&1.provider_id == pm_id))
+      assert Payments.get_default_payment_method(user).provider_id == pm_id
+    end
+
+    test "returns {:ok, local methods} when Stripe payment method list returns an error" do
+      user = user_fixture()
+      cus_id = "cus_pm_err_#{System.unique_integer([:positive])}"
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{stripe_id: cus_id})
+        |> Repo.update()
+
+      stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:error, %Stripe.Error{message: "bad", source: :api, code: :api_error}}
+      end)
+
+      stub(Stripe.CustomerMock, :retrieve, fn ^cus_id, _opts ->
+        {:ok, %Stripe.Customer{id: cus_id, invoice_settings: nil}}
+      end)
+
+      assert {:ok, _} = Payments.sync_payment_methods_with_stripe(user)
+    end
+
+    test "does not fail when Stripe default payment method id is missing locally" do
+      user = user_fixture()
+      cus_id = "cus_orphan_#{System.unique_integer([:positive])}"
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{stripe_id: cus_id})
+        |> Repo.update()
+
+      stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_methods"
+         }}
+      end)
+
+      stub(Stripe.CustomerMock, :retrieve, fn ^cus_id, _opts ->
+        {:ok,
+         %Stripe.Customer{
+           id: cus_id,
+           invoice_settings: %{default_payment_method: "pm_not_in_db"}
+         }}
+      end)
+
+      assert {:ok, _} = Payments.sync_payment_methods_with_stripe(user)
+    end
+
+    test "handles Stripe customer retrieve error when resolving default payment method" do
+      user = user_fixture()
+      cus_id = "cus_cust_err_#{System.unique_integer([:positive])}"
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{stripe_id: cus_id})
+        |> Repo.update()
+
+      stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_methods"
+         }}
+      end)
+
+      stub(Stripe.CustomerMock, :retrieve, fn ^cus_id, _opts ->
+        {:error,
+         %Stripe.Error{
+           message: "missing",
+           source: :api,
+           code: :resource_missing
+         }}
+      end)
+
+      assert {:ok, _} = Payments.sync_payment_methods_with_stripe(user)
+    end
+
+    test "skips default resolution when customer has no invoice_settings" do
+      user = user_fixture()
+      cus_id = "cus_no_inv_#{System.unique_integer([:positive])}"
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{stripe_id: cus_id})
+        |> Repo.update()
+
+      stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_methods"
+         }}
+      end)
+
+      stub(Stripe.CustomerMock, :retrieve, fn ^cus_id, _opts ->
+        {:ok, %Stripe.Customer{id: cus_id, invoice_settings: nil}}
+      end)
+
+      assert {:ok, _} = Payments.sync_payment_methods_with_stripe(user)
+    end
+
+    test "skips default resolution when invoice default_payment_method is nil" do
+      user = user_fixture()
+      cus_id = "cus_nil_defpm_#{System.unique_integer([:positive])}"
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{stripe_id: cus_id})
+        |> Repo.update()
+
+      stub(Stripe.PaymentMethodMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_methods"
+         }}
+      end)
+
+      stub(Stripe.CustomerMock, :retrieve, fn ^cus_id, _opts ->
+        {:ok,
+         %Stripe.Customer{
+           id: cus_id,
+           invoice_settings: %{default_payment_method: nil}
+         }}
+      end)
+
+      assert {:ok, _} = Payments.sync_payment_methods_with_stripe(user)
     end
   end
 

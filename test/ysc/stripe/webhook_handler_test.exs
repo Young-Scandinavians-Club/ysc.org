@@ -1,5 +1,5 @@
 defmodule Ysc.Stripe.WebhookHandlerTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: false
   # Most tests can run async, but some complex ones need to be synchronous
   # due to transaction isolation with the new transactional webhook processing
 
@@ -54,6 +54,11 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
   # Helper to create user with Stripe ID
   defp user_with_stripe_id(attrs \\ %{}) do
+    attrs =
+      Map.put_new_lazy(attrs, :email, fn ->
+        "stripe_webhook_user_#{System.unique_integer([:positive])}_#{:rand.uniform(999_999_999)}@example.com"
+      end)
+
     user = user_fixture(attrs)
 
     {:ok, user} =
@@ -115,7 +120,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
     end)
 
-    stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+    stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params, _opts ->
       {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
     end)
 
@@ -1834,6 +1839,1263 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       # Verify subscription was cancelled
       subscription = Ysc.Repo.reload(subscription)
       assert subscription.stripe_status == "cancelled"
+    end
+  end
+
+  describe "additional stripe webhook coverage" do
+    defp empty_stripe_list do
+      %Stripe.List{data: [], has_more: false, object: "list", url: "/v1"}
+    end
+
+    test "invoice.payment_succeeded with Stripe.Invoice struct processes payment" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      invoice_struct = %Stripe.Invoice{
+        id: "in_struct_#{System.unique_integer()}",
+        object: "invoice",
+        customer: user.stripe_id,
+        subscription: subscription.stripe_id,
+        amount_paid: 4500,
+        description: "Membership",
+        number: "INV-S",
+        charge: nil,
+        metadata: %{},
+        billing_reason: "subscription_cycle",
+        lines: empty_stripe_list()
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", invoice_struct)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ledgers.get_payment_by_external_id(invoice_struct.id) != nil
+    end
+
+    test "invoice.payment.failed with Stripe.Invoice struct delegates to map handler" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      invoice_struct = %Stripe.Invoice{
+        id: "in_fail_struct_#{System.unique_integer()}",
+        object: "invoice",
+        customer: user.stripe_id,
+        subscription: subscription.stripe_id,
+        billing_reason: "subscription_cycle",
+        lines: empty_stripe_list()
+      }
+
+      event = build_stripe_event("invoice.payment.failed", invoice_struct)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "invoice.payment_failed (underscore) with Stripe.Invoice struct" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      invoice_struct = %Stripe.Invoice{
+        id: "in_ufail_#{System.unique_integer()}",
+        object: "invoice",
+        customer: user.stripe_id,
+        subscription: subscription.stripe_id,
+        billing_reason: "subscription_cycle",
+        lines: empty_stripe_list()
+      }
+
+      event = build_stripe_event("invoice.payment_failed", invoice_struct)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "invoice.payment_failed routes map payload to invoice.payment.failed handler" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      invoice_map = %{
+        "id" => "in_map_ufail_#{System.unique_integer()}",
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "billing_reason" => "subscription_cycle"
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event(
+                 "invoice.payment_failed",
+                 invoice_map
+               )
+    end
+
+    test "invoice.payment_action_required returns ok" do
+      invoice_struct = %Stripe.Invoice{
+        id: "in_action_#{System.unique_integer()}",
+        object: "invoice",
+        customer: "cus_nouser",
+        lines: empty_stripe_list()
+      }
+
+      event =
+        build_stripe_event("invoice.payment_action_required", invoice_struct)
+
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "customer.created links stripe_id from metadata user_id" do
+      user = user_fixture()
+
+      {:ok, user} =
+        user |> Ecto.Changeset.change(stripe_id: nil) |> Ysc.Repo.update()
+
+      new_cus = "cus_meta_#{System.unique_integer()}"
+
+      customer = %Stripe.Customer{
+        id: new_cus,
+        email: user.email,
+        metadata: %{"user_id" => user.id}
+      }
+
+      event = build_stripe_event("customer.created", customer)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload!(user).stripe_id == new_cus
+    end
+
+    test "customer.created links stripe_id from email when metadata absent" do
+      email = "customer_created_email_#{System.unique_integer()}@example.com"
+      user = user_fixture(%{email: email})
+
+      {:ok, user} =
+        user |> Ecto.Changeset.change(stripe_id: nil) |> Ysc.Repo.update()
+
+      new_cus = "cus_email_#{System.unique_integer()}"
+
+      customer = %Stripe.Customer{
+        id: new_cus,
+        email: user.email,
+        metadata: %{}
+      }
+
+      event = build_stripe_event("customer.created", customer)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload!(user).stripe_id == new_cus
+    end
+
+    test "customer.created skips when user already has stripe_id" do
+      user = user_with_stripe_id()
+      existing = user.stripe_id
+
+      customer = %Stripe.Customer{
+        id: "cus_other_#{System.unique_integer()}",
+        email: user.email,
+        metadata: %{"user_id" => user.id}
+      }
+
+      event = build_stripe_event("customer.created", customer)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload!(user).stripe_id == existing
+    end
+
+    test "customer.subscription.created with wp_migration metadata is no-op" do
+      user = user_with_stripe_id()
+      stripe_sub_id = "sub_wp_#{System.unique_integer()}"
+
+      subscription_data = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: user.stripe_id,
+        status: "active",
+        metadata: %{"wp_migration" => "true"},
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 86_400,
+        items: empty_stripe_list()
+      }
+
+      event =
+        build_stripe_event("customer.subscription.created", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
+    end
+
+    test "customer.subscription.created with trialing status creates subscription" do
+      user = user_with_stripe_id()
+      stripe_sub_id = "sub_trial_#{System.unique_integer()}"
+
+      subscription_data = %Stripe.Subscription{
+        id: stripe_sub_id,
+        customer: user.stripe_id,
+        status: "trialing",
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 86_400,
+        items: empty_stripe_list()
+      }
+
+      event =
+        build_stripe_event("customer.subscription.created", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      sub = Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+      assert sub != nil
+      assert sub.stripe_status == "trialing"
+    end
+
+    test "subscription_schedule events return ok" do
+      sched = %Stripe.SubscriptionSchedule{
+        id: "sub_sched_#{System.unique_integer()}",
+        object: "subscription_schedule"
+      }
+
+      for type <-
+            ~w(subscription_schedule.created subscription_schedule.updated subscription_schedule.released subscription_schedule.canceled) do
+        event = build_stripe_event(type, sched)
+        assert :ok = WebhookHandler.handle_event(event)
+      end
+    end
+
+    test "setup_intent.created and setup_intent.succeeded" do
+      si_create = %Stripe.SetupIntent{
+        id: "seti_create_#{System.unique_integer()}",
+        object: "setup_intent",
+        customer: "cus_x",
+        status: "requires_payment_method"
+      }
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("setup_intent.created", si_create)
+               )
+
+      user = user_with_stripe_id()
+      pm_id = "pm_si_#{System.unique_integer()}"
+
+      si_ok = %Stripe.SetupIntent{
+        id: "seti_ok_#{System.unique_integer()}",
+        object: "setup_intent",
+        customer: user.stripe_id,
+        payment_method: pm_id,
+        status: "succeeded"
+      }
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("setup_intent.succeeded", si_ok)
+               )
+    end
+
+    test "payment_method.attached syncs card from Stripe payload" do
+      user = user_with_stripe_id()
+      pm_id = "pm_attach_#{System.unique_integer()}"
+
+      pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        object: "payment_method",
+        customer: user.stripe_id,
+        type: "card",
+        metadata: %{},
+        card: %Stripe.Card{
+          brand: "visa",
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          funding: "credit"
+        }
+      }
+
+      event = build_stripe_event("payment_method.attached", pm)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      local = Ysc.Payments.get_payment_method_by_provider(:stripe, pm_id)
+      assert local != nil
+      assert local.last_four == "4242"
+    end
+
+    test "payment_method.detached deletes local payment method" do
+      user = user_with_stripe_id()
+      pm_id = "pm_detach_#{System.unique_integer()}"
+
+      {:ok, _} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: pm_id,
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        object: "payment_method",
+        customer: user.stripe_id,
+        type: "card"
+      }
+
+      event = build_stripe_event("payment_method.detached", pm)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Payments.get_payment_method_by_provider(:stripe, pm_id) == nil
+    end
+
+    test "payment_method.updated syncs without error" do
+      user = user_with_stripe_id()
+      pm_id = "pm_upd_#{System.unique_integer()}"
+
+      pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        object: "payment_method",
+        customer: user.stripe_id,
+        type: "card",
+        metadata: %{},
+        card: %Stripe.Card{
+          brand: "visa",
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          funding: "credit"
+        }
+      }
+
+      event = build_stripe_event("payment_method.attached", pm)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      updated = %Stripe.PaymentMethod{
+        pm
+        | card: %Stripe.Card{
+            brand: "visa",
+            last4: "0005",
+            exp_month: 11,
+            exp_year: 2031,
+            funding: "credit"
+          }
+      }
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("payment_method.updated", updated)
+               )
+    end
+
+    test "payout.paid map handler is idempotent for same stripe payout id" do
+      payout_id = "po_cov_#{System.unique_integer()}"
+      arrival = System.os_time(:second)
+
+      payout_map = %{
+        "id" => payout_id,
+        "amount" => 50_000,
+        "currency" => "usd",
+        "status" => "paid",
+        "arrival_date" => arrival,
+        "description" => "Test payout coverage",
+        "metadata" => %{}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      assert Ledgers.get_payout_by_stripe_id(payout_id) != nil
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+    end
+
+    test "payout.paid with Stripe.Payout struct uses struct clause via handle_webhook_event" do
+      payout_id = "po_struct_#{System.unique_integer()}"
+
+      payout = %Stripe.Payout{
+        id: payout_id,
+        object: "payout",
+        amount: 25_000,
+        currency: "usd",
+        status: "paid",
+        arrival_date: System.os_time(:second),
+        description: "Struct payout",
+        metadata: %{}
+      }
+
+      assert :ok = WebhookHandler.handle_webhook_event("payout.paid", payout)
+      assert Ledgers.get_payout_by_stripe_id(payout_id) != nil
+    end
+
+    test "charge.dispute.created returns ok" do
+      dispute = %Stripe.Dispute{
+        id: "dp_#{System.unique_integer()}",
+        object: "dispute",
+        charge: "ch_123",
+        amount: 2000,
+        currency: "usd"
+      }
+
+      event = build_stripe_event("charge.dispute.created", dispute)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "refund.updated struct and map via handle_webhook_event" do
+      refund_struct = %Stripe.Refund{
+        id: "re_upd_#{System.unique_integer()}",
+        charge: "ch_x",
+        amount: 100,
+        status: "succeeded"
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event(
+                 "refund.updated",
+                 refund_struct
+               )
+
+      refund_map = %{
+        "id" => "re_map_#{System.unique_integer()}",
+        "charge" => "ch_y",
+        "amount" => 200,
+        "status" => "pending"
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("refund.updated", refund_map)
+    end
+
+    test "unhandled invoice.* events hit catch-all and return ok" do
+      assert :ok =
+               WebhookHandler.handle_webhook_event("invoice.finalized", %{
+                 "id" => "in_fin",
+                 "object" => "invoice"
+               })
+    end
+
+    test "handle_webhook_event payment_intent.succeeded with map" do
+      pi = %{
+        "id" => "pi_map_#{System.unique_integer()}",
+        "status" => "succeeded",
+        "customer" => "cus_x",
+        "amount" => 1000
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event(
+                 "payment_intent.succeeded",
+                 pi
+               )
+    end
+
+    test "calculate_estimated_fee returns fee money" do
+      fee = WebhookHandler.calculate_estimated_fee(Decimal.new("100.00"))
+      assert %Money{} = fee
+      assert fee.currency == :USD
+    end
+
+    test "extract_stripe_fee_from_invoice reads cents from metadata" do
+      invoice = %{
+        "id" => "in_fee_#{System.unique_integer()}",
+        "charge" => nil,
+        "metadata" => %{"stripe_fee" => "150"}
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_invoice(invoice)
+      assert %Money{} = fee
+    end
+
+    test "customer.subscription.updated incomplete_expired deletes local subscription" do
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "active",
+          stripe_id: "sub_incexp_#{System.unique_integer()}"
+        })
+
+      subscription_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "incomplete_expired",
+        items: empty_stripe_list()
+      }
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Subscriptions.get_subscription_by_stripe_id(subscription.stripe_id) ==
+               nil
+    end
+  end
+
+  describe "webhook handler coverage expansion" do
+    test "invoice.payment_succeeded subscription_update with proration lines builds upgrade description" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      family_plan =
+        Application.get_env(:ysc, :membership_plans, [])
+        |> Enum.find(&(&1.id in [:family, "family"]))
+
+      assert family_plan, "membership_plans must include family plan"
+
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_id: "si_prorate_#{System.unique_integer()}",
+        stripe_product_id: "prod_family",
+        stripe_price_id: family_plan.stripe_price_id,
+        quantity: 1
+      })
+
+      inv_id = "in_prorate_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => inv_id,
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "billing_reason" => "subscription_update",
+        "amount_paid" => 5000,
+        "description" => "Plan change",
+        "number" => "INV-PR",
+        "charge" => nil,
+        "metadata" => %{},
+        "lines" => %{
+          "data" => [
+            %{
+              "description" => "Unused time on Single after 17 Feb 2026",
+              "amount" => -2500
+            },
+            %{
+              "description" => "Remaining time on Family after 17 Feb 2026",
+              "amount" => 4000
+            }
+          ]
+        }
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", invoice_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      payment = Ledgers.get_payment_by_external_id(inv_id)
+      assert payment != nil
+
+      assert Repo.exists?(
+               from(le in Ysc.Ledgers.LedgerEntry,
+                 where: le.payment_id == ^payment.id,
+                 where: ilike(le.description, "%Prorated upgrade%")
+               )
+             )
+
+      assert Repo.exists?(
+               from(le in Ysc.Ledgers.LedgerEntry,
+                 where: le.payment_id == ^payment.id,
+                 where: ilike(le.description, "%Single%")
+               )
+             )
+
+      assert Repo.exists?(
+               from(le in Ysc.Ledgers.LedgerEntry,
+                 where: le.payment_id == ^payment.id,
+                 where: ilike(le.description, "%Family%")
+               )
+             )
+    end
+
+    test "invoice.payment_succeeded resolves subscription from customer when invoice subscription is null (subscription_update)" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{stripe_status: "active"})
+
+      inv_id = "in_resolve_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => inv_id,
+        "customer" => user.stripe_id,
+        "subscription" => nil,
+        "billing_reason" => "subscription_update",
+        "amount_paid" => 4500,
+        "description" => "Proration",
+        "number" => "INV-RES",
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", invoice_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ledgers.get_payment_by_external_id(inv_id) != nil
+
+      assert Subscriptions.get_subscription_by_stripe_id(subscription.stripe_id) !=
+               nil
+    end
+
+    test "invoice.payment_succeeded resolves subscription from customer when invoice subscription is null (subscription_create)" do
+      user = user_with_stripe_id()
+      _subscription = create_subscription(user, %{stripe_status: "active"})
+
+      inv_id = "in_resolve_create_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => inv_id,
+        "customer" => user.stripe_id,
+        "subscription" => nil,
+        "billing_reason" => "subscription_create",
+        "amount_paid" => 4500,
+        "description" => "Initial",
+        "number" => "INV-INIT",
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", invoice_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ledgers.get_payment_by_external_id(inv_id) != nil
+    end
+
+    test "invoice.payment.failed skips when invoice is not subscription-related" do
+      invoice_data = %{
+        "id" => "in_manual_#{System.unique_integer()}",
+        "customer" => "cus_not_in_db",
+        "subscription" => nil,
+        "billing_reason" => "manual"
+      }
+
+      event = build_stripe_event("invoice.payment.failed", invoice_data)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "customer.updated when Stripe default payment method is not stored locally still returns ok" do
+      user = user_with_stripe_id()
+
+      customer_data = %Stripe.Customer{
+        id: user.stripe_id,
+        email: user.email,
+        invoice_settings: %{
+          default_payment_method: "pm_missing_#{System.unique_integer()}"
+        }
+      }
+
+      event = build_stripe_event("customer.updated", customer_data)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "payout.paid with uppercase USD currency string normalizes and processes" do
+      payout_id = "po_usd_upper_#{System.unique_integer()}"
+
+      payout_map = %{
+        "id" => payout_id,
+        "amount" => 40_000,
+        "currency" => "USD",
+        "status" => "paid",
+        "arrival_date" => System.os_time(:second),
+        "description" => "Uppercase USD payout",
+        "metadata" => %{}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      assert Ledgers.get_payout_by_stripe_id(payout_id) != nil
+    end
+
+    test "customer.created with unknown email returns ok without linking" do
+      customer = %Stripe.Customer{
+        id: "cus_unknown_#{System.unique_integer()}",
+        email: "nobody_#{System.unique_integer()}@example.invalid",
+        metadata: %{}
+      }
+
+      event = build_stripe_event("customer.created", customer)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "customer.subscription.updated sets ends_at from cancel_at when present" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{stripe_status: "active"})
+      cancel_at = System.os_time(:second) + 86_400
+
+      subscription_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "active",
+        cancel_at: cancel_at,
+        start_date: System.os_time(:second),
+        current_period_start: System.os_time(:second),
+        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      updated = Ysc.Repo.reload(subscription)
+
+      assert DateTime.compare(updated.ends_at, DateTime.from_unix!(cancel_at)) ==
+               :eq
+    end
+
+    test "checkout.session.completed falls through catch-all and returns ok" do
+      assert :ok =
+               WebhookHandler.handle_webhook_event(
+                 "checkout.session.completed",
+                 %{
+                   "id" => "cs_test_#{System.unique_integer()}",
+                   "object" => "checkout.session"
+                 }
+               )
+    end
+
+    test "payment_intent.payment_failed falls through catch-all and returns ok" do
+      assert :ok =
+               WebhookHandler.handle_webhook_event(
+                 "payment_intent.payment_failed",
+                 %{
+                   "id" => "pi_fail_#{System.unique_integer()}",
+                   "object" => "payment_intent"
+                 }
+               )
+    end
+
+    test "invoice.voided hits invoice.* debug branch and returns ok" do
+      assert :ok =
+               WebhookHandler.handle_webhook_event("invoice.voided", %{
+                 "id" => "in_void_#{System.unique_integer()}",
+                 "object" => "invoice"
+               })
+    end
+
+    test "second invoice.payment_succeeded for same invoice id is idempotent in handler" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      inv_id = "in_idem_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => inv_id,
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "amount_paid" => 4500,
+        "description" => "Dup test",
+        "number" => "INV-IDEM",
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      e1 = build_stripe_event("invoice.payment_succeeded", invoice_data)
+      assert :ok = WebhookHandler.handle_event(e1)
+
+      e2 = build_stripe_event("invoice.payment_succeeded", invoice_data)
+      assert :ok = WebhookHandler.handle_event(e2)
+
+      payments =
+        Ysc.Repo.all(
+          from(p in Ysc.Ledgers.Payment,
+            where: p.external_payment_id == ^inv_id
+          )
+        )
+
+      assert length(payments) == 1
+    end
+
+    test "setup_intent.succeeded when local payment method already exists" do
+      user = user_with_stripe_id()
+      pm_id = "pm_existing_#{System.unique_integer()}"
+
+      {:ok, _} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: pm_id,
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      si = %Stripe.SetupIntent{
+        id: "seti_pm_exists_#{System.unique_integer()}",
+        object: "setup_intent",
+        customer: user.stripe_id,
+        payment_method: pm_id,
+        status: "succeeded"
+      }
+
+      event = build_stripe_event("setup_intent.succeeded", si)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "payment_intent.succeeded processes Stripe.PaymentIntent struct clause" do
+      pi = %Stripe.PaymentIntent{
+        id: "pi_struct_clause_#{System.unique_integer()}",
+        object: "payment_intent",
+        status: "succeeded",
+        customer: "cus_x",
+        amount: 2000,
+        description: "Test",
+        metadata: %{}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event(
+                 "payment_intent.succeeded",
+                 pi
+               )
+    end
+
+    test "invoice.payment.failed with Stripe.Invoice struct for subscription_cycle enqueues email" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      invoice_struct = %Stripe.Invoice{
+        id: "in_fail_cycle_#{System.unique_integer()}",
+        object: "invoice",
+        customer: user.stripe_id,
+        subscription: subscription.stripe_id,
+        billing_reason: "subscription_cycle",
+        lines: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/lines"
+        }
+      }
+
+      event = build_stripe_event("invoice.payment.failed", invoice_struct)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert_email_sent(subject: "Action Needed: YSC Membership Payment Issue")
+    end
+
+    test "customer.subscription.updated with null period fields preserves stored dates for past_due" do
+      user = user_with_stripe_id()
+      period_end = DateTime.add(DateTime.utc_now(), 20, :day)
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "past_due",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: period_end
+        })
+
+      original_start = subscription.current_period_start
+      original_end = subscription.current_period_end
+
+      subscription_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "past_due",
+        start_date: nil,
+        current_period_start: nil,
+        current_period_end: nil,
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/subscription_items"
+        }
+      }
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      reloaded = Ysc.Repo.reload(subscription)
+      assert reloaded.current_period_start == original_start
+      assert reloaded.current_period_end == original_end
+    end
+
+    test "payment_method.detached when payment method was never stored returns ok" do
+      pm = %Stripe.PaymentMethod{
+        id: "pm_never_saved_#{System.unique_integer()}",
+        object: "payment_method",
+        customer: "cus_any",
+        type: "card"
+      }
+
+      event = build_stripe_event("payment_method.detached", pm)
+      assert :ok = WebhookHandler.handle_event(event)
+    end
+
+    test "charge.refunded processes refunds list when refunds are present" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      inv_id = "in_chref_#{System.unique_integer()}"
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("invoice.payment_succeeded", %{
+                   "id" => inv_id,
+                   "customer" => user.stripe_id,
+                   "subscription" => subscription.stripe_id,
+                   "amount_paid" => 8000,
+                   "description" => "For refund test",
+                   "number" => "INV-RF",
+                   "charge" => nil,
+                   "metadata" => %{}
+                 })
+               )
+
+      payment = Ledgers.get_payment_by_external_id(inv_id)
+      assert payment != nil
+
+      refund_id = "re_chref_#{System.unique_integer()}"
+      charge_id = "ch_with_ref_#{System.unique_integer()}"
+
+      refund_struct = %Stripe.Refund{
+        id: refund_id,
+        object: "refund",
+        charge: charge_id,
+        amount: 4000,
+        status: "succeeded",
+        payment_intent: payment.external_payment_id,
+        metadata: %{}
+      }
+
+      charge = %Stripe.Charge{
+        id: charge_id,
+        object: "charge",
+        payment_intent: payment.external_payment_id,
+        amount: 8000,
+        refunds: %Stripe.List{
+          data: [refund_struct],
+          has_more: false,
+          object: "list",
+          url: "/v1/refunds"
+        }
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("charge.refunded", charge)
+
+      assert Ledgers.get_refund_by_external_id(refund_id) != nil
+    end
+
+    test "normalize_currency falls back to USD for unknown currency string" do
+      payout_id = "po_unk_#{System.unique_integer()}"
+
+      payout_map = %{
+        "id" => payout_id,
+        "amount" => 10_000,
+        "currency" => "xxxunknown",
+        "status" => "paid",
+        "arrival_date" => System.os_time(:second),
+        "description" => "Unknown currency",
+        "metadata" => %{}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      assert Ledgers.get_payout_by_stripe_id(payout_id) != nil
+    end
+
+    test "invoice.subscription_update downgrade proration lines yield default proration ledger description when upgrade indeterminate" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      family_plan =
+        Application.get_env(:ysc, :membership_plans, [])
+        |> Enum.find(&(&1.id in [:family, "family"]))
+
+      assert family_plan
+
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_id: "si_down_#{System.unique_integer()}",
+        stripe_product_id: "prod_family",
+        stripe_price_id: family_plan.stripe_price_id,
+        quantity: 1
+      })
+
+      inv_id = "in_downgrade_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => inv_id,
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "billing_reason" => "subscription_update",
+        "amount_paid" => 3000,
+        "description" => "Downgrade",
+        "number" => "INV-DG",
+        "charge" => nil,
+        "metadata" => %{},
+        "lines" => %{
+          "data" => [
+            %{
+              "description" => "Unused time on Family after 17 Feb 2026",
+              "amount" => -4000
+            },
+            %{
+              "description" => "Remaining time on Single after 17 Feb 2026",
+              "amount" => 2500
+            }
+          ]
+        }
+      }
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("invoice.payment_succeeded", invoice_data)
+               )
+
+      payment = Ledgers.get_payment_by_external_id(inv_id)
+      assert payment != nil
+
+      assert Repo.exists?(
+               from(le in Ysc.Ledgers.LedgerEntry,
+                 where: le.payment_id == ^payment.id,
+                 where: ilike(le.description, "%Prorated membership update%")
+               )
+             )
+    end
+
+    test "invoice subscription_update without proration line pairs uses default proration description" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      inv_id = "in_no_pr_lines_#{System.unique_integer()}"
+
+      invoice_data = %{
+        "id" => inv_id,
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "billing_reason" => "subscription_update",
+        "amount_paid" => 2000,
+        "description" => "Update",
+        "number" => "INV-NP",
+        "charge" => nil,
+        "metadata" => %{},
+        "lines" => %{"data" => []}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("invoice.payment_succeeded", invoice_data)
+               )
+
+      payment = Ledgers.get_payment_by_external_id(inv_id)
+      assert payment != nil
+
+      assert Repo.exists?(
+               from(le in Ysc.Ledgers.LedgerEntry,
+                 where: le.payment_id == ^payment.id,
+                 where: ilike(le.description, "%Prorated membership update%")
+               )
+             )
+    end
+
+    test "customer.subscription.deleted cancels local subscription" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{stripe_status: "active"})
+
+      sub_data = %Stripe.Subscription{
+        id: subscription.stripe_id,
+        customer: user.stripe_id,
+        status: "canceled",
+        items: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/items"
+        }
+      }
+
+      event = build_stripe_event("customer.subscription.deleted", sub_data)
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload(subscription).stripe_status == "cancelled"
+    end
+  end
+
+  describe "WebhookHandler public helpers and fee extraction" do
+    test "event_payload_for_storage returns storable map for nested Stripe data" do
+      user = user_with_stripe_id()
+
+      inv = %Stripe.Invoice{
+        id: "in_store_#{System.unique_integer()}",
+        object: "invoice",
+        customer: user.stripe_id,
+        lines: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/lines"
+        }
+      }
+
+      event = build_stripe_event("invoice.payment_succeeded", inv)
+      payload = WebhookHandler.event_payload_for_storage(event)
+
+      assert payload[:id] == event.id
+      assert payload[:type] == "invoice.payment_succeeded"
+      assert is_map(payload[:data])
+    end
+
+    test "fetch_actual_stripe_fee_from_charge(nil) returns zero USD" do
+      fee = WebhookHandler.fetch_actual_stripe_fee_from_charge(nil)
+      assert Money.zero?(fee)
+      assert fee.currency == :USD
+    end
+
+    test "calculate_estimated_fee_from_charge_amount handles Stripe retrieve error" do
+      fee =
+        WebhookHandler.calculate_estimated_fee_from_charge_amount(
+          "ch_missing_#{System.unique_integer()}"
+        )
+
+      assert Money.zero?(fee)
+    end
+
+    test "extract_stripe_fee_from_invoice falls back when metadata fee is not parseable as integer" do
+      invoice = %{
+        "id" => "in_dec_#{System.unique_integer()}",
+        "charge" => nil,
+        "metadata" => %{"stripe_fee" => "not_integer"}
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_invoice(invoice)
+      assert %Money{} = fee
+    end
+
+    test "extract_stripe_fee_from_invoice treats very large integer metadata as dollars" do
+      invoice = %{
+        "id" => "in_large_#{System.unique_integer()}",
+        "charge" => nil,
+        "metadata" => %{"stripe_fee" => "150000"}
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_invoice(invoice)
+      assert %Money{} = fee
+    end
+
+    test "extract_stripe_fee_from_payment_intent estimates when charge has no id" do
+      pi = %Stripe.PaymentIntent{
+        id: "pi_fee_#{System.unique_integer()}",
+        object: "payment_intent",
+        amount: 10_000,
+        charges: %Stripe.List{
+          data: [%{"amount" => 1000}],
+          has_more: false,
+          object: "list",
+          url: "/v1/charges"
+        }
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_payment_intent(pi)
+      assert %Money{} = fee
+    end
+
+    test "extract_stripe_fee_from_invoice uses integer metadata fee as cents when under large threshold" do
+      invoice = %{
+        "id" => "in_cent_fee_#{System.unique_integer()}",
+        "charge" => nil,
+        "metadata" => %{"stripe_fee" => "350"}
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_invoice(invoice)
+      assert %Money{} = fee
+      assert Money.cmp(fee, Money.new(:USD, "3.50")) == 0
+    end
+
+    test "extract_stripe_fee_from_payment_intent accepts map with latest_charge id" do
+      pi = %{
+        "id" => "pi_map_fee_#{System.unique_integer()}",
+        "amount" => 5000,
+        "latest_charge" => "ch_lc_#{System.unique_integer()}"
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_payment_intent(pi)
+      assert %Money{} = fee
+    end
+
+    test "extract_stripe_fee_from_payment_intent estimates from amount when charge lookup uses only amount" do
+      fee =
+        WebhookHandler.extract_stripe_fee_from_payment_intent(%{
+          "amount" => 20_000
+        })
+
+      assert %Money{} = fee
+    end
+
+    test "extract_stripe_fee_from_payment_intent uses string-key charges.data for charge id" do
+      pi = %{
+        "id" => "pi_charges_map_#{System.unique_integer()}",
+        "charges" => %{
+          "data" => [%{"id" => "ch_nested_#{System.unique_integer()}"}]
+        }
+      }
+
+      fee = WebhookHandler.extract_stripe_fee_from_payment_intent(pi)
+      assert %Money{} = fee
+    end
+
+    test "calculate_estimated_fee handles small payment amounts" do
+      fee = WebhookHandler.calculate_estimated_fee(Decimal.new("1.00"))
+      assert %Money{} = fee
+      assert Money.positive?(fee)
+    end
+
+    test "debug_payout_transactions returns error tuple when Stripe list fails" do
+      assert {:error, _} =
+               WebhookHandler.debug_payout_transactions(
+                 "po_debug_invalid_#{System.unique_integer()}"
+               )
+    end
+
+    test "charge.refunded with empty refund list logs and returns ok via handle_webhook_event" do
+      charge = %Stripe.Charge{
+        id: "ch_empty_ref_#{System.unique_integer()}",
+        object: "charge",
+        payment_intent: "pi_x",
+        amount: 1000,
+        refunds: %Stripe.List{
+          data: [],
+          has_more: false,
+          object: "list",
+          url: "/v1/refunds"
+        }
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("charge.refunded", charge)
+    end
+
+    test "refund.created map handler processes same as struct when payment exists" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      invoice_data = %{
+        "id" => "in_refmap_#{System.unique_integer()}",
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "amount_paid" => 10_000,
+        "charge" => nil
+      }
+
+      assert :ok =
+               WebhookHandler.handle_event(
+                 build_stripe_event("invoice.payment_succeeded", invoice_data)
+               )
+
+      payment = Ledgers.get_payment_by_external_id(invoice_data["id"])
+      refund_id = "re_map_h_#{System.unique_integer()}"
+
+      refund_map = %{
+        "id" => refund_id,
+        "charge" => "ch_test",
+        "amount" => 5000,
+        "status" => "succeeded",
+        "payment_intent" => payment.external_payment_id
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("refund.created", refund_map)
+
+      assert Ledgers.get_refund_by_external_id(refund_id) != nil
     end
   end
 end

@@ -4,6 +4,7 @@ defmodule Ysc.Alerts.DiscordTest do
   import Mox
 
   alias Ysc.Alerts.Discord
+  alias Money
 
   setup :verify_on_exit!
 
@@ -390,6 +391,99 @@ defmodule Ysc.Alerts.DiscordTest do
       end)
 
       assert true
+    end
+  end
+
+  describe "send_webhook_reconciliation_report/2" do
+    test "sends success report with optional stats fields" do
+      stats = %{
+        total_checked: 10,
+        missing_found: 0,
+        duration_ms: 100,
+        processed_success: 5,
+        processed_failed: 0,
+        failed_event_ids: ["evt_1", "evt_2"]
+      }
+
+      assert {:ok, :sent} =
+               Discord.send_webhook_reconciliation_report(stats, :success)
+    end
+
+    test "sends warning report" do
+      stats = %{total_checked: 10, missing_found: 2, duration_ms: 200}
+
+      assert {:ok, :sent} =
+               Discord.send_webhook_reconciliation_report(stats, :warning)
+    end
+
+    test "falls back to info for unknown status" do
+      stats = %{total_checked: 1, missing_found: 0, duration_ms: 1}
+
+      assert {:ok, :sent} =
+               Discord.send_webhook_reconciliation_report(stats, :other)
+    end
+  end
+
+  describe "send_missing_webhooks_alert/2" do
+    test "truncates event id list past ten entries" do
+      ids = for i <- 1..12, do: "evt_#{i}"
+      assert {:ok, :sent} = Discord.send_missing_webhooks_alert(12, ids)
+    end
+
+    test "sends without event id fields when list is empty" do
+      assert {:ok, :sent} = Discord.send_missing_webhooks_alert(3, [])
+    end
+  end
+
+  describe "reconciliation entity totals edge cases" do
+    test "includes events mismatch note when entity_totals events do not match" do
+      report = %{
+        timestamp: DateTime.utc_now(),
+        duration_ms: 500,
+        overall_status: :ok,
+        checks: %{
+          payments: nil,
+          refunds: nil,
+          ledger_balance: nil,
+          entity_totals: %{
+            memberships: %{match: true},
+            bookings: %{match: true},
+            events: %{
+              match: false,
+              ledger_revenue: Money.new(10, :USD),
+              payment_total: Money.new(20, :USD)
+            },
+            donations: %{match: true}
+          }
+        }
+      }
+
+      assert {:ok, :sent} = Discord.send_reconciliation_report(report, :info)
+    end
+
+    test "formats entity amounts line when ledger totals diverge" do
+      report = %{
+        timestamp: DateTime.utc_now(),
+        duration_ms: 500,
+        overall_status: :ok,
+        checks: %{
+          payments: nil,
+          refunds: nil,
+          ledger_balance: nil,
+          entity_totals: %{
+            memberships: %{match: true},
+            bookings: %{
+              match: false,
+              ledger_revenue: Money.new(100, :USD),
+              payment_total: Money.new(50, :USD)
+            },
+            events: %{match: true},
+            donations: %{match: true}
+          }
+        }
+      }
+
+      assert {:ok, :sent} = Discord.send_reconciliation_report(report, :info)
     end
   end
 end

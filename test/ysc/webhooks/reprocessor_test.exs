@@ -1,9 +1,91 @@
 defmodule Ysc.Webhooks.ReprocessorTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: true
 
   alias Ysc.Webhooks.Reprocessor
   alias Ysc.Webhooks
   alias Ysc.Webhooks.WebhookEvent
+
+  describe "reprocess_webhook/1 — Stripe event variants" do
+    test "reprocesses invoice.payment_succeeded when invoice is not for a subscription" do
+      webhook =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "invoice.payment_succeeded",
+          payload: %{
+            "data" => %{
+              "object" => %{
+                "id" => "in_#{System.unique_integer([:positive])}",
+                "customer" => "cus_test",
+                "subscription" => nil
+              }
+            }
+          },
+          state: :failed
+        })
+
+      assert {:ok, :ok} = Reprocessor.reprocess_webhook(webhook.id)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
+
+    test "reprocesses payment_intent.succeeded" do
+      webhook =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "payment_intent.succeeded",
+          payload: %{
+            "data" => %{
+              "object" => %{
+                "id" => "pi_#{System.unique_integer([:positive])}",
+                "customer" => "cus_test",
+                "amount" => 1000,
+                "status" => "succeeded",
+                "metadata" => %{}
+              }
+            }
+          },
+          state: :failed
+        })
+
+      assert {:ok, _} = Reprocessor.reprocess_webhook(webhook.id)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
+
+    test "reprocesses generic Stripe event type via handler fallback" do
+      webhook =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "customer.updated",
+          payload: %{
+            "data" => %{
+              "object" => %{"id" => "cus_#{System.unique_integer([:positive])}"}
+            }
+          },
+          state: :failed
+        })
+
+      assert {:ok, _} = Reprocessor.reprocess_webhook(webhook.id)
+      assert Repo.get!(WebhookEvent, webhook.id).state == :processed
+    end
+
+    test "reprocess_all_failed_webhooks returns empty summary when no events match filters" do
+      unique_type = "no.such.type.#{System.unique_integer([:positive])}"
+
+      result =
+        Reprocessor.reprocess_all_failed_webhooks(
+          provider: "stripe",
+          event_type: unique_type,
+          limit: 20
+        )
+
+      assert result.total_found == 0
+      assert result.successful == 0
+      assert result.failed == 0
+      assert result.results == []
+    end
+  end
 
   describe "reprocess_webhook/1" do
     test "successfully reprocesses a failed stripe webhook" do
@@ -206,6 +288,240 @@ defmodule Ysc.Webhooks.ReprocessorTest do
 
       assert {:ok, updated} = Reprocessor.reset_webhook_to_pending(webhook.id)
       assert updated.state == :pending
+    end
+
+    test "returns {:error, :not_found} for unknown id" do
+      assert Reprocessor.reset_webhook_to_pending(Ecto.ULID.generate()) ==
+               {:error, :not_found}
+    end
+
+    test "returns {:error, {:not_failed, state}} when webhook is not failed" do
+      webhook =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "test.event",
+          payload: %{},
+          state: :processed
+        })
+
+      assert Reprocessor.reset_webhook_to_pending(webhook.id) ==
+               {:error, {:not_failed, :processed}}
+    end
+  end
+
+  describe "get_failed_webhook_details/1" do
+    test "returns {:ok, event} or {:error, :not_found}" do
+      w =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "detail.event",
+          payload: %{},
+          state: :failed
+        })
+
+      assert {:ok, fetched} = Reprocessor.get_failed_webhook_details(w.id)
+      assert fetched.id == w.id
+
+      assert Reprocessor.get_failed_webhook_details(Ecto.ULID.generate()) ==
+               {:error, :not_found}
+    end
+  end
+
+  describe "list_failed_webhooks/1 :since filter" do
+    test "includes webhook when since is before its updated_at" do
+      w =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "since.recent",
+          payload: %{},
+          state: :failed
+        })
+
+      since = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      recent =
+        Reprocessor.list_failed_webhooks(
+          since: since,
+          event_type: "since.recent",
+          limit: 50
+        )
+
+      assert Enum.any?(recent, &(&1.id == w.id))
+    end
+
+    test "only includes webhooks updated on or after since" do
+      old =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "since.old",
+          payload: %{},
+          state: :failed
+        })
+
+      old_ts =
+        DateTime.utc_now()
+        |> DateTime.add(-7200, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        old
+        |> Ecto.Changeset.change(%{updated_at: old_ts})
+        |> Repo.update()
+
+      since = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      recent =
+        Reprocessor.list_failed_webhooks(
+          since: since,
+          event_type: "since.old",
+          limit: 50
+        )
+
+      refute Enum.any?(recent, &(&1.id == old.id))
+    end
+  end
+
+  describe "reprocess_webhooks_by_type/3" do
+    test "passes provider and event_type to listing" do
+      et = "qb.type.#{Ecto.UUID.generate()}"
+
+      Webhooks.create_webhook_event!(%{
+        provider: "quickbooks",
+        event_id: "evt_#{Ecto.UUID.generate()}",
+        event_type: et,
+        payload: %{"eventNotifications" => []},
+        state: :failed
+      })
+
+      result =
+        Reprocessor.reprocess_webhooks_by_type("quickbooks", et,
+          limit: 5,
+          dry_run: true
+        )
+
+      assert result.total_found >= 1
+    end
+  end
+
+  describe "list_pending_or_processing_webhooks/1 and reset_processing_to_pending/1" do
+    test "lists pending and processing; reset moves processing to pending" do
+      Webhooks.create_webhook_event!(%{
+        provider: "stripe",
+        event_id: "evt_#{Ecto.UUID.generate()}",
+        event_type: "pend.e",
+        payload: %{},
+        state: :pending
+      })
+
+      proc =
+        Webhooks.create_webhook_event!(%{
+          provider: "quickbooks",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "proc.e",
+          payload: %{},
+          state: :processing
+        })
+
+      listed = Reprocessor.list_pending_or_processing_webhooks(limit: 100)
+      assert Enum.any?(listed, &(&1.id == proc.id))
+
+      assert {:ok, reset} = Reprocessor.reset_processing_to_pending(proc.id)
+      assert reset.state == :pending
+
+      assert Reprocessor.reset_processing_to_pending(proc.id) ==
+               {:error, {:not_processing, :pending}}
+    end
+
+    test "reset_processing_to_pending returns not_found for unknown id" do
+      assert Reprocessor.reset_processing_to_pending(Ecto.ULID.generate()) ==
+               {:error, :not_found}
+    end
+  end
+
+  describe "reprocess_pending_or_processing_webhook/1" do
+    test "returns not_found when webhook id does not exist" do
+      assert {:error, :not_found} =
+               Reprocessor.reprocess_pending_or_processing_webhook(
+                 Ecto.ULID.generate()
+               )
+    end
+
+    test "resets processing state to pending then reprocesses Stripe webhook" do
+      ev =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "customer.updated",
+          payload: %{
+            "data" => %{
+              "object" => %{"id" => "cus_#{System.unique_integer([:positive])}"}
+            }
+          },
+          state: :processing
+        })
+
+      assert {:ok, _} =
+               Reprocessor.reprocess_pending_or_processing_webhook(ev.id)
+
+      assert Repo.get!(WebhookEvent, ev.id).state == :processed
+    end
+
+    test "reprocesses pending QuickBooks webhook with empty notifications" do
+      ev =
+        Webhooks.create_webhook_event!(%{
+          provider: "quickbooks",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "qb.empty",
+          payload: %{"eventNotifications" => []},
+          state: :pending
+        })
+
+      assert {:ok, :ok} =
+               Reprocessor.reprocess_pending_or_processing_webhook(ev.id)
+
+      assert Repo.get!(WebhookEvent, ev.id).state == :processed
+    end
+
+    test "returns {:error, {:not_pending_or_processing, :processed}} for processed" do
+      ev =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "done.e",
+          payload: %{},
+          state: :processed
+        })
+
+      assert Reprocessor.reprocess_pending_or_processing_webhook(ev.id) ==
+               {:error, {:not_pending_or_processing, :processed}}
+    end
+  end
+
+  describe "reprocess_all_pending_or_processing_webhooks/1" do
+    test "dry_run returns would_process without updating state" do
+      ev =
+        Webhooks.create_webhook_event!(%{
+          provider: "quickbooks",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "dry.pend",
+          payload: %{"eventNotifications" => []},
+          state: :pending
+        })
+
+      summary =
+        Reprocessor.reprocess_all_pending_or_processing_webhooks(
+          dry_run: true,
+          provider: "quickbooks",
+          limit: 20
+        )
+
+      assert summary.total_found >= 1
+      assert Enum.any?(summary.would_process, &(&1.id == ev.id))
+      assert Repo.get!(WebhookEvent, ev.id).state == :pending
     end
   end
 end

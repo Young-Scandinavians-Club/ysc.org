@@ -355,6 +355,102 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
     end
   end
 
+  describe "mount/3 — wrong account logged in" do
+    test "navigates to logout-required when a different user is logged in", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_family_invite()
+      other_user = user_fixture()
+
+      conn = log_in_user(conn, other_user)
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert to == ~p"/family-invite/#{invite.token}/logout-required"
+    end
+  end
+
+  describe "mount/3 — existing account, not logged in" do
+    test "prompts log in when invite email already has an account", %{
+      conn: conn
+    } do
+      existing = user_fixture()
+      primary = user_fixture()
+      token = FamilyInvite.build_token()
+
+      {:ok, invite} =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: existing.email,
+          token: token,
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id
+        })
+        |> Repo.insert()
+
+      invite = Repo.preload(invite, [:primary_user, :created_by_user])
+
+      {:ok, view, html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert html =~ "Log in to accept"
+      assert has_element?(view, "a", "Log in to accept")
+    end
+  end
+
+  describe "handle_event link_existing" do
+    test "links matching user and redirects home", %{conn: conn} do
+      {invite, _primary} = create_family_invite()
+      invited_user = user_fixture(%{email: invite.email})
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      view
+      |> element("button", "Join Family Membership")
+      |> render_click()
+
+      assert_redirected(view, "/")
+    end
+
+    test "shows error when invite was deleted before link", %{conn: conn} do
+      {invite, _primary} = create_family_invite()
+      invited_user = user_fixture(%{email: invite.email})
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      Repo.delete!(invite)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               view
+               |> element("button", "Join Family Membership")
+               |> render_click()
+    end
+
+    test "shows error when invite email no longer matches logged-in user", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_family_invite()
+      invited_user = user_fixture(%{email: invite.email})
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      Repo.update!(Ecto.Changeset.change(invite, email: unique_user_email()))
+
+      html =
+        view
+        |> element("button", "Join Family Membership")
+        |> render_click()
+
+      assert html =~ "log in with the email address that was invited"
+    end
+  end
+
   describe "render/1" do
     test "renders all form fields", %{conn: conn} do
       {invite, _primary_user} = create_family_invite()

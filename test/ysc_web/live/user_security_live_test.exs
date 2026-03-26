@@ -60,8 +60,8 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Wait for async task to complete and re-render
-      render_async(view)
+      # Wait for async task to complete and re-render (generous timeout under parallel test load)
+      render_async(view, 500)
 
       html = render(view)
 
@@ -129,6 +129,27 @@ defmodule YscWeb.UserSecurityLiveTest do
     end
   end
 
+  describe "request_password_change" do
+    test "does not open re-auth modal when password validation fails", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "short",
+          password_confirmation: "short"
+        }
+      })
+
+      refute has_element?(view, "#reauth-modal")
+      assert render(view) =~ "should be at least 12 character"
+    end
+  end
+
   describe "password update flow" do
     test "shows re-auth modal when valid password submitted", %{conn: conn} do
       user = user_fixture()
@@ -179,6 +200,170 @@ defmodule YscWeb.UserSecurityLiveTest do
                "new valid password 123"
              ) !=
                nil
+    end
+
+    test "cancel_reauth closes modal and clears pending change", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "new valid password 123",
+          password_confirmation: "new valid password 123"
+        }
+      })
+
+      assert has_element?(view, "#reauth-modal")
+
+      render_click(view, "cancel_reauth", %{})
+
+      refute has_element?(view, "#reauth-modal")
+    end
+
+    test "reauth_with_password shows error for wrong password", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "new valid password 123",
+          password_confirmation: "new valid password 123"
+        }
+      })
+
+      render_submit(view, "reauth_with_password", %{
+        password: "wrong-password-xyz"
+      })
+
+      assert render(view) =~ "Invalid password"
+    end
+
+    test "reauth_with_passkey pushes authentication challenge event", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "new valid password 123",
+          password_confirmation: "new valid password 123"
+        }
+      })
+
+      assert render_click(view, "reauth_with_passkey", %{}) =~
+               "Verify Your Identity"
+    end
+
+    test "verify_authentication completes password change after re-auth modal",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "new valid password 123",
+          password_confirmation: "new valid password 123"
+        }
+      })
+
+      render_click(view, "verify_authentication", %{})
+
+      refute has_element?(view, "#reauth-modal")
+
+      updated_user = Repo.reload!(user)
+
+      assert Accounts.get_user_by_email_and_password(
+               updated_user.email,
+               "new valid password 123"
+             )
+    end
+
+    test "passkey_auth_error sets reauth error message", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "new valid password 123",
+          password_confirmation: "new valid password 123"
+        }
+      })
+
+      render_click(view, "passkey_auth_error", %{"error" => "aborted"})
+
+      assert render(view) =~ "Passkey authentication failed"
+    end
+  end
+
+  describe "PasskeyAuth hook noop events" do
+    test "ignores passkey_support_detected, user_agent_received, and device_detected",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_click(view, "passkey_support_detected", %{})
+      render_click(view, "user_agent_received", %{})
+      render_click(view, "device_detected", %{})
+
+      assert has_element?(view, "#password_form")
+    end
+  end
+
+  describe "revoke_session" do
+    test "shows info when session token is not found", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      html =
+        render_click(view, "revoke_session", %{
+          "session_id" => Base.encode64(:crypto.strong_rand_bytes(32))
+        })
+
+      assert html =~ "may already be signed out"
+    end
+
+    test "revokes another session and shows success toast", %{conn: conn} do
+      user = user_fixture()
+      other_session_token = Accounts.generate_user_session_token(user)
+      other_encoded = Base.encode64(other_session_token)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      html =
+        render_click(view, "revoke_session", %{"session_id" => other_encoded})
+
+      assert html =~ "Session signed out"
+    end
+
+    test "revoking current session redirects to log-in", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      token = Plug.Conn.get_session(conn, :user_token)
+      encoded = Base.encode64(token)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      assert {:error, {:live_redirect, %{to: "/users/log-in"}}} =
+               render_click(view, "revoke_session", %{"session_id" => encoded})
     end
   end
 
@@ -418,6 +603,166 @@ defmodule YscWeb.UserSecurityLiveTest do
         html |> String.split("192.168.xxx.xxx") |> length() |> Kernel.-(1)
 
       assert masked_ip_count == 10
+    end
+  end
+
+  describe "handle_async exit paths" do
+    test "load_passkeys exit clears loading and marks loaded", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.UserSecurityLive.handle_async(
+                 :load_passkeys,
+                 {:exit, :test_reason},
+                 socket
+               )
+
+      assert new_socket.assigns.passkeys_loading == false
+      assert new_socket.assigns.passkeys_loaded == true
+    end
+
+    test "load_login_history exit clears loading state", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.UserSecurityLive.handle_async(
+                 :load_login_history,
+                 {:exit, :test_reason},
+                 socket
+               )
+
+      assert new_socket.assigns.login_history_loading == false
+    end
+  end
+
+  describe "oauth users without password" do
+    test "shows Set Password heading and explainer", %{conn: conn} do
+      user = oauth_user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/users/settings/security")
+
+      assert html =~ "Set Password"
+
+      assert html =~
+               "Setting a password allows you to sign in with email and password"
+    end
+
+    test "sets initial password via verify_authentication after re-auth modal",
+         %{
+           conn: conn
+         } do
+      user = oauth_user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "first password ok 12",
+          password_confirmation: "first password ok 12"
+        }
+      })
+
+      assert has_element?(view, "#reauth-modal")
+      refute render(view) =~ "Verify with your password"
+
+      render_click(view, "verify_authentication", %{})
+
+      refute has_element?(view, "#reauth-modal")
+
+      updated = Repo.reload!(user)
+
+      assert Accounts.get_user_by_email_and_password(
+               updated.email,
+               "first password ok 12"
+             )
+    end
+  end
+
+  describe "current session and device labels (coverage)" do
+    test "shows Current session when auth event matches live session id", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      token = Plug.Conn.get_session(conn, :user_token)
+      encoded = Base.encode64(token)
+
+      attrs = %{
+        session_id: encoded,
+        ip_address: "192.168.1.50",
+        user_agent: "Mozilla/5.0",
+        device_type: "desktop",
+        browser: "Firefox",
+        operating_system: "Linux",
+        success: true
+      }
+
+      AuthEvent.login_success_changeset(user, attrs)
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_async(view)
+
+      assert render(view) =~ "Current session"
+      assert render(view) =~ "Firefox on Linux"
+    end
+
+    test "uses tablet icon label for tablet device type in history", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      attrs = %{
+        ip_address: "10.0.0.2",
+        user_agent: "Tablet UA",
+        device_type: "tablet",
+        browser: "Safari",
+        operating_system: "iPadOS",
+        success: true
+      }
+
+      AuthEvent.login_success_changeset(user, attrs)
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "Safari on iPadOS"
+      assert html =~ "hero-device-tablet"
+    end
+  end
+
+  describe "family navigation link" do
+    test "shows Family link for primary user with lifetime membership", %{
+      conn: conn
+    } do
+      user =
+        user_fixture(%{})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      assert has_element?(view, ~s(a[href="/users/settings/family"]))
     end
   end
 end

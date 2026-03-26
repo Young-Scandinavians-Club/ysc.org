@@ -1458,17 +1458,16 @@ defmodule Ysc.Bookings do
 
   defp validate_room_price_params(
          property,
-         checkin_date,
-         checkout_date,
+         _checkin_date,
+         _checkout_date,
          guests_count,
          children_count
        ) do
+    # Dates and range are validated in calculate_booking_price_impl/1 via
+    # validate_booking_dates/2 before calculate_room_price/8 is called.
     with :ok <- validate_property(property),
-         :ok <- validate_guests_count(guests_count),
-         :ok <- validate_children_count(children_count),
-         :ok <- validate_checkin_date(checkin_date),
-         :ok <- validate_checkout_date(checkout_date) do
-      validate_date_range(checkin_date, checkout_date)
+         :ok <- validate_guests_count(guests_count) do
+      validate_children_count(children_count)
     end
   end
 
@@ -1486,24 +1485,6 @@ defmodule Ysc.Bookings do
        do: :ok
 
   defp validate_children_count(_), do: {:error, :invalid_children_count}
-
-  defp validate_checkin_date(checkin_date) when is_struct(checkin_date, Date),
-    do: :ok
-
-  defp validate_checkin_date(_), do: {:error, :invalid_checkin_date}
-
-  defp validate_checkout_date(checkout_date)
-       when is_struct(checkout_date, Date), do: :ok
-
-  defp validate_checkout_date(_), do: {:error, :invalid_checkout_date}
-
-  defp validate_date_range(checkin_date, checkout_date) do
-    if Date.compare(checkout_date, checkin_date) == :gt do
-      :ok
-    else
-      {:error, :invalid_date_range}
-    end
-  end
 
   defp calculate_room_price_impl(
          property,

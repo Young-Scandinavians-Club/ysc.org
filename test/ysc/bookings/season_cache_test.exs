@@ -434,4 +434,140 @@ defmodule Ysc.Bookings.SeasonCacheTest do
       assert cached_2025.id == season.id
     end
   end
+
+  describe "cache format and TTL" do
+    test "refetches when versioned entry TTL has expired" do
+      created_season =
+        create_season(%{
+          name: "TTL Winter",
+          property: :tahoe,
+          start_date: ~D[2024-11-01],
+          end_date: ~D[2025-04-30]
+        })
+
+      date = ~D[2024-12-15]
+      cache_key = "season:tahoe:#{Date.to_iso8601(date)}"
+
+      SeasonCache.get(:tahoe, date)
+
+      {:ok, {:version, version, _ttl, cached_snapshot}} =
+        Cachex.get(:ysc_cache, cache_key)
+
+      past_ttl = System.system_time(:millisecond) - 60_000
+
+      Cachex.put(
+        :ysc_cache,
+        cache_key,
+        {:version, version, past_ttl, cached_snapshot}
+      )
+
+      {:ok, updated} =
+        created_season
+        |> Season.changeset(%{name: "TTL Winter Updated"})
+        |> Repo.update()
+
+      cached = SeasonCache.get(:tahoe, date)
+
+      assert cached.id == updated.id
+      assert cached.name == "TTL Winter Updated"
+    end
+
+    test "upgrades legacy cache entry without version metadata" do
+      season =
+        create_season(%{
+          name: "Legacy Season",
+          property: :tahoe,
+          start_date: ~D[2024-11-01],
+          end_date: ~D[2025-04-30]
+        })
+
+      date = ~D[2024-12-15]
+      cache_key = "season:tahoe:#{Date.to_iso8601(date)}"
+
+      Cachex.put(:ysc_cache, cache_key, season)
+
+      cached = SeasonCache.get(:tahoe, date)
+
+      assert cached.id == season.id
+
+      {:ok, stored} = Cachex.get(:ysc_cache, cache_key)
+      assert match?({:version, _, _, _}, stored)
+    end
+
+    test "upgrades legacy get_all_for_property cache entry" do
+      season =
+        create_season(%{
+          name: "All Legacy",
+          property: :tahoe,
+          start_date: ~D[2024-01-01],
+          end_date: ~D[2024-12-31]
+        })
+
+      cache_key = "season:all:tahoe"
+      Cachex.put(:ysc_cache, cache_key, [season])
+
+      seasons = SeasonCache.get_all_for_property(:tahoe)
+
+      assert length(seasons) == 1
+      assert hd(seasons).id == season.id
+
+      {:ok, stored} = Cachex.get(:ysc_cache, cache_key)
+      assert match?({:version, _, _, _}, stored)
+    end
+
+    test "initializes season version when missing before caching get/2" do
+      Cachex.del(:ysc_cache, "season:version")
+
+      season =
+        create_season(%{
+          name: "Version Init Season",
+          property: :tahoe,
+          start_date: ~D[2024-11-01],
+          end_date: ~D[2025-04-30]
+        })
+
+      date = ~D[2024-12-15]
+      assert %Season{id: id} = SeasonCache.get(:tahoe, date)
+      assert id == season.id
+
+      {:ok, v} = Cachex.get(:ysc_cache, "season:version")
+      assert is_integer(v)
+    end
+
+    test "refetches get_all_for_property when versioned entry TTL has expired" do
+      created_season =
+        create_season(%{
+          name: "All TTL Season",
+          property: :tahoe,
+          start_date: ~D[2024-01-01],
+          end_date: ~D[2024-12-31]
+        })
+
+      cache_key = "season:all:tahoe"
+
+      SeasonCache.get_all_for_property(:tahoe)
+
+      {:ok, {:version, version, _ttl, cached_snapshot}} =
+        Cachex.get(:ysc_cache, cache_key)
+
+      past_ttl = System.system_time(:millisecond) - 60_000
+
+      Cachex.put(
+        :ysc_cache,
+        cache_key,
+        {:version, version, past_ttl, cached_snapshot}
+      )
+
+      {:ok, updated} =
+        created_season
+        |> Season.changeset(%{name: "All TTL Season Updated"})
+        |> Repo.update()
+
+      seasons = SeasonCache.get_all_for_property(:tahoe)
+
+      assert length(seasons) == 1
+      assert hd(seasons).id == updated.id
+      assert hd(seasons).name == "All TTL Season Updated"
+    end
+  end
 end

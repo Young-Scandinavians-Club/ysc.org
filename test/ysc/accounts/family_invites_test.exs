@@ -673,4 +673,126 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert FamilyInvites.can_send_family_invite?(user) == false
     end
   end
+
+  describe "list_pending_invites_for_email/1" do
+    test "returns pending valid invites for normalized email" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      found =
+        FamilyInvites.list_pending_invites_for_email(
+          "  " <> String.upcase(email) <> "  "
+        )
+
+      assert length(found) == 1
+      assert hd(found).id == invite.id
+      assert hd(found).primary_user.id == primary_user.id
+    end
+
+    test "returns empty list when no pending invites match" do
+      assert FamilyInvites.list_pending_invites_for_email(unique_user_email()) ==
+               []
+    end
+  end
+
+  describe "link_existing_user/2" do
+    test "links existing account to family when email matches invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Invitee",
+          last_name: "User"
+        })
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert linked.primary_user_id == primary_user.id
+      assert Repo.get!(FamilyInvite, invite.id).accepted_at != nil
+    end
+
+    test "returns email_mismatch when logged-in email does not match invite" do
+      primary_user = create_user_with_lifetime_membership()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, unique_user_email())
+
+      other_user = user_fixture()
+
+      assert {:error, :email_mismatch} =
+               FamilyInvites.link_existing_user(invite.token, other_user)
+    end
+
+    test "returns cannot_link_self when primary tries to link invite for their own email" do
+      primary_user = create_user_with_lifetime_membership()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, primary_user.email)
+
+      assert {:error, :cannot_link_self} =
+               FamilyInvites.link_existing_user(invite.token, primary_user)
+    end
+
+    test "returns already_linked_to_family for sub-account user" do
+      primary_a = create_user_with_lifetime_membership()
+      primary_b = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_b, email)
+
+      sub =
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: email,
+            password: "password1234",
+            first_name: "Sub",
+            last_name: "Account",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary_a.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+
+      assert {:error, :already_linked_to_family} =
+               FamilyInvites.link_existing_user(invite.token, sub)
+    end
+  end
+
+  describe "create_invite/3 spouse limits" do
+    test "returns max_spouses_reached when a pending spouse invite exists" do
+      primary_user = create_user_with_lifetime_membership()
+
+      _ =
+        FamilyInvites.create_invite(primary_user, unique_user_email(),
+          relationship: :spouse
+        )
+
+      assert {:error, :max_spouses_reached} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 relationship: :spouse
+               )
+    end
+
+    test "accepts spouse invite when relationship is passed as string" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      assert {:ok, invite} =
+               FamilyInvites.create_invite(primary_user, email,
+                 relationship: "spouse"
+               )
+
+      assert invite.relationship == :spouse
+    end
+  end
 end

@@ -1263,6 +1263,10 @@ defmodule YscWeb.AdminScannerLive do
            message: "Guest checked in successfully"
          })}
 
+      {:error, _reason, message} when is_binary(message) ->
+        {:noreply,
+         assign(socket, :scan_result, %{status: :error, message: message})}
+
       {:error, _} ->
         {:noreply,
          assign(socket, :scan_result, %{

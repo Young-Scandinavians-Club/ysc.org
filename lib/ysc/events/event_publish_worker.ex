@@ -44,12 +44,20 @@ defmodule Ysc.Events.EventPublishWorker do
             published_at: published_event.published_at
           )
 
-        {:error, changeset} ->
+        {:error, %Ecto.Changeset{} = changeset} ->
           Ysc.Logging.error("Failed to publish scheduled event",
             event_id: event.id,
             reference_id: event.reference_id,
             title: event.title,
             errors: inspect(changeset.errors)
+          )
+
+        {:error, reason} ->
+          Ysc.Logging.error("Failed to publish scheduled event",
+            event_id: event.id,
+            reference_id: event.reference_id,
+            title: event.title,
+            errors: inspect(reason)
           )
       end
     end)

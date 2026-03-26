@@ -26,6 +26,21 @@ defmodule Ysc.AgendasTest do
     %{event: event, organizer: organizer}
   end
 
+  describe "subscribe/1" do
+    test "receives broadcasts on the agenda topic", %{event: event} do
+      me = self()
+      :ok = Agendas.subscribe(event.id)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "agendas:#{event.id}",
+        {:agenda_test, me}
+      )
+
+      assert_receive {:agenda_test, ^me}
+    end
+  end
+
   describe "create_agenda/2" do
     test "creates an agenda for an event", %{event: event} do
       assert {:ok, %Agenda{} = agenda} =
@@ -44,6 +59,11 @@ defmodule Ysc.AgendasTest do
       assert agenda1.position == 0
       assert agenda2.position == 1
       assert agenda3.position == 2
+    end
+
+    test "returns error changeset when title is invalid", %{event: event} do
+      assert {:error, %Ecto.Changeset{}} =
+               Agendas.create_agenda(event, %{title: ""})
     end
   end
 
@@ -91,6 +111,13 @@ defmodule Ysc.AgendasTest do
 
       assert updated.title == "Day One"
     end
+
+    test "returns error when title is invalid", %{event: event} do
+      {:ok, agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Agendas.update_agenda(event.id, agenda, %{title: ""})
+    end
   end
 
   describe "delete_agenda/2" do
@@ -132,6 +159,13 @@ defmodule Ysc.AgendasTest do
       assert item2.position == 1
       assert item3.position == 2
     end
+
+    test "returns error changeset when title is invalid", %{event: event} do
+      {:ok, agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Agendas.create_agenda_item(event.id, agenda, %{title: ""})
+    end
   end
 
   describe "get_agenda_item!/1" do
@@ -144,6 +178,12 @@ defmodule Ysc.AgendasTest do
       fetched = Agendas.get_agenda_item!(item.id)
       assert fetched.id == item.id
       assert fetched.agenda.id == agenda.id
+    end
+
+    test "raises when agenda item does not exist" do
+      assert_raise Ecto.NoResultsError, fn ->
+        Agendas.get_agenda_item!(Ecto.ULID.generate())
+      end
     end
   end
 
@@ -158,6 +198,16 @@ defmodule Ysc.AgendasTest do
         Agendas.update_agenda_item(event.id, item, %{title: "Grand Opening"})
 
       assert updated.title == "Grand Opening"
+    end
+
+    test "returns error when title is invalid", %{event: event} do
+      {:ok, agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      {:ok, item} =
+        Agendas.create_agenda_item(event.id, agenda, %{title: "Opening"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Agendas.update_agenda_item(event.id, item, %{title: ""})
     end
   end
 

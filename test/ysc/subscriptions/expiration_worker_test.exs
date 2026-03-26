@@ -4,6 +4,8 @@ defmodule Ysc.Subscriptions.ExpirationWorkerTest do
 
   Note: Full integration tests that call Stripe API are not included here.
   These tests focus on the worker structure, basic functionality, and query logic.
+
+  `Ysc.DataCase` includes `Oban.Testing` (`perform_job/2`, etc.).
   """
   use Ysc.DataCase, async: false
 
@@ -18,6 +20,11 @@ defmodule Ysc.Subscriptions.ExpirationWorkerTest do
   end
 
   describe "perform/1" do
+    test "can be run via Oban.Testing perform_job" do
+      assert {:ok, msg} = perform_job(ExpirationWorker, %{})
+      assert msg =~ "Checked subscriptions"
+    end
+
     test "processes the expiration job successfully" do
       job = %Oban.Job{args: %{}}
 
@@ -39,6 +46,119 @@ defmodule Ysc.Subscriptions.ExpirationWorkerTest do
   describe "check_and_expire_subscriptions/0" do
     test "returns zero counts when no subscriptions exist" do
       assert {0, 0} = ExpirationWorker.check_and_expire_subscriptions()
+    end
+
+    test "counts failure when Stripe retrieve returns Stripe.Error", %{
+      user: user
+    } do
+      original = Application.get_env(:ysc, :stripe_subscription_retriever)
+
+      Application.put_env(
+        :ysc,
+        :stripe_subscription_retriever,
+        Ysc.StripeSubscriptionRetrieverErrorMock
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_subscription_retriever, original)
+      end)
+
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_stripe_error_mock",
+          stripe_status: "active",
+          name: "Stripe API Error",
+          current_period_end: past_date,
+          ends_at: nil
+        })
+
+      assert {0, 1} = ExpirationWorker.check_and_expire_subscriptions()
+    end
+
+    test "counts failure when Stripe retrieve returns unexpected error", %{
+      user: user
+    } do
+      original = Application.get_env(:ysc, :stripe_subscription_retriever)
+
+      Application.put_env(
+        :ysc,
+        :stripe_subscription_retriever,
+        Ysc.StripeSubscriptionRetrieverUnexpectedErrorMock
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_subscription_retriever, original)
+      end)
+
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_unexpected_mock",
+          stripe_status: "active",
+          name: "Unexpected Error",
+          current_period_end: past_date,
+          ends_at: nil
+        })
+
+      assert {0, 1} = ExpirationWorker.check_and_expire_subscriptions()
+    end
+
+    test "processes expired subscription via Stripe mock and counts success", %{
+      user: user
+    } do
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_exp_mock_works",
+          stripe_status: "active",
+          name: "Expired For Mock",
+          current_period_end: past_date,
+          ends_at: nil
+        })
+
+      assert {1, 0} = ExpirationWorker.check_and_expire_subscriptions()
+    end
+
+    test "treats subscription as renewed when Stripe reports active future period",
+         %{
+           user: user
+         } do
+      original = Application.get_env(:ysc, :stripe_subscription_retriever)
+
+      Application.put_env(
+        :ysc,
+        :stripe_subscription_retriever,
+        Ysc.StripeSubscriptionRetrieverRenewedMock
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_subscription_retriever, original)
+      end)
+
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_renewed_mock_case",
+          stripe_status: "active",
+          name: "Expired Locally Renewed",
+          current_period_end: past_date,
+          ends_at: nil
+        })
+
+      assert {1, 0} = ExpirationWorker.check_and_expire_subscriptions()
     end
 
     test "finds subscriptions with expired current_period_end", %{user: user} do

@@ -67,6 +67,17 @@ config :ysc, YscWeb.Endpoint,
 # In test we don't send emails.
 config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Test
 
+# ExAws: static credentials + localstack-style host so presigned URL generation
+# (e.g. expense report file redirects) works in CI without EC2 instance metadata.
+config :ex_aws,
+  access_key_id: "dummy",
+  secret_access_key: "fake",
+  s3: [
+    scheme: "http://",
+    host: "media.s3.localhost.localstack.cloud",
+    port: "4566"
+  ]
+
 # Relax auth rate limits in test so login/forgot-password tests don't hit them
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
 
@@ -112,6 +123,9 @@ config :ysc,
 # FlowRoute SMS configuration for tests
 # Use a fake number since we're in noop mode anyway
 config :ysc, :flowroute, from_number: "12061231234"
+
+# Enables `Application.put_env(:ysc, :flowroute_test_raise, ...)` in SMS tests only.
+config :ysc, :flowroute_test_inject_enabled, true
 
 # OAuth Configuration for tests
 config :ueberauth, Ueberauth.Strategy.Google.OAuth,

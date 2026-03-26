@@ -1,5 +1,5 @@
 defmodule YscWeb.UserLoginLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -208,6 +208,130 @@ defmodule YscWeb.UserLoginLiveTest do
                "Invalid email or password"
 
       assert redirected_to(conn) == "/users/log-in"
+    end
+  end
+
+  describe "mount options and client hooks" do
+    test "expired_link query shows login error toast", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/users/log-in?reason=expired_link")
+
+      assert html =~ "expired" or html =~ "Invalid" or html =~ "sign in"
+    end
+
+    test "invalid redirect_to query is ignored", %{conn: conn} do
+      {:ok, lv, _html} =
+        live(conn, ~p"/users/log-in?redirect_to=https://evil.example.com")
+
+      result =
+        lv
+        |> element("button[phx-click='sign_in_with_google']")
+        |> render_click()
+
+      assert {:error, {:redirect, %{to: path}}} = result
+      assert path == ~p"/auth/google"
+    end
+
+    test "sign_in_with_passkey pushes authentication challenge", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_support_detected", %{"supported" => true})
+
+      lv
+      |> element("button[phx-click='sign_in_with_passkey']")
+      |> render_click()
+
+      assert_push_event(lv, "create_authentication_challenge", %{options: opts})
+      assert is_binary(opts[:challenge])
+      assert opts[:rpId] == "localhost" or is_binary(opts[:rpId])
+    end
+
+    test "device_detected sets iOS mobile flag", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("device_detected", %{"device" => "ios_mobile"})
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_support_detected", %{"supported" => true})
+
+      html = render(lv)
+      assert html =~ "Face ID" or html =~ "Passkey"
+    end
+
+    test "device_detected with unexpected params does not crash", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("device_detected", %{"device" => "unknown"})
+
+      assert render(lv) =~ "Sign in to your YSC account"
+    end
+
+    test "passkey_support_detected with unexpected params does not crash", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_support_detected", %{"foo" => "bar"})
+
+      assert render(lv) =~ "Sign in to your YSC account"
+    end
+
+    test "user_agent_received is acknowledged", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("user_agent_received", %{})
+
+      assert render(lv) =~ "Sign in to your YSC account"
+    end
+
+    test "verify_authentication without challenge shows error toast", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("verify_authentication", %{
+        "rawId" =>
+          Base.url_encode64(:crypto.strong_rand_bytes(10), padding: false),
+        "response" => %{}
+      })
+
+      html = render(lv)
+      assert html =~ "expired" or html =~ "Authentication" or html =~ "session"
+    end
+
+    test "passkey_auth_error maps NotAllowedError", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_auth_error", %{
+        "error" => "NotAllowedError",
+        "message" => "cancelled"
+      })
+
+      assert render(lv) =~ "cancelled" or render(lv) =~ "not allowed"
+    end
+
+    test "passkey_auth_error fallback handler", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_auth_error", %{"x" => "y"})
+
+      assert render(lv) =~ "error" or render(lv) =~ "authentication"
     end
   end
 end

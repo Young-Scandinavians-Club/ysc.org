@@ -49,6 +49,17 @@ defmodule Ysc.GeoIPTest do
         restore_locus_key(original)
       end
     end
+
+    test "returns false when license key is not a binary" do
+      original = Application.get_env(:locus, :license_key)
+
+      try do
+        Application.put_env(:locus, :license_key, :not_a_string)
+        refute GeoIP.configured?()
+      after
+        restore_locus_key(original)
+      end
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -115,6 +126,76 @@ defmodule Ysc.GeoIPTest do
 
     test "returns empty map for an atom" do
       assert GeoIP.lookup(:not_a_string) == %{}
+    end
+
+    test "returns empty map when lookup returns :not_found (reserved IP)" do
+      original = Application.get_env(:locus, :license_key)
+
+      try do
+        Application.put_env(:locus, :license_key, "fake-key")
+
+        # Valid IP shape; MaxMind DB may not be loaded in test — :not_found is handled.
+        assert GeoIP.lookup("127.0.0.1") == %{}
+      after
+        restore_locus_key(original)
+      end
+    end
+
+    test "returns empty map for public IP when DB is unavailable (error or not_found)" do
+      original = Application.get_env(:locus, :license_key)
+
+      try do
+        Application.put_env(:locus, :license_key, "fake-key")
+        assert GeoIP.lookup("8.8.8.8") == %{}
+      after
+        restore_locus_key(original)
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # parse_locus_entry/1 — map shapes (no live MaxMind DB required)
+  # ---------------------------------------------------------------------------
+
+  describe "parse_locus_entry/1" do
+    test "maps country from country.iso_code" do
+      entry = %{
+        "country" => %{"iso_code" => "US"},
+        "city" => %{"names" => %{"en" => "San Francisco"}},
+        "location" => %{"latitude" => 37.77, "longitude" => -122.42}
+      }
+
+      assert GeoIP.parse_locus_entry(entry) == %{
+               country: "US",
+               city: "San Francisco",
+               latitude: 37.77,
+               longitude: -122.42
+             }
+    end
+
+    test "falls back to registered_country when country is absent" do
+      entry = %{
+        "registered_country" => %{"iso_code" => "CA"},
+        "subdivisions" => [
+          %{"names" => %{"en" => "Ontario"}, "iso_code" => "ON"}
+        ]
+      }
+
+      assert %{country: "CA", region: "Ontario"} =
+               GeoIP.parse_locus_entry(entry)
+    end
+
+    test "uses subdivision iso_code when English name is missing" do
+      entry = %{
+        "country" => %{"iso_code" => "US"},
+        "subdivisions" => [%{"iso_code" => "CA"}]
+      }
+
+      assert GeoIP.parse_locus_entry(entry).region == "CA"
+    end
+
+    test "returns empty map for non-map input" do
+      assert GeoIP.parse_locus_entry(:not_a_map) == %{}
     end
   end
 

@@ -2279,7 +2279,7 @@ defmodule YscWeb.CoreComponents do
           <.input
             field={@form[:text]}
             type="textarea"
-            id="comment"
+            id={"reply-comment-#{@id}"}
             rows="4"
             class="px-0 w-full text-sm text-zinc-900 border-0 focus:ring-0 focus:outline-none"
             placeholder="Write a nice reply..."

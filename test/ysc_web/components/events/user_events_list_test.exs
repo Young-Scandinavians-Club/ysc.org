@@ -6,7 +6,26 @@ defmodule YscWeb.UserEventsListLiveTest do
   import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
 
+  alias Ysc.Media
   alias Ysc.Repo
+
+  defp create_event_image do
+    uploader = user_fixture()
+
+    {:ok, image} =
+      %Media.Image{}
+      |> Media.Image.add_image_changeset(%{
+        title: "User event list image",
+        raw_image_path: "/uploads/uel_raw.jpg",
+        optimized_image_path: "/uploads/uel_opt.jpg",
+        thumbnail_path: "/uploads/uel_thumb.jpg",
+        blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+        user_id: uploader.id
+      })
+      |> Repo.insert()
+
+    image
+  end
 
   describe "rendering" do
     test "displays upcoming event tickets for user" do
@@ -301,6 +320,56 @@ defmodule YscWeb.UserEventsListLiveTest do
 
       # Should display formatted time (2:30 PM)
       assert html =~ "2:30 PM"
+    end
+
+    test "displays cancelled badge for cancelled upcoming events" do
+      user = user_fixture()
+
+      event =
+        event_fixture(%{
+          title: "Cancelled Upcoming #{System.unique_integer()}",
+          start_date: DateTime.add(DateTime.utc_now(), 7, :day)
+        })
+
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      _order = ticket_order_fixture(%{user: user, event: event, tier: tier})
+
+      {:ok, _} =
+        event
+        |> Ecto.Changeset.change(state: :cancelled)
+        |> Repo.update()
+
+      html =
+        render_component(YscWeb.UserEventsListLive, %{
+          id: "user-events",
+          current_user: user
+        })
+
+      assert html =~ "Cancelled"
+    end
+
+    test "renders event image when event has an image" do
+      user = user_fixture()
+      image = create_event_image()
+
+      event =
+        event_fixture(%{
+          title: "Event With Image #{System.unique_integer()}",
+          start_date: DateTime.add(DateTime.utc_now(), 7, :day),
+          image_id: image.id
+        })
+
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      _order = ticket_order_fixture(%{user: user, event: event, tier: tier})
+
+      html =
+        render_component(YscWeb.UserEventsListLive, %{
+          id: "user-events",
+          current_user: user
+        })
+
+      assert html =~ "user-event-image-#{event.id}"
     end
   end
 end

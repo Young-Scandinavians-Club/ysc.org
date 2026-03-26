@@ -4,6 +4,11 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
   """
   use Ysc.DataCase, async: true
 
+  import Ysc.AccountsFixtures
+
+  alias Ysc.ExpenseReports
+  alias Ysc.ExpenseReports.ExpenseReport
+  alias Ysc.Repo
   alias YscWeb.Emails.ExpenseReportConfirmation
 
   describe "get_template_name/0" do
@@ -17,6 +22,59 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
     test "returns correct subject" do
       assert ExpenseReportConfirmation.get_subject() ==
                "Expense Report Submitted - Confirmation"
+    end
+  end
+
+  describe "prepare_email_data/1" do
+    setup do
+      user = user_fixture()
+
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "status" => "draft",
+            "purpose" => "Conference travel",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      full = ExpenseReports.get_expense_report!(report.id, user)
+      bare = Repo.get(ExpenseReport, report.id)
+
+      %{user: user, report: full, bare_report: bare}
+    end
+
+    test "builds data from a fully loaded expense report", %{
+      report: report,
+      user: user
+    } do
+      data = ExpenseReportConfirmation.prepare_email_data(report)
+
+      assert data.first_name == (user.first_name || "Valued Member")
+      assert data.expense_report.purpose == "Conference travel"
+      assert data.expense_report.reimbursement_method == "Bank Transfer"
+      assert data.expense_report.bank_account.last_4 == "7890"
+      assert data.expense_report_url =~ to_string(report.id)
+    end
+
+    test "reloads associations when given a bare struct", %{bare_report: bare} do
+      refute Ecto.assoc_loaded?(bare.user)
+
+      data = ExpenseReportConfirmation.prepare_email_data(bare)
+
+      assert data.expense_report.purpose == "Conference travel"
+      assert is_binary(data.expense_report.submitted_date)
     end
   end
 end

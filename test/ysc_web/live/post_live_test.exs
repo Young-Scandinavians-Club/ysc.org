@@ -4,6 +4,7 @@ defmodule YscWeb.PostLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Media
   alias Ysc.Posts
   alias Ysc.Repo
 
@@ -33,6 +34,25 @@ defmodule YscWeb.PostLiveTest do
       |> Repo.insert()
 
     Repo.preload(post, [:author, :featured_image])
+  end
+
+  defp create_post_image do
+    uploader = user_fixture()
+
+    {:ok, image} =
+      %Media.Image{}
+      |> Media.Image.add_image_changeset(%{
+        title: "Post hero",
+        raw_image_path: "/uploads/post_raw.jpg",
+        optimized_image_path: "/uploads/post_opt.jpg",
+        thumbnail_path: "/uploads/post_thumb.jpg",
+        blur_hash: nil,
+        alt_text: "Alt for post",
+        user_id: uploader.id
+      })
+      |> Repo.insert()
+
+    image
   end
 
   defp maybe_set_board_position_at_publish(attrs, author) do
@@ -169,6 +189,34 @@ defmodule YscWeb.PostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
 
       refute html =~ "post-featured-image"
+    end
+
+    test "renders featured image section and default blur hash when image has no blur_hash",
+         %{conn: conn} do
+      image = create_post_image()
+      author = user_fixture()
+
+      {:ok, post} =
+        %Posts.Post{}
+        |> Posts.Post.new_post_changeset(%{
+          title: "With hero image",
+          raw_body: "<p>Body</p>",
+          url_name: "with-hero-#{System.unique_integer()}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          image_id: image.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      post = Repo.preload(post, [:author, :featured_image])
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ "post-featured-image"
+      assert html =~ "blur-hash-image-#{post.image_id}"
+      assert html =~ "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
     end
   end
 
@@ -413,6 +461,96 @@ defmodule YscWeb.PostLiveTest do
 
       # View should be subscribed (connection established)
       assert view.pid
+    end
+
+    test "shows toast when broadcast comment is from current user", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      post = create_post(%{title: "Test"})
+
+      {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+      render_async(view)
+
+      assert {:ok, _comment} =
+               Posts.add_comment_to_post(
+                 %{"text" => "From me", "post_id" => post.id},
+                 user
+               )
+
+      html = render(view)
+      assert html =~ "Your comment has been posted"
+    end
+
+    test "does not show own-comment toast when broadcast is from another user",
+         %{
+           conn: conn
+         } do
+      viewer = user_fixture()
+      other = user_fixture()
+      conn = log_in_user(conn, viewer)
+      post = create_post(%{title: "Test"})
+
+      {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+      render_async(view)
+
+      assert {:ok, _comment} =
+               Posts.add_comment_to_post(
+                 %{"text" => "From someone else", "post_id" => post.id},
+                 other
+               )
+
+      html = render(view)
+      refute html =~ "Your comment has been posted"
+      assert html =~ "From someone else"
+    end
+
+    test "renders reply comments in the stream", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      post = create_post(%{title: "Threaded"})
+
+      assert {:ok, parent} =
+               Posts.add_comment_to_post(
+                 %{"text" => "Top level", "post_id" => post.id},
+                 user
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+      render_async(view)
+
+      assert {:ok, _reply} =
+               Posts.add_comment_to_post(
+                 %{
+                   "text" => "Nested reply text here",
+                   "post_id" => post.id,
+                   "comment_id" => parent.id
+                 },
+                 user
+               )
+
+      html = render(view)
+      assert html =~ "Nested reply text here"
+    end
+  end
+
+  describe "board position string fallback" do
+    test "renders capitalized label when board_position_at_publish is not a known atom",
+         %{conn: conn} do
+      author = user_fixture(%{board_position: nil})
+      slug = "custom_role_#{System.unique_integer()}"
+
+      post =
+        create_post(%{
+          title: "Role fallback",
+          author: author,
+          board_position_at_publish: slug
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ String.capitalize(slug)
     end
   end
 

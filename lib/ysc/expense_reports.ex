@@ -743,12 +743,14 @@ defmodule Ysc.ExpenseReports do
     result =
       case Application.get_env(:ysc, :expense_reports_s3_upload) do
         nil ->
-          path
-          |> ExAws.S3.Upload.stream_file()
-          |> ExAws.S3.upload(bucket_name, unique_key,
-            cache_control: "public, max-age=86400"
-          )
-          |> ExAws.request!()
+          upload_op =
+            path
+            |> ExAws.S3.Upload.stream_file()
+            |> ExAws.S3.upload(bucket_name, unique_key,
+              cache_control: "public, max-age=86400"
+            )
+
+          expense_report_s3_upload_request!(upload_op)
 
         upload_module when is_atom(upload_module) ->
           upload_module.upload(path, bucket_name, unique_key)
@@ -880,6 +882,13 @@ defmodule Ysc.ExpenseReports do
       _ ->
         false
     end
+  end
+
+  defp expense_report_s3_upload_request!(op) do
+    request_fn =
+      Application.get_env(:ysc, :expense_reports_s3_request, &ExAws.request!/1)
+
+    request_fn.(op)
   end
 
   defp validate_check_reimbursement_method(changeset, user) do

@@ -23,11 +23,13 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     setup_stripe_mocks()
 
     # Configure app to use mock Stripe client
-    Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
 
     on_exit(fn ->
-      Application.delete_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
     end)
+
+    Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
     user = user_with_membership(:lifetime)
     conn = log_in_user(conn, user)

@@ -11,8 +11,12 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
   alias YscWeb.Emails.{
     AccountSetupVerification,
+    ApplicationApproved,
+    ConductViolationConfirmation,
     ContactFormBoardNotification,
     FamilyInvite,
+    FamilyInviteCancelled,
+    FamilyMemberRemoved,
     MembershipPaymentConfirmation,
     MembershipPaymentFailure,
     MembershipRenewalPaymentMethodReminder,
@@ -35,6 +39,22 @@ defmodule YscWeb.Emails.EmailCoverageTest do
   setup do
     user = user_fixture()
     %{user: user}
+  end
+
+  describe "ApplicationApproved" do
+    test "renders and exposes template metadata" do
+      html = ApplicationApproved.render(%{first_name: "Astrid"})
+      assert is_binary(html)
+      assert html =~ "Astrid"
+      assert html =~ "Membership Application Approved"
+
+      assert ApplicationApproved.get_template_name() == "application_approved"
+
+      assert ApplicationApproved.get_subject() =~ "Young Scandinavian"
+
+      assert ApplicationApproved.upcoming_events_url() =~ "/events"
+      assert ApplicationApproved.pay_membership_url() =~ "/users/membership"
+    end
   end
 
   describe "FamilyInvite" do
@@ -110,6 +130,80 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert ContactFormBoardNotification.get_subject() ==
                "New Contact Form Submission - YSC"
+    end
+
+    test "admin_dashboard_url points at the admin path" do
+      url = ContactFormBoardNotification.admin_dashboard_url()
+      assert url =~ "/admin"
+      assert url == YscWeb.Endpoint.url() <> "/admin"
+    end
+  end
+
+  describe "FamilyInviteCancelled" do
+    test "renders and exposes template metadata" do
+      assigns = %{
+        primary_user_name: "John Doe",
+        invite_email: "jane@example.com"
+      }
+
+      html = FamilyInviteCancelled.render(assigns)
+      assert is_binary(html)
+      assert html =~ "John Doe"
+      assert html =~ "jane@example.com"
+
+      assert FamilyInviteCancelled.get_template_name() ==
+               "family_invite_cancelled"
+
+      assert FamilyInviteCancelled.get_subject() ==
+               "Family Membership Invitation Cancelled - YSC"
+    end
+  end
+
+  describe "FamilyMemberRemoved" do
+    test "renders and exposes template metadata" do
+      assigns = %{
+        first_name: "Jane",
+        primary_user_name: "John Doe"
+      }
+
+      html = FamilyMemberRemoved.render(assigns)
+      assert is_binary(html)
+      assert html =~ "Jane"
+      assert html =~ "John Doe"
+
+      assert FamilyMemberRemoved.get_template_name() == "family_member_removed"
+
+      assert FamilyMemberRemoved.get_subject() ==
+               "Removed from Family Membership - YSC"
+    end
+  end
+
+  describe "ConductViolationConfirmation" do
+    test "helper URLs and metadata" do
+      assert ConductViolationConfirmation.get_template_name() ==
+               "conduct_violation_confirmation"
+
+      assert ConductViolationConfirmation.get_subject() ==
+               "Conduct Violation Report Received - YSC"
+
+      assert ConductViolationConfirmation.code_of_conduct_url() ==
+               YscWeb.Endpoint.url() <> "/code-of-conduct"
+
+      assert ConductViolationConfirmation.contact_url() ==
+               YscWeb.Endpoint.url() <> "/contact"
+    end
+
+    test "renders with anonymous flag" do
+      assigns = %{
+        first_name: "Sam",
+        last_name: "Smith",
+        summary: "Summary text",
+        anonymous: true
+      }
+
+      html = ConductViolationConfirmation.render(assigns)
+      assert is_binary(html)
+      assert html =~ "Sam"
     end
   end
 

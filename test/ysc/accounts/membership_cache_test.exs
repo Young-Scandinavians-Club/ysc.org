@@ -6,7 +6,9 @@ defmodule Ysc.Accounts.MembershipCacheTest do
 
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts
+  alias Ysc.Repo
   alias Ysc.Subscriptions
+  alias Ysc.Subscriptions.Subscription
   import Ysc.AccountsFixtures
 
   setup do
@@ -18,6 +20,25 @@ defmodule Ysc.Accounts.MembershipCacheTest do
   describe "get_active_membership/1" do
     test "returns nil for nil user" do
       assert MembershipCache.get_active_membership(nil) == nil
+    end
+
+    test "sub-account inherits primary membership" do
+      primary =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Ysc.Repo.update!()
+
+      membership = MembershipCache.get_active_membership(sub)
+      assert membership.type == :lifetime
+      assert membership.user_id == primary.id
     end
 
     test "returns lifetime membership struct for user with lifetime membership" do
@@ -60,6 +81,108 @@ defmodule Ysc.Accounts.MembershipCacheTest do
     test "returns nil for user with no membership" do
       user = user_fixture()
       assert MembershipCache.get_active_membership(user) == nil
+    end
+
+    test "loads subscriptions from DB when user struct has subscriptions not preloaded" do
+      user = user_fixture()
+
+      period_end =
+        DateTime.utc_now()
+        |> DateTime.add(30, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_noload_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start:
+            DateTime.utc_now() |> DateTime.truncate(:second),
+          current_period_end: period_end
+        })
+
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      single = Enum.find(plans, &(&1.id == :single))
+      assert single
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_noload_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_test",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1
+        })
+
+      bare_user = Repo.get!(Accounts.User, user.id)
+      assert match?(%Ecto.Association.NotLoaded{}, bare_user.subscriptions)
+
+      membership = MembershipCache.get_active_membership(bare_user)
+      assert membership.id == subscription.id
+    end
+
+    test "when multiple active subscriptions exist, picks the higher-priced plan" do
+      user = user_fixture()
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      single = Enum.find(plans, &(&1.id == :single))
+      family = Enum.find(plans, &(&1.id == :family))
+      assert single && family
+
+      period_end =
+        DateTime.utc_now()
+        |> DateTime.add(30, :day)
+        |> DateTime.truncate(:second)
+
+      start =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, cheap_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cheap_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: start,
+          current_period_end: period_end
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: cheap_sub.id,
+          stripe_id: "si_cheap_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_a",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1
+        })
+
+      {:ok, pricey_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_pricey_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: start,
+          current_period_end: period_end
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: pricey_sub.id,
+          stripe_id: "si_pricey_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_b",
+          stripe_price_id: family.stripe_price_id,
+          quantity: 1
+        })
+
+      # User must not have subscriptions preloaded on the struct so that
+      # `Customers.subscriptions/1` loads each subscription with `subscription_items`
+      # (required for price comparison in `get_most_expensive_subscription/1`).
+      user_bare = Repo.get!(Accounts.User, user.id)
+      membership = MembershipCache.get_active_membership(user_bare)
+      assert membership.id == pricey_sub.id
     end
 
     test "caches membership after first lookup" do
@@ -114,6 +237,54 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       membership2 = MembershipCache.get_active_membership(user)
       assert membership2 == nil
     end
+
+    test "invalid subscription left in cache is detected and cleared" do
+      user = user_fixture()
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      single = Enum.find(plans, &(&1.id == :single))
+      assert single
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_stale_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_stale_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_x",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1
+        })
+
+      user = Accounts.get_user!(user.id, [:subscriptions])
+      assert MembershipCache.get_active_membership(user).id == subscription.id
+
+      {:ok, _} =
+        Subscriptions.update_subscription(subscription, %{
+          current_period_end: DateTime.add(DateTime.utc_now(), -2, :day)
+        })
+
+      expired =
+        Repo.get!(Subscription, subscription.id)
+        |> Repo.preload(:subscription_items)
+
+      assert {:ok, true} =
+               Cachex.put(
+                 :ysc_cache,
+                 "membership:#{user.id}:active",
+                 expired,
+                 ttl: :timer.minutes(5)
+               )
+
+      user = Accounts.get_user!(user.id, [:subscriptions])
+      assert MembershipCache.get_active_membership(user) == nil
+    end
   end
 
   describe "get_membership_plan_type/1" do
@@ -137,6 +308,41 @@ defmodule Ysc.Accounts.MembershipCacheTest do
     test "returns nil for user with no membership" do
       user = user_fixture()
       assert MembershipCache.get_membership_plan_type(user) == nil
+    end
+
+    test "returns plan id from subscription items (e.g. :family)" do
+      user = user_fixture()
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      family = Enum.find(plans, &(&1.id == :family))
+      assert family
+
+      period_end =
+        DateTime.utc_now()
+        |> DateTime.add(30, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_plan_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start:
+            DateTime.utc_now() |> DateTime.truncate(:second),
+          current_period_end: period_end
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_plan_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_family",
+          stripe_price_id: family.stripe_price_id,
+          quantity: 1
+        })
+
+      user = Accounts.get_user!(user.id, [:subscriptions])
+      assert MembershipCache.get_membership_plan_type(user) == :family
     end
 
     test "caches plan type after first lookup" do

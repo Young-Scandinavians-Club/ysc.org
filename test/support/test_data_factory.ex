@@ -108,9 +108,10 @@ defmodule Ysc.TestDataFactory do
       ) do
     # Create primary user with membership
     primary =
-      primary_attrs
-      |> Map.put(:role, "member")
-      |> user_with_membership(:lifetime)
+      user_with_membership(
+        :lifetime,
+        Map.put(primary_attrs, :role, "member")
+      )
 
     # Create sub-accounts linked to primary
     sub_accounts =
@@ -121,7 +122,7 @@ defmodule Ysc.TestDataFactory do
             first_name: "Sub#{i}",
             last_name: primary.last_name,
             primary_user_id: primary.id,
-            role: "sub_account"
+            role: "member"
           })
 
         user_fixture(attrs)
@@ -340,7 +341,7 @@ defmodule Ysc.TestDataFactory do
     ticket_selections = Map.new(tiers, fn tier -> {tier.id, 1} end)
 
     # Create order using the fixtures (which handles membership)
-    order_status = Keyword.get(opts, :status, :confirmed)
+    order_status = Keyword.get(opts, :status, :completed)
 
     order =
       ticket_order_fixture(%{

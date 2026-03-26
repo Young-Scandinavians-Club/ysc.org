@@ -258,9 +258,17 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
 
     # Send specific alerts for critical issues
     if !report.checks.ledger_balance.balanced do
+      # Reconciliation stores raw ledger detail tuples; Discord expects a map with
+      # :total_accounts_affected or nil for a generic alert body.
+      imbalance_details =
+        case report.checks.ledger_balance.details do
+          %{total_accounts_affected: _} = d -> d
+          _ -> nil
+        end
+
       Discord.send_ledger_imbalance_alert(
         report.checks.ledger_balance.difference,
-        report.checks.ledger_balance.details
+        imbalance_details
       )
     end
 

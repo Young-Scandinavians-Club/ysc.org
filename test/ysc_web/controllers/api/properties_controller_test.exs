@@ -7,6 +7,8 @@ defmodule YscWeb.Api.PropertiesControllerTest do
   """
   use YscWeb.ConnCase, async: false
 
+  import Ysc.AccountsFixtures
+
   alias Ysc.Bookings
   alias Ysc.Bookings.DoorCode
   alias Ysc.Repo
@@ -373,6 +375,31 @@ defmodule YscWeb.Api.PropertiesControllerTest do
       response = get(bad_conn, ~p"/api/v1/mobile/properties/tahoe/info")
 
       assert json_response(response, 401)
+    end
+
+    test "includes cabin master details in emergency tab when board member exists",
+         %{
+           conn: conn
+         } do
+      user_fixture(%{first_name: "Casey", last_name: "Master"})
+      |> Ecto.Changeset.change(
+        board_position: :clear_lake_cabin_master,
+        phone_number: "+14155551234"
+      )
+      |> Repo.update!()
+
+      response = get(conn, ~p"/api/v1/mobile/properties/clear_lake/info")
+
+      assert %{"data" => data} = json_response(response, 200)
+      assert %{"tabs" => tabs} = data
+      emergency = Enum.find(tabs, &(&1["id"] == "emergency"))
+      assert emergency
+
+      sections_text =
+        emergency["sections"] |> Enum.map_join(" ", & &1["content"])
+
+      assert sections_text =~ "Casey"
+      assert sections_text =~ "Master"
     end
   end
 end

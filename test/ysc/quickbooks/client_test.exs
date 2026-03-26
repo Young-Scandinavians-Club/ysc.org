@@ -39,7 +39,9 @@ defmodule Ysc.Quickbooks.ClientTest do
   the actual HTTP layer. However, this would duplicate the existing comprehensive
   integration test suite.
   """
-  use Ysc.DataCase, async: true
+  use ExUnit.Case, async: true
+
+  require Logger
 
   alias Ysc.Quickbooks.Client
 

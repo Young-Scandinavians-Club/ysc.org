@@ -209,4 +209,117 @@ defmodule Ysc.PropertyOutages.QueriesTest do
       assert Enum.all?(results, &(&1.property == :tahoe))
     end
   end
+
+  describe "since_date/1" do
+    test "returns outages on or after the given date", %{outage3: older} do
+      today = Date.utc_today()
+      results = Queries.since_date(today)
+      assert Enum.all?(results, &(Date.compare(&1.incident_date, today) != :lt))
+      refute Enum.any?(results, &(&1.id == older.id))
+    end
+  end
+
+  describe "between_dates/2" do
+    test "returns outages in inclusive date range" do
+      d0 = Date.add(Date.utc_today(), -5)
+      d1 = Date.add(Date.utc_today(), 5)
+
+      results = Queries.between_dates(d0, d1)
+
+      assert Enum.all?(results, fn o ->
+               Date.compare(o.incident_date, d0) != :lt and
+                 Date.compare(o.incident_date, d1) != :gt
+             end)
+    end
+  end
+
+  describe "created_since/1" do
+    test "returns outages inserted at or after datetime", %{outage1: o1} do
+      since = DateTime.add(o1.inserted_at, -1, :second)
+      results = Queries.created_since(since)
+      assert Enum.any?(results, &(&1.id == o1.id))
+    end
+  end
+
+  describe "latest_for_property/1" do
+    test "returns most recently inserted outage for property", %{
+      outage1: o1,
+      outage3: o3
+    } do
+      latest = Queries.latest_for_property(:tahoe)
+      assert latest.property == :tahoe
+
+      assert latest.inserted_at ==
+               Enum.max_by([o1, o3], & &1.inserted_at).inserted_at
+    end
+  end
+
+  describe "latest_for_property_and_type/2" do
+    test "returns latest matching property and incident type", %{outage1: o1} do
+      latest = Queries.latest_for_property_and_type(:tahoe, :power_outage)
+      assert latest.property == :tahoe
+      assert latest.incident_type == :power_outage
+
+      assert latest.id == o1.id or
+               DateTime.compare(latest.inserted_at, o1.inserted_at) != :lt
+    end
+  end
+
+  describe "has_active_outage?/2" do
+    test "returns true when an outage exists within the window", %{outage1: o1} do
+      days =
+        max(
+          1,
+          Date.diff(Date.utc_today(), DateTime.to_date(o1.inserted_at)) + 1
+        )
+
+      assert Queries.has_active_outage?(:tahoe, days)
+    end
+  end
+
+  describe "has_active_outage_by_type?/3" do
+    test "returns true when matching type exists in window", %{outage1: o1} do
+      days =
+        max(
+          1,
+          Date.diff(Date.utc_today(), DateTime.to_date(o1.inserted_at)) + 1
+        )
+
+      assert Queries.has_active_outage_by_type?(:tahoe, :power_outage, days)
+    end
+  end
+
+  describe "active_outages_for_property/2" do
+    test "lists recent outages for property", %{outage1: o1} do
+      days =
+        max(
+          1,
+          Date.diff(Date.utc_today(), DateTime.to_date(o1.inserted_at)) + 1
+        )
+
+      list = Queries.active_outages_for_property(:tahoe, days)
+      assert Enum.any?(list, &(&1.id == o1.id))
+      assert Enum.all?(list, &(&1.property == :tahoe))
+    end
+  end
+
+  describe "active_outages_for_property_and_type/3" do
+    test "lists recent outages for property and type", %{outage1: o1} do
+      days =
+        max(
+          1,
+          Date.diff(Date.utc_today(), DateTime.to_date(o1.inserted_at)) + 1
+        )
+
+      list =
+        Queries.active_outages_for_property_and_type(
+          :tahoe,
+          :power_outage,
+          days
+        )
+
+      assert Enum.any?(list, &(&1.id == o1.id))
+      assert Enum.all?(list, &(&1.incident_type == :power_outage))
+    end
+  end
 end

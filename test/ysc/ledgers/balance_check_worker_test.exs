@@ -49,25 +49,20 @@ defmodule Ysc.Ledgers.BalanceCheckWorkerTest do
         attempt: 1
       }
 
-      # The perform will detect imbalance. It might error during alerting (Discord config),
-      # but it should still return {:error, :imbalanced} or crash during alerting.
-      # We'll catch any errors from Discord alerting.
-      result =
-        try do
-          BalanceCheckWorker.perform(job)
-        rescue
-          _ -> {:error, :imbalanced}
-        catch
-          _, _ -> {:error, :imbalanced}
-        end
-
-      assert {:error, :imbalanced} = result
+      assert {:error, :imbalanced} = BalanceCheckWorker.perform(job)
     end
   end
 
   describe "check_balance_now/0" do
     test "triggers perform" do
       assert {:ok, :balanced} = BalanceCheckWorker.check_balance_now()
+    end
+  end
+
+  describe "timeout/1" do
+    test "returns 30 second timeout for Oban" do
+      job = %Oban.Job{}
+      assert BalanceCheckWorker.timeout(job) == 30_000
     end
   end
 end
