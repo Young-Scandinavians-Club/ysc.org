@@ -255,7 +255,7 @@ defmodule YscWeb.HomeLive do
             <span class="block font-serif italic text-xl sm:text-2xl md:text-2xl lg:text-4xl mb-3 sm:mb-4 text-white/80 font-light tracking-tight">
               Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years of
             </span>
-            <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-9xl font-black text-white drop-shadow-2xl break-words hyphens-auto max-w-full leading-tight">
+            <h1 class="text-6xl md:text-8xl lg:text-9xl font-black text-white drop-shadow-2xl break-words hyphens-auto max-w-full leading-tight">
               Young Scandinavians Club
             </h1>
           </div>
@@ -281,34 +281,6 @@ defmodule YscWeb.HomeLive do
             >
               Explore Our Events
             </.link>
-          </div>
-
-          <%!-- Stats as a single grouped unit on mobile for visual balance --%>
-          <div class="mt-10 sm:mt-12 md:mt-16 w-full max-w-none mx-auto px-0 py-0">
-            <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:gap-8 text-white/70">
-              <div class="text-center min-w-0 flex-none basis-auto">
-                <div class="text-2xl sm:text-3xl font-bold text-white">500+</div>
-                <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
-                  Members
-                </div>
-              </div>
-              <div class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 block"></div>
-              <div class="text-center min-w-0 flex-none basis-auto">
-                <div class="text-2xl sm:text-3xl font-bold text-white">2</div>
-                <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
-                  Properties
-                </div>
-              </div>
-              <div class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 block"></div>
-              <div class="text-center min-w-0 flex-none basis-auto">
-                <div class="text-2xl sm:text-3xl font-bold text-white">
-                  {div(Date.utc_today().year - 1950, 5) * 5}+
-                </div>
-                <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
-                  Years
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </.hero>
