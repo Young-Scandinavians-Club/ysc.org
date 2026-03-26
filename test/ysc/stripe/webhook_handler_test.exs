@@ -409,11 +409,6 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert length(all_refunds) == 1
     end
 
-    # NOTE: This test is temporarily disabled due to the new transactional behavior
-    # In the new implementation, if the second webhook processing fails for any reason,
-    # the entire transaction rolls back. This test needs to be rewritten to account for
-    # the transactional guarantees. The idempotency logic is tested in other tests.
-    @tag :skip
     @tag :sync
     test "handles both charge.refunded and refund.created without duplicates",
          %{payment: payment} do
@@ -1369,11 +1364,6 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert {:ok, :balanced} = Ledgers.verify_ledger_balance()
     end
 
-    # NOTE: This test is temporarily disabled due to the new transactional behavior
-    # The test creates multiple payments in a loop, and if any fail, the entire
-    # transaction rolls back. This test needs to be rewritten to handle the new
-    # transactional guarantees properly.
-    @tag :skip
     @tag :sync
     test "maintains ledger balance with complex scenario" do
       user = user_with_stripe_id()
