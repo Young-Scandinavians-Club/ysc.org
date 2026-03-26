@@ -1831,7 +1831,12 @@ defmodule YscWeb.AdminMoneyLive do
         </div>
       </div>
       <!-- Refund Modal -->
-      <.modal :if={@live_action == :refund_payment} id="refund-modal" show>
+      <.modal
+        :if={@live_action == :refund_payment}
+        id="refund-modal"
+        show
+        on_cancel={JS.push("close_refund_modal")}
+      >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Process Refund</h3>
 
         <div class="mb-4">
@@ -2172,6 +2177,7 @@ defmodule YscWeb.AdminMoneyLive do
         id="payout-modal"
         max_width="max-w-7xl"
         show
+        on_cancel={JS.push("close_payout_modal")}
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Payout Details</h3>
 
@@ -2557,48 +2563,84 @@ defmodule YscWeb.AdminMoneyLive do
           </p>
         </div>
         <!-- Summary -->
+        <%!-- Compute totals once so we can show reconciliation math --%>
+        <% payout_total_payments =
+          (@selected_payout.payments || [])
+          |> Enum.reduce(Money.new(0, :USD), fn p, acc ->
+            case Money.add(acc, p.amount) do
+              {:ok, total} -> total
+              {:error, _} -> acc
+            end
+          end)
+
+        payout_total_refunds =
+          (@selected_payout.refunds || [])
+          |> Enum.reduce(Money.new(0, :USD), fn r, acc ->
+            case Money.add(acc, r.amount) do
+              {:ok, total} -> total
+              {:error, _} -> acc
+            end
+          end)
+
+        payout_fees = @selected_payout.fee_total || Money.new(0, :USD)
+
+        payout_computed_net =
+          with {:ok, after_refunds} <-
+                 Money.sub(payout_total_payments, payout_total_refunds),
+               {:ok, net} <- Money.sub(after_refunds, payout_fees) do
+            net
+          else
+            _ -> Money.new(0, :USD)
+          end
+
+        payout_reconciles? =
+          payout_computed_net == @selected_payout.amount %>
         <div class="mb-4 p-4 bg-zinc-50 rounded border">
           <h4 class="text-sm font-semibold text-zinc-800 mb-2">Summary</h4>
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p class="text-zinc-600">Total Payments:</p>
+              <p class="text-zinc-600">Total Payments (gross):</p>
               <p class="font-semibold text-zinc-900">
-                {Money.to_string!(
-                  (@selected_payout.payments || [])
-                  |> Enum.reduce(Money.new(0, :USD), fn payment, acc ->
-                    case Money.add(acc, payment.amount) do
-                      {:ok, total} -> total
-                      {:error, _} -> acc
-                    end
-                  end)
-                )}
+                {Money.to_string!(payout_total_payments)}
               </p>
             </div>
             <div>
               <p class="text-zinc-600">Total Refunds:</p>
               <p class="font-semibold text-red-600">
-                {Money.to_string!(
-                  (@selected_payout.refunds || [])
-                  |> Enum.reduce(Money.new(0, :USD), fn refund, acc ->
-                    case Money.add(acc, refund.amount) do
-                      {:ok, total} -> total
-                      {:error, _} -> acc
-                    end
-                  end)
-                )}
-              </p>
-            </div>
-            <div>
-              <p class="text-zinc-600">Net Amount:</p>
-              <p class="font-semibold text-zinc-900">
-                {Money.to_string!(@selected_payout.amount)}
+                {Money.to_string!(payout_total_refunds)}
               </p>
             </div>
             <div>
               <p class="text-zinc-600">Stripe Fees:</p>
               <p class="font-semibold text-red-600">
-                {Money.to_string!(@selected_payout.fee_total || Money.new(0, :USD))}
+                {Money.to_string!(payout_fees)}
               </p>
+            </div>
+            <div>
+              <p class="text-zinc-600">Bank Transfer (Stripe net):</p>
+              <p class="font-semibold text-zinc-900">
+                {Money.to_string!(@selected_payout.amount)}
+              </p>
+            </div>
+          </div>
+          <%!-- Reconciliation row: computed net must equal the Stripe payout amount --%>
+          <div class="mt-3 pt-3 border-t border-zinc-200">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-zinc-500">
+                Gross − Refunds − Fees =
+                <span class="font-mono">
+                  {Money.to_string!(payout_computed_net)}
+                </span>
+              </span>
+              <%= if payout_reconciles? do %>
+                <span class="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                  Reconciled ✓
+                </span>
+              <% else %>
+                <span class="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded">
+                  Mismatch — some charges may not be linked yet
+                </span>
+              <% end %>
             </div>
           </div>
         </div>
@@ -2629,6 +2671,7 @@ defmodule YscWeb.AdminMoneyLive do
         :if={@live_action == :view_payment && @selected_payment}
         id="payment-modal"
         show
+        on_cancel={JS.push("close_payment_modal")}
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Payment Details</h3>
 

@@ -1850,6 +1850,39 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   @doc """
+  Extracts a string ID from a Stripe field that may be either:
+    - a plain string ID (`"pi_..."`, `"in_..."`, etc.)
+    - an expanded Stripe struct (`%Stripe.PaymentIntent{id: "pi_..."}`)
+    - an expanded map (`%{"id" => "pi_..."}` or `%{id: "pi_..."}`)
+
+  Returns `nil` for any other value (including `nil` itself, integers, atoms).
+  This is used when reading fields such as `charge.payment_intent` or `refund.charge`
+  that Stripe may return as either a plain ID string or a fully-expanded object.
+  """
+  def extract_id_from_expandable(nil), do: nil
+  def extract_id_from_expandable(id) when is_binary(id), do: id
+
+  def extract_id_from_expandable(expandable) when is_struct(expandable) do
+    try do
+      case Map.get(expandable, :id) || Map.get(expandable, "id") do
+        id when is_binary(id) -> id
+        _ -> nil
+      end
+    rescue
+      _ -> nil
+    end
+  end
+
+  def extract_id_from_expandable(expandable) when is_map(expandable) do
+    case expandable[:id] || expandable["id"] do
+      id when is_binary(id) -> id
+      _ -> nil
+    end
+  end
+
+  def extract_id_from_expandable(_), do: nil
+
+  @doc """
   Public function to manually re-link payments and refunds to a payout.
   This can be called from IEx to fix payout linking issues.
 
@@ -3373,46 +3406,37 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
 
       if charge do
+        # Use extract_id_from_expandable/1 to handle both plain string IDs and
+        # expanded Stripe objects (e.g. %Stripe.PaymentIntent{id: "pi_..."}).
         payment_intent_id =
-          cond do
-            is_struct(charge) ->
-              # For structs, use Map.get to safely access fields
+          if is_struct(charge) do
+            extract_id_from_expandable(
               Map.get(charge, :payment_intent) ||
                 Map.get(charge, "payment_intent")
-
-            is_map(charge) ->
+            )
+          else
+            extract_id_from_expandable(
               charge[:payment_intent] || charge["payment_intent"]
-
-            true ->
-              nil
+            )
           end
 
         invoice_id =
-          cond do
-            is_struct(charge) ->
-              # For structs, use Map.get to safely access fields
+          if is_struct(charge) do
+            extract_id_from_expandable(
               Map.get(charge, :invoice) || Map.get(charge, "invoice")
-
-            is_map(charge) ->
-              charge[:invoice] || charge["invoice"]
-
-            true ->
-              nil
+            )
+          else
+            extract_id_from_expandable(charge[:invoice] || charge["invoice"])
           end
 
-        # Try to find payment by payment_intent_id first (for booking payments)
-        # If not found, try invoice_id (for subscription payments)
+        # Try payment_intent_id first (booking payments), then invoice_id
+        # (subscription payments). Use sequential fallback rather than exclusive
+        # cond so that a truthy-but-unmatched payment_intent still falls through
+        # to the invoice lookup.
         payment =
-          cond do
-            payment_intent_id ->
-              Ledgers.get_payment_by_external_id(payment_intent_id)
-
-            invoice_id ->
-              Ledgers.get_payment_by_external_id(invoice_id)
-
-            true ->
-              nil
-          end
+          (payment_intent_id &&
+             Ledgers.get_payment_by_external_id(payment_intent_id)) ||
+            (invoice_id && Ledgers.get_payment_by_external_id(invoice_id))
 
         if payment do
           {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
@@ -3503,18 +3527,15 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
 
       if refund do
-        charge_id =
-          cond do
-            is_struct(refund) ->
-              # For structs, use Map.get to safely access fields
-              Map.get(refund, :charge) || Map.get(refund, "charge")
-
-            is_map(refund) ->
-              refund[:charge] || refund["charge"]
-
-            true ->
-              nil
+        # charge may be a plain string ID or an expanded Stripe object
+        raw_charge =
+          if is_struct(refund) do
+            Map.get(refund, :charge) || Map.get(refund, "charge")
+          else
+            refund[:charge] || refund["charge"]
           end
+
+        charge_id = extract_id_from_expandable(raw_charge)
 
         if charge_id do
           # Get the charge to find the payment intent
@@ -3522,7 +3543,12 @@ defmodule Ysc.Stripe.WebhookHandler do
                  Stripe.Charge.retrieve(charge_id)
                end) do
             {:ok, charge} ->
-              payment_intent_id = charge.payment_intent
+              # payment_intent may be a plain ID or an expanded struct
+              payment_intent_id =
+                extract_id_from_expandable(
+                  Map.get(charge, :payment_intent) ||
+                    Map.get(charge, "payment_intent")
+                )
 
               if payment_intent_id do
                 # Find the payment
