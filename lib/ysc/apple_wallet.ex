@@ -25,11 +25,9 @@ defmodule Ysc.AppleWallet do
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet.CertManager
 
-  @icon_path Application.app_dir(:ysc, "priv/apple_wallet/icons/icon.png")
-  @icon_2x_path Application.app_dir(:ysc, "priv/apple_wallet/icons/icon@2x.png")
-  @icon_3x_path Application.app_dir(:ysc, "priv/apple_wallet/icons/icon@3x.png")
-  @logo_path Application.app_dir(:ysc, "priv/apple_wallet/icons/logo.png")
-  @logo_2x_path Application.app_dir(:ysc, "priv/apple_wallet/icons/logo@2x.png")
+  # Resolve under priv at runtime — Application.app_dir in module attributes is
+  # expanded at compile time and would bake in the builder's _build/... path,
+  # which does not exist inside a release image.
 
   @doc """
   Returns true if the given pass type is configured and ready to generate passes.
@@ -245,11 +243,11 @@ defmodule Ysc.AppleWallet do
     }
 
     base_files = [
-      "icon.png": @icon_path,
-      "icon@2x.png": @icon_2x_path,
-      "icon@3x.png": @icon_3x_path,
-      "logo.png": @logo_path,
-      "logo@2x.png": @logo_2x_path
+      "icon.png": apple_wallet_icon("icon.png"),
+      "icon@2x.png": apple_wallet_icon("icon@2x.png"),
+      "icon@3x.png": apple_wallet_icon("icon@3x.png"),
+      "logo.png": apple_wallet_icon("logo.png"),
+      "logo@2x.png": apple_wallet_icon("logo@2x.png")
     ]
 
     {strip_files, strip_tmp_paths} = build_strip_files(event.cover_image)
@@ -315,11 +313,11 @@ defmodule Ysc.AppleWallet do
     }
 
     icon_files = [
-      "icon.png": @icon_path,
-      "icon@2x.png": @icon_2x_path,
-      "icon@3x.png": @icon_3x_path,
-      "logo.png": @logo_path,
-      "logo@2x.png": @logo_2x_path
+      "icon.png": apple_wallet_icon("icon.png"),
+      "icon@2x.png": apple_wallet_icon("icon@2x.png"),
+      "icon@3x.png": apple_wallet_icon("icon@3x.png"),
+      "logo.png": apple_wallet_icon("logo.png"),
+      "logo@2x.png": apple_wallet_icon("logo@2x.png")
     ]
 
     Passbook.generate(
@@ -332,6 +330,10 @@ defmodule Ysc.AppleWallet do
       target_path: System.tmp_dir!() <> "/",
       pass_name: "membership-#{user.id}"
     )
+  end
+
+  defp apple_wallet_icon(filename) when is_binary(filename) do
+    Path.join([:code.priv_dir(:ysc), "apple_wallet", "icons", filename])
   end
 
   # Downloads the event cover image and returns strip file entries for the pass.
