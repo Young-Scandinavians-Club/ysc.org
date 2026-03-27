@@ -6,7 +6,7 @@
 // Also publishes --event-header-height as a CSS custom property on <html>
 // while sticky so that other sticky elements (e.g. the Trix toolbar) can
 // offset themselves by the correct amount.
-export default StickyEventHeader = {
+const StickyEventHeader = {
     mounted() {
         this.sticky = false;
 
@@ -56,3 +56,5 @@ export default StickyEventHeader = {
         }
     },
 };
+
+export default StickyEventHeader;

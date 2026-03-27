@@ -2503,12 +2503,16 @@ defmodule Ysc.BookingsTest do
 
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
+      # Use a Mon–Thu window to avoid the "Saturday must include Sunday" validation
+      days_until_next_monday = Integer.mod(8 - Date.day_of_week(today), 7)
+      next_monday = Date.add(today, days_until_next_monday)
+
       booking =
         booking_fixture(%{
           user_id: user.id,
           property: :tahoe,
-          checkin_date: Date.add(today, -1),
-          checkout_date: Date.add(today, 2)
+          checkin_date: next_monday,
+          checkout_date: Date.add(next_monday, 3)
         })
 
       results =

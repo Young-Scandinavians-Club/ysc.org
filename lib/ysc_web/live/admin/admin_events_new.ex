@@ -442,7 +442,7 @@ defmodule YscWeb.AdminEventsNewLive do
             </div>
           </.form>
 
-          <div class="max-w-3xl mt-6">
+          <div id="hosts-section" class="max-w-3xl mt-6">
             <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
               <div>
                 <h2 class="text-xl font-bold">Hosts</h2>
@@ -487,6 +487,9 @@ defmodule YscWeb.AdminEventsNewLive do
                 <%!-- Search input --%>
                 <div class="relative">
                   <div class="relative">
+                    <label for="host-search-input" class="sr-only">
+                      Search hosts by name or email
+                    </label>
                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <.icon
                         name="hero-magnifying-glass"
@@ -516,32 +519,39 @@ defmodule YscWeb.AdminEventsNewLive do
                       <li
                         :for={user <- @host_search_results}
                         id={"host-result-#{user.id}"}
-                        class="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer transition"
-                        phx-click="add-host"
-                        phx-value-user-id={user.id}
                       >
-                        <.user_avatar_image
-                          email={user.email}
-                          user_id={user.id}
-                          country={user.most_connected_country}
-                          class="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                        />
-                        <div class="min-w-0 flex-1">
-                          <p class="text-sm font-medium text-zinc-900 truncate">
-                            {user.first_name} {user.last_name}
-                          </p>
-                          <p class="text-xs text-zinc-500 truncate">{user.email}</p>
-                        </div>
-                        <.icon
-                          :if={Enum.any?(@hosts, &(&1.id == user.id))}
-                          name="hero-check-circle"
-                          class="w-4 h-4 text-green-500 flex-shrink-0"
-                        />
-                        <.icon
-                          :if={!Enum.any?(@hosts, &(&1.id == user.id))}
-                          name="hero-plus-circle"
-                          class="w-4 h-4 text-blue-400 flex-shrink-0"
-                        />
+                        <button
+                          type="button"
+                          class="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 transition w-full text-left"
+                          phx-click="add-host"
+                          phx-value-user-id={user.id}
+                          aria-label={"Add #{user.first_name} #{user.last_name} (#{user.email}) as host"}
+                        >
+                          <.user_avatar_image
+                            email={user.email}
+                            user_id={user.id}
+                            country={user.most_connected_country}
+                            class="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          />
+                          <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-zinc-900 truncate">
+                              {user.first_name} {user.last_name}
+                            </p>
+                            <p class="text-xs text-zinc-500 truncate">
+                              {user.email}
+                            </p>
+                          </div>
+                          <.icon
+                            :if={Enum.any?(@hosts, &(&1.id == user.id))}
+                            name="hero-check-circle"
+                            class="host-status-icon w-4 h-4 text-green-500 flex-shrink-0"
+                          />
+                          <.icon
+                            :if={!Enum.any?(@hosts, &(&1.id == user.id))}
+                            name="hero-plus-circle"
+                            class="host-status-icon w-4 h-4 text-blue-400 flex-shrink-0"
+                          />
+                        </button>
                       </li>
                     </ul>
                   </div>

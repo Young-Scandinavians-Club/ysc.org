@@ -625,7 +625,7 @@ defmodule YscWeb.EventDetailsLive do
             </section>
 
             <%!-- Attendees --%>
-            <%= if @active_membership? && @async_data_loaded && @attendees_list != nil && length(@attendees_list) > 0 do %>
+            <%= if @active_membership? && @async_data_loaded && @attendees_list != nil do %>
               <% unique_attendees = @attendees_list %>
               <% attendees_to_show = Enum.take(unique_attendees, 5) %>
               <% overflow_count =
@@ -634,7 +634,7 @@ defmodule YscWeb.EventDetailsLive do
                 <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
                   <span class="w-8 h-px bg-zinc-200"></span> Attendees
                 </h3>
-                <div class="flex flex-wrap gap-5">
+                <div id="attendees-list" class="flex flex-wrap gap-5">
                   <%= for attendee <- attendees_to_show do %>
                     <% is_me =
                       @current_user != nil && attendee.id == @current_user.id %>
@@ -723,7 +723,7 @@ defmodule YscWeb.EventDetailsLive do
                 <div class="w-8 h-px bg-zinc-200"></div>
                 <div class="w-28 h-6 bg-zinc-200 rounded"></div>
               </div>
-              <div class="flex gap-5">
+              <div class="flex flex-wrap gap-5">
                 <%= for _i <- 1..5 do %>
                   <div class="flex flex-col items-center gap-2 w-16">
                     <div class="w-14 h-14 rounded-full bg-zinc-200"></div>
@@ -3236,9 +3236,9 @@ defmodule YscWeb.EventDetailsLive do
               ]}>
                 <div class="relative flex-shrink-0">
                   <.user_avatar_image
-                    email={attendee.email}
-                    user_id={attendee.id}
-                    country={Map.get(attendee, :most_connected_country, "SE")}
+                    email={attendee.email || ""}
+                    user_id={to_string(attendee.id)}
+                    country={attendee.most_connected_country || "SE"}
                     class={"h-10 w-10 rounded-full#{if is_host, do: " ring-2 ring-amber-400", else: ""}"}
                   />
                 </div>
@@ -3586,10 +3586,10 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp load_attendees(false, _current_user, _event_id),
-    do: {nil, nil, %{}, MapSet.new()}
+    do: {nil, nil, nil, %{}, MapSet.new()}
 
   defp load_attendees(true, current_user, event_id) do
-    ticket_count = Events.count_tickets_sold_excluding_donations(event_id)
+    sold_ticket_count = Events.count_tickets_sold_excluding_donations(event_id)
     hosts = Events.list_event_hosts_by_event_id(event_id)
     host_ids = MapSet.new(hosts, & &1.id)
 
@@ -3620,12 +3620,15 @@ defmodule YscWeb.EventDetailsLive do
       end
 
     merged = sorted_hosts ++ sorted_non_hosts
+    displayed_attendees_count = Enum.count(merged)
 
-    if merged == [] && ticket_count == 0 do
-      {nil, nil, %{}, MapSet.new()}
+    if merged == [] && sold_ticket_count == 0 do
+      {nil, nil, nil, %{}, MapSet.new()}
     else
       ticket_counts = Events.get_ticket_counts_per_user(event_id)
-      {ticket_count, merged, ticket_counts, host_ids}
+
+      {sold_ticket_count, displayed_attendees_count, merged, ticket_counts,
+       host_ids}
     end
   end
 
@@ -3642,8 +3645,9 @@ defmodule YscWeb.EventDetailsLive do
     {user_tickets, all_tickets_by_order} =
       Map.get(results, :user_tickets, {[], %{}})
 
-    {attendees_count, attendees_list, ticket_counts_per_user, host_ids} =
-      Map.get(results, :attendees, {nil, nil, %{}, MapSet.new()})
+    {_sold_ticket_count, attendees_count, attendees_list,
+     ticket_counts_per_user, host_ids} =
+      Map.get(results, :attendees, {nil, nil, nil, %{}, MapSet.new()})
 
     user_reservations = Map.get(results, :user_reservations, [])
 
@@ -4316,7 +4320,8 @@ defmodule YscWeb.EventDetailsLive do
         socket
       ) do
     if event_id == socket.assigns.event.id do
-      {_count, attendees_list, ticket_counts_per_user, host_ids} =
+      {_sold_ticket_count, displayed_attendees_count, attendees_list,
+       ticket_counts_per_user, host_ids} =
         load_attendees(
           socket.assigns.active_membership?,
           socket.assigns.current_user,
@@ -4325,6 +4330,7 @@ defmodule YscWeb.EventDetailsLive do
 
       {:noreply,
        socket
+       |> assign(:attendees_count, displayed_attendees_count)
        |> assign(:attendees_list, attendees_list)
        |> assign(:ticket_counts_per_user, ticket_counts_per_user)
        |> assign(:host_ids, host_ids)}
@@ -4826,7 +4832,8 @@ defmodule YscWeb.EventDetailsLive do
         add_pricing_info_from_tiers(event, ticket_tiers_with_counts)
 
       # Refresh attendees list if user has active membership
-      {attendees_count, attendees_list, ticket_counts_per_user, host_ids} =
+      {_sold_ticket_count, attendees_count, attendees_list,
+       ticket_counts_per_user, host_ids} =
         load_attendees(
           socket.assigns.active_membership?,
           socket.assigns.current_user,

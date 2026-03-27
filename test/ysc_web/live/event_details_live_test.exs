@@ -1475,7 +1475,8 @@ defmodule YscWeb.EventDetailsLiveTest do
     test "shows current user first labeled as You", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      # Use `user` as the organizer so they are a host and sorted first
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
@@ -1486,7 +1487,10 @@ defmodule YscWeb.EventDetailsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
       render_async(view)
 
-      assert has_element?(view, "#attendees-section [data-attendee-you]")
+      assert has_element?(
+               view,
+               "#attendees-list > div:first-child[data-attendee-you]"
+             )
     end
 
     test "shows overflow tile when more than 5 unique attendees", %{conn: conn} do
@@ -1548,8 +1552,8 @@ defmodule YscWeb.EventDetailsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
       render_async(view)
 
-      html = render_click(view, "show-attendees-modal")
-      assert html =~ "attendees-modal"
+      element(view, "#attendees-overflow-btn") |> render_click()
+      assert has_element?(view, "#attendees-modal")
     end
   end
 end

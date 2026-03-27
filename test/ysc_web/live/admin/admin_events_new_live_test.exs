@@ -29,17 +29,17 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      assert html =~ "Hosts"
-      assert html =~ "Search and add members"
+      assert has_element?(view, "#hosts-section")
+      assert has_element?(view, "#host-search-input")
     end
 
     test "shows host search input", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      assert html =~ "host-search-input"
+      assert has_element?(view, "#host-search-input")
     end
 
     test "renders organizer as a host pill on mount", %{
@@ -57,10 +57,14 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       admin: admin
     } do
       event = event_fixture(%{organizer_id: admin.id})
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      assert html =~ "phx-click=\"remove-host\""
-      assert html =~ "phx-value-user-id=\"#{admin.id}\""
+      assert has_element?(view, "#host-#{admin.id}")
+
+      assert has_element?(
+               view,
+               "#host-#{admin.id} button[phx-click='remove-host']"
+             )
     end
 
     test "does not show hosts section on tickets tab", %{
@@ -84,7 +88,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      render_keyup(view, "search-hosts", %{"value" => ""})
+      element(view, "#host-search-input") |> render_keyup(%{"value" => ""})
 
       refute has_element?(view, "#host-search-results")
     end
@@ -97,10 +101,11 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      render_keyup(view, "search-hosts", %{"value" => "Solvieg"})
+      element(view, "#host-search-input")
+      |> render_keyup(%{"value" => "Solvieg"})
 
       assert has_element?(view, "#host-result-#{other_user.id}")
-      assert render(view) =~ "Solvieg"
+      assert has_element?(view, "#host-result-#{other_user.id}", "Solvieg")
     end
 
     test "query matching no user shows no-results message", %{
@@ -110,10 +115,11 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      render_keyup(view, "search-hosts", %{"value" => "zzznomatch99xyz"})
+      element(view, "#host-search-input")
+      |> render_keyup(%{"value" => "zzznomatch99xyz"})
 
       refute has_element?(view, "#host-search-results")
-      assert render(view) =~ "No members found"
+      assert has_element?(view, "#event-hosts-manager", "No members found")
     end
 
     test "matching user who is already a host shows check-circle icon", %{
@@ -123,10 +129,10 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      render_keyup(view, "search-hosts", %{"value" => admin.first_name})
+      element(view, "#host-search-input")
+      |> render_keyup(%{"value" => admin.first_name})
 
-      html = render(view)
-      assert html =~ "hero-check-circle"
+      assert has_element?(view, "#host-result-#{admin.id} .host-status-icon")
     end
   end
 
@@ -181,8 +187,10 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      render_keyup(view, "search-hosts", %{"value" => "Gunnar"})
-      render_click(view, "add-host", %{"user-id" => other_user.id})
+      element(view, "#host-search-input")
+      |> render_keyup(%{"value" => "Gunnar"})
+
+      element(view, "#host-result-#{other_user.id} button") |> render_click()
 
       refute has_element?(view, "#host-search-results")
     end
@@ -211,7 +219,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert has_element?(view, "#host-#{other_user.id}")
 
-      render_click(view, "remove-host", %{"user-id" => other_user.id})
+      element(view, "#host-#{other_user.id} button[phx-click='remove-host']")
+      |> render_click()
 
       refute has_element?(view, "#host-#{other_user.id}")
     end
