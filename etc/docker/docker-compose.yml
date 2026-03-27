@@ -14,18 +14,6 @@ services:
       timeout: 5s
       retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin4_container
-    restart: always
-    ports:
-      - "8888:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@ysc.org
-      PGADMIN_DEFAULT_PASSWORD: password
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-
   localstack:
     image: localstack/localstack:3.8.1
     ports:
@@ -38,6 +26,3 @@ services:
       # Init: create S3 buckets when LocalStack is ready (no awslocal needed on host)
       - ./localstack-init/ready.d/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
       - ../config/s3_bucket_cors_rules.json:/config/s3_bucket_cors_rules.json:ro
-
-volumes:
-  pgadmin-data:

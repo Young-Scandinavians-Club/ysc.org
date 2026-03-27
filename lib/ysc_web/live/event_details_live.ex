@@ -66,15 +66,37 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% end %>
 
-                <div :if={@event.tickets_tbd && @event.state != :cancelled}>
-                  <.badge>Save the Date</.badge>
-                </div>
-
-                <div :if={
-                  @event.state != :cancelled && @async_data_loaded &&
-                    @event_at_capacity
-                }>
-                  <.badge type="red">SOLD OUT</.badge>
+                <div
+                  :if={
+                    (@event.tickets_tbd && @event.state != :cancelled) ||
+                      (@event.state != :cancelled && @async_data_loaded &&
+                         @event_at_capacity)
+                  }
+                  class="flex flex-wrap items-center gap-2 mb-4"
+                >
+                  <span
+                    :if={@event.tickets_tbd && @event.state != :cancelled}
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
+                  >
+                    <.icon
+                      name="hero-ticket"
+                      class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                    />
+                    <span class="relative z-10">Save the Date</span>
+                  </span>
+                  <span
+                    :if={
+                      @event.state != :cancelled && @async_data_loaded &&
+                        @event_at_capacity
+                    }
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
+                  >
+                    <.icon
+                      name="hero-ticket"
+                      class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                    />
+                    <span class="relative z-10">Sold Out</span>
+                  </span>
                 </div>
 
                 <div
