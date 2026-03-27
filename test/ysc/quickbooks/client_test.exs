@@ -43,6 +43,13 @@ defmodule Ysc.Quickbooks.ClientTest do
 
   alias Ysc.Quickbooks.Client
 
+  setup do
+    # function_exported?/3 returns false if the module is not loaded yet; async
+    # tests can run before anything else references Client.
+    Code.ensure_loaded!(Client)
+    :ok
+  end
+
   describe "module and behavior" do
     test "is loaded and compiled" do
       assert Code.ensure_loaded?(Client)
