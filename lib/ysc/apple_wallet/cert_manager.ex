@@ -127,11 +127,17 @@ defmodule Ysc.AppleWallet.CertManager do
   end
 
   defp write_temp_file(name, content) do
-    path = Path.join(System.tmp_dir!(), name)
+    unique = :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+    path = Path.join(System.tmp_dir!(), "#{name}_#{unique}")
 
-    case File.write(path, content) do
-      :ok -> {:ok, path}
-      {:error, reason} -> {:error, reason}
+    # sobelow_skip ["Traversal.FileModule"] - path is constructed from System.tmp_dir!() + a fixed internal prefix + random hex, not user input
+    with :ok <- File.write(path, content),
+         :ok <- File.chmod(path, 0o600) do
+      {:ok, path}
+    else
+      {:error, reason} ->
+        File.rm(path)
+        {:error, reason}
     end
   end
 end

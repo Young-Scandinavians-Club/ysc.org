@@ -1,5 +1,9 @@
 defmodule Ysc.AppleWallet.CertManagerTest do
-  use ExUnit.Case, async: true
+  # async: false — tests inside "init/1 with valid base64 certs" mutate the global
+  # :ysc :apple_wallet application env via Application.put_env, which would race
+  # with other async test modules reading the same key concurrently.
+  # Restoration is already handled by try/after within each test.
+  use ExUnit.Case, async: false
 
   alias Ysc.AppleWallet.CertManager
 

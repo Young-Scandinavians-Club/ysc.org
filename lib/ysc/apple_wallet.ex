@@ -6,6 +6,12 @@ defmodule Ysc.AppleWallet do
   with the Apple-issued certificates managed by `Ysc.AppleWallet.CertManager`.
   """
 
+  # Passbook.generate/7 has a catch-all clause typed as {:error, :invalid_data} which
+  # Dialyzer uses as the return type because it cannot resolve :zip.create through the
+  # Erlang boundary. Suppress the resulting false-positive pattern_match warnings.
+  @dialyzer {:nowarn_function,
+             generate_ticket_pass: 2, generate_membership_pass: 1}
+
   import Ecto.Query, warn: false
 
   require Ysc.Logging
@@ -37,7 +43,9 @@ defmodule Ysc.AppleWallet do
          {:ticket, %Ticket{} = ticket} <-
            {:ticket, load_ticket(ticket_id, user_id)},
          {:ok, pkpass_path} <- build_ticket_pass(ticket, certs),
+         # sobelow_skip ["Traversal.FileModule"] - path returned by Passbook.generate, always within System.tmp_dir!()
          {:ok, binary} <- File.read(pkpass_path) do
+      # sobelow_skip ["Traversal.FileModule"] - same internally-generated path
       File.rm(pkpass_path)
       {:ok, binary}
     else
@@ -66,7 +74,9 @@ defmodule Ysc.AppleWallet do
   def generate_membership_pass(user) do
     with {:certs, {:ok, certs}} <- {:certs, CertManager.get_membership_certs()},
          {:ok, pkpass_path} <- build_membership_pass(user, certs),
+         # sobelow_skip ["Traversal.FileModule"] - path returned by Passbook.generate, always within System.tmp_dir!()
          {:ok, binary} <- File.read(pkpass_path) do
+      # sobelow_skip ["Traversal.FileModule"] - same internally-generated path
       File.rm(pkpass_path)
       {:ok, binary}
     else
@@ -219,6 +229,7 @@ defmodule Ysc.AppleWallet do
         pass_name: "ticket-#{ticket.reference_id}"
       )
 
+    # sobelow_skip ["Traversal.FileModule"] - paths are generated internally via System.tmp_dir!() in download_image_to_tmp/1
     Enum.each(strip_tmp_paths, &File.rm/1)
     result
   end
@@ -313,10 +324,23 @@ defmodule Ysc.AppleWallet do
     end
   end
 
+  @strip_download_timeout_ms 2_000
+
   defp download_image_to_tmp(nil), do: :error
 
   defp download_image_to_tmp(url) do
-    case Req.get(url) do
+    task =
+      Task.async(fn ->
+        Req.get(url, receive_timeout: @strip_download_timeout_ms)
+      end)
+
+    req_result =
+      case Task.yield(task, @strip_download_timeout_ms) || Task.shutdown(task) do
+        {:ok, result} -> result
+        _ -> :timeout
+      end
+
+    case req_result do
       {:ok, %{status: 200, body: body}}
       when is_binary(body) and byte_size(body) > 0 ->
         tmp_path =
@@ -325,6 +349,7 @@ defmodule Ysc.AppleWallet do
             "aw_strip_#{:crypto.strong_rand_bytes(8) |> Base.encode16()}.png"
           )
 
+        # sobelow_skip ["Traversal.FileModule"] - tmp_path is constructed from System.tmp_dir!() + random hex, not user input
         case File.write(tmp_path, body) do
           :ok -> {:ok, tmp_path}
           _ -> :error

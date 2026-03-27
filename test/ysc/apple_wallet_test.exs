@@ -1,5 +1,8 @@
 defmodule Ysc.AppleWalletTest do
-  use Ysc.DataCase, async: true
+  # async: false — with_fake_certs/1 mutates global state (the named CertManager
+  # GenServer and the :ysc :apple_wallet app env), so this module must run
+  # serially to avoid races with other async test modules.
+  use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures

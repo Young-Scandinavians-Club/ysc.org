@@ -1,4 +1,9 @@
 defmodule YscWeb.AppleWalletController do
+  # Dialyzer infers Passbook.generate/7 always returns {:error, :invalid_data} (false positive
+  # caused by the library's catch-all clause and an unresolvable :zip.create Erlang call),
+  # which propagates here making {:ok, _binary} look unreachable.
+  @dialyzer {:nowarn_function, ticket: 2, membership: 2}
+
   use YscWeb, :controller
 
   require Ysc.Logging
@@ -22,6 +27,7 @@ defmodule YscWeb.AppleWalletController do
           "content-disposition",
           "attachment; filename=\"ticket.pkpass\""
         )
+        # sobelow_skip ["XSS.SendResp"] - binary is a .pkpass file served as an attachment with a non-HTML content type
         |> send_resp(200, binary)
 
       {:error, :not_configured} ->
@@ -67,6 +73,7 @@ defmodule YscWeb.AppleWalletController do
             "content-disposition",
             "attachment; filename=\"membership.pkpass\""
           )
+          # sobelow_skip ["XSS.SendResp"] - binary is a .pkpass file served as an attachment with a non-HTML content type
           |> send_resp(200, binary)
 
         {:error, :not_configured} ->
