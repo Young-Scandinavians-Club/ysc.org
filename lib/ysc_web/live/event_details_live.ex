@@ -3,6 +3,8 @@ defmodule YscWeb.EventDetailsLive do
 
   import YscWeb.Live.AsyncHelpers
 
+  @attendees_preview_count 10
+
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Events
@@ -144,144 +146,143 @@ defmodule YscWeb.EventDetailsLive do
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-16">
           <%!-- Left Column: Event Details (8/12 width on desktop) --%>
           <div class="lg:col-span-8 space-y-16">
-            <%!-- User's Existing Tickets - Member Pass Style --%>
+            <%!-- User's Existing Tickets - Combined View --%>
             <div
               :if={@current_user != nil && length(@user_tickets) > 0}
-              class="mb-12 space-y-6"
+              class="mb-12"
             >
-              <%= for {order_id, order_tickets} <- group_tickets_by_order(@user_tickets) do %>
-                <% first_ticket = List.first(order_tickets) %>
-                <% ticket_order = first_ticket.ticket_order %>
-                <% order_label =
-                  if ticket_order && ticket_order.reference_id do
-                    ticket_order.reference_id
-                  else
-                    "Order ##{String.slice(order_id, 0, 8)}"
-                  end %>
-                <% purchase_date =
-                  if ticket_order && ticket_order.completed_at do
-                    Timex.format!(ticket_order.completed_at, "{Mshort} {D}, {YYYY}")
-                  else
-                    if first_ticket.inserted_at do
-                      Timex.format!(
-                        first_ticket.inserted_at,
-                        "{Mshort} {D}, {YYYY}"
-                      )
-                    else
-                      nil
-                    end
-                  end %>
-                <%!-- Load all tickets for this order (including cancelled/refunded) from preloaded data --%>
-                <% all_order_tickets = Map.get(@all_tickets_by_order, order_id, []) %>
-                <% confirmed_tickets =
-                  Enum.filter(all_order_tickets, &(&1.status == :confirmed)) %>
-                <% refunded_tickets =
-                  Enum.filter(all_order_tickets, &(&1.status == :cancelled)) %>
-                <% all_refunded =
-                  length(confirmed_tickets) == 0 && length(refunded_tickets) > 0 %>
-                <% partial_refund =
-                  length(confirmed_tickets) > 0 && length(refunded_tickets) > 0 %>
-                <%!-- Group all tickets by tier (original counts) and confirmed tickets by tier (new counts) --%>
-                <% all_tiers_by_name = group_tickets_by_tier(all_order_tickets) %>
-                <% confirmed_tiers_by_name =
-                  if length(confirmed_tickets) > 0,
-                    do: group_tickets_by_tier(confirmed_tickets),
-                    else: [] %>
-                <div class={[
-                  "rounded-xl p-10 shadow-sm relative overflow-hidden border",
-                  if(all_refunded,
-                    do: "bg-red-900/90 border-red-800/50",
-                    else: "bg-zinc-900 border-white/5"
-                  )
-                ]}>
-                  <div class="relative z-10">
-                    <%!-- Order Label Badge --%>
-                    <div class="flex items-center justify-between mb-6">
-                      <div class="flex items-center gap-2">
-                        <span class={[
-                          "px-3 py-1 text-xs font-black uppercase tracking-widest rounded border",
-                          if(all_refunded,
-                            do: "bg-red-500/20 text-red-400 border-red-500/30",
-                            else:
-                              "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                          )
-                        ]}>
-                          {order_label}
-                        </span>
-                        <%= if purchase_date do %>
-                          <span class={[
-                            "text-xs uppercase tracking-widest",
-                            if(all_refunded,
-                              do: "text-red-300/70",
-                              else: "text-zinc-500"
-                            )
-                          ]}>
-                            • {purchase_date}
-                          </span>
-                        <% end %>
-                        <%= if all_refunded do %>
-                          <span class="px-3 py-1 bg-red-500/20 text-red-300 text-xs font-black uppercase tracking-widest rounded border border-red-500/30">
-                            Fully Refunded
-                          </span>
-                        <% else %>
-                          <%= if partial_refund do %>
-                            <span class="px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-black uppercase tracking-widest rounded border border-amber-500/30">
-                              Partially Refunded
-                            </span>
-                          <% end %>
-                        <% end %>
-                      </div>
-                    </div>
+              <% orders_data = group_tickets_by_order(@user_tickets) %>
+              <% all_confirmed_count =
+                Enum.reduce(orders_data, 0, fn {order_id, _}, acc ->
+                  confirmed =
+                    @all_tickets_by_order
+                    |> Map.get(order_id, [])
+                    |> Enum.count(&(&1.status == :confirmed))
 
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-8">
-                      <div class="flex items-center gap-5">
-                        <div class={[
-                          "w-14 h-14 rounded-xl flex items-center justify-center ring-1",
-                          if(all_refunded,
-                            do: "bg-red-500/10 ring-red-500/50",
-                            else: "bg-emerald-500/10 ring-emerald-500/50"
+                  acc + confirmed
+                end) %>
+              <div class="rounded-xl overflow-hidden border border-white/5 bg-zinc-900 shadow-sm">
+                <%!-- Card Header --%>
+                <div class="px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/40 flex items-center justify-center flex-shrink-0">
+                      <.icon
+                        name="hero-ticket-solid"
+                        class="w-5 h-5 text-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <h3 class="text-lg font-black text-white tracking-tight leading-none">
+                        Your Tickets
+                      </h3>
+                      <p class="text-xs text-zinc-500 uppercase tracking-widest font-bold mt-1">
+                        {all_confirmed_count} confirmed {if all_confirmed_count == 1,
+                          do: "ticket",
+                          else: "tickets"}
+                      </p>
+                    </div>
+                  </div>
+                  <%= if all_confirmed_count > 0 do %>
+                    <.link
+                      navigate={
+                        ~p"/events/#{@event.id}/tickets/qr" <>
+                          "?return_to=/events/#{@event.id}"
+                      }
+                      class="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all"
+                    >
+                      <.icon name="hero-qr-code" class="w-4 h-4" /> View QR Codes
+                    </.link>
+                  <% end %>
+                </div>
+
+                <%!-- Per-order rows --%>
+                <div class="divide-y divide-white/5">
+                  <%= for {order_id, order_tickets} <- orders_data do %>
+                    <% first_ticket = List.first(order_tickets) %>
+                    <% ticket_order = first_ticket.ticket_order %>
+                    <% order_label =
+                      if ticket_order && ticket_order.reference_id do
+                        ticket_order.reference_id
+                      else
+                        "Order ##{String.slice(order_id, 0, 8)}"
+                      end %>
+                    <% purchase_date =
+                      if ticket_order && ticket_order.completed_at do
+                        Timex.format!(
+                          ticket_order.completed_at,
+                          "{Mshort} {D}, {YYYY}"
+                        )
+                      else
+                        if first_ticket.inserted_at do
+                          Timex.format!(
+                            first_ticket.inserted_at,
+                            "{Mshort} {D}, {YYYY}"
                           )
-                        ]}>
-                          <.icon
-                            name={
-                              if(all_refunded,
-                                do: "hero-x-circle-solid",
-                                else: "hero-check-badge-solid"
-                              )
-                            }
-                            class={[
-                              "w-8 h-8",
-                              if(all_refunded,
-                                do: "text-red-500",
-                                else: "text-emerald-500"
-                              )
-                            ]}
-                          />
-                        </div>
-                        <div>
-                          <h3 class={[
-                            "text-2xl font-black tracking-tight leading-none",
-                            if(all_refunded, do: "text-red-100", else: "text-white")
-                          ]}>
-                            <%= if all_refunded do %>
-                              Order Refunded
-                            <% else %>
-                              Your Tickets
+                        else
+                          nil
+                        end
+                      end %>
+                    <% all_order_tickets =
+                      Map.get(@all_tickets_by_order, order_id, []) %>
+                    <% confirmed_tickets =
+                      Enum.filter(all_order_tickets, &(&1.status == :confirmed)) %>
+                    <% refunded_tickets =
+                      Enum.filter(all_order_tickets, &(&1.status == :cancelled)) %>
+                    <% all_refunded =
+                      length(confirmed_tickets) == 0 && length(refunded_tickets) > 0 %>
+                    <% partial_refund =
+                      length(confirmed_tickets) > 0 && length(refunded_tickets) > 0 %>
+                    <% all_tiers_by_name = group_tickets_by_tier(all_order_tickets) %>
+                    <% confirmed_tiers_by_name =
+                      if length(confirmed_tickets) > 0,
+                        do: group_tickets_by_tier(confirmed_tickets),
+                        else: [] %>
+                    <% dot_class =
+                      cond do
+                        all_refunded -> "bg-red-500"
+                        partial_refund -> "bg-amber-400"
+                        true -> "bg-emerald-400"
+                      end %>
+
+                    <div class={[
+                      "px-8 py-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between",
+                      if(all_refunded, do: "opacity-60")
+                    ]}>
+                      <div class="flex items-start gap-3 min-w-0">
+                        <div class={[
+                          "mt-1.5 w-2 h-2 rounded-full flex-shrink-0",
+                          dot_class
+                        ]} />
+                        <div class="min-w-0">
+                          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1.5">
+                            <span class="text-sm font-black text-white tracking-tight">
+                              {order_label}
+                            </span>
+                            <%= if purchase_date do %>
+                              <span class="text-xs text-zinc-500">
+                                • {purchase_date}
+                              </span>
                             <% end %>
-                          </h3>
-                          <%= if all_refunded do %>
-                            <p class="text-sm text-red-200/80 mt-2">
-                              All tickets in this order have been refunded and returned to stock.
-                            </p>
-                          <% else %>
-                            <div class="mt-2 space-y-1">
-                              <%= if partial_refund do %>
-                                <p class="text-xs text-amber-300/90 uppercase tracking-widest font-bold mb-2">
-                                  {length(confirmed_tickets)} of {length(
-                                    all_order_tickets
-                                  )} tickets confirmed
-                                </p>
+                            <%= cond do %>
+                              <% all_refunded -> %>
+                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs font-bold uppercase tracking-wider rounded border border-red-500/30">
+                                  Refunded
+                                </span>
+                              <% partial_refund -> %>
+                                <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-bold uppercase tracking-wider rounded border border-amber-500/30">
+                                  Partial Refund
+                                </span>
+                              <% true -> %>
+                            <% end %>
+                          </div>
+                          <div class="flex flex-wrap gap-x-3 gap-y-1">
+                            <%= if all_refunded do %>
+                              <%= for {tier_name, tier_tickets} <- all_tiers_by_name do %>
+                                <span class="text-xs text-zinc-600 line-through">
+                                  {length(tier_tickets)}x {tier_name}
+                                </span>
                               <% end %>
+                            <% else %>
                               <%= for {tier_name, confirmed_tier_tickets} <- confirmed_tiers_by_name do %>
                                 <% original_count =
                                   case Enum.find(all_tiers_by_name, fn {name, _} ->
@@ -295,59 +296,40 @@ defmodule YscWeb.EventDetailsLive do
                                   end %>
                                 <% new_count = length(confirmed_tier_tickets) %>
                                 <% has_refunded_tickets = original_count > new_count %>
-                                <p class={[
-                                  "text-xs uppercase tracking-widest font-bold",
-                                  if(all_refunded,
-                                    do: "text-red-300/70",
-                                    else: "text-zinc-500"
-                                  )
-                                ]}>
+                                <span class="text-xs text-zinc-400 font-bold">
                                   <%= if partial_refund && has_refunded_tickets do %>
-                                    <span class="line-through opacity-60">
+                                    <span class="line-through opacity-50 mr-0.5">
                                       {original_count}x
                                     </span>
-                                    <span class="ml-1">
-                                      {new_count}x {tier_name}
-                                    </span>
+                                    {new_count}x {tier_name}
                                   <% else %>
                                     {new_count}x {tier_name}
                                   <% end %>
-                                </p>
+                                </span>
                               <% end %>
-                            </div>
-                          <% end %>
+                            <% end %>
+                          </div>
                         </div>
                       </div>
-                      <div class="flex items-center gap-2">
-                        <%= if !all_refunded && length(confirmed_tickets) > 0 do %>
-                          <.link
-                            navigate={
-                              ~p"/tickets/#{first_ticket.ticket_order.id}/qr" <> "?return_to=/events/#{@event.id}"
-                            }
-                            class="flex items-center gap-1.5 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded text-xs font-black uppercase tracking-widest transition-all"
-                          >
-                            <.icon name="hero-qr-code" class="w-3.5 h-3.5" />
-                            QR Codes
-                          </.link>
-                        <% end %>
-                        <.link
-                          navigate={~p"/orders/#{order_id}/confirmation"}
-                          class={[
-                            "px-4 py-2 backdrop-blur-md rounded text-xs font-black uppercase tracking-widest transition-all",
-                            if(all_refunded,
-                              do:
-                                "bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30",
-                              else: "bg-white/10 hover:bg-white/20 text-white"
-                            )
-                          ]}
-                        >
-                          View Order
-                        </.link>
-                      </div>
+
+                      <.link
+                        navigate={~p"/orders/#{order_id}/confirmation"}
+                        class={[
+                          "flex-shrink-0 px-4 py-1.5 rounded text-xs font-black uppercase tracking-widest transition-all border",
+                          if(all_refunded,
+                            do:
+                              "bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/20",
+                            else:
+                              "bg-white/10 hover:bg-white/20 text-zinc-300 border-white/10"
+                          )
+                        ]}
+                      >
+                        View Order
+                      </.link>
                     </div>
-                  </div>
+                  <% end %>
                 </div>
-              <% end %>
+              </div>
             </div>
 
             <%!-- Meta Info Row - Magazine Style --%>
@@ -627,7 +609,8 @@ defmodule YscWeb.EventDetailsLive do
             <%!-- Attendees --%>
             <%= if @active_membership? && @async_data_loaded && @attendees_list != nil do %>
               <% unique_attendees = @attendees_list %>
-              <% attendees_to_show = Enum.take(unique_attendees, 5) %>
+              <% attendees_to_show =
+                Enum.take(unique_attendees, @attendees_preview_count) %>
               <% overflow_count =
                 length(unique_attendees) - length(attendees_to_show) %>
               <section id="attendees-section" class="space-y-5">
@@ -3418,6 +3401,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:tickets_for_me, %{})
     |> assign(:selected_family_members, %{})
     |> assign(:show_attendees_modal, false)
+    |> assign(:attendees_preview_count, @attendees_preview_count)
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
     # Reservations - will be loaded async
@@ -3712,6 +3696,27 @@ defmodule YscWeb.EventDetailsLive do
 
     # Keep showing the page with minimal data, mark as loaded to avoid infinite loading
     {:noreply, assign(socket, :async_data_loaded, true)}
+  end
+
+  def handle_async(
+        :reload_attendees,
+        {:ok,
+         {_sold_ticket_count, attendees_count, attendees_list,
+          ticket_counts_per_user, host_ids}},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:attendees_count, attendees_count)
+     |> assign(:attendees_list, attendees_list)
+     |> assign(:ticket_counts_per_user, ticket_counts_per_user)
+     |> assign(:host_ids, host_ids)}
+  end
+
+  def handle_async(:reload_attendees, {:exit, reason}, socket) do
+    require Ysc.Logging
+    Ysc.Logging.error("Failed to reload attendees async: #{inspect(reason)}")
+    {:noreply, socket}
   end
 
   @impl true
@@ -4320,20 +4325,13 @@ defmodule YscWeb.EventDetailsLive do
         socket
       ) do
     if event_id == socket.assigns.event.id do
-      {_sold_ticket_count, displayed_attendees_count, attendees_list,
-       ticket_counts_per_user, host_ids} =
-        load_attendees(
-          socket.assigns.active_membership?,
-          socket.assigns.current_user,
-          event_id
-        )
+      active_membership? = socket.assigns.active_membership?
+      current_user = socket.assigns.current_user
 
       {:noreply,
-       socket
-       |> assign(:attendees_count, displayed_attendees_count)
-       |> assign(:attendees_list, attendees_list)
-       |> assign(:ticket_counts_per_user, ticket_counts_per_user)
-       |> assign(:host_ids, host_ids)}
+       start_async(socket, :reload_attendees, fn ->
+         load_attendees(active_membership?, current_user, event_id)
+       end)}
     else
       {:noreply, socket}
     end
