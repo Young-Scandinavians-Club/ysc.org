@@ -70,7 +70,7 @@ defmodule YscWeb.EventDetailsLive do
                   :if={
                     (@event.tickets_tbd && @event.state != :cancelled) ||
                       (@event.state != :cancelled && @async_data_loaded &&
-                         @event_at_capacity)
+                         @event_at_capacity && !@event.tickets_tbd)
                   }
                   class="flex flex-wrap items-center gap-2 mb-4"
                 >
@@ -87,7 +87,7 @@ defmodule YscWeb.EventDetailsLive do
                   <span
                     :if={
                       @event.state != :cancelled && @async_data_loaded &&
-                        @event_at_capacity
+                        @event_at_capacity && !@event.tickets_tbd
                     }
                     class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
                   >
@@ -653,7 +653,7 @@ defmodule YscWeb.EventDetailsLive do
                     </p>
                     <p class={[
                       "text-4xl font-black text-zinc-900 tracking-tighter",
-                      if @event_at_capacity do
+                      if @event_at_capacity && !@event.tickets_tbd do
                         "line-through"
                       else
                         ""
@@ -1003,7 +1003,7 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="flex items-center gap-2 mb-0.5">
                         <p class={[
                           "font-black text-2xl text-zinc-900 tracking-tight leading-none",
-                          if @event_at_capacity do
+                          if @event_at_capacity && !@event.tickets_tbd do
                             "line-through"
                           else
                             ""
@@ -1097,7 +1097,7 @@ defmodule YscWeb.EventDetailsLive do
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
-                          <%= if @event_at_capacity do %>
+                          <%= if @event_at_capacity && !@event.tickets_tbd do %>
                             <div class="text-red-700 font-black text-sm text-center">
                               Sold Out
                             </div>
@@ -1609,7 +1609,7 @@ defmodule YscWeb.EventDetailsLive do
                       </span>
                       <span class={[
                         "font-medium",
-                        if @event_at_capacity do
+                        if @event_at_capacity && !@event.tickets_tbd do
                           "line-through"
                         else
                           ""
@@ -1672,7 +1672,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="flex justify-between font-semibold text-lg">
                     <span>Total:</span>
                     <span class={[
-                      if @event_at_capacity do
+                      if @event_at_capacity && !@event.tickets_tbd do
                         "line-through"
                       else
                         ""
@@ -1687,7 +1687,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="flex justify-between font-semibold text-lg">
                     <span>Total:</span>
                     <span class={[
-                      if @event_at_capacity do
+                      if @event_at_capacity && !@event.tickets_tbd do
                         "line-through"
                       else
                         ""
