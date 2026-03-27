@@ -36,7 +36,7 @@ defmodule YscWeb.Components.Events.EventCard do
 
     ~H"""
     <div class={[
-      "group flex flex-col rounded-xl border transition-all duration-300 overflow-hidden relative hover:ring-2 hover:ring-blue-500",
+      "group flex flex-col rounded-xl border transition-all duration-300 relative hover:ring-2 hover:ring-blue-500 p-2",
       if(@variant == "dark",
         do: "bg-zinc-800 border-zinc-700",
         else: "bg-white border-zinc-100"
@@ -45,7 +45,7 @@ defmodule YscWeb.Components.Events.EventCard do
     ]}>
       <.link navigate={~p"/events/#{@event.id}"} class="block relative">
         <div class={[
-          "relative aspect-video overflow-hidden",
+          "relative aspect-video overflow-hidden rounded-lg",
           @event.state == :cancelled && "grayscale"
         ]}>
           <canvas
@@ -70,7 +70,7 @@ defmodule YscWeb.Components.Events.EventCard do
             }
           />
         </div>
-        <div class="absolute top-4 left-4 flex gap-2 z-[2] flex-wrap pointer-events-none">
+        <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap pointer-events-none">
           <%= for badge <- @badges do %>
             <span class={[
               "px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest pointer-events-auto",
@@ -91,7 +91,7 @@ defmodule YscWeb.Components.Events.EventCard do
         </div>
       </.link>
 
-      <div class="p-8 flex flex-col flex-1">
+      <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
         <div class="flex items-center gap-2 mb-4">
           <span class={[
             "text-sm font-black px-2.5 py-1 rounded uppercase tracking-[0.2em]",

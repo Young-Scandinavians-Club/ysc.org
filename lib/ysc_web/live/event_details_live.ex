@@ -623,12 +623,122 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
               </article>
             </section>
+
+            <%!-- Attendees --%>
+            <%= if @active_membership? && @async_data_loaded && @attendees_list != nil && length(@attendees_list) > 0 do %>
+              <% unique_attendees = @attendees_list %>
+              <% attendees_to_show = Enum.take(unique_attendees, 5) %>
+              <% overflow_count =
+                length(unique_attendees) - length(attendees_to_show) %>
+              <section id="attendees-section" class="space-y-5">
+                <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+                  <span class="w-8 h-px bg-zinc-200"></span> Attendees
+                </h3>
+                <div class="flex flex-wrap gap-5">
+                  <%= for attendee <- attendees_to_show do %>
+                    <% is_me =
+                      @current_user != nil && attendee.id == @current_user.id %>
+                    <% is_host = MapSet.member?(@host_ids, attendee.id) %>
+                    <% ticket_count =
+                      Map.get(@ticket_counts_per_user, attendee.id, 0) %>
+                    <% attendee_name =
+                      "#{attendee.first_name || ""} #{attendee.last_name || ""}"
+                      |> String.trim() %>
+                    <% display_name =
+                      if attendee_name != "",
+                        do: attendee_name,
+                        else: attendee.email || "Member" %>
+                    <div
+                      class="flex flex-col items-center gap-2 w-16"
+                      {if is_me, do: ["data-attendee-you": "true"], else: []}
+                    >
+                      <div class="relative">
+                        <.user_avatar_image
+                          email={attendee.email || ""}
+                          user_id={to_string(attendee.id)}
+                          country={attendee.most_connected_country || "SE"}
+                          class={"w-14 h-14 rounded-full ring-2 #{if is_me, do: "ring-blue-500", else: if(is_host, do: "ring-amber-400", else: "ring-zinc-100")}"}
+                        />
+                        <%= if ticket_count > 1 do %>
+                          <span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-zinc-900 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white">
+                            {ticket_count}
+                          </span>
+                        <% end %>
+                      </div>
+                      <div class="text-center w-full">
+                        <p class="text-xs font-bold text-zinc-900 leading-tight truncate">
+                          {if is_me, do: "You", else: display_name}
+                        </p>
+                        <%= cond do %>
+                          <% is_host && ticket_count == 0 -> %>
+                            <p class="text-[10px] text-amber-500 font-medium leading-tight">
+                              Host
+                            </p>
+                          <% is_me -> %>
+                            <p class="text-[10px] text-blue-500 font-medium leading-tight">
+                              {ticket_count} {if ticket_count == 1,
+                                do: "ticket",
+                                else: "tickets"}
+                            </p>
+                          <% true -> %>
+                            <p class="text-[10px] text-zinc-400 font-medium leading-tight">
+                              {if is_host, do: "Host · ", else: ""}{ticket_count} {if ticket_count ==
+                                                                                        1,
+                                                                                      do:
+                                                                                        "ticket",
+                                                                                      else:
+                                                                                        "tickets"}
+                            </p>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+                  <%!-- +X more tile --%>
+                  <%= if overflow_count > 0 do %>
+                    <button
+                      id="attendees-overflow-btn"
+                      phx-click="show-attendees-modal"
+                      class="flex flex-col items-center gap-2 w-16 group"
+                    >
+                      <div class="w-14 h-14 rounded-full bg-zinc-100 border-2 border-dashed border-zinc-300 flex items-center justify-center group-hover:bg-zinc-200 group-hover:border-zinc-400 transition-colors">
+                        <span class="text-sm font-black text-zinc-500 group-hover:text-zinc-700">
+                          +{overflow_count}
+                        </span>
+                      </div>
+                      <p class="text-xs font-bold text-zinc-400 group-hover:text-zinc-600 transition-colors leading-tight text-center">
+                        more
+                      </p>
+                    </button>
+                  <% end %>
+                </div>
+              </section>
+            <% end %>
+
+            <%!-- Attendees loading skeleton (members only) --%>
+            <div
+              :if={@active_membership? && !@async_data_loaded}
+              class="space-y-5 animate-pulse"
+            >
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-px bg-zinc-200"></div>
+                <div class="w-28 h-6 bg-zinc-200 rounded"></div>
+              </div>
+              <div class="flex gap-5">
+                <%= for _i <- 1..5 do %>
+                  <div class="flex flex-col items-center gap-2 w-16">
+                    <div class="w-14 h-14 rounded-full bg-zinc-200"></div>
+                    <div class="w-12 h-2.5 bg-zinc-200 rounded"></div>
+                    <div class="w-8 h-2 bg-zinc-200 rounded"></div>
+                  </div>
+                <% end %>
+              </div>
+            </div>
           </div>
 
           <%!-- Right Column: Sticky Ticket Sidebar (4/12 width on desktop) --%>
           <aside class="lg:col-span-4">
             <%!-- Spacer for mobile bottom bar --%>
-            <div class="h-36 lg:hidden"></div>
+            <div class="h-12 lg:hidden lg:h-0"></div>
 
             <%!-- Desktop: Sticky sidebar --%>
             <div
@@ -789,67 +899,6 @@ defmodule YscWeb.EventDetailsLive do
                             <.icon name="hero-users" class="w-5 h-5 text-blue-500" />
                             {@available_capacity} Spots Available
                           </div>
-                          <%= if @async_data_loaded && @active_membership? && @attendees_count != nil && @attendees_count >= 5 && @attendees_list != nil && length(@attendees_list) > 0 do %>
-                            <% attendees_to_show = Enum.take(@attendees_list, 5) %>
-                            <% remaining_count =
-                              length(@attendees_list) - length(attendees_to_show) %>
-                            <% names_to_show = Enum.take(@attendees_list, 3) %>
-                            <% names_remaining =
-                              length(@attendees_list) - length(names_to_show) %>
-                            <button
-                              phx-click="show-attendees-modal"
-                              class="flex items-center gap-3 text-sm text-zinc-600 font-medium hover:text-zinc-900 transition-colors cursor-pointer w-full text-left"
-                            >
-                              <%!-- Stack of profile pictures (max 5) --%>
-                              <div class="flex -space-x-2 flex-shrink-0">
-                                <%= for {attendee, index} <- Enum.with_index(attendees_to_show) do %>
-                                  <div class={[
-                                    "relative w-8 h-8 rounded-full border-2 border-white overflow-hidden",
-                                    if(index > 0, do: "-ml-2")
-                                  ]}>
-                                    <.user_avatar_image
-                                      email={attendee.email || ""}
-                                      user_id={to_string(attendee.id)}
-                                      country={
-                                        attendee.most_connected_country || "SE"
-                                      }
-                                      class="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                <% end %>
-                                <%= if remaining_count > 0 do %>
-                                  <div class="relative w-8 h-8 rounded-full border-2 border-white bg-zinc-100 flex items-center justify-center -ml-2">
-                                    <span class="text-xs font-semibold text-zinc-600">
-                                      +{remaining_count}
-                                    </span>
-                                  </div>
-                                <% end %>
-                              </div>
-                              <span class="flex-1 min-w-0">
-                                {names_to_show
-                                |> Enum.map(fn attendee ->
-                                  attendee_name =
-                                    "#{attendee.first_name || ""} #{attendee.last_name || ""}"
-                                    |> String.trim()
-
-                                  if attendee_name != "",
-                                    do: attendee_name,
-                                    else: attendee.email || "Someone"
-                                end)
-                                |> Enum.join(", ")}
-                                <%= if names_remaining > 0 do %>
-                                  +{names_remaining} {if names_remaining ==
-                                                           1,
-                                                         do: "more is",
-                                                         else: "more are"} going
-                                <% else %>
-                                  {if length(@attendees_list) == 1,
-                                    do: "is",
-                                    else: "are"} going
-                                <% end %>
-                              </span>
-                            </button>
-                          <% end %>
                         <% end %>
                       <% end %>
                     </div>
@@ -3177,27 +3226,46 @@ defmodule YscWeb.EventDetailsLive do
                   do: attendee_name,
                   else: attendee.email || "Unknown" %>
               <% ticket_count = Map.get(@ticket_counts_per_user, attendee.id, 0) %>
-              <div class="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
-                <.user_avatar_image
-                  email={attendee.email}
-                  user_id={attendee.id}
-                  country={Map.get(attendee, :most_connected_country, "SE")}
-                  class="h-10 w-10 rounded-full flex-shrink-0"
-                />
+              <% is_host = MapSet.member?(@host_ids, attendee.id) %>
+              <div class={[
+                "flex items-center gap-3 p-3 rounded-xl border",
+                if(is_host,
+                  do: "bg-amber-50 border-amber-200",
+                  else: "bg-zinc-50 border-zinc-200"
+                )
+              ]}>
+                <div class="relative flex-shrink-0">
+                  <.user_avatar_image
+                    email={attendee.email}
+                    user_id={attendee.id}
+                    country={Map.get(attendee, :most_connected_country, "SE")}
+                    class={"h-10 w-10 rounded-full#{if is_host, do: " ring-2 ring-amber-400", else: ""}"}
+                  />
+                </div>
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium text-zinc-900">
-                    {display_name}
-                    <span class="text-zinc-500 font-normal">
-                      ({ticket_count} {if ticket_count == 1,
-                        do: "ticket",
-                        else: "tickets"})
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <p class="font-medium text-zinc-900">
+                      {display_name}
+                    </p>
+                    <span
+                      :if={is_host}
+                      class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
+                    >
+                      Host
                     </span>
-                  </p>
-                  <p
-                    :if={attendee.email && attendee_name != ""}
-                    class="text-sm text-zinc-500 truncate"
-                  >
-                    {attendee.email}
+                  </div>
+                  <p class="text-sm text-zinc-500">
+                    <%= cond do %>
+                      <% ticket_count == 0 && is_host -> %>
+                        No ticket
+                      <% true -> %>
+                        {ticket_count} {if ticket_count == 1,
+                          do: "ticket",
+                          else: "tickets"}
+                    <% end %>
+                    <span :if={attendee.email && attendee_name != ""}>
+                      · {attendee.email}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -3219,18 +3287,6 @@ defmodule YscWeb.EventDetailsLive do
         </div>
       </div>
     </.modal>
-
-    <%!-- Admin floating check-in button (visible to admin and volunteers only) --%>
-    <%= if @current_user && @current_user.role in [:admin, :volunteer] && @event.state in [:published, :scheduled] do %>
-      <div class="fixed bottom-6 right-6 z-50">
-        <.link
-          navigate={~p"/admin/events/#{@event.id}/check-in"}
-          class="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-700 text-white px-4 py-3 text-sm font-semibold shadow-lg transition-colors"
-        >
-          <.icon name="hero-clipboard-document-check" class="w-5 h-5" /> Check-in
-        </.link>
-      </div>
-    <% end %>
     """
   end
 
@@ -3346,6 +3402,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:attendees_count, nil)
     |> assign(:attendees_list, nil)
     |> assign(:ticket_counts_per_user, %{})
+    |> assign(:host_ids, MapSet.new())
     # UI state
     |> assign(:show_ticket_modal, show_ticket_modal)
     |> assign(:show_payment_modal, false)
@@ -3528,27 +3585,47 @@ defmodule YscWeb.EventDetailsLive do
     Events.list_ticket_reservations_for_user(current_user.id, event_id)
   end
 
-  defp load_attendees(false, _current_user, _event_id), do: {nil, nil, %{}}
+  defp load_attendees(false, _current_user, _event_id),
+    do: {nil, nil, %{}, MapSet.new()}
 
   defp load_attendees(true, current_user, event_id) do
     ticket_count = Events.count_tickets_sold_excluding_donations(event_id)
+    hosts = Events.list_event_hosts_by_event_id(event_id)
+    host_ids = MapSet.new(hosts, & &1.id)
 
-    if ticket_count >= 5 do
-      attendees = Events.list_unique_attendees_for_event(event_id)
+    ticket_buyers = Events.list_unique_attendees_for_event(event_id)
 
-      filtered_attendees =
-        if current_user do
-          Enum.reject(attendees, fn attendee ->
-            attendee.id == current_user.id
-          end)
-        else
-          attendees
-        end
+    # Ticket buyers who are not hosts (hosts are already shown at the front)
+    non_host_buyers =
+      Enum.reject(ticket_buyers, &MapSet.member?(host_ids, &1.id))
 
-      ticket_counts = Events.get_ticket_counts_per_user(event_id)
-      {ticket_count, filtered_attendees, ticket_counts}
+    # Within the hosts section, put the current user first
+    sorted_hosts =
+      if current_user && MapSet.member?(host_ids, current_user.id) do
+        {mine, others} = Enum.split_with(hosts, &(&1.id == current_user.id))
+        mine ++ others
+      else
+        hosts
+      end
+
+    # Within the non-host buyers, put the current user first
+    sorted_non_hosts =
+      if current_user && !MapSet.member?(host_ids, current_user.id) do
+        {mine, others} =
+          Enum.split_with(non_host_buyers, &(&1.id == current_user.id))
+
+        mine ++ others
+      else
+        non_host_buyers
+      end
+
+    merged = sorted_hosts ++ sorted_non_hosts
+
+    if merged == [] && ticket_count == 0 do
+      {nil, nil, %{}, MapSet.new()}
     else
-      {nil, nil, %{}}
+      ticket_counts = Events.get_ticket_counts_per_user(event_id)
+      {ticket_count, merged, ticket_counts, host_ids}
     end
   end
 
@@ -3565,8 +3642,8 @@ defmodule YscWeb.EventDetailsLive do
     {user_tickets, all_tickets_by_order} =
       Map.get(results, :user_tickets, {[], %{}})
 
-    {attendees_count, attendees_list, ticket_counts_per_user} =
-      Map.get(results, :attendees, {nil, nil, %{}})
+    {attendees_count, attendees_list, ticket_counts_per_user, host_ids} =
+      Map.get(results, :attendees, {nil, nil, %{}, MapSet.new()})
 
     user_reservations = Map.get(results, :user_reservations, [])
 
@@ -3619,6 +3696,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:attendees_count, attendees_count)
      |> assign(:attendees_list, attendees_list)
      |> assign(:ticket_counts_per_user, ticket_counts_per_user)
+     |> assign(:host_ids, host_ids)
      |> assign(:user_reservations, user_reservations)
      |> assign(:reservations_by_tier, reservations_by_tier)
      |> assign(:async_data_loaded, true)}
@@ -4234,6 +4312,30 @@ defmodule YscWeb.EventDetailsLive do
   @impl true
   def handle_info(
         {Ysc.Events,
+         %Ysc.MessagePassingEvents.EventHostsUpdated{event_id: event_id}},
+        socket
+      ) do
+    if event_id == socket.assigns.event.id do
+      {_count, attendees_list, ticket_counts_per_user, host_ids} =
+        load_attendees(
+          socket.assigns.active_membership?,
+          socket.assigns.current_user,
+          event_id
+        )
+
+      {:noreply,
+       socket
+       |> assign(:attendees_list, attendees_list)
+       |> assign(:ticket_counts_per_user, ticket_counts_per_user)
+       |> assign(:host_ids, host_ids)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketTierAdded{ticket_tier: tier}},
         socket
       ) do
@@ -4724,30 +4826,12 @@ defmodule YscWeb.EventDetailsLive do
         add_pricing_info_from_tiers(event, ticket_tiers_with_counts)
 
       # Refresh attendees list if user has active membership
-      {attendees_count, attendees_list, ticket_counts_per_user} =
-        if socket.assigns.active_membership? do
-          ticket_count = Events.count_tickets_sold_excluding_donations(event_id)
-
-          if ticket_count >= 5 do
-            attendees = Events.list_unique_attendees_for_event(event_id)
-            # Filter out the current user from the attendees list
-            filtered_attendees =
-              if socket.assigns.current_user do
-                Enum.reject(attendees, fn attendee ->
-                  attendee.id == socket.assigns.current_user.id
-                end)
-              else
-                attendees
-              end
-
-            ticket_counts = Events.get_ticket_counts_per_user(event_id)
-            {ticket_count, filtered_attendees, ticket_counts}
-          else
-            {nil, nil, %{}}
-          end
-        else
-          {nil, nil, %{}}
-        end
+      {attendees_count, attendees_list, ticket_counts_per_user, host_ids} =
+        load_attendees(
+          socket.assigns.active_membership?,
+          socket.assigns.current_user,
+          event_id
+        )
 
       # Trigger animation on all tier availability elements
       {:noreply,
@@ -4762,6 +4846,7 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:attendees_count, attendees_count)
        |> assign(:attendees_list, attendees_list)
        |> assign(:ticket_counts_per_user, ticket_counts_per_user)
+       |> assign(:host_ids, host_ids)
        |> push_event("animate-availability-update", %{})}
     else
       {:noreply, socket}

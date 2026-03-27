@@ -121,6 +121,11 @@ defmodule Ysc.Events.Event do
     has_many :agendas, Ysc.Events.Agenda, on_replace: :delete
     has_many :ticket_tiers, Ysc.Events.TicketTier, on_replace: :delete
 
+    many_to_many :hosts, Ysc.Accounts.User,
+      join_through: "event_hosts",
+      join_keys: [event_id: :id, user_id: :id],
+      on_replace: :delete
+
     field :lock_version, :integer, default: 1
 
     timestamps()

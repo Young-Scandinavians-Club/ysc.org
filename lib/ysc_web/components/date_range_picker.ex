@@ -20,7 +20,6 @@ defmodule YscWeb.Components.DateRangePicker do
     <div
       id={Map.get(assigns, :id, @id)}
       class="date-range-picker"
-      data-phx-component={Map.get(assigns, :id, @id)}
     >
       <.input field={@start_date_field} type="hidden" />
       <.input :if={@is_range?} field={@end_date_field} type="hidden" />
