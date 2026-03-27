@@ -33,6 +33,25 @@ defmodule Ysc.AppleWallet.CertManagerTest do
     end
   end
 
+  # CertManager and AppleWallet resolve WWDR and icons via :code.priv_dir(:ysc)
+  # at runtime so release images see the correct paths (not compile-time _build).
+
+  describe "wallet pass asset files on disk" do
+    test "icon and logo PNGs exist under priv/apple_wallet/icons" do
+      icons_dir = Path.join([:code.priv_dir(:ysc), "apple_wallet", "icons"])
+
+      for basename <- ~w(icon.png icon@2x.png icon@3x.png logo.png logo@2x.png) do
+        path = Path.join(icons_dir, basename)
+        assert File.exists?(path), "expected wallet asset at #{path}"
+      end
+    end
+
+    test "WWDR PEM exists under priv/apple_wallet" do
+      path = Path.join(:code.priv_dir(:ysc), "apple_wallet/wwdr.pem")
+      assert File.exists?(path)
+    end
+  end
+
   describe "init/1 with valid base64 certs" do
     # We test the GenServer init logic by starting a fresh (unnamed) process
     # with Application env temporarily patched.
@@ -74,16 +93,22 @@ defmodule Ysc.AppleWallet.CertManagerTest do
         ticket_result = GenServer.call(pid, :get_ticket_certs)
         membership_result = GenServer.call(pid, :get_membership_certs)
 
+        expected_wwdr = Path.join(:code.priv_dir(:ysc), "apple_wallet/wwdr.pem")
+
         assert {:ok, ticket_certs} = ticket_result
         assert is_binary(ticket_certs.cert)
         assert is_binary(ticket_certs.key)
         assert ticket_certs.password == ""
+        assert ticket_certs.wwdr == expected_wwdr
         assert File.exists?(ticket_certs.cert)
         assert File.read!(ticket_certs.cert) == cert_pem
+        assert File.exists?(ticket_certs.wwdr)
 
         assert {:ok, membership_certs} = membership_result
         assert membership_certs.password == "secret"
+        assert membership_certs.wwdr == expected_wwdr
         assert File.exists?(membership_certs.key)
+        assert File.exists?(membership_certs.wwdr)
 
         GenServer.stop(pid)
       after

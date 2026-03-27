@@ -20,8 +20,6 @@ defmodule Ysc.AppleWallet.CertManager do
 
   require Ysc.Logging
 
-  @wwdr_path Application.app_dir(:ysc, "priv/apple_wallet/wwdr.pem")
-
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
@@ -107,7 +105,7 @@ defmodule Ysc.AppleWallet.CertManager do
            cert: cert_path,
            key: key_path,
            password: password || "",
-           wwdr: @wwdr_path
+           wwdr: wwdr_pem_path()
          }}
       else
         :error ->
@@ -128,6 +126,10 @@ defmodule Ysc.AppleWallet.CertManager do
     else
       {:error, :not_configured}
     end
+  end
+
+  defp wwdr_pem_path do
+    Path.join(:code.priv_dir(:ysc), "apple_wallet/wwdr.pem")
   end
 
   # path is constructed from System.tmp_dir!() + a fixed internal prefix + random hex, not user input
