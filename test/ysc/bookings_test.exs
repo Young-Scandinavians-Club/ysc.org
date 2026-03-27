@@ -2502,17 +2502,23 @@ defmodule Ysc.BookingsTest do
         })
 
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+      # The search requires an active booking: checkin <= today < checkout.
+      # Extend checkout by one day when it would land on Sunday (last night would be
+      # Saturday without Sunday, which fails the "full weekend required" validation).
+      checkin = Date.add(today, -1)
+      raw_checkout = Date.add(today, 2)
 
-      # Use a Mon–Thu window to avoid the "Saturday must include Sunday" validation
-      days_until_next_monday = Integer.mod(8 - Date.day_of_week(today), 7)
-      next_monday = Date.add(today, days_until_next_monday)
+      checkout =
+        if Date.day_of_week(raw_checkout) == 7,
+          do: Date.add(raw_checkout, 1),
+          else: raw_checkout
 
       booking =
         booking_fixture(%{
           user_id: user.id,
           property: :tahoe,
-          checkin_date: next_monday,
-          checkout_date: Date.add(next_monday, 3)
+          checkin_date: checkin,
+          checkout_date: checkout
         })
 
       results =

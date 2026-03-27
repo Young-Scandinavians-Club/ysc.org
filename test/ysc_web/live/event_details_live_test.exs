@@ -1464,6 +1464,13 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
+
+      # Remove the auto-added organizer host so the section only appears
+      # because a ticket was sold, not because there is a host
+      Enum.each(Ysc.Events.list_event_hosts(event), fn host ->
+        Ysc.Events.remove_event_host(event, host.id)
+      end)
+
       confirmed_ticket(event, tier, user)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
