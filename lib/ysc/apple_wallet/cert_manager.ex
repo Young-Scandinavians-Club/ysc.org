@@ -136,6 +136,7 @@ defmodule Ysc.AppleWallet.CertManager do
       {:ok, path}
     else
       {:error, reason} ->
+        # sobelow_skip ["Traversal.FileModule"] - same internally-generated path as above
         File.rm(path)
         {:error, reason}
     end
