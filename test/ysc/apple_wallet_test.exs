@@ -137,6 +137,63 @@ defmodule Ysc.AppleWalletTest do
   end
 
   # ---------------------------------------------------------------------------
+  # pkpass temp file cleanup
+  # ---------------------------------------------------------------------------
+
+  # The cleanup path (File.rm inside try/after) cannot be reached through
+  # generate_ticket_pass/generate_membership_pass in tests because Passbook.generate
+  # fails with fake certs before producing a file. These tests exercise the
+  # try/after cleanup pattern directly with a controlled temp file to confirm
+  # that File.rm runs even when File.read returns an error.
+
+  describe "pkpass temp file cleanup" do
+    test "deletes the pkpass temp file even when File.read fails" do
+      tmp_path =
+        Path.join(
+          System.tmp_dir!(),
+          "test_cleanup_#{:crypto.strong_rand_bytes(4) |> Base.encode16()}.pkpass"
+        )
+
+      File.write!(tmp_path, "fake pkpass content")
+      assert File.exists?(tmp_path)
+
+      # Remove read permission so File.read returns {:error, :eacces}.
+      # File.rm still succeeds because it only needs write permission on the
+      # parent directory, which the test process owns.
+      File.chmod!(tmp_path, 0o000)
+
+      try do
+        File.read(tmp_path)
+      after
+        File.rm(tmp_path)
+      end
+
+      refute File.exists?(tmp_path)
+    end
+
+    test "deletes the pkpass temp file when File.read succeeds" do
+      tmp_path =
+        Path.join(
+          System.tmp_dir!(),
+          "test_cleanup_#{:crypto.strong_rand_bytes(4) |> Base.encode16()}.pkpass"
+        )
+
+      File.write!(tmp_path, "fake pkpass content")
+      assert File.exists?(tmp_path)
+
+      result =
+        try do
+          File.read(tmp_path)
+        after
+          File.rm(tmp_path)
+        end
+
+      assert {:ok, "fake pkpass content"} = result
+      refute File.exists?(tmp_path)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # generate_membership_pass/1
   # ---------------------------------------------------------------------------
 

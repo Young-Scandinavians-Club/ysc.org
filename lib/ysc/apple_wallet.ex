@@ -48,10 +48,26 @@ defmodule Ysc.AppleWallet do
     with {:certs, {:ok, certs}} <- {:certs, CertManager.get_ticket_certs()},
          {:ticket, %Ticket{} = ticket} <-
            {:ticket, load_ticket(ticket_id, user_id)},
-         {:ok, pkpass_path} <- build_ticket_pass(ticket, certs),
-         {:ok, binary} <- File.read(pkpass_path) do
-      File.rm(pkpass_path)
-      {:ok, binary}
+         {:ok, pkpass_path} <- build_ticket_pass(ticket, certs) do
+      result =
+        try do
+          File.read(pkpass_path)
+        after
+          File.rm(pkpass_path)
+        end
+
+      case result do
+        {:ok, binary} ->
+          {:ok, binary}
+
+        {:error, reason} ->
+          Ysc.Logging.error("Apple Wallet: failed to read ticket pkpass",
+            ticket_id: ticket_id,
+            error: reason
+          )
+
+          {:error, reason}
+      end
     else
       {:certs, {:error, :not_configured}} ->
         {:error, :not_configured}
@@ -79,10 +95,26 @@ defmodule Ysc.AppleWallet do
   @sobelow_skip ["Traversal.FileModule"]
   def generate_membership_pass(user) do
     with {:certs, {:ok, certs}} <- {:certs, CertManager.get_membership_certs()},
-         {:ok, pkpass_path} <- build_membership_pass(user, certs),
-         {:ok, binary} <- File.read(pkpass_path) do
-      File.rm(pkpass_path)
-      {:ok, binary}
+         {:ok, pkpass_path} <- build_membership_pass(user, certs) do
+      result =
+        try do
+          File.read(pkpass_path)
+        after
+          File.rm(pkpass_path)
+        end
+
+      case result do
+        {:ok, binary} ->
+          {:ok, binary}
+
+        {:error, reason} ->
+          Ysc.Logging.error("Apple Wallet: failed to read membership pkpass",
+            user_id: user.id,
+            error: reason
+          )
+
+          {:error, reason}
+      end
     else
       {:certs, {:error, :not_configured}} ->
         {:error, :not_configured}
