@@ -738,7 +738,7 @@ defmodule YscWeb.EventDetailsLive do
           <%!-- Right Column: Sticky Ticket Sidebar (4/12 width on desktop) --%>
           <aside class="lg:col-span-4">
             <%!-- Spacer for mobile bottom bar --%>
-            <div class="h-12 lg:hidden lg:h-0"></div>
+            <div class="h-20 lg:hidden lg:h-0"></div>
 
             <%!-- Desktop: Sticky sidebar --%>
             <div

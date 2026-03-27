@@ -242,7 +242,7 @@ defmodule Ysc.Events do
   Uses force-reload and optimistic locking to prevent lost concurrent updates.
   """
   def add_event_host(%Event{} = event, %User{} = user) do
-    event = Repo.preload(event, :hosts, force: true)
+    event = Repo.get!(Event, event.id) |> Repo.preload(:hosts, force: true)
     hosts = Enum.uniq_by([user | event.hosts], & &1.id)
 
     result =
@@ -270,7 +270,7 @@ defmodule Ysc.Events do
   Uses force-reload and optimistic locking to prevent lost concurrent updates.
   """
   def remove_event_host(%Event{} = event, user_id) do
-    event = Repo.preload(event, :hosts, force: true)
+    event = Repo.get!(Event, event.id) |> Repo.preload(:hosts, force: true)
     hosts = Enum.reject(event.hosts, &(&1.id == user_id))
 
     result =

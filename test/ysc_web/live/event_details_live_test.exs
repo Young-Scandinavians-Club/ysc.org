@@ -1424,7 +1424,11 @@ defmodule YscWeb.EventDetailsLiveTest do
         event_id: event.id,
         ticket_tier_id: tier.id,
         user_id: user.id,
-        status: :confirmed
+        status: :confirmed,
+        expires_at:
+          DateTime.utc_now()
+          |> DateTime.add(365, :day)
+          |> DateTime.truncate(:second)
       }
       |> Repo.insert!()
     end
