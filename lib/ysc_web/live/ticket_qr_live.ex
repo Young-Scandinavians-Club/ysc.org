@@ -517,11 +517,15 @@ defmodule YscWeb.TicketQrLive do
 
   defp safe_return_to(_), do: ~p"/users/tickets"
 
-  def date_for_add_to_cal(nil), do: nil
+  defp date_for_add_to_cal(nil), do: nil
 
-  def date_for_add_to_cal(dt) do
-    Timex.format!(dt, "%Y-%m-%d", :strftime)
-  end
+  defp date_for_add_to_cal(%DateTime{} = dt),
+    do: dt |> DateTime.to_date() |> Date.to_iso8601()
+
+  defp date_for_add_to_cal(%NaiveDateTime{} = dt),
+    do: dt |> NaiveDateTime.to_date() |> Date.to_iso8601()
+
+  defp date_for_add_to_cal(%Date{} = d), do: Date.to_iso8601(d)
 
   defp get_end_time_for_calendar(event) do
     case {event.start_time, event.end_time} do
