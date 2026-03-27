@@ -1755,10 +1755,15 @@ defmodule YscWeb.UserSettingsLive do
                   <% end %>
                 </div>
               <% end %>
+              <%= if @apple_wallet_membership_enabled? do %>
+                <div class="flex justify-center mt-4">
+                  <.add_to_wallet_button href={~p"/wallet/membership"} />
+                </div>
+              <% end %>
               <.button
                 phx-click="hide_membership_qr"
                 color="zinc"
-                class="w-full mt-5"
+                class="w-full mt-3"
               >
                 Close
               </.button>
@@ -2405,6 +2410,10 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:show_membership_qr, false)
       |> assign(:membership_qr_token, nil)
       |> assign(:membership_qr_details, nil)
+      |> assign(
+        :apple_wallet_membership_enabled?,
+        Ysc.AppleWallet.configured?(:membership)
+      )
 
     # Payments tab assigns (placeholders for initial render)
     socket =

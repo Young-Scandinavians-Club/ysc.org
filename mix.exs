@@ -211,6 +211,7 @@ defmodule Ysc.MixProject do
       {:mogrify, "~> 0.8"},
       {:mox, "~> 1.0", only: :test},
       {:oban, "~> 2.20"},
+      {:passbook, "~> 0.1.8"},
       {:phoenix_bakery, "~> 1.0", runtime: false},
       {:phoenix_ecto, "~> 4.7"},
       {:phoenix_html_helpers, "~> 1.0"},

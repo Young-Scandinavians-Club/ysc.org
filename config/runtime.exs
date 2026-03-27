@@ -41,6 +41,27 @@ config :ysc, :emails,
   tahoe_email: System.get_env("EMAIL_TAHOE") || "tahoe@ysc.org",
   clear_lake_email: System.get_env("EMAIL_CLEAR_LAKE") || "cl@ysc.org"
 
+# ## Apple Wallet Configuration
+#
+# Configure Apple Wallet pass generation for event tickets and membership cards.
+# Certificates must be base64-encoded PEM files (generate with: base64 -w0 certificate.pem).
+# All values are optional — if not set, the "Add to Wallet" buttons are hidden.
+config :ysc, :apple_wallet,
+  team_id: System.get_env("APPLE_WALLET_TEAM_ID"),
+  org_name: System.get_env("APPLE_WALLET_ORG_NAME"),
+  ticket: %{
+    cert_pem_b64: System.get_env("APPLE_WALLET_TICKET_CERT_PEM_B64"),
+    key_pem_b64: System.get_env("APPLE_WALLET_TICKET_KEY_PEM_B64"),
+    key_password: System.get_env("APPLE_WALLET_TICKET_KEY_PASSWORD"),
+    pass_type_id: System.get_env("APPLE_WALLET_TICKET_PASS_TYPE_ID")
+  },
+  membership: %{
+    cert_pem_b64: System.get_env("APPLE_WALLET_MEMBERSHIP_CERT_PEM_B64"),
+    key_pem_b64: System.get_env("APPLE_WALLET_MEMBERSHIP_KEY_PEM_B64"),
+    key_password: System.get_env("APPLE_WALLET_MEMBERSHIP_KEY_PASSWORD"),
+    pass_type_id: System.get_env("APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID")
+  }
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server

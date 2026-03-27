@@ -643,13 +643,13 @@ defmodule YscWeb.EventDetailsLive do
                           class={"w-14 h-14 rounded-full ring-2 #{if is_me, do: "ring-blue-500", else: if(is_host, do: "ring-amber-400", else: "ring-zinc-100")}"}
                         />
                         <%= if ticket_count > 1 do %>
-                          <span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-zinc-900 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white">
+                          <span class="absolute -bottom-1 -right-1 w-5 h-5 ml-0.5 rounded-full bg-zinc-900 text-white text-[10px] font-black leading-none flex items-center justify-center ring-2 ring-white">
                             {ticket_count}
                           </span>
                         <% end %>
                       </div>
                       <div class="text-center w-full">
-                        <p class="text-xs font-bold text-zinc-900 leading-tight truncate">
+                        <p class="text-xs font-bold text-zinc-900 leading-tight">
                           {if is_me, do: "You", else: display_name}
                         </p>
                         <%= cond do %>

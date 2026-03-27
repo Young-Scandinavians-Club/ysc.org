@@ -272,6 +272,8 @@ defmodule YscWeb.Router do
 
     get "/financials", PageController, :financials
     get "/expensereport/files/:encoded_path", ExpenseReportFileController, :show
+    get "/wallet/tickets/:ticket_id", AppleWalletController, :ticket
+    get "/wallet/membership", AppleWalletController, :membership
 
     live_session :require_authenticated_user,
       on_mount: [

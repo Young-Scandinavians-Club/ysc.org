@@ -74,7 +74,8 @@ defmodule YscWeb.HomeLive do
       # Membership QR modal
       show_membership_qr: false,
       membership_qr_token: nil,
-      membership_qr_details: nil
+      membership_qr_details: nil,
+      apple_wallet_membership_enabled?: Ysc.AppleWallet.configured?(:membership)
     )
   end
 
@@ -1761,10 +1762,15 @@ defmodule YscWeb.HomeLive do
                     <% end %>
                   </div>
                 <% end %>
+                <%= if @apple_wallet_membership_enabled? do %>
+                  <div class="flex justify-center mt-4">
+                    <.add_to_wallet_button href={~p"/wallet/membership"} />
+                  </div>
+                <% end %>
                 <.button
                   phx-click="hide_membership_qr"
                   color="zinc"
-                  class="w-full mt-5"
+                  class="w-full mt-3"
                 >
                   Close
                 </.button>

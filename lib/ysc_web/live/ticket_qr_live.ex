@@ -5,6 +5,7 @@ defmodule YscWeb.TicketQrLive do
 
   alias Ysc.Tickets
   alias Ysc.Scanning.QrToken
+  alias Ysc.AppleWallet
 
   @impl true
   def render(assigns) do
@@ -190,6 +191,13 @@ defmodule YscWeb.TicketQrLive do
                         <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-zinc-400 mt-4">
                           Scan to check in
                         </p>
+                        <%= if @apple_wallet_enabled? do %>
+                          <div class="flex justify-center mt-4">
+                            <.add_to_wallet_button href={
+                              ~p"/wallet/tickets/#{ticket.id}"
+                            } />
+                          </div>
+                        <% end %>
                       </div>
 
                       <%!-- ③ Perforation tear-line with side notches --%>
@@ -329,6 +337,7 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:ticket_count, 0)
       |> assign(:order_id, nil)
       |> assign(:order_reference, nil)
+      |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
 
     socket =
       if connected?(socket) do
@@ -357,6 +366,7 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:ticket_count, 0)
       |> assign(:order_id, nil)
       |> assign(:order_reference, nil)
+      |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
 
     socket =
       if connected?(socket) do
