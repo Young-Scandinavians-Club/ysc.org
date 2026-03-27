@@ -14,6 +14,10 @@ defmodule Ysc.AppleWallet.CertManager do
 
   use GenServer
 
+  # Register @sobelow_skip so the Elixir compiler does not warn about the attribute
+  # being unused (Sobelow consumes it from the source AST, not via Elixir reflection).
+  Module.register_attribute(__MODULE__, :sobelow_skip, accumulate: true)
+
   require Ysc.Logging
 
   @wwdr_path Application.app_dir(:ysc, "priv/apple_wallet/wwdr.pem")
@@ -126,17 +130,17 @@ defmodule Ysc.AppleWallet.CertManager do
     end
   end
 
+  # path is constructed from System.tmp_dir!() + a fixed internal prefix + random hex, not user input
+  @sobelow_skip ["Traversal.FileModule"]
   defp write_temp_file(name, content) do
     unique = :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
     path = Path.join(System.tmp_dir!(), "#{name}_#{unique}")
 
-    # sobelow_skip ["Traversal.FileModule"] - path is constructed from System.tmp_dir!() + a fixed internal prefix + random hex, not user input
     with :ok <- File.write(path, content),
          :ok <- File.chmod(path, 0o600) do
       {:ok, path}
     else
       {:error, reason} ->
-        # sobelow_skip ["Traversal.FileModule"] - same internally-generated path as above
         File.rm(path)
         {:error, reason}
     end

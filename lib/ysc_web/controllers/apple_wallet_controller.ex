@@ -4,6 +4,10 @@ defmodule YscWeb.AppleWalletController do
   # which propagates here making {:ok, _binary} look unreachable.
   @dialyzer {:nowarn_function, ticket: 2, membership: 2}
 
+  # Register @sobelow_skip so the Elixir compiler does not warn about the attribute
+  # being unused (Sobelow consumes it from the source AST, not via Elixir reflection).
+  Module.register_attribute(__MODULE__, :sobelow_skip, accumulate: true)
+
   use YscWeb, :controller
 
   require Ysc.Logging
@@ -16,6 +20,8 @@ defmodule YscWeb.AppleWalletController do
   Generates and sends an Apple Wallet ticket pass (.pkpass) for a specific ticket.
   The current user must own the ticket and it must be confirmed.
   """
+  # send_resp delivers a binary .pkpass file with a non-HTML content type and attachment disposition
+  @sobelow_skip ["XSS.SendResp"]
   def ticket(conn, %{"ticket_id" => ticket_id}) do
     user = conn.assigns.current_user
 
@@ -27,7 +33,6 @@ defmodule YscWeb.AppleWalletController do
           "content-disposition",
           "attachment; filename=\"ticket.pkpass\""
         )
-        # sobelow_skip ["XSS.SendResp"] - binary is a .pkpass file served as an attachment with a non-HTML content type
         |> send_resp(200, binary)
 
       {:error, :not_configured} ->
@@ -61,6 +66,8 @@ defmodule YscWeb.AppleWalletController do
   Generates and sends an Apple Wallet membership pass (.pkpass) for the current user.
   The user must have an active membership.
   """
+  # send_resp delivers a binary .pkpass file with a non-HTML content type and attachment disposition
+  @sobelow_skip ["XSS.SendResp"]
   def membership(conn, _params) do
     user = conn.assigns.current_user
 
@@ -73,7 +80,6 @@ defmodule YscWeb.AppleWalletController do
             "content-disposition",
             "attachment; filename=\"membership.pkpass\""
           )
-          # sobelow_skip ["XSS.SendResp"] - binary is a .pkpass file served as an attachment with a non-HTML content type
           |> send_resp(200, binary)
 
         {:error, :not_configured} ->

@@ -32,7 +32,7 @@ defmodule Ysc.AppleWalletTest do
     ticket =
       Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
       |> Ysc.Repo.preload([:tickets])
-      |> Map.fetch!(:tickets)
+      |> then(& &1.tickets)
       |> hd()
       |> Ecto.Changeset.change(status: :confirmed)
       |> Ysc.Repo.update!()
@@ -110,7 +110,7 @@ defmodule Ysc.AppleWalletTest do
       pending_ticket =
         Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
         |> Ysc.Repo.preload([:tickets])
-        |> Map.fetch!(:tickets)
+        |> then(& &1.tickets)
         |> hd()
 
       # Ticket stays :pending — not confirmed
@@ -180,7 +180,8 @@ defmodule Ysc.AppleWalletTest do
       }
     ]
 
-    original = Application.get_env(:ysc, :apple_wallet)
+    original_env = Application.get_env(:ysc, :apple_wallet)
+    original_state = :sys.get_state(Ysc.AppleWallet.CertManager)
 
     try do
       Application.put_env(:ysc, :apple_wallet, config)
@@ -200,15 +201,12 @@ defmodule Ysc.AppleWalletTest do
 
       fun.()
     after
-      # Restore the named CertManager to its original (unconfigured) state
+      # Restore the named CertManager to whatever state it had before this helper ran
       :sys.replace_state(Ysc.AppleWallet.CertManager, fn _state ->
-        %{
-          ticket: {:error, :not_configured},
-          membership: {:error, :not_configured}
-        }
+        original_state
       end)
 
-      Application.put_env(:ysc, :apple_wallet, original)
+      Application.put_env(:ysc, :apple_wallet, original_env)
     end
   end
 end

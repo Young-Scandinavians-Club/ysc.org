@@ -12,6 +12,10 @@ defmodule Ysc.AppleWallet do
   @dialyzer {:nowarn_function,
              generate_ticket_pass: 2, generate_membership_pass: 1}
 
+  # Register @sobelow_skip so the Elixir compiler does not warn about the attribute
+  # being unused (Sobelow consumes it from the source AST, not via Elixir reflection).
+  Module.register_attribute(__MODULE__, :sobelow_skip, accumulate: true)
+
   import Ecto.Query, warn: false
 
   require Ysc.Logging
@@ -38,14 +42,14 @@ defmodule Ysc.AppleWallet do
   Returns `{:ok, binary}` where binary is the .pkpass file contents,
   or `{:error, reason}`.
   """
+  # File.read/rm operate on a path returned by Passbook.generate, always within System.tmp_dir!()
+  @sobelow_skip ["Traversal.FileModule"]
   def generate_ticket_pass(ticket_id, user_id) do
     with {:certs, {:ok, certs}} <- {:certs, CertManager.get_ticket_certs()},
          {:ticket, %Ticket{} = ticket} <-
            {:ticket, load_ticket(ticket_id, user_id)},
          {:ok, pkpass_path} <- build_ticket_pass(ticket, certs),
-         # sobelow_skip ["Traversal.FileModule"] - path returned by Passbook.generate, always within System.tmp_dir!()
          {:ok, binary} <- File.read(pkpass_path) do
-      # sobelow_skip ["Traversal.FileModule"] - same internally-generated path
       File.rm(pkpass_path)
       {:ok, binary}
     else
@@ -71,12 +75,12 @@ defmodule Ysc.AppleWallet do
   Returns `{:ok, binary}` where binary is the .pkpass file contents,
   or `{:error, reason}`.
   """
+  # File.read/rm operate on a path returned by Passbook.generate, always within System.tmp_dir!()
+  @sobelow_skip ["Traversal.FileModule"]
   def generate_membership_pass(user) do
     with {:certs, {:ok, certs}} <- {:certs, CertManager.get_membership_certs()},
          {:ok, pkpass_path} <- build_membership_pass(user, certs),
-         # sobelow_skip ["Traversal.FileModule"] - path returned by Passbook.generate, always within System.tmp_dir!()
          {:ok, binary} <- File.read(pkpass_path) do
-      # sobelow_skip ["Traversal.FileModule"] - same internally-generated path
       File.rm(pkpass_path)
       {:ok, binary}
     else
@@ -105,6 +109,8 @@ defmodule Ysc.AppleWallet do
     |> Repo.one()
   end
 
+  # File.rm cleanup operates on paths generated internally via System.tmp_dir!() in download_image_to_tmp/1
+  @sobelow_skip ["Traversal.FileModule"]
   defp build_ticket_pass(ticket, certs) do
     config = Application.get_env(:ysc, :apple_wallet) || []
     ticket_config = Keyword.get(config, :ticket) || %{}
@@ -229,7 +235,6 @@ defmodule Ysc.AppleWallet do
         pass_name: "ticket-#{ticket.reference_id}"
       )
 
-    # sobelow_skip ["Traversal.FileModule"] - paths are generated internally via System.tmp_dir!() in download_image_to_tmp/1
     Enum.each(strip_tmp_paths, &File.rm/1)
     result
   end
@@ -328,6 +333,8 @@ defmodule Ysc.AppleWallet do
 
   defp download_image_to_tmp(nil), do: :error
 
+  # tmp_path is constructed from System.tmp_dir!() + random hex, not user input
+  @sobelow_skip ["Traversal.FileModule"]
   defp download_image_to_tmp(url) do
     task =
       Task.async(fn ->
@@ -349,7 +356,6 @@ defmodule Ysc.AppleWallet do
             "aw_strip_#{:crypto.strong_rand_bytes(8) |> Base.encode16()}.png"
           )
 
-        # sobelow_skip ["Traversal.FileModule"] - tmp_path is constructed from System.tmp_dir!() + random hex, not user input
         case File.write(tmp_path, body) do
           :ok -> {:ok, tmp_path}
           _ -> :error
