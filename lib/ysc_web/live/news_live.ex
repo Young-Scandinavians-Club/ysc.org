@@ -166,8 +166,8 @@ defmodule YscWeb.NewsLive do
           class="grid grid-cols-1 md:grid-cols-2 py-4 gap-8"
         >
           <%= for _i <- 1..4 do %>
-            <div class="flex flex-col bg-white rounded-xl p-4 ring-1 ring-zinc-100 shadow-sm animate-pulse">
-              <div class="aspect-[16/10] rounded-xl mb-8 bg-zinc-200"></div>
+            <div class="flex flex-col bg-white rounded-xl p-2 ring-1 ring-zinc-100 shadow-sm animate-pulse">
+              <div class="aspect-[16/10] rounded-lg mb-4 bg-zinc-200"></div>
               <div class="px-4 pb-4 space-y-4">
                 <div class="flex items-center gap-3">
                   <div class="w-16 h-3 bg-zinc-200 rounded"></div>
@@ -199,10 +199,10 @@ defmodule YscWeb.NewsLive do
           <div
             :for={{dom_id, post} <- @streams.posts}
             id={dom_id}
-            class="group flex flex-col bg-white rounded-xl p-4 border border-zinc-100 transition-all duration-300 hover:ring-2 hover:ring-blue-500"
+            class="group flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition-all duration-300 hover:ring-2 hover:ring-blue-500"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
-              <div class="relative aspect-[16/10] overflow-hidden rounded-xl mb-8">
+              <div class="relative aspect-[16/10] overflow-hidden rounded-lg">
                 <canvas
                   id={"blur-hash-image-#{post.id}"}
                   src={get_blur_hash(post.featured_image)}
@@ -228,7 +228,7 @@ defmodule YscWeb.NewsLive do
               </div>
             </.link>
 
-            <div class="px-4 pb-4 flex flex-col flex-1">
+            <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-sm font-black text-blue-600 uppercase tracking-[0.2em]">
                   {format_post_date(post.published_on)}

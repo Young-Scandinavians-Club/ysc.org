@@ -1417,4 +1417,158 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert is_binary(result)
     end
   end
+
+  describe "attendees section" do
+    defp confirmed_ticket(event, tier, user) do
+      %Ysc.Events.Ticket{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.utc_now()
+          |> DateTime.add(365, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+    end
+
+    test "does not show attendees section for non-members", %{conn: conn} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+      buyer = user_with_membership(:lifetime)
+      confirmed_ticket(event, tier, buyer)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      refute has_element?(view, "#attendees-section")
+    end
+
+    test "shows attendees section with host even when no tickets sold", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      # event_with_tickets auto-adds the organizer as a host, so the section
+      # now shows even without any ticket sales
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(view, "#attendees-section")
+    end
+
+    test "shows attendees section for members when at least one ticket is sold",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      # Remove the auto-added organizer host so the section only appears
+      # because a ticket was sold, not because there is a host
+      Enum.each(Ysc.Events.list_event_hosts(event), fn host ->
+        Ysc.Events.remove_event_host(event, host.id)
+      end)
+
+      confirmed_ticket(event, tier, user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(view, "#attendees-section")
+    end
+
+    test "shows current user first labeled as You", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      # Use `user` as the organizer so they are a host and sorted first
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      other_user = user_with_membership(:lifetime)
+      confirmed_ticket(event, tier, other_user)
+      confirmed_ticket(event, tier, user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(
+               view,
+               "#attendees-list > div:first-child[data-attendee-you]"
+             )
+    end
+
+    test "shows overflow tile when more than 10 unique attendees", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      # 9 buyers + user + separate event host = 11 unique attendees, exceeding
+      # the preview count of 10 and triggering the overflow tile.
+      for _ <- 1..9 do
+        buyer = user_with_membership(:lifetime)
+        confirmed_ticket(event, tier, buyer)
+      end
+
+      confirmed_ticket(event, tier, user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(view, "#attendees-overflow-btn")
+    end
+
+    test "does not show overflow tile when 10 or fewer unique attendees", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      # Use `user` as the organizer so they are both the event host and a ticket
+      # buyer — they get deduplicated into a single slot, keeping the total ≤ 10.
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      for _ <- 1..4 do
+        buyer = user_with_membership(:lifetime)
+        confirmed_ticket(event, tier, buyer)
+      end
+
+      confirmed_ticket(event, tier, user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      refute has_element?(view, "#attendees-overflow-btn")
+    end
+
+    test "overflow tile opens attendees modal", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      # 10 buyers + separate event host = 11 unique attendees, exceeding the
+      # preview count of 10 and triggering the overflow tile.
+      for _ <- 1..10 do
+        buyer = user_with_membership(:lifetime)
+        confirmed_ticket(event, tier, buyer)
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      element(view, "#attendees-overflow-btn") |> render_click()
+      assert has_element?(view, "#attendees-modal")
+    end
+  end
 end

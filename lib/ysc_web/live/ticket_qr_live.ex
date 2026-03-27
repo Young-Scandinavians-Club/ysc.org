@@ -56,31 +56,47 @@ defmodule YscWeb.TicketQrLive do
         <% @load_error -> %>
           <%!-- no strip on error --%>
         <% true -> %>
-          <div class="px-5 py-4 flex flex-col gap-2 border-b border-white/10">
-            <span
+          <div class="px-5 py-4 flex items-start justify-between gap-4 border-b border-white/10">
+            <div class="flex flex-col gap-2">
+              <span
+                :if={@event.start_date}
+                class="flex items-center gap-2 text-sm font-medium text-zinc-200"
+              >
+                <.icon name="hero-calendar" class="w-4 h-4 text-zinc-400 shrink-0" />
+                {format_event_date(@event.start_date, @event.start_time)}
+              </span>
+              <span
+                :if={@event.location_name}
+                class="flex items-center gap-2 text-sm text-zinc-200"
+              >
+                <.icon name="hero-map-pin" class="w-4 h-4 text-zinc-400 shrink-0" />
+                {@event.location_name}
+              </span>
+              <span
+                :if={@event.address}
+                class="flex items-center gap-2 text-sm text-zinc-300"
+              >
+                <.icon
+                  name="hero-building-office"
+                  class="w-4 h-4 text-zinc-400 shrink-0"
+                />
+                {@event.address}
+              </span>
+            </div>
+            <add-to-calendar-button
               :if={@event.start_date}
-              class="flex items-center gap-2 text-sm font-medium text-zinc-200"
+              name={@event.title}
+              startDate={date_for_add_to_cal(@event.start_date)}
+              {if get_end_date_for_calendar(@event), do: [endDate: date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
+              options="'Apple','Google','iCal','Outlook.com','Yahoo'"
+              startTime={@event.start_time}
+              {if get_end_time_for_calendar(@event), do: [endTime: get_end_time_for_calendar(@event)], else: []}
+              timeZone="America/Los_Angeles"
+              location={@event.location_name}
+              size="4"
+              lightMode="dark"
             >
-              <.icon name="hero-calendar" class="w-4 h-4 text-zinc-400 shrink-0" />
-              {format_event_date(@event.start_date, @event.start_time)}
-            </span>
-            <span
-              :if={@event.location_name}
-              class="flex items-center gap-2 text-sm text-zinc-200"
-            >
-              <.icon name="hero-map-pin" class="w-4 h-4 text-zinc-400 shrink-0" />
-              {@event.location_name}
-            </span>
-            <span
-              :if={@event.address}
-              class="flex items-center gap-2 text-sm text-zinc-300"
-            >
-              <.icon
-                name="hero-building-office"
-                class="w-4 h-4 text-zinc-400 shrink-0"
-              />
-              {@event.address}
-            </span>
+            </add-to-calendar-button>
           </div>
       <% end %>
 
@@ -133,7 +149,7 @@ defmodule YscWeb.TicketQrLive do
               <%!-- Wider padding (1.5rem) gives the side notch circles room to breathe --%>
               <div
                 data-slider-viewport
-                class="flex overflow-x-scroll snap-x snap-mandatory"
+                class="flex overflow-x-scroll snap-x snap-mandatory max-w-xl mx-auto"
               >
                 <%= for ticket <- @tickets do %>
                   <div
@@ -424,6 +440,8 @@ defmodule YscWeb.TicketQrLive do
           title: event.title,
           start_date: event.start_date,
           start_time: event.start_time,
+          end_time: event.end_time,
+          end_date: event.end_date,
           location_name: event.location_name,
           address: event.address
         },
@@ -474,6 +492,8 @@ defmodule YscWeb.TicketQrLive do
               title: event.title,
               start_date: event.start_date,
               start_time: event.start_time,
+              end_time: event.end_time,
+              end_date: event.end_date,
               location_name: event.location_name,
               address: event.address
             },
@@ -496,6 +516,42 @@ defmodule YscWeb.TicketQrLive do
   end
 
   defp safe_return_to(_), do: ~p"/users/tickets"
+
+  defp date_for_add_to_cal(nil), do: nil
+
+  defp date_for_add_to_cal(%DateTime{} = dt),
+    do: dt |> DateTime.to_date() |> Date.to_iso8601()
+
+  defp date_for_add_to_cal(%NaiveDateTime{} = dt),
+    do: dt |> NaiveDateTime.to_date() |> Date.to_iso8601()
+
+  defp date_for_add_to_cal(%Date{} = d), do: Date.to_iso8601(d)
+
+  defp get_end_time_for_calendar(event) do
+    case {event.start_time, event.end_time} do
+      {start_time, nil} when not is_nil(start_time) ->
+        Time.add(start_time, 3 * 60 * 60, :second)
+
+      {_start_time, end_time} ->
+        end_time
+    end
+  end
+
+  defp get_end_date_for_calendar(event) do
+    case {event.start_time, event.end_time, event.end_date} do
+      {start_time, nil, _end_date} when not is_nil(start_time) ->
+        calculated_end_time = Time.add(start_time, 3 * 60 * 60, :second)
+
+        if Time.compare(calculated_end_time, start_time) == :lt do
+          Date.add(DateTime.to_date(event.start_date), 1)
+        else
+          nil
+        end
+
+      {_start_time, _end_time, end_date} ->
+        if end_date, do: DateTime.to_date(end_date), else: nil
+    end
+  end
 
   defp format_event_date(start_date, start_time) do
     date_str = Calendar.strftime(start_date, "%A, %B %-d, %Y")

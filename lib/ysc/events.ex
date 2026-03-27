@@ -17,6 +17,7 @@ defmodule Ysc.Events do
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketReservation
   alias Ysc.Events.EventNotificationSubscription
+  alias Ysc.Accounts.User
 
   def subscribe() do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic())
@@ -173,17 +174,122 @@ defmodule Ysc.Events do
   @doc """
   Insert a new event into the database.
   """
+  @dialyzer {:nowarn_function, create_event: 1}
   def create_event(attrs \\ %{}) do
-    %Event{}
-    |> Event.changeset(attrs)
-    |> Repo.insert()
-    |> case do
-      {:ok, event} ->
+    organizer_id =
+      Map.get(attrs, :organizer_id) || Map.get(attrs, "organizer_id")
+
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:event, Event.changeset(%Event{}, attrs))
+
+    multi =
+      if organizer_id do
+        Ecto.Multi.run(multi, :add_host, fn repo, %{event: event} ->
+          case repo.get(User, organizer_id) do
+            nil ->
+              {:ok, nil}
+
+            organizer ->
+              event
+              |> repo.preload(:hosts)
+              |> Ecto.Changeset.change()
+              |> Ecto.Changeset.put_assoc(:hosts, [organizer])
+              |> repo.update()
+          end
+        end)
+      else
+        multi
+      end
+
+    case Repo.transaction(multi) do
+      {:ok, %{event: event}} ->
         broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
         {:ok, event}
 
-      {:error, changeset} ->
+      {:error, :event, changeset, _} ->
         {:error, changeset}
+
+      {:error, :add_host, error, _} ->
+        {:error, error}
+    end
+  end
+
+  @doc """
+  List hosts for an event, preloaded from the join table.
+  """
+  def list_event_hosts(%Event{} = event) do
+    event
+    |> Repo.preload(:hosts)
+    |> then(& &1.hosts)
+  end
+
+  @doc """
+  List hosts for an event by event_id, without needing a full Event struct.
+  """
+  def list_event_hosts_by_event_id(event_id) do
+    from(u in User,
+      join: eh in "event_hosts",
+      on: eh.user_id == u.id,
+      where: eh.event_id == type(^event_id, Ecto.ULID),
+      order_by: [asc: eh.user_id]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Add a user as a host of an event. Silently succeeds if already a host.
+  Uses force-reload and optimistic locking to prevent lost concurrent updates.
+  """
+  def add_event_host(%Event{} = event, %User{} = user) do
+    event = Repo.get!(Event, event.id) |> Repo.preload(:hosts, force: true)
+    hosts = Enum.uniq_by([user | event.hosts], & &1.id)
+
+    result =
+      event
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.optimistic_lock(:lock_version)
+      |> Ecto.Changeset.put_assoc(:hosts, hosts)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_event} ->
+        broadcast(%Ysc.MessagePassingEvents.EventHostsUpdated{
+          event_id: updated_event.id
+        })
+
+        {:ok, updated_event}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Remove a user from the hosts of an event.
+  Uses force-reload and optimistic locking to prevent lost concurrent updates.
+  """
+  def remove_event_host(%Event{} = event, user_id) do
+    event = Repo.get!(Event, event.id) |> Repo.preload(:hosts, force: true)
+    hosts = Enum.reject(event.hosts, &(&1.id == user_id))
+
+    result =
+      event
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.optimistic_lock(:lock_version)
+      |> Ecto.Changeset.put_assoc(:hosts, hosts)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_event} ->
+        broadcast(%Ysc.MessagePassingEvents.EventHostsUpdated{
+          event_id: updated_event.id
+        })
+
+        {:ok, updated_event}
+
+      error ->
+        error
     end
   end
 

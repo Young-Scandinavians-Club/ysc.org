@@ -124,4 +124,9 @@ defmodule Ysc.MessagePassingEvents do
     @moduledoc false
     defstruct ticket: nil, event_id: nil
   end
+
+  defmodule EventHostsUpdated do
+    @moduledoc false
+    defstruct event_id: nil
+  end
 end

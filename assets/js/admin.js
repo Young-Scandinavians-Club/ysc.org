@@ -17,6 +17,7 @@ import FocusSearchInput from "./focus_search_input";
 import ScheduleTimezone from "./schedule_timezone";
 import LocalTime from "./local_time";
 import QrScanner from "./qr_scanner";
+import StickyEventHeader from "./sticky_event_header";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
@@ -49,6 +50,7 @@ window.__adminHooks = {
     ScheduleTimezone,
     LocalTime,
     QrScanner,
+    StickyEventHeader,
 };
 
 window.addEventListener("phx:focus-search", (e) => {

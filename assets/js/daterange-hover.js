@@ -56,10 +56,10 @@ const DaterangeHover = {
                 // Invalid ID, skip
             }
 
-            // If not found, try to find by data-phx-component attribute
+            // If not found, try to find by data-component-id attribute
             if (!this.componentEl) {
                 try {
-                    this.componentEl = document.querySelector(`[data-phx-component="${componentId}"]`);
+                    this.componentEl = document.querySelector(`[data-component-id="${componentId}"]`);
                 } catch (e) {
                     // Invalid selector, skip
                 }
@@ -79,8 +79,8 @@ const DaterangeHover = {
                                 // by walking up the DOM tree
                                 let parent = this.el.parentElement;
                                 while (parent && !this.componentEl) {
-                                    if (parent.hasAttribute && parent.hasAttribute("data-phx-component")) {
-                                        const parentComponentId = parent.getAttribute("data-phx-component");
+                                    if (parent.hasAttribute && parent.hasAttribute("data-component-id")) {
+                                        const parentComponentId = parent.getAttribute("data-component-id");
                                         if (parentComponentId === componentId) {
                                             this.componentEl = parent;
                                             break;
@@ -101,7 +101,7 @@ const DaterangeHover = {
                 let parent = this.el.parentElement;
                 while (parent && !this.componentEl) {
                     if (parent.id === componentId ||
-                        (parent.hasAttribute && parent.getAttribute("data-phx-component") === componentId)) {
+                        (parent.hasAttribute && parent.getAttribute("data-component-id") === componentId)) {
                         this.componentEl = parent;
                         break;
                     }

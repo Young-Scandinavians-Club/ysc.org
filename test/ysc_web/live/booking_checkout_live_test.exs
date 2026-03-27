@@ -1,5 +1,5 @@
 defmodule YscWeb.BookingCheckoutLiveTest do
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   import Ecto.Changeset
   import Phoenix.LiveViewTest
@@ -13,6 +13,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   alias Ysc.Repo
   alias Ysc.StripeMock
 
+  setup :set_mox_global
   setup :verify_on_exit!
 
   setup %{conn: conn} do
