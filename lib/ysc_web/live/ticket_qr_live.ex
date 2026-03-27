@@ -539,13 +539,13 @@ defmodule YscWeb.TicketQrLive do
         calculated_end_time = Time.add(start_time, 3 * 60 * 60, :second)
 
         if Time.compare(calculated_end_time, start_time) == :lt do
-          Date.add(event.start_date, 1)
+          Date.add(DateTime.to_date(event.start_date), 1)
         else
           nil
         end
 
       {_start_time, _end_time, end_date} ->
-        end_date
+        if end_date, do: DateTime.to_date(end_date), else: nil
     end
   end
 

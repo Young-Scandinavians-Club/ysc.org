@@ -1504,14 +1504,16 @@ defmodule YscWeb.EventDetailsLiveTest do
              )
     end
 
-    test "shows overflow tile when more than 5 unique attendees", %{conn: conn} do
+    test "shows overflow tile when more than 10 unique attendees", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
       event = event_with_tickets(tier_count: 1, state: :upcoming)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      for _ <- 1..6 do
+      # 9 buyers + user + separate event host = 11 unique attendees, exceeding
+      # the preview count of 10 and triggering the overflow tile.
+      for _ <- 1..9 do
         buyer = user_with_membership(:lifetime)
         confirmed_ticket(event, tier, buyer)
       end
@@ -1524,13 +1526,13 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert has_element?(view, "#attendees-overflow-btn")
     end
 
-    test "does not show overflow tile when 5 or fewer unique attendees", %{
+    test "does not show overflow tile when 10 or fewer unique attendees", %{
       conn: conn
     } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
       # Use `user` as the organizer so they are both the event host and a ticket
-      # buyer — they get deduplicated into a single slot, keeping the total ≤ 5.
+      # buyer — they get deduplicated into a single slot, keeping the total ≤ 10.
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
@@ -1555,7 +1557,9 @@ defmodule YscWeb.EventDetailsLiveTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      for _ <- 1..7 do
+      # 10 buyers + separate event host = 11 unique attendees, exceeding the
+      # preview count of 10 and triggering the overflow tile.
+      for _ <- 1..10 do
         buyer = user_with_membership(:lifetime)
         confirmed_ticket(event, tier, buyer)
       end
