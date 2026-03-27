@@ -2932,6 +2932,32 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Renders an official "Add to Apple Wallet" badge linking to the given href.
+
+  Uses Apple's provided SVG artwork as required by the
+  Add to Apple Wallet badge guidelines.
+
+  ## Examples
+
+      <.add_to_wallet_button href="/wallet/tickets/abc123" />
+      <.add_to_wallet_button href="/wallet/membership" height={52} />
+  """
+  attr :href, :string, required: true
+  attr :height, :integer, default: 44
+
+  def add_to_wallet_button(assigns) do
+    ~H"""
+    <a href={@href}>
+      <img
+        src={~p"/images/apple/US-UK_Add_to_Apple_Wallet_RGB_101421.svg"}
+        alt="Add to Apple Wallet"
+        height={@height}
+      />
+    </a>
+    """
+  end
+
+  @doc """
   Renders a QR code as an inline SVG.
 
   ## Examples

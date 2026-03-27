@@ -43,6 +43,8 @@ defmodule Ysc.Application do
       {Ysc.ScanRateLimit, [clean_period: :timer.minutes(1)]},
       # Start verification code cache
       Ysc.VerificationCache,
+      # Start Apple Wallet certificate manager
+      Ysc.AppleWallet.CertManager,
       # Start the Endpoint (http/https)
       YscWeb.Endpoint,
       # Start a worker by calling: Ysc.Worker.start_link(arg)
