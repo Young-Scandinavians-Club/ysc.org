@@ -238,7 +238,7 @@ defmodule Ysc.SettingsTest do
       assert length(settings) == 1
     end
 
-    test "returns default when insert raises a non-unique database exception" do
+    test "returns default when setting name exceeds max length without inserting" do
       long_name = String.duplicate("x", 500)
 
       assert Settings.get_or_create_setting(
