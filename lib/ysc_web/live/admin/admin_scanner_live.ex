@@ -781,7 +781,7 @@ defmodule YscWeb.AdminScannerLive do
               @scan_result && "opacity-0"
             ]}>
               <details class="group pointer-events-auto w-full max-w-sm">
-                <summary class="cursor-pointer text-sm text-white/55 hover:text-white/80 font-medium flex items-center justify-center gap-1.5 select-none">
+                <summary class="cursor-pointer text-sm text-white/90 hover:text-white font-medium flex items-center justify-center gap-1.5 select-none">
                   <.icon name="hero-pencil-square" class="w-4 h-4" /> Manual Entry
                   <.icon
                     name="hero-chevron-up"

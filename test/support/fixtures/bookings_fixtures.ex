@@ -16,10 +16,16 @@ defmodule Ysc.BookingsFixtures do
     end
   end
 
-  def booking_fixture(attrs \\ %{}) do
-    user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
+  @doc """
+  Returns `{checkin, checkout}` for a Tahoe stay that satisfies weekend and summer rules.
+
+  Used by tests that call `Bookings.create_booking/1` directly. `offset_days` is added to
+  today's date before snapping to the first Monday on or after that day (then summer
+  adjustment when the month is Tahoe winter).
+  """
+  def tahoe_booking_dates(offset_days \\ 7) do
     today = Date.utc_today()
-    base = Date.add(today, 7)
+    base = Date.add(today, offset_days)
 
     # Ensure we don't hit the "Saturday must include Sunday" rule:
     # Start on a Monday, stay for 3 nights (checkout Thursday).
@@ -40,6 +46,12 @@ defmodule Ysc.BookingsFixtures do
       end
 
     checkout = Date.add(checkin, 3)
+    {checkin, checkout}
+  end
+
+  def booking_fixture(attrs \\ %{}) do
+    user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
+    {checkin, checkout} = tahoe_booking_dates(7)
 
     {:ok, booking} =
       attrs

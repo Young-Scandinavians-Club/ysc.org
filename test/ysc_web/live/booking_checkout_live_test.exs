@@ -412,8 +412,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
           season_id: nil
         })
 
-      checkin = Date.utc_today() |> Date.add(40)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(40)
 
       hold_expires_at =
         DateTime.utc_now()
