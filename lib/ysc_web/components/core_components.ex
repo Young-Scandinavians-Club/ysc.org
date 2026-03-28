@@ -2940,10 +2940,10 @@ defmodule YscWeb.CoreComponents do
   ## Examples
 
       <.add_to_wallet_button href="/wallet/tickets/abc123" />
-      <.add_to_wallet_button href="/wallet/membership" height={52} />
+      <.add_to_wallet_button href="/wallet/membership" height={50} />
   """
   attr :href, :string, required: true
-  attr :height, :integer, default: 44
+  attr :height, :integer, default: 66
 
   def add_to_wallet_button(assigns) do
     ~H"""
