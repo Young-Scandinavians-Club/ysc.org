@@ -226,7 +226,7 @@ defmodule Ysc.GoogleWallet do
        })
        when not is_nil(path) do
     %{
-      "sourceUri" => %{"uri" => path},
+      "sourceUri" => %{"uri" => absolute_image_url(path)},
       "contentDescription" => localized_string(title)
     }
   end
@@ -234,21 +234,31 @@ defmodule Ysc.GoogleWallet do
   defp event_hero_image(%{cover_image: %{raw_image_path: path}, title: title})
        when not is_nil(path) do
     %{
-      "sourceUri" => %{"uri" => path},
+      "sourceUri" => %{"uri" => absolute_image_url(path)},
       "contentDescription" => localized_string(title)
     }
   end
 
   defp event_hero_image(_event), do: nil
 
+  defp absolute_image_url("http://" <> _ = url), do: url
+  defp absolute_image_url("https://" <> _ = url), do: url
+  defp absolute_image_url(path), do: YscWeb.Endpoint.url() <> path
+
   defp build_venue(%{location_name: name, place_id: place_id})
-       when not is_nil(name) and not is_nil(place_id) do
-    %{"name" => localized_string(name), "placeId" => place_id}
+       when not is_nil(name) and is_binary(place_id) and place_id != "" do
+    %{
+      "name" => localized_string(String.trim(name)),
+      "placeId" => String.trim(place_id)
+    }
   end
 
   defp build_venue(%{location_name: name, address: address})
-       when not is_nil(name) and not is_nil(address) do
-    %{"name" => localized_string(name), "address" => localized_string(address)}
+       when not is_nil(name) and is_binary(address) and address != "" do
+    %{
+      "name" => localized_string(String.trim(name)),
+      "address" => localized_string(String.trim(address))
+    }
   end
 
   defp build_venue(_event), do: nil
