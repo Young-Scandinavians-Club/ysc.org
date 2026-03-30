@@ -201,19 +201,57 @@ defmodule Ysc.GoogleWallet do
   end
 
   defp build_event_ticket_class(event, issuer_id) do
+    logo_url =
+      YscWeb.Endpoint.url() <>
+        YscWeb.Endpoint.static_path("/images/ysc_logo.png")
+
     %{
       "id" => event_class_id(issuer_id, event.reference_id),
       "issuerName" => "Young Scandinavians Club",
       "reviewStatus" => "UNDER_REVIEW",
       "eventName" => localized_string(event.title),
-      "venue" =>
-        if(event.location_name,
-          do: %{"name" => localized_string(event.location_name)},
-          else: nil
-        )
+      "venue" => build_venue(event),
+      "logo" => %{
+        "sourceUri" => %{"uri" => logo_url},
+        "contentDescription" => localized_string("Young Scandinavians Club")
+      },
+      "heroImage" => event_hero_image(event)
     }
     |> compact()
   end
+
+  defp event_hero_image(%{
+         cover_image: %{optimized_image_path: path},
+         title: title
+       })
+       when not is_nil(path) do
+    %{
+      "sourceUri" => %{"uri" => path},
+      "contentDescription" => localized_string(title)
+    }
+  end
+
+  defp event_hero_image(%{cover_image: %{raw_image_path: path}, title: title})
+       when not is_nil(path) do
+    %{
+      "sourceUri" => %{"uri" => path},
+      "contentDescription" => localized_string(title)
+    }
+  end
+
+  defp event_hero_image(_event), do: nil
+
+  defp build_venue(%{location_name: name, place_id: place_id})
+       when not is_nil(place_id) do
+    %{"name" => localized_string(name), "placeId" => place_id}
+  end
+
+  defp build_venue(%{location_name: name, address: address})
+       when not is_nil(name) and not is_nil(address) do
+    %{"name" => localized_string(name), "address" => localized_string(address)}
+  end
+
+  defp build_venue(_event), do: nil
 
   defp build_event_ticket_object(ticket, issuer_id) do
     event = ticket.event
@@ -280,10 +318,19 @@ defmodule Ysc.GoogleWallet do
   end
 
   defp build_generic_class(issuer_id) do
+    logo_url =
+      YscWeb.Endpoint.url() <>
+        YscWeb.Endpoint.static_path("/images/ysc_logo.png")
+
     %{
       "id" => membership_class_id(issuer_id),
       "issuerName" => "Young Scandinavians Club",
-      "reviewStatus" => "UNDER_REVIEW"
+      "reviewStatus" => "UNDER_REVIEW",
+      "hexBackgroundColor" => "#1b1b52",
+      "logo" => %{
+        "sourceUri" => %{"uri" => logo_url},
+        "contentDescription" => localized_string("Young Scandinavians Club")
+      }
     }
   end
 
