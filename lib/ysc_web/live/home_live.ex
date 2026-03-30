@@ -2761,36 +2761,6 @@ defmodule YscWeb.HomeLive do
     ceil(word_count / 200) |> max(1)
   end
 
-  defp membership_status_text(user, membership) do
-    cond do
-      # User is pending approval - they're not a member yet
-      user.state == :pending_approval ->
-        "Application submitted #{Calendar.strftime(user.inserted_at, "%Y")}"
-
-      # Lifetime membership uses awarded_at, not start_date
-      membership != nil && is_map(membership) &&
-          Map.get(membership, :type) == :lifetime ->
-        "Member since #{Calendar.strftime(membership.awarded_at, "%Y")}"
-
-      # User has active membership with start date
-      membership != nil && is_map(membership) &&
-          Map.get(membership, :start_date) != nil ->
-        "Member since #{Calendar.strftime(membership.start_date, "%Y")}"
-
-      # User has lifetime membership tracked on user record
-      user.lifetime_membership_awarded_at != nil ->
-        "Member since #{Calendar.strftime(user.lifetime_membership_awarded_at, "%Y")}"
-
-      # Fallback: use account creation date for active users
-      user.state == :active ->
-        "Member since #{Calendar.strftime(user.inserted_at, "%Y")}"
-
-      # Other states (rejected, suspended, deleted)
-      true ->
-        "Account created #{Calendar.strftime(user.inserted_at, "%Y")}"
-    end
-  end
-
   defp preview_text_for_news(%Post{preview_text: nil} = post) do
     if post.raw_body do
       post.raw_body
