@@ -6,11 +6,15 @@ defmodule YscWeb.TicketQrLive do
   alias Ysc.Tickets
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet
+  alias Ysc.GoogleWallet
 
   @impl true
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-zinc-900 text-white flex flex-col">
+      <%!-- Detects platform to show the correct wallet button(s) --%>
+      <div id="wallet-platform-detector" phx-hook="WalletPlatform" class="hidden">
+      </div>
       <%!-- Header bar --%>
       <div class="flex items-center gap-3 px-4 pt-safe-top py-4 border-b border-white/10">
         <.link
@@ -191,10 +195,19 @@ defmodule YscWeb.TicketQrLive do
                         <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-zinc-400 mt-4">
                           Scan to check in
                         </p>
-                        <%= if @apple_wallet_enabled? do %>
+                        <%= if @apple_wallet_enabled? && @wallet_platform in [:apple_only, :both] do %>
                           <div class="flex justify-center mt-4">
                             <.add_to_wallet_button href={
                               ~p"/wallet/tickets/#{ticket.id}"
+                            } />
+                          </div>
+                        <% end %>
+                        <%= if @google_wallet_enabled? &&
+                              @wallet_platform in [:google_only, :both] &&
+                              Map.get(@google_wallet_ticket_urls, ticket.id) do %>
+                          <div class="flex justify-center mt-2">
+                            <.add_to_google_wallet_button href={
+                              Map.get(@google_wallet_ticket_urls, ticket.id)
                             } />
                           </div>
                         <% end %>
@@ -338,6 +351,9 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:order_id, nil)
       |> assign(:order_reference, nil)
       |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
+      |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
+      |> assign(:google_wallet_ticket_urls, %{})
+      |> assign(:wallet_platform, :both)
 
     socket =
       if connected?(socket) do
@@ -367,6 +383,9 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:order_id, nil)
       |> assign(:order_reference, nil)
       |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
+      |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
+      |> assign(:google_wallet_ticket_urls, %{})
+      |> assign(:wallet_platform, :both)
 
     socket =
       if connected?(socket) do
@@ -393,6 +412,23 @@ defmodule YscWeb.TicketQrLive do
   end
 
   def handle_async(:load_ticket_data, {:ok, data}, socket) do
+    google_wallet_urls =
+      if socket.assigns.google_wallet_enabled? do
+        user_id = socket.assigns.current_user.id
+
+        Map.new(data.tickets, fn ticket ->
+          url =
+            case GoogleWallet.generate_ticket_save_url(ticket.id, user_id) do
+              {:ok, url} -> url
+              _ -> nil
+            end
+
+          {ticket.id, url}
+        end)
+      else
+        %{}
+      end
+
     {:noreply,
      socket
      |> assign(:loading, false)
@@ -401,7 +437,8 @@ defmodule YscWeb.TicketQrLive do
      |> assign(:tickets, data.tickets)
      |> assign(:ticket_count, data.ticket_count)
      |> assign(:order_id, data.order_id)
-     |> assign(:order_reference, data.order_reference)}
+     |> assign(:order_reference, data.order_reference)
+     |> assign(:google_wallet_ticket_urls, google_wallet_urls)}
   end
 
   def handle_async(:load_ticket_data, {:exit, reason}, socket) do
@@ -411,6 +448,22 @@ defmodule YscWeb.TicketQrLive do
      socket
      |> assign(:loading, false)
      |> assign(:load_error, true)}
+  end
+
+  @impl true
+  def handle_event(
+        "wallet_platform_detected",
+        %{"platform" => platform},
+        socket
+      ) do
+    platform_atom =
+      case platform do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+
+    {:noreply, assign(socket, :wallet_platform, platform_atom)}
   end
 
   # --- Private ---

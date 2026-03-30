@@ -895,7 +895,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           end)
 
         case result do
-          {:ok, _updated_subscription} ->
+          {:ok, updated_subscription} ->
+            maybe_update_google_wallet_membership(updated_subscription, attrs)
             :ok
 
           {:error, reason} ->
@@ -3993,4 +3994,49 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp wp_migration_event?(_), do: false
+
+  # Updates the Google Wallet membership pass after a subscription change.
+  # Only fires when:
+  #   - Google Wallet is configured
+  #   - The subscription belongs to a user
+  #   - The subscription is active/trialing (not cancelled/expired)
+  #   - current_period_end was actually updated in this webhook
+  # Runs in a background Task so HTTP latency never delays webhook processing.
+  defp maybe_update_google_wallet_membership(updated_subscription, attrs) do
+    active_statuses = ["active", "trialing"]
+    status = updated_subscription.stripe_status
+    period_end = updated_subscription.current_period_end
+    user_id = updated_subscription.user_id
+
+    with true <- Ysc.GoogleWallet.configured?(),
+         true <- is_binary(user_id),
+         true <- status in active_statuses,
+         true <- Map.has_key?(attrs, :current_period_end),
+         %DateTime{} <- period_end do
+      wallet_attrs = %{
+        "validTimeInterval" => %{
+          "end" => %{"date" => DateTime.to_iso8601(period_end)}
+        }
+      }
+
+      Task.start(fn ->
+        case Ysc.GoogleWallet.update_membership_object(user_id, wallet_attrs) do
+          :ok ->
+            Ysc.Logging.info(
+              "Google Wallet membership pass updated after subscription renewal",
+              user_id: user_id
+            )
+
+          {:error, reason} ->
+            Ysc.Logging.warning(
+              "Google Wallet membership update failed after subscription renewal",
+              user_id: user_id,
+              error: inspect(reason)
+            )
+        end
+      end)
+    end
+
+    :ok
+  end
 end

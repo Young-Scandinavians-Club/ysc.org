@@ -45,12 +45,18 @@ defmodule Ysc.Application do
       Ysc.VerificationCache,
       # Start Apple Wallet certificate manager
       Ysc.AppleWallet.CertManager,
+      # Start Google Wallet credentials manager
+      Ysc.GoogleWallet.Credentials,
       # Start the Endpoint (http/https)
       YscWeb.Endpoint,
       # Start a worker by calling: Ysc.Worker.start_link(arg)
       # {Ysc.Worker, arg}
       {Oban, Application.fetch_env!(:ysc, Oban)}
     ]
+
+    # Start Goth (Google OAuth2 token server) only when Google Wallet is configured
+    base_children =
+      base_children ++ Ysc.GoogleWallet.Credentials.goth_child_spec()
 
     # PromEx periodically polls metrics (including DB-backed plugins). In tests, this can
     # generate noisy ownership errors due to the SQL sandbox.

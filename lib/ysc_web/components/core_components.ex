@@ -2943,7 +2943,7 @@ defmodule YscWeb.CoreComponents do
       <.add_to_wallet_button href="/wallet/membership" height={50} />
   """
   attr :href, :string, required: true
-  attr :height, :integer, default: 66
+  attr :height, :integer, default: 86
 
   def add_to_wallet_button(assigns) do
     ~H"""
@@ -2951,6 +2951,33 @@ defmodule YscWeb.CoreComponents do
       <img
         src={~p"/images/apple/US-UK_Add_to_Apple_Wallet_RGB_101421.svg"}
         alt="Add to Apple Wallet"
+        height={@height}
+      />
+    </a>
+    """
+  end
+
+  @doc """
+  Renders an official "Add to Google Wallet" badge linking to the given href.
+
+  Uses Google's provided SVG artwork as required by the
+  Add to Google Wallet badge guidelines. Opens in a new tab since the save URL
+  navigates to Google's domain.
+
+  ## Examples
+
+      <.add_to_google_wallet_button href="https://pay.google.com/gp/v/save/..." />
+      <.add_to_google_wallet_button href={@google_wallet_url} height={50} />
+  """
+  attr :href, :string, required: true
+  attr :height, :integer, default: 68
+
+  def add_to_google_wallet_button(assigns) do
+    ~H"""
+    <a href={@href} target="_blank" rel="noopener noreferrer">
+      <img
+        src={~p"/images/google/enGB_add_to_google_wallet_add-wallet-badge.svg"}
+        alt="Add to Google Wallet"
         height={@height}
       />
     </a>

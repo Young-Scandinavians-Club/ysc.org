@@ -56,6 +56,7 @@ import HeroVideoControls from "./hero_video_controls";
 import AdminFloatingButton from "./admin_floating_button";
 import AutoResizeIframe from "./auto_resize_iframe";
 import TicketSlider from "./ticket_slider";
+import WalletPlatform from "./wallet_platform";
 import { createLiveToastHook } from "../../deps/live_toast";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
@@ -92,6 +93,7 @@ let Hooks = {
     AdminFloatingButton,
     AutoResizeIframe,
     TicketSlider,
+    WalletPlatform,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
 };
 Hooks.LivePhone = LivePhone;
