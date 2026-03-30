@@ -709,6 +709,13 @@ defmodule Ysc.ScanningTest do
       {:ok, _} =
         Scanning.process_scan(session, QrToken.sign_membership(user.id))
 
+      Ysc.Repo.update_all(
+        Ecto.Query.from(r in Ysc.Scanning.ScanRecord,
+          where: r.scan_session_id == ^session.id
+        ),
+        set: [inserted_at: DateTime.add(DateTime.utc_now(), -10, :second)]
+      )
+
       {:ok, _} =
         Scanning.process_scan(session, QrToken.sign_membership(user2.id))
 
