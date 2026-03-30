@@ -242,7 +242,7 @@ defmodule Ysc.GoogleWallet do
   defp event_hero_image(_event), do: nil
 
   defp build_venue(%{location_name: name, place_id: place_id})
-       when not is_nil(place_id) do
+       when not is_nil(name) and not is_nil(place_id) do
     %{"name" => localized_string(name), "placeId" => place_id}
   end
 
