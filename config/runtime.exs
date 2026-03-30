@@ -62,6 +62,15 @@ config :ysc, :apple_wallet,
     pass_type_id: System.get_env("APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID")
   }
 
+# ## Google Wallet Configuration
+#
+# Configure Google Wallet pass generation for event tickets and membership cards.
+# Use the full JSON content of the Google service account key file.
+# All values are optional — if not set, the "Add to Google Wallet" buttons are hidden.
+config :ysc, :google_wallet,
+  credentials_json: System.get_env("GOOGLE_WALLET_CREDENTIALS_JSON"),
+  issuer_id: System.get_env("GOOGLE_WALLET_ISSUER_ID")
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server

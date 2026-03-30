@@ -882,7 +882,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                   end
                 end
 
-                {:ok, updated_subscription}
+                updated_subscription
 
               {:error, changeset} ->
                 Ysc.Logging.error("Failed to update subscription",
@@ -895,7 +895,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           end)
 
         case result do
-          {:ok, _updated_subscription} ->
+          {:ok, updated_subscription} ->
+            maybe_update_google_wallet_membership(updated_subscription, attrs)
             :ok
 
           {:error, reason} ->
@@ -3993,4 +3994,51 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp wp_migration_event?(_), do: false
+
+  # Updates the Google Wallet membership pass after a subscription change.
+  # Only fires when:
+  #   - Google Wallet is configured
+  #   - The subscription belongs to a user
+  #   - The subscription is active/trialing (not cancelled/expired)
+  #   - current_period_end was actually updated in this webhook
+  # Runs in a background Task so HTTP latency never delays webhook processing.
+  # Enqueues an Oban job to update the Google Wallet membership pass after renewal.
+  #
+  # Using Oban.insert (rather than Task.start) ensures the job row is written to
+  # oban_jobs inside the same database transaction that is already open in
+  # process_webhook_event/2. If that outer transaction rolls back (e.g. because
+  # marking the webhook event as processed fails), the job insert is rolled back
+  # too and the Google Wallet PATCH never fires. If the transaction commits, the
+  # Oban worker picks up the job and performs the PATCH safely post-commit.
+  defp maybe_update_google_wallet_membership(updated_subscription, attrs) do
+    active_statuses = ["active", "trialing"]
+    status = updated_subscription.stripe_status
+    period_end = updated_subscription.current_period_end
+    user_id = updated_subscription.user_id
+
+    with true <- Ysc.GoogleWallet.configured?(),
+         true <- is_binary(user_id),
+         true <- status in active_statuses,
+         true <- Map.has_key?(attrs, :current_period_end),
+         %DateTime{} <- period_end do
+      job_args = %{
+        "user_id" => user_id,
+        "period_end" => DateTime.to_iso8601(period_end)
+      }
+
+      case Oban.insert(Ysc.GoogleWallet.MembershipUpdateWorker.new(job_args)) do
+        {:ok, _job} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Google Wallet: failed to enqueue membership update job",
+            user_id: user_id,
+            error: inspect(reason)
+          )
+      end
+    end
+
+    :ok
+  end
 end

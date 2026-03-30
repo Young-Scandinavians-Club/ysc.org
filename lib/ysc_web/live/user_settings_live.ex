@@ -8,6 +8,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Accounts.UserNotifier
   alias Ysc.Customers
+  alias Ysc.GoogleWallet
   alias Ysc.Ledgers
   alias Ysc.Newsletter
   alias Ysc.Repo
@@ -1686,6 +1687,14 @@ defmodule YscWeb.UserSettingsLive do
             </div>
           </div>
 
+          <%!-- Detects platform to show the correct wallet button(s) --%>
+          <div
+            id="wallet-platform-detector"
+            phx-hook="WalletPlatform"
+            class="hidden"
+          >
+          </div>
+
           <.modal
             :if={
               @show_membership_qr &&
@@ -1755,9 +1764,17 @@ defmodule YscWeb.UserSettingsLive do
                   <% end %>
                 </div>
               <% end %>
-              <%= if @apple_wallet_membership_enabled? do %>
+              <%= if @apple_wallet_membership_enabled? &&
+                    @wallet_platform in [:apple_only, :both] do %>
                 <div class="flex justify-center mt-4">
                   <.add_to_wallet_button href={~p"/wallet/membership"} />
+                </div>
+              <% end %>
+              <%= if @google_wallet_membership_enabled? &&
+                    @wallet_platform in [:google_only, :both] &&
+                    @google_wallet_membership_url do %>
+                <div class="flex justify-center mt-2">
+                  <.add_to_google_wallet_button href={@google_wallet_membership_url} />
                 </div>
               <% end %>
               <.button
@@ -2414,6 +2431,12 @@ defmodule YscWeb.UserSettingsLive do
         :apple_wallet_membership_enabled?,
         Ysc.AppleWallet.configured?(:membership)
       )
+      |> assign(
+        :google_wallet_membership_enabled?,
+        GoogleWallet.configured?(:membership)
+      )
+      |> assign(:google_wallet_membership_url, nil)
+      |> assign(:wallet_platform, wallet_platform_from_params(socket))
 
     # Payments tab assigns (placeholders for initial render)
     socket =
@@ -2706,6 +2729,21 @@ defmodule YscWeb.UserSettingsLive do
     do: {:noreply, socket}
 
   def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "wallet_platform_detected",
+        %{"platform" => platform},
+        socket
+      ) do
+    platform_atom =
+      case platform do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+
+    {:noreply, assign(socket, :wallet_platform, platform_atom)}
+  end
 
   def handle_event("validate_profile", params, socket) do
     %{"user" => user_params} = params
@@ -3839,11 +3877,20 @@ defmodule YscWeb.UserSettingsLive do
     token = Ysc.Scanning.QrToken.sign_membership(user.id)
     details = build_membership_qr_details(socket.assigns)
 
+    google_wallet_url =
+      if socket.assigns.google_wallet_membership_enabled? do
+        case GoogleWallet.generate_membership_save_url(user) do
+          {:ok, url} -> url
+          _ -> nil
+        end
+      end
+
     {:noreply,
      socket
      |> assign(:show_membership_qr, true)
      |> assign(:membership_qr_token, token)
-     |> assign(:membership_qr_details, details)}
+     |> assign(:membership_qr_details, details)
+     |> assign(:google_wallet_membership_url, google_wallet_url)}
   end
 
   def handle_event("show_membership_qr", _params, socket) do
@@ -5819,5 +5866,17 @@ defmodule YscWeb.UserSettingsLive do
 
   defp build_membership_qr_details(assigns) do
     YscWeb.MembershipHelpers.build_membership_qr_details(assigns)
+  end
+
+  defp wallet_platform_from_params(socket) do
+    if connected?(socket) do
+      case get_connect_params(socket)["wallet_platform"] do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+    else
+      :both
+    end
   end
 end

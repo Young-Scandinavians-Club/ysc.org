@@ -7,6 +7,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
+  alias Ysc.GoogleWallet
   alias HtmlSanitizeEx.Scrubber
   import Ecto.Query
 
@@ -75,7 +76,11 @@ defmodule YscWeb.HomeLive do
       show_membership_qr: false,
       membership_qr_token: nil,
       membership_qr_details: nil,
-      apple_wallet_membership_enabled?: Ysc.AppleWallet.configured?(:membership)
+      apple_wallet_membership_enabled?:
+        Ysc.AppleWallet.configured?(:membership),
+      google_wallet_membership_enabled?: GoogleWallet.configured?(:membership),
+      google_wallet_membership_url: nil,
+      wallet_platform: wallet_platform_from_params(socket)
     )
   end
 
@@ -1696,6 +1701,14 @@ defmodule YscWeb.HomeLive do
               </div>
             </div>
 
+            <%!-- Detects platform to show the correct wallet button(s) --%>
+            <div
+              id="wallet-platform-detector"
+              phx-hook="WalletPlatform"
+              class="hidden"
+            >
+            </div>
+
             <.modal
               :if={@show_membership_qr}
               id="membership-qr-modal"
@@ -1710,9 +1723,19 @@ defmodule YscWeb.HomeLive do
                   Show this to an admin for membership verification
                 </p>
                 <.qr_code data={@membership_qr_token} size={250} class="mx-auto" />
-                <%= if @apple_wallet_membership_enabled? do %>
+                <%= if @apple_wallet_membership_enabled? &&
+                      @wallet_platform in [:apple_only, :both] do %>
                   <div class="flex justify-center mt-4">
                     <.add_to_wallet_button href={~p"/wallet/membership"} />
+                  </div>
+                <% end %>
+                <%= if @google_wallet_membership_enabled? &&
+                      @wallet_platform in [:google_only, :both] &&
+                      @google_wallet_membership_url do %>
+                  <div class="flex justify-center mt-2">
+                    <.add_to_google_wallet_button href={
+                      @google_wallet_membership_url
+                    } />
                   </div>
                 <% end %>
                 <%= if @membership_qr_details do %>
@@ -2303,11 +2326,20 @@ defmodule YscWeb.HomeLive do
     token = Ysc.Scanning.QrToken.sign_membership(user.id)
     details = build_membership_qr_details(socket.assigns)
 
+    google_wallet_url =
+      if socket.assigns.google_wallet_membership_enabled? do
+        case GoogleWallet.generate_membership_save_url(user) do
+          {:ok, url} -> url
+          _ -> nil
+        end
+      end
+
     {:noreply,
      socket
      |> assign(:show_membership_qr, true)
      |> assign(:membership_qr_token, token)
-     |> assign(:membership_qr_details, details)}
+     |> assign(:membership_qr_details, details)
+     |> assign(:google_wallet_membership_url, google_wallet_url)}
   end
 
   def handle_event("show_membership_qr", _params, socket) do
@@ -2320,6 +2352,21 @@ defmodule YscWeb.HomeLive do
      |> assign(:show_membership_qr, false)
      |> assign(:membership_qr_token, nil)
      |> assign(:membership_qr_details, nil)}
+  end
+
+  def handle_event(
+        "wallet_platform_detected",
+        %{"platform" => platform},
+        socket
+      ) do
+    platform_atom =
+      case platform do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+
+    {:noreply, assign(socket, :wallet_platform, platform_atom)}
   end
 
   @impl true
@@ -2805,5 +2852,17 @@ defmodule YscWeb.HomeLive do
 
   defp build_membership_qr_details(assigns) do
     YscWeb.MembershipHelpers.build_membership_qr_details(assigns)
+  end
+
+  defp wallet_platform_from_params(socket) do
+    if connected?(socket) do
+      case get_connect_params(socket)["wallet_platform"] do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+    else
+      :both
+    end
   end
 end
