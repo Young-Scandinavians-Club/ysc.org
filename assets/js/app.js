@@ -167,12 +167,17 @@ let liveSocket = new LiveSocket("/live", Socket, {
         sidebar_collapsed: localStorage.getItem("admin-sidebar-collapsed") === "true",
         // Cached wallet platform so the server knows the correct value from the
         // very first connected render (eliminates layout shifts on return visits).
-        // Falls back to live detection if localStorage is empty or unavailable.
+        // Each step (localStorage read, live detection) is isolated in its own
+        // try/catch so neither can propagate an exception that aborts LiveSocket.
         wallet_platform: (() => {
             try {
-                return localStorage.getItem("wallet_platform") || detectWalletPlatform();
-            } catch (_) {
+                const cached = localStorage.getItem("wallet_platform");
+                if (cached) return cached;
+            } catch (_) {}
+            try {
                 return detectWalletPlatform();
+            } catch (_) {
+                return "both";
             }
         })(),
     }),

@@ -190,7 +190,7 @@ defmodule Ysc.GoogleWalletTest do
     end
 
     test "returns {:ok, url} with a pay.google.com save URL" do
-      user = user_fixture()
+      user = user_with_active_subscription()
 
       with_fake_credentials(fn ->
         assert {:ok, url} = GoogleWallet.generate_membership_save_url(user)
@@ -199,7 +199,7 @@ defmodule Ysc.GoogleWalletTest do
     end
 
     test "returned JWT contains expected Generic pass payload structure" do
-      user = user_fixture()
+      user = user_with_active_subscription()
 
       with_fake_credentials(fn ->
         {:ok, url} = GoogleWallet.generate_membership_save_url(user)
@@ -229,11 +229,49 @@ defmodule Ysc.GoogleWalletTest do
         assert generic_object["barcode"]["type"] == "QR_CODE"
       end)
     end
+
+    test "returned JWT has state INACTIVE when user has no active subscription" do
+      user = user_fixture()
+
+      with_fake_credentials(fn ->
+        {:ok, url} = GoogleWallet.generate_membership_save_url(user)
+
+        jwt =
+          String.replace_prefix(url, "https://pay.google.com/gp/v/save/", "")
+
+        [_header, payload_b64, _sig] = String.split(jwt, ".")
+        {:ok, payload_json} = Base.url_decode64(payload_b64, padding: false)
+        {:ok, claims} = Jason.decode(payload_json)
+
+        [generic_object] = claims["payload"]["genericObjects"]
+        assert generic_object["state"] == "INACTIVE"
+      end)
+    end
   end
 
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Creates a user with an active Stripe subscription so membership_wallet_info/1
+  # returns state "ACTIVE" and a valid validity window.
+  defp user_with_active_subscription do
+    user = user_fixture()
+    now = DateTime.truncate(DateTime.utc_now(), :second)
+
+    {:ok, _sub} =
+      Ysc.Subscriptions.create_subscription(%{
+        user_id: user.id,
+        name: "Membership",
+        stripe_id: "sub_test_#{System.unique_integer([:positive])}",
+        stripe_status: "active",
+        start_date: now,
+        current_period_start: now,
+        current_period_end: DateTime.add(now, 30, :day)
+      })
+
+    user
+  end
 
   # Generates a real RSA-2048 private key in PEM format for test JWT signing.
   defp generate_test_rsa_pem do
