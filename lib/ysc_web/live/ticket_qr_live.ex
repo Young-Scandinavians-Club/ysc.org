@@ -353,7 +353,7 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
       |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
       |> assign(:google_wallet_ticket_urls, %{})
-      |> assign(:wallet_platform, :both)
+      |> assign(:wallet_platform, wallet_platform_from_params(socket))
 
     socket =
       if connected?(socket) do
@@ -385,7 +385,7 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
       |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
       |> assign(:google_wallet_ticket_urls, %{})
-      |> assign(:wallet_platform, :both)
+      |> assign(:wallet_platform, wallet_platform_from_params(socket))
 
     socket =
       if connected?(socket) do
@@ -623,6 +623,21 @@ defmodule YscWeb.TicketQrLive do
       "#{date_str} at #{Calendar.strftime(start_time, "%-I:%M %p")}"
     else
       date_str
+    end
+  end
+
+  # Reads the wallet platform from LiveView connect_params (populated from
+  # localStorage by app.js). Falls back to :both on the disconnected render
+  # (no connect_params available) and on unknown values.
+  defp wallet_platform_from_params(socket) do
+    if connected?(socket) do
+      case get_connect_params(socket)["wallet_platform"] do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+    else
+      :both
     end
   end
 end

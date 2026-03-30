@@ -2436,7 +2436,7 @@ defmodule YscWeb.UserSettingsLive do
         GoogleWallet.configured?(:membership)
       )
       |> assign(:google_wallet_membership_url, nil)
-      |> assign(:wallet_platform, :both)
+      |> assign(:wallet_platform, wallet_platform_from_params(socket))
 
     # Payments tab assigns (placeholders for initial render)
     socket =
@@ -5866,5 +5866,17 @@ defmodule YscWeb.UserSettingsLive do
 
   defp build_membership_qr_details(assigns) do
     YscWeb.MembershipHelpers.build_membership_qr_details(assigns)
+  end
+
+  defp wallet_platform_from_params(socket) do
+    if connected?(socket) do
+      case get_connect_params(socket)["wallet_platform"] do
+        "apple_only" -> :apple_only
+        "google_only" -> :google_only
+        _ -> :both
+      end
+    else
+      :both
+    end
   end
 end

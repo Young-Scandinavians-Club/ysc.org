@@ -56,7 +56,7 @@ import HeroVideoControls from "./hero_video_controls";
 import AdminFloatingButton from "./admin_floating_button";
 import AutoResizeIframe from "./auto_resize_iframe";
 import TicketSlider from "./ticket_slider";
-import WalletPlatform from "./wallet_platform";
+import WalletPlatform, { detectWalletPlatform } from "./wallet_platform";
 import { createLiveToastHook } from "../../deps/live_toast";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
@@ -165,6 +165,16 @@ let liveSocket = new LiveSocket("/live", Socket, {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         timezone_offset: -(new Date().getTimezoneOffset() / 60),
         sidebar_collapsed: localStorage.getItem("admin-sidebar-collapsed") === "true",
+        // Cached wallet platform so the server knows the correct value from the
+        // very first connected render (eliminates layout shifts on return visits).
+        // Falls back to live detection if localStorage is empty or unavailable.
+        wallet_platform: (() => {
+            try {
+                return localStorage.getItem("wallet_platform") || detectWalletPlatform();
+            } catch (_) {
+                return detectWalletPlatform();
+            }
+        })(),
     }),
     hooks: Hooks,
     uploaders: Uploaders,
