@@ -882,7 +882,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                   end
                 end
 
-                {:ok, updated_subscription}
+                updated_subscription
 
               {:error, changeset} ->
                 Ysc.Logging.error("Failed to update subscription",

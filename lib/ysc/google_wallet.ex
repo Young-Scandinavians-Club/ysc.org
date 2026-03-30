@@ -26,6 +26,7 @@ defmodule Ysc.GoogleWallet do
   alias Ysc.Events.Ticket
   alias Ysc.Scanning.QrToken
   alias Ysc.GoogleWallet.Credentials
+  alias Ysc.Subscriptions
 
   @save_url_base "https://pay.google.com/gp/v/save"
   @wallet_api_base "https://walletobjects.googleapis.com/walletobjects/v1"
@@ -84,11 +85,18 @@ defmodule Ysc.GoogleWallet do
   Builds the GenericClass and GenericObject payloads for the user, signs a JWT,
   and returns the save URL.
 
+  Includes `validTimeInterval` in the object when the user has an active
+  subscription with a known `current_period_end`, so the expiry date is visible
+  on the card immediately after the user first adds it — regardless of whether a
+  renewal PATCH has been issued yet.
+
   Returns `{:ok, url}` or `{:error, :not_configured | reason}`.
   """
   def generate_membership_save_url(user) do
+    period_end = active_subscription_period_end(user)
+
     with {:creds, {:ok, creds}} <- {:creds, Credentials.get_credentials()},
-         {:ok, jwt} <- sign_membership_jwt(user, creds) do
+         {:ok, jwt} <- sign_membership_jwt(user, creds, period_end) do
       {:ok, "#{@save_url_base}/#{jwt}"}
     else
       {:creds, {:error, :not_configured}} ->
@@ -258,10 +266,10 @@ defmodule Ysc.GoogleWallet do
   # Private — membership JWT
   # ---------------------------------------------------------------------------
 
-  defp sign_membership_jwt(user, creds) do
+  defp sign_membership_jwt(user, creds, period_end) do
     issuer_id = creds.issuer_id
     membership_class = build_generic_class(issuer_id)
-    membership_object = build_generic_object(user, issuer_id)
+    membership_object = build_generic_object(user, issuer_id, period_end)
 
     payload = %{
       "genericClasses" => [membership_class],
@@ -279,9 +287,22 @@ defmodule Ysc.GoogleWallet do
     }
   end
 
-  defp build_generic_object(user, issuer_id) do
+  defp build_generic_object(user, issuer_id, period_end) do
     qr_token = QrToken.sign_membership(user.id)
     member_name = "#{user.first_name} #{user.last_name}"
+
+    valid_time_interval =
+      case period_end do
+        %DateTime{} = dt ->
+          %{
+            "end" => %{
+              "date" => DateTime.to_iso8601(dt)
+            }
+          }
+
+        _ ->
+          nil
+      end
 
     %{
       "id" => membership_object_id(issuer_id, user.id),
@@ -294,8 +315,17 @@ defmodule Ysc.GoogleWallet do
         "type" => "QR_CODE",
         "value" => qr_token,
         "alternateText" => "YSC Member"
-      }
+      },
+      "validTimeInterval" => valid_time_interval
     }
+    |> compact()
+  end
+
+  defp active_subscription_period_end(user) do
+    case Subscriptions.get_active_subscription(user) do
+      %{current_period_end: %DateTime{} = dt} -> dt
+      _ -> nil
+    end
   end
 
   # ---------------------------------------------------------------------------
