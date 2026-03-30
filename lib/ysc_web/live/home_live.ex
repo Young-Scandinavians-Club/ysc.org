@@ -1191,26 +1191,6 @@ defmodule YscWeb.HomeLive do
                 )}
               </h1>
             </div>
-            <div class="hidden md:flex items-center gap-4">
-              <div class="text-right hidden md:block">
-                <p class="text-sm font-bold text-zinc-900">
-                  {YscWeb.UserAuth.get_membership_plan_display_name(
-                    @current_membership
-                  )}
-                </p>
-                <p class="text-xs text-zinc-500">
-                  {membership_status_text(@current_user, @current_membership)}
-                </p>
-              </div>
-              <div class="w-16 h-16 rounded-full ring-4 ring-zinc-50 shadow-inner overflow-hidden">
-                <.user_avatar_image
-                  email={@current_user.email}
-                  user_id={@current_user.id}
-                  country={@current_user.most_connected_country}
-                  class="w-full h-full object-cover"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1322,13 +1302,13 @@ defmodule YscWeb.HomeLive do
                 <div class="flex flex-col sm:flex-row gap-3 justify-center">
                   <.link
                     navigate={~p"/bookings/tahoe"}
-                    class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded transition-colors"
+                    class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
                   >
                     Book Lake Tahoe
                   </.link>
                   <.link
                     navigate={~p"/bookings/clear-lake"}
-                    class="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded transition-colors"
+                    class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
                   >
                     Book Clear Lake
                   </.link>
@@ -1667,12 +1647,12 @@ defmodule YscWeb.HomeLive do
                 <.link
                   navigate={~p"/users/membership"}
                   class={[
-                    "flex w-full items-center justify-center rounded-md px-6 py-4 text-sm font-black transition-colors duration-150",
-                    if @active_membership? do
-                      "bg-white text-zinc-900 hover:bg-blue-50"
-                    else
-                      "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
-                    end
+                    "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
+                    if(@active_membership?,
+                      do: "bg-white text-zinc-900 hover:bg-blue-50",
+                      else:
+                        "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
+                    )
                   ]}
                 >
                   <%= if @active_membership? do %>
@@ -1689,7 +1669,7 @@ defmodule YscWeb.HomeLive do
                 <button
                   :if={@active_membership?}
                   phx-click="show_membership_qr"
-                  class="flex w-full items-center justify-center rounded-md mt-3 px-6 py-3 text-sm font-semibold bg-white/10 text-white hover:bg-white/20 backdrop-blur-md transition-colors duration-150 border border-white/20"
+                  class="flex w-full items-center justify-center rounded mt-3 px-6 py-3 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/20"
                 >
                   <.icon name="hero-qr-code" class="w-5 h-5 mr-2" />
                   My Membership QR
@@ -1931,7 +1911,7 @@ defmodule YscWeb.HomeLive do
               </p>
               <.link
                 navigate={~p"/events"}
-                class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded transition-colors"
+                class="inline-flex items-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-zinc-700 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
               >
                 Browse Events
               </.link>
