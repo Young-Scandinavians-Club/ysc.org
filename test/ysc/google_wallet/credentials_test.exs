@@ -91,22 +91,12 @@ defmodule Ysc.GoogleWallet.CredentialsTest do
           "client_id" => "123"
         })
 
-      Application.put_env(:ysc, :google_wallet,
-        credentials_json: credentials_json,
-        issuer_id: "1234567890"
-      )
-
-      try do
+      with_credentials(credentials_json, "1234567890", fn ->
         spec = Credentials.goth_child_spec()
         assert [{Goth, opts}] = spec
         assert opts[:name] == Ysc.Goth
         assert {:service_account, _, _} = opts[:source]
-      after
-        Application.put_env(:ysc, :google_wallet,
-          credentials_json: nil,
-          issuer_id: nil
-        )
-      end
+      end)
     end
   end
 

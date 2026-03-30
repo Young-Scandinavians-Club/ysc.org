@@ -93,10 +93,10 @@ defmodule Ysc.GoogleWallet do
   Returns `{:ok, url}` or `{:error, :not_configured | reason}`.
   """
   def generate_membership_save_url(user) do
-    period_end = active_subscription_period_end(user)
+    membership_info = membership_wallet_info(user)
 
     with {:creds, {:ok, creds}} <- {:creds, Credentials.get_credentials()},
-         {:ok, jwt} <- sign_membership_jwt(user, creds, period_end) do
+         {:ok, jwt} <- sign_membership_jwt(user, creds, membership_info) do
       {:ok, "#{@save_url_base}/#{jwt}"}
     else
       {:creds, {:error, :not_configured}} ->
@@ -266,10 +266,10 @@ defmodule Ysc.GoogleWallet do
   # Private — membership JWT
   # ---------------------------------------------------------------------------
 
-  defp sign_membership_jwt(user, creds, period_end) do
+  defp sign_membership_jwt(user, creds, membership_info) do
     issuer_id = creds.issuer_id
     membership_class = build_generic_class(issuer_id)
-    membership_object = build_generic_object(user, issuer_id, period_end)
+    membership_object = build_generic_object(user, issuer_id, membership_info)
 
     payload = %{
       "genericClasses" => [membership_class],
@@ -287,18 +287,27 @@ defmodule Ysc.GoogleWallet do
     }
   end
 
-  defp build_generic_object(user, issuer_id, period_end) do
+  defp build_generic_object(user, issuer_id, membership_info) do
     qr_token = QrToken.sign_membership(user.id)
     member_name = "#{user.first_name} #{user.last_name}"
 
+    %{state: pass_state, period_start: period_start, period_end: period_end} =
+      membership_info
+
     valid_time_interval =
-      case period_end do
-        %DateTime{} = dt ->
-          %{
-            "end" => %{
-              "date" => DateTime.to_iso8601(dt)
-            }
-          }
+      case {period_start, period_end} do
+        {_, %DateTime{} = dt_end} ->
+          interval = %{"end" => %{"date" => DateTime.to_iso8601(dt_end)}}
+
+          case period_start do
+            %DateTime{} = dt_start ->
+              Map.put(interval, "start", %{
+                "date" => DateTime.to_iso8601(dt_start)
+              })
+
+            _ ->
+              interval
+          end
 
         _ ->
           nil
@@ -307,7 +316,7 @@ defmodule Ysc.GoogleWallet do
     %{
       "id" => membership_object_id(issuer_id, user.id),
       "classId" => membership_class_id(issuer_id),
-      "state" => "ACTIVE",
+      "state" => pass_state,
       "cardTitle" => localized_string("Young Scandinavians Club"),
       "header" => localized_string(member_name),
       "subheader" => localized_string("Member"),
@@ -321,10 +330,20 @@ defmodule Ysc.GoogleWallet do
     |> compact()
   end
 
-  defp active_subscription_period_end(user) do
+  defp membership_wallet_info(user) do
     case Subscriptions.get_active_subscription(user) do
-      %{current_period_end: %DateTime{} = dt} -> dt
-      _ -> nil
+      %{
+        current_period_start: period_start,
+        current_period_end: %DateTime{} = period_end
+      } ->
+        %{state: "ACTIVE", period_start: period_start, period_end: period_end}
+
+      %{} ->
+        # Active subscription exists but has no period_end (e.g. lifetime membership)
+        %{state: "ACTIVE", period_start: nil, period_end: nil}
+
+      nil ->
+        %{state: "INACTIVE", period_start: nil, period_end: nil}
     end
   end
 

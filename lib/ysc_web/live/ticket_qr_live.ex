@@ -416,14 +416,20 @@ defmodule YscWeb.TicketQrLive do
       if socket.assigns.google_wallet_enabled? do
         user_id = socket.assigns.current_user.id
 
-        Map.new(data.tickets, fn ticket ->
-          url =
-            case GoogleWallet.generate_ticket_save_url(ticket.id, user_id) do
-              {:ok, url} -> url
-              _ -> nil
-            end
+        Enum.reduce(data.tickets, %{}, fn ticket, acc ->
+          case GoogleWallet.generate_ticket_save_url(ticket.id, user_id) do
+            {:ok, url} ->
+              Map.put(acc, ticket.id, url)
 
-          {ticket.id, url}
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to generate Google Wallet URL for ticket",
+                ticket_id: ticket.id,
+                error: inspect(reason)
+              )
+
+              acc
+          end
         end)
       else
         %{}
