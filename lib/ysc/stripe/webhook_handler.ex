@@ -2701,11 +2701,9 @@ defmodule Ysc.Stripe.WebhookHandler do
                         invoice_id: invoice_id
                       )
 
-                      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                             Stripe.PaymentMethod.retrieve(
-                               stripe_payment_method_id
-                             )
-                           end) do
+                      case stripe_client().retrieve_payment_method(
+                             stripe_payment_method_id
+                           ) do
                         {:ok, stripe_payment_method} ->
                           # Sync the payment method to our database
                           case Ysc.Payments.sync_payment_method_from_stripe(
@@ -2776,7 +2774,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           {:error, error} ->
             Ysc.Logging.warning("Failed to retrieve charge from Stripe",
               charge_id: charge_id,
-              error: error.message,
+              error: inspect(error),
               invoice_id: invoice_id
             )
 
