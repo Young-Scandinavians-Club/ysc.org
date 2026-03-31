@@ -536,16 +536,10 @@ defmodule YscWeb.AdminBookingsLive do
                 Guest Details
               </label>
               <div class="flex items-center gap-3">
-                <% user_initials =
-                  if @booking.user && @booking.user.first_name &&
-                       @booking.user.last_name do
-                    "#{String.first(@booking.user.first_name)}#{String.first(@booking.user.last_name)}"
-                  else
-                    "?"
-                  end %>
-                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm">
-                  {user_initials}
-                </div>
+                <.user_avatar_image
+                  user={@booking.user}
+                  class="w-10 h-10 rounded-full flex-shrink-0"
+                />
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-zinc-900 truncate">
                     {if @booking.user do
@@ -1103,16 +1097,10 @@ defmodule YscWeb.AdminBookingsLive do
               <div class="bg-zinc-50 rounded-lg p-4 border border-zinc-200 hover:bg-zinc-100 transition-colors">
                 <div class="flex items-start justify-between gap-4">
                   <div class="flex items-center gap-3 min-w-0">
-                    <% user_initials =
-                      if booking.user && booking.user.first_name &&
-                           booking.user.last_name do
-                        "#{String.first(booking.user.first_name)}#{String.first(booking.user.last_name)}"
-                      else
-                        "?"
-                      end %>
-                    <div class="flex-shrink-0 w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm">
-                      {user_initials}
-                    </div>
+                    <.user_avatar_image
+                      user={booking.user}
+                      class="w-9 h-9 rounded-full flex-shrink-0"
+                    />
                     <div class="min-w-0">
                       <p class="text-sm font-semibold text-zinc-900 truncate">
                         {if booking.user do
@@ -3928,12 +3916,12 @@ defmodule YscWeb.AdminBookingsLive do
     booking = Bookings.get_booking!(id)
 
     booking =
-      Ysc.Repo.preload(booking, [
-        :user,
-        :booking_guests,
+      Ysc.Repo.preload(booking,
+        user: :current_avatar,
+        booking_guests: [],
         rooms: :room_category,
         check_ins: :check_in_vehicles
-      ])
+      )
 
     # Ensure selected_property matches the booking's property
     socket =
@@ -4056,7 +4044,9 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp apply_action(socket, :edit_booking, %{"id" => id}) do
     booking = Bookings.get_booking!(id)
-    booking = Ysc.Repo.preload(booking, [:user, rooms: :room_category])
+
+    booking =
+      Ysc.Repo.preload(booking, user: :current_avatar, rooms: :room_category)
 
     # Determine booking type from existing booking
     has_rooms = Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
@@ -4983,7 +4973,9 @@ defmodule YscWeb.AdminBookingsLive do
     date = Date.from_iso8601!(date_str)
 
     bookings =
-      Bookings.list_bookings(:clear_lake, date, date, preload: [:user, :rooms])
+      Bookings.list_bookings(:clear_lake, date, date,
+        preload: [user: :current_avatar, rooms: []]
+      )
       |> Enum.filter(fn b ->
         b.status not in [:canceled, :refunded] &&
           Date.compare(b.checkin_date, date) != :gt &&

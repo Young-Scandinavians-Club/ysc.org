@@ -408,7 +408,7 @@ defmodule YscWeb.AdminDashboardLive do
                 <div class="relative flex-shrink-0">
                   <.user_avatar_image
                     user={user}
-                    class="w-14 h-14 rounded object-cover ring-2 ring-zinc-50 shadow-sm"
+                    class="w-14 h-14 rounded-full object-cover ring-2 ring-zinc-50 shadow-sm"
                   />
                 </div>
 
