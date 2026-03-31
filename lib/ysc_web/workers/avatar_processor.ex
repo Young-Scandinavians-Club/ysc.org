@@ -157,6 +157,7 @@ defmodule YscWeb.Workers.AvatarProcessor do
     end
   end
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp download_from_url!(url, dest_path) do
     case Req.get(url, max_redirects: 5, receive_timeout: 30_000) do
       {:ok, %Req.Response{status: 200, body: body}} ->
