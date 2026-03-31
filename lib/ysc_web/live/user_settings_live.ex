@@ -80,7 +80,6 @@ defmodule YscWeb.UserSettingsLive do
               type="otp"
               label="Verification Code"
               required
-              phx-input="validate_phone_code"
             />
             <p class="text-xs text-zinc-600 mt-1">
               Didn't receive the code? Check your messages or
@@ -165,7 +164,6 @@ defmodule YscWeb.UserSettingsLive do
               type="otp"
               label="Verification Code"
               required
-              phx-input="validate_email_code"
             />
             <p class="text-xs text-zinc-600 mt-1">
               Didn't receive the code? Check your email or
@@ -768,7 +766,7 @@ defmodule YscWeb.UserSettingsLive do
                                 <img
                                   src={~p"/images/google/google_g_logo.svg"}
                                   alt="Google"
-                                  class="w-3 h-3"
+                                  class="w-5 h-5"
                                 />
                               </span>
                             <% avatar.source == :facebook -> %>
@@ -776,7 +774,7 @@ defmodule YscWeb.UserSettingsLive do
                                 <img
                                   src={~p"/images/fb/facebook_f_logo.svg"}
                                   alt="Facebook"
-                                  class="w-3 h-3"
+                                  class="w-5 h-5"
                                 />
                               </span>
                             <% true -> %>

@@ -30,4 +30,13 @@ defmodule Ysc.StripeClient do
 
   def list_events(params, opts \\ []),
     do: stripe_retry(fn -> Stripe.Event.list(params, opts) end)
+
+  def retrieve_charge(id, opts \\ []),
+    do: stripe_retry(fn -> Stripe.Charge.retrieve(id, opts) end)
+
+  def retrieve_payout(id, opts \\ []),
+    do: stripe_retry(fn -> Stripe.Payout.retrieve(id, opts) end)
+
+  def list_balance_transactions(params, opts \\ []),
+    do: stripe_retry(fn -> Stripe.BalanceTransaction.all(params, opts) end)
 end

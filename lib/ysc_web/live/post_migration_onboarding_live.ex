@@ -380,7 +380,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           type="otp"
           label="Verification Code"
           required
-          phx-input="validate_phone_code"
         />
         <:actions>
           <div class="flex items-center justify-between w-full">

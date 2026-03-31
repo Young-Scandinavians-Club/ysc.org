@@ -57,7 +57,6 @@ defmodule YscWeb.AccountSetupLive do
               type="otp"
               label="Verification Code"
               required
-              phx-input="validate_email_code"
             />
             <p class="text-xs text-zinc-600 mt-1">
               Didn't receive the code? Check your spam folder or
@@ -215,7 +214,6 @@ defmodule YscWeb.AccountSetupLive do
               type="otp"
               label="Verification Code"
               required
-              phx-input="validate_phone_code"
             />
             <p class="text-xs text-zinc-600 mt-1">
               Didn't receive the code? Check your messages or

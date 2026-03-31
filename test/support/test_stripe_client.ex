@@ -41,4 +41,13 @@ defmodule Ysc.TestStripeClient do
 
   @impl true
   def list_events(_params, _opts), do: {:error, :not_implemented}
+
+  @impl true
+  def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+
+  @impl true
+  def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+  @impl true
+  def list_balance_transactions(_params, _opts), do: {:error, :not_implemented}
 end

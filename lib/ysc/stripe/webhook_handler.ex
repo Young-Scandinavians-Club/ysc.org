@@ -57,6 +57,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Maximum age for webhook events (5 minutes in seconds)
   @webhook_max_age_seconds 300
 
+  defp stripe_client do
+    Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+  end
+
   # Optional override for tests: when set, get_webhook_event_by_provider_and_event_id
   # in the duplicate-rescue path uses this module (e.g. to simulate "not found").
   defp webhooks_context do
@@ -1985,9 +1989,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     try do
       # Fetch the charge with expanded balance transaction to get actual fees
-      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Charge.retrieve(charge_id, expand: ["balance_transaction"])
-           end) do
+      case stripe_client().retrieve_charge(charge_id,
+             expand: ["balance_transaction"]
+           ) do
         {:ok,
          %Stripe.Charge{
            balance_transaction: %Stripe.BalanceTransaction{fee: fee}
@@ -2055,9 +2059,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     try do
       # Try to get the charge amount to calculate estimated fee
-      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Charge.retrieve(charge_id)
-           end) do
+      case stripe_client().retrieve_charge(charge_id, []) do
         {:ok, %Stripe.Charge{amount: amount}} ->
           # amount is in cents, convert to dollars for calculation
           amount_dollars = MoneyHelper.cents_to_dollars(amount)
@@ -2665,9 +2667,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       charge_id when is_binary(charge_id) ->
         # Retrieve the charge to get payment method details
-        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.Charge.retrieve(charge_id)
-             end) do
+        case stripe_client().retrieve_charge(charge_id, []) do
           {:ok, charge} ->
             # Get the payment method ID from the charge
             payment_method_id = charge.payment_method
@@ -2701,11 +2701,9 @@ defmodule Ysc.Stripe.WebhookHandler do
                         invoice_id: invoice_id
                       )
 
-                      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                             Stripe.PaymentMethod.retrieve(
-                               stripe_payment_method_id
-                             )
-                           end) do
+                      case stripe_client().retrieve_payment_method(
+                             stripe_payment_method_id
+                           ) do
                         {:ok, stripe_payment_method} ->
                           # Sync the payment method to our database
                           case Ysc.Payments.sync_payment_method_from_stripe(
@@ -2776,7 +2774,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           {:error, error} ->
             Ysc.Logging.warning("Failed to retrieve charge from Stripe",
               charge_id: charge_id,
-              error: error.message,
+              error: inspect(error),
               invoice_id: invoice_id
             )
 
@@ -2807,9 +2805,9 @@ defmodule Ysc.Stripe.WebhookHandler do
     # If payment_intent is not directly available, try to get it from charge
     payment_intent_id =
       if is_nil(payment_intent_id) && charge_id do
-        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.Charge.retrieve(charge_id, expand: ["payment_intent"])
-             end) do
+        case stripe_client().retrieve_charge(charge_id,
+               expand: ["payment_intent"]
+             ) do
           {:ok, charge} ->
             charge.payment_intent
 
@@ -2905,9 +2903,9 @@ defmodule Ysc.Stripe.WebhookHandler do
         do: Map.put(params, :starting_after, starting_after),
         else: params
 
-    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.BalanceTransaction.all(params, expand: ["data.source"])
-         end) do
+    case stripe_client().list_balance_transactions(params,
+           expand: ["data.source"]
+         ) do
       {:ok, %Stripe.List{data: data, has_more: true}} when is_list(data) ->
         last_id = List.last(data) |> extract_balance_transaction_id()
 
@@ -2943,7 +2941,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         Ysc.Logging.error("Failed to fetch balance transactions",
           payout_id: payout_id,
           error: inspect(reason),
-          error_type: reason.__struct__
+          error_type: if(is_struct(reason), do: reason.__struct__, else: nil)
         )
 
         {:error, reason}
@@ -2984,11 +2982,9 @@ defmodule Ysc.Stripe.WebhookHandler do
     # First, try to get fees from the payout's balance transaction (most reliable)
     # The payout's balance transaction contains the total fees for all charges/refunds in the payout
     updated_payout =
-      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Payout.retrieve(stripe_payout_id,
-               expand: ["balance_transaction"]
-             )
-           end) do
+      case stripe_client().retrieve_payout(stripe_payout_id,
+             expand: ["balance_transaction"]
+           ) do
         {:ok,
          %Stripe.Payout{
            balance_transaction: %Stripe.BalanceTransaction{fee: fee_cents} = bt
@@ -3386,9 +3382,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
           is_binary(charge_id) ->
             # Source is just an ID, fetch the charge
-            case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                   Stripe.Charge.retrieve(charge_id)
-                 end) do
+            case stripe_client().retrieve_charge(charge_id, []) do
               {:ok, charge} ->
                 charge
 
@@ -3534,12 +3528,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
         if charge_id do
           # Get the charge to find the payment intent
-          case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                 Stripe.Charge.retrieve(charge_id)
-               end) do
+          case stripe_client().retrieve_charge(charge_id, []) do
             {:ok, charge} ->
               # payment_intent may be a plain ID or an expanded struct;
-              # charge is always a %Stripe.Charge{} from Stripe.Charge.retrieve/2
               payment_intent_id =
                 extract_id_from_expandable(charge.payment_intent)
 
