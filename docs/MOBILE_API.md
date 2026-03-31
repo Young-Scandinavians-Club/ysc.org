@@ -55,7 +55,7 @@ List bookings for a property, optionally filtered by date range.
         "first_name": "Jane",
         "last_name": "Doe",
         "email": "jane@example.com",
-        "avatar_url": "https://fly.storage.tigris.dev/avatars/01HXYZ.../thumb.webp"
+        "avatar_url": "https://fly.storage.tigris.dev/avatars/01HXYZ.../profile.webp"
       },
       "rooms": [
         { "id": "01HXYZ...", "name": "Master Bedroom" }

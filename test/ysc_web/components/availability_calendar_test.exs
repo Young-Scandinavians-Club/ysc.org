@@ -34,6 +34,14 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     end
   end
 
+  # Renders the calendar with today/min shifted one day before `date` so the
+  # availability window includes the "morning" reference day (date - 1), which
+  # is required for gradient (check-in style) rendering to work correctly.
+  defp render_shifted_calendar(date) do
+    calendar_base = Date.add(date, -1)
+    render_clear_lake_calendar(today: calendar_base, min: calendar_base)
+  end
+
   defp render_clear_lake_calendar(opts \\ []) do
     today = Date.utc_today()
 
@@ -198,19 +206,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           total_price: Money.new(500, :USD)
         })
 
-      # The gradient cell logic works by checking whether the day *before* the cell
-      # (the "morning" reference) is in the loaded availability range and is not booked.
-      # The availability range is loaded starting from `today`, so if checkin == today,
-      # yesterday (the morning reference) falls outside the range and is treated as
-      # unavailable, producing solid red instead of a gradient.
-      #
-      # Fix: set the calendar's `today` and `min` to one day before checkin.  This shifts
-      # the availability window back one day so yesterday-of-checkin is always included.
-      calendar_base = Date.add(checkin, -1)
-
-      html =
-        render_clear_lake_calendar(today: calendar_base, min: calendar_base)
-
+      html = render_shifted_calendar(checkin)
       day_str = Calendar.strftime(checkin, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 
@@ -230,14 +226,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           reason: "Test blackout"
         })
 
-      # Same reasoning as the buyout test above: shift `today` and `min` back one day
-      # so the availability window includes the day before the blackout date, allowing
-      # the gradient (check-in style) rendering to work regardless of what day it is.
-      calendar_base = Date.add(blackout_date, -1)
-
-      html =
-        render_clear_lake_calendar(today: calendar_base, min: calendar_base)
-
+      html = render_shifted_calendar(blackout_date)
       day_str = Calendar.strftime(blackout_date, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 

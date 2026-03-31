@@ -158,13 +158,16 @@ defmodule YscWeb.Workers.AvatarProcessor do
   end
 
   defp download_from_url!(url, dest_path) do
-    {:ok, :saved_to_file} =
-      :httpc.request(
-        :get,
-        {to_charlist(URI.encode(url)), []},
-        [],
-        stream: to_charlist(dest_path)
-      )
+    case Req.get(url, max_redirects: 5, receive_timeout: 30_000) do
+      {:ok, %Req.Response{status: 200, body: body}} ->
+        File.write!(dest_path, body)
+
+      {:ok, %Req.Response{status: status}} ->
+        raise "Avatar download failed: HTTP #{status} for #{url}"
+
+      {:error, reason} ->
+        raise "Avatar download failed: #{inspect(reason)} for #{url}"
+    end
   end
 
   defp key_from_url(url) when is_binary(url) do

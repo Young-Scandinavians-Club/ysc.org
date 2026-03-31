@@ -769,14 +769,17 @@ defmodule YscWeb.AdminComponents do
 
   defp derive_side_menu_user(%{user: user} = assigns) when not is_nil(user) do
     assigns
-    |> assign(:email, Map.get(user, :email, ""))
-    |> assign(:user_id, to_string(Map.get(user, :id, "0")))
+    |> assign(:email, Map.get(user, :email))
     |> assign(
-      :most_connected_country,
-      Map.get(user, :most_connected_country, "SE")
+      :user_id,
+      case Map.get(user, :id) do
+        nil -> nil
+        id -> to_string(id)
+      end
     )
-    |> assign(:first_name, Map.get(user, :first_name, ""))
-    |> assign(:last_name, Map.get(user, :last_name, ""))
+    |> assign(:most_connected_country, Map.get(user, :most_connected_country))
+    |> assign(:first_name, Map.get(user, :first_name))
+    |> assign(:last_name, Map.get(user, :last_name))
     |> assign(:board_position, Map.get(user, :board_position))
   end
 

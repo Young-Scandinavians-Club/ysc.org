@@ -355,7 +355,18 @@ if config_env() == :prod do
     System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"
 
   avatars_bucket =
-    System.get_env("AVATARS_BUCKET_NAME") || "avatars"
+    case System.get_env("AVATARS_BUCKET_NAME") do
+      value when is_binary(value) and value != "" ->
+        value
+
+      _ ->
+        if config_env() == :prod,
+          do:
+            raise(
+              "AVATARS_BUCKET_NAME environment variable is required in production"
+            ),
+          else: "avatars"
+    end
 
   config :ysc,
     s3_bucket: s3_bucket,

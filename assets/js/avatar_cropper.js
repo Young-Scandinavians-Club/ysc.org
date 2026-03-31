@@ -1,5 +1,9 @@
 import Cropper from "../vendor/cropper.js";
 
+const MAX_POLL_ATTEMPTS = 50;
+const POLL_INTERVAL_MS = 300;
+const SUBMIT_DELAY_MS = 500;
+
 const AvatarCropper = {
   mounted() {
     this.cropperInstance = null;
@@ -56,8 +60,7 @@ const AvatarCropper = {
 
       const img = document.createElement("img");
       img.src = event.target.result;
-      img.style.maxWidth = "100%";
-      img.style.display = "block";
+      img.className = "max-w-full block";
       container.appendChild(img);
 
       this.showModal();
@@ -162,7 +165,7 @@ const AvatarCropper = {
         ? form.parentElement?.querySelector("[style*='width: 100%']")
         : null;
 
-      if (progressEl || attempts > 50) {
+      if (progressEl || attempts > MAX_POLL_ATTEMPTS) {
         this.stopPolling();
         setTimeout(() => {
           if (form) {
@@ -170,9 +173,9 @@ const AvatarCropper = {
               new Event("submit", { bubbles: true, cancelable: true }),
             );
           }
-        }, 500);
+        }, SUBMIT_DELAY_MS);
       }
-    }, 300);
+    }, POLL_INTERVAL_MS);
   },
 
   stopPolling() {

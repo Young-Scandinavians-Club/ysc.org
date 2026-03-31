@@ -332,7 +332,7 @@ defmodule YscWeb.PostLive do
         %Phoenix.Socket.Broadcast{event: "new_comment", payload: new_comment},
         socket
       ) do
-    loaded = Posts.get_comment!(new_comment.id, [:author])
+    loaded = Posts.get_comment!(new_comment.id, author: :current_avatar)
 
     new_comment_changeset =
       Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})

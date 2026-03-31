@@ -50,14 +50,18 @@ defmodule Ysc.Avatars do
   Sets the user's current avatar. Verifies the avatar belongs to the user.
   """
   def set_current_avatar(%User{} = user, avatar_id) do
-    avatar = Repo.get!(Avatar, avatar_id)
+    case Repo.get(Avatar, avatar_id) do
+      nil ->
+        {:error, :not_found}
 
-    if avatar.user_id == user.id do
-      user
-      |> Ecto.Changeset.change(current_avatar_id: avatar.id)
-      |> Repo.update()
-    else
-      {:error, :not_owner}
+      avatar ->
+        if avatar.user_id == user.id do
+          user
+          |> Ecto.Changeset.change(current_avatar_id: avatar.id)
+          |> Repo.update()
+        else
+          {:error, :not_owner}
+        end
     end
   end
 
@@ -175,11 +179,17 @@ defmodule Ysc.Avatars do
               source_url: image_url
             })
 
-          %{id: avatar.id}
-          |> YscWeb.Workers.AvatarProcessor.new()
-          |> Oban.insert()
+          case Oban.insert(YscWeb.Workers.AvatarProcessor.new(%{id: avatar.id})) do
+            {:ok, _job} ->
+              {:ok, avatar}
 
-          {:ok, avatar}
+            {:error, reason} ->
+              Ysc.Logging.warning("Failed to enqueue avatar processing job",
+                extra: %{avatar_id: avatar.id, reason: inspect(reason)}
+              )
+
+              {:error, reason}
+          end
         after
           File.rm(tmp_path)
         end

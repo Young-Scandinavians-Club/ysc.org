@@ -2671,12 +2671,14 @@ defmodule YscWeb.UserSettingsLive do
 
   @impl true
   def handle_info({:avatar_processed, _user_id}, socket) do
-    user = socket.assigns.current_user
-    user = Ysc.Repo.preload(user, :current_avatar, force: true)
+    user =
+      Ysc.Repo.get!(Ysc.Accounts.User, socket.assigns.current_user.id)
+      |> Ysc.Repo.preload(:current_avatar)
 
     {:noreply,
      socket
      |> assign(:current_user, user)
+     |> assign(:user, user)
      |> assign(:user_avatars, load_user_avatars(user))
      |> assign(:current_avatar_url, resolve_current_avatar_url(user))
      |> assign(:avatar_processing, false)}
@@ -2979,17 +2981,19 @@ defmodule YscWeb.UserSettingsLive do
       consume_uploaded_entries(socket, :avatar, fn %{key: key}, _entry ->
         location = S3Config.object_url(key, S3Config.avatars_bucket_name())
 
-        {:ok, avatar} =
-          Avatars.create_avatar(user, %{
-            source: :upload,
-            original_path: location
-          })
-
-        %{id: avatar.id}
-        |> YscWeb.Workers.AvatarProcessor.new()
-        |> Oban.insert()
-
-        {:ok, avatar}
+        with {:ok, avatar} <-
+               Avatars.create_avatar(user, %{
+                 source: :upload,
+                 original_path: location
+               }),
+             {:ok, _job} <-
+               %{id: avatar.id}
+               |> YscWeb.Workers.AvatarProcessor.new()
+               |> Oban.insert() do
+          {:ok, avatar}
+        else
+          {:error, reason} -> {:error, reason}
+        end
       end)
 
     socket =

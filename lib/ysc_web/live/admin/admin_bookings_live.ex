@@ -4974,7 +4974,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     bookings =
       Bookings.list_bookings(:clear_lake, date, date,
-        preload: [user: :current_avatar, rooms: []]
+        preload: [user: :current_avatar]
       )
       |> Enum.filter(fn b ->
         b.status not in [:canceled, :refunded] &&

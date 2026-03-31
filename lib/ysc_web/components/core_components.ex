@@ -2183,7 +2183,7 @@ defmodule YscWeb.CoreComponents do
     assigns = derive_avatar_assigns(assigns)
 
     full_path =
-      if assigns[:avatar_url] do
+      if is_binary(assigns[:avatar_url]) and assigns[:avatar_url] != "" do
         assigns[:avatar_url]
       else
         user_id = assigns[:user_id] || "0"
@@ -2192,6 +2192,7 @@ defmodule YscWeb.CoreComponents do
         image_id =
           user_id
           |> String.replace(~r/[^\d]/, "")
+          |> then(fn s -> if s == "", do: "0", else: s end)
           |> String.to_integer()
           |> rem(2)
 

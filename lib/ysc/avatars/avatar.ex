@@ -35,7 +35,6 @@ defmodule Ysc.Avatars.Avatar do
     avatar
     |> cast(attrs, [:source, :original_path, :source_url])
     |> validate_required([:source, :original_path])
-    |> validate_inclusion(:source, [:upload, :google, :facebook])
     |> validate_length(:original_path, max: 2048)
     |> validate_length(:source_url, max: 2048)
   end

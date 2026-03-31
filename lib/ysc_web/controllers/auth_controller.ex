@@ -78,9 +78,50 @@ defmodule YscWeb.AuthController do
   end
 
   defp extract_image(%Ueberauth.Auth{info: %{image: image}})
-       when is_binary(image) and image != "", do: image
+       when is_binary(image) and image != "" do
+    if safe_image_url?(image), do: image, else: nil
+  end
 
   defp extract_image(_), do: nil
+
+  # Validates that a URL is safe to fetch: must be HTTPS and must not point to
+  # localhost, loopback, link-local, or private RFC-1918 address ranges.
+  defp safe_image_url?(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: "https", host: host} when is_binary(host) and host != "" ->
+        not private_host?(host)
+
+      _ ->
+        false
+    end
+  end
+
+  defp safe_image_url?(_), do: false
+
+  @private_prefixes ["10.", "192.168.", "169.254.", "0."]
+  @loopback_hosts ["localhost", "127.0.0.1", "::1", "[::1]"]
+
+  defp private_host?(host) do
+    host = String.downcase(host)
+
+    host in @loopback_hosts or
+      String.ends_with?(host, ".localhost") or
+      Enum.any?(@private_prefixes, &String.starts_with?(host, &1)) or
+      match_172_private?(host)
+  end
+
+  defp match_172_private?(host) do
+    case String.split(host, ".") do
+      ["172", second | _] ->
+        case Integer.parse(second) do
+          {n, ""} when n >= 16 and n <= 31 -> true
+          _ -> false
+        end
+
+      _ ->
+        false
+    end
+  end
 
   defp handle_oauth_success(conn, email, provider, image_url) do
     case Accounts.get_user_by_email(email) do

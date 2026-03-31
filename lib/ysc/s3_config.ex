@@ -138,7 +138,14 @@ defmodule Ysc.S3Config do
             "#{virtual_hosted_url}/#{key}"
 
           true ->
-            bucket_url = String.replace(base_url, default_bucket, bucket)
+            uri = URI.parse(base_url)
+
+            new_host =
+              String.replace(uri.host || "", default_bucket, bucket,
+                global: false
+              )
+
+            bucket_url = URI.to_string(%{uri | host: new_host})
             "#{bucket_url}/#{key}"
         end
 

@@ -414,6 +414,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
       avatar_url = booking["member"]["avatar_url"]
 
       assert avatar_url =~ "norway"
+      assert avatar_url =~ "/images/"
     end
   end
 end
