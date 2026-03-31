@@ -637,9 +637,7 @@ defmodule YscWeb.EventDetailsLive do
                     >
                       <div class="relative">
                         <.user_avatar_image
-                          email={attendee.email || ""}
-                          user_id={to_string(attendee.id)}
-                          country={attendee.most_connected_country || "SE"}
+                          user={attendee}
                           class={"w-14 h-14 rounded-full ring-2 #{if is_me, do: "ring-blue-500", else: if(is_host, do: "ring-amber-400", else: "ring-zinc-100")}"}
                         />
                         <%= if ticket_count > 1 do %>
@@ -3219,9 +3217,7 @@ defmodule YscWeb.EventDetailsLive do
               ]}>
                 <div class="relative flex-shrink-0">
                   <.user_avatar_image
-                    email={attendee.email || ""}
-                    user_id={to_string(attendee.id)}
-                    country={attendee.most_connected_country || "SE"}
+                    user={attendee}
                     class={"h-10 w-10 rounded-full#{if is_host, do: " ring-2 ring-amber-400", else: ""}"}
                   />
                 </div>

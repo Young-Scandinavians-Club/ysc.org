@@ -26,12 +26,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     ~H"""
     <.side_menu
       active_page={@active_page}
-      email={@current_user.email}
-      first_name={@current_user.first_name}
-      last_name={@current_user.last_name}
-      user_id={@current_user.id}
-      most_connected_country={@current_user.most_connected_country}
-      board_position={@current_user.board_position}
+      user={@current_user}
       role={@admin_role}
     >
       <div class="flex flex-col justify-between py-6">
@@ -52,9 +47,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         <div class="w-full py-4">
           <div class="h-24">
             <.user_avatar_image
-              email={@selected_user.email}
-              user_id={@selected_user.id}
-              country={@selected_user.most_connected_country}
+              user={@selected_user}
               class="w-24 h-24 rounded-full"
             />
           </div>
@@ -929,9 +922,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </p>
               <div class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg">
                 <.user_avatar_image
-                  email={@primary_user.email}
-                  user_id={@primary_user.id}
-                  country={@primary_user.most_connected_country}
+                  user={@primary_user}
                   class="w-10 h-10 rounded-full"
                 />
                 <div class="flex-1">
@@ -1663,9 +1654,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
                   >
                     <.user_avatar_image
-                      email={@primary_user.email}
-                      user_id={@primary_user.id}
-                      country={@primary_user.most_connected_country}
+                      user={@primary_user}
                       class="w-10 h-10 rounded-full"
                     />
                     <div class="flex-1">
@@ -1689,9 +1678,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <% else %>
                   <div class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg">
                     <.user_avatar_image
-                      email={@selected_user.email}
-                      user_id={@selected_user.id}
-                      country={@selected_user.most_connected_country}
+                      user={@selected_user}
                       class="w-10 h-10 rounded-full"
                     />
                     <div class="flex-1">
@@ -1710,9 +1697,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <div class="flex items-center justify-between gap-4 p-4 bg-zinc-50 rounded-lg">
                     <div class="flex items-center gap-4 flex-1">
                       <.user_avatar_image
-                        email={sub_account.email}
-                        user_id={sub_account.id}
-                        country={sub_account.most_connected_country}
+                        user={sub_account}
                         class="w-10 h-10 rounded-full"
                       />
                       <div>
@@ -2059,8 +2044,9 @@ defmodule YscWeb.AdminUserDetailsLive do
       Accounts.get_user!(id, [
         :family_members,
         :billing_address,
-        :primary_user,
-        :sub_accounts
+        {:primary_user, :current_avatar},
+        {:sub_accounts, :current_avatar},
+        :current_avatar
       ])
 
     user_changeset =
@@ -3448,8 +3434,9 @@ defmodule YscWeb.AdminUserDetailsLive do
       user =
         Accounts.get_user!(selected_user.id, [
           :family_members,
-          :primary_user,
-          :sub_accounts
+          {:primary_user, :current_avatar},
+          {:sub_accounts, :current_avatar},
+          :current_avatar
         ])
 
       primary_user = Accounts.get_primary_user(user)
@@ -3590,8 +3577,9 @@ defmodule YscWeb.AdminUserDetailsLive do
     selected_user =
       Accounts.get_user!(user_id, [
         :family_members,
-        :primary_user,
-        :sub_accounts
+        {:primary_user, :current_avatar},
+        {:sub_accounts, :current_avatar},
+        :current_avatar
       ])
 
     # Get primary user if this is a sub-account

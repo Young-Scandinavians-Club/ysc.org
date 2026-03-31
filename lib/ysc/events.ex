@@ -220,7 +220,7 @@ defmodule Ysc.Events do
   """
   def list_event_hosts(%Event{} = event) do
     event
-    |> Repo.preload(:hosts)
+    |> Repo.preload(hosts: :current_avatar)
     |> then(& &1.hosts)
   end
 
@@ -232,7 +232,8 @@ defmodule Ysc.Events do
       join: eh in "event_hosts",
       on: eh.user_id == u.id,
       where: eh.event_id == type(^event_id, Ecto.ULID),
-      order_by: [asc: eh.user_id]
+      order_by: [asc: eh.user_id],
+      preload: [:current_avatar]
     )
     |> Repo.all()
   end
@@ -1485,7 +1486,8 @@ defmodule Ysc.Events do
       order_map = user_ids |> Enum.with_index() |> Map.new()
 
       from(u in User,
-        where: u.id in ^user_ids
+        where: u.id in ^user_ids,
+        preload: [:current_avatar]
       )
       |> Repo.all()
       |> Enum.sort_by(fn user -> Map.get(order_map, user.id, 999_999) end)

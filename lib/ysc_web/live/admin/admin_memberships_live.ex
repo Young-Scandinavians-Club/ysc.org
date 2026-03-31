@@ -62,12 +62,7 @@ defmodule YscWeb.AdminMembershipsLive do
     ~H"""
     <.side_menu
       active_page={@active_page}
-      email={@current_user.email}
-      first_name={@current_user.first_name}
-      last_name={@current_user.last_name}
-      user_id={@current_user.id}
-      most_connected_country={@current_user.most_connected_country}
-      board_position={@current_user.board_position}
+      user={@current_user}
       role={@admin_role}
     >
       <div class="bg-zinc-50/80 min-h-screen -mx-4 lg:-mx-10 px-4 lg:px-10 py-8">
@@ -217,9 +212,7 @@ defmodule YscWeb.AdminMembershipsLive do
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="flex items-center gap-3">
                         <.user_avatar_image
-                          email={membership.primary_user.email}
-                          user_id={membership.primary_user.id}
-                          country={membership.primary_user.most_connected_country}
+                          user={membership.primary_user}
                           class="w-8 h-8 rounded-full"
                         />
                         <div>
@@ -248,9 +241,7 @@ defmodule YscWeb.AdminMembershipsLive do
                             class="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
                           >
                             <.user_avatar_image
-                              email={user.email}
-                              user_id={user.id}
-                              country={user.most_connected_country}
+                              user={user}
                               class="w-6 h-6 rounded-full"
                             />
                             <span>

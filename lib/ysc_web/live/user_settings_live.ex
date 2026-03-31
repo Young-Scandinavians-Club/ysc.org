@@ -7,12 +7,15 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Accounts
   alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Accounts.UserNotifier
+  alias Ysc.Avatars
   alias Ysc.Customers
   alias Ysc.GoogleWallet
   alias Ysc.Ledgers
   alias Ysc.Newsletter
   alias Ysc.Repo
+  alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias YscWeb.S3.SimpleS3Upload
 
   import Ecto.Query
 
@@ -577,27 +580,211 @@ defmodule YscWeb.UserSettingsLive do
             <!-- Profile Picture Section -->
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Profile Picture</h2>
+              <p class="text-sm text-zinc-500">
+                Adding a profile picture helps other members recognize you at events and makes the community feel more personal.
+              </p>
 
-              <div class="flex items-center space-x-4">
-                <.user_avatar_image
-                  email={@user.email}
-                  user_id={@user.id}
-                  country={@user.most_connected_country}
-                  class="w-20 rounded-full"
-                />
-                <div>
-                  <p class="text-sm text-zinc-600">
-                    Your profile picture is synced via Gravatar. Update it on your
-                    <a
-                      class="text-blue-600 hover:underline"
-                      href="https://gravatar.com/connect"
-                      target="_blank"
-                      rel="noopener noreferrer"
+              <div class="flex items-start gap-6">
+                <%!-- Current avatar (large) --%>
+                <div class="shrink-0 relative">
+                  <.user_avatar_image
+                    user={@user}
+                    avatar_url={@current_avatar_url}
+                    class={
+                      if @avatar_processing,
+                        do: "w-24 h-24 rounded-full opacity-50",
+                        else: "w-24 h-24 rounded-full"
+                    }
+                  />
+                  <div
+                    :if={@avatar_processing}
+                    class="absolute inset-0 flex items-center justify-center"
+                  >
+                    <svg
+                      class="w-8 h-8 text-blue-600 animate-spin"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
                     >
-                      Gravatar profile
-                    </a>
-                    (sign in with the email for this account).
-                  </p>
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                <%!-- Upload + library --%>
+                <div class="flex-1 space-y-4">
+                  <form
+                    id="avatar-upload-form"
+                    phx-change="validate_avatar"
+                    phx-submit="save_avatar"
+                  >
+                    <div id="avatar-uploader" phx-hook="AvatarCropper">
+                      <div phx-update="ignore" id="avatar-cropper-ui">
+                        <label class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg cursor-pointer hover:bg-zinc-50 transition-colors">
+                          <.icon name="hero-arrow-up-tray" class="w-4 h-4" />
+                          Upload new photo
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            class="hidden"
+                            data-avatar-file-input
+                          />
+                        </label>
+
+                        <%!-- Cropper modal --%>
+                        <div
+                          data-cropper-modal
+                          class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                        >
+                          <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+                            <h3 class="text-lg font-semibold text-zinc-900">
+                              Crop your photo
+                            </h3>
+                            <div
+                              data-cropper-container
+                              class="w-full overflow-hidden rounded-lg"
+                            >
+                            </div>
+                            <div class="flex justify-end gap-3">
+                              <button
+                                type="button"
+                                data-cropper-cancel
+                                class="px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                data-cropper-confirm
+                                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <.live_file_input upload={@uploads.avatar} class="hidden" />
+                    </div>
+                  </form>
+
+                  <%!-- Upload progress --%>
+                  <%= for entry <- @uploads.avatar.entries do %>
+                    <div class="flex items-center gap-3">
+                      <div class="w-full bg-zinc-200 rounded-full h-2">
+                        <div
+                          class="bg-blue-600 h-2 rounded-full transition-all"
+                          style={"width: #{entry.progress}%"}
+                        >
+                        </div>
+                      </div>
+                      <span class="text-sm text-zinc-500 tabular-nums">
+                        {entry.progress}%
+                      </span>
+                    </div>
+                    <%= for err <- upload_errors(@uploads.avatar, entry) do %>
+                      <p class="text-sm text-red-600">
+                        <.icon
+                          name="hero-exclamation-circle"
+                          class="w-4 h-4 -mt-0.5 inline"
+                        />
+                        {avatar_upload_error_to_string(err)}
+                      </p>
+                    <% end %>
+                  <% end %>
+
+                  <%!-- Processing indicator --%>
+                  <div
+                    :if={@avatar_processing}
+                    class="flex items-center gap-2 text-sm text-blue-600"
+                  >
+                    <svg
+                      class="w-4 h-4 animate-spin"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    Processing your photo…
+                  </div>
+
+                  <%!-- Avatar library --%>
+                  <div :if={@user_avatars != []} class="pt-2">
+                    <p class="text-sm font-bold text-zinc-900 mb-2">
+                      Your photos
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                      <%= for avatar <- @user_avatars do %>
+                        <div class="relative">
+                          <button
+                            type="button"
+                            phx-click="select_avatar"
+                            phx-value-id={avatar.id}
+                            id={"avatar-#{avatar.id}"}
+                            class={[
+                              "w-14 h-14 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
+                              if(@user.current_avatar_id == avatar.id,
+                                do: "border-blue-600 ring-2 ring-blue-200",
+                                else: "border-zinc-200 hover:border-zinc-400"
+                              )
+                            ]}
+                          >
+                            <img
+                              src={Ysc.Avatars.avatar_url(avatar, :thumb)}
+                              alt="Previous avatar"
+                              class="w-full h-full object-cover"
+                            />
+                          </button>
+                          <%!-- Source badge for OAuth-synced avatars --%>
+                          <%= cond do %>
+                            <% avatar.source == :google -> %>
+                              <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center pointer-events-none">
+                                <img
+                                  src={~p"/images/google/google_g_logo.svg"}
+                                  alt="Google"
+                                  class="w-3 h-3"
+                                />
+                              </span>
+                            <% avatar.source == :facebook -> %>
+                              <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center pointer-events-none">
+                                <img
+                                  src={~p"/images/fb/facebook_f_logo.svg"}
+                                  alt="Facebook"
+                                  class="w-3 h-3"
+                                />
+                              </span>
+                            <% true -> %>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2437,6 +2624,16 @@ defmodule YscWeb.UserSettingsLive do
       )
       |> assign(:google_wallet_membership_url, nil)
       |> assign(:wallet_platform, wallet_platform_from_params(socket))
+      |> assign(:user_avatars, [])
+      |> assign(:current_avatar_url, nil)
+      |> assign(:avatar_processing, false)
+      |> allow_upload(:avatar,
+        accept: ~w(.jpg .jpeg .png .webp .gif),
+        max_entries: 1,
+        max_file_size: 10_000_000,
+        external: &presign_avatar_upload/2,
+        auto_upload: true
+      )
 
     # Payments tab assigns (placeholders for initial render)
     socket =
@@ -2462,6 +2659,7 @@ defmodule YscWeb.UserSettingsLive do
     if connected?(socket) do
       send(self(), :load_settings_data)
       Ysc.Subscriptions.subscribe_membership_updates(user.id)
+      Ysc.Avatars.subscribe_avatar_updates(user.id)
 
       if live_action == :payments do
         send(self(), :load_payments_data)
@@ -2471,7 +2669,21 @@ defmodule YscWeb.UserSettingsLive do
     {:ok, socket}
   end
 
-  # Handle async data loading for settings page
+  @impl true
+  def handle_info({:avatar_processed, _user_id}, socket) do
+    user =
+      Ysc.Repo.get!(Ysc.Accounts.User, socket.assigns.current_user.id)
+      |> Ysc.Repo.preload(:current_avatar)
+
+    {:noreply,
+     socket
+     |> assign(:current_user, user)
+     |> assign(:user, user)
+     |> assign(:user_avatars, load_user_avatars(user))
+     |> assign(:current_avatar_url, resolve_current_avatar_url(user))
+     |> assign(:avatar_processing, false)}
+  end
+
   @impl true
   def handle_info(:load_settings_data, socket) do
     user = socket.assigns.current_user
@@ -2529,7 +2741,9 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(
        :membership_form,
        to_form(%{"membership_type" => membership_type_to_select})
-     )}
+     )
+     |> assign(:user_avatars, load_user_avatars(user))
+     |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
   end
 
   # Handle async data loading for payments tab
@@ -2755,6 +2969,79 @@ defmodule YscWeb.UserSettingsLive do
       |> to_form()
 
     {:noreply, assign(socket, profile_form: profile_form)}
+  end
+
+  # Avatar upload: auto-consumed after presigned upload completes
+  def handle_event("validate_avatar", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("save_avatar", _params, socket) do
+    user = socket.assigns.current_user
+
+    uploaded_avatars =
+      consume_uploaded_entries(socket, :avatar, fn %{key: key}, _entry ->
+        location = S3Config.object_url(key, S3Config.avatars_bucket_name())
+
+        with {:ok, avatar} <-
+               Avatars.create_avatar(user, %{
+                 source: :upload,
+                 original_path: location
+               }),
+             {:ok, _job} <-
+               %{id: avatar.id}
+               |> YscWeb.Workers.AvatarProcessor.new()
+               |> Oban.insert() do
+          {:ok, avatar}
+        else
+          {:error, reason} -> {:error, reason}
+        end
+      end)
+
+    socket =
+      case uploaded_avatars do
+        [_avatar | _] ->
+          socket
+          |> YscWeb.Flash.put_toast(
+            :info,
+            "Photo uploaded! It will be ready shortly.",
+            title: "Profile Picture"
+          )
+          |> assign(:user_avatars, load_user_avatars(user))
+          |> assign(:avatar_processing, true)
+
+        _ ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("select_avatar", %{"id" => avatar_id}, socket) do
+    user = socket.assigns.current_user
+
+    case Avatars.set_current_avatar(user, avatar_id) do
+      {:ok, updated_user} ->
+        {:noreply,
+         socket
+         |> assign(:user, updated_user)
+         |> assign(
+           :current_avatar_url,
+           resolve_current_avatar_url(updated_user)
+         )
+         |> YscWeb.Flash.put_toast(:info, "Profile picture updated.",
+           title: "Profile Picture"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not update profile picture.",
+           title: "Profile Picture"
+         )}
+    end
   end
 
   def handle_event("update_profile", params, socket) do
@@ -5879,4 +6166,77 @@ defmodule YscWeb.UserSettingsLive do
       :both
     end
   end
+
+  # --- Avatar helpers ---
+
+  @allowed_avatar_extensions ~w(.jpg .jpeg .png .webp .gif .svg)
+
+  defp presign_avatar_upload(entry, socket) do
+    user = socket.assigns.current_user
+    avatar_id = Ecto.ULID.generate()
+
+    ext =
+      entry.client_name
+      |> Path.extname()
+      |> String.downcase()
+      |> then(fn e ->
+        if e in @allowed_avatar_extensions, do: e, else: ".webp"
+      end)
+
+    key = "#{user.id}/#{avatar_id}/original#{ext}"
+
+    config = %{
+      region: S3Config.region(),
+      access_key_id: S3Config.aws_access_key_id(),
+      secret_access_key: S3Config.aws_secret_access_key()
+    }
+
+    {:ok, fields} =
+      SimpleS3Upload.sign_form_upload(config, S3Config.avatars_bucket_name(),
+        key: key,
+        content_type: entry.client_type,
+        max_file_size: socket.assigns.uploads.avatar.max_file_size,
+        expires_in: :timer.hours(1)
+      )
+
+    meta = %{
+      uploader: "S3",
+      key: key,
+      url: S3Config.upload_url() |> avatar_upload_url(),
+      fields: fields
+    }
+
+    {:ok, meta, socket}
+  end
+
+  defp avatar_upload_url(base_url) do
+    media_bucket = S3Config.bucket_name()
+    avatars_bucket = S3Config.avatars_bucket_name()
+
+    String.replace(base_url, media_bucket, avatars_bucket)
+  end
+
+  defp load_user_avatars(user) do
+    Avatars.list_user_avatars(user)
+  end
+
+  defp resolve_current_avatar_url(user) do
+    user = Repo.preload(user, :current_avatar)
+
+    case user.current_avatar do
+      nil -> nil
+      avatar -> Avatars.avatar_url(avatar, :profile)
+    end
+  end
+
+  defp avatar_upload_error_to_string(:too_large),
+    do: "Image must be under 10 MB"
+
+  defp avatar_upload_error_to_string(:not_accepted),
+    do: "Only JPG, PNG, WebP, and GIF files are accepted"
+
+  defp avatar_upload_error_to_string(:too_many_files),
+    do: "Only one photo at a time"
+
+  defp avatar_upload_error_to_string(_), do: "Upload failed"
 end

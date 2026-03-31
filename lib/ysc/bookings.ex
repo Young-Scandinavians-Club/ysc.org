@@ -809,7 +809,7 @@ defmodule Ysc.Bookings do
                 ^normalized_last_name
               ),
           order_by: [desc: b.checkin_date],
-          preload: [:rooms, :user]
+          preload: [:rooms, {:user, :current_avatar}]
         )
         |> Repo.all()
 

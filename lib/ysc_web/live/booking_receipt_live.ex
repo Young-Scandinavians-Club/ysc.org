@@ -30,7 +30,7 @@ defmodule YscWeb.BookingReceiptLive do
         from(b in Booking,
           where: b.id == ^booking_id and b.user_id == ^user.id,
           preload: [
-            :user,
+            {:user, :current_avatar},
             :booking_guests,
             rooms: :room_category
           ]
@@ -57,7 +57,7 @@ defmodule YscWeb.BookingReceiptLive do
               from(b in Booking,
                 where: b.id == ^booking_id and b.user_id == ^user.id,
                 preload: [
-                  :user,
+                  {:user, :current_avatar},
                   :booking_guests,
                   rooms: :room_category
                 ]
@@ -583,9 +583,7 @@ defmodule YscWeb.BookingReceiptLive do
                         <%= if guest.is_booking_user do %>
                           <%= if Ecto.assoc_loaded?(@booking.user) && @booking.user do %>
                             <.user_avatar_image
-                              email={@booking.user.email || ""}
-                              user_id={to_string(@booking.user.id)}
-                              country={@booking.user.most_connected_country || "SE"}
+                              user={@booking.user}
                               class="w-full h-full object-cover"
                             />
                           <% else %>

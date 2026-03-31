@@ -131,9 +131,7 @@ defmodule YscWeb.NewsLive do
 
                   <div class="flex items-center gap-3 pt-4 border-t border-zinc-100 sm:border-white/20">
                     <.user_avatar_image
-                      email={@featured.author.email}
-                      user_id={@featured.author.id}
-                      country={@featured.author.most_connected_country}
+                      user={@featured.author}
                       class="w-8 h-8 sm:w-10 sm:h-10 rounded-full ring-2 ring-zinc-200 sm:ring-white/30"
                     />
                     <div>
@@ -253,9 +251,7 @@ defmodule YscWeb.NewsLive do
               <div class="mt-auto pt-6 border-t border-zinc-50 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <.user_avatar_image
-                    email={post.author.email}
-                    user_id={post.author.id}
-                    country={post.author.most_connected_country}
+                    user={post.author}
                     class="w-8 h-8 rounded-full"
                   />
                   <div>
@@ -318,7 +314,7 @@ defmodule YscWeb.NewsLive do
         {:featured,
          fn ->
            Posts.get_featured_post()
-           |> Ysc.Repo.preload([:author, :featured_image])
+           |> Ysc.Repo.preload([{:author, :current_avatar}, :featured_image])
          end},
         {:post_count, fn -> Posts.count_published_posts() end},
         {:posts, fn -> Posts.list_posts(nil, 10) end}

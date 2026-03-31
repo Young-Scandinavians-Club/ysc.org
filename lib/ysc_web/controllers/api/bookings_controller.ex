@@ -28,7 +28,7 @@ defmodule YscWeb.Api.BookingsController do
         Bookings.list_bookings(property, start_date, end_date,
           preload: [
             :rooms,
-            :user,
+            {:user, :current_avatar},
             :booking_guests,
             check_ins: :check_in_vehicles
           ]
@@ -58,7 +58,7 @@ defmodule YscWeb.Api.BookingsController do
         Bookings.list_bookings(property, start_date, end_date,
           preload: [
             :rooms,
-            :user,
+            {:user, :current_avatar},
             :booking_guests,
             check_ins: :check_in_vehicles
           ]

@@ -17,12 +17,7 @@ defmodule YscWeb.AdminUsersLive do
     ~H"""
     <.side_menu
       active_page={@active_page}
-      email={@current_user.email}
-      first_name={@current_user.first_name}
-      last_name={@current_user.last_name}
-      user_id={@current_user.id}
-      most_connected_country={@current_user.most_connected_country}
-      board_position={@current_user.board_position}
+      user={@current_user}
       role={@admin_role}
     >
       <.modal
@@ -37,9 +32,7 @@ defmodule YscWeb.AdminUsersLive do
 
         <div>
           <.user_avatar_image
-            email={@selected_user.email}
-            user_id={@selected_user.id}
-            country={@selected_user.most_connected_country}
+            user={@selected_user}
             class="w-32 h-32 rounded-full"
           />
         </div>
@@ -590,13 +583,7 @@ defmodule YscWeb.AdminUsersLive do
                   class="block"
                 >
                   <div class="flex items-start gap-3 mb-3">
-                    <.user_card
-                      email={user.email}
-                      user_id={user.id}
-                      most_connected_country={user.most_connected_country}
-                      first_name={user.first_name}
-                      last_name={user.last_name}
-                    />
+                    <.user_card user={user} />
                   </div>
                 </.link>
 
@@ -728,13 +715,7 @@ defmodule YscWeb.AdminUsersLive do
                   }
                   class="cursor-pointer hover:opacity-80 transition-opacity"
                 >
-                  <.user_card
-                    email={user.email}
-                    user_id={user.id}
-                    most_connected_country={user.most_connected_country}
-                    first_name={user.first_name}
-                    last_name={user.last_name}
-                  />
+                  <.user_card user={user} />
                 </.link>
               </:col>
               <:col :let={{_, user}} label="Phone" field={:phone_number}>
@@ -845,7 +826,7 @@ defmodule YscWeb.AdminUsersLive do
   def mount(%{"id" => id} = params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    selected_user = Accounts.get_user!(id, [:family_members])
+    selected_user = Accounts.get_user!(id, [:family_members, :current_avatar])
 
     application =
       Accounts.get_signup_application_from_user_id!(id, current_user, [

@@ -34,6 +34,14 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     end
   end
 
+  # Renders the calendar with today/min shifted one day before `date` so the
+  # availability window includes the "morning" reference day (date - 1), which
+  # is required for gradient (check-in style) rendering to work correctly.
+  defp render_shifted_calendar(date) do
+    calendar_base = Date.add(date, -1)
+    render_clear_lake_calendar(today: calendar_base, min: calendar_base)
+  end
+
   defp render_clear_lake_calendar(opts \\ []) do
     today = Date.utc_today()
 
@@ -198,7 +206,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           total_price: Money.new(500, :USD)
         })
 
-      html = render_clear_lake_calendar()
+      html = render_shifted_calendar(checkin)
       day_str = Calendar.strftime(checkin, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 
@@ -218,7 +226,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           reason: "Test blackout"
         })
 
-      html = render_clear_lake_calendar()
+      html = render_shifted_calendar(blackout_date)
       day_str = Calendar.strftime(blackout_date, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 
