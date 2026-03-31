@@ -116,6 +116,11 @@ const AvatarCropper = {
           liveInput.files = dataTransfer.files;
           liveInput.dispatchEvent(new Event("input", { bubbles: true }));
 
+          // Reset the source file picker so selecting the same file again
+          // triggers a new change event next time.
+          const fileInput = this.getFileInput();
+          if (fileInput) fileInput.value = "";
+
           this.hideModal();
           this.destroyCropper();
 
@@ -161,19 +166,26 @@ const AvatarCropper = {
     this.pollTimer = setInterval(() => {
       attempts++;
       const form = this.el.closest("form");
+
+      // Look for the LiveView upload progress bar within the same parent
+      // container as the form (progress is rendered outside the <form> tag but
+      // within the same wrapping section).
       const progressEl = form
         ? form.parentElement?.querySelector("[style*='width: 100%']")
         : null;
 
-      if (progressEl || attempts > MAX_POLL_ATTEMPTS) {
+      if (progressEl) {
         this.stopPolling();
         setTimeout(() => {
-          if (form) {
-            form.dispatchEvent(
-              new Event("submit", { bubbles: true, cancelable: true }),
-            );
-          }
+          form.dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          );
         }, SUBMIT_DELAY_MS);
+      } else if (attempts >= MAX_POLL_ATTEMPTS) {
+        // Upload took too long — stop polling without submitting so the user
+        // can retry rather than sending an incomplete upload.
+        this.stopPolling();
+        console.error("AvatarCropper: upload progress not detected after max attempts; aborting auto-submit");
       }
     }, POLL_INTERVAL_MS);
   },

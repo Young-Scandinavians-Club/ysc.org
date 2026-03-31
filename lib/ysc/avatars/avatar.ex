@@ -48,6 +48,7 @@ defmodule Ysc.Avatars.Avatar do
       :processing_state,
       :original_path
     ])
+    |> validate_length(:original_path, max: 2048)
     |> validate_length(:thumb_path, max: 2048)
     |> validate_length(:profile_path, max: 2048)
     |> validate_length(:large_path, max: 2048)

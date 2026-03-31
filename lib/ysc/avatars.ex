@@ -147,7 +147,8 @@ defmodule Ysc.Avatars do
       )
       |> Repo.one()
 
-    if latest && latest.source_url == image_url do
+    if latest && latest.source_url == image_url &&
+         latest.processing_state == :completed do
       {:ok, :unchanged}
     else
       download_and_create_avatar(user, image_url, source)

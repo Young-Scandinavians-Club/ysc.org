@@ -129,6 +129,12 @@ defmodule YscWeb.Workers.AvatarProcessor do
           _ -> :ok
         end
 
+        try do
+          Avatars.broadcast_avatar_processed(avatar.user_id)
+        rescue
+          _ -> :ok
+        end
+
         {:error, e}
     after
       cleanup_files(base)

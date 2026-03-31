@@ -2624,8 +2624,8 @@ defmodule YscWeb.UserSettingsLive do
       )
       |> assign(:google_wallet_membership_url, nil)
       |> assign(:wallet_platform, wallet_platform_from_params(socket))
-      |> assign(:user_avatars, load_user_avatars(user))
-      |> assign(:current_avatar_url, resolve_current_avatar_url(user))
+      |> assign(:user_avatars, [])
+      |> assign(:current_avatar_url, nil)
       |> assign(:avatar_processing, false)
       |> allow_upload(:avatar,
         accept: ~w(.jpg .jpeg .png .webp .gif),
@@ -2741,7 +2741,9 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(
        :membership_form,
        to_form(%{"membership_type" => membership_type_to_select})
-     )}
+     )
+     |> assign(:user_avatars, load_user_avatars(user))
+     |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
   end
 
   # Handle async data loading for payments tab
@@ -6167,10 +6169,21 @@ defmodule YscWeb.UserSettingsLive do
 
   # --- Avatar helpers ---
 
+  @allowed_avatar_extensions ~w(.jpg .jpeg .png .webp .gif .svg)
+
   defp presign_avatar_upload(entry, socket) do
     user = socket.assigns.current_user
     avatar_id = Ecto.ULID.generate()
-    key = "#{user.id}/#{avatar_id}/original_#{entry.client_name}"
+
+    ext =
+      entry.client_name
+      |> Path.extname()
+      |> String.downcase()
+      |> then(fn e ->
+        if e in @allowed_avatar_extensions, do: e, else: ".webp"
+      end)
+
+    key = "#{user.id}/#{avatar_id}/original#{ext}"
 
     config = %{
       region: S3Config.region(),

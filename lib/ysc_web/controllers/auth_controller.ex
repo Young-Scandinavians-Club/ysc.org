@@ -96,8 +96,6 @@ defmodule YscWeb.AuthController do
     end
   end
 
-  defp safe_image_url?(_), do: false
-
   @private_prefixes ["10.", "192.168.", "169.254.", "0."]
   @loopback_hosts ["localhost", "127.0.0.1", "::1", "[::1]"]
 
