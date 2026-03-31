@@ -1021,7 +1021,7 @@ defmodule YscWeb.UserSettingsLive do
                 :if={@current_membership != nil}
                 phx-click="show_membership_qr"
               >
-                <.icon name="hero-qr-code" class="w-4 h-4 mr-1.5" />
+                <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
                 My Membership QR
               </.button>
               <div
@@ -1071,7 +1071,7 @@ defmodule YscWeb.UserSettingsLive do
                 is_sub_account={@is_sub_account}
               />
               <.button phx-click="show_membership_qr">
-                <.icon name="hero-qr-code" class="w-4 h-4 mr-1.5" />
+                <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
                 My Membership QR
               </.button>
               <.link
@@ -1521,14 +1521,14 @@ defmodule YscWeb.UserSettingsLive do
 
                 <div class="flex flex-wrap items-center gap-3 pt-4 border-t border-zinc-100">
                   <.button phx-click="show_membership_qr">
-                    <.icon name="hero-qr-code" class="w-4 h-4 mr-1.5" />
+                    <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
                     My Membership QR
                   </.button>
                   <.button
                     phx-click={JS.patch(~p"/users/membership/payment-method")}
                     variant="outline"
                   >
-                    <.icon name="hero-credit-card" class="w-4 h-4 mr-1.5" />
+                    <.icon name="hero-credit-card" class="w-5 h-5 me-1.5 -mt-0.5" />
                     Change Payment Method
                   </.button>
                   <.button
