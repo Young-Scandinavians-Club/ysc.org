@@ -3011,7 +3011,7 @@ defmodule YscWeb.CoreComponents do
       <img
         src={~p"/images/apple/US-UK_Add_to_Apple_Wallet_RGB_101421.svg"}
         alt="Add to Apple Wallet"
-        class="block h-14 w-auto"
+        class="block w-[200px]"
       />
     </a>
     """
@@ -3036,7 +3036,7 @@ defmodule YscWeb.CoreComponents do
       <img
         src={~p"/images/google/enGB_add_to_google_wallet_add-wallet-badge.svg"}
         alt="Add to Google Wallet"
-        class="block h-14 w-auto"
+        class="block w-[200px]"
       />
     </a>
     """
