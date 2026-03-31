@@ -322,11 +322,7 @@ defmodule YscWeb.BookingCheckoutLive do
                   <div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-200">
                     <%= if assigns[:current_user] do %>
                       <.user_avatar_image
-                        email={assigns[:current_user].email || ""}
-                        user_id={to_string(assigns[:current_user].id)}
-                        country={
-                          assigns[:current_user].most_connected_country || "SE"
-                        }
+                        user={assigns[:current_user]}
                         class="w-full h-full object-cover"
                       />
                     <% else %>

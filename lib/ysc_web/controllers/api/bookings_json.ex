@@ -63,7 +63,7 @@ defmodule YscWeb.Api.BookingsJSON do
       email: user.email,
       avatar_url:
         UserAvatar.url(
-          user.email,
+          Ysc.Avatars.resolve_user_avatar_url(user),
           user.id,
           user.most_connected_country
         )

@@ -52,9 +52,7 @@ defmodule YscWeb.VolunteerLive do
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-blue-200">
                   <.user_avatar_image
-                    email={@current_user.email}
-                    user_id={@current_user.id}
-                    country={@current_user.most_connected_country}
+                    user={@current_user}
                     class="w-full h-full object-cover"
                   />
                 </div>

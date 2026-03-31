@@ -18,7 +18,6 @@ defmodule YscWeb.CoreComponents do
   use Gettext, backend: YscWeb.Gettext
   use YscWeb, :verified_routes
 
-  import Exgravatar
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -1535,24 +1534,32 @@ defmodule YscWeb.CoreComponents do
     membership_director: "Membership Director"
   }
 
-  attr :email, :string, required: true
+  attr :user, :any,
+    default: nil,
+    doc:
+      "User struct or map; when provided, derives all user fields automatically"
+
+  attr :email, :string, default: nil
   attr :title, :string, required: false, default: nil
-  attr :user_id, :string, required: true
-  attr :most_connected_country, :string, required: true
-  attr :first_name, :string, required: true
-  attr :last_name, :string, required: true
+  attr :user_id, :string, default: nil
+  attr :most_connected_country, :string, default: nil
+  attr :first_name, :string, default: nil
+  attr :last_name, :string, default: nil
   attr :right, :boolean, default: false
   attr :show_subtitle, :boolean, default: true
   attr :class, :string, default: ""
+  attr :avatar_url, :string, default: nil
 
   def user_card(assigns) do
+    assigns = derive_user_card_assigns(assigns)
+
     subtitle =
       if assigns[:title] != nil do
         "YSC #{Map.get(@board_position_to_title_lookup,
         assigns[:title],
         String.capitalize("#{assigns[:title]}"))}"
       else
-        String.downcase(assigns[:email])
+        String.downcase(assigns[:email] || "")
       end
 
     assigns = assign(assigns, :subtitle, subtitle)
@@ -1580,9 +1587,11 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div class={"flex items-center whitespace-nowrap h-10 #{@class}"}>
       <.user_avatar_image
+        user={@user}
         email={@email}
         user_id={@user_id}
         country={@most_connected_country}
+        avatar_url={@avatar_url}
         class={
           Enum.join(
             [
@@ -1608,14 +1617,42 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  attr :user_id, :string, required: true
-  attr :email, :string, required: true
-  attr :first_name, :string, required: true
-  attr :last_name, :string, required: true
-  attr :most_connected_country, :string, required: true
+  defp derive_user_card_assigns(%{user: user} = assigns)
+       when not is_nil(user) do
+    assigns
+    |> assign(:email, Map.get(user, :email, ""))
+    |> assign(:user_id, to_string(Map.get(user, :id, "0")))
+    |> assign(
+      :most_connected_country,
+      Map.get(user, :most_connected_country, "SE")
+    )
+    |> assign(:first_name, Map.get(user, :first_name, ""))
+    |> assign(:last_name, Map.get(user, :last_name, ""))
+    |> assign(
+      :avatar_url,
+      assigns[:avatar_url] ||
+        Ysc.Avatars.resolve_user_avatar_url(user, :profile)
+    )
+  end
+
+  defp derive_user_card_assigns(assigns), do: assigns
+
+  attr :user, :any,
+    default: nil,
+    doc:
+      "User struct or map; when provided, derives all user fields automatically"
+
+  attr :user_id, :string, default: nil
+  attr :email, :string, default: nil
+  attr :first_name, :string, default: nil
+  attr :last_name, :string, default: nil
+  attr :most_connected_country, :string, default: nil
+  attr :avatar_url, :string, default: nil
   slot :inner_block, required: true
 
   def user_avatar(assigns) do
+    assigns = derive_user_card_assigns(assigns)
+
     ~H"""
     <div class="relative">
       <button
@@ -1625,11 +1662,13 @@ defmodule YscWeb.CoreComponents do
         phx-click={show_dropdown("#avatar-menu")}
       >
         <.user_card
+          user={@user}
           email={@email}
           user_id={@user_id}
           most_connected_country={@most_connected_country}
           first_name={@first_name}
           last_name={@last_name}
+          avatar_url={@avatar_url}
           right={true}
           show_subtitle={false}
         />
@@ -2125,31 +2164,60 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  attr :email, :string, required: true
-  attr :user_id, :string, required: true
-  attr :country, :string, required: true
+  attr :user, :any,
+    default: nil,
+    doc:
+      "User struct or map; when provided, derives email/user_id/country/avatar_url automatically"
+
+  attr :email, :string, default: nil
+  attr :user_id, :string, default: nil
+  attr :country, :string, default: nil
   attr :class, :string, default: ""
+  attr :avatar_url, :string, default: nil
+
+  attr :size, :atom,
+    default: :profile,
+    doc: "Avatar size variant (:thumb, :profile, :large)"
 
   def user_avatar_image(assigns) do
-    email = assigns[:email] || "default@example.com"
-    user_id = assigns[:user_id] || "0"
-    country = assigns[:country] || "SE"
+    assigns = derive_avatar_assigns(assigns)
 
-    cleaned_email = String.downcase(email) |> String.trim()
+    full_path =
+      if assigns[:avatar_url] do
+        assigns[:avatar_url]
+      else
+        user_id = assigns[:user_id] || "0"
+        country = assigns[:country] || "SE"
 
-    image_id =
-      user_id |> String.replace(~r/[^\d]/, "") |> String.to_integer() |> rem(2)
+        image_id =
+          user_id
+          |> String.replace(~r/[^\d]/, "")
+          |> String.to_integer()
+          |> rem(2)
 
-    image_path = default_avatar_path(country, image_id)
+        default_avatar_path(country, image_id)
+      end
 
-    assigns =
-      assigns
-      |> assign(:full_path, full_path(cleaned_email, image_path))
+    assigns = assign(assigns, :full_path, full_path)
 
     ~H"""
     <img class={@class} src={@full_path} loading="lazy" alt="User avatar" />
     """
   end
+
+  defp derive_avatar_assigns(%{user: user} = assigns) when not is_nil(user) do
+    assigns
+    |> assign(:email, Map.get(user, :email))
+    |> assign(:user_id, to_string(Map.get(user, :id, "0")))
+    |> assign(:country, Map.get(user, :most_connected_country, "SE"))
+    |> assign(
+      :avatar_url,
+      assigns[:avatar_url] ||
+        Ysc.Avatars.resolve_user_avatar_url(user, assigns[:size] || :profile)
+    )
+  end
+
+  defp derive_avatar_assigns(assigns), do: assigns
 
   defp default_avatar_path("DK", 0),
     do: ~p"/images/default_avatars/denmark_flag.webp"
@@ -2183,15 +2251,6 @@ defmodule YscWeb.CoreComponents do
 
   defp default_avatar_path(_, image_id), do: default_avatar_path("SE", image_id)
 
-  defp full_path(email, image_path) do
-    if Application.get_env(:ysc, :dev_routes, false) == true do
-      image_path
-    else
-      default_url = YscWeb.Endpoint.url() <> image_path
-      gravatar_url(email, s: 512, d: default_url)
-    end
-  end
-
   attr :color, :string, default: "blue"
   slot :inner_block, required: true
 
@@ -2212,6 +2271,7 @@ defmodule YscWeb.CoreComponents do
   attr :author_email, :string, required: true
   attr :author_most_connected, :string, required: true
   attr :author_id, :string, required: true
+  attr :author_avatar_url, :string, default: nil
   attr :date, :any, required: true
   attr :reply, :boolean, default: false
   attr :form, :any, required: true
@@ -2240,6 +2300,7 @@ defmodule YscWeb.CoreComponents do
             email={@author_email}
             user_id={@author_id}
             country={@author_most_connected}
+            avatar_url={@author_avatar_url}
             class="w-8 h-8 rounded-full ring-2 ring-white shadow-sm"
           />
           <div>

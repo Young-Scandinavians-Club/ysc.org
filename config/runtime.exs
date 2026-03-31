@@ -354,11 +354,15 @@ if config_env() == :prod do
   expense_reports_bucket =
     System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"
 
+  avatars_bucket =
+    System.get_env("AVATARS_BUCKET_NAME") || "avatars"
+
   config :ysc,
     s3_bucket: s3_bucket,
     s3_region: s3_region,
     s3_base_url: s3_base_url,
     expense_reports_s3_bucket: expense_reports_bucket,
+    avatars_s3_bucket: avatars_bucket,
     aws_access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
 

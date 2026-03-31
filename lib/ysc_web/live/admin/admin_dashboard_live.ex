@@ -15,12 +15,7 @@ defmodule YscWeb.AdminDashboardLive do
     ~H"""
     <.side_menu
       active_page={@active_page}
-      email={@current_user.email}
-      first_name={@current_user.first_name}
-      last_name={@current_user.last_name}
-      user_id={@current_user.id}
-      most_connected_country={@current_user.most_connected_country}
-      board_position={@current_user.board_position}
+      user={@current_user}
       role={@admin_role}
     >
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-6 mb-8">
@@ -287,9 +282,7 @@ defmodule YscWeb.AdminDashboardLive do
           <div class="mt-6 flex -space-x-2 overflow-hidden">
             <div :for={user <- @active_guests_sample} class="relative">
               <.user_avatar_image
-                email={user.email}
-                user_id={user.id}
-                country={user.most_connected_country}
+                user={user}
                 class="inline-block h-6 w-6 rounded-full ring-2 ring-white"
               />
             </div>
@@ -414,9 +407,7 @@ defmodule YscWeb.AdminDashboardLive do
 
                 <div class="relative flex-shrink-0">
                   <.user_avatar_image
-                    email={user.email}
-                    user_id={user.id}
-                    country={user.most_connected_country}
+                    user={user}
                     class="w-14 h-14 rounded object-cover ring-2 ring-zinc-50 shadow-sm"
                   />
                 </div>
@@ -1255,7 +1246,7 @@ defmodule YscWeb.AdminDashboardLive do
         where: b.status == :complete,
         where: b.checkin_date <= ^today,
         where: b.checkout_date >= ^today,
-        preload: [:user]
+        preload: [user: :current_avatar]
       )
 
     bookings = Repo.all(query)

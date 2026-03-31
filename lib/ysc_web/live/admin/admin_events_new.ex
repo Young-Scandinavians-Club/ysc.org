@@ -22,12 +22,7 @@ defmodule YscWeb.AdminEventsNewLive do
     ~H"""
     <.side_menu
       active_page={@active_page}
-      email={@current_user.email}
-      first_name={@current_user.first_name}
-      last_name={@current_user.last_name}
-      user_id={@current_user.id}
-      most_connected_country={@current_user.most_connected_country}
-      board_position={@current_user.board_position}
+      user={@current_user}
       role={@admin_role}
     >
       <div class="flex py-6 flex-col">
@@ -464,9 +459,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     class="flex items-center gap-2 bg-zinc-100 rounded-full pl-1 pr-3 py-1"
                   >
                     <.user_avatar_image
-                      email={host.email}
-                      user_id={host.id}
-                      country={host.most_connected_country}
+                      user={host}
                       class="w-7 h-7 rounded-full object-cover flex-shrink-0"
                     />
                     <span class="text-sm font-medium text-zinc-800">
@@ -528,9 +521,7 @@ defmodule YscWeb.AdminEventsNewLive do
                           aria-label={"Add #{user.first_name} #{user.last_name} (#{user.email}) as host"}
                         >
                           <.user_avatar_image
-                            email={user.email}
-                            user_id={user.id}
-                            country={user.most_connected_country}
+                            user={user}
                             class="w-8 h-8 rounded-full object-cover flex-shrink-0"
                           />
                           <div class="min-w-0 flex-1">

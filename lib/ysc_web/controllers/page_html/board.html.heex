@@ -31,9 +31,8 @@
           <%= for member <- @bod_members do %>
             <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
               <.user_avatar_image
-                email={member.email}
-                user_id={member.id}
-                country={member.most_connected_country}
+                user={member}
+                size={:large}
                 class="h-24 w-24 rounded-full flex-shrink-0"
               />
               <div class="flex-1">
@@ -124,9 +123,8 @@
           <%= for member <- @bod_members do %>
             <div class="flex items-center gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
               <.user_avatar_image
-                email={member.email}
-                user_id={member.id}
-                country={member.most_connected_country}
+                user={member}
+                size={:large}
                 class="h-24 w-24 rounded-full flex-shrink-0"
               />
               <div class="flex-1">

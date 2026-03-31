@@ -45,9 +45,10 @@ defmodule YscWeb.AuthController do
   def callback(%{assigns: %{ueberauth_auth: auth}} = conn, _params) do
     # Extract email from OAuth response
     email = extract_email(auth)
+    image_url = extract_image(auth)
 
     if email do
-      handle_oauth_success(conn, email, auth.provider)
+      handle_oauth_success(conn, email, auth.provider, image_url)
     else
       conn
       |> YscWeb.Flash.put_toast(
@@ -73,11 +74,15 @@ defmodule YscWeb.AuthController do
   # Private helper functions
 
   defp extract_email(%Ueberauth.Auth{info: info}) do
-    # Try multiple fields where email might be stored
     info.email || info.raw["email"] || info.raw["emailAddress"]
   end
 
-  defp handle_oauth_success(conn, email, provider) do
+  defp extract_image(%Ueberauth.Auth{info: %{image: image}})
+       when is_binary(image) and image != "", do: image
+
+  defp extract_image(_), do: nil
+
+  defp handle_oauth_success(conn, email, provider, image_url) do
     case Accounts.get_user_by_email(email) do
       nil ->
         # User doesn't exist - use generic message to avoid user enumeration
@@ -102,6 +107,15 @@ defmodule YscWeb.AuthController do
             else
               user
             end
+
+          # Sync OAuth profile image asynchronously (non-blocking)
+          if image_url do
+            source = provider_to_avatar_source(provider)
+
+            Task.Supervisor.start_child(Ysc.TaskSupervisor, fn ->
+              Ysc.Avatars.sync_oauth_avatar(updated_user, image_url, source)
+            end)
+          end
 
           # Get redirect_to from session if it was stored
           redirect_to = get_session(conn, :oauth_redirect_to)
@@ -135,4 +149,8 @@ defmodule YscWeb.AuthController do
         end
     end
   end
+
+  defp provider_to_avatar_source(:google), do: :google
+  defp provider_to_avatar_source(:facebook), do: :facebook
+  defp provider_to_avatar_source(_), do: :upload
 end

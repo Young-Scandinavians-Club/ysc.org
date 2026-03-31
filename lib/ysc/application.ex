@@ -47,6 +47,8 @@ defmodule Ysc.Application do
       Ysc.AppleWallet.CertManager,
       # Start Google Wallet credentials manager
       Ysc.GoogleWallet.Credentials,
+      # Task supervisor for fire-and-forget async work (e.g. OAuth avatar sync)
+      {Task.Supervisor, name: Ysc.TaskSupervisor},
       # Start the Endpoint (http/https)
       YscWeb.Endpoint,
       # Start a worker by calling: Ysc.Worker.start_link(arg)

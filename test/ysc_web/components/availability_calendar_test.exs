@@ -198,7 +198,19 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           total_price: Money.new(500, :USD)
         })
 
-      html = render_clear_lake_calendar()
+      # The gradient cell logic works by checking whether the day *before* the cell
+      # (the "morning" reference) is in the loaded availability range and is not booked.
+      # The availability range is loaded starting from `today`, so if checkin == today,
+      # yesterday (the morning reference) falls outside the range and is treated as
+      # unavailable, producing solid red instead of a gradient.
+      #
+      # Fix: set the calendar's `today` and `min` to one day before checkin.  This shifts
+      # the availability window back one day so yesterday-of-checkin is always included.
+      calendar_base = Date.add(checkin, -1)
+
+      html =
+        render_clear_lake_calendar(today: calendar_base, min: calendar_base)
+
       day_str = Calendar.strftime(checkin, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 
@@ -218,7 +230,14 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           reason: "Test blackout"
         })
 
-      html = render_clear_lake_calendar()
+      # Same reasoning as the buyout test above: shift `today` and `min` back one day
+      # so the availability window includes the day before the blackout date, allowing
+      # the gradient (check-in style) rendering to work regardless of what day it is.
+      calendar_base = Date.add(blackout_date, -1)
+
+      html =
+        render_clear_lake_calendar(today: calendar_base, min: calendar_base)
+
       day_str = Calendar.strftime(blackout_date, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 

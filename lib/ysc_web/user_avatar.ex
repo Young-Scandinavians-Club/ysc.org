@@ -1,43 +1,33 @@
 defmodule YscWeb.UserAvatar do
   @moduledoc """
-  Shared logic for generating user avatar URLs (Gravatar with country-based defaults).
+  Shared logic for generating user avatar URLs.
 
-  Used by the website (CoreComponents) and API responses (e.g. BookingsJSON).
+  Uses the user's stored avatar when available, falling back to a
+  country-based default image. Used by the website (CoreComponents) and
+  API responses (e.g. BookingsJSON).
   """
-
-  import Exgravatar
 
   @doc """
   Returns the full avatar URL for a user.
 
-  Uses Gravatar when available, falling back to a country-based default image
-  (same as the website). Suitable for API responses where the client needs
-  a loadable image URL.
+  When the user has a current avatar with a stored URL, returns that URL.
+  Otherwise falls back to a country-based default image.
 
   ## Examples
 
-      iex> UserAvatar.url("user@example.com", "01HXYZ123", "SE")
-      "https://secure.gravatar.com/avatar/..."
-
-      iex> UserAvatar.url(nil, "01HXYZ123", "NO")
-      "https://ysc.org/images/default_avatars/norway_flag.webp"
+      iex> UserAvatar.url(nil, "01HXYZ123", "SE")
+      "/images/default_avatars/sweden_flag.webp"
   """
-  def url(email, user_id, country) do
+  def url(avatar_url, _user_id, _country)
+      when is_binary(avatar_url) and avatar_url != "" do
+    avatar_url
+  end
+
+  def url(_avatar_url, user_id, country) do
     country = country || "SE"
     image_id = image_id_from_user(user_id)
     image_path = default_avatar_path(country, image_id)
-    default_url = YscWeb.Endpoint.url() <> image_path
-
-    cleaned_email =
-      (email || "")
-      |> String.downcase()
-      |> String.trim()
-
-    if cleaned_email == "" do
-      default_url
-    else
-      gravatar_url(cleaned_email, s: 512, d: default_url)
-    end
+    YscWeb.Endpoint.url() <> image_path
   end
 
   defp image_id_from_user(nil), do: 0

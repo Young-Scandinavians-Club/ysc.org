@@ -63,16 +63,23 @@ defmodule YscWeb.AdminComponents do
   # ---------------------------------------------------------------------------
 
   attr :active_page, :string
-  attr :email, :string
-  attr :first_name, :string
-  attr :last_name, :string
-  attr :user_id, :string
-  attr :most_connected_country, :string
+
+  attr :user, :any,
+    default: nil,
+    doc: "User struct; when provided, derives email/name/user_id/country/avatar"
+
+  attr :email, :string, default: nil
+  attr :first_name, :string, default: nil
+  attr :last_name, :string, default: nil
+  attr :user_id, :string, default: nil
+  attr :most_connected_country, :string, default: nil
   attr :board_position, :any, default: nil
   attr :role, :atom, default: :admin
   slot :inner_block, required: true
 
   def side_menu(assigns) do
+    assigns = derive_side_menu_user(assigns)
+
     ~H"""
     <button
       class="inline-flex items-center mb-2 p-2 mt-2 ms-3 text-sm text-zinc-500 rounded :hidden hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-200"
@@ -453,6 +460,7 @@ defmodule YscWeb.AdminComponents do
           class="flex-shrink-0 px-5 py-4 border-t border-zinc-800 bg-zinc-900"
         >
           <.user_card
+            user={@user}
             email={@email}
             user_id={@user_id}
             most_connected_country={@most_connected_country}
@@ -468,6 +476,7 @@ defmodule YscWeb.AdminComponents do
           class="hidden flex-shrink-0 py-4 border-t border-zinc-700 bg-zinc-900 items-center justify-center"
         >
           <.user_avatar_image
+            user={@user}
             email={@email}
             user_id={@user_id}
             country={@most_connected_country}
@@ -757,4 +766,19 @@ defmodule YscWeb.AdminComponents do
     </div>
     """
   end
+
+  defp derive_side_menu_user(%{user: user} = assigns) when not is_nil(user) do
+    assigns
+    |> assign(:email, Map.get(user, :email, ""))
+    |> assign(:user_id, to_string(Map.get(user, :id, "0")))
+    |> assign(
+      :most_connected_country,
+      Map.get(user, :most_connected_country, "SE")
+    )
+    |> assign(:first_name, Map.get(user, :first_name, ""))
+    |> assign(:last_name, Map.get(user, :last_name, ""))
+    |> assign(:board_position, Map.get(user, :board_position))
+  end
+
+  defp derive_side_menu_user(assigns), do: assigns
 end
