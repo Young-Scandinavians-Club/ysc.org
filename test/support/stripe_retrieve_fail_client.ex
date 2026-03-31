@@ -25,4 +25,13 @@ defmodule Ysc.StripeRetrieveFailClient do
 
   @impl true
   defdelegate list_events(p, o), to: Ysc.TestStripeClient
+
+  @impl true
+  defdelegate retrieve_charge(id, o), to: Ysc.TestStripeClient
+
+  @impl true
+  defdelegate retrieve_payout(id, o), to: Ysc.TestStripeClient
+
+  @impl true
+  defdelegate list_balance_transactions(p, o), to: Ysc.TestStripeClient
 end

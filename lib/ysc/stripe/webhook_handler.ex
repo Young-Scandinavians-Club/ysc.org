@@ -2943,7 +2943,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         Ysc.Logging.error("Failed to fetch balance transactions",
           payout_id: payout_id,
           error: inspect(reason),
-          error_type: reason.__struct__
+          error_type: if(is_struct(reason), do: reason.__struct__, else: nil)
         )
 
         {:error, reason}

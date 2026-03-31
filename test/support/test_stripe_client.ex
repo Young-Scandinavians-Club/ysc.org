@@ -43,17 +43,11 @@ defmodule Ysc.TestStripeClient do
   def list_events(_params, _opts), do: {:error, :not_implemented}
 
   @impl true
-  def retrieve_charge(id, _opts) when is_binary(id) do
-    {:ok, %Stripe.Charge{id: id}}
-  end
+  def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
 
   @impl true
-  def retrieve_payout(id, _opts) when is_binary(id) do
-    {:ok, %Stripe.Payout{id: id}}
-  end
+  def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
 
   @impl true
-  def list_balance_transactions(_params, _opts) do
-    {:ok, %Stripe.List{data: [], has_more: false}}
-  end
+  def list_balance_transactions(_params, _opts), do: {:error, :not_implemented}
 end
