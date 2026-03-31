@@ -77,6 +77,14 @@ defmodule YscWeb.AuthController do
     info.email || info.raw["email"] || info.raw["emailAddress"]
   end
 
+  defp extract_image(%Ueberauth.Auth{provider: :google, info: %{image: image}})
+       when is_binary(image) and image != "" do
+    # Google userinfo returns URLs with a small size suffix like `=s96-c`.
+    # Strip it to request the original full-resolution image instead.
+    url = Regex.replace(~r/=s\d+-c$/, image, "=s0-c")
+    if safe_image_url?(url), do: url, else: nil
+  end
+
   defp extract_image(%Ueberauth.Auth{info: %{image: image}})
        when is_binary(image) and image != "" do
     if safe_image_url?(image), do: image, else: nil

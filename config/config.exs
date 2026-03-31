@@ -320,7 +320,12 @@ config :mime, :types, %{
 config :ueberauth, Ueberauth,
   providers: [
     google: {Ueberauth.Strategy.Google, [default_scope: "email profile"]},
-    facebook: {Ueberauth.Strategy.Facebook, [default_scope: "email"]}
+    facebook:
+      {Ueberauth.Strategy.Facebook,
+       [
+         default_scope: "email,public_profile",
+         profile_fields: "id,name,email,picture.type(large)"
+       ]}
   ]
 
 # Import environment specific config. This must remain at the bottom
