@@ -98,6 +98,9 @@ defmodule Ysc.Accounts.User do
     has_many :user_notes, Ysc.Accounts.UserNote, foreign_key: :user_id
     has_many :passkeys, Ysc.Accounts.UserPasskey, foreign_key: :user_id
 
+    belongs_to :current_avatar, Ysc.Avatars.Avatar
+    has_many :avatars, Ysc.Avatars.Avatar
+
     field :display_name, :string, virtual: true
     field :payment_id, :string, virtual: true
     field :sms_opt_in, :boolean, virtual: true

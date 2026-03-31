@@ -55,7 +55,7 @@ List bookings for a property, optionally filtered by date range.
         "first_name": "Jane",
         "last_name": "Doe",
         "email": "jane@example.com",
-        "avatar_url": "https://secure.gravatar.com/avatar/abc123?s=512&d=https%3A%2F%2Fysc.org%2Fimages%2Fdefault_avatars%2Fsweden_flag.webp"
+        "avatar_url": "https://fly.storage.tigris.dev/avatars/01HXYZ.../profile.webp"
       },
       "rooms": [
         { "id": "01HXYZ...", "name": "Master Bedroom" }
@@ -93,7 +93,7 @@ List bookings for a property, optionally filtered by date range.
 | Field          | Type    | Description |
 |----------------|---------|-------------|
 | `member`       | object  | The YSC member who made the booking. `null` if no user linked. |
-| `member.avatar_url` | string | Full URL to the member's profile picture. Uses Gravatar when available; otherwise falls back to a country-based default image (same as the website). Load this URL directly in an `<img>` or image component. |
+| `member.avatar_url` | string | Full URL to the member's profile picture. When the member has uploaded a custom avatar (or one was synced from Google/Facebook), this points to an optimized WebP image on our CDN. Otherwise falls back to a country-based default image (same as the website). Load this URL directly in an `<img>` or image component. |
 | `status`       | string  | `draft`, `hold`, `complete`, `refunded`, or `canceled` |
 | `booking_mode` | string  | `room`, `day`, or `buyout` |
 | `checked_in`   | boolean | Whether the guest has completed check-in |
@@ -136,7 +136,7 @@ Calendar view: bookings grouped by date. Each date in the range lists the bookin
           "first_name": "Jane",
           "last_name": "Doe",
           "email": "jane@example.com",
-          "avatar_url": "https://secure.gravatar.com/avatar/abc123?s=512&d=..."
+          "avatar_url": "https://fly.storage.tigris.dev/avatars/01HXYZ.../profile.webp"
         },
         "rooms": [...],
         "guests": [...],
@@ -150,7 +150,7 @@ Calendar view: bookings grouped by date. Each date in the range lists the bookin
 }
 ```
 
-The `data` object maps date strings (ISO 8601) to arrays of booking objects. Each booking has the same structure as in the index endpoint, including `member.avatar_url` for the profile picture.
+The `data` object maps date strings (ISO 8601) to arrays of booking objects. Each booking has the same structure as in the index endpoint, including `member.avatar_url` for the profile picture (stored avatar or country-based default).
 
 ---
 
@@ -236,10 +236,12 @@ Perform check-in for one or more bookings.
 
 ## Profile pictures (`avatar_url`)
 
-The `member.avatar_url` field in booking responses is a full URL you can load directly:
+The `member.avatar_url` field in booking responses is a full URL you can load directly.
 
-- **Gravatar:** If the member has a Gravatar linked to their email, the URL points to Gravatar (512×512).
-- **Default:** If not, it uses a country-based default image hosted on ysc.org (same as the website).
+**Avatar sources (in priority order):**
+
+1. **Uploaded avatar:** If the member has uploaded a profile picture (or one was synced from their Google/Facebook login), the URL points to an optimized WebP image on our CDN. Multiple sizes are generated (50×50 thumbnail, 200×200 profile, 500×500 large); the API returns the profile-size variant.
+2. **Country default:** If the member has no custom avatar, a country-based default image hosted on ysc.org is used (determined by the member's most connected Nordic country).
 
 Use it in your UI like any image URL:
 
@@ -247,4 +249,4 @@ Use it in your UI like any image URL:
 <img src="{member.avatar_url}" alt="Profile" />
 ```
 
-No authentication is needed to fetch the image; both Gravatar and the default images are publicly accessible.
+No authentication is needed to fetch the image; both the CDN-hosted avatars and the default images are publicly accessible.

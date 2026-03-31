@@ -63,9 +63,7 @@ defmodule YscWeb.PostLive do
           </h1>
           <div class="flex items-center justify-center gap-4 py-6 border-y border-zinc-100">
             <.user_avatar_image
-              email={@post.author.email}
-              user_id={@post.author.id}
-              country={@post.author.most_connected_country}
+              user={@post.author}
               class="w-10 h-10 rounded-full"
             />
             <div class="text-left">
@@ -200,6 +198,9 @@ defmodule YscWeb.PostLive do
                 author_email={comment.author.email}
                 author_most_connected={comment.author.most_connected_country}
                 author_id={comment.author.id}
+                author_avatar_url={
+                  Ysc.Avatars.resolve_user_avatar_url(comment.author)
+                }
                 date={comment.inserted_at}
                 form={@form}
                 post_id={@post.id}
@@ -220,8 +221,14 @@ defmodule YscWeb.PostLive do
     # Load post synchronously - essential for SEO (title, content, image)
     post =
       case Ecto.ULID.cast(id) do
-        {:ok, ulid_id} -> Posts.get_post(ulid_id, [:author, :featured_image])
-        :error -> Posts.get_post_by_url_name(id, [:author, :featured_image])
+        {:ok, ulid_id} ->
+          Posts.get_post(ulid_id, [{:author, :current_avatar}, :featured_image])
+
+        :error ->
+          Posts.get_post_by_url_name(id, [
+            {:author, :current_avatar},
+            :featured_image
+          ])
       end
 
     case post do
@@ -273,7 +280,7 @@ defmodule YscWeb.PostLive do
   # Load comments asynchronously after WebSocket connection
   defp load_comments_async(socket, post_id) do
     start_async(socket, :load_comments, fn ->
-      comments = Posts.get_comments_for_post(post_id, [:author])
+      comments = Posts.get_comments_for_post(post_id, author: :current_avatar)
       Posts.sort_comments_for_render(comments)
     end)
   end
@@ -325,7 +332,7 @@ defmodule YscWeb.PostLive do
         %Phoenix.Socket.Broadcast{event: "new_comment", payload: new_comment},
         socket
       ) do
-    loaded = Posts.get_comment!(new_comment.id, [:author])
+    loaded = Posts.get_comment!(new_comment.id, author: :current_avatar)
 
     new_comment_changeset =
       Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})

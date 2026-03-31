@@ -143,7 +143,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
       member = booking["member"]
       assert member != nil
       assert Map.has_key?(member, "avatar_url")
-      assert String.starts_with?(member["avatar_url"], "https://")
+      assert String.starts_with?(member["avatar_url"], "http")
       assert Map.has_key?(booking, "rooms")
       assert Map.has_key?(booking, "guests")
       assert Map.has_key?(booking, "check_ins")
@@ -347,7 +347,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
   end
 
   describe "member avatar_url" do
-    test "index includes member avatar_url with Gravatar format when user has email",
+    test "index includes member avatar_url with country-based default",
          %{
            conn: conn
          } do
@@ -359,14 +359,8 @@ defmodule YscWeb.Api.BookingsControllerTest do
       assert %{"data" => [booking | _]} = json_response(response, 200)
       member = booking["member"]
       avatar_url = member["avatar_url"]
-      assert avatar_url =~ "gravatar.com"
-      assert avatar_url =~ "s=512"
-      # Gravatar URL includes MD5 hash of lowercase email
-      expected_hash =
-        :crypto.hash(:md5, "avatar-test@example.com")
-        |> Base.encode16(case: :lower)
-
-      assert avatar_url =~ expected_hash
+      assert String.starts_with?(avatar_url, "http")
+      assert avatar_url =~ "/images/default_avatars/"
     end
 
     test "calendar includes member avatar_url in each booking", %{conn: conn} do
@@ -419,8 +413,8 @@ defmodule YscWeb.Api.BookingsControllerTest do
       assert %{"data" => [booking | _]} = json_response(response, 200)
       avatar_url = booking["member"]["avatar_url"]
 
-      # Gravatar URL includes d= param with encoded default; or if no Gravatar, direct default
-      assert avatar_url =~ "norway" or avatar_url =~ "gravatar.com"
+      assert avatar_url =~ "norway"
+      assert avatar_url =~ "/images/"
     end
   end
 end

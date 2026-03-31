@@ -347,7 +347,8 @@ defmodule Ysc.Accounts do
             ^search_term
           ),
       order_by: [asc: u.last_name, asc: u.first_name],
-      limit: ^limit
+      limit: ^limit,
+      preload: [:current_avatar]
     )
     |> Repo.all()
   end
@@ -1031,14 +1032,7 @@ defmodule Ysc.Accounts do
   def list_bod_members() do
     from(u in User,
       where: not is_nil(u.board_position),
-      select: %{
-        id: u.id,
-        email: u.email,
-        first_name: u.first_name,
-        last_name: u.last_name,
-        board_position: u.board_position,
-        most_connected_country: u.most_connected_country
-      },
+      preload: [:current_avatar],
       order_by: [
         desc: fragment("CASE
           WHEN board_position = 'president' THEN 10
@@ -1135,7 +1129,7 @@ defmodule Ysc.Accounts do
     Repo.all(
       from u in User,
         where: u.state == :pending_approval,
-        preload: [:registration_form],
+        preload: [:registration_form, :current_avatar],
         order_by: [asc: u.inserted_at]
     )
   end
@@ -1668,9 +1662,8 @@ defmodule Ysc.Accounts do
           preload_active_subscriptions_for_auth(user)
 
         {:ok, _cached_membership} ->
-          # Cache hit - skip preload to reduce DB queries
-          # Subscriptions will be loaded by membership cache if needed
-          user
+          # Cache hit - skip subscription preload but still load avatar
+          Repo.preload(user, :current_avatar)
 
         {:error, _reason} ->
           # Cache error - fallback to preloading for safety
@@ -1692,7 +1685,9 @@ defmodule Ysc.Accounts do
       )
       |> Repo.all()
 
-    %{user | subscriptions: active_subscriptions}
+    user
+    |> Map.put(:subscriptions, active_subscriptions)
+    |> Repo.preload(:current_avatar)
   end
 
   @doc """
@@ -2105,6 +2100,7 @@ defmodule Ysc.Accounts do
 
   # Helper function to preload only active subscriptions
   defp preload_active_subscriptions(users) do
+    users = Repo.preload(users, :current_avatar)
     user_ids = Enum.map(users, & &1.id)
 
     # Get active subscriptions for all users in one query
@@ -2881,7 +2877,11 @@ defmodule Ysc.Accounts do
         order_by: [asc: u.last_name, asc: u.first_name],
         limit: ^limit,
         offset: ^offset,
-        preload: [:sub_accounts, subscriptions: :subscription_items]
+        preload: [
+          {:sub_accounts, :current_avatar},
+          :current_avatar,
+          subscriptions: :subscription_items
+        ]
       )
       |> Repo.all()
 

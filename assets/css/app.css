@@ -3537,3 +3537,14 @@ input[type="search"][list] {
 [data-slider-viewport]::-webkit-scrollbar {
     display: none;
 }
+
+/* Avatar cropper modal */
+cropper-canvas {
+    height: 400px;
+}
+
+@media (max-width: 640px) {
+    cropper-canvas {
+        height: 300px;
+    }
+}
