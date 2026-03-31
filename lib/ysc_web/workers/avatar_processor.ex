@@ -25,7 +25,7 @@ defmodule YscWeb.Workers.AvatarProcessor do
 
     if is_nil(avatar) do
       Ysc.Logging.warning("Avatar not found", extra: %{avatar_id: id})
-      {:error, "Avatar not found"}
+      {:discard, :avatar_not_found}
     else
       process_avatar(avatar)
     end
@@ -45,7 +45,7 @@ defmodule YscWeb.Workers.AvatarProcessor do
       {:ok, clean} = Image.remove_metadata(parsed, [:exif, :iptc, :xmp])
 
       stripped_path = "#{base}_stripped.webp"
-      Image.write(clean, stripped_path, quality: @webp_quality)
+      {:ok, _} = Image.write(clean, stripped_path, quality: @webp_quality)
 
       # Re-upload stripped original
       original_key = key_from_url(avatar.original_path)
@@ -71,13 +71,13 @@ defmodule YscWeb.Workers.AvatarProcessor do
       large_path = "#{base}_large.webp"
 
       {:ok, thumb} = Image.thumbnail(square, @thumb_size)
-      Image.write(thumb, thumb_path, quality: @webp_quality)
+      {:ok, _} = Image.write(thumb, thumb_path, quality: @webp_quality)
 
       {:ok, profile} = Image.thumbnail(square, @profile_size)
-      Image.write(profile, profile_path, quality: @webp_quality)
+      {:ok, _} = Image.write(profile, profile_path, quality: @webp_quality)
 
       {:ok, large} = Image.thumbnail(square, @large_size)
-      Image.write(large, large_path, quality: @webp_quality)
+      {:ok, _} = Image.write(large, large_path, quality: @webp_quality)
 
       # Upload variants to S3
       user_id = avatar.user_id
