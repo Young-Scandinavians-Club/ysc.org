@@ -17,6 +17,7 @@ defmodule Ysc.MessagesTest do
 
   alias Ysc.Messages
   alias Ysc.Messages.MessageIdempotency
+  alias Ysc.SmsRateLimit
   import Ysc.AccountsFixtures
 
   # ---------------------------------------------------------------------------
@@ -700,11 +701,6 @@ defmodule Ysc.MessagesTest do
   end
 
   describe "run_send_sms_idempotent/3 - rate limiting" do
-    setup do
-      Cachex.clear(:ysc_cache)
-      :ok
-    end
-
     test "returns error when per-minute SMS rate limit is exceeded" do
       # Use a highly unique NANP-style number to avoid collisions with parallel tests.
       phone =
@@ -716,16 +712,11 @@ defmodule Ysc.MessagesTest do
            ))
         |> String.slice(0, 11)
 
-      for i <- 1..5 do
-        key = "sms_rl_#{i}_#{System.unique_integer()}"
-
-        assert {:ok, _} =
-                 Messages.run_send_sms_idempotent(
-                   phone,
-                   "[YSC] Rate limit batch.",
-                   sms_attrs(key)
-                 )
-      end
+      # Pre-populate the rate limit cache directly instead of going through
+      # 5 real sends. This keeps the window between "cache is full" and the
+      # 6th-send assertion essentially zero, preventing flakiness caused by
+      # concurrent async tests calling Cachex.clear(:ysc_cache).
+      for _ <- 1..5, do: SmsRateLimit.record_sms_send(phone)
 
       key6 = "sms_rl_blocked_#{System.unique_integer()}"
       parent = self()
@@ -759,7 +750,6 @@ defmodule Ysc.MessagesTest do
     end
 
     test "returns error for invalid phone before transaction (send_sms error path)" do
-      Cachex.clear(:ysc_cache)
       key = "sms_bad_to_#{System.unique_integer()}"
 
       assert {:error, "failed to send SMS"} =
