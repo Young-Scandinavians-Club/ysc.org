@@ -67,15 +67,15 @@ config :ysc, YscWeb.Endpoint,
 # In test we don't send emails.
 config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Test
 
-# ExAws: static credentials + localstack-style host so presigned URL generation
+# ExAws: static credentials + MinIO-style host so presigned URL generation
 # (e.g. expense report file redirects) works in CI without EC2 instance metadata.
 config :ex_aws,
-  access_key_id: "dummy",
-  secret_access_key: "fake",
+  access_key_id: "minioadmin",
+  secret_access_key: "minioadmin",
   s3: [
     scheme: "http://",
-    host: "media.s3.localhost.localstack.cloud",
-    port: "4566"
+    host: "localhost",
+    port: 9000
   ]
 
 # Relax auth rate limits in test so login/forgot-password tests don't hit them

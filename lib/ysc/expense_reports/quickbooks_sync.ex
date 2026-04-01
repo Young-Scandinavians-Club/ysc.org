@@ -777,8 +777,8 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
   defp download_from_s3_to_temp(s3_path) do
     # Parse S3 path to get bucket and key
     # S3 paths can be in different formats:
-    # - http://bucket.s3.localhost.localstack.cloud:4566/key
-    # - https://bucket.fly.storage.tigris.dev/key
+    # - http://localhost:9000/bucket/key (MinIO, dev)
+    # - https://bucket.fly.storage.tigris.dev/key (Tigris, prod)
     # - /key (relative path)
 
     bucket = S3Config.expense_reports_bucket_name()

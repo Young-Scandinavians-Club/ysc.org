@@ -43,14 +43,14 @@ defmodule YscWeb.AdminEventsLive do
       <div class="w-full pt-4">
         <%!-- Tab navigation --%>
         <div class="border-b border-zinc-200 mb-6">
-          <nav id="events-tabs" class="-mb-px flex gap-6" aria-label="Events tabs">
+          <nav id="events-tabs" class="flex gap-0" aria-label="Events tabs">
             <%= for {label, tab_key} <- [{"Upcoming", :upcoming}, {"Drafts", :drafts}, {"Past", :past}, {"All", :all}] do %>
               <.link
                 patch={~p"/admin/events?#{Map.put(@params, "tab", tab_key)}"}
                 class={[
-                  "whitespace-nowrap pb-3 px-1 border-b-2 text-sm font-medium transition-colors",
+                  "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t",
                   if(@active_tab == tab_key,
-                    do: "border-zinc-800 text-zinc-900",
+                    do: "border-blue-500 text-blue-600 bg-white",
                     else:
                       "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
                   )

@@ -36,8 +36,8 @@ This document provides a visual overview of how all the pieces fit together in y
 │  │  └─────────────────────────────────────┘                           │  │
 │  │           │                                                         │  │
 │  │  ┌────────▼────────────────────────────┐                           │  │
-│  │  │  LocalStack (Port 4566)             │                           │  │
-│  │  │  (Simulates AWS S3 for file upload) │                           │  │
+│  │  │  MinIO (9000 API / 9001 console)    │                           │  │
+│  │  │  (S3-compatible storage for uploads) │                           │  │
 │  │  └─────────────────────────────────────┘                           │  │
 │  │           │                                                         │  │
 │  │  ┌────────▼────────────────────────────┐                           │  │
@@ -97,7 +97,7 @@ Browser → LiveView Upload → Phoenix Controller
                             S3 Upload Logic
                                     │
                                     ▼
-                          LocalStack S3 (local)
+                          MinIO (local)
                             or AWS S3 (production)
                                     │
                                     ▼
@@ -154,7 +154,8 @@ User subscribes → Phoenix LiveView → Save to YSC DB
 | Phoenix       | 4000 | http://localhost:4000            | Main application           |
 | Swoosh Mailbox| 4000 | http://localhost:4000/dev/mailbox| App email preview          |
 | PostgreSQL    | 5432 | localhost:5432                   | Database                   |
-| LocalStack S3 | 4566 | http://localhost:4566            | Local S3 simulation        |
+| MinIO S3 API    | 9000 | http://localhost:9000            | Local S3-compatible API    |
+| MinIO Console   | 9001 | http://localhost:9001            | Bucket/object web UI       |
 | PgAdmin       | 8888 | http://localhost:8888            | Database management UI     |
 
 ## Environment Files
@@ -237,7 +238,7 @@ ysc-redesign-ex/
 
 ### File Storage
 - **AWS S3**: Production file storage
-- **LocalStack**: Local S3 simulation for development
+- **MinIO**: Local S3-compatible storage for development
 
 ### External Services
 - **Stripe**: Payment processing
@@ -251,7 +252,7 @@ ysc-redesign-ex/
 
 ### Development Services (Docker)
 - **PostgreSQL**: Database for the YSC app
-- **LocalStack**: AWS S3 simulation
+- **MinIO**: S3-compatible storage (buckets seeded via `minio-init` in docker-compose)
 - **PgAdmin**: Database management UI
 
 ## Understanding the Codebase

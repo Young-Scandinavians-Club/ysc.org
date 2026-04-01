@@ -96,7 +96,7 @@
                 </div>
                 <.link
                   navigate={
-                    ~p"/contact?subject=#{URI.encode(atom_to_readable(position))}"
+                    ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'm interested in the #{atom_to_readable(position)} position on the YSC Board of Directors. I'd love to learn more about the role and how I can contribute.")}"
                   }
                   class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0 ml-4 transition-colors duration-150"
                 >

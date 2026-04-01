@@ -1,7 +1,7 @@
 # ===============================================
 # Stage 1: Build the Elixir/Phoenix application
 # ===============================================
-FROM elixir:1.19-alpine AS builder
+FROM elixir:1.19-alpine@sha256:b1fd9f99dfb3f56576646c173ff2e75a3b971172a55f624941cc83eafe5aa8fd AS builder
 
 # Install build dependencies
 # ffmpeg is required during asset compilation (mix assets.deploy)
@@ -67,7 +67,7 @@ RUN BUILD_VERSION=${BUILD_VERSION:-$(git describe --first-parent --abbrev=10 --l
 # ===============================================
 # Stage 2: Create the final production image
 # ===============================================
-FROM alpine:3.22 AS app
+FROM alpine:3.22@sha256:55ae5d250caebc548793f321534bc6a8ef1d116f334f18f4ada1b2daad3251b2 AS app
 
 # Install runtime dependencies
 RUN apk add --no-cache \

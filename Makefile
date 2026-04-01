@@ -20,9 +20,9 @@ RED 			:= $(shell tput setaf 1)
 GREEN 			:= $(shell tput setaf 2)
 TEAL 			:= $(shell tput setaf 6)
 
-# AWS configuration for local development
-export AWS_ACCESS_KEY_ID 	?= fake
-export AWS_SECRET_ACCESS_KEY 	?= secret
+# S3 (MinIO) credentials for local development
+export AWS_ACCESS_KEY_ID 	?= minioadmin
+export AWS_SECRET_ACCESS_KEY 	?= minioadmin
 export PGPASSWORD 		?= postgres
 export DBNAME 			?= ysc_dev
 
@@ -56,7 +56,7 @@ dev-setup:  ## Set up local dev environment
 setup-dev: dev-setup
 
 .PHONY: dev-services
-dev-services:  ## Start Docker services (postgres, localstack, etc.)
+dev-services:  ## Start Docker services (postgres, minio, etc.)
 	@echo "$(BOLD)Starting Docker services...$(RESET)"
 	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@./etc/scripts/_wait_db_connection.sh
@@ -66,8 +66,8 @@ dev-services:  ## Start Docker services (postgres, localstack, etc.)
 setup: dev-setup
 
 .PHONY: setup-s3
-setup-s3:  ## No-op: S3 buckets are created automatically by LocalStack init when you run make dev-services
-	@echo "$(GREEN)S3 buckets (media, expense-reports) are created automatically when LocalStack starts.$(RESET)"
+setup-s3:  ## No-op: S3 buckets are created automatically by MinIO init when you run make dev-services
+	@echo "$(GREEN)S3 buckets (media, expense-reports, avatars) are created automatically when MinIO starts.$(RESET)"
 
 .PHONY: shell
 shell:  ## Open a shell in the dev container

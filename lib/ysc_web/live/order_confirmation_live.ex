@@ -213,7 +213,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 </p>
                 <p class="text-xl font-bold text-zinc-900">
                   <%= if @event.start_date do %>
-                    {Calendar.strftime(@event.start_date, "%B %d, %Y")}
+                    {format_event_date(@event.start_date)}
                   <% else %>
                     TBD
                   <% end %>
@@ -1009,4 +1009,13 @@ defmodule YscWeb.OrderConfirmationLive do
       nil
     end
   end
+
+  defp format_event_date(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
+  end
+
+  defp format_event_date(%Date{} = date),
+    do: Calendar.strftime(date, "%B %d, %Y")
+
+  defp format_event_date(_), do: "TBD"
 end

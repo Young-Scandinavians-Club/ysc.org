@@ -1495,10 +1495,7 @@ defmodule YscWeb.UserSettingsLive do
                           )}
                         </strong>
                         after <strong>
-                          <%= Calendar.strftime(
-                            @scheduled_downgrade_info.effective_date,
-                            "%B %d, %Y"
-                          ) %>
+                          <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %>
                         </strong>. You will keep your current benefits until that date.
                       </p>
                       <div class="mt-3">
@@ -1913,7 +1910,7 @@ defmodule YscWeb.UserSettingsLive do
                         Member Since
                       </span>
                       <span class="text-sm font-semibold text-zinc-900">
-                        {Calendar.strftime(
+                        {format_utc_date(
                           @membership_qr_details.member_since,
                           "%b %-d, %Y"
                         )}
@@ -1926,7 +1923,7 @@ defmodule YscWeb.UserSettingsLive do
                     </span>
                     <%= if @membership_qr_details.renewal_date do %>
                       <span class="text-sm font-semibold text-zinc-900">
-                        {Calendar.strftime(
+                        {format_utc_date(
                           @membership_qr_details.renewal_date,
                           "%b %-d, %Y"
                         )}
@@ -2153,7 +2150,7 @@ defmodule YscWeb.UserSettingsLive do
                 <%= if @yearly_stats && (@yearly_stats.nights > 0 || @yearly_stats.events > 0) do %>
                   <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
                     <p class="text-sm text-blue-900 font-semibold">
-                      In {Date.utc_today().year}, you've enjoyed
+                      In {@yearly_stats_year}, you've enjoyed
                       <%= if @yearly_stats.nights > 0 do %>
                         <strong>{@yearly_stats.nights}</strong>
                         {if @yearly_stats.nights == 1,
@@ -2647,6 +2644,7 @@ defmodule YscWeb.UserSettingsLive do
         |> assign(:filtered_payments_count, 0)
         |> assign(:filtered_payments_list, [])
         |> assign(:yearly_stats, nil)
+        |> assign(:yearly_stats_year, nil)
         |> assign(:loading_payments, true)
       else
         socket
@@ -2755,6 +2753,7 @@ defmodule YscWeb.UserSettingsLive do
     total_pages = div(total_count + per_page - 1, per_page)
 
     # Calculate yearly impact stats
+    yearly_stats_year = pst_today().year
     yearly_stats = calculate_yearly_stats(all_payments)
 
     {:noreply,
@@ -2766,6 +2765,7 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(:filtered_payments_count, length(all_payments))
      |> assign(:filtered_payments_list, all_payments)
      |> assign(:yearly_stats, yearly_stats)
+     |> assign(:yearly_stats_year, yearly_stats_year)
      |> assign(:loading_payments, false)}
   end
 
@@ -5062,7 +5062,7 @@ defmodule YscWeb.UserSettingsLive do
   defp apply_payment_filter(payments, _), do: payments
 
   defp calculate_yearly_stats(payments) do
-    current_year = Date.utc_today().year
+    current_year = pst_today().year
 
     stats =
       Enum.reduce(
@@ -5073,13 +5073,13 @@ defmodule YscWeb.UserSettingsLive do
           payment_date =
             cond do
               payment_info.payment && payment_info.payment.payment_date ->
-                payment_info.payment.payment_date
+                to_pst_date(payment_info.payment.payment_date)
 
               payment_info.payment && payment_info.payment.inserted_at ->
-                DateTime.to_date(payment_info.payment.inserted_at)
+                to_pst_date(payment_info.payment.inserted_at)
 
               payment_info.ticket_order && payment_info.ticket_order.inserted_at ->
-                DateTime.to_date(payment_info.ticket_order.inserted_at)
+                to_pst_date(payment_info.ticket_order.inserted_at)
 
               true ->
                 nil
@@ -5499,12 +5499,12 @@ defmodule YscWeb.UserSettingsLive do
           <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
             Paid on {if @payment_info.payment do
               if @payment_info.payment.payment_date do
-                Timex.format!(@payment_info.payment.payment_date, "{Mshort} {D}")
+                format_payment_date(@payment_info.payment.payment_date)
               else
-                Timex.format!(@payment_info.payment.inserted_at, "{Mshort} {D}")
+                format_payment_date(@payment_info.payment.inserted_at)
               end
             else
-              Timex.format!(@payment_info.ticket_order.inserted_at, "{Mshort} {D}")
+              format_payment_date(@payment_info.ticket_order.inserted_at)
             end}
           </p>
         </div>
@@ -5587,12 +5587,12 @@ defmodule YscWeb.UserSettingsLive do
         <p class="text-xs text-zinc-400 uppercase tracking-wider font-bold">
           {if @payment_info.payment do
             if @payment_info.payment.payment_date do
-              Timex.format!(@payment_info.payment.payment_date, "{Mshort} {D}")
+              format_payment_date(@payment_info.payment.payment_date)
             else
-              Timex.format!(@payment_info.payment.inserted_at, "{Mshort} {D}")
+              format_payment_date(@payment_info.payment.inserted_at)
             end
           else
-            Timex.format!(@payment_info.ticket_order.inserted_at, "{Mshort} {D}")
+            format_payment_date(@payment_info.ticket_order.inserted_at)
           end}
         </p>
       </td>
@@ -6237,4 +6237,36 @@ defmodule YscWeb.UserSettingsLive do
     do: "Only one photo at a time"
 
   defp avatar_upload_error_to_string(_), do: "Upload failed"
+
+  defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+  defp to_pst_date(%DateTime{} = dt),
+    do: dt |> DateTime.shift_zone!("America/Los_Angeles") |> DateTime.to_date()
+
+  defp to_pst_date(%Date{} = d), do: d
+  defp to_pst_date(_), do: nil
+
+  defp format_utc_date(%DateTime{} = dt, format) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Calendar.strftime(format)
+  end
+
+  defp format_utc_date(%Date{} = date, format),
+    do: Calendar.strftime(date, format)
+
+  defp format_utc_date(_, _), do: ""
+
+  defp format_payment_date(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Calendar.strftime("%b %-d")
+  end
+
+  defp format_payment_date(%Date{} = date),
+    do: Calendar.strftime(date, "%b %-d")
+
+  defp format_payment_date(_), do: ""
 end

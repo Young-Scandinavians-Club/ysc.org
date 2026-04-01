@@ -52,7 +52,7 @@ This document summarizes the audit and fixes made to ensure the application is p
 
 - S3 configuration uses `Ysc.S3Config` module
 - Environment variables: `S3_BUCKET`, `S3_REGION`, `S3_BASE_URL`
-- Properly handles localstack for dev/test and AWS for production
+- Properly handles MinIO for dev/test and AWS for production
 
 ### 5. ✅ Hostname Configuration
 
@@ -66,7 +66,7 @@ This document summarizes the audit and fixes made to ensure the application is p
 
 **Status**: Properly configured
 
-- Makefile has fake credentials for local dev (acceptable)
+- Makefile defaults to MinIO credentials (`minioadmin`/`minioadmin`) for local dev (acceptable)
 - Production uses environment variables or IAM roles
 - No changes needed
 
@@ -86,7 +86,7 @@ The following hardcoded values are acceptable and don't need to be configurable:
 3. **Test/Development Values**:
    - `localhost` in dev configs
    - Test Stripe price IDs in `dev.exs`
-   - Fake AWS credentials in Makefile for local dev
+   - MinIO development credentials in Makefile for local dev
 
 ## Production Environment Variables Checklist
 

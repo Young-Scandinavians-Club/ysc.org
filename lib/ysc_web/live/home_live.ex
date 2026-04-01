@@ -89,7 +89,10 @@ defmodule YscWeb.HomeLive do
   defp mount_guest_with_data(socket) do
     # Determine hero video and captions based on season (no DB query)
     {hero_video, hero_poster, hero_captions} =
-      case Season.for_date(:tahoe, Date.utc_today()) do
+      case Season.for_date(
+             :tahoe,
+             DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+           ) do
         %{name: "Summer"} ->
           {~p"/video/clear_lake_hero.mp4",
            ~p"/images/clear_lake_hero_poster.webp",
@@ -1734,9 +1737,8 @@ defmodule YscWeb.HomeLive do
                           Member Since
                         </span>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Calendar.strftime(
-                            @membership_qr_details.member_since,
-                            "%b %-d, %Y"
+                          {format_membership_date(
+                            @membership_qr_details.member_since
                           )}
                         </span>
                       </div>
@@ -1747,9 +1749,8 @@ defmodule YscWeb.HomeLive do
                       </span>
                       <%= if @membership_qr_details.renewal_date do %>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Calendar.strftime(
-                            @membership_qr_details.renewal_date,
-                            "%b %-d, %Y"
+                          {format_membership_date(
+                            @membership_qr_details.renewal_date
                           )}
                         </span>
                       <% else %>
@@ -1974,10 +1975,10 @@ defmodule YscWeb.HomeLive do
         else
           cond do
             scheduled_for_cancellation? && renewal_date ->
-              "Your #{membership_type} membership is scheduled for cancellation. You are still an active member until #{Timex.format!(renewal_date, "{Mshort} {D}, {YYYY}")}. Your membership will not automatically renew."
+              "Your #{membership_type} membership is scheduled for cancellation. You are still an active member until #{format_membership_date(renewal_date)}. Your membership will not automatically renew."
 
             renewal_date ->
-              "You have an active #{membership_type} membership. Your membership will renew on #{Timex.format!(renewal_date, "{Mshort} {D}, {YYYY}")}."
+              "You have an active #{membership_type} membership. Your membership will renew on #{format_membership_date(renewal_date)}."
 
             true ->
               "You have an active #{membership_type} membership."
@@ -2537,8 +2538,7 @@ defmodule YscWeb.HomeLive do
   end
 
   defp tier_on_sale?(ticket_tier) do
-    # Use PST timezone for comparison
-    now_pst = DateTime.now!("America/Los_Angeles")
+    now = DateTime.utc_now()
 
     start_date =
       Map.get(ticket_tier, :start_date) || Map.get(ticket_tier, "start_date")
@@ -2546,54 +2546,33 @@ defmodule YscWeb.HomeLive do
     end_date =
       Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
 
-    # Check if sale has started (convert to PST if needed)
     sale_started =
       case start_date do
-        nil ->
-          true
-
-        sd when is_struct(sd, DateTime) ->
-          start_date_pst = DateTime.shift_zone!(sd, "America/Los_Angeles")
-          DateTime.compare(now_pst, start_date_pst) != :lt
-
-        _ ->
-          true
+        nil -> true
+        sd when is_struct(sd, DateTime) -> DateTime.compare(now, sd) != :lt
+        _ -> true
       end
 
-    # Check if sale has ended (convert to PST if needed)
     sale_ended =
       case end_date do
-        nil ->
-          false
-
-        ed when is_struct(ed, DateTime) ->
-          end_date_pst = DateTime.shift_zone!(ed, "America/Los_Angeles")
-          DateTime.compare(now_pst, end_date_pst) == :gt
-
-        _ ->
-          false
+        nil -> false
+        ed when is_struct(ed, DateTime) -> DateTime.compare(now, ed) == :gt
+        _ -> false
       end
 
     sale_started && !sale_ended
   end
 
   defp tier_sale_ended?(ticket_tier) do
-    # Use PST timezone for comparison
-    now_pst = DateTime.now!("America/Los_Angeles")
+    now = DateTime.utc_now()
 
     end_date =
       Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
 
     case end_date do
-      nil ->
-        false
-
-      ed when is_struct(ed, DateTime) ->
-        end_date_pst = DateTime.shift_zone!(ed, "America/Los_Angeles")
-        DateTime.compare(now_pst, end_date_pst) == :gt
-
-      _ ->
-        false
+      nil -> false
+      ed when is_struct(ed, DateTime) -> DateTime.compare(now, ed) == :gt
+      _ -> false
     end
   end
 
@@ -2673,10 +2652,7 @@ defmodule YscWeb.HomeLive do
   defp format_event_time(_, _), do: ""
 
   defp format_event_date(%DateTime{} = date) do
-    # Convert UTC DateTime to PST, then format
-    date_pst = DateTime.shift_zone!(date, "America/Los_Angeles")
-    date_only = DateTime.to_date(date_pst)
-    Timex.format!(date_only, "{Mshort} {D}")
+    date |> DateTime.to_date() |> Timex.format!("{Mshort} {D}")
   end
 
   defp format_event_date(%Date{} = date) do
@@ -2686,10 +2662,7 @@ defmodule YscWeb.HomeLive do
   defp format_event_date(_), do: ""
 
   defp format_event_date_long(%DateTime{} = date) do
-    # Convert UTC DateTime to PST, then format
-    date_pst = DateTime.shift_zone!(date, "America/Los_Angeles")
-    date_only = DateTime.to_date(date_pst)
-    Calendar.strftime(date_only, "%b %d, %Y")
+    date |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")
   end
 
   defp format_event_date_long(%Date{} = date) do
@@ -2710,6 +2683,18 @@ defmodule YscWeb.HomeLive do
   end
 
   defp format_post_date(_), do: ""
+
+  defp format_membership_date(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Calendar.strftime("%b %-d, %Y")
+  end
+
+  defp format_membership_date(%Date{} = date),
+    do: Calendar.strftime(date, "%b %-d, %Y")
+
+  defp format_membership_date(_), do: ""
 
   defp format_family_relationship(nil), do: "Child"
   defp format_family_relationship("spouse"), do: "Spouse"

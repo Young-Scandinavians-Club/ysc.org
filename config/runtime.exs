@@ -392,33 +392,20 @@ if config_env() == :prod do
     secret_access_key: {:system, "AWS_SECRET_ACCESS_KEY"}
 
   # Configure ExAws S3 endpoint
-  # Dev/Test: Uses localstack
+  # Dev/Test: Uses MinIO (localhost:9000, path-style)
   # Production: Uses Tigris endpoint (fly.storage.tigris.dev for Fly, or t3.storage.dev for general Tigris)
+  uri = URI.parse(s3_base_url)
+  s3_scheme = (uri.scheme || "https") <> "://"
+  s3_host = uri.host || "fly.storage.tigris.dev"
+
   ex_aws_s3_config =
-    cond do
-      # Local development with localstack
-      config_env() in [:dev, :test] ->
-        [
-          scheme: "http://",
-          host: "media.s3.localhost.localstack.cloud",
-          port: "4566"
-        ]
-
-      # Production - use Tigris endpoint
-      true ->
-        uri = URI.parse(s3_base_url)
-
-        # Extract hostname (e.g., "fly.storage.tigris.dev" from "https://fly.storage.tigris.dev")
-        host = uri.host || "fly.storage.tigris.dev"
-
-        [
-          scheme: "https://",
-          host: host,
-          region: s3_region
-        ]
-        |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
-        |> Enum.reject(fn {_, v} -> is_nil(v) end)
-    end
+    [
+      scheme: s3_scheme,
+      host: s3_host,
+      region: s3_region
+    ]
+    |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
+    |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
   config :ex_aws, :s3, ex_aws_s3_config
 

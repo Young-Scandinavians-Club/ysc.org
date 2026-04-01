@@ -2,7 +2,7 @@ defmodule Ysc.S3Config do
   @moduledoc """
   Centralized S3 configuration for different environments.
   Provides environment-specific S3 bucket names, URLs, and regions.
-  Uses Tigris (S3-compatible) storage for production.
+  Uses MinIO for local dev/test and Tigris (S3-compatible) for production.
   """
 
   @doc """
@@ -34,13 +34,12 @@ defmodule Ysc.S3Config do
 
   @doc """
   Returns the S3 base URL for the current environment.
-  For localstack: http://media.s3.localhost.localstack.cloud:4566
+  For MinIO (dev/test): http://localhost:9000
   For production: Uses Tigris endpoint (https://fly.storage.tigris.dev)
   """
   def base_url do
     case Application.get_env(:ysc, :s3_base_url) do
       nil ->
-        # Use default based on environment (localstack for dev/test, Tigris for prod)
         default_base_url()
 
       url ->
@@ -51,7 +50,7 @@ defmodule Ysc.S3Config do
   @doc """
   Returns the S3 upload endpoint URL for form uploads.
   For Tigris: Uses virtual-hosted style (https://<bucket-name>.fly.storage.tigris.dev)
-  For localstack: Uses the base URL
+  For MinIO: Uses path-style (http://localhost:9000/<bucket>)
   """
   def upload_url do
     base = base_url()
@@ -60,21 +59,18 @@ defmodule Ysc.S3Config do
     case base do
       url when is_binary(url) and url != "" ->
         base_url = String.trim_trailing(base, "/")
-        # Check if this is Tigris endpoint
+
         if String.contains?(base_url, "tigris.dev") do
-          # Tigris virtual-hosted style: https://<bucket-name>.fly.storage.tigris.dev
           base_url
           |> String.replace(
             "fly.storage.tigris.dev",
             "#{bucket}.fly.storage.tigris.dev"
           )
         else
-          # Localstack or other custom endpoint
-          base_url
+          "#{base_url}/#{bucket}"
         end
 
       _ ->
-        # Fallback: use Tigris virtual-hosted style
         "https://#{bucket}.fly.storage.tigris.dev"
     end
   end
@@ -120,33 +116,22 @@ defmodule Ysc.S3Config do
   def object_url(key, bucket) do
     base = base_url()
     key = String.trim_leading(key, "/")
-    default_bucket = bucket_name()
 
     case base do
       url when is_binary(url) and url != "" ->
         base_url = String.trim_trailing(base, "/")
 
-        cond do
-          String.contains?(base_url, "tigris.dev") ->
-            virtual_hosted_url =
-              base_url
-              |> String.replace(
-                "fly.storage.tigris.dev",
-                "#{bucket}.fly.storage.tigris.dev"
-              )
+        if String.contains?(base_url, "tigris.dev") do
+          virtual_hosted_url =
+            base_url
+            |> String.replace(
+              "fly.storage.tigris.dev",
+              "#{bucket}.fly.storage.tigris.dev"
+            )
 
-            "#{virtual_hosted_url}/#{key}"
-
-          true ->
-            uri = URI.parse(base_url)
-
-            new_host =
-              String.replace(uri.host || "", default_bucket, bucket,
-                global: false
-              )
-
-            bucket_url = URI.to_string(%{uri | host: new_host})
-            "#{bucket_url}/#{key}"
+          "#{virtual_hosted_url}/#{key}"
+        else
+          "#{base_url}/#{bucket}/#{key}"
         end
 
       _ ->
@@ -159,13 +144,12 @@ defmodule Ysc.S3Config do
 
     case env do
       :dev ->
-        "http://media.s3.localhost.localstack.cloud:4566"
+        "http://localhost:9000"
 
       :test ->
-        "http://media.s3.localhost.localstack.cloud:4566"
+        "http://localhost:9000"
 
       _ ->
-        # Production - use Tigris endpoint
         "https://fly.storage.tigris.dev"
     end
   end

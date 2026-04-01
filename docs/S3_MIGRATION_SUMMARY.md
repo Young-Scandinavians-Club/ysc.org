@@ -7,7 +7,7 @@ This document summarizes the changes made to ensure environment-specific S3 conf
 The codebase was audited and updated to:
 
 1. Remove hardcoded S3 URLs and bucket names
-2. Support environment-specific S3 configuration (localstack for dev, AWS S3 for production)
+2. Support environment-specific S3 configuration (MinIO for dev, AWS S3 for production)
 3. Create Terraform configurations for sandbox and production environments
 
 ## Changes Made
@@ -20,7 +20,7 @@ A new module provides centralized access to S3 configuration:
 
 - `bucket_name()` - Returns the S3 bucket name from configuration
 - `region()` - Returns the AWS region
-- `base_url()` - Returns the S3 base URL (localstack for dev/test, AWS for production)
+- `base_url()` - Returns the S3 base URL (MinIO for dev/test, AWS for production)
 - `object_url(key)` - Constructs the full URL for an S3 object
 
 ### 2. Updated Runtime Configuration
@@ -35,7 +35,7 @@ Added S3 configuration that reads from environment variables:
 
 Also configures ExAws S3 endpoint:
 
-- Dev/Test: Uses localstack endpoint
+- Dev/Test: Uses MinIO endpoint (`localhost:9000`, path-style URLs)
 - Production: Uses custom endpoint if provided, otherwise default AWS S3
 
 ### 3. Updated Files with Hardcoded S3 URLs
@@ -46,7 +46,7 @@ The following files were updated to use `Ysc.S3Config` instead of hardcoded valu
 
    - Changed: Hardcoded `@s3_bucket "media"` → `S3Config.bucket_name()`
    - Changed: Hardcoded `region: "us-west-1"` → `S3Config.region()`
-   - Changed: Hardcoded `url: "http://media.s3.localhost.localstack.cloud:4566"` → `S3Config.base_url()`
+   - Changed: Hardcoded virtual-hosted-style dev URL → `S3Config.base_url()` (path-style MinIO: `http://localhost:9000/...`)
    - Changed: URL construction → `S3Config.object_url(details[:key])`
 
 2. **lib/ysc_web/live/admin/admin_post_editor.ex**
@@ -85,13 +85,15 @@ Created Terraform configurations for both sandbox and production environments:
 
 ### Local Development (Dev/Test)
 
-Uses localstack automatically:
+Uses MinIO automatically (via `config/dev.exs` / `config/test.exs`):
 
 - Bucket: `media` (or from `S3_BUCKET` env var)
 - Region: `us-west-1` (or from `S3_REGION` env var)
-- Base URL: `http://media.s3.localhost.localstack.cloud:4566`
+- Base URL: `http://localhost:9000` (path-style object URLs: `http://localhost:9000/media/<key>`)
+- Credentials: `minioadmin` / `minioadmin` (match the `minio` service in docker-compose)
+- Buckets are created by the `minio-init` sidecar when Docker Compose starts (not via `awslocal`)
 
-**No environment variables required** - works out of the box with localstack.
+**No environment variables required** for a standard setup—ensure Docker services (including MinIO) are running.
 
 ### Sandbox Environment
 
@@ -136,7 +138,7 @@ export AWS_SECRET_ACCESS_KEY=<from terraform output>
 
 ## Testing
 
-1. **Local Development**: Should continue working with localstack without any changes
+1. **Local Development**: Should continue working with MinIO without any changes (when containers are up)
 2. **Sandbox**: Deploy Terraform, set environment variables, test uploads
 3. **Production**: Deploy Terraform, set environment variables, test uploads
 
@@ -145,8 +147,7 @@ export AWS_SECRET_ACCESS_KEY=<from terraform output>
 If issues occur, you can temporarily revert by:
 
 1. Setting `S3_BUCKET=media` in environment
-2. For local dev, the code will automatically use localstack
-3. The hardcoded values are preserved in the dev.exs config for ExAws
+2. For local dev, keep ExAws pointed at MinIO via `config/dev.exs` / `config/test.exs` (endpoint, credentials, path-style URLs)
 
 ## Notes
 

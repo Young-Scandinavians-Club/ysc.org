@@ -184,7 +184,7 @@ defmodule YscWeb.EventsLive do
                         :if={event.start_date}
                         class="text-white/80 text-sm font-medium mt-1"
                       >
-                        {Timex.format!(event.start_date, "{Mshort} {D}, {YYYY}")}
+                        {format_event_date(event.start_date)}
                       </p>
                     </div>
                   </div>
@@ -482,6 +482,15 @@ defmodule YscWeb.EventsLive do
   end
 
   # Helper functions
+  defp format_event_date(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")
+  end
+
+  defp format_event_date(%Date{} = date),
+    do: Calendar.strftime(date, "%b %d, %Y")
+
+  defp format_event_date(_), do: ""
+
   defp get_blur_hash(nil), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
   defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
   defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash

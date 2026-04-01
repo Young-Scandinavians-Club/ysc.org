@@ -225,28 +225,33 @@ const PasskeyAuth = {
                     }
                 }
             } catch (error) {
-                console.error("[PasskeyAuth] Passkey authentication failed", error);
+                const isUserCancellation = error.name === "NotAllowedError" ||
+                    error.name === "AbortError";
 
-                // Capture full error context in Sentry
-                if (window.Sentry) {
-                    window.Sentry.captureException(error, {
-                        tags: {
-                            component: "passkey_auth",
-                            operation: "authentication",
-                            error_name: error.name,
-                            browser: navigator.userAgent.match(/Firefox|Chrome|Safari|Edge/)?.[0] || "unknown"
-                        },
-                        extra: {
-                            errorMessage: error.message,
-                            errorStack: error.stack,
-                            userAgent: navigator.userAgent,
-                            hasPublicKeyCredential: typeof window.PublicKeyCredential !== "undefined",
-                            hasParseRequestOptions: !!window.PublicKeyCredential?.parseRequestOptionsFromJSON
-                        }
-                    });
+                if (isUserCancellation) {
+                    console.info("[PasskeyAuth] Authentication cancelled by user or timed out");
+                } else {
+                    console.error("[PasskeyAuth] Passkey authentication failed", error);
+
+                    if (window.Sentry) {
+                        window.Sentry.captureException(error, {
+                            tags: {
+                                component: "passkey_auth",
+                                operation: "authentication",
+                                error_name: error.name,
+                                browser: navigator.userAgent.match(/Firefox|Chrome|Safari|Edge/)?.[0] || "unknown"
+                            },
+                            extra: {
+                                errorMessage: error.message,
+                                errorStack: error.stack,
+                                userAgent: navigator.userAgent,
+                                hasPublicKeyCredential: typeof window.PublicKeyCredential !== "undefined",
+                                hasParseRequestOptions: !!window.PublicKeyCredential?.parseRequestOptionsFromJSON
+                            }
+                        });
+                    }
                 }
 
-                // Push error event to LiveView
                 this.pushEvent("passkey_auth_error", {
                     error: error.name || "UnknownError",
                     message: error.message || "Authentication failed"
@@ -476,28 +481,33 @@ const PasskeyAuth = {
                     }
                 }
             } catch (error) {
-                console.error("[PasskeyAuth] Passkey registration failed", error);
+                const isUserCancellation = error.name === "NotAllowedError" ||
+                    error.name === "AbortError";
 
-                // Capture full error context in Sentry
-                if (window.Sentry) {
-                    window.Sentry.captureException(error, {
-                        tags: {
-                            component: "passkey_auth",
-                            operation: "registration",
-                            error_name: error.name,
-                            browser: navigator.userAgent.match(/Firefox|Chrome|Safari|Edge/)?.[0] || "unknown"
-                        },
-                        extra: {
-                            errorMessage: error.message,
-                            errorStack: error.stack,
-                            userAgent: navigator.userAgent,
-                            hasPublicKeyCredential: typeof window.PublicKeyCredential !== "undefined",
-                            hasParseCreationOptions: !!window.PublicKeyCredential?.parseCreationOptionsFromJSON
-                        }
-                    });
+                if (isUserCancellation) {
+                    console.info("[PasskeyAuth] Registration cancelled by user or timed out");
+                } else {
+                    console.error("[PasskeyAuth] Passkey registration failed", error);
+
+                    if (window.Sentry) {
+                        window.Sentry.captureException(error, {
+                            tags: {
+                                component: "passkey_auth",
+                                operation: "registration",
+                                error_name: error.name,
+                                browser: navigator.userAgent.match(/Firefox|Chrome|Safari|Edge/)?.[0] || "unknown"
+                            },
+                            extra: {
+                                errorMessage: error.message,
+                                errorStack: error.stack,
+                                userAgent: navigator.userAgent,
+                                hasPublicKeyCredential: typeof window.PublicKeyCredential !== "undefined",
+                                hasParseCreationOptions: !!window.PublicKeyCredential?.parseCreationOptionsFromJSON
+                            }
+                        });
+                    }
                 }
 
-                // Push error event to LiveView
                 this.pushEvent("passkey_registration_error", {
                     error: error.name || "UnknownError",
                     message: error.message || "Registration failed"

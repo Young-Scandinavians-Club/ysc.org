@@ -57,15 +57,15 @@ if [ "$POSTGRES_RUNNING" -eq "0" ]; then
 fi
 echo "${GREEN}✓ PostgreSQL container is running${RESET}"
 
-# Check LocalStack container
-LOCALSTACK_RUNNING=$(docker ps --filter "name=localstack" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -c "localstack" || echo "0")
-if [ "$LOCALSTACK_RUNNING" -eq "0" ]; then
-  echo "${RED}✗ LocalStack container is not running${RESET}"
+# Check MinIO container
+MINIO_RUNNING=$(docker ps --filter "name=minio" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -c "minio" || echo "0")
+if [ "$MINIO_RUNNING" -eq "0" ]; then
+  echo "${RED}✗ MinIO container is not running${RESET}"
   echo "${TEAL}  Hint: Start containers with: docker compose -f ${DOCKER_COMPOSE_FILE:-etc/docker/docker-compose.yml} up -d${RESET}"
   echo "${TEAL}  Or run: make dev-setup${RESET}"
   exit 1
 fi
-echo "${GREEN}✓ LocalStack container is running${RESET}"
+echo "${GREEN}✓ MinIO container is running${RESET}"
 echo ""
 
 # Check database connection (use psql inside postgres container so host needs no PostgreSQL client)

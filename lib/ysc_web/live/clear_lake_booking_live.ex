@@ -3798,7 +3798,8 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp normalize_dates(checkin_date, checkout_date, today_assign) do
     if checkin_date && checkout_date do
-      today = today_assign || Date.utc_today()
+      today =
+        today_assign || DateTime.now!(default_timezone()) |> DateTime.to_date()
 
       validated_checkin_date =
         if Date.compare(checkin_date, today) == :lt,
