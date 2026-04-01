@@ -5880,29 +5880,29 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   def format_start_date(%DateTime{} = date) do
-    date |> DateTime.to_date() |> Timex.format!("{WDfull}, {Mfull} {D}")
+    date |> DateTime.to_date() |> Calendar.strftime("%A, %B %-d")
   end
 
   def format_start_date(%Date{} = date),
-    do: Timex.format!(date, "{WDfull}, {Mfull} {D}")
+    do: Calendar.strftime(date, "%A, %B %-d")
 
   def format_start_date(_), do: ""
 
   def format_start_date_short(%DateTime{} = date) do
-    date |> DateTime.to_date() |> Timex.format!("{WDshort}, {Mshort} {D}")
+    date |> DateTime.to_date() |> Calendar.strftime("%a, %b %-d")
   end
 
   def format_start_date_short(%Date{} = date),
-    do: Timex.format!(date, "{WDshort}, {Mshort} {D}")
+    do: Calendar.strftime(date, "%a, %b %-d")
 
   def format_start_date_short(_), do: ""
 
   defp format_date_short(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Timex.format!("{Mshort} {D}")
+    dt |> DateTime.to_date() |> Calendar.strftime("%b %-d")
   end
 
   defp format_date_short(%Date{} = date),
-    do: Timex.format!(date, "{Mshort} {D}")
+    do: Calendar.strftime(date, "%b %-d")
 
   defp format_date_short(_), do: ""
 
@@ -5916,11 +5916,11 @@ defmodule YscWeb.EventDetailsLive do
   defp format_date_long(_), do: ""
 
   defp format_datetime_display(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Timex.format!("{Mshort} {D}, {YYYY}")
+    dt |> DateTime.to_date() |> Calendar.strftime("%b %-d, %Y")
   end
 
   defp format_datetime_display(%Date{} = date),
-    do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
+    do: Calendar.strftime(date, "%b %-d, %Y")
 
   defp format_datetime_display(_), do: ""
 

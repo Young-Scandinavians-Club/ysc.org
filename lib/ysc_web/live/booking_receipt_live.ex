@@ -223,11 +223,11 @@ defmodule YscWeb.BookingReceiptLive do
     else
       {:noreply,
        socket
+       |> assign(:show_cancel_modal, false)
+       |> assign(:can_cancel, false)
        |> YscWeb.Flash.put_toast(
          :error,
-         "This booking can no longer be cancelled.",
-         title: "Cancellation"
-       )}
+         "This booking can no longer be cancelled.", title: "Cancellation")}
     end
   end
 

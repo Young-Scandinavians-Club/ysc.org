@@ -2150,7 +2150,7 @@ defmodule YscWeb.UserSettingsLive do
                 <%= if @yearly_stats && (@yearly_stats.nights > 0 || @yearly_stats.events > 0) do %>
                   <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
                     <p class="text-sm text-blue-900 font-semibold">
-                      In {pst_today().year}, you've enjoyed
+                      In {@yearly_stats_year}, you've enjoyed
                       <%= if @yearly_stats.nights > 0 do %>
                         <strong>{@yearly_stats.nights}</strong>
                         {if @yearly_stats.nights == 1,
@@ -2644,6 +2644,7 @@ defmodule YscWeb.UserSettingsLive do
         |> assign(:filtered_payments_count, 0)
         |> assign(:filtered_payments_list, [])
         |> assign(:yearly_stats, nil)
+        |> assign(:yearly_stats_year, nil)
         |> assign(:loading_payments, true)
       else
         socket
@@ -2752,6 +2753,7 @@ defmodule YscWeb.UserSettingsLive do
     total_pages = div(total_count + per_page - 1, per_page)
 
     # Calculate yearly impact stats
+    yearly_stats_year = pst_today().year
     yearly_stats = calculate_yearly_stats(all_payments)
 
     {:noreply,
@@ -2763,6 +2765,7 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(:filtered_payments_count, length(all_payments))
      |> assign(:filtered_payments_list, all_payments)
      |> assign(:yearly_stats, yearly_stats)
+     |> assign(:yearly_stats_year, yearly_stats_year)
      |> assign(:loading_payments, false)}
   end
 
