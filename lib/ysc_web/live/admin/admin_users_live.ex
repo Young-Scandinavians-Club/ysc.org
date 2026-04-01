@@ -99,11 +99,7 @@ defmodule YscWeb.AdminUsersLive do
                     Timex.from_now(@selected_user_application.completed)
                 else
                   "Reviewed " <>
-                    Timex.format!(
-                      @selected_user_application.reviewed_at,
-                      "%b %d, %Y",
-                      :strftime
-                    ) <>
+                    format_utc_date(@selected_user_application.reviewed_at) <>
                     " by " <> @selected_user_application.reviewed_by.email
                 end}
               </p>
@@ -1356,4 +1352,13 @@ defmodule YscWeb.AdminUsersLive do
     do: Map.drop(params, @flop_keys)
 
   defp non_flop_params(_), do: %{}
+
+  defp format_utc_date(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Calendar.strftime("%b %d, %Y")
+  end
+
+  defp format_utc_date(_), do: "—"
 end

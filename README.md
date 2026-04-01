@@ -291,7 +291,7 @@ Now that all prerequisites are installed and configured, set up the development 
 # Install dependencies and set up database
 # This will:
 # - Install Elixir dependencies
-# - Start Docker containers (PostgreSQL, LocalStack S3, etc.)
+# - Start Docker containers (PostgreSQL, MinIO S3, etc.)
 # - Wait for database to be ready
 # - Run database migrations
 # - Seed the database with initial data
@@ -342,7 +342,7 @@ make dev
 The `make dev` command now includes automatic checks to ensure everything is ready:
 
 - ✅ **Environment variables** - Verifies Stripe credentials are set
-- ✅ **Docker containers** - Checks PostgreSQL and LocalStack are running
+- ✅ **Docker containers** - Checks PostgreSQL and MinIO are running
 - ✅ **Database connection** - Ensures database is accessible
 - ✅ **Migrations** - Verifies all migrations have been applied
 
@@ -358,7 +358,7 @@ If any check fails, you'll get a helpful error message with instructions on how 
 
 → Checking Docker containers...
 ✓ PostgreSQL container is running
-✓ LocalStack container is running
+✓ MinIO container is running
 
 → Checking database connection...
 ✓ Database connection successful
@@ -466,7 +466,7 @@ The following services are available while running the dev environment:
 - **PgAdmin** (Database UI): [http://localhost:8888](http://localhost:8888)
   - Email: `admin@ysc.org`
   - Password: `password`
-- **LocalStack** (Local AWS S3): [http://localhost:4566](http://localhost:4566)
+- **MinIO** (local S3-compatible storage): S3 API [http://localhost:9000](http://localhost:9000), web console [http://localhost:9001](http://localhost:9001)
 
 ### Testing Emails in Development
 

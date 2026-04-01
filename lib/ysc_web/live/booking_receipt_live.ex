@@ -169,7 +169,7 @@ defmodule YscWeb.BookingReceiptLive do
   def handle_event("confirm-cancel", %{"reason" => reason}, socket) do
     booking = socket.assigns.booking
 
-    case Bookings.cancel_booking(booking, Date.utc_today(), reason) do
+    case Bookings.cancel_booking(booking, get_today_pst(), reason) do
       {:ok, _canceled_booking, refund_amount, refund_result} ->
         # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
         is_pending_refund =
@@ -1679,7 +1679,7 @@ defmodule YscWeb.BookingReceiptLive do
   # Accepts pre-fetched payment to avoid duplicate query
   defp get_refund_info_with_payment(booking, payment) do
     if can_cancel_booking?(booking) do
-      case Bookings.calculate_refund(booking, Date.utc_today()) do
+      case Bookings.calculate_refund(booking, get_today_pst()) do
         {:ok, refund_amount, applied_rule} ->
           policy =
             Bookings.get_active_refund_policy(
@@ -1720,7 +1720,11 @@ defmodule YscWeb.BookingReceiptLive do
     hours_until_checkin =
       if booking.checkin_date do
         checkin_datetime =
-          DateTime.new!(booking.checkin_date, ~T[15:00:00], "Etc/UTC")
+          DateTime.new!(
+            booking.checkin_date,
+            ~T[15:00:00],
+            "America/Los_Angeles"
+          )
 
         now = DateTime.utc_now()
         DateTime.diff(checkin_datetime, now, :hour)
@@ -1741,7 +1745,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp booking_is_active?(booking) do
-    today = Date.utc_today()
+    today = get_today_pst()
 
     if booking.checkin_date && booking.checkout_date do
       Date.compare(today, booking.checkin_date) != :lt &&

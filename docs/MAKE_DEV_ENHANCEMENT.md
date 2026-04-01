@@ -12,7 +12,7 @@ Enhanced the `make dev` command to include automatic prerequisite checks before 
 - ✅ **Environment variables check** - Verifies Stripe credentials are set
 - ✅ **Docker daemon check** - Ensures Docker is running
 - ✅ **PostgreSQL container check** - Verifies postgres container is running
-- ✅ **LocalStack container check** - Verifies localstack container is running
+- ✅ **MinIO container check** - Verifies the MinIO container is running
 - ✅ **Database connection check** - Tests database connectivity
 - ✅ **Migration check** - Detects pending migrations
 
@@ -23,7 +23,7 @@ Each check provides:
 
 #### Added new make target `dev-services`:
 ```bash
-make dev-services  # Start Docker services (postgres, localstack, etc.)
+make dev-services  # Start Docker services (postgres, minio, etc.)
 ```
 
 This provides a quick way to start just the Docker containers without running the full setup.
@@ -66,7 +66,7 @@ This provides a quick way to start just the Docker containers without running th
 
 → Checking Docker containers...
 ✓ PostgreSQL container is running
-✓ LocalStack container is running
+✓ MinIO container is running
 
 → Checking database connection...
 ✓ Database connection successful
@@ -104,7 +104,7 @@ Visit http://localhost:4000
 
 → Checking Docker containers...
 ✓ PostgreSQL container is running
-✓ LocalStack container is running
+✓ MinIO container is running
 
 → Checking database connection...
 ✓ Database connection successful
@@ -141,9 +141,9 @@ Visit http://localhost:4000
    - Uses `docker ps` with filters to check if postgres container is running
    - Provides commands to start containers
 
-4. **LocalStack Container**
-   - Uses `docker ps` with filters to check if localstack container is running
-   - Essential for S3 file uploads in development
+4. **MinIO Container**
+   - Uses `docker ps` with filters to check if a MinIO container is running
+   - Essential for S3 file uploads in development (buckets are created by the `minio-init` service in docker-compose)
 
 5. **Database Connection**
    - Attempts `psql` connection with test query
@@ -159,7 +159,7 @@ Visit http://localhost:4000
 
 ```makefile
 .PHONY: dev-services
-dev-services:  ## Start Docker services (postgres, localstack, etc.)
+dev-services:  ## Start Docker services (postgres, minio, etc.)
 	@echo "$(BOLD)Starting Docker services...$(RESET)"
 	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@./etc/scripts/_wait_db_connection.sh
@@ -187,7 +187,7 @@ This provides a lightweight way to start just the Docker services without runnin
 
 Potential additions for the future:
 - Check if Stripe CLI is running (webhook forwarding)
-- Verify S3 buckets are created
+- Verify MinIO buckets exist (normally created automatically by `minio-init` when Docker services start)
 - Check Node.js/npm for asset compilation
 - Validate other optional services
 - Add `--skip-checks` flag for advanced users

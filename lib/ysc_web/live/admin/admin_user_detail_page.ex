@@ -392,7 +392,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   </div>
                   <%= if order.event.start_date do %>
                     <div class="text-xs text-zinc-500 mt-0.5">
-                      {Calendar.strftime(order.event.start_date, "%b %d, %Y")}
+                      {format_event_date(order.event.start_date)}
                     </div>
                   <% end %>
                 <% else %>
@@ -435,7 +435,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, order}} label="Order Date" field={:inserted_at}>
                 <span class="text-sm text-zinc-600">
-                  {Calendar.strftime(order.inserted_at, "%b %d, %Y")}
+                  {format_utc_date(order.inserted_at)}
                 </span>
               </:col>
             </Flop.Phoenix.table>
@@ -587,7 +587,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, booking}} label="Booked" field={:inserted_at}>
                 <span class="text-sm text-zinc-600">
-                  {Calendar.strftime(booking.inserted_at, "%b %d, %Y")}
+                  {format_utc_date(booking.inserted_at)}
                 </span>
               </:col>
             </Flop.Phoenix.table>
@@ -643,10 +643,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                       else: "N/A"}
                   <% else %>
                     <%= if @selected_user_application.reviewed_at do %>
-                      Reviewed {Timex.format!(
-                        @selected_user_application.reviewed_at,
-                        "%b %d, %Y",
-                        :strftime
+                      Reviewed {format_utc_date(
+                        @selected_user_application.reviewed_at
                       )} by {if @selected_user_application.reviewed_by,
                         do: @selected_user_application.reviewed_by.email,
                         else: "—"}
@@ -1043,7 +1041,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                             to_string(@scheduled_downgrade_info.target_plan)
                           )}
                         </strong>
-                        on <strong><%= Calendar.strftime(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %></strong>.
+                        on <strong><%= format_utc_date_long(@scheduled_downgrade_info.effective_date) %></strong>.
                       </p>
                     </div>
                   </div>
@@ -1093,9 +1091,8 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <span class="font-semibold">Scheduled Downgrade:</span>
                     Will change to {String.capitalize(
                       to_string(@scheduled_downgrade_info.target_plan)
-                    )} on {Calendar.strftime(
-                      @scheduled_downgrade_info.effective_date,
-                      "%B %d, %Y"
+                    )} on {format_utc_date_long(
+                      @scheduled_downgrade_info.effective_date
                     )}
                   </p>
                   <p>
@@ -1336,10 +1333,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         Account ending in ••••{bank_account.account_number_last_4}
                       </h3>
                       <p class="text-sm text-zinc-600 mt-1">
-                        Added {Calendar.strftime(
-                          bank_account.inserted_at,
-                          "%B %d, %Y"
-                        )}
+                        Added {format_utc_date_long(bank_account.inserted_at)}
                       </p>
                     </div>
                     <button
@@ -1751,7 +1745,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           {format_family_relationship(invite.relationship)}
                         </.badge>
                         <span class="text-xs text-zinc-500 ml-2">
-                          Expires {Calendar.strftime(invite.expires_at, "%b %d, %Y")}
+                          Expires {format_utc_date(invite.expires_at)}
                         </span>
                       </div>
                       <button
@@ -3382,6 +3376,30 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp format_family_relationship("spouse"), do: "Spouse"
   defp format_family_relationship("child"), do: "Child"
   defp format_family_relationship(_), do: "Child"
+
+  defp format_event_date(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")
+  end
+
+  defp format_event_date(_), do: "—"
+
+  defp format_utc_date(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Calendar.strftime("%b %d, %Y")
+  end
+
+  defp format_utc_date(_), do: "—"
+
+  defp format_utc_date_long(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Calendar.strftime("%B %d, %Y")
+  end
+
+  defp format_utc_date_long(_), do: "—"
 
   defp format_datetime_for_display(nil), do: "N/A"
 

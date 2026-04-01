@@ -139,7 +139,7 @@ Logger.debug("[QB Expense Sync] download_from_s3_to_temp: ExAws configuration ch
 
 2. **Connection Errors**
    - Verify `AWS_ENDPOINT_URL_S3` is set correctly (for Tigris or custom endpoints)
-   - For localstack: Ensure localstack is running and accessible
+   - For MinIO: Ensure the `minio` container is running (`http://localhost:9000`) and buckets exist (created by `minio-init` when Docker Compose starts)
 
 3. **Missing Credentials**
    - Check environment variables are loaded at runtime
@@ -148,19 +148,21 @@ Logger.debug("[QB Expense Sync] download_from_s3_to_temp: ExAws configuration ch
 
 ## Environment-Specific Configuration
 
-### Development (Localstack)
+### Development (MinIO)
 
 ```elixir
 # config/dev.exs
 config :ex_aws,
-  access_key_id: "dummy",
-  secret_access_key: "fake",
+  access_key_id: "minioadmin",
+  secret_access_key: "minioadmin",
   s3: [
     scheme: "http://",
-    host: "media.s3.localhost.localstack.cloud",
-    port: "4566"
+    host: "localhost",
+    port: 9000
   ]
 ```
+
+Object URLs use path-style addressing (for example `http://localhost:9000/media/<key>`). The Docker Compose `minio-init` service creates buckets (`media`, `expense-reports`, `avatars`) using `mc`; there is no separate shell-init step in the repo for that.
 
 ### Production (Tigris)
 

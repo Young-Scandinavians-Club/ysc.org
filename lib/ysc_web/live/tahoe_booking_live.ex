@@ -645,8 +645,15 @@ defmodule YscWeb.TahoeBookingLive do
         {:updated_event, %{start_date: start_date, end_date: end_date}},
         socket
       ) do
-    checkin_date = if start_date, do: DateTime.to_date(start_date), else: nil
-    checkout_date = if end_date, do: DateTime.to_date(end_date), else: nil
+    checkin_date =
+      if start_date,
+        do: DateTime.to_date(start_date),
+        else: nil
+
+    checkout_date =
+      if end_date,
+        do: DateTime.to_date(end_date),
+        else: nil
 
     date_form =
       to_form(

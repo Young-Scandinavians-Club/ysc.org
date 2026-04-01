@@ -27,7 +27,7 @@ defmodule YscWeb.AdminMoneyLive do
     timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
 
     # Set default date range to current calendar year
-    current_year = DateTime.utc_now().year
+    current_year = DateTime.now!("America/Los_Angeles") |> Map.get(:year)
     start_date = DateTime.new!(Date.new!(current_year, 1, 1), ~T[00:00:00])
     end_date = DateTime.new!(Date.new!(current_year, 12, 31), ~T[23:59:59])
 
@@ -1188,8 +1188,9 @@ defmodule YscWeb.AdminMoneyLive do
           </.button>
         </form>
         <p class="text-sm text-zinc-600 mt-2">
-          Showing data from {Calendar.strftime(@start_date, "%B %d, %Y")} to {Calendar.strftime(
+          Showing data from {format_datetime(@start_date, @timezone, "%B %d, %Y")} to {format_datetime(
             @end_date,
+            @timezone,
             "%B %d, %Y"
           )}
         </p>

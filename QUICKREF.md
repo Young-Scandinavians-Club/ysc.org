@@ -39,14 +39,14 @@ Other test users follow the pattern `firstname_lastname_N@ysc.org` (all with the
 
 ```bash
 make dev              # Start the Phoenix development server (with automatic checks)
-make dev-services     # Start Docker services only (postgres, localstack, etc.)
+make dev-services     # Start Docker services only (postgres, minio, etc.)
 make shell            # Open an IEx shell with the app loaded
 ```
 
 **Note:** `make dev` now includes automatic checks for:
 
 - Environment variables (Stripe credentials)
-- Docker containers (PostgreSQL, LocalStack)
+- Docker containers (PostgreSQL, MinIO)
 - Database connection
 - Pending migrations
 
@@ -106,7 +106,7 @@ make dev-setup        # Set up everything from scratch
 - **PgAdmin** (Database UI): http://localhost:8888
   - Email: `admin@ysc.org`
   - Password: `password`
-- **LocalStack** (Local AWS S3): http://localhost:4566
+- **MinIO** (local S3): API http://localhost:9000, console http://localhost:9001
 
 ## Stripe Testing
 

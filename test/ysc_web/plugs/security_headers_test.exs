@@ -153,7 +153,7 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
     assert String.contains?(csp, "https://cdn.example.com")
   end
 
-  test "omits wildcard localstack connect host when code_reloader is false" do
+  test "omits MinIO connect host when code_reloader is false" do
     Application.put_env(:ysc, :environment, :dev)
     Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
 
@@ -163,6 +163,6 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
       |> SecurityHeaders.call([])
 
     [csp] = get_resp_header(conn, "content-security-policy")
-    refute String.contains?(csp, "http://*.localhost.localstack.cloud:4566")
+    refute String.contains?(csp, "http://localhost:9000")
   end
 end

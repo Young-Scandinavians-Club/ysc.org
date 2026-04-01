@@ -136,7 +136,8 @@ docker-compose -f etc/docker/docker-compose.yml up -d
 
 # Check if ports are already in use
 lsof -i :5432  # PostgreSQL
-lsof -i :4566  # LocalStack
+lsof -i :9000  # MinIO S3 API
+lsof -i :9001  # MinIO console
 ```
 
 ### Port conflicts
@@ -294,7 +295,7 @@ curl http://localhost:4000
 As of the latest update, the `make dev` command now performs automatic checks before starting the Phoenix server:
 
 - ✅ Environment variables (Stripe credentials)
-- ✅ Docker containers (PostgreSQL, LocalStack)
+- ✅ Docker containers (PostgreSQL, MinIO)
 - ✅ Database connection
 - ✅ Pending migrations
 

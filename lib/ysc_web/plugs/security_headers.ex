@@ -192,7 +192,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     frame_ancestors = if is_dev, do: "'self' http://localhost:*", else: "'self'"
 
     # Upgrade insecure requests - only in production
-    # In development, we need to allow HTTP for LocalStack
+    # In development, we need to allow HTTP for MinIO
     base_policy = [
       "default-src #{default_src}",
       "script-src #{script_src}",
@@ -237,7 +237,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
 
     sources =
       if Application.get_env(:ysc, YscWeb.Endpoint)[:code_reloader] == true do
-        ["http://*.localhost.localstack.cloud:4566" | sources]
+        ["http://localhost:9000" | sources]
       else
         sources
       end
@@ -255,10 +255,6 @@ defmodule YscWeb.Plugs.SecurityHeaders do
       _ ->
         sources
     end
-  end
-
-  defp build_source_from_uri("http", host, 4566) do
-    "http://#{host}:#{4566}"
   end
 
   defp build_source_from_uri("https", host, nil) do
@@ -299,7 +295,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
 
     sources =
       if Application.get_env(:ysc, YscWeb.Endpoint)[:code_reloader] == true do
-        ["http://*.localhost.localstack.cloud:4566" | sources]
+        ["http://localhost:9000" | sources]
       else
         sources
       end

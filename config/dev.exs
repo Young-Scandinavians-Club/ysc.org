@@ -90,16 +90,19 @@ config :phoenix, :plug_init_mode, :runtime
 config :swoosh, :api_client, false
 
 config :ex_aws,
-  access_key_id: "dummy",
-  secret_access_key: "fake",
+  access_key_id: "minioadmin",
+  secret_access_key: "minioadmin",
   debug_requests: true,
   s3: [
     scheme: "http://",
-    host: "media.s3.localhost.localstack.cloud",
-    port: "4566"
+    host: "localhost",
+    port: 9000
   ]
 
 config :ysc,
+  s3_base_url: "http://localhost:9000",
+  aws_access_key_id: "minioadmin",
+  aws_secret_access_key: "minioadmin",
   expense_reports_s3_bucket: "expense-reports",
   avatars_s3_bucket: "avatars",
   membership_plans: [

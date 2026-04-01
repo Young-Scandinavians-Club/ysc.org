@@ -101,7 +101,7 @@ If you're already familiar with Elixir/Phoenix development:
 
 Before running setup, ensure you have installed:
 
-- **Docker** - For PostgreSQL and LocalStack
+- **Docker** - For PostgreSQL and MinIO
 - **Elixir/Erlang** (via asdf) - See `.tool-versions` for versions
 - **Stripe CLI** - For webhook forwarding during development
 - **ShellCheck and shfmt** - For shell script linting (required for `mix precommit` and `make preflight`)

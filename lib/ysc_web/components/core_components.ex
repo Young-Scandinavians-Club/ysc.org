@@ -2627,11 +2627,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= Timex.format!(get_membership_ends_at(@current_membership), "{Mshort} {D}, {YYYY}") %>
+              <%= format_utc_date_display(get_membership_ends_at(@current_membership)) %>
               </strong>, at which point you will no longer have access to the YSC membership features.
             <% else %>
               You are still an active member until <strong>
-              <%= Timex.format!(get_membership_ends_at(@current_membership), "{Mshort} {D}, {YYYY}") %>
+              <%= format_utc_date_display(get_membership_ends_at(@current_membership)) %>
               </strong>, at which point you will no longer have access to the YSC membership features.
             <% end %>
           </p>
@@ -2679,7 +2679,7 @@ defmodule YscWeb.CoreComponents do
             class="text-sm text-green-900 mt-2"
           >
             Your membership will renew on <strong class="text-green-900">
-            <%= Timex.format!(get_membership_renewal_date(@current_membership), "{Mshort} {D}, {YYYY}") %>
+            <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
           </strong>.
           </p>
 
@@ -2847,6 +2847,18 @@ defmodule YscWeb.CoreComponents do
   end
 
   defp get_membership_renewal_date(_), do: nil
+
+  defp format_utc_date_display(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> DateTime.to_date()
+    |> Timex.format!("{Mshort} {D}, {YYYY}")
+  end
+
+  defp format_utc_date_display(%Date{} = date),
+    do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
+
+  defp format_utc_date_display(_), do: ""
 
   @doc """
   Renders a hero section with a background image or video and optional overlay content.

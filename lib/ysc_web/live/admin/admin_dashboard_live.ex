@@ -172,7 +172,7 @@ defmodule YscWeb.AdminDashboardLive do
         <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-200 flex flex-col justify-between">
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-              Total Revenue ({Timex.format!(DateTime.utc_now(), "{Mshort}")})
+              Total Revenue ({pst_month_name()})
             </p>
             <div class="flex items-baseline gap-2">
               <p class="text-3xl font-black text-emerald-600">
@@ -201,7 +201,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">
-                vs {Timex.format!(DateTime.utc_now(), "{Mshort}")} '23
+                vs {pst_month_name()} '23
               </p>
               <p class="text-sm font-bold text-zinc-500">
                 {format_money(@last_year_month_revenue)}
@@ -488,10 +488,7 @@ defmodule YscWeb.AdminDashboardLive do
                     </span>
                   </span>
                   <span>
-                    {Timex.format!(
-                      comment.inserted_at,
-                      "{YYYY}-{0M}-{0D} {h12}:{m} {AM}"
-                    )}
+                    {format_admin_datetime(comment.inserted_at)}
                   </span>
                 </div>
               </li>
@@ -1205,7 +1202,10 @@ defmodule YscWeb.AdminDashboardLive do
         change_percent =
           ((current_amount - prev_amount) / prev_amount * 100) |> round()
 
-        month_name = Timex.format!(prev_month_start, "{Mshort}")
+        month_name =
+          prev_month_start
+          |> DateTime.shift_zone!("America/Los_Angeles")
+          |> Timex.format!("{Mshort}")
 
         {text, direction} =
           cond do
@@ -1237,7 +1237,7 @@ defmodule YscWeb.AdminDashboardLive do
     alias Ysc.Repo
     import Ecto.Query
 
-    today = Date.utc_today()
+    today = pst_today()
     checkout_time = ~T[11:00:00]
 
     # Get all active bookings: checked in on or before today, and not yet checked out
@@ -1256,9 +1256,12 @@ defmodule YscWeb.AdminDashboardLive do
       bookings
       |> Enum.filter(fn booking ->
         if Date.compare(booking.checkout_date, today) == :eq do
-          now = DateTime.utc_now()
-          checkout_datetime = DateTime.new!(today, checkout_time, "Etc/UTC")
-          DateTime.compare(now, checkout_datetime) == :lt
+          now_pst = DateTime.now!("America/Los_Angeles")
+
+          checkout_datetime =
+            DateTime.new!(today, checkout_time, "America/Los_Angeles")
+
+          DateTime.compare(now_pst, checkout_datetime) == :lt
         else
           true
         end
@@ -1280,4 +1283,18 @@ defmodule YscWeb.AdminDashboardLive do
   def handle_event("navigate-to-review", %{"user-id" => user_id}, socket) do
     {:noreply, push_navigate(socket, to: build_review_url(user_id))}
   end
+
+  defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+  defp pst_month_name do
+    DateTime.now!("America/Los_Angeles") |> Timex.format!("{Mshort}")
+  end
+
+  defp format_admin_datetime(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM}")
+  end
+
+  defp format_admin_datetime(_), do: "—"
 end

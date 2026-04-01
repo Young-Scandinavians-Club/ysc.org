@@ -208,16 +208,10 @@ defmodule YscWeb.EventDetailsLive do
                       end %>
                     <% purchase_date =
                       if ticket_order && ticket_order.completed_at do
-                        Timex.format!(
-                          ticket_order.completed_at,
-                          "{Mshort} {D}, {YYYY}"
-                        )
+                        format_datetime_display(ticket_order.completed_at)
                       else
                         if first_ticket.inserted_at do
-                          Timex.format!(
-                            first_ticket.inserted_at,
-                            "{Mshort} {D}, {YYYY}"
-                          )
+                          format_datetime_display(first_ticket.inserted_at)
                         else
                           nil
                         end
@@ -355,7 +349,7 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
                 <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
                   <%= if @event.start_date != nil do %>
-                    {Timex.format!(@event.start_date, "{Mshort} {D}")}
+                    {format_date_short(@event.start_date)}
                   <% else %>
                     TBD
                   <% end %>
@@ -1525,20 +1519,14 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_pre_sale} class="mt-2">
                     <p class="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
                       <.icon name="hero-clock" class="w-4 h-4 inline me-1" />
-                      Sale starts {Timex.format!(
-                        ticket_tier.start_date,
-                        "{Mshort} {D}, {YYYY}"
-                      )}
+                      Sale starts {format_datetime_display(ticket_tier.start_date)}
                     </p>
                   </div>
 
                   <div :if={!is_donation && is_sale_ended} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-x-circle" class="w-4 h-4 inline me-1" />
-                      Sale ended on {Timex.format!(
-                        ticket_tier.end_date,
-                        "{Mshort} {D}, {YYYY}"
-                      )}
+                      Sale ended on {format_datetime_display(ticket_tier.end_date)}
                     </p>
                   </div>
 
@@ -2985,7 +2973,7 @@ defmodule YscWeb.EventDetailsLive do
             <div class="flex justify-between">
               <span class="text-zinc-600">Date:</span>
               <span class="font-medium">
-                {Calendar.strftime(@event.start_date, "%B %d, %Y")}
+                {format_date_long(@event.start_date)}
               </span>
             </div>
             <div class="flex justify-between">
@@ -5891,13 +5879,50 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  def format_start_date(date) do
-    Timex.format!(date, "{WDfull}, {Mfull} {D}")
+  def format_start_date(%DateTime{} = date) do
+    date |> DateTime.to_date() |> Timex.format!("{WDfull}, {Mfull} {D}")
   end
 
-  def format_start_date_short(date) do
-    Timex.format!(date, "{WDshort}, {Mshort} {D}")
+  def format_start_date(%Date{} = date),
+    do: Timex.format!(date, "{WDfull}, {Mfull} {D}")
+
+  def format_start_date(_), do: ""
+
+  def format_start_date_short(%DateTime{} = date) do
+    date |> DateTime.to_date() |> Timex.format!("{WDshort}, {Mshort} {D}")
   end
+
+  def format_start_date_short(%Date{} = date),
+    do: Timex.format!(date, "{WDshort}, {Mshort} {D}")
+
+  def format_start_date_short(_), do: ""
+
+  defp format_date_short(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Timex.format!("{Mshort} {D}")
+  end
+
+  defp format_date_short(%Date{} = date),
+    do: Timex.format!(date, "{Mshort} {D}")
+
+  defp format_date_short(_), do: ""
+
+  defp format_date_long(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
+  end
+
+  defp format_date_long(%Date{} = date),
+    do: Calendar.strftime(date, "%B %d, %Y")
+
+  defp format_date_long(_), do: ""
+
+  defp format_datetime_display(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Timex.format!("{Mshort} {D}, {YYYY}")
+  end
+
+  defp format_datetime_display(%Date{} = date),
+    do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
+
+  defp format_datetime_display(_), do: ""
 
   defp event_body(%Event{rendered_details: nil} = event),
     do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)
@@ -5940,9 +5965,14 @@ defmodule YscWeb.EventDetailsLive do
 
   def date_for_add_to_cal(nil), do: nil
 
-  def date_for_add_to_cal(dt) do
-    Timex.format!(dt, "%Y-%m-%d", :strftime)
+  def date_for_add_to_cal(%DateTime{} = dt) do
+    dt |> DateTime.to_date() |> Timex.format!("%Y-%m-%d", :strftime)
   end
+
+  def date_for_add_to_cal(%Date{} = d),
+    do: Timex.format!(d, "%Y-%m-%d", :strftime)
+
+  def date_for_add_to_cal(dt), do: Timex.format!(dt, "%Y-%m-%d", :strftime)
 
   defp get_end_time_for_calendar(event) do
     case {event.start_time, event.end_time} do
@@ -6589,7 +6619,6 @@ defmodule YscWeb.EventDetailsLive do
 
   defp days_until_sale_starts(ticket_tier) do
     case ticket_tier.start_date do
-      # No start date
       nil ->
         nil
 
@@ -6597,15 +6626,12 @@ defmodule YscWeb.EventDetailsLive do
         now = DateTime.utc_now()
 
         if DateTime.compare(now, start_date) == :lt do
-          # Convert to dates and calculate calendar day difference
-          start_date_only = DateTime.to_date(start_date)
-          now_date_only = DateTime.to_date(now)
+          today_pst =
+            DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
-          # Calculate days difference using calendar days
-          diff = Date.diff(start_date_only, now_date_only)
-          max(0, diff)
+          sale_date = DateTime.to_date(start_date)
+          max(0, Date.diff(sale_date, today_pst))
         else
-          # Already on sale
           nil
         end
     end
@@ -6855,23 +6881,17 @@ defmodule YscWeb.EventDetailsLive do
   defp event_in_past?(event) do
     now = DateTime.utc_now()
 
-    # Combine the date and time properly
     event_datetime =
       case {event.start_date, event.start_time} do
         {%DateTime{} = date, %Time{} = time} ->
-          # Convert DateTime to NaiveDateTime, then combine with time
-          naive_date = DateTime.to_naive(date)
-          date_part = NaiveDateTime.to_date(naive_date)
-          naive_datetime = NaiveDateTime.new!(date_part, time)
-          DateTime.from_naive!(naive_datetime, "Etc/UTC")
+          DateTime.new!(DateTime.to_date(date), time, "America/Los_Angeles")
+          |> DateTime.shift_zone!("Etc/UTC")
 
-        {date, time} when not is_nil(date) and not is_nil(time) ->
-          # Handle other date/time combinations
-          NaiveDateTime.new!(date, time)
-          |> DateTime.from_naive!("Etc/UTC")
+        {%Date{} = date, %Time{} = time} ->
+          DateTime.new!(date, time, "America/Los_Angeles")
+          |> DateTime.shift_zone!("Etc/UTC")
 
         _ ->
-          # Fallback to just the date if time is nil
           event.start_date
       end
 
