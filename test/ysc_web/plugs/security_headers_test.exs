@@ -156,6 +156,7 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
   test "omits MinIO connect host when code_reloader is false" do
     Application.put_env(:ysc, :environment, :dev)
     Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    Application.put_env(:ysc, :s3_base_url, "https://cdn.example.com")
 
     conn =
       conn(:get, "/")
