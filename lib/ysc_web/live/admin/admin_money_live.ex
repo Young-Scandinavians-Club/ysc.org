@@ -1188,10 +1188,8 @@ defmodule YscWeb.AdminMoneyLive do
           </.button>
         </form>
         <p class="text-sm text-zinc-600 mt-2">
-          Showing data from {format_datetime(@start_date, @timezone, "%B %d, %Y")} to {format_datetime(
-            @end_date,
-            @timezone,
-            "%B %d, %Y"
+          Showing data from {format_date_boundary(@start_date)} to {format_date_boundary(
+            @end_date
           )}
         </p>
       </div>
@@ -3434,6 +3432,11 @@ defmodule YscWeb.AdminMoneyLive do
       {:error, _} -> DateTime.utc_now()
     end
   end
+
+  defp format_date_boundary(%DateTime{} = dt),
+    do: dt |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
+
+  defp format_date_boundary(_), do: "—"
 
   # Format DateTime in user timezone for display
   defp format_datetime(%DateTime{} = datetime, timezone, format) do

@@ -759,33 +759,44 @@ defmodule YscWeb.UserLoginLive do
       ) do
     require Ysc.Logging
 
-    # Log the error with context
-    Ysc.Logging.error(
-      "[UserLoginLive] Passkey authentication error from client",
-      error: error,
-      message: message,
-      user_agent: socket.assigns[:user_agent],
-      has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
-      auth_mode: socket.assigns[:passkey_auth_mode]
-    )
+    user_cancelled? = error in ["NotAllowedError", "AbortError"]
 
-    error_message =
+    if user_cancelled? do
+      Ysc.Logging.info(
+        "[UserLoginLive] Passkey authentication cancelled by user or timed out",
+        error: error
+      )
+    else
+      Ysc.Logging.error(
+        "[UserLoginLive] Passkey authentication error from client",
+        error: error,
+        message: message,
+        user_agent: socket.assigns[:user_agent],
+        has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
+        auth_mode: socket.assigns[:passkey_auth_mode]
+      )
+    end
+
+    {toast_level, error_message} =
       case error do
-        "NotAllowedError" ->
-          "Authentication was cancelled or not allowed. Please try again."
+        e when e in ["NotAllowedError", "AbortError"] ->
+          {:info, "Passkey sign-in was cancelled."}
 
         "InvalidStateError" ->
-          "This passkey may have been removed. Please use another sign-in method."
+          {:error,
+           "This passkey may have been removed. Please use another sign-in method."}
 
         "NotSupportedError" ->
-          "Your device doesn't support this authentication method. Please use another sign-in method."
+          {:error,
+           "Your device doesn't support this authentication method. Please use another sign-in method."}
 
         _ ->
-          "Authentication failed: #{message}. Please try again or use another sign-in method."
+          {:error,
+           "Authentication failed: #{message}. Please try again or use another sign-in method."}
       end
 
     {:noreply,
-     YscWeb.Flash.put_toast(socket, :error, error_message, title: "Login")
+     YscWeb.Flash.put_toast(socket, toast_level, error_message, title: "Login")
      |> assign(:passkey_loading, false)
      |> assign(:passkey_challenge, nil)
      |> assign(:passkey_auth_mode, nil)}
