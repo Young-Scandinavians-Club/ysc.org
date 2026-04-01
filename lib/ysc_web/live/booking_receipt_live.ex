@@ -227,7 +227,9 @@ defmodule YscWeb.BookingReceiptLive do
        |> assign(:can_cancel, false)
        |> YscWeb.Flash.put_toast(
          :error,
-         "This booking can no longer be cancelled.", title: "Cancellation")}
+         "This booking can no longer be cancelled.",
+         title: "Cancellation"
+       )}
     end
   end
 
