@@ -5070,7 +5070,7 @@ defmodule YscWeb.UserSettingsLive do
           payment_date =
             cond do
               payment_info.payment && payment_info.payment.payment_date ->
-                payment_info.payment.payment_date
+                to_pst_date(payment_info.payment.payment_date)
 
               payment_info.payment && payment_info.payment.inserted_at ->
                 to_pst_date(payment_info.payment.inserted_at)
@@ -6259,11 +6259,11 @@ defmodule YscWeb.UserSettingsLive do
     dt
     |> DateTime.shift_zone!("America/Los_Angeles")
     |> DateTime.to_date()
-    |> Timex.format!("{Mshort} {D}")
+    |> Calendar.strftime("%b %-d")
   end
 
   defp format_payment_date(%Date{} = date),
-    do: Timex.format!(date, "{Mshort} {D}")
+    do: Calendar.strftime(date, "%b %-d")
 
   defp format_payment_date(_), do: ""
 end

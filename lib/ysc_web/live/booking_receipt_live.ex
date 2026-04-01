@@ -169,55 +169,63 @@ defmodule YscWeb.BookingReceiptLive do
   def handle_event("confirm-cancel", %{"reason" => reason}, socket) do
     booking = socket.assigns.booking
 
-    case Bookings.cancel_booking(booking, get_today_pst(), reason) do
-      {:ok, _canceled_booking, refund_amount, refund_result} ->
-        # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
-        is_pending_refund =
-          case refund_result do
-            %Ysc.Bookings.PendingRefund{} -> true
-            _ -> false
-          end
-
-        refund_message =
-          if Money.positive?(refund_amount) do
-            if is_pending_refund do
-              "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} is pending admin review and will be processed once approved."
-            else
-              "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
+    if can_cancel_booking?(booking) do
+      case Bookings.cancel_booking(booking, get_today_pst(), reason) do
+        {:ok, _canceled_booking, refund_amount, refund_result} ->
+          # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
+          is_pending_refund =
+            case refund_result do
+              %Ysc.Bookings.PendingRefund{} -> true
+              _ -> false
             end
-          else
-            "Booking cancelled. No refund is available based on the cancellation policy."
-          end
 
-        {:noreply,
-         socket
-         |> assign(:show_cancel_modal, false)
-         |> YscWeb.Flash.put_toast(:info, refund_message, title: "Booking")
-         |> push_navigate(to: ~p"/bookings/#{booking.id}/receipt")}
+          refund_message =
+            if Money.positive?(refund_amount) do
+              if is_pending_refund do
+                "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} is pending admin review and will be processed once approved."
+              else
+                "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
+              end
+            else
+              "Booking cancelled. No refund is available based on the cancellation policy."
+            end
 
-      {:error, reason} ->
-        error_message =
-          case reason do
-            {:payment_not_found, _} ->
-              "Unable to process cancellation: payment not found."
+          {:noreply,
+           socket
+           |> assign(:show_cancel_modal, false)
+           |> YscWeb.Flash.put_toast(:info, refund_message, title: "Booking")
+           |> push_navigate(to: ~p"/bookings/#{booking.id}/receipt")}
 
-            {:calculation_failed, _} ->
-              "Unable to calculate refund amount."
+        {:error, reason} ->
+          error_message =
+            case reason do
+              {:payment_not_found, _} ->
+                "Unable to process cancellation: payment not found."
 
-            {:refund_failed, _} ->
-              "Booking cancelled but refund processing failed. Please contact support."
+              {:calculation_failed, _} ->
+                "Unable to calculate refund amount."
 
-            {:pending_refund_failed, _} ->
-              "Booking cancelled but could not create pending refund. Please contact support."
+              {:refund_failed, _} ->
+                "Booking cancelled but refund processing failed. Please contact support."
 
-            {:cancellation_failed, _} ->
-              "Failed to cancel booking. Please try again or contact support."
-          end
+              {:pending_refund_failed, _} ->
+                "Booking cancelled but could not create pending refund. Please contact support."
 
-        {:noreply,
-         socket
-         |> assign(:show_cancel_modal, false)
-         |> YscWeb.Flash.put_toast(:error, error_message)}
+              {:cancellation_failed, _} ->
+                "Failed to cancel booking. Please try again or contact support."
+            end
+
+          {:noreply,
+           socket
+           |> assign(:show_cancel_modal, false)
+           |> YscWeb.Flash.put_toast(:error, error_message)}
+      end
+    else
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "This booking can no longer be cancelled.", title: "Cancellation")}
     end
   end
 

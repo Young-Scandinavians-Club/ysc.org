@@ -6878,6 +6878,8 @@ defmodule YscWeb.EventDetailsLive do
     |> Enum.any?(fn {_tier_id, quantity} -> quantity > 0 end)
   end
 
+  defp event_in_past?(%Event{start_date: nil}), do: false
+
   defp event_in_past?(event) do
     now = DateTime.utc_now()
 
@@ -6887,15 +6889,17 @@ defmodule YscWeb.EventDetailsLive do
           DateTime.new!(DateTime.to_date(date), time, "America/Los_Angeles")
           |> DateTime.shift_zone!("Etc/UTC")
 
-        {%Date{} = date, %Time{} = time} ->
-          DateTime.new!(date, time, "America/Los_Angeles")
-          |> DateTime.shift_zone!("Etc/UTC")
+        {%DateTime{} = date, nil} ->
+          date
 
         _ ->
-          event.start_date
+          nil
       end
 
-    DateTime.compare(now, event_datetime) == :gt
+    case event_datetime do
+      nil -> false
+      dt -> DateTime.compare(now, dt) == :gt
+    end
   end
 
   defp calculate_total_price(

@@ -4386,10 +4386,18 @@ defmodule YscWeb.AdminBookingsLive do
   def handle_event("view-booking", %{"booking-id" => booking_id}, socket) do
     # Ensure we have valid dates before building query params
     start_date =
-      socket.assigns[:calendar_start_date] || Date.add(today_in_timezone(), -2)
+      socket.assigns[:calendar_start_date] ||
+        Date.add(
+          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          -2
+        )
 
     end_date =
-      socket.assigns[:calendar_end_date] || Date.add(today_in_timezone(), 14)
+      socket.assigns[:calendar_end_date] ||
+        Date.add(
+          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          14
+        )
 
     # Start with base query params
     base_query_params = %{
@@ -4475,10 +4483,18 @@ defmodule YscWeb.AdminBookingsLive do
   def handle_event("view-blackout", %{"blackout-id" => blackout_id}, socket) do
     # Ensure we have valid dates before building query params
     start_date =
-      socket.assigns[:calendar_start_date] || Date.add(today_in_timezone(), -2)
+      socket.assigns[:calendar_start_date] ||
+        Date.add(
+          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          -2
+        )
 
     end_date =
-      socket.assigns[:calendar_end_date] || Date.add(today_in_timezone(), 14)
+      socket.assigns[:calendar_end_date] ||
+        Date.add(
+          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          14
+        )
 
     query_params = [
       property: socket.assigns.selected_property,
@@ -4512,12 +4528,15 @@ defmodule YscWeb.AdminBookingsLive do
         end
 
       # Navigate to form with date range
+      tz = socket.assigns[:timezone] || "America/Los_Angeles"
+
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(), -2)
+          Date.add(today_in_timezone(tz), -2)
 
       calendar_end =
-        socket.assigns[:calendar_end_date] || Date.add(today_in_timezone(), 14)
+        socket.assigns[:calendar_end_date] ||
+          Date.add(today_in_timezone(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4560,12 +4579,15 @@ defmodule YscWeb.AdminBookingsLive do
         end
 
       # Navigate to form with date range
+      tz = socket.assigns[:timezone] || "America/Los_Angeles"
+
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(), -2)
+          Date.add(today_in_timezone(tz), -2)
 
       calendar_end =
-        socket.assigns[:calendar_end_date] || Date.add(today_in_timezone(), 14)
+        socket.assigns[:calendar_end_date] ||
+          Date.add(today_in_timezone(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4615,12 +4637,15 @@ defmodule YscWeb.AdminBookingsLive do
         end
 
       # Navigate to form with date range
+      tz = socket.assigns[:timezone] || "America/Los_Angeles"
+
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(), -2)
+          Date.add(today_in_timezone(tz), -2)
 
       calendar_end =
-        socket.assigns[:calendar_end_date] || Date.add(today_in_timezone(), 14)
+        socket.assigns[:calendar_end_date] ||
+          Date.add(today_in_timezone(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -6708,8 +6733,6 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp default_date_range(_), do: default_date_range("America/Los_Angeles")
-
-  defp today_in_timezone, do: today_in_timezone("America/Los_Angeles")
 
   defp today_in_timezone(timezone) when is_binary(timezone) do
     DateTime.now!(timezone) |> DateTime.to_date()

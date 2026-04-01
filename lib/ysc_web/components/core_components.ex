@@ -2852,11 +2852,11 @@ defmodule YscWeb.CoreComponents do
     dt
     |> DateTime.shift_zone!("America/Los_Angeles")
     |> DateTime.to_date()
-    |> Timex.format!("{Mshort} {D}, {YYYY}")
+    |> Calendar.strftime("%b %-d, %Y")
   end
 
   defp format_utc_date_display(%Date{} = date),
-    do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
+    do: Calendar.strftime(date, "%b %-d, %Y")
 
   defp format_utc_date_display(_), do: ""
 

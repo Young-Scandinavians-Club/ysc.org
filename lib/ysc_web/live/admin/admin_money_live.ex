@@ -20,6 +20,8 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.Repo
   import Ecto.Query
 
+  require Ysc.Logging
+
   @impl true
   def mount(_params, _session, socket) do
     # Get timezone from connect params (browser sends via LiveSocket)
@@ -27,7 +29,7 @@ defmodule YscWeb.AdminMoneyLive do
     timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
 
     # Set default date range to current calendar year
-    current_year = DateTime.now!("America/Los_Angeles") |> Map.get(:year)
+    current_year = DateTime.now!("America/Los_Angeles").year
     start_date = DateTime.new!(Date.new!(current_year, 1, 1), ~T[00:00:00])
     end_date = DateTime.new!(Date.new!(current_year, 12, 31), ~T[23:59:59])
 
@@ -562,8 +564,6 @@ defmodule YscWeb.AdminMoneyLive do
                     "Refund processed successfully (no booking or ticket order found to release)"
 
                   {:error, reason} ->
-                    require Ysc.Logging
-
                     Ysc.Logging.warning(
                       "Refund processed but failed to release availability",
                       payment_id: payment.id,
@@ -3700,8 +3700,6 @@ defmodule YscWeb.AdminMoneyLive do
       # Mark as refunded and release inventory
       case BookingLocker.refund_complete_booking(booking.id, true) do
         {:ok, _refunded_booking} ->
-          require Ysc.Logging
-
           Ysc.Logging.info("Booking refunded and dates released after refund",
             booking_id: booking.id,
             payment_id: payment_id
@@ -3728,8 +3726,6 @@ defmodule YscWeb.AdminMoneyLive do
                "Refund processed - tickets released"
              ) do
           {:ok, _canceled_order} ->
-            require Ysc.Logging
-
             Ysc.Logging.info(
               "Ticket order canceled and tickets released after refund",
               ticket_order_id: ticket_order.id,

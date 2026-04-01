@@ -394,30 +394,17 @@ if config_env() == :prod do
   # Configure ExAws S3 endpoint
   # Dev/Test: Uses MinIO (localhost:9000, path-style)
   # Production: Uses Tigris endpoint (fly.storage.tigris.dev for Fly, or t3.storage.dev for general Tigris)
+  uri = URI.parse(s3_base_url)
+  host = uri.host || "fly.storage.tigris.dev"
+
   ex_aws_s3_config =
-    cond do
-      # Local development with MinIO
-      config_env() in [:dev, :test] ->
-        [
-          scheme: "http://",
-          host: "localhost",
-          port: 9000
-        ]
-
-      # Production - use Tigris endpoint
-      true ->
-        uri = URI.parse(s3_base_url)
-
-        host = uri.host || "fly.storage.tigris.dev"
-
-        [
-          scheme: "https://",
-          host: host,
-          region: s3_region
-        ]
-        |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
-        |> Enum.reject(fn {_, v} -> is_nil(v) end)
-    end
+    [
+      scheme: "https://",
+      host: host,
+      region: s3_region
+    ]
+    |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
+    |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
   config :ex_aws, :s3, ex_aws_s3_config
 
