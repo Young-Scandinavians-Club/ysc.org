@@ -17,8 +17,10 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
   alias YscWeb.Sms.Notifier, as: SmsNotifier
 
   setup do
-    # Clear SMS rate limit cache
-    Cachex.clear(:ysc_cache)
+    # Clear only the rate limit entry for the hardcoded test phone number.
+    # Using a targeted delete instead of Cachex.clear/1 avoids wiping rate
+    # limit state that concurrent async test modules are building up.
+    Cachex.del(:ysc_cache, "sms_rate_limit:14155551234")
 
     # Configure FlowRoute for tests
     Application.put_env(:ysc, :flowroute, from_number: "12061231234")
@@ -453,7 +455,10 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
     # Each test gives the user a real phone number and enables SMS so that
     # send_checkin_reminder_sms → SmsNotifier → run_send_sms_idempotent actually runs.
     setup do
-      Cachex.clear(:ysc_cache)
+      # Clear only the rate limit entry for the hardcoded test phone number.
+      # Using a targeted delete instead of Cachex.clear/1 avoids wiping rate
+      # limit state that concurrent async test modules are building up.
+      Cachex.del(:ysc_cache, "sms_rate_limit:14155551234")
       :ok
     end
 

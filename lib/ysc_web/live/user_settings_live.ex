@@ -1894,6 +1894,19 @@ defmodule YscWeb.UserSettingsLive do
                 Show this to an admin for membership verification
               </p>
               <.qr_code data={@membership_qr_token} size={250} class="mx-auto" />
+              <%= if @apple_wallet_membership_enabled? &&
+                    @wallet_platform in [:apple_only, :both] do %>
+                <div class="flex justify-center mt-4">
+                  <.add_to_wallet_button href={~p"/wallet/membership"} />
+                </div>
+              <% end %>
+              <%= if @google_wallet_membership_enabled? &&
+                    @wallet_platform in [:google_only, :both] &&
+                    @google_wallet_membership_url do %>
+                <div class="flex justify-center mt-2">
+                  <.add_to_google_wallet_button href={@google_wallet_membership_url} />
+                </div>
+              <% end %>
               <%= if @membership_qr_details do %>
                 <div class="mt-5 rounded-xl bg-zinc-50 border border-zinc-200 divide-y divide-zinc-200 text-left">
                   <div class="flex items-center justify-between px-4 py-3">
@@ -1944,19 +1957,6 @@ defmodule YscWeb.UserSettingsLive do
                       </span>
                     </div>
                   <% end %>
-                </div>
-              <% end %>
-              <%= if @apple_wallet_membership_enabled? &&
-                    @wallet_platform in [:apple_only, :both] do %>
-                <div class="flex justify-center mt-4">
-                  <.add_to_wallet_button href={~p"/wallet/membership"} />
-                </div>
-              <% end %>
-              <%= if @google_wallet_membership_enabled? &&
-                    @wallet_platform in [:google_only, :both] &&
-                    @google_wallet_membership_url do %>
-                <div class="flex justify-center mt-2">
-                  <.add_to_google_wallet_button href={@google_wallet_membership_url} />
                 </div>
               <% end %>
               <.button
