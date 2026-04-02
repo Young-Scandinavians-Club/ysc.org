@@ -236,9 +236,19 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert has_element?(view, "#order-confirmation", "Hope you had a blast, Sigrid")
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "Hope you had a blast, Sigrid"
+             )
+
       assert has_element?(view, "#order-confirmation", "Thanks for coming")
-      assert has_element?(view, "#order-confirmation", "See you at the next one")
+
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "See you at the next one"
+             )
     end
 
     test "shows upcoming copy when event start_date is in the future", %{
@@ -257,7 +267,12 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert has_element?(view, "#order-confirmation", "See you at the Event, Lars")
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "See you at the Event, Lars"
+             )
+
       assert has_element?(view, "#order-confirmation", "are confirmed")
     end
 

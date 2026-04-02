@@ -559,7 +559,13 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert has_element?(view, "#booking-receipt", "What a stay, Ingrid")
-      assert has_element?(view, "#booking-receipt", "Hope you had an amazing time")
+
+      assert has_element?(
+               view,
+               "#booking-receipt",
+               "Hope you had an amazing time"
+             )
+
       assert has_element?(view, "#booking-receipt", "See you next time")
     end
 
@@ -573,7 +579,12 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert has_element?(view, "#booking-receipt", "See you at the Cabin, Bjorn")
+      assert has_element?(
+               view,
+               "#booking-receipt",
+               "See you at the Cabin, Bjorn"
+             )
+
       assert has_element?(view, "#booking-receipt", "is all set")
     end
 
