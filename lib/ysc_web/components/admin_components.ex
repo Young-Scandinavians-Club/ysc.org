@@ -670,7 +670,7 @@ defmodule YscWeb.AdminComponents do
   attr :on_change, :string, default: "change"
   attr :debounce, :string, default: "200"
   attr :clear_event, :string, default: nil
-  attr :rest, :global, include: ~w(phx-submit phx-submit-disable)
+  attr :rest, :global, include: ~w(phx-submit phx-submit-disable phx-hook)
 
   def admin_search_bar(assigns) do
     ~H"""

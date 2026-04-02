@@ -82,7 +82,7 @@ defmodule YscWeb.AdminEventCheckInLive do
 
       <%!-- Search bar --%>
       <div class="bg-white border-b border-zinc-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2">
           <.admin_search_bar
             id="check-in-search-form"
             input_id="check-in-search-input"
@@ -92,7 +92,37 @@ defmodule YscWeb.AdminEventCheckInLive do
             on_change="search"
             debounce="300"
             clear_event="clear-search"
+            phx-hook="EventCheckInKeyboard"
           />
+          <p class="mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none">
+            <span class="flex items-center gap-0.5">
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                ↑
+              </kbd>
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                ↓
+              </kbd>
+            </span>
+            <span>navigate</span>
+            <span class="text-zinc-300">·</span>
+            <kbd class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+              ↵ enter
+            </kbd>
+            <span>check in</span>
+            <span class="text-zinc-300">·</span>
+            <span class="flex items-center gap-0.5">
+              <kbd
+                data-key="alt"
+                class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+              >
+                alt
+              </kbd>
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                1–3
+              </kbd>
+            </span>
+            <span>quick check in</span>
+          </p>
         </div>
       </div>
 
@@ -192,16 +222,23 @@ defmodule YscWeb.AdminEventCheckInLive do
                   <%!-- Ticket rows --%>
                   <div
                     :for={ticket <- group.tickets}
-                    class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 hover:bg-zinc-50/60 transition-colors items-center last:border-0"
+                    data-checkin-row
+                    class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 hover:bg-zinc-50/60 transition-all duration-100 ease-out items-center last:border-0"
                   >
-                    <div class="col-span-1 flex justify-center">
+                    <div class="col-span-1 flex items-center justify-center gap-1.5">
                       <button
                         phx-click="toggle-check-in"
                         phx-value-ticket-id={ticket.id}
+                        data-checkin-btn
                         class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
                         aria-label="Mark as checked in"
                       >
                       </button>
+                      <span
+                        class="checkin-kbd-badge hidden select-none gap-0.5"
+                        hidden
+                      >
+                      </span>
                     </div>
                     <div class="col-span-3">
                       <p class="text-sm font-medium text-zinc-900">
@@ -272,7 +309,8 @@ defmodule YscWeb.AdminEventCheckInLive do
                   </div>
                   <div
                     :for={ticket <- group.tickets}
-                    class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0"
+                    data-checkin-row
+                    class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0 transition-all duration-100 ease-out"
                   >
                     <div class="min-w-0 flex-1 mr-3">
                       <p class="text-sm font-medium text-zinc-900">
@@ -293,6 +331,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                     <button
                       phx-click="toggle-check-in"
                       phx-value-ticket-id={ticket.id}
+                      data-checkin-btn
                       class="shrink-0 w-9 h-9 rounded-full border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
                       aria-label="Mark as checked in"
                     >

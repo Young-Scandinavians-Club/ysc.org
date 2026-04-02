@@ -3548,3 +3548,16 @@ cropper-canvas {
         height: 300px;
     }
 }
+
+/* Check-in desk keyboard navigation highlight — shared between membership and event views */
+[data-checkin-index].keyboard-focused,
+[data-checkin-row].keyboard-focused {
+    @apply bg-emerald-50 relative z-10 rounded-md;
+    box-shadow: 0 0 0 2px theme('colors.emerald.400'), 0 0 0 5px theme('colors.emerald.100');
+}
+
+/* Red variant when the highlighted row would undo a check-in */
+[data-checkin-index][data-checked-in].keyboard-focused {
+    @apply bg-red-50;
+    box-shadow: 0 0 0 2px theme('colors.red.400'), 0 0 0 5px theme('colors.red.100');
+}

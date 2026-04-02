@@ -18,6 +18,9 @@ import ScheduleTimezone from "./schedule_timezone";
 import LocalTime from "./local_time";
 import QrScanner from "./qr_scanner";
 import StickyEventHeader from "./sticky_event_header";
+import MembershipCheckInKeyboard from "./membership_checkin_keyboard";
+import EventCheckInKeyboard from "./event_checkin_keyboard";
+import { applyPlatformKeyLabels } from "./platform_keys";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
@@ -51,7 +54,13 @@ window.__adminHooks = {
     LocalTime,
     QrScanner,
     StickyEventHeader,
+    MembershipCheckInKeyboard,
+    EventCheckInKeyboard,
 };
+
+// Apply platform-aware key labels on initial load and after every LiveView patch.
+window.addEventListener("DOMContentLoaded", applyPlatformKeyLabels);
+window.addEventListener("phx:page-loading-stop", applyPlatformKeyLabels);
 
 window.addEventListener("phx:focus-search", (e) => {
     const targetId = e.detail?.id;

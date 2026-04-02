@@ -127,7 +127,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
       <%!-- Search bar --%>
       <div class="bg-white border-b border-zinc-200">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2">
           <.admin_search_bar
             id="member-search-form"
             input_id="member-search-input"
@@ -137,7 +137,37 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             on_change="search"
             debounce="300"
             clear_event="clear-search"
+            phx-hook="MembershipCheckInKeyboard"
           />
+          <p class="mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none">
+            <span class="flex items-center gap-0.5">
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                ↑
+              </kbd>
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                ↓
+              </kbd>
+            </span>
+            <span>navigate</span>
+            <span class="text-zinc-300">·</span>
+            <kbd class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+              ↵ enter
+            </kbd>
+            <span>check in</span>
+            <span class="text-zinc-300">·</span>
+            <span class="flex items-center gap-0.5">
+              <kbd
+                data-key="alt"
+                class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+              >
+                alt
+              </kbd>
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                1–3
+              </kbd>
+            </span>
+            <span>quick check in</span>
+          </p>
         </div>
       </div>
 
@@ -175,10 +205,12 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                 id="search-results-list"
               >
                 <div
-                  :for={result <- @search_results}
+                  :for={{result, index} <- Enum.with_index(@search_results)}
                   id={"search-result-#{result.user.id}"}
+                  data-checkin-index={index}
+                  data-checked-in={if result.checked_in?, do: "true"}
                 >
-                  {render_search_result(assigns, result)}
+                  {render_search_result(assigns, result, index)}
                 </div>
               </div>
             </div>
@@ -262,17 +294,37 @@ defmodule YscWeb.AdminMembershipCheckInLive do
     """
   end
 
-  defp render_search_result(assigns, result) do
-    assigns = assign(assigns, result: result)
+  defp render_search_result(assigns, result, index) do
+    assigns = assign(assigns, result: result, result_index: index)
 
     ~H"""
     <div class={[
-      "flex items-center gap-4 px-4 py-3 transition-colors",
+      "flex items-center gap-4 px-4 py-3 transition-all duration-100 ease-out",
       if(@result.membership_status == :inactive,
         do: "bg-red-50/30",
         else: "hover:bg-zinc-50/60"
       )
     ]}>
+      <%!-- Keyboard shortcut badge for the first 3 results --%>
+      <div class="shrink-0 hidden sm:flex items-center justify-center w-14">
+        <%= if @result_index < 3 do %>
+          <span
+            class="inline-flex items-center gap-0.5 select-none"
+            title={"Alt+#{@result_index + 1} to check in"}
+          >
+            <kbd
+              data-key="alt"
+              class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+            >
+              alt
+            </kbd>
+            <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+              {@result_index + 1}
+            </kbd>
+          </span>
+        <% end %>
+      </div>
+
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
           <p class="text-sm font-semibold text-zinc-900">
@@ -305,6 +357,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             <button
               phx-click="undo-check-in"
               phx-value-user-id={@result.user.id}
+              data-checkin-btn
               class="text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors"
               data-confirm="Remove this member's check-in?"
             >
@@ -314,6 +367,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             <button
               phx-click="check-in-member"
               phx-value-user-id={@result.user.id}
+              data-checkin-btn
               class="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg transition-colors"
             >
               Check In
