@@ -5,6 +5,7 @@ defmodule Ysc.Scanning do
   Handles two scanning modes:
   - **Membership**: Validates a user's active membership status
   - **Event**: Validates ticket ownership and performs check-in
+  - **Event Membership**: Verifies membership status and tracks attendance for an event without pre-sold tickets
   """
 
   import Ecto.Query
@@ -17,7 +18,7 @@ defmodule Ysc.Scanning do
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
   alias Ysc.Tickets.TicketOrder
-  alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord}
+  alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord, SessionCheckIn}
   alias Ysc.MessagePassingEvents
 
   # --- Session Management ---
@@ -35,9 +36,20 @@ defmodule Ysc.Scanning do
   def close_session(session_id) do
     session = get_session!(session_id)
 
-    session
-    |> ScanSession.close_changeset()
-    |> Repo.update()
+    case session |> ScanSession.close_changeset() |> Repo.update() do
+      {:ok, _updated} = result ->
+        broadcast_membership_checkin(
+          session_id,
+          %MessagePassingEvents.MembershipSessionCompleted{
+            session_id: session_id
+          }
+        )
+
+        result
+
+      error ->
+        error
+    end
   end
 
   def get_session!(id) do
@@ -62,6 +74,19 @@ defmodule Ysc.Scanning do
   def get_open_sessions(user_id) do
     ScanSession
     |> where([s], s.created_by_id == ^user_id and is_nil(s.closed_at))
+    |> order_by([s], desc: s.inserted_at)
+    |> preload([:event, :created_by])
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns all open event_membership sessions across all admins.
+  Used for the "join session" feature so any admin can participate in an
+  active membership check-in desk.
+  """
+  def get_open_membership_sessions do
+    ScanSession
+    |> where([s], s.type == :event_membership and is_nil(s.closed_at))
     |> order_by([s], desc: s.inserted_at)
     |> preload([:event, :created_by])
     |> Repo.all()
@@ -110,7 +135,30 @@ defmodule Ysc.Scanning do
      "Invalid Ticket: This is a Membership QR. Please scan an Event Ticket."}
   end
 
+  defp process_membership_scan(
+         %ScanSession{type: :event_membership} = session,
+         user_id
+       ) do
+    case process_membership_scan_for_user(session, user_id) do
+      {:ok, result} ->
+        if result.status == :active do
+          user = result.user
+          checked_in_by = Repo.get!(Ysc.Accounts.User, session.created_by_id)
+          check_in_member(session, user, checked_in_by)
+        end
+
+        {:ok, result}
+
+      error ->
+        error
+    end
+  end
+
   defp process_membership_scan(%ScanSession{} = session, user_id) do
+    process_membership_scan_for_user(session, user_id)
+  end
+
+  defp process_membership_scan_for_user(%ScanSession{} = session, user_id) do
     case Accounts.get_user(user_id) do
       nil ->
         record_scan(session, %{
@@ -163,6 +211,14 @@ defmodule Ysc.Scanning do
        ) do
     {:error, :cross_mode,
      "Invalid QR: This is a Ticket QR. Please scan a Membership QR code."}
+  end
+
+  defp process_ticket_scan(
+         %ScanSession{type: :event_membership} = _session,
+         _ticket_id
+       ) do
+    {:error, :cross_mode,
+     "Invalid QR: This session checks membership, not tickets. Please scan a Membership QR code."}
   end
 
   defp process_ticket_scan(%ScanSession{} = session, ticket_id) do
@@ -478,7 +534,7 @@ defmodule Ysc.Scanning do
 
     headers =
       case session.type do
-        :membership ->
+        t when t in [:membership, :event_membership] ->
           [
             "Name",
             "Email",
@@ -512,7 +568,7 @@ defmodule Ysc.Scanning do
           Calendar.strftime(record.inserted_at, "%Y-%m-%d %H:%M:%S UTC")
 
         case session.type do
-          :membership ->
+          t when t in [:membership, :event_membership] ->
             [
               name,
               email,
@@ -537,6 +593,61 @@ defmodule Ysc.Scanning do
               to_string(record.result)
             ]
         end
+      end)
+
+    [headers | rows]
+    |> CSV.encode()
+    |> Enum.to_list()
+    |> IO.iodata_to_binary()
+  end
+
+  @doc """
+  Exports a membership check-in session's SessionCheckIn records as a CSV string.
+  Each row contains the checked-in member's name, email, membership status,
+  membership type, check-in time, and the name of the admin who checked them in.
+  """
+  def export_membership_checkins_csv(session_id) do
+    check_ins =
+      SessionCheckIn
+      |> where([sc], sc.scan_session_id == ^session_id)
+      |> order_by([sc], asc: sc.inserted_at)
+      |> preload([:user, :checked_in_by])
+      |> Repo.all()
+
+    headers = [
+      "Name",
+      "Email",
+      "Membership Status",
+      "Membership Type",
+      "Checked-in At",
+      "Checked-in By"
+    ]
+
+    rows =
+      Enum.map(check_ins, fn sc ->
+        user = sc.user
+        checked_in_by = sc.checked_in_by
+
+        name =
+          if user, do: "#{user.first_name} #{user.last_name}", else: "Unknown"
+
+        email = if user, do: user.email, else: ""
+
+        by_name =
+          if checked_in_by,
+            do: "#{checked_in_by.first_name} #{checked_in_by.last_name}",
+            else: ""
+
+        timestamp = Calendar.strftime(sc.inserted_at, "%Y-%m-%d %H:%M:%S UTC")
+
+        [
+          name,
+          email,
+          sc.membership_status || "",
+          sc.membership_type || "",
+          timestamp,
+          by_name
+        ]
       end)
 
     [headers | rows]
@@ -687,6 +798,234 @@ defmodule Ysc.Scanning do
   end
 
   defp checkin_topic(event_id), do: "checkin:event:#{event_id}"
+
+  # --- Membership Check-in (event_membership sessions) ---
+
+  @doc """
+  Checks in a user to a membership scan session.
+
+  Verifies membership status, creates a SessionCheckIn record, and broadcasts
+  via PubSub. Returns `{:ok, check_in}` on success.
+
+  Returns `{:error, :already_checked_in, message}` if the user was already
+  checked in. Unlike ticket check-in, there is NO restriction on inactive
+  membership — the user is always checked in; the status is merely recorded.
+  """
+  def check_in_member(%ScanSession{closed_at: closed_at}, _user, _checked_in_by)
+      when not is_nil(closed_at) do
+    {:error, :session_closed,
+     "This session has been completed and is no longer accepting check-ins."}
+  end
+
+  def check_in_member(%ScanSession{} = session, user, checked_in_by) do
+    membership = MembershipCache.get_active_membership(user)
+    active? = YscWeb.UserAuth.membership_active?(membership)
+
+    plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+
+    membership_status = if(active?, do: "active", else: "inactive")
+
+    membership_type =
+      case plan_type do
+        nil -> nil
+        atom when is_atom(atom) -> Atom.to_string(atom)
+        other -> to_string(other)
+      end
+
+    attrs = %{
+      membership_status: membership_status,
+      membership_type: membership_type
+    }
+
+    changeset =
+      %SessionCheckIn{}
+      |> Ecto.Changeset.change(%{
+        scan_session_id: session.id,
+        user_id: user.id,
+        checked_in_by_id: checked_in_by.id
+      })
+      |> SessionCheckIn.changeset(attrs)
+      |> SessionCheckIn.validate_required_keys()
+
+    case Repo.insert(changeset) do
+      {:ok, check_in} ->
+        check_in =
+          Repo.preload(check_in, [:user, :checked_in_by, :scan_session])
+
+        broadcast_membership_checkin(
+          session.id,
+          %MessagePassingEvents.MemberCheckedIn{
+            session_check_in: check_in,
+            session_id: session.id
+          }
+        )
+
+        {:ok, check_in}
+
+      {:error, %Ecto.Changeset{} = cs} when cs.errors != [] ->
+        if Enum.any?(cs.errors, fn {_field, {_msg, opts}} ->
+             Keyword.get(opts, :constraint_name) ==
+               "session_check_ins_scan_session_id_user_id_index"
+           end) do
+          {:error, :already_checked_in,
+           "This member has already been checked in."}
+        else
+          {:error, :db_error, inspect(cs.errors)}
+        end
+
+      {:error, changeset} ->
+        {:error, :db_error, inspect(changeset.errors)}
+    end
+  end
+
+  @doc """
+  Undoes (removes) a membership check-in for a user in a session.
+  Broadcasts MemberCheckInUndone via PubSub.
+  """
+  def undo_member_check_in(session_id, user_id) do
+    session = get_session!(session_id)
+
+    if session.closed_at do
+      {:error, :session_closed,
+       "This session has been completed and is no longer accepting changes."}
+    else
+      do_undo_member_check_in(session_id, user_id)
+    end
+  end
+
+  defp do_undo_member_check_in(session_id, user_id) do
+    case Repo.get_by(SessionCheckIn,
+           scan_session_id: session_id,
+           user_id: user_id
+         ) do
+      nil ->
+        {:error, :not_found, "Check-in not found."}
+
+      check_in ->
+        case Repo.delete(check_in) do
+          {:ok, _deleted} ->
+            broadcast_membership_checkin(
+              session_id,
+              %MessagePassingEvents.MemberCheckInUndone{
+                user_id: user_id,
+                session_id: session_id
+              }
+            )
+
+            {:ok, :removed}
+
+          {:error, changeset} ->
+            {:error, :db_error, inspect(changeset.errors)}
+        end
+    end
+  end
+
+  @doc """
+  Lists all users checked in to a membership session, with optional search.
+  Results are ordered by check-in time (most recent first).
+  """
+  def list_membership_check_ins(session_id, search \\ nil) do
+    alias Ysc.Accounts.User
+
+    base =
+      from(sc in SessionCheckIn,
+        where: sc.scan_session_id == ^session_id,
+        join: u in User,
+        on: u.id == sc.user_id,
+        preload: [:user, :checked_in_by],
+        order_by: [desc: sc.inserted_at]
+      )
+
+    query =
+      if search && String.trim(search) != "" do
+        term = "%#{String.trim(search)}%"
+
+        from([sc, u] in base,
+          where:
+            ilike(u.first_name, ^term) or
+              ilike(u.last_name, ^term) or
+              ilike(u.email, ^term) or
+              ilike(fragment("? || ' ' || ?", u.first_name, u.last_name), ^term)
+        )
+      else
+        base
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Returns the count of members checked in to a session.
+  """
+  def membership_check_in_count(session_id) do
+    SessionCheckIn
+    |> where([sc], sc.scan_session_id == ^session_id)
+    |> Repo.aggregate(:count)
+  end
+
+  @doc """
+  Returns true if the given user is already checked in to the session.
+  """
+  def member_checked_in?(session_id, user_id) do
+    SessionCheckIn
+    |> where([sc], sc.scan_session_id == ^session_id and sc.user_id == ^user_id)
+    |> Repo.exists?()
+  end
+
+  @doc """
+  Searches active users and enriches each result with:
+  - `membership_status`: :active | :inactive
+  - `membership_type`: plan atom or nil
+  - `checked_in?`: whether the user is already checked in to this session
+  """
+  def search_users_for_checkin(_session_id, query)
+      when is_binary(query) and byte_size(query) == 0,
+      do: []
+
+  def search_users_for_checkin(session_id, query) when is_binary(query) do
+    trimmed = String.trim(query)
+
+    if trimmed == "" do
+      []
+    else
+      users = Accounts.search_users(trimmed, limit: 20)
+
+      Enum.map(users, fn user ->
+        membership = MembershipCache.get_active_membership(user)
+        active? = YscWeb.UserAuth.membership_active?(membership)
+        plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+        checked_in? = member_checked_in?(session_id, user.id)
+
+        %{
+          user: user,
+          membership_status: if(active?, do: :active, else: :inactive),
+          membership_type: plan_type,
+          checked_in?: checked_in?
+        }
+      end)
+    end
+  end
+
+  @doc """
+  Subscribe to membership check-in events for a specific session.
+  """
+  def subscribe_membership_checkin(session_id) do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, membership_checkin_topic(session_id))
+  end
+
+  @doc """
+  Broadcast a membership check-in event to all subscribers for the session.
+  """
+  def broadcast_membership_checkin(session_id, event) do
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      membership_checkin_topic(session_id),
+      {__MODULE__, event}
+    )
+  end
+
+  defp membership_checkin_topic(session_id),
+    do: "membership_checkin:session:#{session_id}"
 
   # --- Helpers ---
 

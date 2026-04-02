@@ -129,4 +129,19 @@ defmodule Ysc.MessagePassingEvents do
     @moduledoc false
     defstruct event_id: nil
   end
+
+  defmodule MemberCheckedIn do
+    @moduledoc false
+    defstruct session_check_in: nil, session_id: nil
+  end
+
+  defmodule MemberCheckInUndone do
+    @moduledoc false
+    defstruct user_id: nil, session_id: nil
+  end
+
+  defmodule MembershipSessionCompleted do
+    @moduledoc false
+    defstruct session_id: nil
+  end
 end

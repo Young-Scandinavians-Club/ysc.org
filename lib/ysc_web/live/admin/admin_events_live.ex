@@ -27,7 +27,7 @@ defmodule YscWeb.AdminEventsLive do
           <.button phx-click={JS.navigate(~p"/admin/scanner")}>
             <.icon name="hero-qr-code" class="w-5 h-5 -mt-1" />
             <span class="ms-1">
-              QR Scanner
+              Check-in &amp; Scan
             </span>
           </.button>
 

@@ -49,19 +49,26 @@ defmodule YscWeb.AdminEventCheckInLive do
               </.badge>
             </div>
 
-            <%!-- QR Scanner link --%>
-            <div class="shrink-0">
+            <%!-- QR Scanner + Membership check-in links --%>
+            <div class="shrink-0 flex items-center gap-2">
               <.button
-                phx-click="launch-scanner"
+                phx-click="launch-membership-checkin"
                 variant="outline"
                 color="zinc"
+                class="hidden sm:inline-flex"
+              >
+                <.icon name="hero-identification" class="w-5 h-5 me-1 mt-0.5" />
+                Membership Check-in
+              </.button>
+              <.button
+                phx-click="launch-scanner"
                 class="hidden sm:inline-flex"
               >
                 <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
               </.button>
               <button
                 phx-click="launch-scanner"
-                class="sm:hidden p-2 text-zinc-500 hover:text-zinc-700"
+                class="sm:hidden p-2 text-blue-700 hover:text-blue-900"
                 aria-label="Open QR Scanner"
               >
                 <.icon name="hero-qr-code" class="w-6 h-6" />
@@ -73,7 +80,7 @@ defmodule YscWeb.AdminEventCheckInLive do
 
       <%!-- Search bar --%>
       <div class="bg-white border-b border-zinc-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2">
           <.admin_search_bar
             id="check-in-search-form"
             input_id="check-in-search-input"
@@ -83,7 +90,37 @@ defmodule YscWeb.AdminEventCheckInLive do
             on_change="search"
             debounce="300"
             clear_event="clear-search"
+            phx-hook="EventCheckInKeyboard"
           />
+          <p class="mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none">
+            <span class="flex items-center gap-0.5">
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                ↑
+              </kbd>
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                ↓
+              </kbd>
+            </span>
+            <span>navigate</span>
+            <span class="text-zinc-300">·</span>
+            <kbd class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+              ↵ enter
+            </kbd>
+            <span>check in</span>
+            <span class="text-zinc-300">·</span>
+            <span class="flex items-center gap-0.5">
+              <kbd
+                data-key="alt"
+                class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+              >
+                alt
+              </kbd>
+              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+                1–3
+              </kbd>
+            </span>
+            <span>quick check in</span>
+          </p>
         </div>
       </div>
 
@@ -125,7 +162,7 @@ defmodule YscWeb.AdminEventCheckInLive do
 
             <div
               :if={@total_count - @checked_in_count == 0}
-              class="bg-white rounded-xl border border-zinc-200 py-12 text-center text-zinc-500"
+              class="bg-white rounded border border-zinc-200 py-12 text-center text-zinc-500"
             >
               <.icon
                 name="hero-check-circle"
@@ -137,7 +174,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             <%!-- Desktop: table with order grouping --%>
             <div
               :if={@total_count - @checked_in_count > 0}
-              class="hidden md:block bg-white rounded-xl border border-zinc-200"
+              class="hidden md:block bg-white rounded border border-zinc-200"
             >
               <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 <div class="col-span-1"></div>
@@ -183,16 +220,23 @@ defmodule YscWeb.AdminEventCheckInLive do
                   <%!-- Ticket rows --%>
                   <div
                     :for={ticket <- group.tickets}
-                    class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 hover:bg-zinc-50/60 transition-colors items-center last:border-0"
+                    data-checkin-row
+                    class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 hover:bg-zinc-50/60 transition-all duration-100 ease-out items-center last:border-0"
                   >
-                    <div class="col-span-1 flex justify-center">
+                    <div class="col-span-1 flex items-center justify-center gap-1.5">
                       <button
                         phx-click="toggle-check-in"
                         phx-value-ticket-id={ticket.id}
+                        data-checkin-btn
                         class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
                         aria-label="Mark as checked in"
                       >
                       </button>
+                      <span
+                        class="checkin-kbd-badge hidden select-none gap-0.5"
+                        hidden
+                      >
+                      </span>
                     </div>
                     <div class="col-span-3">
                       <p class="text-sm font-medium text-zinc-900">
@@ -240,7 +284,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                 <div
                   :for={{dom_id, group} <- @streams.pending_groups}
                   id={"mobile-#{dom_id}"}
-                  class="bg-white rounded-xl border border-zinc-200 overflow-hidden"
+                  class="bg-white rounded border border-zinc-200 overflow-hidden"
                 >
                   <div class="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-100">
                     <div class="flex items-center gap-2">
@@ -263,7 +307,8 @@ defmodule YscWeb.AdminEventCheckInLive do
                   </div>
                   <div
                     :for={ticket <- group.tickets}
-                    class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0"
+                    data-checkin-row
+                    class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0 transition-all duration-100 ease-out"
                   >
                     <div class="min-w-0 flex-1 mr-3">
                       <p class="text-sm font-medium text-zinc-900">
@@ -284,10 +329,11 @@ defmodule YscWeb.AdminEventCheckInLive do
                     <button
                       phx-click="toggle-check-in"
                       phx-value-ticket-id={ticket.id}
-                      class="shrink-0 w-9 h-9 rounded-full border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
+                      data-checkin-btn
+                      class="shrink-0 border border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-400 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
                       aria-label="Mark as checked in"
                     >
-                      <.icon name="hero-check" class="w-4 h-4 text-zinc-300" />
+                      <.icon name="hero-check" class="w-3.5 h-3.5" /> Check in
                     </button>
                   </div>
                 </div>
@@ -307,7 +353,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             </div>
 
             <%!-- Desktop --%>
-            <div class="hidden md:block bg-white rounded-xl border border-zinc-200">
+            <div class="hidden md:block bg-white rounded border border-zinc-200">
               <div id="checked-in-tickets" phx-update="stream">
                 <div
                   :for={{dom_id, ticket} <- @streams.checked_in_tickets}
@@ -382,7 +428,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                 <div
                   :for={{dom_id, ticket} <- @streams.checked_in_tickets}
                   id={"mobile-checked-#{dom_id}"}
-                  class="bg-white rounded-xl border border-zinc-200 overflow-hidden"
+                  class="bg-white rounded border border-zinc-200 overflow-hidden"
                 >
                   <div class="flex items-center justify-between px-4 py-3">
                     <div class="min-w-0 flex-1 mr-3">
@@ -404,10 +450,10 @@ defmodule YscWeb.AdminEventCheckInLive do
                     <button
                       phx-click="toggle-check-in"
                       phx-value-ticket-id={ticket.id}
-                      class="shrink-0 w-9 h-9 rounded-full border-2 border-emerald-500 bg-emerald-500 hover:bg-red-500 hover:border-red-500 transition-colors flex items-center justify-center"
+                      class="shrink-0 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
                       aria-label="Undo check-in"
                     >
-                      <.icon name="hero-check" class="w-4 h-4 text-white" />
+                      <.icon name="hero-check" class="w-3.5 h-3.5" /> Undo
                     </button>
                   </div>
                 </div>
@@ -482,6 +528,32 @@ defmodule YscWeb.AdminEventCheckInLive do
            socket,
            :error,
            "Could not start scan session. Please try again."
+         )}
+    end
+  end
+
+  def handle_event("launch-membership-checkin", _params, socket) do
+    %{event: event, current_user: current_user} = socket.assigns
+
+    session_name =
+      "#{event.title} – Membership – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
+
+    case Scanning.create_session(%{
+           name: session_name,
+           type: :event_membership,
+           event_id: event.id,
+           created_by_id: current_user.id
+         }) do
+      {:ok, session} ->
+        {:noreply,
+         push_navigate(socket, to: ~p"/admin/membership-check-in/#{session.id}")}
+
+      {:error, _changeset} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Could not start membership check-in session. Please try again."
          )}
     end
   end

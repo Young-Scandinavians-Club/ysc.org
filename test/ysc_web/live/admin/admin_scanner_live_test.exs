@@ -599,7 +599,7 @@ defmodule YscWeb.AdminScannerLiveTest do
       view
       |> render_hook("camera_started", %{})
 
-      assert render(view) =~ "QR Scanner"
+      assert render(view) =~ "Check-in &amp; Scan"
     end
 
     test "scanner_debug logs path without crashing", %{conn: conn} do

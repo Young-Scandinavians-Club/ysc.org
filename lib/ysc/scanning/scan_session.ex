@@ -25,6 +25,7 @@ defmodule Ysc.Scanning.ScanSession do
     field :closed_at, :utc_datetime
 
     has_many :scan_records, Ysc.Scanning.ScanRecord
+    has_many :session_check_ins, Ysc.Scanning.SessionCheckIn
 
     timestamps()
   end
@@ -40,7 +41,7 @@ defmodule Ysc.Scanning.ScanSession do
     session
     |> cast(attrs, [:name, :type, :event_id])
     |> validate_required([:name, :type])
-    |> validate_inclusion(:type, [:membership, :event])
+    |> validate_inclusion(:type, [:membership, :event, :event_membership])
     |> validate_event_id_for_type()
     |> foreign_key_constraint(:event_id)
     |> foreign_key_constraint(:created_by_id)
@@ -54,11 +55,13 @@ defmodule Ysc.Scanning.ScanSession do
     type = get_field(changeset, :type)
     event_id = get_field(changeset, :event_id)
 
+    event_required_types = [:event, :event_membership]
+
     cond do
-      type == :event && is_nil(event_id) ->
+      type in event_required_types && is_nil(event_id) ->
         add_error(changeset, :event_id, "is required for event scan sessions")
 
-      type != :event && not is_nil(event_id) ->
+      type == :membership && not is_nil(event_id) ->
         add_error(
           changeset,
           :event_id,
