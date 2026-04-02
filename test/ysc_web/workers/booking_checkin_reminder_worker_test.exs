@@ -7,6 +7,10 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
   """
   use Ysc.DataCase, async: true
 
+  # Normalized (no "+") phone used by sms_enabled_user/0 fixtures.
+  @sms_test_phone "14155551234"
+  @sms_rate_limit_key "sms_rate_limit:#{@sms_test_phone}"
+
   import Ysc.AccountsFixtures
 
   alias YscWeb.Workers.BookingCheckinReminderWorker
@@ -20,7 +24,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
     # Clear only the rate limit entry for the hardcoded test phone number.
     # Using a targeted delete instead of Cachex.clear/1 avoids wiping rate
     # limit state that concurrent async test modules are building up.
-    Cachex.del(:ysc_cache, "sms_rate_limit:14155551234")
+    Cachex.del(:ysc_cache, @sms_rate_limit_key)
 
     # Configure FlowRoute for tests
     Application.put_env(:ysc, :flowroute, from_number: "12061231234")
@@ -458,7 +462,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       # Clear only the rate limit entry for the hardcoded test phone number.
       # Using a targeted delete instead of Cachex.clear/1 avoids wiping rate
       # limit state that concurrent async test modules are building up.
-      Cachex.del(:ysc_cache, "sms_rate_limit:14155551234")
+      Cachex.del(:ysc_cache, @sms_rate_limit_key)
       :ok
     end
 
