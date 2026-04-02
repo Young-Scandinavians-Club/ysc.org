@@ -101,6 +101,7 @@ defmodule YscWeb.BookingReceiptLive do
             |> assign(:timezone, timezone)
             |> assign(:price_breakdown, price_breakdown)
             |> assign(:user_first_name, user.first_name || "Member")
+            |> assign(:booking_in_past, booking_checkout_in_past?(booking))
             |> assign(:can_cancel, can_cancel)
             |> assign(:show_cancel_modal, false)
             |> assign(:cancel_reason, "")
@@ -285,13 +286,22 @@ defmodule YscWeb.BookingReceiptLive do
               </span>
             </div>
             <h1 class="text-4xl font-bold text-zinc-900">
-              See you at the Cabin, {@user_first_name}!
+              <%= if @booking_in_past do %>
+                What a stay, {@user_first_name}!
+              <% else %>
+                See you at the Cabin, {@user_first_name}!
+              <% end %>
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
-              Your stay at
-              <strong>{format_property_name(@booking.property)}</strong>
-              is all set.
-              We've sent a copy of these details to your email.
+              <%= if @booking_in_past do %>
+                Hope you had an amazing time at <strong>{format_property_name(@booking.property)}</strong>.
+                See you next time!
+              <% else %>
+                Your stay at
+                <strong>{format_property_name(@booking.property)}</strong>
+                is all set.
+                We've sent a copy of these details to your email.
+              <% end %>
             </p>
           <% end %>
         </div>
@@ -1754,6 +1764,13 @@ defmodule YscWeb.BookingReceiptLive do
     else
       {nil, false}
     end
+  end
+
+  defp booking_checkout_in_past?(booking) do
+    today = get_today_pst()
+
+    booking.checkout_date != nil &&
+      Date.compare(booking.checkout_date, today) == :lt
   end
 
   defp booking_is_active?(booking) do

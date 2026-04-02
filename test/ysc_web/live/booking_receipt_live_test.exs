@@ -537,6 +537,46 @@ defmodule YscWeb.BookingReceiptLiveTest do
   end
 
   describe "greeting and stay copy" do
+    test "shows past-stay copy when checkout date is in the past", %{conn: conn} do
+      user = user_fixture(%{first_name: "Ingrid"})
+      conn = log_in_user(conn, user)
+
+      # Use a past Monday–Thursday stay
+      today = Date.utc_today()
+      past_base = Date.add(today, -14)
+      days_since_monday = Date.day_of_week(past_base, :monday) - 1
+      checkin_date = Date.add(past_base, -days_since_monday)
+      checkout_date = Date.add(checkin_date, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          checkin_date: checkin_date,
+          checkout_date: checkout_date
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "What a stay, Ingrid"
+      assert html =~ "Hope you had an amazing time"
+      assert html =~ "See you next time"
+    end
+
+    test "shows upcoming copy when checkout date is in the future", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Bjorn"})
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert html =~ "See you at the Cabin, Bjorn"
+      assert html =~ "is all set"
+    end
+
     test "uses Member when user has no first name", %{conn: conn} do
       user = user_fixture()
 
