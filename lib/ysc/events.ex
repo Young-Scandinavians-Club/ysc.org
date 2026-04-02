@@ -17,6 +17,7 @@ defmodule Ysc.Events do
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketReservation
   alias Ysc.Events.EventNotificationSubscription
+  alias Ysc.Events.EventUpdate
   alias Ysc.Accounts.User
 
   def subscribe() do
@@ -2139,6 +2140,134 @@ defmodule Ysc.Events do
           error: inspect(reason)
         )
     end
+  end
+
+  # --- Event Updates ---
+
+  @doc """
+  Creates an event update and enqueues the notification worker.
+  """
+  def create_event_update(event, attrs) do
+    result =
+      %EventUpdate{}
+      |> EventUpdate.changeset(attrs)
+      |> Ecto.Changeset.put_assoc(:event, event)
+      |> Ecto.Changeset.put_change(
+        :sent_by_id,
+        attrs[:sent_by_id] || attrs["sent_by_id"]
+      )
+      |> Repo.insert()
+
+    case result do
+      {:ok, event_update} ->
+        broadcast(%Ysc.MessagePassingEvents.EventUpdateCreated{
+          event_update: event_update,
+          event_id: event.id
+        })
+
+        {:ok, event_update}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Returns all updates for an event, newest first (admin view).
+  """
+  def list_event_updates(event_id) do
+    EventUpdate
+    |> where([u], u.event_id == ^event_id)
+    |> order_by([u], desc: u.inserted_at)
+    |> Repo.all()
+    |> Repo.preload(:sent_by)
+  end
+
+  @doc """
+  Returns updates visible on the public event page, newest first.
+  """
+  def list_visible_event_updates(event_id) do
+    EventUpdate
+    |> where([u], u.event_id == ^event_id and u.show_on_event_page == true)
+    |> order_by([u], desc: u.inserted_at)
+    |> Repo.all()
+    |> Repo.preload(:sent_by)
+  end
+
+  @doc """
+  Collects deduplicated recipient email addresses for an event.
+
+  Returns emails from both ticket purchasers (User.email) and
+  registrants (TicketDetail.email) for all confirmed tickets.
+  """
+  def list_event_update_recipients(event_id) do
+    tickets =
+      Ticket
+      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
+      |> join(:left, [t], tt in TicketTier, on: t.ticket_tier_id == tt.id)
+      |> where([t, tt], tt.type != :donation)
+      |> join(:left, [t, _tt], u in User, on: t.user_id == u.id)
+      |> preload([t, _tt, u], user: u)
+      |> Repo.all()
+
+    ticket_ids = Enum.map(tickets, & &1.id)
+
+    details_map =
+      if ticket_ids == [] do
+        %{}
+      else
+        TicketDetail
+        |> where([td], td.ticket_id in ^ticket_ids)
+        |> Repo.all()
+        |> Map.new(&{&1.ticket_id, &1})
+      end
+
+    recipients =
+      Enum.reduce(tickets, %{}, fn ticket, acc ->
+        acc =
+          if ticket.user do
+            email = String.downcase(ticket.user.email)
+
+            Map.put_new(acc, email, %{
+              email: ticket.user.email,
+              first_name: ticket.user.first_name
+            })
+          else
+            acc
+          end
+
+        case Map.get(details_map, ticket.id) do
+          %TicketDetail{email: detail_email, first_name: first_name}
+          when is_binary(detail_email) and detail_email != "" ->
+            key = String.downcase(detail_email)
+
+            Map.put_new(acc, key, %{email: detail_email, first_name: first_name})
+
+          _ ->
+            acc
+        end
+      end)
+
+    Map.values(recipients)
+  end
+
+  @doc """
+  Returns the count of unique recipients for an event update.
+  """
+  def count_event_update_recipients(event_id) do
+    list_event_update_recipients(event_id) |> length()
+  end
+
+  @doc """
+  Marks an event update as sent with the given recipient count.
+  """
+  def mark_event_update_sent(event_update, recipient_count) do
+    event_update
+    |> Ecto.Changeset.change(%{
+      sent_at: DateTime.truncate(DateTime.utc_now(), :second),
+      recipient_count: recipient_count
+    })
+    |> Repo.update()
   end
 
   defp broadcast(event) do
