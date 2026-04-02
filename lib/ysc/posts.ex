@@ -81,6 +81,21 @@ defmodule Ysc.Posts do
     |> Repo.preload([{:author, :current_avatar}, :featured_image])
   end
 
+  @doc """
+  Published posts for Atom feeds: includes featured posts, newest first by publish time.
+  """
+  def list_recent_published_posts_for_feed(limit \\ 50) do
+    Repo.all(
+      from p in Post,
+        where: p.state == :published,
+        order_by: [
+          desc: fragment("COALESCE(?, ?)", p.published_on, p.inserted_at)
+        ],
+        limit: ^limit
+    )
+    |> Repo.preload([{:author, :current_avatar}, :featured_image])
+  end
+
   def list_posts_paginated(params, opts \\ []) do
     opts = normalize_list_posts_opts(opts)
     date_from = Keyword.get(opts, :date_from, "")

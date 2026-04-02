@@ -14,6 +14,17 @@ defmodule YscWeb.Router do
               true
             end)
 
+  pipeline :feed do
+    plug :accepts, ["atom", "xml", "html"]
+
+    if @is_prod do
+      plug Plug.SSL, rewrite_on: [:x_forwarded_proto], max_age: 31_536_000
+    end
+
+    plug YscWeb.Plugs.FeedHeaders
+    plug :put_secure_browser_headers
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
 
@@ -108,6 +119,13 @@ defmodule YscWeb.Router do
     get "/properties/:property/info", PropertiesController, :info
     get "/events", EventsController, :index
     post "/check-in", CheckInsController, :create
+  end
+
+  scope "/", YscWeb do
+    pipe_through [:feed]
+
+    get "/feeds/events.atom", FeedController, :events
+    get "/feeds/posts.atom", FeedController, :posts
   end
 
   scope "/", YscWeb do
