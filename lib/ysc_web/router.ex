@@ -21,8 +21,7 @@ defmodule YscWeb.Router do
       plug Plug.SSL, rewrite_on: [:x_forwarded_proto], max_age: 31_536_000
     end
 
-    plug YscWeb.Plugs.SecurityHeaders
-    plug :put_secure_browser_headers
+    plug YscWeb.Plugs.FeedHeaders
   end
 
   pipeline :browser do
