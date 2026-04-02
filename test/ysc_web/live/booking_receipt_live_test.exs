@@ -556,11 +556,11 @@ defmodule YscWeb.BookingReceiptLiveTest do
           checkout_date: checkout_date
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "What a stay, Ingrid"
-      assert html =~ "Hope you had an amazing time"
-      assert html =~ "See you next time"
+      assert has_element?(view, "#booking-receipt", "What a stay, Ingrid")
+      assert has_element?(view, "#booking-receipt", "Hope you had an amazing time")
+      assert has_element?(view, "#booking-receipt", "See you next time")
     end
 
     test "shows upcoming copy when checkout date is in the future", %{
@@ -571,10 +571,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "See you at the Cabin, Bjorn"
-      assert html =~ "is all set"
+      assert has_element?(view, "#booking-receipt", "See you at the Cabin, Bjorn")
+      assert has_element?(view, "#booking-receipt", "is all set")
     end
 
     test "uses Member when user has no first name", %{conn: conn} do
