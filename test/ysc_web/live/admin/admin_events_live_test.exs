@@ -37,7 +37,7 @@ defmodule YscWeb.AdminEventsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events")
 
       view
-      |> element("button", "QR Scanner")
+      |> element("button", "Check-in & Scan")
       |> render_click()
 
       assert_redirected(view, ~p"/admin/scanner")
