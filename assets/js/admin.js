@@ -70,3 +70,13 @@ window.addEventListener("phx:focus-search", (e) => {
         setTimeout(() => tryFocus(0), 50);
     });
 });
+
+window.addEventListener("phx:focus-and-clear", (e) => {
+    const targetId = e.detail?.id;
+    if (!targetId) return;
+    const el = document.getElementById(targetId);
+    if (el) {
+        el.value = "";
+        el.focus();
+    }
+});

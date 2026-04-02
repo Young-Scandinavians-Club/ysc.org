@@ -34,4 +34,18 @@ defmodule Ysc.ScanningFixtures do
     {:ok, session} = Scanning.create_session(attrs)
     Scanning.get_session!(session.id)
   end
+
+  def event_membership_session_fixture(event, admin_user, attrs \\ %{}) do
+    base_attrs = %{
+      name: "Membership Check-in #{System.unique_integer()}",
+      type: :event_membership,
+      event_id: event.id,
+      created_by_id: admin_user.id
+    }
+
+    attrs = Map.merge(base_attrs, Enum.into(attrs, %{}))
+
+    {:ok, session} = Scanning.create_session(attrs)
+    Scanning.get_session!(session.id)
+  end
 end

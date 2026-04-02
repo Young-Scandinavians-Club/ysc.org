@@ -486,6 +486,11 @@ defmodule YscWeb.Router do
 
       # Event check-in management
       live "/events/:id/check-in", AdminEventCheckInLive, :index
+
+      # Membership check-in desk (event_membership sessions)
+      live "/membership-check-in/:session_id",
+           AdminMembershipCheckInLive,
+           :index
     end
   end
 

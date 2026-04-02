@@ -26,13 +26,13 @@ defmodule YscWeb.AdminScannerLive do
     >
       <div class="py-6">
         <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-semibold text-zinc-800">Scan Sessions</h1>
+          <h1 class="text-2xl font-semibold text-zinc-800">Check-in Sessions</h1>
           <.link
             navigate={~p"/admin/scanner"}
             class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:scale-[0.98] transition duration-150 ease-in-out"
           >
             <.icon name="hero-qr-code" class="w-4 h-4 -mt-0.5 me-1" />
-            New Scan Session
+            New Check-in Session
           </.link>
         </div>
 
@@ -51,12 +51,18 @@ defmodule YscWeb.AdminScannerLive do
               <div class="flex items-center gap-3">
                 <span class={[
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                  if(session.type == :membership,
-                    do: "bg-emerald-100 text-emerald-800",
-                    else: "bg-blue-100 text-blue-800"
-                  )
+                  cond do
+                    session.type == :membership ->
+                      "bg-emerald-100 text-emerald-800"
+
+                    session.type == :event_membership ->
+                      "bg-violet-100 text-violet-800"
+
+                    true ->
+                      "bg-blue-100 text-blue-800"
+                  end
                 ]}>
-                  {if session.type == :membership, do: "Membership", else: "Event"}
+                  {session_type_label(session.type)}
                 </span>
                 <span class={[
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
@@ -71,7 +77,9 @@ defmodule YscWeb.AdminScannerLive do
               </div>
               <div class="flex items-center gap-3">
                 <.link
-                  :if={is_nil(session.closed_at)}
+                  :if={
+                    is_nil(session.closed_at) && session.type != :event_membership
+                  }
                   navigate={~p"/admin/scanner?resume=#{session.id}"}
                   class="text-sm text-emerald-600 hover:text-emerald-800 font-medium"
                 >
@@ -79,10 +87,31 @@ defmodule YscWeb.AdminScannerLive do
                   Resume
                 </.link>
                 <.link
+                  :if={
+                    is_nil(session.closed_at) && session.type == :event_membership
+                  }
+                  navigate={~p"/admin/membership-check-in/#{session.id}"}
+                  class="text-sm text-violet-600 hover:text-violet-800 font-medium"
+                >
+                  <.icon name="hero-play" class="w-3.5 h-3.5 inline -mt-0.5" />
+                  Open Desk
+                </.link>
+                <.link
+                  :if={session.type != :event_membership}
                   navigate={~p"/admin/scanner/sessions/#{session.id}"}
                   class="text-sm text-blue-600 hover:text-blue-800 font-medium"
                 >
                   View
+                </.link>
+                <.link
+                  :if={
+                    session.type == :event_membership &&
+                      not is_nil(session.closed_at)
+                  }
+                  navigate={~p"/admin/membership-check-in/#{session.id}"}
+                  class="text-sm text-violet-600 hover:text-violet-800 font-medium"
+                >
+                  View Desk
                 </.link>
               </div>
             </div>
@@ -134,14 +163,18 @@ defmodule YscWeb.AdminScannerLive do
             </h1>
             <span class={[
               "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0",
-              if(@detail_session.type == :membership,
-                do: "bg-emerald-100 text-emerald-800",
-                else: "bg-blue-100 text-blue-800"
-              )
+              cond do
+                @detail_session.type == :membership ->
+                  "bg-emerald-100 text-emerald-800"
+
+                @detail_session.type == :event_membership ->
+                  "bg-violet-100 text-violet-800"
+
+                true ->
+                  "bg-blue-100 text-blue-800"
+              end
             ]}>
-              {if @detail_session.type == :membership,
-                do: "Membership",
-                else: "Event"}
+              {session_type_label(@detail_session.type)}
             </span>
           </div>
         </div>
@@ -361,7 +394,7 @@ defmodule YscWeb.AdminScannerLive do
     >
       <div class="py-6">
         <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-semibold text-zinc-800">QR Scanner</h1>
+          <h1 class="text-2xl font-semibold text-zinc-800">Check-in &amp; Scan</h1>
           <.link
             navigate={~p"/admin/scanner/sessions"}
             class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 border border-zinc-200 hover:bg-zinc-50 text-zinc-700 bg-transparent transition duration-150 ease-in-out"
@@ -372,7 +405,7 @@ defmodule YscWeb.AdminScannerLive do
 
         <%!-- Session Setup --%>
         <div :if={@phase == :setup} class="max-w-lg mx-auto space-y-4">
-          <%!-- Resume open sessions --%>
+          <%!-- Resume own open sessions --%>
           <div
             :if={@open_sessions != []}
             class="bg-white rounded-xl border border-green-200 p-4 shadow-sm"
@@ -390,14 +423,18 @@ defmodule YscWeb.AdminScannerLive do
                   <div class="flex items-center gap-2">
                     <span class={[
                       "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
-                      if(session.type == :membership,
-                        do: "bg-emerald-100 text-emerald-800",
-                        else: "bg-blue-100 text-blue-800"
-                      )
+                      cond do
+                        session.type == :membership ->
+                          "bg-emerald-100 text-emerald-800"
+
+                        session.type == :event_membership ->
+                          "bg-violet-100 text-violet-800"
+
+                        true ->
+                          "bg-blue-100 text-blue-800"
+                      end
                     ]}>
-                      {if session.type == :membership,
-                        do: "Membership",
-                        else: "Event"}
+                      {session_type_label(session.type)}
                     </span>
                     <span class="text-sm font-medium text-zinc-800 truncate">
                       {session.name}
@@ -416,21 +453,79 @@ defmodule YscWeb.AdminScannerLive do
                     </span>
                   </div>
                 </div>
-                <.button
-                  phx-click="resume_session"
-                  phx-value-session-id={session.id}
-                  color="green"
-                  class="ml-3 shrink-0"
+                <%= if session.type == :event_membership do %>
+                  <.link
+                    navigate={~p"/admin/membership-check-in/#{session.id}"}
+                    class="ml-3 shrink-0 inline-flex items-center rounded px-3 py-1.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+                  >
+                    Open Desk
+                  </.link>
+                <% else %>
+                  <.button
+                    phx-click="resume_session"
+                    phx-value-session-id={session.id}
+                    color="green"
+                    class="ml-3 shrink-0"
+                  >
+                    Resume
+                  </.button>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Join open event_membership sessions from other admins --%>
+          <div
+            :if={@joinable_sessions != []}
+            class="bg-white rounded-xl border border-violet-200 p-4 shadow-sm"
+          >
+            <h2 class="text-sm font-semibold text-violet-800 mb-3 flex items-center gap-1.5">
+              <.icon name="hero-user-group" class="w-4 h-4" />
+              Join a Membership Check-in Session
+            </h2>
+            <div class="space-y-2">
+              <div
+                :for={session <- @joinable_sessions}
+                class="flex items-center justify-between bg-violet-50 rounded-lg px-3 py-2.5"
+              >
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-violet-100 text-violet-800">
+                      Event + Members
+                    </span>
+                    <span class="text-sm font-medium text-zinc-800 truncate">
+                      {session.name}
+                    </span>
+                  </div>
+                  <div class="text-xs text-zinc-500 mt-0.5">
+                    <span :if={session.event}>
+                      {session.event.title} &middot;
+                    </span>
+                    <span>
+                      by {session.created_by.first_name} {session.created_by.last_name} &middot;
+                    </span>
+                    <span
+                      id={"joinable-session-time-#{session.id}"}
+                      phx-hook="LocalTime"
+                      data-utc-time={DateTime.to_iso8601(session.inserted_at)}
+                    >
+                      {Calendar.strftime(session.inserted_at, "%b %d at %H:%M UTC")}
+                    </span>
+                  </div>
+                </div>
+                <.link
+                  navigate={~p"/admin/membership-check-in/#{session.id}"}
+                  class="ml-3 shrink-0 inline-flex items-center rounded px-3 py-1.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors"
                 >
-                  Resume
-                </.button>
+                  Join
+                </.link>
               </div>
             </div>
           </div>
 
           <div class="bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
             <h2 class="text-lg font-semibold text-zinc-800 mb-4">
-              Start a Scan Session
+              Start a Check-in Session
             </h2>
 
             <.form
@@ -443,15 +538,15 @@ defmodule YscWeb.AdminScannerLive do
                 field={@setup_form[:name]}
                 type="text"
                 label="Session Name"
-                placeholder="e.g. Friday Night Check-in"
+                placeholder="e.g. Annual Meeting 2026"
                 required
               />
 
               <div>
                 <label class="block text-sm font-medium text-zinc-700 mb-2">
-                  Scan Mode
+                  Mode
                 </label>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     phx-click="select_mode"
@@ -483,7 +578,7 @@ defmodule YscWeb.AdminScannerLive do
                     ]}>
                       Membership
                     </span>
-                    <span class="text-xs text-zinc-400 mt-1">
+                    <span class="text-xs text-zinc-400 mt-1 text-center">
                       Verify member status
                     </span>
                   </button>
@@ -519,14 +614,50 @@ defmodule YscWeb.AdminScannerLive do
                     ]}>
                       Event
                     </span>
-                    <span class="text-xs text-zinc-400 mt-1">
+                    <span class="text-xs text-zinc-400 mt-1 text-center">
                       Check in ticket holders
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    phx-click="select_mode"
+                    phx-value-mode="event_membership"
+                    class={[
+                      "flex flex-col items-center p-4 rounded-lg border-2 transition-all",
+                      if(@selected_mode == "event_membership",
+                        do: "border-violet-500 bg-violet-50",
+                        else: "border-zinc-200 hover:border-zinc-300"
+                      )
+                    ]}
+                  >
+                    <.icon
+                      name="hero-calendar-days"
+                      class={[
+                        "w-8 h-8 mb-2",
+                        if(@selected_mode == "event_membership",
+                          do: "text-violet-600",
+                          else: "text-zinc-400"
+                        )
+                      ]}
+                    />
+                    <span class={[
+                      "text-sm font-medium",
+                      if(@selected_mode == "event_membership",
+                        do: "text-violet-700",
+                        else: "text-zinc-600"
+                      )
+                    ]}>
+                      Event + Members
+                    </span>
+                    <span class="text-xs text-zinc-400 mt-1 text-center">
+                      Verify membership for event
                     </span>
                   </button>
                 </div>
               </div>
 
-              <div :if={@selected_mode == "event"}>
+              <div :if={@selected_mode in ["event", "event_membership"]}>
                 <.input
                   field={@setup_form[:event_id]}
                   type="select"
@@ -538,7 +669,7 @@ defmodule YscWeb.AdminScannerLive do
               </div>
 
               <.button type="submit" class="w-full" disabled={@selected_mode == nil}>
-                Start Scanning
+                Start Session
               </.button>
             </.form>
           </div>
@@ -554,19 +685,31 @@ defmodule YscWeb.AdminScannerLive do
           <div class={[
             "absolute top-0 inset-x-0 z-20 px-4 pt-4 pb-16",
             "bg-gradient-to-b",
-            if(@active_session.type == :membership,
-              do: "from-emerald-950/95 to-transparent",
-              else: "from-blue-950/95 to-transparent"
-            )
+            cond do
+              @active_session.type == :membership ->
+                "from-emerald-950/95 to-transparent"
+
+              @active_session.type == :event_membership ->
+                "from-violet-950/95 to-transparent"
+
+              true ->
+                "from-blue-950/95 to-transparent"
+            end
           ]}>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2.5 text-white min-w-0">
                 <.icon
                   name={
-                    if(@active_session.type == :membership,
-                      do: "hero-identification",
-                      else: "hero-ticket"
-                    )
+                    cond do
+                      @active_session.type == :membership ->
+                        "hero-identification"
+
+                      @active_session.type == :event_membership ->
+                        "hero-calendar-days"
+
+                      true ->
+                        "hero-ticket"
+                    end
                   }
                   class="w-5 h-5 shrink-0"
                 />
@@ -575,7 +718,10 @@ defmodule YscWeb.AdminScannerLive do
                     {@active_session.name}
                   </p>
                   <p
-                    :if={@active_session.type == :event && @active_session.event}
+                    :if={
+                      @active_session.type in [:event, :event_membership] &&
+                        @active_session.event
+                    }
                     class="text-xs text-white/55 truncate"
                   >
                     {@active_session.event.title}
@@ -586,6 +732,13 @@ defmodule YscWeb.AdminScannerLive do
                 <span class="text-white text-sm">
                   {@scan_count} {if(@scan_count == 1, do: "scan", else: "scans")}
                 </span>
+                <.link
+                  :if={@active_session.type == :event_membership}
+                  navigate={~p"/admin/membership-check-in/#{@active_session.id}"}
+                  class="bg-white/15 hover:bg-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-white/20"
+                >
+                  Desk
+                </.link>
                 <button
                   phx-click="end_session"
                   class="bg-white/15 hover:bg-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-white/20"
@@ -1045,7 +1198,7 @@ defmodule YscWeb.AdminScannerLive do
     socket =
       socket
       |> assign(:active_page, :scanner)
-      |> assign(:page_title, "QR Scanner")
+      |> assign(:page_title, "Check-in & Scan")
       |> assign(:phase, :setup)
       |> assign(:selected_mode, nil)
       |> assign(:active_session, nil)
@@ -1059,6 +1212,7 @@ defmodule YscWeb.AdminScannerLive do
       )
       |> assign(:manual_form, to_form(%{"query" => ""}, as: :manual))
       |> assign(:open_sessions, [])
+      |> assign(:joinable_sessions, [])
       |> assign(:sessions, [])
       |> assign(:detail_session, nil)
       |> assign(:detail_records, [])
@@ -1086,7 +1240,7 @@ defmodule YscWeb.AdminScannerLive do
       scan_count = Scanning.get_session_scan_count(session_id)
 
       socket
-      |> assign(:page_title, "QR Scanner")
+      |> assign(:page_title, "Check-in & Scan")
       |> assign(:phase, :scanning)
       |> assign(:active_session, session)
       |> assign(:scan_count, scan_count)
@@ -1096,26 +1250,30 @@ defmodule YscWeb.AdminScannerLive do
       |> assign(:open_sessions, [])
     else
       open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+      joinable_sessions = load_joinable_sessions(socket, open_sessions)
 
       socket
-      |> assign(:page_title, "QR Scanner")
+      |> assign(:page_title, "Check-in & Scan")
       |> assign(:phase, :setup)
       |> assign(:active_session, nil)
       |> assign(:scan_result, nil)
       |> assign(:open_sessions, open_sessions)
+      |> assign(:joinable_sessions, joinable_sessions)
       |> put_flash(:error, "That session is already closed.")
     end
   end
 
   defp apply_action(socket, :index, _params) do
     open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+    joinable_sessions = load_joinable_sessions(socket, open_sessions)
 
     socket
-    |> assign(:page_title, "QR Scanner")
+    |> assign(:page_title, "Check-in & Scan")
     |> assign(:phase, :setup)
     |> assign(:active_session, nil)
     |> assign(:scan_result, nil)
     |> assign(:open_sessions, open_sessions)
+    |> assign(:joinable_sessions, joinable_sessions)
   end
 
   defp apply_action(socket, :sessions, _params) do
@@ -1128,12 +1286,17 @@ defmodule YscWeb.AdminScannerLive do
 
   defp apply_action(socket, :session_detail, %{"id" => id}) do
     session = Scanning.get_session!(id)
-    records = Scanning.list_scan_records(id)
 
-    socket
-    |> assign(:page_title, "Session: #{session.name}")
-    |> assign(:detail_session, session)
-    |> assign(:detail_records, records)
+    if session.type == :event_membership do
+      push_navigate(socket, to: ~p"/admin/membership-check-in/#{id}")
+    else
+      records = Scanning.list_scan_records(id)
+
+      socket
+      |> assign(:page_title, "Session: #{session.name}")
+      |> assign(:detail_session, session)
+      |> assign(:detail_records, records)
+    end
   end
 
   # --- Events ---
@@ -1150,6 +1313,7 @@ defmodule YscWeb.AdminScannerLive do
       case session_type_str do
         "membership" -> :membership
         "event" -> :event
+        "event_membership" -> :event_membership
         _ -> nil
       end
 
@@ -1157,27 +1321,36 @@ defmodule YscWeb.AdminScannerLive do
       {:noreply,
        put_flash(socket, :error, "Please select a scan mode before starting.")}
     else
+      needs_event_id = session_type in [:event, :event_membership]
+
       attrs = %{
         name: params["name"] || "Scan Session",
         type: session_type,
-        event_id: if(session_type == :event, do: params["event_id"]),
+        event_id: if(needs_event_id, do: params["event_id"]),
         created_by_id: socket.assigns.current_user.id
       }
 
       case Scanning.create_session(attrs) do
         {:ok, session} ->
-          session = Scanning.get_session!(session.id)
+          if session_type == :event_membership do
+            {:noreply,
+             push_navigate(socket,
+               to: ~p"/admin/membership-check-in/#{session.id}"
+             )}
+          else
+            session = Scanning.get_session!(session.id)
 
-          socket =
-            socket
-            |> assign(:phase, :scanning)
-            |> assign(:active_session, session)
-            |> assign(:scan_count, 0)
-            |> assign(:scan_result, nil)
-            |> assign(:camera_error, nil)
-            |> assign(:group_prompt, nil)
+            socket =
+              socket
+              |> assign(:phase, :scanning)
+              |> assign(:active_session, session)
+              |> assign(:scan_count, 0)
+              |> assign(:scan_result, nil)
+              |> assign(:camera_error, nil)
+              |> assign(:group_prompt, nil)
 
-          {:noreply, socket}
+            {:noreply, socket}
+          end
 
         {:error, changeset} ->
           {:noreply,
@@ -1321,6 +1494,7 @@ defmodule YscWeb.AdminScannerLive do
     end
 
     open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+    joinable_sessions = load_joinable_sessions(socket, open_sessions)
 
     socket =
       socket
@@ -1331,6 +1505,7 @@ defmodule YscWeb.AdminScannerLive do
       |> assign(:camera_error, nil)
       |> assign(:group_prompt, nil)
       |> assign(:open_sessions, open_sessions)
+      |> assign(:joinable_sessions, joinable_sessions)
       |> push_event("stop-camera", %{})
 
     {:noreply, socket}
@@ -1463,4 +1638,19 @@ defmodule YscWeb.AdminScannerLive do
   defp result_badge_class(:expired), do: "bg-amber-100 text-amber-800"
   defp result_badge_class(:cross_mode), do: "bg-amber-100 text-amber-800"
   defp result_badge_class(_), do: "bg-zinc-100 text-zinc-800"
+
+  defp session_type_label(:membership), do: "Membership"
+  defp session_type_label(:event), do: "Event"
+  defp session_type_label(:event_membership), do: "Event + Members"
+  defp session_type_label(_), do: "Session"
+
+  defp load_joinable_sessions(socket, own_open_sessions) do
+    current_user_id = socket.assigns.current_user.id
+    own_ids = MapSet.new(own_open_sessions, & &1.id)
+
+    Scanning.get_open_membership_sessions()
+    |> Enum.reject(fn s ->
+      s.created_by_id == current_user_id or MapSet.member?(own_ids, s.id)
+    end)
+  end
 end

@@ -1,6 +1,6 @@
 import EctoEnum
 
-defenum(ScanSessionType, ["membership", "event"])
+defenum(ScanSessionType, ["membership", "event", "event_membership"])
 defenum(CheckinType, ["individual", "group"])
 
 defenum(ScanResultType, [
