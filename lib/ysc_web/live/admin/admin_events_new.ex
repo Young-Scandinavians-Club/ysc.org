@@ -8,6 +8,8 @@ defmodule YscWeb.AdminEventsNewLive do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
+  require Ysc.Logging
+
   alias Phoenix.LiveView.JS
   alias Ysc.Events.Event
   alias Ysc.Events
@@ -1204,17 +1206,39 @@ defmodule YscWeb.AdminEventsNewLive do
 
       case Events.create_event_update(event, attrs) do
         {:ok, event_update} ->
-          %{"event_update_id" => event_update.id}
-          |> YscWeb.Workers.EventUpdateNotificationWorker.new()
-          |> Oban.insert()
+          oban_result =
+            %{"event_update_id" => event_update.id}
+            |> YscWeb.Workers.EventUpdateNotificationWorker.new()
+            |> Oban.insert()
+
+          socket =
+            case oban_result do
+              {:ok, _job} ->
+                YscWeb.Flash.put_toast(
+                  socket,
+                  :info,
+                  "Update queued for #{socket.assigns.recipient_count} recipient(s).",
+                  title: "Event Update"
+                )
+
+              {:error, reason} ->
+                Ysc.Logging.error("Failed to enqueue event update notification",
+                  extra: %{
+                    event_update_id: event_update.id,
+                    reason: inspect(reason)
+                  }
+                )
+
+                YscWeb.Flash.put_toast(
+                  socket,
+                  :warning,
+                  "Update saved but notification delivery could not be scheduled. Please try again.",
+                  title: "Event Update"
+                )
+            end
 
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "Update sent to #{socket.assigns.recipient_count} recipient(s).",
-             title: "Event Update"
-           )
            |> assign(
              :update_form,
              to_form(
@@ -1230,11 +1254,25 @@ defmodule YscWeb.AdminEventsNewLive do
            |> assign(:event_updates, Events.list_event_updates(event.id))}
 
         {:error, changeset} ->
+          message =
+            changeset
+            |> Ecto.Changeset.traverse_errors(fn {msg, opts} ->
+              Enum.reduce(opts, msg, fn {key, value}, acc ->
+                String.replace(acc, "%{#{key}}", to_string(value))
+              end)
+            end)
+            |> Enum.map_join("; ", fn {field, errors} ->
+              "#{Phoenix.Naming.humanize(field)}: #{Enum.join(errors, ", ")}"
+            end)
+
           {:noreply,
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to create update: #{inspect(changeset.errors)}",
+             if(message == "",
+               do: "Please correct the highlighted fields.",
+               else: message
+             ),
              title: "Update"
            )}
       end

@@ -5981,18 +5981,7 @@ defmodule YscWeb.EventDetailsLive do
 
   defp event_body(%Event{} = event), do: event.rendered_details
 
-  defp format_relative_time(%DateTime{} = dt) do
-    now = DateTime.utc_now()
-    diff_seconds = DateTime.diff(now, dt, :second)
-
-    cond do
-      diff_seconds < 60 -> "just now"
-      diff_seconds < 3600 -> "#{div(diff_seconds, 60)} min ago"
-      diff_seconds < 86400 -> "#{div(diff_seconds, 3600)} hours ago"
-      diff_seconds < 604_800 -> "#{div(diff_seconds, 86400)} days ago"
-      true -> Calendar.strftime(dt, "%b %d, %Y")
-    end
-  end
+  defp format_relative_time(%DateTime{} = dt), do: Timex.from_now(dt)
 
   defp format_relative_time(_), do: ""
 

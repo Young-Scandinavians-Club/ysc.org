@@ -41,7 +41,8 @@ defmodule YscWeb.Emails.EventUpdateNotification do
     if is_nil(update), do: raise(ArgumentError, "Update cannot be nil")
 
     event =
-      if Ecto.assoc_loaded?(event.cover_image) do
+      if Ecto.assoc_loaded?(event.cover_image) and
+           Ecto.assoc_loaded?(event.organizer) do
         event
       else
         case Repo.get(Event, event.id)
@@ -100,10 +101,19 @@ defmodule YscWeb.Emails.EventUpdateNotification do
 
   defp constrain_media(html) do
     html
-    |> String.replace(~r/<img\b/, "<img style=\"max-width:100%;height:auto;\"")
+    |> inject_style("img", "max-width:100%;height:auto;")
+    |> inject_style("figure", "max-width:100%;margin:8px 0;overflow:hidden;")
+  end
+
+  defp inject_style(html, tag, rules) do
+    html
     |> String.replace(
-      ~r/<figure\b/,
-      "<figure style=\"max-width:100%;margin:8px 0;overflow:hidden;\""
+      ~r/<#{tag}\b([^>]*)\bstyle="([^"]*)"([^>]*)>/,
+      "<#{tag}\\1style=\"#{rules}\\2\"\\3>"
+    )
+    |> String.replace(
+      ~r/<#{tag}\b(?![^>]*\bstyle=)([^>]*)>/,
+      "<#{tag} style=\"#{rules}\"\\1>"
     )
   end
 
