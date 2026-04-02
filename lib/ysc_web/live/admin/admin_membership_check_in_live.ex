@@ -510,26 +510,6 @@ defmodule YscWeb.AdminMembershipCheckInLive do
     end
   end
 
-  defp do_check_in_member(socket, session, user, current_user) do
-    case Scanning.check_in_member(session, user, current_user) do
-      {:ok, _check_in} ->
-        socket =
-          socket
-          |> assign(:search_query, "")
-          |> assign(:search_results, [])
-          |> reload_checked_in()
-          |> push_event("focus-and-clear", %{id: "member-search-input"})
-
-        {:noreply, socket}
-
-      {:error, :already_checked_in, message} ->
-        {:noreply, put_flash(socket, :error, message)}
-
-      {:error, _type, message} ->
-        {:noreply, put_flash(socket, :error, message)}
-    end
-  end
-
   def handle_event("undo-check-in", %{"user-id" => user_id}, socket) do
     %{session: session} = socket.assigns
 
@@ -586,6 +566,30 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
     {:noreply,
      push_event(socket, "download-csv", %{content: encoded, filename: filename})}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  defp do_check_in_member(socket, session, user, current_user) do
+    case Scanning.check_in_member(session, user, current_user) do
+      {:ok, _check_in} ->
+        socket =
+          socket
+          |> assign(:search_query, "")
+          |> assign(:search_results, [])
+          |> reload_checked_in()
+          |> push_event("focus-and-clear", %{id: "member-search-input"})
+
+        {:noreply, socket}
+
+      {:error, :already_checked_in, message} ->
+        {:noreply, put_flash(socket, :error, message)}
+
+      {:error, _type, message} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
   end
 
   # ---------------------------------------------------------------------------

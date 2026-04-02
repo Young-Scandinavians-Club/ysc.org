@@ -543,9 +543,12 @@ defmodule YscWeb.AdminScannerLive do
               />
 
               <div>
-                <label class="block text-sm font-medium text-zinc-700 mb-2">
+                <label class="block text-sm font-medium text-zinc-700 mb-1">
                   Mode
                 </label>
+                <p class="text-sm text-zinc-500 mb-3">
+                  Choose how attendees will be checked in at this session.
+                </p>
                 <div class="grid grid-cols-3 gap-3">
                   <button
                     type="button"
@@ -655,6 +658,49 @@ defmodule YscWeb.AdminScannerLive do
                     </span>
                   </button>
                 </div>
+
+                <%!-- Mode description shown after selection --%>
+                <%= cond do %>
+                  <% @selected_mode == "membership" -> %>
+                    <div class="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-sm text-emerald-800 space-y-1">
+                      <p class="font-medium">Membership-only check-in</p>
+                      <p class="text-emerald-700">
+                        Use this for standalone membership verification — e.g. a member meeting,
+                        board session, or members-only gathering that is not tied to a ticketed event.
+                        You scan or search for any member and the system confirms whether their
+                        membership is currently active. No pre-sold tickets are required.
+                        The session is not linked to a specific event and will appear under
+                        general membership sessions.
+                      </p>
+                    </div>
+                  <% @selected_mode == "event" -> %>
+                    <div class="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-800 space-y-1">
+                      <p class="font-medium">Event ticket check-in</p>
+                      <p class="text-blue-700">
+                        Use this for ticketed events where attendees have purchased a booking in
+                        advance. The desk shows a live list of all ticket holders; you scan their
+                        QR code or search by name to mark them as arrived. The session is linked
+                        to the selected event and tracks each ticket redemption. Membership status
+                        is not verified in this mode — only ticket ownership.
+                      </p>
+                    </div>
+                  <% @selected_mode == "event_membership" -> %>
+                    <div class="mt-3 p-3 rounded-lg bg-violet-50 border border-violet-100 text-sm text-violet-800 space-y-1">
+                      <p class="font-medium">
+                        Event attendance with membership verification
+                      </p>
+                      <p class="text-violet-700">
+                        Use this when you want to track who shows up to an event and also confirm
+                        they are active members — without relying on pre-sold tickets. Ideal for
+                        events open only to members (e.g. a club night, holiday party, or AGM)
+                        where guests simply arrive at the door. You search for the member by name
+                        or email, the system checks their membership status, and logs them as
+                        attended under the chosen event. Multiple admins can share the same session
+                        and check in guests simultaneously from different devices.
+                      </p>
+                    </div>
+                  <% true -> %>
+                <% end %>
               </div>
 
               <div :if={@selected_mode in ["event", "event_membership"]}>
