@@ -144,7 +144,12 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
         )
 
       assert has_element?(view, "#search-results-list")
-      assert render(view) =~ member.first_name
+
+      assert has_element?(
+               view,
+               "#search-result-#{member.id}",
+               member.first_name
+             )
     end
 
     test "shows inactive membership for user without membership", %{
@@ -193,7 +198,7 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
       |> render_click()
 
       assert has_element?(view, "#checked-in-members")
-      assert render(view) =~ member.first_name
+      assert has_element?(view, "#checked-in-members", member.first_name)
 
       assert Scanning.member_checked_in?(session.id, member.id)
     end
@@ -266,8 +271,8 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
 
       {:ok, _} = Scanning.check_in_member(session, member, admin)
 
-      assert render(view1) =~ member.first_name
-      assert render(view2) =~ member.first_name
+      assert has_element?(view1, "#checked-in-members", member.first_name)
+      assert has_element?(view2, "#checked-in-members", member.first_name)
     end
   end
 

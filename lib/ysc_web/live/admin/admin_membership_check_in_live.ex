@@ -416,6 +416,16 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def mount(%{"session_id" => session_id}, _session, socket) do
     session = Scanning.get_session!(session_id)
 
+    if session.type != :event_membership do
+      {:error, {:redirect, %{to: ~p"/admin/scanner/sessions"}}}
+    else
+      mount_desk(session, socket)
+    end
+  end
+
+  defp mount_desk(session, socket) do
+    session_id = session.id
+
     if connected?(socket) do
       Scanning.subscribe_membership_checkin(session_id)
     end

@@ -939,7 +939,8 @@ defmodule YscWeb.AdminScannerLive do
                         name="manual[query]"
                         id="manual_query"
                         placeholder={
-                          if(@active_session.type == :membership,
+                          if(
+                            @active_session.type in [:membership, :event_membership],
                             do: "Enter email address",
                             else: "Enter Order ID (e.g. ORD-XXXX)"
                           )
@@ -1571,7 +1572,7 @@ defmodule YscWeb.AdminScannerLive do
     session = socket.assigns.active_session
 
     case session.type do
-      :membership ->
+      t when t in [:membership, :event_membership] ->
         case Scanning.manual_membership_lookup(query) do
           {:ok, user} ->
             token = QrToken.sign_membership(user.id)

@@ -469,7 +469,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
     defp sms_enabled_user do
       user_fixture(%{email: "sms_idemp_#{System.unique_integer()}@example.com"})
       |> Ecto.Changeset.change(
-        phone_number: "+14155551234",
+        phone_number: "+#{@sms_test_phone}",
         account_notifications_sms: true
       )
       |> Repo.update!()

@@ -811,6 +811,12 @@ defmodule Ysc.Scanning do
   checked in. Unlike ticket check-in, there is NO restriction on inactive
   membership — the user is always checked in; the status is merely recorded.
   """
+  def check_in_member(%ScanSession{closed_at: closed_at}, _user, _checked_in_by)
+      when not is_nil(closed_at) do
+    {:error, :session_closed,
+     "This session has been completed and is no longer accepting check-ins."}
+  end
+
   def check_in_member(%ScanSession{} = session, user, checked_in_by) do
     membership = MembershipCache.get_active_membership(user)
     active? = YscWeb.UserAuth.membership_active?(membership)
@@ -877,6 +883,17 @@ defmodule Ysc.Scanning do
   Broadcasts MemberCheckInUndone via PubSub.
   """
   def undo_member_check_in(session_id, user_id) do
+    session = get_session!(session_id)
+
+    if session.closed_at do
+      {:error, :session_closed,
+       "This session has been completed and is no longer accepting changes."}
+    else
+      do_undo_member_check_in(session_id, user_id)
+    end
+  end
+
+  defp do_undo_member_check_in(session_id, user_id) do
     case Repo.get_by(SessionCheckIn,
            scan_session_id: session_id,
            user_id: user_id

@@ -83,9 +83,16 @@ window.addEventListener("phx:focus-search", (e) => {
 window.addEventListener("phx:focus-and-clear", (e) => {
     const targetId = e.detail?.id;
     if (!targetId) return;
-    const el = document.getElementById(targetId);
-    if (el) {
-        el.value = "";
-        el.focus();
-    }
+    const tryFocusAndClear = (attempt = 0) => {
+        const el = document.getElementById(targetId);
+        if (el) {
+            el.value = "";
+            el.focus();
+            return;
+        }
+        if (attempt < 20) {
+            setTimeout(() => tryFocusAndClear(attempt + 1), 50);
+        }
+    };
+    requestAnimationFrame(() => tryFocusAndClear(0));
 });
