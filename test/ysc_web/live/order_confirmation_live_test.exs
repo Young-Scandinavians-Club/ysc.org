@@ -211,6 +211,71 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert html =~ "Order Confirmed"
     end
 
+    test "shows past-event copy when event start_date is in the past", %{
+      conn: conn
+    } do
+      user = create_user_with_membership(%{first_name: "Sigrid"})
+
+      # Create as future first so ticket purchase validation passes, then backdate
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      # Backdate the event so it appears to be in the past
+      {:ok, _} =
+        event
+        |> Ecto.Changeset.change(%{
+          start_date:
+            DateTime.add(DateTime.utc_now(), -7, :day)
+            |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "Hope you had a blast, Sigrid"
+             )
+
+      assert has_element?(view, "#order-confirmation", "Thanks for coming")
+
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "See you at the next one"
+             )
+    end
+
+    test "shows upcoming copy when event start_date is in the future", %{
+      conn: conn
+    } do
+      user = create_user_with_membership(%{first_name: "Lars"})
+
+      future_event =
+        create_event(%{start_date: DateTime.add(DateTime.utc_now(), 14, :day)})
+
+      tier = create_ticket_tier(future_event)
+      order = create_ticket_order(user, future_event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "See you at the Event, Lars"
+             )
+
+      assert has_element?(view, "#order-confirmation", "are confirmed")
+    end
+
     test "displays order reference number", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})

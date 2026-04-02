@@ -57,6 +57,7 @@ defmodule YscWeb.OrderConfirmationLive do
             |> assign(:ticket_order, ticket_order)
             |> assign(:event, event)
             |> assign(:user_first_name, user.first_name || "Member")
+            |> assign(:event_in_past, event_in_past?(event))
             |> assign(:show_confetti, show_confetti)
             |> assign(:page_title, "Order Confirmation")
             |> assign(
@@ -136,11 +137,19 @@ defmodule YscWeb.OrderConfirmationLive do
               </span>
             </div>
             <h1 class="text-4xl font-bold text-zinc-900">
-              See you at the Event, {@user_first_name}!
+              <%= if @event_in_past do %>
+                Hope you had a blast, {@user_first_name}!
+              <% else %>
+                See you at the Event, {@user_first_name}!
+              <% end %>
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
-              Your tickets for <strong>{@event.title}</strong> are confirmed.
-              We've sent a copy of these details to your email.
+              <%= if @event_in_past do %>
+                Thanks for coming to <strong>{@event.title}</strong>. See you at the next one!
+              <% else %>
+                Your tickets for <strong>{@event.title}</strong> are confirmed.
+                We've sent a copy of these details to your email.
+              <% end %>
             </p>
           <% end %>
         </div>
@@ -1007,6 +1016,16 @@ defmodule YscWeb.OrderConfirmationLive do
       }
     else
       nil
+    end
+  end
+
+  defp event_in_past?(event) do
+    today = Date.utc_today()
+
+    case event.start_date do
+      %DateTime{} = dt -> Date.compare(DateTime.to_date(dt), today) == :lt
+      %Date{} = date -> Date.compare(date, today) == :lt
+      _ -> false
     end
   end
 
