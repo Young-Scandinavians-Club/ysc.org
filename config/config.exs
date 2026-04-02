@@ -312,6 +312,8 @@ config :ysc,
 config :phoenix_template, :format_encoders, []
 
 config :mime, :types, %{
+  "application/atom+xml" => ["atom"],
+  "application/xml" => ["xml"],
   "text/styles" => ["styles"]
 }
 

@@ -10,6 +10,18 @@
       content={assigns[:meta_description]}
     />
     <link rel="manifest" href="/site.webmanifest" />
+    <link
+      rel="alternate"
+      type="application/atom+xml"
+      title="YSC Events"
+      href={url(~p"/feeds/events.atom")}
+    />
+    <link
+      rel="alternate"
+      type="application/atom+xml"
+      title="YSC Club News"
+      href={url(~p"/feeds/posts.atom")}
+    />
     <.live_title suffix=" · Young Scandinavians Club">
       {assigns[:page_title] || "YSC"}
     </.live_title>
