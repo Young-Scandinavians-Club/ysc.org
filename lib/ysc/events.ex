@@ -2262,12 +2262,26 @@ defmodule Ysc.Events do
   Marks an event update as sent with the given recipient count.
   """
   def mark_event_update_sent(event_update, recipient_count) do
-    event_update
-    |> Ecto.Changeset.change(%{
-      sent_at: DateTime.truncate(DateTime.utc_now(), :second),
-      recipient_count: recipient_count
-    })
-    |> Repo.update()
+    result =
+      event_update
+      |> Ecto.Changeset.change(%{
+        sent_at: DateTime.truncate(DateTime.utc_now(), :second),
+        recipient_count: recipient_count
+      })
+      |> Repo.update()
+
+    case result do
+      {:ok, updated} ->
+        broadcast(%Ysc.MessagePassingEvents.EventUpdateSent{
+          event_update: updated,
+          event_id: updated.event_id
+        })
+
+        {:ok, updated}
+
+      error ->
+        error
+    end
   end
 
   defp broadcast(event) do

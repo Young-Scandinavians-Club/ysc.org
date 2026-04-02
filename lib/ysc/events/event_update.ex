@@ -30,5 +30,19 @@ defmodule Ysc.Events.EventUpdate do
     |> cast(attrs, [:title, :raw_body, :rendered_body, :show_on_event_page])
     |> validate_required([:raw_body, :rendered_body])
     |> validate_length(:title, max: 200)
+    |> validate_rendered_body_has_content()
+  end
+
+  defp validate_rendered_body_has_content(changeset) do
+    validate_change(changeset, :rendered_body, fn :rendered_body, value ->
+      stripped =
+        (value || "")
+        |> HtmlSanitizeEx.strip_tags()
+        |> String.replace(~r/[\s\x{00a0}]+/u, "")
+
+      if stripped == "",
+        do: [rendered_body: "message body cannot be empty"],
+        else: []
+    end)
   end
 end

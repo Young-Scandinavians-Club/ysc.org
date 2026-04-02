@@ -1267,6 +1267,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
           {:noreply,
            socket
+           |> assign(:update_form, to_form(changeset, as: "update"))
            |> YscWeb.Flash.put_toast(
              :error,
              if(message == "",
@@ -1723,6 +1724,20 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.EventUpdateCreated{event_id: event_id}},
+        socket
+      ) do
+    if socket.assigns[:event] && event_id == socket.assigns.event.id do
+      {:noreply,
+       assign(socket, :event_updates, Events.list_event_updates(event_id))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.EventUpdateSent{event_id: event_id}},
         socket
       ) do
     if socket.assigns[:event] && event_id == socket.assigns.event.id do
