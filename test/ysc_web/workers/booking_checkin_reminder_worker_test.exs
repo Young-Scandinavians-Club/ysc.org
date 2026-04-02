@@ -65,7 +65,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       user =
         user_fixture(%{
           email: "test@example.com",
-          phone_number: "+14155551234"
+          phone_number: "+#{@sms_test_phone}"
         })
 
       # Enable SMS notifications
@@ -118,7 +118,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       user =
         user_fixture(%{
           email: "test@example.com",
-          phone_number: "+14155551234"
+          phone_number: "+#{@sms_test_phone}"
         })
 
       # Disable SMS notifications
@@ -146,7 +146,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       user =
         user_fixture(%{
           email: "test@example.com",
-          phone_number: "+14155551234"
+          phone_number: "+#{@sms_test_phone}"
         })
 
       user =
@@ -305,7 +305,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       user =
         user_fixture(%{
           email: "dup_sms_checkin@example.com",
-          phone_number: "+14155551234"
+          phone_number: "+#{@sms_test_phone}"
         })
         |> Ecto.Changeset.change(account_notifications_sms: true)
         |> Repo.update!()
@@ -429,7 +429,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       user =
         user_fixture(%{
           email: "test@example.com",
-          phone_number: "+14155551234",
+          phone_number: "+#{@sms_test_phone}",
           first_name: "John"
         })
 

@@ -166,8 +166,12 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
         )
 
       assert has_element?(view, "#search-results-list")
-      html = render(view)
-      assert html =~ "NO MEMBERSHIP"
+
+      assert has_element?(
+               view,
+               "#search-result-#{inactive.id}",
+               "NO MEMBERSHIP"
+             )
     end
   end
 
@@ -210,13 +214,16 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
       %{session: session} = setup_session(admin)
       inactive = make_inactive_member()
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(
           conn,
           ~p"/admin/membership-check-in/#{session.id}?q=#{URI.encode(inactive.email)}"
         )
 
-      refute html =~ "check-in-member"
+      refute has_element?(
+               view,
+               "#search-result-#{inactive.id} [phx-click='check-in-member']"
+             )
     end
 
     test "undoing a check-in removes the member from the list", %{

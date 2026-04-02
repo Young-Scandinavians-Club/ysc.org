@@ -125,8 +125,11 @@ defmodule YscWeb.AdminMembershipCheckInLive do
         </div>
       </div>
 
-      <%!-- Search bar --%>
-      <div class="bg-white border-b border-zinc-200">
+      <%!-- Search bar (hidden once session is completed) --%>
+      <div
+        :if={is_nil(@session.closed_at)}
+        class="bg-white border-b border-zinc-200"
+      >
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2">
           <.admin_search_bar
             id="member-search-form"
@@ -210,7 +213,12 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                   data-checkin-index={index}
                   data-checked-in={if result.checked_in?, do: "true"}
                 >
-                  {render_search_result(assigns, result, index)}
+                  {render_search_result(
+                    assigns,
+                    result,
+                    index,
+                    is_nil(@session.closed_at)
+                  )}
                 </div>
               </div>
             </div>
@@ -294,8 +302,13 @@ defmodule YscWeb.AdminMembershipCheckInLive do
     """
   end
 
-  defp render_search_result(assigns, result, index) do
-    assigns = assign(assigns, result: result, result_index: index)
+  defp render_search_result(assigns, result, index, session_open?) do
+    assigns =
+      assign(assigns,
+        result: result,
+        result_index: index,
+        session_open?: session_open?
+      )
 
     ~H"""
     <div class={[
@@ -351,7 +364,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
         </p>
       </div>
 
-      <div class="shrink-0">
+      <div :if={@session_open?} class="shrink-0">
         <%= cond do %>
           <% @result.checked_in? -> %>
             <button
@@ -488,8 +501,16 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def handle_event("check-in-member", %{"user-id" => user_id}, socket) do
     %{session: session, current_user: current_user} = socket.assigns
 
-    user = Ysc.Accounts.get_user(user_id)
+    case Ysc.Accounts.get_user(user_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Member not found.")}
 
+      user ->
+        do_check_in_member(socket, session, user, current_user)
+    end
+  end
+
+  defp do_check_in_member(socket, session, user, current_user) do
     case Scanning.check_in_member(session, user, current_user) do
       {:ok, _check_in} ->
         socket =
