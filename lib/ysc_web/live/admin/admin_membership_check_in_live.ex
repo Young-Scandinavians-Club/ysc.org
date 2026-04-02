@@ -75,8 +75,6 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                 <.button
                   id="launch-scanner-btn"
                   phx-click="launch-scanner"
-                  variant="outline"
-                  color="zinc"
                   class="hidden sm:inline-flex"
                 >
                   <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" />
@@ -84,7 +82,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                 </.button>
                 <button
                   phx-click="launch-scanner"
-                  class="sm:hidden p-2 text-zinc-500 hover:text-zinc-700"
+                  class="sm:hidden p-2 text-blue-700 hover:text-blue-900"
                   aria-label="Open QR Scanner"
                 >
                   <.icon name="hero-qr-code" class="w-6 h-6" />
@@ -204,7 +202,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
               <div
                 :if={@search_results != []}
-                class="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100"
+                class="bg-white rounded border border-zinc-200 divide-y divide-zinc-100"
                 id="search-results-list"
               >
                 <div
@@ -238,7 +236,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             <div
               id="checked-in-members"
               phx-update="stream"
-              class="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100"
+              class="bg-white rounded border border-zinc-200 divide-y divide-zinc-100"
             >
               <div
                 id="checked-in-members-empty"
@@ -288,7 +286,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                 <button
                   phx-click="undo-check-in"
                   phx-value-user-id={check_in.user.id}
-                  class="shrink-0 text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors"
+                  class="shrink-0 text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded transition-colors"
                   data-confirm="Remove this member's check-in?"
                 >
                   Undo
@@ -371,7 +369,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               phx-click="undo-check-in"
               phx-value-user-id={@result.user.id}
               data-checkin-btn
-              class="text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors"
+              class="text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded transition-colors"
               data-confirm="Remove this member's check-in?"
             >
               Undo
@@ -381,14 +379,14 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               phx-click="check-in-member"
               phx-value-user-id={@result.user.id}
               data-checkin-btn
-              class="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg transition-colors"
+              class="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded transition-colors"
             >
               Check In
             </button>
           <% true -> %>
             <button
               disabled
-              class="text-sm font-semibold text-zinc-400 bg-zinc-100 px-4 py-2 rounded-lg cursor-not-allowed"
+              class="text-sm font-semibold text-zinc-400 bg-zinc-100 px-4 py-2 rounded cursor-not-allowed"
               title="User does not have an active membership"
             >
               No Membership

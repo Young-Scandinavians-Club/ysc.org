@@ -51,16 +51,7 @@ defmodule YscWeb.AdminScannerLive do
               <div class="flex items-center gap-3">
                 <span class={[
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                  cond do
-                    session.type == :membership ->
-                      "bg-emerald-100 text-emerald-800"
-
-                    session.type == :event_membership ->
-                      "bg-violet-100 text-violet-800"
-
-                    true ->
-                      "bg-blue-100 text-blue-800"
-                  end
+                  session_type_badge_class(session.type)
                 ]}>
                   {session_type_label(session.type)}
                 </span>
@@ -163,16 +154,7 @@ defmodule YscWeb.AdminScannerLive do
             </h1>
             <span class={[
               "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0",
-              cond do
-                @detail_session.type == :membership ->
-                  "bg-emerald-100 text-emerald-800"
-
-                @detail_session.type == :event_membership ->
-                  "bg-violet-100 text-violet-800"
-
-                true ->
-                  "bg-blue-100 text-blue-800"
-              end
+              session_type_badge_class(@detail_session.type)
             ]}>
               {session_type_label(@detail_session.type)}
             </span>
@@ -423,16 +405,7 @@ defmodule YscWeb.AdminScannerLive do
                   <div class="flex items-center gap-2">
                     <span class={[
                       "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
-                      cond do
-                        session.type == :membership ->
-                          "bg-emerald-100 text-emerald-800"
-
-                        session.type == :event_membership ->
-                          "bg-violet-100 text-violet-800"
-
-                        true ->
-                          "bg-blue-100 text-blue-800"
-                      end
+                      session_type_badge_class(session.type)
                     ]}>
                       {session_type_label(session.type)}
                     </span>
@@ -1690,6 +1663,14 @@ defmodule YscWeb.AdminScannerLive do
   defp session_type_label(:event), do: "Event"
   defp session_type_label(:event_membership), do: "Event + Members"
   defp session_type_label(_), do: "Session"
+
+  defp session_type_badge_class(:membership),
+    do: "bg-emerald-100 text-emerald-800"
+
+  defp session_type_badge_class(:event_membership),
+    do: "bg-violet-100 text-violet-800"
+
+  defp session_type_badge_class(_), do: "bg-blue-100 text-blue-800"
 
   defp load_joinable_sessions(socket, own_open_sessions) do
     current_user_id = socket.assigns.current_user.id
