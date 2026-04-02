@@ -2,9 +2,12 @@ defmodule YscWeb.Plugs.FeedHeaders do
   @moduledoc """
   Minimal response headers for Atom/XML feed endpoints.
 
-  Avoids browser-oriented plugs (`SecurityHeaders`, default `put_secure_browser_headers`)
-  that set CSP, frame policies, and permissions-policy—feeds are not HTML documents
-  and are consumed by aggregators, not rendered as active pages.
+  Avoids the full `SecurityHeaders` plug (heavy CSP, S3 lookups, COOP/CORP, etc.).
+
+  The router still runs `put_secure_browser_headers` after this plug so default
+  secure headers (minimal CSP, `x-permitted-cross-domain-policies`) satisfy policy
+  scanners; duplicate keys such as `referrer-policy` and `x-content-type-options`
+  are not re-added by Phoenix.
   """
 
   import Plug.Conn

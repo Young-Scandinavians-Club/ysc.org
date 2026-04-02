@@ -22,6 +22,7 @@ defmodule YscWeb.Router do
     end
 
     plug YscWeb.Plugs.FeedHeaders
+    plug :put_secure_browser_headers
   end
 
   pipeline :browser do
