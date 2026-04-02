@@ -68,7 +68,8 @@ defmodule YscWeb.Emails.Notifier do
     "booking_cancellation_treasurer_notification" =>
       YscWeb.Emails.BookingCancellationTreasurerNotification,
     "booking_cancellation_confirmation" =>
-      YscWeb.Emails.BookingCancellationConfirmation
+      YscWeb.Emails.BookingCancellationConfirmation,
+    "event_update_notification" => YscWeb.Emails.EventUpdateNotification
   }
 
   def schedule_email(

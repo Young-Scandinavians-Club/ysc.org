@@ -588,6 +588,33 @@ defmodule YscWeb.EventDetailsLive do
               <% end %>
             </section>
 
+            <%!-- Event Updates --%>
+            <section :if={@event_updates != []} class="space-y-6">
+              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
+                <span class="w-8 h-px bg-zinc-200"></span> Updates
+              </h3>
+              <div class="space-y-6">
+                <%= for update <- @event_updates do %>
+                  <div class="rounded-xl border border-zinc-200 bg-zinc-50/50 p-6">
+                    <div class="flex items-start justify-between gap-4 mb-3">
+                      <h4 :if={update.title} class="text-lg font-bold text-zinc-900">
+                        {update.title}
+                      </h4>
+                      <span class="shrink-0 text-sm text-zinc-400">
+                        {format_relative_time(update.inserted_at)}
+                      </span>
+                    </div>
+                    <article class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none text-zinc-600 leading-relaxed">
+                      {raw(update.rendered_body)}
+                    </article>
+                    <p :if={update.sent_by} class="mt-4 text-sm text-zinc-400">
+                      Posted by {update.sent_by.first_name} {update.sent_by.last_name}
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+            </section>
+
             <%!-- Details --%>
             <section class="space-y-6">
               <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
@@ -3391,6 +3418,8 @@ defmodule YscWeb.EventDetailsLive do
     # Reservations - will be loaded async
     |> assign(:user_reservations, [])
     |> assign(:reservations_by_tier, %{})
+    # Event updates visible on public page
+    |> assign(:event_updates, [])
     # Track async loading state
     |> assign(:async_data_loaded, false)
     # Save-the-date notification subscription state
@@ -3431,7 +3460,8 @@ defmodule YscWeb.EventDetailsLive do
       {:attendees,
        fn -> load_attendees(active_membership?, current_user, event_id) end},
       {:user_reservations,
-       fn -> load_user_reservations(current_user, event_id) end}
+       fn -> load_user_reservations(current_user, event_id) end},
+      {:event_updates, fn -> Events.list_visible_event_updates(event_id) end}
     ]
 
     results =
@@ -3671,6 +3701,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:host_ids, host_ids)
      |> assign(:user_reservations, user_reservations)
      |> assign(:reservations_by_tier, reservations_by_tier)
+     |> assign(:event_updates, Map.get(results, :event_updates, []))
      |> assign(:async_data_loaded, true)}
   end
 
@@ -4766,6 +4797,27 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:event_selling_fast, event_selling_fast)
        |> assign(:available_capacity, available_capacity)
        |> assign(:sold_percentage, sold_percentage)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.EventUpdateCreated{
+           event_update: event_update,
+           event_id: event_id
+         }},
+        socket
+      ) do
+    if event_id == socket.assigns.event.id && event_update.show_on_event_page do
+      {:noreply,
+       assign(
+         socket,
+         :event_updates,
+         Events.list_visible_event_updates(event_id)
+       )}
     else
       {:noreply, socket}
     end
@@ -5928,6 +5980,10 @@ defmodule YscWeb.EventDetailsLive do
     do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)
 
   defp event_body(%Event{} = event), do: event.rendered_details
+
+  defp format_relative_time(%DateTime{} = dt), do: Timex.from_now(dt)
+
+  defp format_relative_time(_), do: ""
 
   defp default_active_agenda([]), do: nil
   defp default_active_agenda(agendas), do: hd(agendas).id

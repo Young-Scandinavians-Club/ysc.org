@@ -8,6 +8,8 @@ defmodule YscWeb.AdminEventsNewLive do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
+  require Ysc.Logging
+
   alias Phoenix.LiveView.JS
   alias Ysc.Events.Event
   alias Ysc.Events
@@ -240,6 +242,20 @@ defmodule YscWeb.AdminEventsNewLive do
                 >
                   Tickets {if @partiful_link_present,
                     do: "(Disabled - Using Partiful)"}
+                </.link>
+              </li>
+              <li class="me-2">
+                <.link
+                  navigate={~p"/admin/events/#{@event.id}/updates"}
+                  class={[
+                    "inline-block p-4 border-b-2 rounded-t-lg",
+                    @live_action == :updates &&
+                      "text-blue-600 border-blue-600 active",
+                    @live_action != :updates &&
+                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
+                  ]}
+                >
+                  Updates
                 </.link>
               </li>
             </ul>
@@ -718,6 +734,125 @@ defmodule YscWeb.AdminEventsNewLive do
             />
           </div>
         </div>
+
+        <div :if={@live_action == :updates} class="relative py-8">
+          <div class="max-w-3xl space-y-8">
+            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+              <div>
+                <h2 class="text-xl font-bold">Send Update to Attendees</h2>
+                <p class="text-zinc-600 text-sm">
+                  Send a branded email notification to everyone who has a ticket for this event.
+                  This includes both ticket purchasers and registered attendees.
+                </p>
+                <p class="mt-2 text-sm font-medium text-blue-600">
+                  {@recipient_count} recipient(s) will receive this update
+                </p>
+              </div>
+
+              <.form
+                for={@update_form}
+                id="event-update-form"
+                phx-submit="send-event-update"
+                phx-change="validate-event-update"
+                class="space-y-4"
+              >
+                <.input
+                  field={@update_form[:title]}
+                  type="text"
+                  label="Title (optional)"
+                  placeholder="e.g. Venue Change, Schedule Update..."
+                />
+
+                <div>
+                  <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
+                    Message
+                  </label>
+                  <.input
+                    type="hidden"
+                    id="update[raw_body]"
+                    field={@update_form[:raw_body]}
+                    phx-hook="TrixHook"
+                    phx-debounce={200}
+                  />
+                  <div id="update-richtext" phx-update="ignore">
+                    <trix-editor
+                      input="update[raw_body]"
+                      class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px]"
+                      placeholder="Write the update message to send to all attendees..."
+                    >
+                    </trix-editor>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <.input
+                    field={@update_form[:show_on_event_page]}
+                    type="checkbox"
+                    label="Also show this update on the public event page"
+                  />
+                </div>
+
+                <div class="flex items-center gap-4 pt-2">
+                  <.button
+                    type="submit"
+                    phx-disable-with="Sending..."
+                    class="bg-blue-600 hover:bg-blue-700"
+                    data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                  >
+                    <.icon name="hero-paper-airplane" class="w-5 h-5 -mt-0.5 mr-1" />
+                    Send Update
+                  </.button>
+                </div>
+              </.form>
+            </div>
+
+            <div
+              :if={@event_updates != []}
+              class="border border-zinc-200 rounded py-6 px-4 space-y-4"
+            >
+              <h2 class="text-xl font-bold">Past Updates</h2>
+              <div class="divide-y divide-zinc-100">
+                <div
+                  :for={update <- @event_updates}
+                  class="py-4 first:pt-0 last:pb-0"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                      <p :if={update.title} class="font-semibold text-zinc-900">
+                        {update.title}
+                      </p>
+                      <div class="text-sm text-zinc-600 mt-1 prose prose-sm prose-zinc max-w-none line-clamp-3">
+                        {Phoenix.HTML.raw(update.rendered_body)}
+                      </div>
+                    </div>
+                    <div class="shrink-0 text-right text-xs text-zinc-500 space-y-1">
+                      <p :if={update.sent_at}>
+                        Sent {Calendar.strftime(
+                          update.sent_at,
+                          "%b %d, %Y %I:%M %p"
+                        )}
+                      </p>
+                      <p :if={update.recipient_count}>
+                        {update.recipient_count} recipient(s)
+                      </p>
+                      <p>
+                        <span
+                          :if={update.show_on_event_page}
+                          class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700"
+                        >
+                          Visible on event page
+                        </span>
+                      </p>
+                      <p :if={update.sent_by}>
+                        by {update.sent_by.first_name} {update.sent_by.last_name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </.side_menu>
     """
@@ -766,7 +901,21 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:host_search_results, [])
      |> stream(:agendas, agendas)
      |> assign(:list_params, Map.drop(params, ["id"]))
-     |> assign(form: to_form(event_changeset, as: "event"))}
+     |> assign(form: to_form(event_changeset, as: "event"))
+     |> assign(
+       :update_form,
+       to_form(
+         %{
+           "title" => "",
+           "raw_body" => "",
+           "rendered_body" => "",
+           "show_on_event_page" => false
+         },
+         as: "update"
+       )
+     )
+     |> assign(:event_updates, Events.list_event_updates(event.id))
+     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))}
   end
 
   @impl true
@@ -983,6 +1132,24 @@ defmodule YscWeb.AdminEventsNewLive do
 
   def handle_event(
         "editor-update",
+        %{"field" => "update[raw_body]", "value" => raw_body},
+        socket
+      ) do
+    current_form = socket.assigns.update_form.params || %{}
+    rendered = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+
+    updated_params =
+      Map.merge(current_form, %{
+        "raw_body" => raw_body,
+        "rendered_body" => rendered
+      })
+
+    {:noreply,
+     assign(socket, :update_form, to_form(updated_params, as: "update"))}
+  end
+
+  def handle_event(
+        "editor-update",
         %{"field" => _field, "value" => raw_body},
         socket
       ) do
@@ -1011,6 +1178,106 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {:noreply,
      assign_form(socket, updated_changeset) |> assign(:event, updated_event)}
+  end
+
+  def handle_event("validate-event-update", %{"update" => params}, socket) do
+    {:noreply, assign(socket, :update_form, to_form(params, as: "update"))}
+  end
+
+  def handle_event("send-event-update", %{"update" => params}, socket) do
+    event = socket.assigns.event
+    raw_body = params["raw_body"] || ""
+    rendered_body = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+
+    if String.trim(raw_body) == "" do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:error, "Message body cannot be empty.",
+         title: "Update"
+       )}
+    else
+      attrs = %{
+        title: params["title"],
+        raw_body: raw_body,
+        rendered_body: rendered_body,
+        show_on_event_page: params["show_on_event_page"] == "true",
+        sent_by_id: socket.assigns.current_user.id
+      }
+
+      case Events.create_event_update(event, attrs) do
+        {:ok, event_update} ->
+          oban_result =
+            %{"event_update_id" => event_update.id}
+            |> YscWeb.Workers.EventUpdateNotificationWorker.new()
+            |> Oban.insert()
+
+          socket =
+            case oban_result do
+              {:ok, _job} ->
+                YscWeb.Flash.put_toast(
+                  socket,
+                  :info,
+                  "Update queued for #{socket.assigns.recipient_count} recipient(s).",
+                  title: "Event Update"
+                )
+
+              {:error, reason} ->
+                Ysc.Logging.error("Failed to enqueue event update notification",
+                  extra: %{
+                    event_update_id: event_update.id,
+                    reason: inspect(reason)
+                  }
+                )
+
+                YscWeb.Flash.put_toast(
+                  socket,
+                  :warning,
+                  "Update saved but notification delivery could not be scheduled. Please try again.",
+                  title: "Event Update"
+                )
+            end
+
+          {:noreply,
+           socket
+           |> assign(
+             :update_form,
+             to_form(
+               %{
+                 "title" => "",
+                 "raw_body" => "",
+                 "rendered_body" => "",
+                 "show_on_event_page" => false
+               },
+               as: "update"
+             )
+           )
+           |> assign(:event_updates, Events.list_event_updates(event.id))}
+
+        {:error, changeset} ->
+          message =
+            changeset
+            |> Ecto.Changeset.traverse_errors(fn {msg, opts} ->
+              Enum.reduce(opts, msg, fn {key, value}, acc ->
+                String.replace(acc, "%{#{key}}", to_string(value))
+              end)
+            end)
+            |> Enum.map_join("; ", fn {field, errors} ->
+              "#{Phoenix.Naming.humanize(field)}: #{Enum.join(errors, ", ")}"
+            end)
+
+          {:noreply,
+           socket
+           |> assign(:update_form, to_form(changeset, as: "update"))
+           |> YscWeb.Flash.put_toast(
+             :error,
+             if(message == "",
+               do: "Please correct the highlighted fields.",
+               else: message
+             ),
+             title: "Update"
+           )}
+      end
+    end
   end
 
   def handle_event(
@@ -1452,6 +1719,37 @@ defmodule YscWeb.AdminEventsNewLive do
     # Component handles this, but we need to catch it to prevent crashes
     {:noreply, socket}
   end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.EventUpdateCreated{event_id: event_id}},
+        socket
+      ) do
+    if socket.assigns[:event] && event_id == socket.assigns.event.id do
+      {:noreply,
+       assign(socket, :event_updates, Events.list_event_updates(event_id))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.EventUpdateSent{event_id: event_id}},
+        socket
+      ) do
+    if socket.assigns[:event] && event_id == socket.assigns.event.id do
+      {:noreply,
+       assign(socket, :event_updates, Events.list_event_updates(event_id))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({Ysc.Events, _msg}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info({:ticket_reservation_created, event_id}, socket) do

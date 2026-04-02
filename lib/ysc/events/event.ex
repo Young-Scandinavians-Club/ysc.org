@@ -120,6 +120,7 @@ defmodule Ysc.Events.Event do
     has_many :faq_questions, Ysc.Events.FaqQuestion, on_replace: :delete
     has_many :agendas, Ysc.Events.Agenda, on_replace: :delete
     has_many :ticket_tiers, Ysc.Events.TicketTier, on_replace: :delete
+    has_many :event_updates, Ysc.Events.EventUpdate
 
     many_to_many :hosts, Ysc.Accounts.User,
       join_through: "event_hosts",

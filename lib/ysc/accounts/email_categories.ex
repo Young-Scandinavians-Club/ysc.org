@@ -59,6 +59,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "ticket_order_refund" => :account,
     "outage_notification" => :account,
     "event_notification" => :event,
+    "event_update_notification" => :event,
     "save_the_date_available" => :event,
     # Booking notifications (can be disabled)
     "booking_confirmation" => :account,

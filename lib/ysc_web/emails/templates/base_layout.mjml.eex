@@ -180,6 +180,20 @@
       object-fit: cover;
       width: 100%;
       }
+      .update-body img {
+      max-width: 100% !important;
+      height: auto !important;
+      }
+      .update-body figure {
+      max-width: 100% !important;
+      margin: 8px 0 !important;
+      overflow: hidden;
+      }
+      .update-body hr {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 16px 0;
+      }
     </mj-style>
   </mj-head>
   <mj-body background-color="#eee">
