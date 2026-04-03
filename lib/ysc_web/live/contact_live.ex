@@ -273,12 +273,12 @@ defmodule YscWeb.ContactLive do
       base_params
       |> then(fn p ->
         if subject = params["subject"],
-          do: Map.put(p, :subject, subject),
+          do: Map.put(p, :subject, URI.decode(subject)),
           else: p
       end)
       |> then(fn p ->
         if message = params["message"],
-          do: Map.put(p, :message, message),
+          do: Map.put(p, :message, URI.decode(message)),
           else: p
       end)
 
