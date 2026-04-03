@@ -1,6 +1,0 @@
-# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
-#
-# Disallow all robots from accessing admin pages and expense reports
-User-agent: *
-Disallow: /admin/
-Disallow: /expensereport

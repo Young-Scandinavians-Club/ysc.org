@@ -19,7 +19,7 @@ defmodule YscWeb do
 
   def static_paths,
     do:
-      ~w(assets fonts images video exports annual_meetings documents favicon.ico robots.txt security.txt site.webmanifest favicon-16x16.png favicon-32x32.png apple-touch-icon.png android-chrome-512x512.png android-chrome-192x192.png)
+      ~w(assets fonts images video exports annual_meetings documents favicon.ico security.txt site.webmanifest favicon-16x16.png favicon-32x32.png apple-touch-icon.png android-chrome-512x512.png android-chrome-192x192.png)
 
   def router do
     quote do
