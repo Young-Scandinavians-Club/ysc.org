@@ -23,6 +23,7 @@ defmodule Ysc.Sitemap do
     case Cachex.get(:ysc_cache, @cache_key) do
       {:ok, nil} -> build_and_cache()
       {:ok, xml} -> xml
+      {:error, _reason} -> build_and_cache()
     end
   end
 

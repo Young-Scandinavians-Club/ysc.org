@@ -8,7 +8,7 @@ defmodule YscWeb.SitemapController do
 
     conn
     |> put_resp_content_type("application/xml")
-    |> text(xml)
+    |> send_resp(200, xml)
   end
 
   def robots(conn, _params) do
@@ -30,6 +30,6 @@ defmodule YscWeb.SitemapController do
 
     conn
     |> put_resp_content_type("text/plain")
-    |> text(String.trim(content))
+    |> send_resp(200, String.trim(content))
   end
 end

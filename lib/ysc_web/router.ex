@@ -127,6 +127,9 @@ defmodule YscWeb.Router do
     get "/feeds/events.atom", FeedController, :events
     get "/feeds/posts.atom", FeedController, :posts
     get "/sitemap.xml", SitemapController, :index
+  end
+
+  scope "/", YscWeb do
     get "/robots.txt", SitemapController, :robots
   end
 
