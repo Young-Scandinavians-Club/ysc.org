@@ -22,9 +22,14 @@ defmodule YscWeb.Components.Image do
 
       <img
         src={image_url(@image, @preferred_type)}
+        srcset={image_srcset(@image)}
+        sizes={@sizes}
         id={"image-#{@id}"}
         loading={@loading}
+        decoding={@decoding}
         fetchpriority={@fetchpriority}
+        width={image_dimension(@image, :width)}
+        height={image_dimension(@image, :height)}
         phx-hook="BlurHashImage"
         class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover"
         alt={
@@ -41,14 +46,18 @@ defmodule YscWeb.Components.Image do
     aspect_class = Map.get(assigns, :aspect_class, "aspect-video")
     preferred_type = Map.get(assigns, :preferred_type, nil)
     loading = Map.get(assigns, :loading, "lazy")
+    decoding = Map.get(assigns, :decoding, "async")
     fetchpriority = Map.get(assigns, :fetchpriority, nil)
+    sizes = Map.get(assigns, :sizes, "(max-width: 1024px) 100vw, 50vw")
 
     socket =
       socket
       |> assign(:aspect_class, aspect_class)
       |> assign(:preferred_type, preferred_type)
       |> assign(:loading, loading)
+      |> assign(:decoding, decoding)
       |> assign(:fetchpriority, fetchpriority)
+      |> assign(:sizes, sizes)
 
     # Use preloaded image if available (from batch loading), otherwise fetch
     image =
@@ -106,4 +115,22 @@ defmodule YscWeb.Components.Image do
       true -> "/images/ysc_logo.png"
     end
   end
+
+  # Build a srcset string from thumbnail (500w) and optimized (1920w) when both exist,
+  # so the browser picks the right size for the current viewport.
+  defp image_srcset(nil), do: nil
+
+  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
+  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
+
+  defp image_srcset(%Image{
+         thumbnail_path: thumb,
+         optimized_image_path: optimized
+       }) do
+    "#{thumb} 500w, #{optimized} 1920w"
+  end
+
+  defp image_dimension(nil, _), do: nil
+  defp image_dimension(%Image{} = image, :width), do: image.width
+  defp image_dimension(%Image{} = image, :height), do: image.height
 end

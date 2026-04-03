@@ -57,10 +57,13 @@ defmodule YscWeb.Components.Events.EventCard do
           </canvas>
           <img
             src={event_image_url(@event.image)}
+            srcset={image_srcset(@event.image)}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             id={"image-card-#{@event.id}"}
             phx-hook="BlurHashImage"
             class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
             loading="lazy"
+            decoding="async"
             alt={
               if @event.image,
                 do:
@@ -195,6 +198,16 @@ defmodule YscWeb.Components.Events.EventCard do
     do: optimized_path
 
   defp event_image_url(_), do: "/images/ysc_logo.png"
+
+  defp image_srcset(nil), do: nil
+  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
+  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
+
+  defp image_srcset(%Image{
+         thumbnail_path: thumb,
+         optimized_image_path: optimized
+       }),
+       do: "#{thumb} 500w, #{optimized} 1920w"
 
   defp get_event_badges_for_card(event, sold_out, selling_fast) do
     state = Map.get(event, :state) || Map.get(event, "state")

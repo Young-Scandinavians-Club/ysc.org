@@ -2944,6 +2944,7 @@ defmodule YscWeb.CoreComponents do
         playsinline
         poster={@poster}
         class="absolute inset-0 w-full h-full object-cover"
+        fetchpriority="high"
       >
         <source src={@video} type="video/mp4" />
         <track
