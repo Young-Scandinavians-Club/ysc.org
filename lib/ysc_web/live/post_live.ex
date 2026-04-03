@@ -98,8 +98,11 @@ defmodule YscWeb.PostLive do
 
         <img
           src={featured_image_url(@post.featured_image)}
+          srcset={image_srcset(@post.featured_image)}
+          sizes="(max-width: 1280px) 100vw, 1280px"
           id={"image-#{@post.image_id}"}
           loading="eager"
+          decoding="async"
           fetchpriority="high"
           class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover"
           phx-hook="BlurHashImage"
@@ -381,6 +384,16 @@ defmodule YscWeb.PostLive do
 
   defp featured_image_url(%Image{optimized_image_path: optimized_path}),
     do: optimized_path
+
+  defp image_srcset(nil), do: nil
+  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
+  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
+
+  defp image_srcset(%Image{
+         thumbnail_path: thumb,
+         optimized_image_path: optimized
+       }),
+       do: "#{thumb} 500w, #{optimized} 1920w"
 
   defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
   defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash

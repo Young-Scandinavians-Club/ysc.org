@@ -79,10 +79,13 @@ defmodule YscWeb.NewsLive do
                 </canvas>
                 <img
                   src={featured_image_url(@featured.featured_image)}
+                  srcset={image_srcset(@featured.featured_image)}
+                  sizes="(max-width: 1280px) 100vw, 1280px"
                   id={"image-#{@featured.id}"}
                   phx-hook="BlurHashImage"
                   class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
                   loading="eager"
+                  decoding="async"
                   fetchpriority="high"
                   alt={
                     if @featured.featured_image,
@@ -210,8 +213,11 @@ defmodule YscWeb.NewsLive do
                 </canvas>
                 <img
                   src={featured_image_url(post.featured_image)}
+                  srcset={image_srcset(post.featured_image)}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   id={"image-#{post.id}"}
                   loading="lazy"
+                  decoding="async"
                   phx-hook="BlurHashImage"
                   class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-500 group-hover:scale-[1.03]"
                   alt={
@@ -403,6 +409,16 @@ defmodule YscWeb.NewsLive do
 
   defp featured_image_url(%Image{optimized_image_path: optimized_path}),
     do: optimized_path
+
+  defp image_srcset(nil), do: nil
+  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
+  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
+
+  defp image_srcset(%Image{
+         thumbnail_path: thumb,
+         optimized_image_path: optimized
+       }),
+       do: "#{thumb} 500w, #{optimized} 1920w"
 
   # Calculate reading time based on word count (average 225 words per minute)
   # Uses rendered_body if available, otherwise falls back to raw_body

@@ -325,15 +325,8 @@ defmodule Ysc.Media do
     end
   end
 
-  # Determine best output format (WEBP for modern browsers, fallback to original)
-  defp determine_output_format(original_format) do
-    # Prefer WEBP for better compression, but keep original format for compatibility
-    # You can change this to :webp if you want to always convert to WEBP
-    case original_format do
-      :jpeg -> :jpg
-      _ -> original_format
-    end
-  end
+  # Always convert to WebP for optimal compression and modern browser support
+  defp determine_output_format(_original_format), do: :webp
 
   # Ensure file path has correct extension for the format
   defp ensure_format_extension(path, format) do
@@ -351,8 +344,11 @@ defmodule Ysc.Media do
     end
   end
 
-  # Get write options based on format
-  # Format is determined by file extension, so we mainly need quality settings
+  # WebP uses effort level 6 (maximum compression, best size reduction)
+  defp get_write_options(:webp, quality) do
+    [quality: quality, effort: 6]
+  end
+
   defp get_write_options(_format, quality) do
     [quality: quality]
   end
@@ -417,11 +413,25 @@ defmodule Ysc.Media do
 
   defp upload_files_to_s3(files) do
     Enum.map(files, fn {k, v} ->
-      upload_response = upload_file_to_s3(v)
+      content_type = content_type_from_path(v)
+
+      upload_response =
+        upload_file_to_s3(v, Path.basename(v), content_type: content_type)
+
       location = upload_response[:body][:location]
       {k, location}
     end)
     |> Enum.into(%{})
+  end
+
+  defp content_type_from_path(path) do
+    case path |> Path.extname() |> String.downcase() do
+      ".webp" -> "image/webp"
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".png" -> "image/png"
+      _ -> "application/octet-stream"
+    end
   end
 
   # Generate blurhash safely, ensuring we don't create files in source directories

@@ -798,6 +798,7 @@ body.overflow-hidden {
     height: auto;
     margin-top: 0em !important;
     margin-bottom: 0em !important;
+    border-radius: 0.75rem;
 }
 
 .trix-content .attachment {
@@ -1113,7 +1114,7 @@ body.overflow-hidden {
 .post-render .post-render-image-figure a {
     display: block;
     line-height: 0;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     overflow: hidden;
     cursor: zoom-in;
     transition: opacity 0.2s ease;
@@ -1133,7 +1134,7 @@ body.overflow-hidden {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     margin: 0 !important;
 }
 
