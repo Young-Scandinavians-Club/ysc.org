@@ -1514,14 +1514,18 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3 pt-4 border-t border-zinc-100">
-                  <.button phx-click="show_membership_qr">
+                <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 pt-4 border-t border-zinc-100">
+                  <.button
+                    phx-click="show_membership_qr"
+                    class="w-full sm:w-auto justify-center"
+                  >
                     <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
                     My Membership QR
                   </.button>
                   <.button
                     phx-click={JS.patch(~p"/users/membership/payment-method")}
                     variant="outline"
+                    class="w-full sm:w-auto justify-center"
                   >
                     <.icon name="hero-credit-card" class="w-5 h-5 me-1.5 -mt-0.5" />
                     Change Payment Method
@@ -1537,6 +1541,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-disable-with="Reactivating..."
                     color="green"
                     disabled={!@user_is_active}
+                    class="w-full sm:w-auto justify-center"
                   >
                     Reactivate Membership
                   </.button>
@@ -1559,6 +1564,7 @@ defmodule YscWeb.UserSettingsLive do
                         )
                     }
                     data-confirm="Are you sure you want to cancel your membership?"
+                    class="w-full sm:w-auto justify-center"
                   >
                     Cancel Membership
                   </.button>
