@@ -15,5 +15,5 @@ defmodule YscWeb.Scrubber.StripEverythingExceptText do
   Meta.allow_tag_with_these_attributes("strong", [])
   Meta.allow_tag_with_these_attributes("em", [])
 
-  Meta.strip_everything_not_covered()
+  @before_compile HtmlSanitizeEx.ScrubberCompiler
 end

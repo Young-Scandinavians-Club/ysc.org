@@ -238,7 +238,7 @@ defmodule Ysc.Media do
     # Detect original format from file extension
     original_format = detect_image_format(path)
 
-    # Determine output format - prefer WEBP for better compression, fallback to original format
+    # Optimized and thumbnail outputs are always written as WebP
     output_format = determine_output_format(original_format)
 
     # Ensure optimized output path uses correct extension
@@ -335,23 +335,11 @@ defmodule Ysc.Media do
     "#{base_path}#{extension}"
   end
 
-  # Convert format atom to file extension
-  defp format_to_extension(format) do
-    case format do
-      :jpg -> ".jpg"
-      :png -> ".png"
-      :webp -> ".webp"
-    end
-  end
+  # Convert format atom to file extension (outputs are always WebP; see `determine_output_format/1`)
+  defp format_to_extension(:webp), do: ".webp"
 
   # WebP uses effort level 6 (maximum compression, best size reduction)
-  defp get_write_options(:webp, quality) do
-    [quality: quality, effort: 6]
-  end
-
-  defp get_write_options(_format, quality) do
-    [quality: quality]
-  end
+  defp get_write_options(:webp, quality), do: [quality: quality, effort: 6]
 
   def upload_file_to_s3(path),
     do: upload_file_to_s3(path, Path.basename(path), [])

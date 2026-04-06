@@ -6,5 +6,14 @@ defmodule Ysc.Cldr do
   """
   use Cldr,
     locales: [:en],
-    default_locale: :en
+    default_locale: :en,
+    providers: [
+      Cldr.Number,
+      Cldr.DateTime,
+      Cldr.List,
+      Cldr.Unit,
+      Cldr.Calendar,
+      Cldr.Territory,
+      Cldr.PersonName
+    ]
 end

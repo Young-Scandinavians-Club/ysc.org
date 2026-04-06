@@ -72,5 +72,5 @@ defmodule Ysc.TrixScrubber do
 
   Meta.allow_tag_with_these_attributes("figcaption", ["class"])
 
-  Meta.strip_everything_not_covered()
+  @before_compile HtmlSanitizeEx.ScrubberCompiler
 end
