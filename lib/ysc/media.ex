@@ -238,7 +238,7 @@ defmodule Ysc.Media do
     # Detect original format from file extension
     original_format = detect_image_format(path)
 
-    # Determine output format - prefer WEBP for better compression, fallback to original format
+    # Optimized and thumbnail outputs are always written as WebP
     output_format = determine_output_format(original_format)
 
     # Ensure optimized output path uses correct extension
@@ -335,22 +335,24 @@ defmodule Ysc.Media do
     "#{base_path}#{extension}"
   end
 
-  # Convert format atom to file extension
-  defp format_to_extension(format) do
-    case format do
-      :jpg -> ".jpg"
-      :png -> ".png"
-      :webp -> ".webp"
-    end
+  # Catch-alls below are defensive; Dialyzer only sees `:webp` from `determine_output_format/1`.
+  @dialyzer {:nowarn_function, format_to_extension: 1}
+  @dialyzer {:nowarn_function, get_write_options: 2}
+
+  # Convert format atom to file extension (outputs are always WebP; see `determine_output_format/1`)
+  defp format_to_extension(:webp), do: ".webp"
+
+  defp format_to_extension(other) do
+    raise ArgumentError,
+          "Ysc.Media.format_to_extension/1: unsupported format #{inspect(other)}"
   end
 
   # WebP uses effort level 6 (maximum compression, best size reduction)
-  defp get_write_options(:webp, quality) do
-    [quality: quality, effort: 6]
-  end
+  defp get_write_options(:webp, quality), do: [quality: quality, effort: 6]
 
-  defp get_write_options(_format, quality) do
-    [quality: quality]
+  defp get_write_options(other, _quality) do
+    raise ArgumentError,
+          "Ysc.Media.get_write_options/2: unsupported format #{inspect(other)}"
   end
 
   def upload_file_to_s3(path),
