@@ -932,6 +932,45 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:list_params, Map.drop(params, ["id"]))
+      |> maybe_refresh_tab_data()
+
+    {:noreply, socket}
+  end
+
+  defp maybe_refresh_tab_data(socket) do
+    case socket.assigns[:event] do
+      nil ->
+        socket
+
+      event ->
+        case socket.assigns.live_action do
+          :updates ->
+            socket
+            |> assign(:event_updates, Events.list_event_updates(event.id))
+            |> assign(
+              :recipient_count,
+              Events.count_event_update_recipients(event.id)
+            )
+
+          :tickets ->
+            ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
+            tickets = Events.list_tickets_for_event(event.id)
+
+            socket
+            |> assign(:ticket_tier_count, length(ticket_tiers))
+            |> assign(:ticket_count, length(tickets))
+
+          _ ->
+            socket
+        end
+    end
+  end
+
+  @impl true
   def handle_event("copy-event", _, socket) do
     event = socket.assigns.event
 
