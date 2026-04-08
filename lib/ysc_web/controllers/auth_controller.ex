@@ -102,7 +102,9 @@ defmodule YscWeb.AuthController do
         |> delete_session(:reauth_return_to)
         |> YscWeb.Flash.put_toast(
           :error,
-          "Session expired. Please sign in again.", title: "Authentication")
+          "Session expired. Please sign in again.",
+          title: "Authentication"
+        )
         |> redirect(to: ~p"/users/log-in")
 
       String.downcase(oauth_email) == String.downcase(current_user.email) ->
