@@ -278,6 +278,16 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
 
       assert render(lv) =~ "Add a Passkey"
     end
+
+    test "device_detected from PasskeyAuth hook does not crash", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      lv
+      |> element("#passkey-registration")
+      |> render_hook("device_detected", %{"device" => "ios_mobile"})
+
+      assert render(lv) =~ "Add a Passkey"
+    end
   end
 
   describe "passkey_registration_error variants" do
