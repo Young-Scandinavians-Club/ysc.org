@@ -27,15 +27,6 @@ defmodule YscWeb.UserSecurityLiveTest do
     |> render_click()
   end
 
-  defp hook_verify_authentication(view, params \\ %{}) do
-    view
-    |> element("#reauth-passkey-hook")
-    |> render_hook("verify_authentication", params)
-
-    # Flush the :reauth_verified message so handle_info runs before we continue.
-    render(view)
-  end
-
   defp hook_passkey_auth_error(view, error) do
     view
     |> element("#reauth-passkey-hook")

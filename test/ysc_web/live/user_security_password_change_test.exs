@@ -26,13 +26,12 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
     |> render_click()
   end
 
-  defp hook_verify_authentication(view, params \\ %{}) do
-    view
-    |> element("#reauth-passkey-hook")
-    |> render_hook("verify_authentication", params)
-
-    # Flush the :reauth_verified message from the component to the parent LiveView
-    # so that handle_info(:reauth_verified) runs before we continue.
+  # Simulates the server-side :reauth_verified message that ReauthComponent sends
+  # to its parent LiveView after successful verification (password or WebAuthn).
+  # Used in tests where the reauth method cannot be fully replicated
+  # (e.g. passkey auth for OAuth users without a password).
+  defp simulate_reauth_verified(view) do
+    send(view.pid, :reauth_verified)
     render(view)
   end
 
@@ -296,18 +295,7 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         user: %{password: new_password, password_confirmation: new_password}
       })
 
-      click_reauth_passkey(view)
-
-      hook_verify_authentication(view, %{
-        "id" => "test-credential-id",
-        "rawId" => Base.encode64("test-raw-id"),
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("test-auth-data"),
-          "clientDataJSON" => Base.encode64("test-client-data"),
-          "signature" => Base.encode64("test-signature")
-        }
-      })
+      submit_reauth_password(view, valid_user_password())
 
       refute has_element?(view, "#reauth-modal")
 
@@ -384,15 +372,10 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       click_reauth_passkey(view)
 
-      hook_verify_authentication(view, %{
-        "id" => "test-credential-id",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("test-data"),
-          "clientDataJSON" => Base.encode64("test-data"),
-          "signature" => Base.encode64("test-sig")
-        }
-      })
+      # Real WebAuthn assertions cannot be constructed in unit tests; simulate the
+      # server-side :reauth_verified message that ReauthComponent sends after a
+      # successful Wax.authenticate call.
+      simulate_reauth_verified(view)
 
       updated_user = Repo.reload!(user)
       assert updated_user.hashed_password != nil
@@ -420,16 +403,7 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       })
 
       click_reauth_passkey(view)
-
-      hook_verify_authentication(view, %{
-        "id" => "test-credential",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("data"),
-          "clientDataJSON" => Base.encode64("data"),
-          "signature" => Base.encode64("sig")
-        }
-      })
+      simulate_reauth_verified(view)
 
       updated_user = Repo.reload!(user)
       assert updated_user.password_set_at != nil
@@ -459,16 +433,7 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       })
 
       click_reauth_passkey(view)
-
-      hook_verify_authentication(view, %{
-        "id" => "test",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("d"),
-          "clientDataJSON" => Base.encode64("d"),
-          "signature" => Base.encode64("s")
-        }
-      })
+      simulate_reauth_verified(view)
     end
   end
 

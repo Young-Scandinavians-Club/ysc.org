@@ -34,14 +34,6 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
     |> render_click()
   end
 
-  defp hook_verify_authentication(view, params \\ %{}) do
-    view
-    |> element("#reauth-passkey-hook")
-    |> render_hook("verify_authentication", params)
-
-    render(view)
-  end
-
   defp hook_passkey_auth_error(view, params) do
     view
     |> element("#reauth-passkey-hook")
