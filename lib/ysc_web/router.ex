@@ -303,6 +303,7 @@ defmodule YscWeb.Router do
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.UserAuth, :ensure_onboarding_complete},
+        {YscWeb.UserAuth, :mount_reauth_session},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do

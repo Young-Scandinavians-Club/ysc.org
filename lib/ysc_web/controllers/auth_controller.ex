@@ -12,13 +12,28 @@ defmodule YscWeb.AuthController do
   @doc """
   Handles OAuth request phase - redirects to provider.
   This is handled automatically by Ueberauth plug.
-  Stores redirect_to from query params in session for callback.
+  Stores redirect_to (normal login) or reauth metadata in session for callback.
   """
-  def request(conn, %{"redirect_to" => redirect_to}) do
-    # Store redirect_to in session if it's a valid internal redirect
-    if YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
+  def request(conn, %{"reauth" => "true"} = params) do
+    return_to = Map.get(params, "return_to", "/")
+
+    if YscWeb.UserAuth.valid_internal_redirect?(return_to) do
       conn
-      |> put_session(:oauth_redirect_to, redirect_to)
+      |> put_session(:reauth_mode, true)
+      |> put_session(:reauth_return_to, return_to)
+    else
+      conn
+    end
+  end
+
+  def request(conn, %{"redirect_to" => redirect_to}) do
+    conn =
+      conn
+      |> delete_session(:reauth_mode)
+      |> delete_session(:reauth_return_to)
+
+    if YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
+      put_session(conn, :oauth_redirect_to, redirect_to)
     else
       conn
     end
@@ -26,14 +41,18 @@ defmodule YscWeb.AuthController do
 
   def request(conn, _params) do
     conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
   end
 
   @doc """
   Handles OAuth callback phase for Google authentication.
   """
   def callback(%{assigns: %{ueberauth_failure: _fails}} = conn, _params) do
-    # User cancelled or OAuth provider returned an error
+    # User cancelled or OAuth provider returned an error — clear any stale reauth flags
     conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
     |> YscWeb.Flash.put_toast(
       :error,
       "Authentication was cancelled or failed. Please try again.",
@@ -43,14 +62,19 @@ defmodule YscWeb.AuthController do
   end
 
   def callback(%{assigns: %{ueberauth_auth: auth}} = conn, _params) do
-    # Extract email from OAuth response
     email = extract_email(auth)
     image_url = extract_image(auth)
 
     if email do
-      handle_oauth_success(conn, email, auth.provider, image_url)
+      if get_session(conn, :reauth_mode) do
+        handle_oauth_reauth(conn, email)
+      else
+        handle_oauth_success(conn, email, auth.provider, image_url)
+      end
     else
       conn
+      |> delete_session(:reauth_mode)
+      |> delete_session(:reauth_return_to)
       |> YscWeb.Flash.put_toast(
         :error,
         "Unable to retrieve email from your account. Please contact support.",
@@ -61,8 +85,10 @@ defmodule YscWeb.AuthController do
   end
 
   def callback(conn, _params) do
-    # Unexpected state - no auth and no failure
+    # Unexpected state - no auth and no failure — clear any stale reauth flags
     conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
     |> YscWeb.Flash.put_toast(
       :error,
       "Authentication error occurred. Please try again.",
@@ -72,6 +98,52 @@ defmodule YscWeb.AuthController do
   end
 
   # Private helper functions
+
+  defp handle_oauth_reauth(conn, oauth_email) do
+    return_to = get_session(conn, :reauth_return_to) || "/"
+
+    user_token = get_session(conn, :user_token)
+
+    current_user =
+      if user_token, do: Accounts.get_user_by_session_token(user_token)
+
+    cond do
+      is_nil(current_user) ->
+        conn
+        |> delete_session(:reauth_mode)
+        |> delete_session(:reauth_return_to)
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "Session expired. Please sign in again.",
+          title: "Authentication"
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      String.downcase(oauth_email) == String.downcase(current_user.email) ->
+        conn
+        |> delete_session(:reauth_mode)
+        |> delete_session(:reauth_return_to)
+        |> put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+        |> YscWeb.Flash.put_toast(:info, "Identity verified successfully.",
+          title: "Verification"
+        )
+        |> redirect(to: return_to)
+
+      true ->
+        conn
+        |> delete_session(:reauth_mode)
+        |> delete_session(:reauth_return_to)
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "The social account email doesn't match your account. Please use the account associated with #{current_user.email}.",
+          title: "Verification failed"
+        )
+        |> redirect(to: return_to)
+    end
+  end
 
   defp extract_email(%Ueberauth.Auth{info: info}) do
     info.email || info.raw["email"] || info.raw["emailAddress"]

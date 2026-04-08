@@ -27,7 +27,6 @@ defmodule YscWeb.S3.SimpleS3UploadTest do
       assert fields["key"] == "public/test-file.jpg"
       assert fields["acl"] == "public-read"
       assert fields["content-type"] == "image/jpeg"
-      assert fields["x-amz-server-side-encryption"] == "AES256"
       assert fields["x-amz-algorithm"] == "AWS4-HMAC-SHA256"
     end
 
@@ -45,7 +44,6 @@ defmodule YscWeb.S3.SimpleS3UploadTest do
         "key",
         "acl",
         "content-type",
-        "x-amz-server-side-encryption",
         "x-amz-credential",
         "x-amz-algorithm",
         "x-amz-date",
@@ -57,6 +55,43 @@ defmodule YscWeb.S3.SimpleS3UploadTest do
         assert Map.has_key?(fields, field), "Missing required field: #{field}"
         assert is_binary(fields[field]), "Field #{field} should be a string"
       end)
+    end
+
+    test "omits SSE field by default (MinIO compatible)" do
+      opts = [
+        key: "public/test-file.jpg",
+        content_type: "image/jpeg",
+        max_file_size: 10_000_000,
+        expires_in: 3_600_000
+      ]
+
+      {:ok, fields} = SimpleS3Upload.sign_form_upload(@config, @bucket, opts)
+
+      refute Map.has_key?(fields, "x-amz-server-side-encryption")
+
+      policy_json = Base.decode64!(fields["policy"])
+      policy = Jason.decode!(policy_json)
+      sse_condition = %{"x-amz-server-side-encryption" => "AES256"}
+      refute sse_condition in policy["conditions"]
+    end
+
+    test "includes SSE field when server_side_encryption: true" do
+      opts = [
+        key: "public/test-file.jpg",
+        content_type: "image/jpeg",
+        max_file_size: 10_000_000,
+        expires_in: 3_600_000,
+        server_side_encryption: true
+      ]
+
+      {:ok, fields} = SimpleS3Upload.sign_form_upload(@config, @bucket, opts)
+
+      assert fields["x-amz-server-side-encryption"] == "AES256"
+
+      policy_json = Base.decode64!(fields["policy"])
+      policy = Jason.decode!(policy_json)
+      sse_condition = %{"x-amz-server-side-encryption" => "AES256"}
+      assert sse_condition in policy["conditions"]
     end
 
     test "generates valid policy" do

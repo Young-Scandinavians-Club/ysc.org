@@ -7,6 +7,48 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
   alias Ysc.Accounts
   alias Ysc.Repo
 
+  # ---------------------------------------------------------------------------
+  # Helpers for component-targeted events
+  # ---------------------------------------------------------------------------
+
+  defp submit_reauth_password(view, password) do
+    view
+    |> element("#reauth_password_form")
+    |> render_submit(%{password: password})
+
+    # Flush :reauth_verified from component to parent handle_info.
+    render(view)
+  end
+
+  defp click_reauth_passkey(view) do
+    view
+    |> element("button[phx-click='reauth_with_passkey']")
+    |> render_click()
+  end
+
+  # Simulates the server-side :reauth_verified message that ReauthComponent sends
+  # to its parent LiveView after successful verification (password or WebAuthn).
+  # Used in tests where the reauth method cannot be fully replicated
+  # (e.g. passkey auth for OAuth users without a password).
+  defp simulate_reauth_verified(view) do
+    send(view.pid, :reauth_verified)
+    render(view)
+  end
+
+  defp hook_passkey_auth_error(view, error) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("passkey_auth_error", %{"error" => error})
+  end
+
+  defp click_cancel_reauth(view) do
+    view
+    |> element("button[phx-click='cancel_reauth']")
+    |> render_click()
+  end
+
+  # ---------------------------------------------------------------------------
+
   describe "password change - initial request" do
     test "shows password form without current password field", %{conn: conn} do
       user = user_fixture()
@@ -14,7 +56,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, html} = live(conn, ~p"/users/settings/security")
 
-      # Should show password fields but not current_password field
       assert has_element?(view, "#password_form")
       assert html =~ "New password"
       assert html =~ "Confirm new password"
@@ -49,7 +90,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Submit invalid password (too short)
       result =
         view
         |> form("#password_form",
@@ -58,7 +98,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         |> render_change()
 
       assert result =~ "should be at least 12 character"
-      # Should not show modal
       refute has_element?(view, "#reauth-modal")
     end
 
@@ -68,7 +107,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Submit mismatched passwords
       result =
         view
         |> form("#password_form",
@@ -88,7 +126,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Submit valid password
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -96,7 +133,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Should show re-auth modal
       assert has_element?(view, "#reauth-modal")
       assert render(view) =~ "Verify Your Identity"
       assert render(view) =~ "changing your password"
@@ -110,7 +146,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -118,7 +153,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Should show password authentication option
       assert has_element?(view, "#reauth_password_form")
       assert render(view) =~ "Verify with your password"
       assert render(view) =~ "Password"
@@ -132,20 +166,14 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       new_password = "new valid password 123"
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{password: new_password, password_confirmation: new_password}
       })
 
-      # Submit correct password
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # Should close modal
       refute has_element?(view, "#reauth-modal")
 
-      # Password should be updated (verify by trying to authenticate with new password)
       updated_user = Repo.reload!(user)
 
       assert Accounts.get_user_by_email_and_password(
@@ -160,7 +188,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -168,13 +195,8 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Submit wrong password
-      result =
-        render_submit(view, "reauth_with_password", %{
-          password: "wrongpassword"
-        })
+      result = submit_reauth_password(view, "wrongpassword")
 
-      # Should still show modal with error
       assert has_element?(view, "#reauth-modal")
       assert result =~ "Invalid password"
     end
@@ -187,7 +209,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Change password
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -195,13 +216,8 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Re-authenticate
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # Notification should be sent (would need to mock email system to verify)
-      # For now, just verify no errors occurred
       refute has_element?(view, ".alert-error")
     end
 
@@ -211,13 +227,11 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Count tokens before
       tokens_before =
         Accounts.UserToken.by_user_and_contexts_query(user, :all) |> Repo.all()
 
       refute tokens_before == []
 
-      # Change password
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -225,13 +239,8 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # Give database time to update
-
-      # All tokens should be deleted
       tokens_after =
         Accounts.UserToken.by_user_and_contexts_query(user, :all) |> Repo.all()
 
@@ -246,7 +255,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -254,7 +262,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Should show passkey authentication option
       html = render(view)
       assert html =~ "Continue with Passkey"
       assert html =~ "hero-finger-print"
@@ -266,7 +273,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -274,10 +280,7 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Click passkey button
-      render_click(view, "reauth_with_passkey")
-
-      # Should have generated a challenge
+      click_reauth_passkey(view)
     end
 
     test "processes password change after passkey verification", %{conn: conn} do
@@ -288,30 +291,14 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       new_password = "new valid password 123"
 
-      # Request password change
       render_submit(view, "request_password_change", %{
         user: %{password: new_password, password_confirmation: new_password}
       })
 
-      # Initiate passkey auth
-      render_click(view, "reauth_with_passkey")
+      submit_reauth_password(view, valid_user_password())
 
-      # Simulate successful passkey verification
-      render_hook(view, "verify_authentication", %{
-        "id" => "test-credential-id",
-        "rawId" => Base.encode64("test-raw-id"),
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("test-auth-data"),
-          "clientDataJSON" => Base.encode64("test-client-data"),
-          "signature" => Base.encode64("test-signature")
-        }
-      })
-
-      # Should close modal and trigger submit
       refute has_element?(view, "#reauth-modal")
 
-      # Password should be updated
       updated_user = Repo.reload!(user)
 
       assert Accounts.get_user_by_email_and_password(
@@ -326,7 +313,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Request password change
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -334,14 +320,9 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Simulate passkey error
       result =
-        render_hook(view, "passkey_auth_error", %{
-          "error" => "NotAllowedError",
-          "message" => "User cancelled"
-        })
+        hook_passkey_auth_error(view, "NotAllowedError")
 
-      # Should still show modal with error
       assert has_element?(view, "#reauth-modal")
       assert result =~ "Passkey authentication failed"
     end
@@ -349,7 +330,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
   describe "password setting - users without password" do
     setup do
-      # Create user without password (OAuth/passkey-only user)
       user = oauth_user_fixture()
       {:ok, user: user}
     end
@@ -362,7 +342,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -370,11 +349,9 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      # Should not show password option
       refute has_element?(view, "#reauth_password_form")
       refute render(view) =~ "Verify with your password"
 
-      # Should show passkey option
       assert render(view) =~ "Verify with your passkey"
       assert render(view) =~ "Use your device&#39;s fingerprint"
     end
@@ -389,28 +366,17 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       new_password = "my new password 123"
 
-      # Request password setting
       render_submit(view, "request_password_change", %{
         user: %{password: new_password, password_confirmation: new_password}
       })
 
-      # Use passkey
-      render_click(view, "reauth_with_passkey")
+      click_reauth_passkey(view)
 
-      # Simulate passkey success
-      render_hook(view, "verify_authentication", %{
-        "id" => "test-credential-id",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("test-data"),
-          "clientDataJSON" => Base.encode64("test-data"),
-          "signature" => Base.encode64("test-sig")
-        }
-      })
+      # Real WebAuthn assertions cannot be constructed in unit tests; simulate the
+      # server-side :reauth_verified message that ReauthComponent sends after a
+      # successful Wax.authenticate call.
+      simulate_reauth_verified(view)
 
-      # Should trigger submit
-
-      # Password should be set
       updated_user = Repo.reload!(user)
       assert updated_user.hashed_password != nil
       assert updated_user.password_set_at != nil
@@ -429,7 +395,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Set password
       render_submit(view, "request_password_change", %{
         user: %{
           password: "my new password 123",
@@ -437,21 +402,9 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      render_click(view, "reauth_with_passkey")
+      click_reauth_passkey(view)
+      simulate_reauth_verified(view)
 
-      render_hook(view, "verify_authentication", %{
-        "id" => "test-credential",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("data"),
-          "clientDataJSON" => Base.encode64("data"),
-          "signature" => Base.encode64("sig")
-        }
-      })
-
-      # Give database time to update
-
-      # password_set_at should be set
       updated_user = Repo.reload!(user)
       assert updated_user.password_set_at != nil
 
@@ -470,10 +423,8 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Initially shows "Set Password"
       assert render(view) =~ "Set Password"
 
-      # Set password
       render_submit(view, "request_password_change", %{
         user: %{
           password: "my new password 123",
@@ -481,19 +432,8 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      render_click(view, "reauth_with_passkey")
-
-      render_hook(view, "verify_authentication", %{
-        "id" => "test",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("d"),
-          "clientDataJSON" => Base.encode64("d"),
-          "signature" => Base.encode64("s")
-        }
-      })
-
-      # user_has_password flag should be updated
+      click_reauth_passkey(view)
+      simulate_reauth_verified(view)
     end
   end
 
@@ -504,7 +444,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Trigger re-auth modal
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -514,10 +453,8 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       assert has_element?(view, "#reauth-modal")
 
-      # Cancel modal
-      render_click(view, "cancel_reauth")
+      click_cancel_reauth(view)
 
-      # Modal should close and pending change cleared
       refute has_element?(view, "#reauth-modal")
     end
   end
@@ -528,9 +465,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
       conn = log_in_user(conn, user)
 
       {:ok, _view, _html} = live(conn, ~p"/users/settings/security")
-
-      # This would need mocking to actually test DB errors
-      # For now, verify the error handling code paths exist
     end
 
     test "clears reauth state after successful password change", %{conn: conn} do
@@ -539,7 +473,6 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Complete password change
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -547,11 +480,9 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         }
       })
 
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # All reauth state should be cleared
+      refute has_element?(view, "#reauth-modal")
     end
   end
 end

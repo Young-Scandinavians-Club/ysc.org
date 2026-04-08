@@ -169,7 +169,8 @@ defmodule YscWeb.Components.ImageUploadComponent do
         key: key,
         content_type: entry.client_type,
         max_file_size: uploads[entry.upload_config].max_file_size,
-        expires_in: :timer.hours(1)
+        expires_in: :timer.hours(1),
+        server_side_encryption: S3Config.server_side_encryption?()
       )
 
     meta = %{

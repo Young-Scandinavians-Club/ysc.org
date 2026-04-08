@@ -8,59 +8,75 @@ defmodule YscWeb.PasskeyRegistrationLive do
   def render(assigns) do
     ~H"""
     <div class="max-w-sm mx-auto py-10">
-      <.header class="text-center">
-        Add a Passkey to Your Account
-        <:subtitle>
-          Use your device's fingerprint or face scan to sign in faster
-        </:subtitle>
-      </.header>
+      <.live_component
+        :if={@show_reauth}
+        module={YscWeb.ReauthComponent}
+        id="reauth"
+        user={@current_user}
+        user_has_password={@user_has_password}
+        return_to={~p"/users/settings/passkeys/new"}
+        description="For security reasons, please verify your identity before adding a passkey."
+      />
 
-      <div id="passkey-registration" class="space-y-3 pt-8" phx-hook="PasskeyAuth">
-        <div
-          :if={@error}
-          class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
-        >
-          <p class="text-sm text-red-800">{@error}</p>
-        </div>
+      <div :if={!@show_reauth}>
+        <.header class="text-center">
+          Add a Passkey to Your Account
+          <:subtitle>
+            Use your device's fingerprint or face scan to sign in faster
+          </:subtitle>
+        </.header>
 
-        <div
-          :if={@success}
-          class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6"
-        >
-          <p class="text-sm text-green-800">
-            Passkey added successfully! You can now use it to sign in.
-          </p>
-        </div>
+        <div id="passkey-registration" class="space-y-3 pt-8" phx-hook="PasskeyAuth">
+          <div
+            :if={@error}
+            class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
+          >
+            <p class="text-sm text-red-800">{@error}</p>
+          </div>
 
-        <.button
-          :if={@passkey_supported && !@success}
-          type="button"
-          disabled={@loading}
-          class={
-            "w-full flex items-center justify-center gap-2 h-10" <>
-              if(@loading, do: " opacity-50 cursor-not-allowed", else: "")
-          }
-          phx-click="create_passkey"
-          phx-mounted={
-            JS.transition(
-              {"transition ease-out duration-300", "opacity-0 -translate-y-1",
-               "opacity-100 translate-y-0"}
-            )
-          }
-        >
-          <.icon :if={@loading} name="hero-arrow-path" class="w-5 h-5 animate-spin" />
-          <.icon :if={!@loading} name="hero-key" class="w-5 h-5" />
-          {if @loading, do: "Creating Passkey...", else: "Create Passkey"}
-        </.button>
+          <div
+            :if={@success}
+            class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6"
+          >
+            <p class="text-sm text-green-800">
+              Passkey added successfully! You can now use it to sign in.
+            </p>
+          </div>
 
-        <div :if={!@passkey_supported} class="text-center text-sm text-zinc-500">
-          Your device doesn't support passkeys. Please use a modern browser with WebAuthn support.
-        </div>
+          <.button
+            :if={@passkey_supported && !@success}
+            type="button"
+            disabled={@loading}
+            class={
+              "w-full flex items-center justify-center gap-2 h-10" <>
+                if(@loading, do: " opacity-50 cursor-not-allowed", else: "")
+            }
+            phx-click="create_passkey"
+            phx-mounted={
+              JS.transition(
+                {"transition ease-out duration-300", "opacity-0 -translate-y-1",
+                 "opacity-100 translate-y-0"}
+              )
+            }
+          >
+            <.icon
+              :if={@loading}
+              name="hero-arrow-path"
+              class="w-5 h-5 animate-spin"
+            />
+            <.icon :if={!@loading} name="hero-key" class="w-5 h-5" />
+            {if @loading, do: "Creating Passkey...", else: "Create Passkey"}
+          </.button>
 
-        <div class="mt-6 text-center">
-          <.link navigate={~p"/"} class="text-sm text-blue-600 hover:underline">
-            ← Back to Home
-          </.link>
+          <div :if={!@passkey_supported} class="text-center text-sm text-zinc-500">
+            Your device doesn't support passkeys. Please use a modern browser with WebAuthn support.
+          </div>
+
+          <div class="mt-6 text-center">
+            <.link navigate={~p"/"} class="text-sm text-blue-600 hover:underline">
+              ← Back to Home
+            </.link>
+          </div>
         </div>
       </div>
     </div>
@@ -79,6 +95,8 @@ defmodule YscWeb.PasskeyRegistrationLive do
        )
        |> redirect(to: ~p"/users/log-in")}
     else
+      reauth_verified = socket.assigns[:session_reauth_verified] || false
+
       {:ok,
        assign(socket,
          page_title: "Add Passkey",
@@ -89,92 +107,41 @@ defmodule YscWeb.PasskeyRegistrationLive do
          success: false,
          loading: false,
          passkey_challenge: nil,
-         user_agent: nil
+         user_agent: nil,
+         show_reauth: !reauth_verified,
+         user_has_password: !is_nil(user.hashed_password)
        )}
     end
   end
 
+  def handle_info(:reauth_verified, socket) do
+    {:noreply, assign(socket, :show_reauth, false)}
+  end
+
+  def handle_info(:reauth_cancelled, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/users/settings/security")}
+  end
+
   def handle_event("create_passkey", _params, socket) do
-    require Ysc.Logging
-    user = socket.assigns.current_user
-
-    # Set loading state
-    socket = assign(socket, :loading, true)
-
-    # Generate registration challenge
-    # For registration, we need to provide user information
-    user_id_binary = user.id
-
-    try do
-      # Get rp_id and origin from Wax config to ensure consistency
-      rp_id = Application.get_env(:wax_, :rp_id) || "localhost"
-      origin = get_origin()
-
-      challenge =
-        Wax.new_registration_challenge(
-          origin: origin,
-          rp_id: rp_id,
-          user: %{
-            id: user_id_binary,
-            name: user.email,
-            display_name: "#{user.first_name} #{user.last_name}"
-          },
-          user_verification: "preferred",
-          authenticator_selection: %{
-            authenticator_attachment: "platform",
-            user_verification: "preferred",
-            require_resident_key: true
-          }
-        )
-
-      require Ysc.Logging
-
-      # Convert challenge to JSON-serializable format for JS
-      # Note: WebAuthn API requires camelCase keys
-      challenge_json = %{
-        challenge: Base.url_encode64(challenge.bytes, padding: false),
-        timeout: challenge.timeout,
-        rp: %{
-          id: challenge.rp_id,
-          name: "YSC"
-        },
-        user: %{
-          id: Base.url_encode64(user_id_binary, padding: false),
-          name: user.email,
-          displayName: "#{user.first_name} #{user.last_name}"
-        },
-        pubKeyCredParams: [
-          %{type: "public-key", alg: -7},
-          %{type: "public-key", alg: -257}
-        ],
-        authenticatorSelection: %{
-          authenticatorAttachment: "platform",
-          userVerification: "preferred",
-          requireResidentKey: true
-        }
-      }
-
+    if socket.assigns.show_reauth do
       {:noreply,
-       socket
-       |> assign(:passkey_challenge, challenge)
-       |> push_event("create_registration_challenge", %{options: challenge_json})}
-    rescue
-      e ->
-        Ysc.Logging.error(
-          "[PasskeyRegistrationLive] Error creating challenge",
-          %{
-            error: inspect(e),
-            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-          }
-        )
-
-        {:noreply,
-         assign(socket,
-           error: "Failed to create passkey challenge. Please try again.",
-           loading: false,
-           passkey_challenge: nil
-         )}
+       assign(socket,
+         error: "Re-authentication is required before adding a passkey.",
+         loading: false
+       )}
+    else
+      do_create_passkey(socket)
     end
+  end
+
+  def handle_event("verify_registration", _response, socket)
+      when socket.assigns.show_reauth do
+    {:noreply,
+     assign(socket,
+       error: "Re-authentication is required before adding a passkey.",
+       loading: false,
+       passkey_challenge: nil
+     )}
   end
 
   def handle_event("verify_registration", response, socket) do
@@ -418,6 +385,78 @@ defmodule YscWeb.PasskeyRegistrationLive do
   end
 
   def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
+  defp do_create_passkey(socket) do
+    require Ysc.Logging
+
+    user = socket.assigns.current_user
+    user_id_binary = user.id
+
+    socket = assign(socket, :loading, true)
+
+    try do
+      rp_id = Application.get_env(:wax_, :rp_id) || "localhost"
+      origin = get_origin()
+
+      challenge =
+        Wax.new_registration_challenge(
+          origin: origin,
+          rp_id: rp_id,
+          user: %{
+            id: user_id_binary,
+            name: user.email,
+            display_name: "#{user.first_name} #{user.last_name}"
+          },
+          user_verification: "preferred",
+          authenticator_selection: %{
+            authenticator_attachment: "platform",
+            user_verification: "preferred",
+            require_resident_key: true
+          }
+        )
+
+      challenge_json = %{
+        challenge: Base.url_encode64(challenge.bytes, padding: false),
+        timeout: challenge.timeout,
+        rp: %{id: challenge.rp_id, name: "YSC"},
+        user: %{
+          id: Base.url_encode64(user_id_binary, padding: false),
+          name: user.email,
+          displayName: "#{user.first_name} #{user.last_name}"
+        },
+        pubKeyCredParams: [
+          %{type: "public-key", alg: -7},
+          %{type: "public-key", alg: -257}
+        ],
+        authenticatorSelection: %{
+          authenticatorAttachment: "platform",
+          userVerification: "preferred",
+          requireResidentKey: true
+        }
+      }
+
+      {:noreply,
+       socket
+       |> assign(:passkey_challenge, challenge)
+       |> push_event("create_registration_challenge", %{options: challenge_json})}
+    rescue
+      e ->
+        Ysc.Logging.error(
+          "[PasskeyRegistrationLive] Error creating challenge",
+          %{
+            error: inspect(e),
+            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          }
+        )
+
+        {:noreply,
+         assign(socket,
+           error: "Failed to create passkey challenge. Please try again.",
+           loading: false,
+           passkey_challenge: nil
+         )}
+    end
+  end
 
   defp get_origin do
     # Get origin from Wax config

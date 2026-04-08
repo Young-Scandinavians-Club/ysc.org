@@ -66,6 +66,10 @@ defmodule YscWeb.UserAuth do
       conn
       |> renew_session()
       |> put_token_in_session(token)
+      |> put_session(
+        :reauth_verified_at,
+        DateTime.utc_now() |> DateTime.to_unix()
+      )
       |> maybe_write_remember_me_cookie(token, params)
 
     # Log sign-in after session is set so auth_events.session_id is populated (for "Current session" on Security page)
@@ -359,6 +363,35 @@ defmodule YscWeb.UserAuth do
     else
       {:cont, socket}
     end
+  end
+
+  @reauth_ttl_seconds 300
+
+  def on_mount(:mount_reauth_session, _params, session, socket) do
+    timestamp = session["reauth_verified_at"]
+
+    # Compute the absolute expiry so handlers can re-check at action time
+    # rather than relying on a boolean that was frozen at mount.
+    expires_at =
+      case timestamp do
+        ts when is_integer(ts) -> ts + @reauth_ttl_seconds
+        _ -> nil
+      end
+
+    verified =
+      case expires_at do
+        ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
+        _ -> false
+      end
+
+    {:cont,
+     socket
+     |> Phoenix.Component.assign_new(:session_reauth_verified, fn ->
+       verified
+     end)
+     |> Phoenix.Component.assign_new(:session_reauth_expires_at, fn ->
+       expires_at
+     end)}
   end
 
   def on_mount(:redirect_if_user_is_authenticated, _params, session, socket) do

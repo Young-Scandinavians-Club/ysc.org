@@ -43,40 +43,52 @@ defmodule YscWeb.S3.SimpleS3Upload do
     max_file_size = Keyword.fetch!(opts, :max_file_size)
     content_type = Keyword.fetch!(opts, :content_type)
     expires_in = Keyword.fetch!(opts, :expires_in)
+    sse = Keyword.get(opts, :server_side_encryption, false)
 
     expires_at = DateTime.add(DateTime.utc_now(), expires_in, :millisecond)
     amz_date = amz_date(expires_at)
     credential = credential(config, expires_at)
 
-    encoded_policy =
-      Base.encode64("""
-      {
-        "expiration": "#{DateTime.to_iso8601(expires_at)}",
-        "conditions": [
-          {"bucket":  "#{bucket}"},
-          ["eq", "$key", "#{key}"],
-          {"acl": "public-read"},
-          ["eq", "$Content-Type", "#{content_type}"],
-          ["content-length-range", 0, #{max_file_size}],
-          {"x-amz-server-side-encryption": "AES256"},
-          {"x-amz-credential": "#{credential}"},
-          {"x-amz-algorithm": "AWS4-HMAC-SHA256"},
-          {"x-amz-date": "#{amz_date}"}
-        ]
-      }
-      """)
+    base_conditions = [
+      %{"bucket" => bucket},
+      ["eq", "$key", key],
+      %{"acl" => "public-read"},
+      ["eq", "$Content-Type", content_type],
+      ["content-length-range", 0, max_file_size],
+      %{"x-amz-credential" => credential},
+      %{"x-amz-algorithm" => "AWS4-HMAC-SHA256"},
+      %{"x-amz-date" => amz_date}
+    ]
 
-    fields = %{
+    conditions =
+      if sse,
+        do: [%{"x-amz-server-side-encryption" => "AES256"} | base_conditions],
+        else: base_conditions
+
+    policy_data = %{
+      "expiration" => DateTime.to_iso8601(expires_at),
+      "conditions" => conditions
+    }
+
+    encoded_policy = policy_data |> Jason.encode!() |> Base.encode64()
+
+    base_fields = %{
       "key" => key,
       "acl" => "public-read",
       "content-type" => content_type,
-      "x-amz-server-side-encryption" => "AES256",
       "x-amz-credential" => credential,
       "x-amz-algorithm" => "AWS4-HMAC-SHA256",
       "x-amz-date" => amz_date,
       "policy" => encoded_policy,
       "x-amz-signature" => signature(config, expires_at, encoded_policy)
     }
+
+    fields =
+      if sse do
+        Map.put(base_fields, "x-amz-server-side-encryption", "AES256")
+      else
+        base_fields
+      end
 
     {:ok, fields}
   end

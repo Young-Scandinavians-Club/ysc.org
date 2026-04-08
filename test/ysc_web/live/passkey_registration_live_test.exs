@@ -6,23 +6,92 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
 
   import Phoenix.LiveViewTest
 
+  # Inject a fresh reauth_verified_at into the session so tests that focus
+  # on passkey registration itself can skip the reauth gate.
+  defp with_reauth_verified(conn) do
+    Plug.Conn.put_session(
+      conn,
+      :reauth_verified_at,
+      DateTime.utc_now() |> DateTime.to_unix()
+    )
+  end
+
   setup :register_and_log_in_user
+
+  describe "Passkey registration page - reauth gate" do
+    test "shows reauth modal for new visits (no session reauth)", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      assert has_element?(view, "#reauth-modal")
+      refute has_element?(view, "#passkey-registration")
+    end
+
+    test "shows registration UI when session reauth is recent", %{conn: conn} do
+      conn = with_reauth_verified(conn)
+      {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      assert has_element?(view, "#passkey-registration")
+      refute has_element?(view, "#reauth-modal")
+    end
+
+    test "navigates back to security page on cancel", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      assert has_element?(view, "#reauth-modal")
+
+      # The cancel button is inside the ReauthComponent (phx-target={@myself}).
+      # The component sends :reauth_cancelled to the parent via send/2 (async),
+      # which is then processed in handle_info and calls push_navigate.
+      # The LiveView process exits after the navigate. Calling render/1 after this
+      # raises an exit, which we catch.
+      view
+      |> element("button[phx-click='cancel_reauth']")
+      |> render_click()
+
+      # render/1 processes the queued :reauth_cancelled + push_navigate exit.
+      # The GenServer exits, so the call raises. We just verify it navigated.
+      try do
+        render(view)
+      catch
+        :exit, _ -> :ok
+      end
+
+      refute Process.alive?(view.pid)
+    end
+
+    test "shows registration UI after successful password reauth", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
+
+      assert has_element?(view, "#reauth-modal")
+
+      view
+      |> element("#reauth_password_form")
+      |> render_submit(%{
+        "password" => Ysc.AccountsFixtures.valid_user_password()
+      })
+
+      render(view)
+
+      assert has_element?(view, "#passkey-registration")
+      refute has_element?(view, "#reauth-modal")
+    end
+  end
 
   describe "Passkey registration page" do
     test "renders registration page for authenticated user", %{
       conn: conn,
       user: _user
     } do
+      conn = with_reauth_verified(conn)
       {:ok, _lv, html} = live(conn, ~p"/users/settings/passkeys/new")
 
       assert html =~ "Add a Passkey to Your Account"
-      # Check for subtitle text (may be in different format)
+
       assert html =~ "fingerprint" || html =~ "face scan" ||
                html =~ "sign in faster"
     end
 
     test "redirects unauthenticated users to login", %{conn: _conn} do
-      # Create a new connection without authentication
       unauthenticated_conn = Phoenix.ConnTest.build_conn()
 
       assert {:error, {:redirect, %{to: path}}} =
@@ -37,7 +106,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # First enable passkey support so the button is visible
       lv
@@ -61,12 +131,11 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "handles challenge creation failure gracefully", %{conn: conn} do
-      # This LiveView falls back to sensible defaults for Wax config.
-      # The important part is that clicking does not crash and we push a challenge.
       original_rp_id = Application.get_env(:wax_, :rp_id)
       Application.put_env(:wax_, :rp_id, nil)
 
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # First enable passkey support so the button is visible
       lv
@@ -91,7 +160,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
       conn: conn,
       user: _user
     } do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # First enable passkey support so the button is visible
       lv
@@ -145,7 +215,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "handles passkey registration errors", %{conn: conn, user: _user} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # First enable passkey support so the button is visible
       lv
@@ -171,7 +242,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "handles expired challenge", %{conn: conn, user: _user} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # Try to verify without creating challenge first (simulating expired challenge)
       response = %{
@@ -194,7 +266,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "shows loading state during passkey creation", %{conn: conn} do
-      {:ok, lv, html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # Initially not loading
       refute html =~ "Creating Passkey..."
@@ -217,7 +290,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
 
   describe "Passkey support detection" do
     test "detects passkey support and updates UI", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # Simulate passkey support detection
       lv
@@ -231,7 +305,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "hides create button when passkeys not supported", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       # Simulate no passkey support
       lv
@@ -245,7 +320,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     test "passkey_support_detected without supported key leaves defaults", %{
       conn: conn
     } do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")
@@ -258,7 +334,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     test "user_agent_received stores user agent for device nickname", %{
       conn: conn
     } do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")
@@ -270,7 +347,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "user_agent_received with empty params is a no-op", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")
@@ -280,7 +358,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "device_detected from PasskeyAuth hook does not crash", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")
@@ -294,7 +373,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     setup :register_and_log_in_user
 
     test "maps InvalidStateError to friendly message", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")
@@ -307,7 +387,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     end
 
     test "maps NotSupportedError to friendly message", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")
@@ -322,7 +403,8 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
     test "fallback passkey_registration_error without structured fields", %{
       conn: conn
     } do
-      {:ok, lv, _html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, lv, _html} =
+        live(with_reauth_verified(conn), ~p"/users/settings/passkeys/new")
 
       lv
       |> element("#passkey-registration")

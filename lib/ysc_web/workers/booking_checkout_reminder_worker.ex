@@ -66,7 +66,8 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorker do
              template_name,
              email_data,
              "",
-             booking.user_id
+             booking.user_id,
+             Ysc.EmailConfig.booking_reply_to(booking.property)
            ) do
         %Oban.Job{} ->
           Ysc.Logging.info("Booking checkout reminder scheduled successfully",

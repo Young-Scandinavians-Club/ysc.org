@@ -67,4 +67,19 @@ defmodule Ysc.EmailConfig do
   def clear_lake_email do
     Application.get_env(:ysc, :emails)[:clear_lake_email] || "cl@ysc.org"
   end
+
+  @doc """
+  Returns the reply-to email address for a booking based on its property.
+
+  - Tahoe bookings reply to tahoe@ysc.org
+  - Clear Lake bookings reply to cl@ysc.org
+  - Defaults to info@ysc.org for unknown properties
+  """
+  def booking_reply_to(property) do
+    case property do
+      :tahoe -> tahoe_email()
+      :clear_lake -> clear_lake_email()
+      _ -> contact_email()
+    end
+  end
 end

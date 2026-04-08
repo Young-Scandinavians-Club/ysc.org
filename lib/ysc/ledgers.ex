@@ -1191,16 +1191,17 @@ defmodule Ysc.Ledgers do
         # Generate idempotency key
         idempotency_key = "booking_refund_processed_#{refund.id}"
 
-        # Schedule email
+        # Schedule email — use configurable notifier so env/test overrides apply
         result =
-          YscWeb.Emails.Notifier.schedule_email(
+          ledger_refund_email_notifier().schedule_email(
             payment.user.email,
             idempotency_key,
             YscWeb.Emails.BookingRefundProcessed.get_subject(),
             "booking_refund_processed",
             email_data,
             "",
-            payment.user_id
+            payment.user_id,
+            Ysc.EmailConfig.booking_reply_to(booking.property)
           )
 
         case result do
