@@ -932,6 +932,111 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   @impl true
+  def handle_params(%{"id" => incoming_id} = params, _uri, socket) do
+    current_id = socket.assigns[:event] && socket.assigns.event.id
+
+    socket =
+      if incoming_id != current_id do
+        load_event(socket, incoming_id)
+      else
+        socket
+      end
+      |> assign(:list_params, Map.drop(params, ["id"]))
+      |> maybe_refresh_tab_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_params(params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:list_params, Map.drop(params, ["id"]))
+      |> maybe_refresh_tab_data()
+
+    {:noreply, socket}
+  end
+
+  defp load_event(socket, id) do
+    Agendas.subscribe(id)
+
+    event = Events.get_event!(id)
+    event_changeset = Event.changeset(event, %{})
+
+    capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
+    capacity_changeset = Event.changeset(event, capacity_attrs)
+    agendas = Agendas.list_agendas_for_event(event.id)
+    ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
+    tickets = Events.list_tickets_for_event(event.id)
+    hosts = Events.list_event_hosts(event)
+
+    socket
+    |> assign(:event, event)
+    |> assign(:active_page, :events)
+    |> assign(:capacity_form, to_form(capacity_changeset))
+    |> assign(:page_title, event.title)
+    |> assign(:description_length, description_length(event.description))
+    |> assign(:event_title, event.title)
+    |> assign(:state, event.state)
+    |> assign(:start_date, event.start_date)
+    |> assign(:end_date, event.end_date)
+    |> assign(:start_time, event.start_time)
+    |> assign(:end_time, event.end_time)
+    |> assign(:can_publish, can_publish?(event.start_date, event.title))
+    |> assign(:ticket_count, length(tickets))
+    |> assign(:ticket_tier_count, length(ticket_tiers))
+    |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
+    |> assign(trigger_submit: false, check_errors: false)
+    |> assign(:hosts, hosts)
+    |> assign(:host_search_query, "")
+    |> assign(:host_search_results, [])
+    |> stream(:agendas, agendas, reset: true)
+    |> assign(form: to_form(event_changeset, as: "event"))
+    |> assign(
+      :update_form,
+      to_form(
+        %{
+          "title" => "",
+          "raw_body" => "",
+          "rendered_body" => "",
+          "show_on_event_page" => false
+        },
+        as: "update"
+      )
+    )
+    |> assign(:event_updates, Events.list_event_updates(event.id))
+    |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+  end
+
+  defp maybe_refresh_tab_data(socket) do
+    case socket.assigns[:event] do
+      nil ->
+        socket
+
+      event ->
+        case socket.assigns.live_action do
+          :updates ->
+            socket
+            |> assign(:event_updates, Events.list_event_updates(event.id))
+            |> assign(
+              :recipient_count,
+              Events.count_event_update_recipients(event.id)
+            )
+
+          :tickets ->
+            ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
+            tickets = Events.list_tickets_for_event(event.id)
+
+            socket
+            |> assign(:ticket_tier_count, length(ticket_tiers))
+            |> assign(:ticket_count, length(tickets))
+
+          _ ->
+            socket
+        end
+    end
+  end
+
+  @impl true
   def handle_event("copy-event", _, socket) do
     event = socket.assigns.event
 
