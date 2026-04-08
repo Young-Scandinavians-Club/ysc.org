@@ -303,7 +303,7 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      hook_verify_authentication(view)
+      submit_reauth_password(view, Ysc.AccountsFixtures.valid_user_password())
 
       refute has_element?(view, "#reauth-modal")
 
@@ -675,7 +675,7 @@ defmodule YscWeb.UserSecurityLiveTest do
                "Setting a password allows you to sign in with email and password"
     end
 
-    test "sets initial password via verify_authentication after re-auth modal",
+    test "shows passkey-only reauth modal for oauth users (no password form)",
          %{
            conn: conn
          } do
@@ -693,17 +693,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       assert has_element?(view, "#reauth-modal")
       refute render(view) =~ "Verify with your password"
-
-      hook_verify_authentication(view)
-
-      refute has_element?(view, "#reauth-modal")
-
-      updated = Repo.reload!(user)
-
-      assert Accounts.get_user_by_email_and_password(
-               updated.email,
-               "first password ok 12"
-             )
+      assert render(view) =~ "Verify with your passkey"
     end
   end
 
@@ -721,9 +711,6 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      html = render(view)
-      assert html =~ "Continue with Google"
-      assert html =~ "Continue with Facebook"
       assert has_element?(view, "button[phx-click='reauth_with_google']")
       assert has_element?(view, "button[phx-click='reauth_with_facebook']")
     end

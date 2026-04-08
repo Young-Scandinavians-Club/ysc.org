@@ -370,19 +370,27 @@ defmodule YscWeb.UserAuth do
   def on_mount(:mount_reauth_session, _params, session, socket) do
     timestamp = session["reauth_verified_at"]
 
-    verified =
+    # Compute the absolute expiry so handlers can re-check at action time
+    # rather than relying on a boolean that was frozen at mount.
+    expires_at =
       case timestamp do
-        ts when is_integer(ts) ->
-          DateTime.diff(DateTime.utc_now(), DateTime.from_unix!(ts), :second) <
-            @reauth_ttl_seconds
+        ts when is_integer(ts) -> ts + @reauth_ttl_seconds
+        _ -> nil
+      end
 
-        _ ->
-          false
+    verified =
+      case expires_at do
+        ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
+        _ -> false
       end
 
     {:cont,
-     Phoenix.Component.assign_new(socket, :session_reauth_verified, fn ->
+     socket
+     |> Phoenix.Component.assign_new(:session_reauth_verified, fn ->
        verified
+     end)
+     |> Phoenix.Component.assign_new(:session_reauth_expires_at, fn ->
+       expires_at
      end)}
   end
 

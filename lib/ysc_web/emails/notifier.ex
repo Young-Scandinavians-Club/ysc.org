@@ -6,6 +6,8 @@ defmodule YscWeb.Emails.Notifier do
   """
   import Swoosh.Email
 
+  require Ysc.Logging
+
   defp from_email do
     Ysc.EmailConfig.from_email()
   end
@@ -126,8 +128,6 @@ defmodule YscWeb.Emails.Notifier do
          user_id,
          reply_to
        ) do
-    require Ysc.Logging
-
     category = Ysc.Accounts.EmailCategories.get_category(template)
 
     base_job_args = %{

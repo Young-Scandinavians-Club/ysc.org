@@ -119,8 +119,8 @@ defmodule YscWeb.UserSecurityLive do
     if changeset.valid? do
       socket = assign(socket, :pending_password_change, user_params)
 
-      if socket.assigns[:session_reauth_verified] do
-        # Already verified via OAuth reauth — process immediately
+      if reauth_still_valid?(socket) do
+        # Already verified via recent reauth — process immediately
         {:noreply, process_password_change_after_reauth(socket)}
       else
         {:noreply, assign(socket, :show_reauth_modal, true)}
@@ -256,6 +256,13 @@ defmodule YscWeb.UserSecurityLive do
 
   # Catch-all: drop unhandled messages (e.g. Swoosh email delivery in tests)
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  defp reauth_still_valid?(socket) do
+    case socket.assigns[:session_reauth_expires_at] do
+      ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
+      _ -> false
+    end
+  end
 
   @dialyzer {:nowarn_function, process_password_change_after_reauth: 1}
   defp process_password_change_after_reauth(socket) do

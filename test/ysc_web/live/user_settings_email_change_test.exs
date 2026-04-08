@@ -231,10 +231,7 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
         user: %{email: new_email}
       })
 
-      click_reauth_with_passkey(view)
-      assert_push_event(view, "create_authentication_challenge", %{})
-
-      hook_verify_authentication(view)
+      submit_reauth_password(view, Ysc.AccountsFixtures.valid_user_password())
 
       refute has_element?(view, "#reauth-modal")
     end
@@ -288,10 +285,11 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       assert render(view) =~ "Continue with Passkey"
     end
 
-    test "can change email using passkey authentication", %{
-      conn: conn,
-      user: user
-    } do
+    test "shows passkey-only reauth modal for oauth users (no password form)",
+         %{
+           conn: conn,
+           user: user
+         } do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
@@ -300,10 +298,9 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
         user: %{email: "newemail@example.com"}
       })
 
-      click_reauth_with_passkey(view)
-      hook_verify_authentication(view)
-
-      refute has_element?(view, "#reauth-modal")
+      assert has_element?(view, "#reauth-modal")
+      refute has_element?(view, "#reauth_password_form")
+      assert render(view) =~ "Verify with your passkey"
     end
   end
 

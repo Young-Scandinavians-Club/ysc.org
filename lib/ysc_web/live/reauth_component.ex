@@ -15,6 +15,7 @@ defmodule YscWeb.ReauthComponent do
   use YscWeb, :live_component
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.UserPasskey
 
   require Ysc.Logging
 
@@ -51,25 +52,142 @@ defmodule YscWeb.ReauthComponent do
   def handle_event("reauth_with_passkey", _params, socket) do
     Ysc.Logging.info("[ReauthComponent] reauth_with_passkey event received")
 
+    user = socket.assigns.user
+
+    # Build allow_credentials from the user's registered passkeys so Wax can
+    # verify the signature against the correct public key.
+    allow_credentials =
+      user
+      |> Accounts.get_user_passkeys()
+      |> Enum.map(fn pk ->
+        {pk.external_id, UserPasskey.decode_public_key(pk.public_key)}
+      end)
+
+    rp_id = Application.get_env(:wax_, :rp_id) || "localhost"
+    origin = Application.get_env(:wax_, :origin) || "http://localhost:4000"
+
     challenge =
-      :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+      Wax.new_authentication_challenge(
+        rp_id: rp_id,
+        origin: origin,
+        allow_credentials: allow_credentials
+      )
 
     {:noreply,
      socket
      |> assign(:reauth_challenge, challenge)
      |> push_event("create_authentication_challenge", %{
        options: %{
-         challenge: challenge,
+         challenge: Base.url_encode64(challenge.bytes, padding: false),
          timeout: 60_000,
          userVerification: "required"
        }
      })}
   end
 
-  def handle_event("verify_authentication", _params, socket) do
+  def handle_event("verify_authentication", response, socket) do
     Ysc.Logging.info("[ReauthComponent] verify_authentication event received")
-    notify_parent(:reauth_verified)
-    {:noreply, socket}
+
+    challenge = socket.assigns.reauth_challenge
+    user = socket.assigns.user
+
+    if is_nil(challenge) do
+      Ysc.Logging.warning(
+        "[ReauthComponent] Challenge is nil in verify_authentication"
+      )
+
+      {:noreply,
+       assign(
+         socket,
+         :reauth_error,
+         "Authentication session expired. Please try again."
+       )}
+    else
+      try do
+        raw_id_string = response["rawId"] || response["id"]
+        raw_id = Base.url_decode64!(raw_id_string, padding: false)
+
+        authenticator_data =
+          Base.url_decode64!(response["response"]["authenticatorData"],
+            padding: false
+          )
+
+        client_data_json =
+          Base.url_decode64!(response["response"]["clientDataJSON"],
+            padding: false
+          )
+
+        signature =
+          Base.url_decode64!(response["response"]["signature"], padding: false)
+
+        case Accounts.get_user_passkey_by_external_id(raw_id) do
+          nil ->
+            Ysc.Logging.warning(
+              "[ReauthComponent] Passkey not found by external_id"
+            )
+
+            {:noreply,
+             assign(
+               socket,
+               :reauth_error,
+               "Passkey not recognized. Please try again."
+             )}
+
+          passkey ->
+            if passkey.user_id != user.id do
+              Ysc.Logging.error(
+                "[ReauthComponent] Passkey user_id mismatch — possible credential stuffing",
+                passkey_user_id: inspect(passkey.user_id),
+                current_user_id: inspect(user.id)
+              )
+
+              {:noreply,
+               assign(
+                 socket,
+                 :reauth_error,
+                 "Passkey verification failed. Please try again."
+               )}
+            else
+              case Wax.authenticate(
+                     raw_id,
+                     authenticator_data,
+                     signature,
+                     client_data_json,
+                     challenge
+                   ) do
+                {:ok, _auth_data} ->
+                  notify_parent(:reauth_verified)
+                  {:noreply, socket}
+
+                {:error, reason} ->
+                  Ysc.Logging.error("[ReauthComponent] Wax.authenticate failed",
+                    error: inspect(reason),
+                    user_id: user.id
+                  )
+
+                  {:noreply,
+                   assign(
+                     socket,
+                     :reauth_error,
+                     "Passkey authentication failed. Please try again."
+                   )}
+              end
+            end
+        end
+      rescue
+        e ->
+          Ysc.Logging.error("[ReauthComponent] Error decoding passkey response",
+            error: inspect(e)
+          )
+
+          {:noreply,
+           assign(
+             socket,
+             :reauth_error,
+             "Invalid passkey response. Please try again."
+           )}
+      end
+    end
   end
 
   def handle_event("passkey_auth_error", %{"error" => error}, socket) do

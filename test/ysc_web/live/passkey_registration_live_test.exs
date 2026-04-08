@@ -20,19 +20,18 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
 
   describe "Passkey registration page - reauth gate" do
     test "shows reauth modal for new visits (no session reauth)", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
 
-      assert html =~ "Verify Your Identity"
       assert has_element?(view, "#reauth-modal")
-      refute html =~ "Add a Passkey to Your Account"
+      refute has_element?(view, "#passkey-registration")
     end
 
     test "shows registration UI when session reauth is recent", %{conn: conn} do
       conn = with_reauth_verified(conn)
-      {:ok, _view, html} = live(conn, ~p"/users/settings/passkeys/new")
+      {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
 
-      assert html =~ "Add a Passkey to Your Account"
-      refute html =~ "Verify Your Identity"
+      assert has_element?(view, "#passkey-registration")
+      refute has_element?(view, "#reauth-modal")
     end
 
     test "navigates back to security page on cancel", %{conn: conn} do
@@ -60,21 +59,20 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
       refute Process.alive?(view.pid)
     end
 
-    test "shows registration UI after successful component reauth", %{
-      conn: conn
-    } do
+    test "shows registration UI after successful password reauth", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/users/settings/passkeys/new")
 
       assert has_element?(view, "#reauth-modal")
 
       view
-      |> element("#reauth-passkey-hook")
-      |> render_hook("verify_authentication", %{})
+      |> element("#reauth_password_form")
+      |> render_submit(%{
+        "password" => Ysc.AccountsFixtures.valid_user_password()
+      })
 
       render(view)
 
-      html = render(view)
-      assert html =~ "Add a Passkey to Your Account"
+      assert has_element?(view, "#passkey-registration")
       refute has_element?(view, "#reauth-modal")
     end
   end

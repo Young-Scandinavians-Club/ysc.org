@@ -49,27 +49,28 @@ defmodule YscWeb.S3.SimpleS3Upload do
     amz_date = amz_date(expires_at)
     credential = credential(config, expires_at)
 
-    sse_condition =
-      if sse,
-        do: ~s({"x-amz-server-side-encryption": "AES256"},\n        ),
-        else: ""
+    base_conditions = [
+      %{"bucket" => bucket},
+      ["eq", "$key", key],
+      %{"acl" => "public-read"},
+      ["eq", "$Content-Type", content_type],
+      ["content-length-range", 0, max_file_size],
+      %{"x-amz-credential" => credential},
+      %{"x-amz-algorithm" => "AWS4-HMAC-SHA256"},
+      %{"x-amz-date" => amz_date}
+    ]
 
-    encoded_policy =
-      Base.encode64("""
-      {
-        "expiration": "#{DateTime.to_iso8601(expires_at)}",
-        "conditions": [
-          {"bucket":  "#{bucket}"},
-          ["eq", "$key", "#{key}"],
-          {"acl": "public-read"},
-          ["eq", "$Content-Type", "#{content_type}"],
-          ["content-length-range", 0, #{max_file_size}],
-          #{sse_condition}{"x-amz-credential": "#{credential}"},
-          {"x-amz-algorithm": "AWS4-HMAC-SHA256"},
-          {"x-amz-date": "#{amz_date}"}
-        ]
-      }
-      """)
+    conditions =
+      if sse,
+        do: [%{"x-amz-server-side-encryption" => "AES256"} | base_conditions],
+        else: base_conditions
+
+    policy_data = %{
+      "expiration" => DateTime.to_iso8601(expires_at),
+      "conditions" => conditions
+    }
+
+    encoded_policy = policy_data |> Jason.encode!() |> Base.encode64()
 
     base_fields = %{
       "key" => key,

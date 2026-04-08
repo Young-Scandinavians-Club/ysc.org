@@ -30,7 +30,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   defp click_cancel_reauth(view) do
     view
-    |> element("button[phx-click='cancel_reauth']")
+    |> element("#reauth-modal button[phx-click='cancel_reauth']")
     |> render_click()
 
     render(view)
@@ -38,7 +38,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   defp click_reauth_with_passkey(view) do
     view
-    |> element("button[phx-click='reauth_with_passkey']")
+    |> element("#reauth-passkey-hook button[phx-click='reauth_with_passkey']")
     |> render_click()
   end
 
@@ -1781,10 +1781,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      click_reauth_with_passkey(view)
-      assert_push_event(view, "create_authentication_challenge", %{})
-
-      hook_verify_authentication(view)
+      submit_reauth_password(view, Ysc.AccountsFixtures.valid_user_password())
 
       assert render(view) =~ "Verify Your New Email Address"
 

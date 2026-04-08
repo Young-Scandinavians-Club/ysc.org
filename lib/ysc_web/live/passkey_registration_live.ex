@@ -123,86 +123,25 @@ defmodule YscWeb.PasskeyRegistrationLive do
   end
 
   def handle_event("create_passkey", _params, socket) do
-    require Ysc.Logging
-    user = socket.assigns.current_user
-
-    # Set loading state
-    socket = assign(socket, :loading, true)
-
-    # Generate registration challenge
-    # For registration, we need to provide user information
-    user_id_binary = user.id
-
-    try do
-      # Get rp_id and origin from Wax config to ensure consistency
-      rp_id = Application.get_env(:wax_, :rp_id) || "localhost"
-      origin = get_origin()
-
-      challenge =
-        Wax.new_registration_challenge(
-          origin: origin,
-          rp_id: rp_id,
-          user: %{
-            id: user_id_binary,
-            name: user.email,
-            display_name: "#{user.first_name} #{user.last_name}"
-          },
-          user_verification: "preferred",
-          authenticator_selection: %{
-            authenticator_attachment: "platform",
-            user_verification: "preferred",
-            require_resident_key: true
-          }
-        )
-
-      require Ysc.Logging
-
-      # Convert challenge to JSON-serializable format for JS
-      # Note: WebAuthn API requires camelCase keys
-      challenge_json = %{
-        challenge: Base.url_encode64(challenge.bytes, padding: false),
-        timeout: challenge.timeout,
-        rp: %{
-          id: challenge.rp_id,
-          name: "YSC"
-        },
-        user: %{
-          id: Base.url_encode64(user_id_binary, padding: false),
-          name: user.email,
-          displayName: "#{user.first_name} #{user.last_name}"
-        },
-        pubKeyCredParams: [
-          %{type: "public-key", alg: -7},
-          %{type: "public-key", alg: -257}
-        ],
-        authenticatorSelection: %{
-          authenticatorAttachment: "platform",
-          userVerification: "preferred",
-          requireResidentKey: true
-        }
-      }
-
+    if socket.assigns.show_reauth do
       {:noreply,
-       socket
-       |> assign(:passkey_challenge, challenge)
-       |> push_event("create_registration_challenge", %{options: challenge_json})}
-    rescue
-      e ->
-        Ysc.Logging.error(
-          "[PasskeyRegistrationLive] Error creating challenge",
-          %{
-            error: inspect(e),
-            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-          }
-        )
-
-        {:noreply,
-         assign(socket,
-           error: "Failed to create passkey challenge. Please try again.",
-           loading: false,
-           passkey_challenge: nil
-         )}
+       assign(socket,
+         error: "Re-authentication is required before adding a passkey.",
+         loading: false
+       )}
+    else
+      do_create_passkey(socket)
     end
+  end
+
+  def handle_event("verify_registration", _response, socket)
+      when socket.assigns.show_reauth do
+    {:noreply,
+     assign(socket,
+       error: "Re-authentication is required before adding a passkey.",
+       loading: false,
+       passkey_challenge: nil
+     )}
   end
 
   def handle_event("verify_registration", response, socket) do
@@ -446,6 +385,78 @@ defmodule YscWeb.PasskeyRegistrationLive do
   end
 
   def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
+  defp do_create_passkey(socket) do
+    require Ysc.Logging
+
+    user = socket.assigns.current_user
+    user_id_binary = user.id
+
+    socket = assign(socket, :loading, true)
+
+    try do
+      rp_id = Application.get_env(:wax_, :rp_id) || "localhost"
+      origin = get_origin()
+
+      challenge =
+        Wax.new_registration_challenge(
+          origin: origin,
+          rp_id: rp_id,
+          user: %{
+            id: user_id_binary,
+            name: user.email,
+            display_name: "#{user.first_name} #{user.last_name}"
+          },
+          user_verification: "preferred",
+          authenticator_selection: %{
+            authenticator_attachment: "platform",
+            user_verification: "preferred",
+            require_resident_key: true
+          }
+        )
+
+      challenge_json = %{
+        challenge: Base.url_encode64(challenge.bytes, padding: false),
+        timeout: challenge.timeout,
+        rp: %{id: challenge.rp_id, name: "YSC"},
+        user: %{
+          id: Base.url_encode64(user_id_binary, padding: false),
+          name: user.email,
+          displayName: "#{user.first_name} #{user.last_name}"
+        },
+        pubKeyCredParams: [
+          %{type: "public-key", alg: -7},
+          %{type: "public-key", alg: -257}
+        ],
+        authenticatorSelection: %{
+          authenticatorAttachment: "platform",
+          userVerification: "preferred",
+          requireResidentKey: true
+        }
+      }
+
+      {:noreply,
+       socket
+       |> assign(:passkey_challenge, challenge)
+       |> push_event("create_registration_challenge", %{options: challenge_json})}
+    rescue
+      e ->
+        Ysc.Logging.error(
+          "[PasskeyRegistrationLive] Error creating challenge",
+          %{
+            error: inspect(e),
+            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          }
+        )
+
+        {:noreply,
+         assign(socket,
+           error: "Failed to create passkey challenge. Please try again.",
+           loading: false,
+           passkey_challenge: nil
+         )}
+    end
+  end
 
   defp get_origin do
     # Get origin from Wax config

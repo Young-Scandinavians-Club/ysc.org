@@ -27,9 +27,13 @@ defmodule YscWeb.AuthController do
   end
 
   def request(conn, %{"redirect_to" => redirect_to}) do
-    if YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
+    conn =
       conn
-      |> put_session(:oauth_redirect_to, redirect_to)
+      |> delete_session(:reauth_mode)
+      |> delete_session(:reauth_return_to)
+
+    if YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
+      put_session(conn, :oauth_redirect_to, redirect_to)
     else
       conn
     end
@@ -37,14 +41,18 @@ defmodule YscWeb.AuthController do
 
   def request(conn, _params) do
     conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
   end
 
   @doc """
   Handles OAuth callback phase for Google authentication.
   """
   def callback(%{assigns: %{ueberauth_failure: _fails}} = conn, _params) do
-    # User cancelled or OAuth provider returned an error
+    # User cancelled or OAuth provider returned an error — clear any stale reauth flags
     conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
     |> YscWeb.Flash.put_toast(
       :error,
       "Authentication was cancelled or failed. Please try again.",
@@ -65,6 +73,8 @@ defmodule YscWeb.AuthController do
       end
     else
       conn
+      |> delete_session(:reauth_mode)
+      |> delete_session(:reauth_return_to)
       |> YscWeb.Flash.put_toast(
         :error,
         "Unable to retrieve email from your account. Please contact support.",
@@ -75,8 +85,10 @@ defmodule YscWeb.AuthController do
   end
 
   def callback(conn, _params) do
-    # Unexpected state - no auth and no failure
+    # Unexpected state - no auth and no failure — clear any stale reauth flags
     conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
     |> YscWeb.Flash.put_toast(
       :error,
       "Authentication error occurred. Please try again.",

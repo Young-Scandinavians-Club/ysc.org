@@ -2795,12 +2795,21 @@ defmodule YscWeb.UserSettingsLive do
     new_email = user_params["email"]
 
     if new_email != user.email do
-      socket = assign(socket, :pending_email_change, new_email)
+      changeset =
+        user
+        |> Accounts.change_user_email(user_params)
+        |> Map.put(:action, :validate)
 
-      if socket.assigns[:session_reauth_verified] do
-        {:noreply, process_email_change_after_reauth(socket)}
+      if changeset.valid? do
+        socket = assign(socket, :pending_email_change, new_email)
+
+        if reauth_still_valid?(socket) do
+          {:noreply, process_email_change_after_reauth(socket)}
+        else
+          {:noreply, assign(socket, :show_reauth_modal, true)}
+        end
       else
-        {:noreply, assign(socket, :show_reauth_modal, true)}
+        {:noreply, assign(socket, :email_form, to_form(changeset))}
       end
     else
       {:noreply,
@@ -4386,6 +4395,13 @@ defmodule YscWeb.UserSettingsLive do
     |> assign(:reauth_error, nil)
     |> assign(:reauth_verified_at, DateTime.utc_now())
     |> push_patch(to: ~p"/users/settings/email-verification?email=#{new_email}")
+  end
+
+  defp reauth_still_valid?(socket) do
+    case socket.assigns[:session_reauth_expires_at] do
+      ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
+      _ -> false
+    end
   end
 
   defp validate_user_active(user) do

@@ -97,8 +97,8 @@ defmodule Ysc.S3Config do
   outside of production (Tigris) where SSE is available by default.
   """
   def server_side_encryption? do
-    base_url()
-    |> String.contains?("tigris.dev")
+    url = base_url()
+    is_binary(url) && String.contains?(url, "tigris.dev")
   end
 
   @doc """
