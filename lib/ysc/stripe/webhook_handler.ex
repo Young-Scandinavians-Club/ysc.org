@@ -2585,9 +2585,9 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   defp retrieve_payment_intent_with_charges(payment_intent_id) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.PaymentIntent.retrieve(payment_intent_id,
+           Stripe.PaymentIntent.retrieve(payment_intent_id, %{
              expand: ["charges.data.balance_transaction"]
-           )
+           })
          end) do
       {:ok, payment_intent} -> {:ok, payment_intent}
       {:error, reason} -> {:error, reason}

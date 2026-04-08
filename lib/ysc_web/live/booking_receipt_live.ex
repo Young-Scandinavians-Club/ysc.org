@@ -1219,9 +1219,9 @@ defmodule YscWeb.BookingReceiptLive do
 
     # Retrieve payment intent to verify (expand payment_method and charges)
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.PaymentIntent.retrieve(payment_intent_id,
+           Stripe.PaymentIntent.retrieve(payment_intent_id, %{
              expand: ["payment_method", "charges"]
-           )
+           })
          end) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do

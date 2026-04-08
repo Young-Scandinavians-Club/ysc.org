@@ -417,6 +417,8 @@ defmodule YscWeb.PasskeyRegistrationLive do
     {:noreply, socket}
   end
 
+  def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
   defp get_origin do
     # Get origin from Wax config
     Application.get_env(:wax_, :origin) || "http://localhost:4000"
