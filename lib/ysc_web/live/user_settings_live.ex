@@ -206,79 +206,15 @@ defmodule YscWeb.UserSettingsLive do
           </.simple_form>
         </.modal>
 
-        <.modal
+        <.live_component
           :if={@show_reauth_modal}
-          id="reauth-modal"
-          on_cancel={JS.push("cancel_reauth")}
-          show
-        >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
-            Verify Your Identity
-          </h2>
-
-          <p class="text-base text-zinc-600 mb-6">
-            For security reasons, please verify your identity before changing your email address.
-          </p>
-
-          <div id="reauth-methods" class="space-y-4" phx-hook="PasskeyAuth">
-            <!-- Password Authentication Option (if user has a password) -->
-            <div :if={@user_has_password} class="space-y-4">
-              <h3 class="font-semibold text-zinc-900">Verify with your password</h3>
-              <.simple_form
-                for={@reauth_form}
-                id="reauth_password_form"
-                phx-submit="reauth_with_password"
-              >
-                <.input
-                  field={@reauth_form[:password]}
-                  type="password-toggle"
-                  label="Password"
-                  required
-                  autocomplete="current-password"
-                />
-                <%= if @reauth_error do %>
-                  <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p class="text-sm text-red-800">{@reauth_error}</p>
-                  </div>
-                <% end %>
-                <:actions>
-                  <.button phx-disable-with="Verifying..." class="w-full">
-                    Continue
-                  </.button>
-                </:actions>
-              </.simple_form>
-            </div>
-            <!-- Passkey Authentication Option -->
-            <div class="space-y-4">
-              <div :if={@user_has_password} class="relative">
-                <div class="absolute inset-0 flex items-center">
-                  <div class="w-full border-t border-zinc-200"></div>
-                </div>
-                <div class="relative flex justify-center text-sm">
-                  <span class="px-2 bg-white text-zinc-500">OR</span>
-                </div>
-              </div>
-
-              <h3 class="font-semibold text-zinc-900">
-                {if @user_has_password,
-                  do: "Verify with a passkey",
-                  else: "Verify with your passkey"}
-              </h3>
-              <p class="text-sm text-zinc-600">
-                Use your device's fingerprint, face recognition, or security key
-              </p>
-              <.button
-                type="button"
-                phx-click="reauth_with_passkey"
-                phx-disable-with="Verifying..."
-                class="w-full"
-              >
-                <.icon name="hero-finger-print" class="w-5 h-5 me-2" />
-                Continue with Passkey
-              </.button>
-            </div>
-          </div>
-        </.modal>
+          module={YscWeb.ReauthComponent}
+          id="reauth"
+          user={@current_user}
+          user_has_password={@user_has_password}
+          return_to={@request_path}
+          description="For security reasons, please verify your identity before changing your email address."
+        />
 
         <.modal
           :if={@live_action == :payment_method}
@@ -2478,30 +2414,36 @@ defmodule YscWeb.UserSettingsLive do
 
   @impl true
   def mount(%{"token" => token}, _session, socket) do
+    # Only process the token on WebSocket connection, not on the dead render.
+    # If processed on both, the token is consumed on the dead render and the
+    # WebSocket mount would always see it as expired, showing two conflicting toasts.
     socket =
-      case Accounts.update_user_email(socket.assigns.current_user, token) do
-        {:ok, updated_user, new_email} ->
-          # Send notification to old email address for security
-          old_email = socket.assigns.current_user.email
+      if connected?(socket) do
+        case Accounts.update_user_email(socket.assigns.current_user, token) do
+          {:ok, updated_user, new_email} ->
+            old_email = socket.assigns.current_user.email
 
-          UserNotifier.deliver_email_changed_notification(
-            updated_user,
-            old_email,
-            new_email
-          )
+            UserNotifier.deliver_email_changed_notification(
+              updated_user,
+              old_email,
+              new_email
+            )
 
-          YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.",
-            title: "Email",
-            icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
-          )
+            YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.",
+              title: "Email",
+              icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
+            )
 
-        :error ->
-          YscWeb.Flash.put_toast(
-            socket,
-            :error,
-            "Email change link is invalid or it has expired.",
-            title: "Email"
-          )
+          :error ->
+            YscWeb.Flash.put_toast(
+              socket,
+              :error,
+              "Email change link is invalid or it has expired.",
+              title: "Email"
+            )
+        end
+      else
+        socket
       end
 
     {:ok, push_patch(socket, to: ~p"/users/settings")}
@@ -2575,10 +2517,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:change_membership_button, false)
       |> assign(:membership_change_info, nil)
       |> assign(:show_reauth_modal, false)
-      |> assign(:reauth_form, to_form(%{"password" => ""}))
-      |> assign(:reauth_error, nil)
       |> assign(:reauth_verified_at, nil)
-      |> assign(:reauth_challenge, nil)
       |> assign(:pending_email_change, nil)
       |> assign(:user_has_password, !is_nil(user.hashed_password))
       # Placeholder values for async-loaded data
@@ -2781,7 +2720,12 @@ defmodule YscWeb.UserSettingsLive do
         socket
       ) do
     if socket.assigns.user.id == user_id do
-      {:noreply, reload_membership_data(socket)}
+      {:noreply,
+       socket
+       |> reload_membership_data()
+       |> YscWeb.Flash.put_toast(:info, "Your membership has been updated.",
+         title: "Membership"
+       )}
     else
       {:noreply, socket}
     end
@@ -2818,6 +2762,17 @@ defmodule YscWeb.UserSettingsLive do
     end
   end
 
+  def handle_info(:reauth_verified, socket) do
+    {:noreply, process_email_change_after_reauth(socket)}
+  end
+
+  def handle_info(:reauth_cancelled, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_reauth_modal, false)
+     |> assign(:pending_email_change, nil)}
+  end
+
   # Catch-all for messages we don't need to handle (like email deliveries in tests)
   def handle_info(_msg, socket), do: {:noreply, socket}
 
@@ -2839,16 +2794,15 @@ defmodule YscWeb.UserSettingsLive do
     user = socket.assigns.current_user
     new_email = user_params["email"]
 
-    # Check if email actually changed
     if new_email != user.email do
-      # Store pending email change and show re-auth modal
-      {:noreply,
-       socket
-       |> assign(:pending_email_change, new_email)
-       |> assign(:show_reauth_modal, true)
-       |> assign(:reauth_error, nil)}
+      socket = assign(socket, :pending_email_change, new_email)
+
+      if socket.assigns[:session_reauth_verified] do
+        {:noreply, process_email_change_after_reauth(socket)}
+      else
+        {:noreply, assign(socket, :show_reauth_modal, true)}
+      end
     else
-      # Email hasn't changed
       {:noreply,
        YscWeb.Flash.put_toast(
          socket,
@@ -2859,87 +2813,7 @@ defmodule YscWeb.UserSettingsLive do
     end
   end
 
-  def handle_event("cancel_reauth", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_reauth_modal, false)
-     |> assign(:pending_email_change, nil)
-     |> assign(:reauth_error, nil)}
-  end
-
-  def handle_event("reauth_with_password", %{"password" => password}, socket) do
-    user = socket.assigns.current_user
-
-    case Accounts.get_user_by_email_and_password(user.email, password) do
-      nil ->
-        {:noreply,
-         assign(socket, :reauth_error, "Invalid password. Please try again.")}
-
-      _valid_user ->
-        # Password verified, proceed with email change
-        {:noreply, process_email_change_after_reauth(socket)}
-    end
-  end
-
-  def handle_event("reauth_with_passkey", _params, socket) do
-    require Ysc.Logging
-    Ysc.Logging.info("[UserSettingsLive] reauth_with_passkey event received")
-
-    # Generate authentication challenge for passkey
-    challenge =
-      :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-
-    challenge_json = %{
-      challenge: challenge,
-      timeout: 60_000,
-      userVerification: "required"
-    }
-
-    {:noreply,
-     socket
-     |> assign(:reauth_challenge, challenge)
-     |> push_event("create_authentication_challenge", %{options: challenge_json})}
-  end
-
-  def handle_event("verify_authentication", params, socket) do
-    require Ysc.Logging
-
-    Ysc.Logging.info(
-      "[UserSettingsLive] verify_authentication event received for re-auth"
-    )
-
-    Ysc.Logging.debug("Params: #{inspect(params)}")
-
-    # In a full production implementation, you should verify the passkey signature here
-    # against the stored public key and challenge. For now, we trust the browser's
-    # verification since the user is already authenticated in the session.
-
-    # The browser has already verified:
-    # 1. The user's biometric/PIN
-    # 2. The passkey belongs to this domain
-    # 3. The signature is valid
-
-    # Since the user is in an authenticated session and the browser verified their
-    # passkey, we can proceed with the email change
-    {:noreply, process_email_change_after_reauth(socket)}
-  end
-
-  def handle_event("passkey_auth_error", %{"error" => error}, socket) do
-    require Ysc.Logging
-
-    Ysc.Logging.debug(
-      "[UserSettingsLive] Passkey authentication error: #{inspect(error)}"
-    )
-
-    {:noreply,
-     assign(
-       socket,
-       :reauth_error,
-       "Passkey authentication failed. Please try again."
-     )}
-  end
-
-  # PasskeyAuth hook sends these events - we don't need to handle them in user settings
+  # PasskeyAuth hook sends these events to the LiveView (via pushEvent, not pushEventTo)
   def handle_event("passkey_support_detected", _params, socket),
     do: {:noreply, socket}
 
@@ -3339,10 +3213,6 @@ defmodule YscWeb.UserSettingsLive do
         %{"verification_code" => code},
         socket
       ) do
-    require Ysc.Logging
-    Ysc.Logging.debug("=== EMAIL VALIDATION EVENT ===")
-    Ysc.Logging.debug("Validation code: #{inspect(code)}")
-
     # Only allow email code validation if user has pending email verification
     pending_email = socket.assigns.pending_email
 
@@ -3360,62 +3230,32 @@ defmodule YscWeb.UserSettingsLive do
         end
 
       normalized_code = normalize_verification_code(merged_code)
-      # Basic validation - ensure it's 6 digits
+
       is_valid =
         String.length(normalized_code) == 6 &&
           String.match?(normalized_code, ~r/^\d{6}$/)
-
-      Ysc.Logging.debug(
-        "Normalized validation code: #{normalized_code}, is_valid: #{is_valid}"
-      )
 
       {:noreply,
        socket
        |> assign(email_code_valid: is_valid, email_verification_error: nil)
        |> assign(:email_verification_code_state, merged_code)}
     else
-      Ysc.Logging.debug("No pending email for validation")
       {:noreply, socket}
     end
   end
 
   def handle_event("verify_email_code", params, socket) do
-    require Ysc.Logging
-    Ysc.Logging.debug("=== EMAIL VERIFICATION EVENT TRIGGERED ===")
-    Ysc.Logging.debug("Params: #{inspect(params)}")
-
-    Ysc.Logging.debug(
-      "Socket assigns: pending_email=#{socket.assigns.pending_email}, live_action=#{socket.assigns.live_action}"
-    )
-
     # Ensure user has pending email verification
     pending_email = socket.assigns.pending_email
     user = socket.assigns.current_user
 
-    Ysc.Logging.debug(
-      "Pending email: #{pending_email}, User: #{user && user.email}"
-    )
-
     if pending_email do
-      Ysc.Logging.debug("Has pending email, processing verification...")
-
       case params do
         %{"verification_code" => entered_code} ->
-          Ysc.Logging.debug(
-            "Found verification_code in params: #{inspect(entered_code)}"
-          )
-
-          # Handle both OTP array format and single string format
           code = normalize_verification_code(entered_code)
-
-          Ysc.Logging.debug("Normalized code: #{code}")
 
           verification_result =
             Accounts.verify_email_verification_code(user, code)
-
-          Ysc.Logging.debug(
-            "Verification result: #{inspect(verification_result)}"
-          )
 
           case verification_result do
             {:ok, :verified} ->
@@ -3497,8 +3337,6 @@ defmodule YscWeb.UserSettingsLive do
           end
 
         _ ->
-          Ysc.Logging.debug("No verification_code in params")
-
           {:noreply,
            assign(
              socket,
@@ -3507,8 +3345,6 @@ defmodule YscWeb.UserSettingsLive do
            )}
       end
     else
-      Ysc.Logging.debug("No pending email verification")
-
       {:noreply,
        assign(
          socket,
@@ -4522,9 +4358,6 @@ defmodule YscWeb.UserSettingsLive do
       :membership_form,
       to_form(%{"membership_type" => membership_type_str})
     )
-    |> YscWeb.Flash.put_toast(:info, "Your membership has been updated.",
-      title: "Membership"
-    )
   end
 
   defp process_email_change_after_reauth(socket) do
@@ -4553,12 +4386,6 @@ defmodule YscWeb.UserSettingsLive do
     |> assign(:reauth_error, nil)
     |> assign(:reauth_verified_at, DateTime.utc_now())
     |> push_patch(to: ~p"/users/settings/email-verification?email=#{new_email}")
-    |> YscWeb.Flash.put_toast(
-      :info,
-      "Email change initiated. Please verify the code sent to your new email address.",
-      title: "Email",
-      icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
-    )
   end
 
   defp validate_user_active(user) do
@@ -6200,7 +6027,8 @@ defmodule YscWeb.UserSettingsLive do
         key: key,
         content_type: entry.client_type,
         max_file_size: socket.assigns.uploads.avatar.max_file_size,
-        expires_in: :timer.hours(1)
+        expires_in: :timer.hours(1),
+        server_side_encryption: S3Config.server_side_encryption?()
       )
 
     meta = %{

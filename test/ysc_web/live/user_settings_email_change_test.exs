@@ -7,6 +7,47 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
   alias Ysc.Accounts
   alias Ysc.Repo
 
+  # Helpers to target the ReauthComponent which is now a LiveComponent.
+  # Events for reauth (password, passkey, cancel) are handled by the component,
+  # not by the parent UserSettingsLive.
+
+  defp submit_reauth_password(view, password) do
+    view
+    |> element("#reauth_password_form")
+    |> render_submit(%{"password" => password})
+
+    # Flush async :reauth_verified message from component to parent.
+    render(view)
+  end
+
+  defp click_cancel_reauth(view) do
+    view
+    |> element("button[phx-click='cancel_reauth']")
+    |> render_click()
+
+    render(view)
+  end
+
+  defp click_reauth_with_passkey(view) do
+    view
+    |> element("button[phx-click='reauth_with_passkey']")
+    |> render_click()
+  end
+
+  defp hook_verify_authentication(view, params \\ %{}) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("verify_authentication", params)
+
+    render(view)
+  end
+
+  defp hook_passkey_auth_error(view, params) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("passkey_auth_error", params)
+  end
+
   describe "email change - initial request" do
     test "shows email form without current password field", %{conn: conn} do
       user = user_fixture()
@@ -96,17 +137,12 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
 
-      # Trigger re-auth modal
       render_submit(view, "request_email_change", %{
         user: %{email: "newemail@example.com"}
       })
 
-      # Submit correct password
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # Should close modal and redirect to email verification
       refute has_element?(view, "#reauth-modal")
     end
 
@@ -116,20 +152,16 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
 
-      # Trigger re-auth modal
       render_submit(view, "request_email_change", %{
         user: %{email: "newemail@example.com"}
       })
 
-      # Submit wrong password
-      result =
-        render_submit(view, "reauth_with_password", %{
-          password: "wrongpassword"
-        })
+      view
+      |> element("#reauth_password_form")
+      |> render_submit(%{"password" => "wrongpassword"})
 
-      # Should still show modal with error
       assert has_element?(view, "#reauth-modal")
-      assert result =~ "Invalid password"
+      assert render(view) =~ "Invalid password"
     end
 
     test "sends verification code to new email after successful re-auth", %{
@@ -142,17 +174,12 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       new_email = "newemail@example.com"
 
-      # Request email change
       render_submit(view, "request_email_change", %{
         user: %{email: new_email}
       })
 
-      # Re-authenticate with password
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # Verify code was stored
       code = Accounts.get_email_verification_code(user)
       assert code != nil
       assert String.length(code) == 6
@@ -183,15 +210,13 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
 
-      # Trigger re-auth modal
       render_submit(view, "request_email_change", %{
         user: %{email: "newemail@example.com"}
       })
 
-      # Click passkey button
-      render_click(view, "reauth_with_passkey")
+      click_reauth_with_passkey(view)
 
-      # Should have generated a challenge
+      assert_push_event(view, "create_authentication_challenge", %{})
     end
 
     test "processes email change after passkey verification", %{conn: conn} do
@@ -202,27 +227,15 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       new_email = "newemail@example.com"
 
-      # Request email change
       render_submit(view, "request_email_change", %{
         user: %{email: new_email}
       })
 
-      # Initiate passkey auth
-      render_click(view, "reauth_with_passkey")
+      click_reauth_with_passkey(view)
+      assert_push_event(view, "create_authentication_challenge", %{})
 
-      # Simulate successful passkey verification
-      render_hook(view, "verify_authentication", %{
-        "id" => "test-credential-id",
-        "rawId" => Base.encode64("test-raw-id"),
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("test-auth-data"),
-          "clientDataJSON" => Base.encode64("test-client-data"),
-          "signature" => Base.encode64("test-signature")
-        }
-      })
+      hook_verify_authentication(view)
 
-      # Should redirect to email verification
       refute has_element?(view, "#reauth-modal")
     end
 
@@ -232,21 +245,17 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
 
-      # Request email change
       render_submit(view, "request_email_change", %{
         user: %{email: "newemail@example.com"}
       })
 
-      # Simulate passkey error
-      result =
-        render_hook(view, "passkey_auth_error", %{
-          "error" => "NotAllowedError",
-          "message" => "User cancelled"
-        })
+      hook_passkey_auth_error(view, %{
+        "error" => "NotAllowedError",
+        "message" => "User cancelled"
+      })
 
-      # Should still show modal with error
       assert has_element?(view, "#reauth-modal")
-      assert result =~ "Passkey authentication failed"
+      assert render(view) =~ "Passkey authentication failed"
     end
   end
 
@@ -287,26 +296,14 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
 
-      # Request email change
       render_submit(view, "request_email_change", %{
         user: %{email: "newemail@example.com"}
       })
 
-      # Use passkey
-      render_click(view, "reauth_with_passkey")
+      click_reauth_with_passkey(view)
+      hook_verify_authentication(view)
 
-      # Simulate passkey success
-      render_hook(view, "verify_authentication", %{
-        "id" => "test-credential-id",
-        "type" => "public-key",
-        "response" => %{
-          "authenticatorData" => Base.encode64("test-data"),
-          "clientDataJSON" => Base.encode64("test-data"),
-          "signature" => Base.encode64("test-sig")
-        }
-      })
-
-      # Should redirect to verification
+      refute has_element?(view, "#reauth-modal")
     end
   end
 
@@ -317,17 +314,14 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
 
-      # Trigger re-auth modal
       render_submit(view, "request_email_change", %{
         user: %{email: "newemail@example.com"}
       })
 
       assert has_element?(view, "#reauth-modal")
 
-      # Cancel modal
-      render_click(view, "cancel_reauth")
+      click_cancel_reauth(view)
 
-      # Modal should close and pending change cleared
       refute has_element?(view, "#reauth-modal")
     end
   end
@@ -343,14 +337,9 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       new_email = "newemail@example.com"
 
-      # Complete email change request with re-auth
       render_submit(view, "request_email_change", %{user: %{email: new_email}})
+      submit_reauth_password(view, valid_user_password())
 
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
-
-      # Should show email verification modal
       assert has_element?(view, "#email-verification-modal")
       assert render(view) =~ "Verify Your New Email Address"
       assert render(view) =~ new_email
@@ -364,20 +353,12 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       new_email = "newemail@example.com"
 
-      # Complete re-auth
       render_submit(view, "request_email_change", %{user: %{email: new_email}})
+      submit_reauth_password(view, valid_user_password())
 
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
-
-      # Get verification code
       code = Accounts.get_email_verification_code(user)
-
-      # Submit verification code
       render_submit(view, "verify_email_code", %{verification_code: code})
 
-      # Email should be updated
       updated_user = Repo.reload!(user)
       assert updated_user.email == new_email
       assert updated_user.email_verified_at != nil

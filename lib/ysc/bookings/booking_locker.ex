@@ -1455,7 +1455,8 @@ defmodule Ysc.Bookings.BookingLocker do
             "booking_confirmation",
             email_data,
             "",
-            booking.user_id
+            booking.user_id,
+            Ysc.EmailConfig.booking_reply_to(booking.property)
           )
 
         case result do

@@ -61,6 +61,52 @@ defmodule YscWeb.AuthControllerTest do
     }
   end
 
+  describe "request/2 - reauth mode" do
+    test "stores reauth_mode and return_to when reauth=true with valid return_to",
+         %{conn: conn} do
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> AuthController.request(%{
+          "reauth" => "true",
+          "return_to" => "/users/settings/security"
+        })
+
+      assert get_session(conn, :reauth_mode) == true
+      assert get_session(conn, :reauth_return_to) == "/users/settings/security"
+    end
+
+    test "does not store reauth session when return_to is external URL", %{
+      conn: conn
+    } do
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> AuthController.request(%{
+          "reauth" => "true",
+          "return_to" => "https://evil.com"
+        })
+
+      assert get_session(conn, :reauth_mode) == nil
+      assert get_session(conn, :reauth_return_to) == nil
+    end
+
+    test "defaults return_to to / when not provided in reauth mode", %{
+      conn: conn
+    } do
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> AuthController.request(%{"reauth" => "true"})
+
+      assert get_session(conn, :reauth_mode) == true
+      assert get_session(conn, :reauth_return_to) == "/"
+    end
+  end
+
   describe "request/2 - OAuth request phase" do
     test "stores valid internal redirect_to in session", %{conn: conn} do
       redirect_to = "/events"
@@ -427,6 +473,110 @@ defmodule YscWeb.AuthControllerTest do
 
       # Should redirect safely (not to external URL)
       refute redirected_to(conn) =~ "evil.com"
+    end
+  end
+
+  describe "callback/2 - OAuth re-authentication flow" do
+    test "sets reauth_verified_at and redirects back when email matches", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "reauth@example.com"})
+      auth = build_oauth_auth(user.email)
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> fetch_flash()
+        |> init_test_session(%{
+          reauth_mode: true,
+          reauth_return_to: "/users/settings/security"
+        })
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == "/users/settings/security"
+      assert get_session(conn, :reauth_verified_at) != nil
+      assert get_session(conn, :reauth_mode) == nil
+      assert get_session(conn, :reauth_return_to) == nil
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "verified"
+    end
+
+    test "rejects reauth when OAuth email differs from logged-in user email", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "user@example.com"})
+      auth = build_oauth_auth("different@example.com")
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> fetch_flash()
+        |> init_test_session(%{
+          reauth_mode: true,
+          reauth_return_to: "/users/settings/security"
+        })
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == "/users/settings/security"
+      assert get_session(conn, :reauth_verified_at) == nil
+      assert get_session(conn, :reauth_mode) == nil
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "doesn't match"
+    end
+
+    test "reauth is case-insensitive for email comparison", %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "casetest@example.com"})
+      auth = build_oauth_auth("CASETEST@EXAMPLE.COM")
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> fetch_flash()
+        |> init_test_session(%{reauth_mode: true, reauth_return_to: "/"})
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert get_session(conn, :reauth_verified_at) != nil
+    end
+
+    test "redirects to login when session has no user token during reauth", %{
+      conn: conn
+    } do
+      auth = build_oauth_auth("someone@example.com")
+
+      conn =
+        conn
+        |> init_test_session(%{
+          reauth_mode: true,
+          reauth_return_to: "/users/settings/security"
+        })
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      assert get_session(conn, :reauth_mode) == nil
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "expired"
+    end
+
+    test "reauth defaults return_to to / when session value missing", %{
+      conn: conn
+    } do
+      user =
+        user_fixture(%{state: "active", email: "returndefault@example.com"})
+
+      auth = build_oauth_auth(user.email)
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> fetch_flash()
+        |> init_test_session(%{reauth_mode: true})
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == "/"
+      assert get_session(conn, :reauth_verified_at) != nil
     end
   end
 

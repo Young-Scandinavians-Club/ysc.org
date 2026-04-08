@@ -1200,7 +1200,8 @@ defmodule Ysc.Ledgers do
             "booking_refund_processed",
             email_data,
             "",
-            payment.user_id
+            payment.user_id,
+            Ysc.EmailConfig.booking_reply_to(booking.property)
           )
 
         case result do

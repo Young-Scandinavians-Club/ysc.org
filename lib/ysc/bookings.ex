@@ -3119,7 +3119,8 @@ defmodule Ysc.Bookings do
             "booking_refund_pending",
             email_data,
             "",
-            booking.user_id
+            booking.user_id,
+            Ysc.EmailConfig.booking_reply_to(booking.property)
           )
 
         case result do
@@ -3287,7 +3288,8 @@ defmodule Ysc.Bookings do
           "booking_cancellation_cabin_master_notification",
           email_data,
           "",
-          cabin_master.id
+          cabin_master.id,
+          Ysc.EmailConfig.booking_reply_to(booking.property)
         )
 
       case result do
@@ -3356,7 +3358,8 @@ defmodule Ysc.Bookings do
           "booking_cancellation_treasurer_notification",
           email_data,
           "",
-          treasurer.id
+          treasurer.id,
+          Ysc.EmailConfig.booking_reply_to(booking.property)
         )
 
       case result do
@@ -3425,7 +3428,8 @@ defmodule Ysc.Bookings do
             "booking_cancellation_confirmation",
             email_data,
             "",
-            booking.user_id
+            booking.user_id,
+            Ysc.EmailConfig.booking_reply_to(booking.property)
           )
 
         case result do

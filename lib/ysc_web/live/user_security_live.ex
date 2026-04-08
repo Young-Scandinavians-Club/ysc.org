@@ -34,9 +34,6 @@ defmodule YscWeb.UserSecurityLive do
       |> assign(:passkeys_loaded, false)
       |> assign(:active_plan_type, active_plan)
       |> assign(:show_reauth_modal, false)
-      |> assign(:reauth_form, to_form(%{"password" => ""}))
-      |> assign(:reauth_error, nil)
-      |> assign(:reauth_challenge, nil)
       |> assign(:pending_password_change, nil)
       |> assign(:user_has_password, !is_nil(user.hashed_password))
       |> assign(:login_history, [])
@@ -114,106 +111,26 @@ defmodule YscWeb.UserSecurityLive do
     %{"user" => user_params} = params
     user = socket.assigns.current_user
 
-    # Validate the password form first
     changeset =
       user
       |> Accounts.change_user_password(user_params)
       |> Map.put(:action, :validate)
 
     if changeset.valid? do
-      # Store pending password change and show re-auth modal
-      {:noreply,
-       socket
-       |> assign(:pending_password_change, user_params)
-       |> assign(:show_reauth_modal, true)
-       |> assign(:reauth_error, nil)}
+      socket = assign(socket, :pending_password_change, user_params)
+
+      if socket.assigns[:session_reauth_verified] do
+        # Already verified via OAuth reauth — process immediately
+        {:noreply, process_password_change_after_reauth(socket)}
+      else
+        {:noreply, assign(socket, :show_reauth_modal, true)}
+      end
     else
-      # Show validation errors
       {:noreply, assign(socket, password_form: to_form(changeset))}
     end
   end
 
-  def handle_event("cancel_reauth", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_reauth_modal, false)
-     |> assign(:pending_password_change, nil)
-     |> assign(:reauth_error, nil)}
-  end
-
-  def handle_event("reauth_with_password", %{"password" => password}, socket) do
-    user = socket.assigns.current_user
-
-    case Accounts.get_user_by_email_and_password(user.email, password) do
-      nil ->
-        {:noreply,
-         assign(socket, :reauth_error, "Invalid password. Please try again.")}
-
-      _valid_user ->
-        # Password verified, proceed with password change
-        {:noreply, process_password_change_after_reauth(socket)}
-    end
-  end
-
-  def handle_event("reauth_with_passkey", _params, socket) do
-    require Ysc.Logging
-    Ysc.Logging.info("[UserSecurityLive] reauth_with_passkey event received")
-
-    # Generate authentication challenge for passkey
-    challenge =
-      :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-
-    challenge_json = %{
-      challenge: challenge,
-      timeout: 60_000,
-      userVerification: "required"
-    }
-
-    {:noreply,
-     socket
-     |> assign(:reauth_challenge, challenge)
-     |> push_event("create_authentication_challenge", %{options: challenge_json})}
-  end
-
-  def handle_event("verify_authentication", params, socket) do
-    require Ysc.Logging
-
-    Ysc.Logging.info(
-      "[UserSecurityLive] verify_authentication event received for re-auth"
-    )
-
-    Ysc.Logging.debug("Params: #{inspect(params)}")
-
-    # In a full production implementation, you should verify the passkey signature here
-    # against the stored public key and challenge. For now, we trust the browser's
-    # verification since the user is already authenticated in the session.
-
-    # The browser has already verified:
-    # 1. The user's biometric/PIN
-    # 2. The passkey belongs to this domain
-    # 3. The signature is valid
-
-    # Since the user is in an authenticated session and the browser verified their
-    # passkey, we can proceed with the password change
-    {:noreply, process_password_change_after_reauth(socket)}
-  end
-
-  def handle_event("passkey_auth_error", %{"error" => error}, socket) do
-    require Ysc.Logging
-
-    Ysc.Logging.debug(
-      "[UserSecurityLive] Passkey authentication error: #{inspect(error)}"
-    )
-
-    {:noreply,
-     assign(
-       socket,
-       :reauth_error,
-       "Passkey authentication failed. Please try again."
-     )}
-  end
-
-  # PasskeyAuth hook sends these events - we don't need to handle them in security settings
+  # PasskeyAuth hook sends these events to the LiveView (via pushEvent, not pushEventTo)
   def handle_event("passkey_support_detected", _params, socket),
     do: {:noreply, socket}
 
@@ -325,6 +242,21 @@ defmodule YscWeb.UserSecurityLive do
     end
   end
 
+  @impl true
+  def handle_info(:reauth_verified, socket) do
+    {:noreply, process_password_change_after_reauth(socket)}
+  end
+
+  def handle_info(:reauth_cancelled, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_reauth_modal, false)
+     |> assign(:pending_password_change, nil)}
+  end
+
+  # Catch-all: drop unhandled messages (e.g. Swoosh email delivery in tests)
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
   @dialyzer {:nowarn_function, process_password_change_after_reauth: 1}
   defp process_password_change_after_reauth(socket) do
     user = socket.assigns.current_user
@@ -389,83 +321,21 @@ defmodule YscWeb.UserSecurityLive do
   def render(assigns) do
     ~H"""
     <div class="max-w-screen-xl px-4 mx-auto py-8 lg:py-10">
-      <.modal
+      <.live_component
         :if={@show_reauth_modal}
-        id="reauth-modal"
-        on_cancel={JS.push("cancel_reauth")}
-        show
-      >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
-          Verify Your Identity
-        </h2>
-
-        <p class="text-sm text-zinc-600 mb-6">
-          <%= if @user_has_password do %>
-            For security reasons, please verify your identity before changing your password.
-          <% else %>
-            For security reasons, please verify your identity before setting a password.
-          <% end %>
-        </p>
-
-        <div id="reauth-methods-password" class="space-y-4" phx-hook="PasskeyAuth">
-          <!-- Password Authentication Option (if user has a password) -->
-          <div :if={@user_has_password} class="space-y-4">
-            <h3 class="font-semibold text-zinc-900">Verify with your password</h3>
-            <.simple_form
-              for={@reauth_form}
-              id="reauth_password_form"
-              phx-submit="reauth_with_password"
-            >
-              <.input
-                field={@reauth_form[:password]}
-                type="password-toggle"
-                label="Password"
-                required
-                autocomplete="current-password"
-              />
-              <%= if @reauth_error do %>
-                <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                  <p class="text-sm text-red-800">{@reauth_error}</p>
-                </div>
-              <% end %>
-              <:actions>
-                <.button phx-disable-with="Verifying..." class="w-full">
-                  Continue
-                </.button>
-              </:actions>
-            </.simple_form>
-          </div>
-          <!-- Passkey Authentication Option -->
-          <div class="space-y-4">
-            <div :if={@user_has_password} class="relative">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-zinc-200"></div>
-              </div>
-              <div class="relative flex justify-center text-sm">
-                <span class="px-2 bg-white text-zinc-500">OR</span>
-              </div>
-            </div>
-
-            <h3 class="font-semibold text-zinc-900">
-              {if @user_has_password,
-                do: "Verify with a passkey",
-                else: "Verify with your passkey"}
-            </h3>
-            <p class="text-sm text-zinc-600">
-              Use your device's fingerprint, face recognition, or security key
-            </p>
-            <.button
-              type="button"
-              phx-click="reauth_with_passkey"
-              phx-disable-with="Verifying..."
-              class="w-full"
-            >
-              <.icon name="hero-finger-print" class="w-5 h-5 me-2" />
-              Continue with Passkey
-            </.button>
-          </div>
-        </div>
-      </.modal>
+        module={YscWeb.ReauthComponent}
+        id="reauth"
+        user={@current_user}
+        user_has_password={@user_has_password}
+        return_to={@request_path}
+        description={
+          if @user_has_password,
+            do:
+              "For security reasons, please verify your identity before changing your password.",
+            else:
+              "For security reasons, please verify your identity before setting a password."
+        }
+      />
 
       <div class="md:flex md:flex-row md:flex-auto md:grow container mx-auto">
         <ul class="flex-column space-y space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">

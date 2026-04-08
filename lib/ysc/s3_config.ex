@@ -92,6 +92,16 @@ defmodule Ysc.S3Config do
   end
 
   @doc """
+  Returns whether server-side encryption (SSE-S3/AES256) should be requested
+  on uploads. MinIO does not support SSE without KMS, so this is disabled
+  outside of production (Tigris) where SSE is available by default.
+  """
+  def server_side_encryption? do
+    base_url()
+    |> String.contains?("tigris.dev")
+  end
+
+  @doc """
   Returns the S3 endpoint configuration for ExAws.
   """
   def endpoint_config do

@@ -208,8 +208,9 @@ const PasskeyAuth = {
                         });
                     }
 
-                    // Push the result back to the LiveView
-                    this.pushEvent("verify_authentication", credentialJson);
+                    // Push the result to the component if data-push-to is set,
+                    // otherwise fall back to the LiveView (e.g. login page).
+                    this.pushPasskeyEvent("verify_authentication", credentialJson);
                 } else {
                     const errorMsg = "No credential returned from navigator.credentials.get";
                     console.error("[PasskeyAuth]", errorMsg);
@@ -252,7 +253,7 @@ const PasskeyAuth = {
                     }
                 }
 
-                this.pushEvent("passkey_auth_error", {
+                this.pushPasskeyEvent("passkey_auth_error", {
                     error: error.name || "UnknownError",
                     message: error.message || "Authentication failed"
                 });
@@ -514,6 +515,21 @@ const PasskeyAuth = {
                 });
             }
         });
+    },
+
+    /**
+     * Push an event to the component identified by `data-push-to` if present,
+     * otherwise push to the root LiveView. This lets the ReauthComponent receive
+     * verify_authentication and passkey_auth_error directly without the parent
+     * LiveView acting as a relay.
+     */
+    pushPasskeyEvent(event, payload) {
+        const target = this.el.dataset.pushTo;
+        if (target) {
+            this.pushEventTo(`#${target}`, event, payload);
+        } else {
+            this.pushEvent(event, payload);
+        }
     },
 
     reconnected() {

@@ -8,6 +8,48 @@ defmodule YscWeb.UserSecurityLiveTest do
   alias Ysc.Accounts.AuthEvent
   alias Ysc.Repo
 
+  # ---------------------------------------------------------------------------
+  # Helpers for targeting component events
+  # ---------------------------------------------------------------------------
+
+  defp submit_reauth_password(view, password) do
+    view
+    |> element("#reauth_password_form")
+    |> render_submit(%{password: password})
+
+    # Flush :reauth_verified from component to parent handle_info.
+    render(view)
+  end
+
+  defp click_reauth_passkey(view) do
+    view
+    |> element("button[phx-click='reauth_with_passkey']")
+    |> render_click()
+  end
+
+  defp hook_verify_authentication(view, params \\ %{}) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("verify_authentication", params)
+
+    # Flush the :reauth_verified message so handle_info runs before we continue.
+    render(view)
+  end
+
+  defp hook_passkey_auth_error(view, error) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("passkey_auth_error", %{"error" => error})
+  end
+
+  defp click_cancel_reauth(view) do
+    view
+    |> element("button[phx-click='cancel_reauth']")
+    |> render_click()
+  end
+
+  # ---------------------------------------------------------------------------
+
   describe "mount/3" do
     test "loads security settings page with password form", %{conn: conn} do
       user = user_fixture()
@@ -27,7 +69,6 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/users/settings/security")
 
-      # Initial mount shows loading state
       assert html =~ "Loading passkeys..."
     end
 
@@ -46,10 +87,8 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Wait for async task to complete
       render_async(view)
 
-      # After loading, should show empty state or passkeys
       html = render(view)
       refute html =~ "Loading passkeys..."
     end
@@ -60,12 +99,10 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Wait for async task to complete and re-render (generous timeout under parallel test load)
       render_async(view, 500)
 
       html = render(view)
 
-      # Check for either loading state or empty state (async may still be processing)
       assert html =~ "Loading passkeys" or html =~ "Add Passkey"
     end
   end
@@ -157,7 +194,6 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Submit password change request
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -165,7 +201,6 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      # Should show re-auth modal
       assert has_element?(view, "#reauth-modal")
       assert render(view) =~ "Verify Your Identity"
     end
@@ -176,7 +211,6 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Submit password change request
       render_submit(view, "request_password_change", %{
         user: %{
           password: "new valid password 123",
@@ -184,15 +218,10 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      # Re-authenticate with password
-      render_submit(view, "reauth_with_password", %{
-        password: valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      # Should close modal
       refute has_element?(view, "#reauth-modal")
 
-      # Verify password was actually changed
       updated_user = Repo.reload!(user)
 
       assert Accounts.get_user_by_email_and_password(
@@ -217,7 +246,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       assert has_element?(view, "#reauth-modal")
 
-      render_click(view, "cancel_reauth", %{})
+      click_cancel_reauth(view)
 
       refute has_element?(view, "#reauth-modal")
     end
@@ -235,9 +264,7 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      render_submit(view, "reauth_with_password", %{
-        password: "wrong-password-xyz"
-      })
+      submit_reauth_password(view, "wrong-password-xyz")
 
       assert render(view) =~ "Invalid password"
     end
@@ -257,8 +284,7 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      assert render_click(view, "reauth_with_passkey", %{}) =~
-               "Verify Your Identity"
+      assert click_reauth_passkey(view) =~ "Verify Your Identity"
     end
 
     test "verify_authentication completes password change after re-auth modal",
@@ -277,7 +303,7 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      render_click(view, "verify_authentication", %{})
+      hook_verify_authentication(view)
 
       refute has_element?(view, "#reauth-modal")
 
@@ -302,13 +328,13 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
-      render_click(view, "passkey_auth_error", %{"error" => "aborted"})
+      hook_passkey_auth_error(view, "aborted")
 
       assert render(view) =~ "Passkey authentication failed"
     end
   end
 
-  describe "PasskeyAuth hook noop events" do
+  describe "PasskeyAuth hook noop events (sent to LiveView via pushEvent)" do
     test "ignores passkey_support_detected, user_agent_received, and device_detected",
          %{conn: conn} do
       user = user_fixture()
@@ -372,7 +398,6 @@ defmodule YscWeb.UserSecurityLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      # Create a passkey for the user
       {:ok, passkey} =
         Ysc.Accounts.create_user_passkey(user, %{
           external_id: Base.encode64(:crypto.strong_rand_bytes(32)),
@@ -383,10 +408,8 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Wait for passkeys to load
       render_async(view)
 
-      # Delete the passkey
       result =
         view
         |> element("button[phx-value-passkey_id='#{passkey.id}']")
@@ -415,7 +438,6 @@ defmodule YscWeb.UserSecurityLiveTest do
       other_user = user_fixture()
       conn = log_in_user(conn, user)
 
-      # Create a passkey for a different user
       {:ok, other_passkey} =
         Ysc.Accounts.create_user_passkey(other_user, %{
           external_id: Base.encode64(:crypto.strong_rand_bytes(32)),
@@ -440,7 +462,6 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Verify main navigation links are present
       assert has_element?(view, ~s(a[href="/users/settings"]))
       assert has_element?(view, ~s(a[href="/users/membership"]))
       assert has_element?(view, ~s(a[href="/users/payments"]))
@@ -454,7 +475,6 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
-      # Security tab should have active styling
       assert has_element?(
                view,
                ~s(a[href="/users/settings/security"][class*="bg-blue-600"])
@@ -598,7 +618,6 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       html = render(view)
 
-      # Each event shows masked IP "192.168.xxx.xxx"; we limit to 10 so count should be 10
       masked_ip_count =
         html |> String.split("192.168.xxx.xxx") |> length() |> Kernel.-(1)
 
@@ -675,7 +694,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       assert has_element?(view, "#reauth-modal")
       refute render(view) =~ "Verify with your password"
 
-      render_click(view, "verify_authentication", %{})
+      hook_verify_authentication(view)
 
       refute has_element?(view, "#reauth-modal")
 
@@ -685,6 +704,28 @@ defmodule YscWeb.UserSecurityLiveTest do
                updated.email,
                "first password ok 12"
              )
+    end
+  end
+
+  describe "reauth modal shows OAuth options" do
+    test "shows Google and Facebook verification options", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "new valid password 123",
+          password_confirmation: "new valid password 123"
+        }
+      })
+
+      html = render(view)
+      assert html =~ "Continue with Google"
+      assert html =~ "Continue with Facebook"
+      assert has_element?(view, "button[phx-click='reauth_with_google']")
+      assert has_element?(view, "button[phx-click='reauth_with_facebook']")
     end
   end
 

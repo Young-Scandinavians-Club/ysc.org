@@ -17,6 +17,45 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   setup :verify_on_exit!
 
+  # Helpers that target the ReauthComponent (a LiveComponent) rather than the
+  # parent UserSettingsLive, since reauth events are now handled by the component.
+
+  defp submit_reauth_password(view, password) do
+    view
+    |> element("#reauth_password_form")
+    |> render_submit(%{"password" => password})
+
+    render(view)
+  end
+
+  defp click_cancel_reauth(view) do
+    view
+    |> element("button[phx-click='cancel_reauth']")
+    |> render_click()
+
+    render(view)
+  end
+
+  defp click_reauth_with_passkey(view) do
+    view
+    |> element("button[phx-click='reauth_with_passkey']")
+    |> render_click()
+  end
+
+  defp hook_verify_authentication(view, params \\ %{}) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("verify_authentication", params)
+
+    render(view)
+  end
+
+  defp hook_passkey_auth_error(view, params) do
+    view
+    |> element("#reauth-passkey-hook")
+    |> render_hook("passkey_auth_error", params)
+  end
+
   describe "membership PubSub real-time updates" do
     setup %{conn: conn} do
       user = user_fixture(%{state: :active})
@@ -1541,11 +1580,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
-
-      render(view)
+      submit_reauth_password(view, valid_user_password())
 
       render_click(view, "resend_email_code")
       assert render(view) =~ "Verification code sent to your email"
@@ -1664,11 +1699,8 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert has_element?(view, "#reauth-modal")
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
+      submit_reauth_password(view, valid_user_password())
 
-      render(view)
       assert render(view) =~ "Verify Your New Email Address"
 
       render_submit(view, "verify_email_code", %{
@@ -1694,8 +1726,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert has_element?(view, "#reauth-modal")
 
-      render_click(view, "cancel_reauth")
-      render(view)
+      click_cancel_reauth(view)
 
       refute has_element?(view, "#reauth-modal")
     end
@@ -1710,9 +1741,9 @@ defmodule YscWeb.UserSettingsLiveTest do
         }
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => "definitely_wrong_password"
-      })
+      view
+      |> element("#reauth_password_form")
+      |> render_submit(%{"password" => "definitely_wrong_password"})
 
       assert render(view) =~ "Invalid password"
     end
@@ -1727,7 +1758,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         }
       })
 
-      render_click(view, "reauth_with_passkey")
+      click_reauth_with_passkey(view)
 
       assert_push_event(view, "create_authentication_challenge", %{
         options: options
@@ -1750,13 +1781,11 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_click(view, "reauth_with_passkey")
-
+      click_reauth_with_passkey(view)
       assert_push_event(view, "create_authentication_challenge", %{})
 
-      render_click(view, "verify_authentication", %{})
+      hook_verify_authentication(view)
 
-      render(view)
       assert render(view) =~ "Verify Your New Email Address"
 
       render_submit(view, "verify_email_code", %{
@@ -1777,7 +1806,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         }
       })
 
-      render_click(view, "passkey_auth_error", %{"error" => "cancelled"})
+      hook_passkey_auth_error(view, %{"error" => "cancelled"})
 
       assert render(view) =~ "Passkey authentication failed"
     end
@@ -1795,11 +1824,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
-
-      render(view)
+      submit_reauth_password(view, valid_user_password())
 
       render_click(view, "confirm_cancel_email_verification")
 
@@ -1819,11 +1844,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
-
-      render(view)
+      submit_reauth_password(view, valid_user_password())
 
       render_change(view, "validate_email_code", %{
         "verification_code" => %{
@@ -1851,11 +1872,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
-
-      render(view)
+      submit_reauth_password(view, valid_user_password())
 
       render_click(view, "resend_email_code")
 
@@ -1875,11 +1892,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
-
-      render(view)
+      submit_reauth_password(view, valid_user_password())
 
       render_submit(view, "verify_email_code", %{
         "verification_code" => "111111"
@@ -1922,11 +1935,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "user" => %{"email" => new_email}
       })
 
-      render_submit(view, "reauth_with_password", %{
-        "password" => valid_user_password()
-      })
-
-      render(view)
+      submit_reauth_password(view, valid_user_password())
 
       render_submit(view, "verify_email_code", %{})
 

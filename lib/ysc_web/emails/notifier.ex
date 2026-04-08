@@ -79,14 +79,57 @@ defmodule YscWeb.Emails.Notifier do
         template,
         variables,
         text_body,
-        user_id
+        user_id,
+        reply_to_override \\ nil
       ) do
+    reply_to =
+      reply_to_override || Ysc.Accounts.EmailCategories.get_reply_to(template)
+
+    do_schedule_email(
+      recipient,
+      idempotency_key,
+      subject,
+      template,
+      variables,
+      text_body,
+      user_id,
+      reply_to
+    )
+  end
+
+  def schedule_email(
+        recipient,
+        idempotency_key,
+        subject,
+        template,
+        variables,
+        text_body
+      ) do
+    schedule_email(
+      recipient,
+      idempotency_key,
+      subject,
+      template,
+      variables,
+      text_body,
+      nil
+    )
+  end
+
+  defp do_schedule_email(
+         recipient,
+         idempotency_key,
+         subject,
+         template,
+         variables,
+         text_body,
+         user_id,
+         reply_to
+       ) do
     require Ysc.Logging
 
-    # Get category for this template
     category = Ysc.Accounts.EmailCategories.get_category(template)
 
-    # Membership emails get reply-to set to memberships@ysc.org
     base_job_args = %{
       "recipient" => recipient,
       "idempotency_key" => idempotency_key,
@@ -99,9 +142,9 @@ defmodule YscWeb.Emails.Notifier do
     }
 
     job_args =
-      case Ysc.Accounts.EmailCategories.get_reply_to(template) do
+      case reply_to do
         nil -> base_job_args
-        reply_to -> Map.put(base_job_args, "reply_to", reply_to)
+        rt -> Map.put(base_job_args, "reply_to", rt)
       end
 
     job = YscWeb.Workers.EmailNotifier.new(job_args)
@@ -130,25 +173,6 @@ defmodule YscWeb.Emails.Notifier do
 
         error
     end
-  end
-
-  def schedule_email(
-        recipient,
-        idempotency_key,
-        subject,
-        template,
-        variables,
-        text_body
-      ) do
-    schedule_email(
-      recipient,
-      idempotency_key,
-      subject,
-      template,
-      variables,
-      text_body,
-      nil
-    )
   end
 
   def schedule_email_to_board(idempotency_key, subject, template, variables) do
