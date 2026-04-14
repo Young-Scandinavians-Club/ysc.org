@@ -240,23 +240,42 @@ defmodule YscWeb.AdminBookingsLive do
           />
 
           <:actions>
-            <.button phx-click={
-              JS.patch(
-                ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
-              )
-            }>
-              Cancel
-            </.button>
-            <.button
-              type="submit"
-              phx-disable-with={
-                if @live_action == :new_pricing_rule,
-                  do: "Creating...",
-                  else: "Updating..."
-              }
-            >
-              {if @live_action == :new_pricing_rule, do: "Create", else: "Update"}
-            </.button>
+            <div class="flex justify-between w-full">
+              <div>
+                <button
+                  :if={@live_action == :edit_pricing_rule}
+                  type="button"
+                  phx-click="delete-pricing-rule"
+                  phx-value-id={@pricing_rule && @pricing_rule.id}
+                  phx-disable-with="Deleting..."
+                  data-confirm="Are you sure you want to delete this pricing rule?"
+                  class="rounded bg-red-600 hover:bg-red-700 py-2 px-4 transition duration-200 text-sm font-semibold text-white active:text-white/80"
+                >
+                  <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
+                </button>
+              </div>
+              <div class="flex gap-2">
+                <.button phx-click={
+                  JS.patch(
+                    ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
+                  )
+                }>
+                  Cancel
+                </.button>
+                <.button
+                  type="submit"
+                  phx-disable-with={
+                    if @live_action == :new_pricing_rule,
+                      do: "Creating...",
+                      else: "Updating..."
+                  }
+                >
+                  {if @live_action == :new_pricing_rule,
+                    do: "Create",
+                    else: "Update"}
+                </.button>
+              </div>
+            </div>
           </:actions>
         </.simple_form>
       </.modal>
@@ -5740,6 +5759,30 @@ defmodule YscWeb.AdminBookingsLive do
         {:noreply,
          assign(socket, :form, to_form(changeset, as: "pricing_rule"))}
     end
+  end
+
+  def handle_event("delete-pricing-rule", %{"id" => id}, socket) do
+    pricing_rule = Bookings.get_pricing_rule!(id)
+    Bookings.delete_pricing_rule(pricing_rule)
+
+    pricing_rules = Bookings.list_pricing_rules()
+
+    {:noreply,
+     socket
+     |> YscWeb.Flash.put_toast(:info, "Pricing rule deleted successfully",
+       title: "Pricing"
+     )
+     |> assign(:pricing_rules, pricing_rules)
+     |> assign_filtered_data(
+       socket.assigns.selected_property,
+       socket.assigns.seasons,
+       pricing_rules,
+       socket.assigns.refund_policies
+     )
+     |> push_patch(
+       to:
+         ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
+     )}
   end
 
   def handle_event(
