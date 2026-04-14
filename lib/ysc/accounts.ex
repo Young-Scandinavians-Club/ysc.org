@@ -2290,6 +2290,31 @@ defmodule Ysc.Accounts do
         where: is_nil(s.ends_at) or s.ends_at > ^now,
         select: s.user_id
 
+    # Build per-plan subqueries upfront so higher-tier plans can be excluded
+    # from lower-tier filters (e.g. a user with family should not appear in
+    # the single filter, even if they have a stale single subscription item).
+    plan_user_id_subqueries =
+      Map.new([:single, :family], fn plan_type ->
+        price_id =
+          Enum.find_value(membership_plans, fn p ->
+            if p.id == plan_type, do: p.stripe_price_id
+          end)
+
+        subq =
+          if price_id do
+            from s in Ysc.Subscriptions.Subscription,
+              join: si in assoc(s, :subscription_items),
+              where: s.stripe_status in ["active", "trialing"],
+              where:
+                is_nil(s.current_period_end) or s.current_period_end > ^now,
+              where: is_nil(s.ends_at) or s.ends_at > ^now,
+              where: si.stripe_price_id == ^price_id,
+              select: s.user_id
+          end
+
+        {plan_type, subq}
+      end)
+
     condition =
       Enum.reduce(membership_filters, nil, fn type, acc ->
         type_condition =
@@ -2305,24 +2330,28 @@ defmodule Ysc.Accounts do
               )
 
             plan_type when plan_type in [:single, :family] ->
-              price_id =
-                Enum.find_value(membership_plans, fn p ->
-                  if p.id == plan_type, do: p.stripe_price_id
-                end)
+              case Map.get(plan_user_id_subqueries, plan_type) do
+                nil ->
+                  nil
 
-              if price_id do
-                price_sub_query =
-                  from s in Ysc.Subscriptions.Subscription,
-                    join: si in assoc(s, :subscription_items),
-                    where: s.stripe_status in ["active", "trialing"],
-                    where:
-                      is_nil(s.current_period_end) or
-                        s.current_period_end > ^now,
-                    where: is_nil(s.ends_at) or s.ends_at > ^now,
-                    where: si.stripe_price_id == ^price_id,
-                    select: s.user_id
+                price_sub_query ->
+                  # Reflect the user's effective membership (highest-tier wins).
+                  # Exclude users with lifetime and users whose best plan is
+                  # higher-tier (family beats single).
+                  base =
+                    dynamic(
+                      [u],
+                      u.id in subquery(price_sub_query) and
+                        is_nil(u.lifetime_membership_awarded_at)
+                    )
 
-                dynamic([u], u.id in subquery(price_sub_query))
+                  case {plan_type, Map.get(plan_user_id_subqueries, :family)} do
+                    {:single, family_subq} when not is_nil(family_subq) ->
+                      dynamic([u], ^base and u.id not in subquery(family_subq))
+
+                    _ ->
+                      base
+                  end
               end
 
             _ ->

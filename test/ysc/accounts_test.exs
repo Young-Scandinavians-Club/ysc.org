@@ -2376,6 +2376,174 @@ defmodule Ysc.AccountsTest do
       end
     end
 
+    test "does not include upgraded user in single filter when they now have family membership" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      if single_plan && family_plan do
+        user = user_fixture(%{phone_number: unique_user_phone()})
+
+        # Create one subscription with a single item (as if the user signed up for single)
+        # AND a family item (as if they upgraded but the old item was not cleaned up).
+        # This simulates the stale-item scenario after a plan upgrade.
+        {:ok, subscription} =
+          Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_upgrade_test_#{System.unique_integer()}",
+            stripe_status: "active",
+            name: "Membership",
+            current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+          })
+
+        {:ok, _single_item} =
+          Subscriptions.create_subscription_item(%{
+            subscription_id: subscription.id,
+            stripe_price_id: single_plan.stripe_price_id,
+            stripe_product_id: "prod_single_stale",
+            stripe_id: "si_stale_single_#{System.unique_integer()}",
+            quantity: 1
+          })
+
+        {:ok, _family_item} =
+          Subscriptions.create_subscription_item(%{
+            subscription_id: subscription.id,
+            stripe_price_id: family_plan.stripe_price_id,
+            stripe_product_id: "prod_family_new",
+            stripe_id: "si_new_family_#{System.unique_integer()}",
+            quantity: 1
+          })
+
+        single_params = %{
+          "page" => "1",
+          "page_size" => "100",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "single"}
+          }
+        }
+
+        family_params = %{
+          "page" => "1",
+          "page_size" => "100",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "family"}
+          }
+        }
+
+        assert {:ok, {single_users, _}} =
+                 Accounts.list_paginated_users(single_params)
+
+        assert {:ok, {family_users, _}} =
+                 Accounts.list_paginated_users(family_params)
+
+        refute Enum.any?(single_users, &(&1.id == user.id)),
+               "User with both single and family items should NOT appear in single filter"
+
+        assert Enum.any?(family_users, &(&1.id == user.id)),
+               "User with both single and family items SHOULD appear in family filter"
+      end
+    end
+
+    test "user appears in single filter after downgrade from family executes (single item only)" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      if single_plan && family_plan do
+        user = user_fixture(%{phone_number: unique_user_phone()})
+
+        # After the scheduled downgrade executes, the webhook calls
+        # update_subscription_items which inserts the new single item and
+        # deletes the old family item. The DB ends up with only the single item.
+        {:ok, subscription} =
+          Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_downgrade_done_#{System.unique_integer()}",
+            stripe_status: "active",
+            name: "Membership",
+            current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+          })
+
+        {:ok, _single_item} =
+          Subscriptions.create_subscription_item(%{
+            subscription_id: subscription.id,
+            stripe_price_id: single_plan.stripe_price_id,
+            stripe_product_id: "prod_single_new",
+            stripe_id: "si_single_new_#{System.unique_integer()}",
+            quantity: 1
+          })
+
+        single_params = %{
+          "page" => "1",
+          "page_size" => "100",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "single"}
+          }
+        }
+
+        family_params = %{
+          "page" => "1",
+          "page_size" => "100",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "family"}
+          }
+        }
+
+        assert {:ok, {single_users, _}} =
+                 Accounts.list_paginated_users(single_params)
+
+        assert {:ok, {family_users, _}} =
+                 Accounts.list_paginated_users(family_params)
+
+        assert Enum.any?(single_users, &(&1.id == user.id)),
+               "User after completed downgrade SHOULD appear in single filter"
+
+        refute Enum.any?(family_users, &(&1.id == user.id)),
+               "User after completed downgrade should NOT appear in family filter"
+      end
+    end
+
+    test "user still appears in family filter while downgrade is only scheduled (family item still active)" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      if single_plan && family_plan do
+        # The downgrade is scheduled for next renewal, but the subscription
+        # still has the family item — user keeps family access until then.
+        user =
+          user_with_family_subscription(%{phone_number: unique_user_phone()})
+
+        single_params = %{
+          "page" => "1",
+          "page_size" => "100",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "single"}
+          }
+        }
+
+        family_params = %{
+          "page" => "1",
+          "page_size" => "100",
+          "filters" => %{
+            "0" => %{"field" => "membership_type", "value" => "family"}
+          }
+        }
+
+        assert {:ok, {single_users, _}} =
+                 Accounts.list_paginated_users(single_params)
+
+        assert {:ok, {family_users, _}} =
+                 Accounts.list_paginated_users(family_params)
+
+        refute Enum.any?(single_users, &(&1.id == user.id)),
+               "User with pending downgrade should NOT appear in single filter yet"
+
+        assert Enum.any?(family_users, &(&1.id == user.id)),
+               "User with pending downgrade SHOULD still appear in family filter"
+      end
+    end
+
     test "membership_type filter accepts a list of types (OR)" do
       membership_plans = Application.get_env(:ysc, :membership_plans, [])
       family_plan = Enum.find(membership_plans, &(&1.id == :family))

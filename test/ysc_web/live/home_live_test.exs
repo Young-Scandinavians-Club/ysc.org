@@ -205,6 +205,23 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ "Get Membership Now"
     end
 
+    test "shows pending review state for users awaiting board approval", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "pending_approval"})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+      html = render(view)
+
+      assert html =~ "Application Under Review"
+      assert html =~ "Awaiting board review"
+      refute html =~ "Get Membership Now"
+      refute html =~ "Membership Required"
+    end
+
     test "shows expense report launcher for volunteer users", %{conn: conn} do
       user = user_fixture(%{role: "volunteer"})
       conn = log_in_user(conn, user)

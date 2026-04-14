@@ -1570,104 +1570,133 @@ defmodule YscWeb.HomeLive do
             <%!-- Membership Status Card --%>
             <div class={[
               "relative overflow-hidden rounded-xl p-8 text-white shadow-sm",
-              if @active_membership? do
-                "bg-zinc-900"
-              else
-                "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900"
+              cond do
+                @active_membership? ->
+                  "bg-zinc-900"
+
+                @current_user.state == :pending_approval ->
+                  "bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950"
+
+                true ->
+                  "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900"
               end
             ]}>
               <div class="absolute inset-0 z-0 opacity-40">
-                <%= if @active_membership? do %>
-                  <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-blue-500 blur-[80px]">
-                  </div>
-                  <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
-                  </div>
-                  <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-800 blur-[80px]">
-                  </div>
-                <% else %>
-                  <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
-                  </div>
-                  <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
-                  </div>
-                  <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
-                  </div>
+                <%= cond do %>
+                  <% @active_membership? -> %>
+                    <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-blue-500 blur-[80px]">
+                    </div>
+                    <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
+                    </div>
+                    <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-800 blur-[80px]">
+                    </div>
+                  <% @current_user.state == :pending_approval -> %>
+                    <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
+                    </div>
+                    <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
+                    </div>
+                    <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-700 blur-[80px]">
+                    </div>
+                  <% true -> %>
+                    <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
+                    </div>
+                    <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
+                    </div>
+                    <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
+                    </div>
                 <% end %>
               </div>
 
               <div class="relative z-10">
-                <div class={[
-                  "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md backdrop-blur-md",
-                  if @active_membership? do
-                    "bg-white/10"
-                  else
-                    "bg-white/20"
-                  end
-                ]}>
+                <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md backdrop-blur-md bg-white/10">
                   <.icon
-                    name="hero-identification"
+                    name={
+                      if @current_user.state == :pending_approval,
+                        do: "hero-clock",
+                        else: "hero-identification"
+                    }
                     class={[
                       "w-6 h-6",
-                      if @active_membership? do
-                        "text-blue-400"
-                      else
-                        "text-amber-300"
+                      cond do
+                        @active_membership? -> "text-blue-400"
+                        @current_user.state == :pending_approval -> "text-sky-300"
+                        true -> "text-amber-300"
                       end
                     ]}
                   />
                 </div>
 
                 <h2 class="text-2xl font-black tracking-tight mb-2">
-                  {YscWeb.UserAuth.get_membership_plan_display_name(
-                    @current_membership
-                  )}
+                  <%= cond do %>
+                    <% @current_user.state == :pending_approval -> %>
+                      Application Under Review
+                    <% true -> %>
+                      {YscWeb.UserAuth.get_membership_plan_display_name(
+                        @current_membership
+                      )}
+                  <% end %>
                 </h2>
                 <p class={[
                   "text-base leading-relaxed mb-8",
-                  if @active_membership? do
-                    "text-zinc-300"
-                  else
-                    "text-amber-100 font-semibold"
+                  cond do
+                    @active_membership? -> "text-zinc-300"
+                    @current_user.state == :pending_approval -> "text-sky-100"
+                    true -> "text-amber-100 font-semibold"
                   end
                 ]}>
-                  <%= if @active_membership? do %>
-                    {get_membership_description(
-                      @current_membership,
-                      @is_sub_account || false,
-                      @primary_user
-                    )}
-                  <% else %>
-                    <span class="block mb-2 font-bold text-white">
-                      Membership Required
-                    </span>
-                    <%= if @current_membership == nil do %>
-                      You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
-                    <% else %>
-                      Your membership has expired. Renew now to continue enjoying all YSC benefits including cabin access and exclusive events.
-                    <% end %>
+                  <%= cond do %>
+                    <% @active_membership? -> %>
+                      {get_membership_description(
+                        @current_membership,
+                        @is_sub_account || false,
+                        @primary_user
+                      )}
+                    <% @current_user.state == :pending_approval -> %>
+                      <span class="block mb-2 font-bold text-white">
+                        Pending Approval
+                      </span>
+                      Your membership application has been submitted and is being reviewed by the board. You'll receive an email once a decision has been made.
+                    <% true -> %>
+                      <span class="block mb-2 font-bold text-white">
+                        Membership Required
+                      </span>
+                      <%= if @current_membership == nil do %>
+                        You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
+                      <% else %>
+                        Your membership has expired. Renew now to continue enjoying all YSC benefits including cabin access and exclusive events.
+                      <% end %>
                   <% end %>
                 </p>
 
-                <.link
-                  navigate={~p"/users/membership"}
-                  class={[
-                    "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
-                    if(@active_membership?,
-                      do: "bg-white text-zinc-900 hover:bg-blue-50",
-                      else:
-                        "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
-                    )
-                  ]}
-                >
-                  <%= if @active_membership? do %>
-                    Manage Membership
-                  <% else %>
-                    <%= if @current_membership == nil do %>
-                      Get Membership Now
-                    <% else %>
-                      Renew Membership
-                    <% end %>
-                  <% end %>
-                </.link>
+                <%= cond do %>
+                  <% @current_user.state == :pending_approval -> %>
+                    <div class="flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 bg-white/10 text-sky-100 border border-white/20 backdrop-blur-md">
+                      <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
+                      Awaiting board review
+                    </div>
+                  <% true -> %>
+                    <.link
+                      navigate={~p"/users/membership"}
+                      class={[
+                        "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
+                        if(@active_membership?,
+                          do: "bg-white text-zinc-900 hover:bg-blue-50",
+                          else:
+                            "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
+                        )
+                      ]}
+                    >
+                      <%= if @active_membership? do %>
+                        Manage Membership
+                      <% else %>
+                        <%= if @current_membership == nil do %>
+                          Get Membership Now
+                        <% else %>
+                          Renew Membership
+                        <% end %>
+                      <% end %>
+                    </.link>
+                <% end %>
 
                 <button
                   :if={@active_membership?}
