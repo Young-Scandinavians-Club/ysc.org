@@ -1283,19 +1283,20 @@ defmodule Ysc.BookingsTest do
 
   describe "refund calculations" do
     test "calculate_refund/2 calculates refund amount" do
+      # Deactivate any active policy left over from earlier tests in this shared-sandbox
+      # module so calculate_refund always follows the deterministic "no policy" path.
+      from(p in Ysc.Bookings.RefundPolicy,
+        where: p.property == ^:tahoe,
+        where: p.booking_mode == ^:buyout,
+        where: p.is_active == true
+      )
+      |> Ysc.Repo.update_all(set: [is_active: false])
+
       booking = booking_fixture(%{total_price: Money.new(10_000, :USD)})
       cancellation_date = Date.utc_today()
 
-      result = Bookings.calculate_refund(booking, cancellation_date)
-      # Function returns {:ok, refund_amount, rule} or {:ok, nil, nil}
-      assert {:ok, refund_amount, _rule} = result
-
-      # If there's no policy, refund_amount will be nil, otherwise it's a Money struct
-      if refund_amount == nil do
-        assert refund_amount == nil
-      else
-        assert %Money{} = refund_amount
-      end
+      assert {:ok, nil, nil} =
+               Bookings.calculate_refund(booking, cancellation_date)
     end
 
     test "get_booking_payment_amount/1 returns payment amount for booking" do
