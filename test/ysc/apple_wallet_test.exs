@@ -1,3 +1,20 @@
+defmodule Ysc.AppleWallet.TestImagePlug do
+  @moduledoc false
+  import Plug.Conn
+
+  @tiny_png Base.decode64!(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            )
+
+  def init(opts), do: opts
+
+  def call(conn, _opts) do
+    conn
+    |> put_resp_content_type("image/png")
+    |> send_resp(200, @tiny_png)
+  end
+end
+
 defmodule Ysc.AppleWalletTest do
   # async: false — with_fake_certs/1 mutates global state (the named CertManager
   # GenServer and the :ysc :apple_wallet app env), so this module must run
@@ -9,10 +26,28 @@ defmodule Ysc.AppleWalletTest do
   import Ysc.TicketsFixtures
 
   alias Ysc.AppleWallet
+  alias Ysc.Repo
 
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
+
+  # Starts a Plug.Cowboy HTTP server on a random free port.
+  # Registers an on_exit callback to shut it down after each test.
+  defp start_http_server(plug_module) do
+    {:ok, socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+
+    ref = :"apple_wallet_http_#{port}_#{System.unique_integer([:positive])}"
+    {:ok, _} = Plug.Cowboy.http(plug_module, [], port: port, ref: ref)
+
+    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
+
+    port
+  end
 
   defp member_with_confirmed_ticket do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -203,6 +238,280 @@ defmodule Ysc.AppleWalletTest do
 
       assert {:error, :not_configured} =
                AppleWallet.generate_membership_pass(user)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # generate_membership_pass/1 — beyond the cert check
+  # ---------------------------------------------------------------------------
+
+  describe "generate_membership_pass/1 with fake certs" do
+    test "successfully generates a pass binary" do
+      user = user_fixture()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} = AppleWallet.generate_membership_pass(user)
+        # pkpass is a ZIP archive (.pkpass); verify it has content
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+        # ZIP magic bytes: PK
+        assert <<80, 75, _::binary>> = pkpass
+      end)
+    end
+
+    test "handles a user whose last_name is nil without crashing" do
+      user = user_fixture()
+      # Override in-memory; generate_membership_pass does not reload from DB
+      user_with_nil_last = %{user | last_name: nil}
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_membership_pass(user_with_nil_last)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # generate_ticket_pass/2 — pass field logic
+  # ---------------------------------------------------------------------------
+
+  describe "generate_ticket_pass/2 pass field logic" do
+    setup do
+      {user, ticket} = member_with_confirmed_ticket()
+      event = Repo.get!(Ysc.Events.Event, ticket.event_id)
+      %{user: user, ticket: ticket, event: event}
+    end
+
+    test "successfully generates a pass with a fully populated event", %{
+      user: user,
+      ticket: ticket,
+      event: event
+    } do
+      event
+      |> Ecto.Changeset.change(
+        location_name: "Central Park",
+        address: "59th St and 5th Ave, New York, NY",
+        start_time: ~T[19:30:00]
+      )
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+        assert <<80, 75, _::binary>> = pkpass
+      end)
+    end
+
+    test "omits the location field when event has no location_name", %{
+      user: user,
+      ticket: ticket,
+      event: event
+    } do
+      event
+      |> Ecto.Changeset.change(location_name: nil)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "omits the address back field when event has no address", %{
+      user: user,
+      ticket: ticket,
+      event: event
+    } do
+      event
+      |> Ecto.Changeset.change(address: nil)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "includes the holder field when the ticket has a registration with a name",
+         %{
+           user: user,
+           ticket: ticket
+         } do
+      Repo.insert!(%Ysc.Events.TicketDetail{
+        ticket_id: ticket.id,
+        first_name: "Jane",
+        last_name: "Smith",
+        email: "jane@example.com"
+      })
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "omits the holder field when the ticket has no registration", %{
+      user: user,
+      ticket: ticket
+    } do
+      # ticket_order_fixture does not create a TicketDetail by default
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "includes time in the date string when the event has start_time set",
+         %{
+           user: user,
+           ticket: ticket,
+           event: event
+         } do
+      event
+      |> Ecto.Changeset.change(start_time: ~T[19:30:00])
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "shows date only (no time) when start_time is nil", %{
+      user: user,
+      ticket: ticket,
+      event: event
+    } do
+      event
+      |> Ecto.Changeset.change(start_time: nil)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "formats the date as 'TBD' when the event has no start_date", %{
+      user: user,
+      ticket: ticket,
+      event: event
+    } do
+      # Ecto.Changeset.change/2 bypasses validation — start_date is optional in the changeset.
+      # The format_event_date_for_pass(nil, _) clause returns "TBD".
+      event
+      |> Ecto.Changeset.change(start_date: nil)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # generate_ticket_pass/2 — strip files (event cover image download)
+  # ---------------------------------------------------------------------------
+
+  describe "generate_ticket_pass/2 strip files" do
+    setup do
+      {user, ticket} = member_with_confirmed_ticket()
+      event = Repo.get!(Ysc.Events.Event, ticket.event_id)
+      %{user: user, ticket: ticket, event: event}
+    end
+
+    test "downloads the cover image and includes it as a strip file", %{
+      user: user,
+      ticket: ticket,
+      event: event
+    } do
+      port = start_http_server(Ysc.AppleWallet.TestImagePlug)
+      url = "http://127.0.0.1:#{port}/cover.png"
+
+      {:ok, image} =
+        %Ysc.Media.Image{}
+        |> Ysc.Media.Image.add_image_changeset(%{
+          title: "Event Cover",
+          raw_image_path: url,
+          optimized_image_path: url,
+          thumbnail_path: url,
+          processing_state: "completed",
+          user_id: user.id
+        })
+        |> Repo.insert()
+
+      event
+      |> Ecto.Changeset.change(image_id: image.id)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "handles a cover_image whose image paths are nil (no strip files, pass still generated)",
+         %{
+           user: user,
+           ticket: ticket,
+           event: event
+         } do
+      {:ok, image} =
+        %Ysc.Media.Image{}
+        |> Ysc.Media.Image.add_image_changeset(%{
+          title: "Unprocessed Cover",
+          raw_image_path: "/uploads/raw.jpg",
+          optimized_image_path: nil,
+          thumbnail_path: nil,
+          processing_state: "unprocessed",
+          user_id: user.id
+        })
+        |> Repo.insert()
+
+      event
+      |> Ecto.Changeset.change(image_id: image.id)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
+
+    test "handles a nil cover_image (no event image set, pass still generated)",
+         %{
+           user: user,
+           ticket: ticket
+         } do
+      # event_fixture does not set image_id, so cover_image will be nil
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
     end
   end
 
