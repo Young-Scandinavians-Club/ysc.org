@@ -256,9 +256,19 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button phx-click={
-                  JS.patch(
-                    ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
-                  )
+                  query_params =
+                    build_booking_modal_close_params(
+                      @selected_property,
+                      @calendar_start_date,
+                      @calendar_end_date,
+                      @current_section,
+                      @reservation_params
+                    )
+
+                  query_string =
+                    URI.encode_query(flatten_query_params(query_params))
+
+                  JS.patch("/admin/bookings?#{query_string}")
                 }>
                   Cancel
                 </.button>
@@ -5763,26 +5773,46 @@ defmodule YscWeb.AdminBookingsLive do
 
   def handle_event("delete-pricing-rule", %{"id" => id}, socket) do
     pricing_rule = Bookings.get_pricing_rule!(id)
-    Bookings.delete_pricing_rule(pricing_rule)
 
-    pricing_rules = Bookings.list_pricing_rules()
+    case Bookings.delete_pricing_rule(pricing_rule) do
+      {:ok, _deleted} ->
+        pricing_rules = Bookings.list_pricing_rules()
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Pricing rule deleted successfully",
-       title: "Pricing"
-     )
-     |> assign(:pricing_rules, pricing_rules)
-     |> assign_filtered_data(
-       socket.assigns.selected_property,
-       socket.assigns.seasons,
-       pricing_rules,
-       socket.assigns.refund_policies
-     )
-     |> push_patch(
-       to:
-         ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
-     )}
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Pricing rule deleted successfully",
+           title: "Pricing"
+         )
+         |> assign(:pricing_rules, pricing_rules)
+         |> assign_filtered_data(
+           socket.assigns.selected_property,
+           socket.assigns.seasons,
+           pricing_rules,
+           socket.assigns.refund_policies
+         )
+         |> push_patch(
+           to:
+             ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
+         )}
+
+      {:error, changeset} ->
+        error_message =
+          Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+            Enum.reduce(opts, msg, fn {key, value}, acc ->
+              String.replace(acc, "%{#{key}}", to_string(value))
+            end)
+          end)
+          |> Enum.map_join("; ", fn {field, errors} ->
+            "#{field}: #{Enum.join(errors, ", ")}"
+          end)
+
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to delete pricing rule: #{error_message}"
+         )}
+    end
   end
 
   def handle_event(
