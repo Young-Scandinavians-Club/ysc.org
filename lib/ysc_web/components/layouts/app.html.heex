@@ -109,6 +109,14 @@
                       </li>
                       <li>
                         <.link
+                          navigate={~p"/choir"}
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
+                        >
+                          YSC Choir
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
                           navigate={~p"/history"}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
@@ -262,6 +270,29 @@
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Newsletters
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          navigate={~p"/choir"}
+                          phx-click={
+                            JS.remove_class("open",
+                              to: "#navbar-dropdown-hamburger"
+                            )
+                            |> JS.add_class("hidden",
+                              to: "#navbar-dropdown-overlay"
+                            )
+                            |> JS.add_class("-translate-x-full",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("translate-x-0",
+                              to: "#navbar-dropdown"
+                            )
+                            |> JS.remove_class("overflow-hidden", to: "body")
+                          }
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
+                        >
+                          YSC Choir
                         </.link>
                       </li>
                       <li>

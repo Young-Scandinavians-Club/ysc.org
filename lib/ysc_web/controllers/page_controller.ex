@@ -170,6 +170,16 @@ defmodule YscWeb.PageController do
     |> render(:financials)
   end
 
+  def choir(conn, _params) do
+    conn
+    |> assign(:page_title, "YSC Choir")
+    |> assign(
+      :meta_description,
+      "Join the YSC Choir — a welcoming community choir celebrating Scandinavian music and culture. Learn about rehearsal schedules, location, and how to get involved."
+    )
+    |> render(:choir)
+  end
+
   def pending_review(conn, _params) do
     accounts_module = Application.get_env(:ysc, :accounts_module, Ysc.Accounts)
     current_user = conn.assigns.current_user

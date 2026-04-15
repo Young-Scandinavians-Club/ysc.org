@@ -1460,7 +1460,7 @@ defmodule YscWeb.HomeLive do
                 </p>
                 <.link
                   navigate={~p"/events"}
-                  class="inline-flex items-center px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-bold rounded transition-colors"
+                  class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-zinc-900 hover:bg-zinc-800 text-white active:text-white/80 active:scale-[0.98] active:transition-none"
                 >
                   Browse Events
                 </.link>
