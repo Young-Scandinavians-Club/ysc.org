@@ -1734,7 +1734,11 @@ defmodule YscWeb.HomeLive do
                 <p class="text-sm text-zinc-500 mb-5">
                   Show this to an admin for membership verification
                 </p>
-                <.qr_code data={@membership_qr_token} size={250} class="mx-auto" />
+                <.qr_code
+                  data={@membership_qr_token}
+                  size={250}
+                  class="mx-auto p-2 rounded-lg border border-1"
+                />
                 <%= if @apple_wallet_membership_enabled? &&
                       @wallet_platform in [:apple_only, :both] do %>
                   <div class="flex justify-center mt-4">

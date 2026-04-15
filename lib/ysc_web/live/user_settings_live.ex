@@ -521,7 +521,13 @@ defmodule YscWeb.UserSettingsLive do
               <div class="flex items-start gap-6">
                 <%!-- Current avatar (large) --%>
                 <div class="shrink-0 relative">
+                  <div
+                    :if={@loading_avatars}
+                    class="w-24 h-24 rounded-full bg-zinc-200 animate-pulse"
+                  >
+                  </div>
                   <.user_avatar_image
+                    :if={!@loading_avatars}
                     user={@user}
                     avatar_url={@current_avatar_url}
                     class={
@@ -669,7 +675,17 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
 
                   <%!-- Avatar library --%>
-                  <div :if={@user_avatars != []} class="pt-2">
+                  <div :if={@loading_avatars} class="pt-2">
+                    <div class="h-4 w-20 bg-zinc-200 rounded animate-pulse mb-2">
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <%= for _i <- 1..4 do %>
+                        <div class="w-14 h-14 rounded-full bg-zinc-200 animate-pulse">
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                  <div :if={!@loading_avatars && @user_avatars != []} class="pt-2">
                     <p class="text-sm font-bold text-zinc-900 mb-2">
                       Your photos
                     </p>
@@ -681,6 +697,7 @@ defmodule YscWeb.UserSettingsLive do
                             phx-click="select_avatar"
                             phx-value-id={avatar.id}
                             id={"avatar-#{avatar.id}"}
+                            disabled={@selecting_avatar_id == avatar.id}
                             class={[
                               "w-14 h-14 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
                               if(@user.current_avatar_id == avatar.id,
@@ -695,6 +712,33 @@ defmodule YscWeb.UserSettingsLive do
                               class="w-full h-full object-cover"
                             />
                           </button>
+                          <div
+                            :if={@selecting_avatar_id == avatar.id}
+                            class="absolute inset-0 flex items-center justify-center rounded-full bg-white/60"
+                          >
+                            <svg
+                              class="animate-spin w-5 h-5 text-blue-600"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                class="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                stroke-width="4"
+                              >
+                              </circle>
+                              <path
+                                class="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                              >
+                              </path>
+                            </svg>
+                          </div>
                           <%!-- Source badge for OAuth-synced avatars --%>
                           <%= cond do %>
                             <% avatar.source == :google -> %>
@@ -2567,6 +2611,8 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:user_avatars, [])
       |> assign(:current_avatar_url, nil)
       |> assign(:avatar_processing, false)
+      |> assign(:selecting_avatar_id, nil)
+      |> assign(:loading_avatars, true)
       |> allow_upload(:avatar,
         accept: ~w(.jpg .jpeg .png .webp .gif),
         max_entries: 1,
@@ -2684,6 +2730,7 @@ defmodule YscWeb.UserSettingsLive do
        to_form(%{"membership_type" => membership_type_to_select})
      )
      |> assign(:user_avatars, load_user_avatars(user))
+     |> assign(:loading_avatars, false)
      |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
   end
 
@@ -2906,11 +2953,13 @@ defmodule YscWeb.UserSettingsLive do
 
   def handle_event("select_avatar", %{"id" => avatar_id}, socket) do
     user = socket.assigns.current_user
+    socket = assign(socket, :selecting_avatar_id, avatar_id)
 
     case Avatars.set_current_avatar(user, avatar_id) do
       {:ok, updated_user} ->
         {:noreply,
          socket
+         |> assign(:selecting_avatar_id, nil)
          |> assign(:user, updated_user)
          |> assign(
            :current_avatar_url,
@@ -2922,8 +2971,9 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, _} ->
         {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
+         socket
+         |> assign(:selecting_avatar_id, nil)
+         |> YscWeb.Flash.put_toast(
            :error,
            "Could not update profile picture.",
            title: "Profile Picture"

@@ -2422,13 +2422,13 @@ defmodule YscWeb.TahoeBookingLive do
                     }
                     class="pt-2"
                   >
-                    <label class="flex items-start gap-2 cursor-pointer">
+                    <label class="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         id="terms-agreement"
                         phx-click="toggle-terms-agreement"
                         checked={@terms_agreed}
-                        class="mt-1 items-center"
+                        class="shrink-0"
                       />
                       <span class="text-xs text-zinc-600">
                         I have read and agree to the Tahoe Cabin <button
