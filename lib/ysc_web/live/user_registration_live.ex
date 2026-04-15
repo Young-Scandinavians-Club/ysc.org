@@ -174,19 +174,22 @@ defmodule YscWeb.UserRegistrationLive do
 
                 <div :if={!@trigger_submit}>
                   <.inputs_for :let={nested_f} field={@form[:family_members]}>
-                    <div class="relative mb-3 rounded-lg border border-zinc-200 p-3 space-y-2 sm:mb-0 sm:flex sm:items-start sm:space-y-0 sm:gap-3 sm:rounded-none sm:border-0 sm:p-0">
+                    <div class="relative mb-2 last:mb-0 rounded-lg border border-zinc-200 p-3 pr-10">
                       <input
                         type="hidden"
                         name="user[family_members_order][]"
                         value={nested_f.index}
                       />
-                      <.input
-                        type="select"
-                        options={[Spouse: "spouse", Child: "child"]}
-                        field={nested_f[:type]}
-                        label="Type"
-                      />
-                      <div class="grid grid-cols-2 gap-x-3 sm:contents">
+                      <%!-- Row 1: Type + First Name + Last Name --%>
+                      <div class="grid grid-cols-2 gap-3 sm:grid-cols-[7.5rem_1fr_1fr]">
+                        <div class="col-span-2 sm:col-span-1">
+                          <.input
+                            type="select"
+                            options={[Spouse: "spouse", Child: "child"]}
+                            field={nested_f[:type]}
+                            label="Type"
+                          />
+                        </div>
                         <.input
                           type="text"
                           field={nested_f[:first_name]}
@@ -200,14 +203,18 @@ defmodule YscWeb.UserRegistrationLive do
                           label="Last Name"
                         />
                       </div>
-                      <.input
-                        type="date-text"
-                        field={nested_f[:birth_date]}
-                        placeholder="Birth Date"
-                        label="Birth Date"
-                        max={@today_max}
-                      />
-                      <label class="absolute top-2 right-2 sm:top-0 cursor-pointer">
+                      <%!-- Row 2: Birth Date --%>
+                      <div class="mt-3">
+                        <.input
+                          type="date-text"
+                          field={nested_f[:birth_date]}
+                          placeholder="Birth Date"
+                          label="Birth Date"
+                          max={@today_max}
+                        />
+                      </div>
+                      <%!-- Delete button: always absolute top-right --%>
+                      <label class="absolute top-2.5 right-2.5 cursor-pointer">
                         <input
                           type="checkbox"
                           name="user[family_members_delete][]"

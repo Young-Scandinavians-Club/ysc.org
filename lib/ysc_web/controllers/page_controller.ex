@@ -181,27 +181,38 @@ defmodule YscWeb.PageController do
   end
 
   def pending_review(conn, _params) do
-    accounts_module = Application.get_env(:ysc, :accounts_module, Ysc.Accounts)
     current_user = conn.assigns.current_user
 
-    submitted_application_at =
-      accounts_module.get_signup_application_submission_date(current_user.id)
+    if current_user.state == :active do
+      conn
+      |> redirect(to: ~p"/")
+    else
+      accounts_module =
+        Application.get_env(:ysc, :accounts_module, Ysc.Accounts)
 
-    submitted_date = submitted_application_at[:submit_date]
+      submitted_application_at =
+        accounts_module.get_signup_application_submission_date(current_user.id)
 
-    timezone =
-      case submitted_application_at[:timezone] do
-        nil -> "America/Los_Angeles"
-        v -> v
-      end
+      submitted_date = submitted_application_at[:submit_date]
 
-    local_date = Timex.Timezone.convert(submitted_date, timezone)
-    days_ago = Timex.from_now(submitted_date)
+      timezone =
+        case submitted_application_at[:timezone] do
+          nil -> "America/Los_Angeles"
+          v -> v
+        end
 
-    conn
-    |> assign(:application_submitted_date, local_date)
-    |> assign(:time_delta, days_ago)
-    |> assign(:page_title, "Account Pending Review")
-    |> render(:pending_review)
+      local_date = Timex.Timezone.convert(submitted_date, timezone)
+      days_ago = Timex.from_now(submitted_date)
+
+      has_payment_method =
+        not is_nil(Ysc.Payments.get_default_payment_method(current_user))
+
+      conn
+      |> assign(:application_submitted_date, local_date)
+      |> assign(:time_delta, days_ago)
+      |> assign(:has_payment_method, has_payment_method)
+      |> assign(:page_title, "Account Pending Review")
+      |> render(:pending_review)
+    end
   end
 end

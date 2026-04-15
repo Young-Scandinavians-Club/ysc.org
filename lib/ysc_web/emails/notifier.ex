@@ -20,6 +20,8 @@ defmodule YscWeb.Emails.Notifier do
     "account_setup_verification" => YscWeb.Emails.AccountSetupVerification,
     "application_rejected" => YscWeb.Emails.ApplicationRejected,
     "application_approved" => YscWeb.Emails.ApplicationApproved,
+    "application_approved_payment_success" =>
+      YscWeb.Emails.ApplicationApprovedPaymentSuccess,
     "application_approved_family_linked" =>
       YscWeb.Emails.ApplicationApprovedFamilyLinked,
     "application_submitted" => YscWeb.Emails.ApplicationSubmitted,
