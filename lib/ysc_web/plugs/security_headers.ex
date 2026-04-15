@@ -168,12 +168,12 @@ defmodule YscWeb.Plugs.SecurityHeaders do
       |> Enum.join(" ")
 
     # Frame sources - allow Stripe (including sub-origins and hooks for 3DS redirects),
-    # Cloudflare Turnstile, and localhost for dev tools
+    # Cloudflare Turnstile, Google Calendar embed, and localhost for dev tools
     frame_src =
       if is_dev do
-        "'self' http://localhost:* https://localhost:* https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com"
+        "'self' http://localhost:* https://localhost:* https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com https://calendar.google.com"
       else
-        "'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com"
+        "'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com https://calendar.google.com"
       end
 
     # Worker sources - allow blob: workers (Radar library creates workers from blob URLs)

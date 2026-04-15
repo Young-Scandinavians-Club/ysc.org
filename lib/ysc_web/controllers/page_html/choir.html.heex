@@ -129,6 +129,30 @@
     </div>
   </div>
 
+  <%!-- Google Calendar --%>
+  <div class="border-t border-zinc-100 py-12 mb-2">
+    <div class="flex items-center gap-3 mb-6">
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 flex-shrink-0">
+        <.icon name="hero-calendar" class="w-5 h-5" />
+      </span>
+      <h2 class="text-xl font-black text-zinc-900 tracking-tight">
+        Choir Calendar
+      </h2>
+    </div>
+    <div class="w-full overflow-hidden rounded-xl border border-zinc-200">
+      <iframe
+        id="choir-google-calendar"
+        src="https://calendar.google.com/calendar/embed?src=c_f9fe96ca412f8a0ba8c8e1e7175731b55810fe3d2ad30e85996c2909a4a31af8%40group.calendar.google.com&ctz=America%2FLos_Angeles"
+        class="w-full border-0"
+        height="600"
+        frameborder="0"
+        scrolling="no"
+        title="YSC Choir Calendar"
+      >
+      </iframe>
+    </div>
+  </div>
+
   <%!-- About Section --%>
   <div class="border-t border-zinc-100 py-12">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
