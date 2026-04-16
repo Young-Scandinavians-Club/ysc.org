@@ -1383,13 +1383,21 @@ defmodule YscWeb.AdminUsersLive do
 
       case subscription_result do
         {:ok, stripe_subscription} ->
-          _ =
-            Subscriptions.create_subscription_from_stripe(
-              user,
-              stripe_subscription
-            )
+          case Subscriptions.create_subscription_from_stripe(
+                 user,
+                 stripe_subscription
+               ) do
+            {:ok, _} ->
+              _ = Ysc.Accounts.MembershipCache.invalidate_user(user.id)
 
-          _ = Ysc.Accounts.MembershipCache.invalidate_user(user.id)
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to persist Stripe subscription locally on approval",
+                user_id: user.id,
+                stripe_subscription_id: stripe_subscription.id,
+                reason: inspect(reason)
+              )
+          end
 
           YscWeb.Emails.Notifier.schedule_email(
             user.email,

@@ -58,7 +58,7 @@
       While we appreciate your enthusiasm for our community, we weren't able to determine that you met the eligibility requirements based on the information provided in your application.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <%= if @has_payment_method do %>
+    <%= if assigns[:has_payment_method] do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Your payment method on file has not been charged and will not be charged.</strong> No action is required on your part.
     </mj-text>

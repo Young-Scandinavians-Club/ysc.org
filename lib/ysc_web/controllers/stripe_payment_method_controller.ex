@@ -47,34 +47,19 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
   end
 
   def setup_payment(conn, _params) do
-    # Get user from user_id in params
-    user_id = conn.path_params["user_id"]
+    user = conn.assigns.current_user
 
-    try do
-      user = Ysc.Accounts.get_user!(user_id)
+    case @customers_module.create_setup_intent(user) do
+      {:ok, intent} ->
+        conn |> json(%{client_secret: intent.client_secret})
 
-      case @customers_module.create_setup_intent(user) do
-        {:ok, intent} ->
-          conn |> json(%{client_secret: intent.client_secret})
-
-        {:error, reason} ->
-          conn
-          |> put_status(:bad_request)
-          |> json(%{
-            error: "Failed to create setup intent",
-            reason: format_error_reason(reason)
-          })
-      end
-    rescue
-      Ecto.Query.CastError ->
+      {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{error: "Invalid user ID format"})
-
-      Ecto.NoResultsError ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "User not found"})
+        |> json(%{
+          error: "Failed to create setup intent",
+          reason: format_error_reason(reason)
+        })
     end
   end
 

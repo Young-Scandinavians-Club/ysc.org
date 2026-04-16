@@ -118,6 +118,13 @@ defmodule Ysc.DataCase do
          user_message: nil
        }}
     end)
+
+    # Turnstile: always pass verification and pass through socket on refresh
+    stub(TurnstileMock, :verify, fn _params, _ip ->
+      {:ok, %{"success" => true}}
+    end)
+
+    stub(TurnstileMock, :refresh, fn socket -> socket end)
   end
 
   @doc """

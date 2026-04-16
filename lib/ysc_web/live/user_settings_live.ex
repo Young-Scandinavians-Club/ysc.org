@@ -4,6 +4,10 @@ defmodule YscWeb.UserSettingsLive do
   @phone_verification_token_salt "phone_verification"
   @phone_verification_token_max_age 3600
 
+  @email_verification_token_salt "email_verification_pending"
+  # 30 minutes — long enough to complete the verification step
+  @email_verification_token_max_age 1800
+
   alias Ysc.Accounts
   alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Accounts.UserNotifier
@@ -905,7 +909,12 @@ defmodule YscWeb.UserSettingsLive do
                       </p>
                       <.link
                         patch={
-                          ~p"/users/settings/email-verification?email=#{@pending_email}"
+                          if @pending_email_token do
+                            ~p"/users/settings/email-verification" <>
+                              "?etok=#{@pending_email_token}"
+                          else
+                            ~p"/users/settings/email-verification"
+                          end
                         }
                         class="inline-block mt-2 text-sm font-medium text-amber-800 hover:text-amber-900 underline"
                       >
@@ -2416,12 +2425,44 @@ defmodule YscWeb.UserSettingsLive do
         socket
       end
 
-    # Restore pending_email from URL params for email verification
+    # Restore pending_email from a signed token so a page refresh during the
+    # email-verification step does not lose the flow. The email is stored in a
+    # signed Phoenix.Token in the URL rather than in plaintext, keeping it out
+    # of browser history and server logs.
     socket =
-      if socket.assigns[:live_action] == :email_verification && params["email"] do
-        socket
-        |> assign(:pending_email, params["email"])
-        |> assign(:email_verification_code_state, %{})
+      if socket.assigns[:live_action] == :email_verification do
+        cond do
+          not is_nil(socket.assigns[:pending_email]) ->
+            # Already in memory from the initial push_patch — nothing to do.
+            socket
+
+          is_binary(params["etok"]) ->
+            case Phoenix.Token.verify(
+                   YscWeb.Endpoint,
+                   @email_verification_token_salt,
+                   params["etok"],
+                   max_age: @email_verification_token_max_age
+                 ) do
+              {:ok, email} when is_binary(email) ->
+                socket
+                |> assign(:pending_email, email)
+                |> assign(:pending_email_token, params["etok"])
+                |> assign(:email_verification_code_state, %{})
+
+              _ ->
+                socket
+                |> push_patch(to: ~p"/users/settings")
+                |> YscWeb.Flash.put_toast(
+                  :error,
+                  "Verification link expired. Please request a new email verification code.",
+                  title: "Email"
+                )
+            end
+
+          true ->
+            # No token and no pending_email in assigns — redirect to settings.
+            push_patch(socket, to: ~p"/users/settings")
+        end
       else
         socket
       end
@@ -2593,6 +2634,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:email_verification_code_state, %{})
       |> assign(:email_resend_disabled_until, nil)
       |> assign(:pending_email, nil)
+      |> assign(:pending_email_token, nil)
       |> assign(:email_code_valid, false)
       |> assign(:email_verification_error, nil)
       |> assign(:show_membership_qr, false)
@@ -3351,6 +3393,7 @@ defmodule YscWeb.UserSettingsLive do
                    socket
                    |> assign(:user, updated_user)
                    |> assign(:pending_email, nil)
+                   |> assign(:pending_email_token, nil)
                    |> assign(:email_verification_code_state, %{})
                    |> assign(:current_email, updated_user.email)
                    |> push_patch(to: ~p"/users/settings")
@@ -4437,14 +4480,29 @@ defmodule YscWeb.UserSettingsLive do
     email_form =
       Accounts.change_user_email(user, %{"email" => new_email}) |> to_form()
 
+    token =
+      Phoenix.Token.sign(
+        YscWeb.Endpoint,
+        @email_verification_token_salt,
+        new_email,
+        max_age: @email_verification_token_max_age
+      )
+
+    path =
+      ~p"/users/settings/email-verification"
+      |> URI.parse()
+      |> Map.put(:query, URI.encode_query(%{"etok" => token}))
+      |> URI.to_string()
+
     socket
     |> assign(:email_form, email_form)
     |> assign(:pending_email, new_email)
+    |> assign(:pending_email_token, token)
     |> assign(:show_reauth_modal, false)
     |> assign(:pending_email_change, nil)
     |> assign(:reauth_error, nil)
     |> assign(:reauth_verified_at, DateTime.utc_now())
-    |> push_patch(to: ~p"/users/settings/email-verification?email=#{new_email}")
+    |> push_patch(to: path)
   end
 
   defp reauth_still_valid?(socket) do

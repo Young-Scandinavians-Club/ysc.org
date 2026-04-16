@@ -70,8 +70,10 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
   end
 
   describe "setup_payment/2" do
-    test "creates setup intent for valid user", %{conn: conn, user: user} do
-      # Mock successful setup intent creation
+    test "creates setup intent for the authenticated user", %{
+      conn: conn,
+      user: user
+    } do
       Ysc.CustomersMock
       |> stub(:create_setup_intent, fn _user ->
         {:ok,
@@ -93,28 +95,61 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       assert response["client_secret"] == "seti_new123_secret_xxx"
     end
 
-    test "returns 400 for invalid ULID format", %{conn: conn, user: user} do
+    test "ignores user_id in URL and always uses the authenticated user (IDOR fix)",
+         %{
+           conn: conn,
+           user: user
+         } do
+      other_user = user_fixture(%{stripe_id: "cus_other_user"})
+
+      # The create_setup_intent mock captures which user it is called with.
+      # It must be called with the *authenticated* user (user), not other_user.
+      Ysc.CustomersMock
+      |> expect(:create_setup_intent, fn called_with_user ->
+        assert called_with_user.id == user.id,
+               "setup_payment must use current_user, not user_id from URL"
+
+        {:ok,
+         %Stripe.SetupIntent{
+           id: "seti_correct",
+           client_secret: "seti_correct_secret",
+           status: "requires_payment_method",
+           customer: user.stripe_id
+         }}
+      end)
+
+      # Log in as `user` but pass `other_user`'s ID in the URL path.
+      # Before the IDOR fix, this would have created a SetupIntent for other_user.
+      # After the fix, it must create one for the authenticated user.
       conn =
         conn
         |> log_in_user(user)
-        |> get("/billing/user/not_valid_ulid/setup-payment")
+        |> get("/billing/user/#{other_user.id}/setup-payment")
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+      assert response["client_secret"] == "seti_correct_secret"
+    end
+
+    test "returns error when Stripe call fails", %{conn: conn, user: user} do
+      Ysc.CustomersMock
+      |> stub(:create_setup_intent, fn _user ->
+        {:error,
+         %Stripe.Error{
+           message: "No such customer",
+           source: :api,
+           code: :resource_missing
+         }}
+      end)
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> get("/billing/user/#{user.id}/setup-payment")
 
       assert conn.status == 400
       response = json_response(conn, 400)
-      assert response["error"] == "Invalid user ID format"
-    end
-
-    test "returns 404 for non-existent user", %{conn: conn, user: user} do
-      non_existent_id = Ecto.ULID.generate()
-
-      conn =
-        conn
-        |> log_in_user(user)
-        |> get("/billing/user/#{non_existent_id}/setup-payment")
-
-      assert conn.status == 404
-      response = json_response(conn, 404)
-      assert response["error"] == "User not found"
+      assert response["error"] == "Failed to create setup intent"
     end
   end
 
@@ -300,30 +335,6 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
   end
 
   describe "error handling" do
-    test "setup_payment handles Ecto.Query.CastError", %{conn: conn, user: user} do
-      conn =
-        conn
-        |> log_in_user(user)
-        |> get("/billing/user/invalid_ulid/setup-payment")
-
-      assert conn.status == 400
-      response = json_response(conn, 400)
-      assert response["error"] == "Invalid user ID format"
-    end
-
-    test "setup_payment handles Ecto.NoResultsError", %{conn: conn, user: user} do
-      non_existent_id = Ecto.ULID.generate()
-
-      conn =
-        conn
-        |> log_in_user(user)
-        |> get("/billing/user/#{non_existent_id}/setup-payment")
-
-      assert conn.status == 404
-      response = json_response(conn, 404)
-      assert response["error"] == "User not found"
-    end
-
     test "format_error_reason handles Stripe.Error structs", %{
       conn: conn,
       user: user

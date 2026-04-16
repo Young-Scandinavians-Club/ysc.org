@@ -252,8 +252,6 @@ defmodule YscWeb.UserSessionController do
     |> redirect(to: ~p"/users/log-in")
   end
 
-  @passkey_login_token_max_age 120
-
   # sobelow_skip ["XSS.SendResp"]
   def passkey_login(conn, params) do
     require Ysc.Logging
@@ -403,33 +401,17 @@ defmodule YscWeb.UserSessionController do
       }
     )
 
-    # Verify one-time token issued by LiveView after successful passkey verification.
-    # Token contains user_id and expires after @passkey_login_token_max_age seconds.
-    case Phoenix.Token.verify(
-           YscWeb.Endpoint,
-           "passkey_login",
-           token,
-           max_age: @passkey_login_token_max_age
-         ) do
-      {:ok, user_id} when is_binary(user_id) ->
-        do_passkey_login_with_user_id(conn, user_id, redirect_to)
+    # Verify and atomically consume the one-time DB token issued by the LiveView
+    # after successful passkey verification. Consuming on first use prevents replay
+    # attacks within the token's TTL window.
+    case Accounts.verify_and_consume_passkey_login_token(token) do
+      {:ok, user} ->
+        do_passkey_login_with_user(conn, user, redirect_to)
 
-      {:ok, _invalid_payload} ->
-        Ysc.Logging.warning(
-          "[UserSessionController] passkey_login token had invalid payload",
-          %{}
-        )
-
-        conn
-        |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
-          title: "Login"
-        )
-        |> redirect(to: ~p"/users/log-in")
-
-      {:error, reason} ->
+      {:error, :invalid_or_expired} ->
         Ysc.Logging.warning(
           "[UserSessionController] passkey_login token verification failed",
-          %{reason: reason}
+          %{}
         )
 
         conn
@@ -442,83 +424,53 @@ defmodule YscWeb.UserSessionController do
     end
   end
 
-  defp do_passkey_login_with_user_id(conn, user_id, redirect_to) do
+  defp do_passkey_login_with_user(conn, user, redirect_to) do
     require Ysc.Logging
 
-    # Try to get user, handling invalid ULID gracefully
-    user =
-      try do
-        Accounts.get_user(user_id)
-      rescue
-        Ecto.Query.CastError ->
-          Ysc.Logging.warning(
-            "[UserSessionController] Invalid ULID format",
-            %{
-              user_id: user_id
-            }
-          )
-
+    if user.state in [:pending_approval, :active] do
+      validated_redirect =
+        if redirect_to && redirect_to != "" &&
+             YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
+          redirect_to
+        else
           nil
-      end
+        end
 
-    if user do
-      if user.state in [:pending_approval, :active] do
-        validated_redirect =
-          if redirect_to && redirect_to != "" &&
-               YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
-            redirect_to
-          else
-            nil
-          end
-
-        Ysc.Logging.info(
-          "[UserSessionController] Logging in user successfully",
-          %{
-            user_id: user.id,
-            user_email: user.email,
-            validated_redirect: validated_redirect
-          }
-        )
-
-        conn
-        |> delete_session(:failed_login_attempts)
-        |> put_session(:just_logged_in, true)
-        |> YscWeb.Flash.put_toast(
-          :info,
-          "Welcome back! 👋 Good to see you again.",
-          title: "Welcome back! 👋"
-        )
-        |> UserAuth.log_in_user(
-          user,
-          %{"method" => "passkey", "remember_me" => "true"},
-          validated_redirect
-        )
-      else
-        # Account not active
-        Ysc.Logging.warning(
-          "[UserSessionController] User account not active",
-          %{
-            user_id: user.id,
-            user_state: user.state
-          }
-        )
-
-        conn
-        |> YscWeb.Flash.put_toast(
-          :error,
-          "Your account is not currently active.",
-          title: "Login"
-        )
-        |> redirect(to: ~p"/users/log-in")
-      end
-    else
-      # Invalid user ID (e.g. user was deleted after token was issued)
-      Ysc.Logging.warning("[UserSessionController] User not found",
-        user_id_hex: Base.encode16(user_id, case: :lower)
+      Ysc.Logging.info(
+        "[UserSessionController] Logging in user successfully",
+        %{
+          user_id: user.id,
+          user_email: user.email,
+          validated_redirect: validated_redirect
+        }
       )
 
       conn
-      |> YscWeb.Flash.put_toast(:error, "Invalid login session.",
+      |> delete_session(:failed_login_attempts)
+      |> put_session(:just_logged_in, true)
+      |> YscWeb.Flash.put_toast(
+        :info,
+        "Welcome back! 👋 Good to see you again.",
+        title: "Welcome back! 👋"
+      )
+      |> UserAuth.log_in_user(
+        user,
+        %{"method" => "passkey", "remember_me" => "true"},
+        validated_redirect
+      )
+    else
+      Ysc.Logging.warning(
+        "[UserSessionController] User account not active",
+        %{
+          user_id: user.id,
+          user_state: user.state
+        }
+      )
+
+      conn
+      |> YscWeb.Flash.put_toast(
+        :error,
+        "Your account is not currently active.",
         title: "Login"
       )
       |> redirect(to: ~p"/users/log-in")

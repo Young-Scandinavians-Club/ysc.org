@@ -1,6 +1,8 @@
 defmodule YscWeb.AccountSetupLive do
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
   alias Ysc.Accounts
   alias Ysc.Customers
   alias Ysc.Payments
@@ -695,6 +697,8 @@ defmodule YscWeb.AccountSetupLive do
         |> assign(:public_key, public_key)
 
       {:ok, socket}
+    else
+      {:ok, redirect(socket, to: ~p"/")}
     end
   end
 
@@ -1122,13 +1126,6 @@ defmodule YscWeb.AccountSetupLive do
     else
       case Accounts.set_user_initial_password(socket.assigns.user, user_params) do
         {:ok, updated_user} ->
-          # Store the password for later login and move to next step
-          password = user_params["password"]
-
-          # Cache the password temporarily for the account setup flow
-          cache_key = "account_setup_password:#{updated_user.id}"
-          Cachex.put(:ysc_cache, cache_key, password, ttl: :timer.minutes(30))
-
           updated_user_needs = compute_user_needs(updated_user)
 
           # Determine next step based on phone status
@@ -1159,8 +1156,7 @@ defmodule YscWeb.AccountSetupLive do
              to: ~p"/account/setup/#{socket.assigns.user.id}?step=#{next_step}"
            )
            |> assign(:user, updated_user)
-           |> assign(:user_needs, updated_user_needs)
-           |> assign(:password, password)}
+           |> assign(:user_needs, updated_user_needs)}
 
         {:error, changeset} ->
           {:noreply, assign(socket, password_form: to_form(changeset))}
@@ -1365,13 +1361,15 @@ defmodule YscWeb.AccountSetupLive do
           # Mark phone as verified in database
           {:ok, updated_user} = Accounts.mark_phone_verified(user)
 
-          # Payment was already handled in step 1, so after phone verify we go to pending-review
-          token = Accounts.generate_user_session_token(updated_user)
+          # Use a short-lived signed token (same pattern as email verification)
+          token =
+            Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
 
           {:noreply,
            socket
            |> Phoenix.LiveView.redirect(
-             to: ~p"/users/log-in/auto?#{%{token: Base.url_encode64(token)}}"
+             to:
+               ~p"/users/log-in/auto?#{%{token: token, redirect_to: "/account/setup/#{updated_user.id}?step=5"}}"
            )}
 
         {:error, :not_found} ->
@@ -1477,7 +1475,6 @@ defmodule YscWeb.AccountSetupLive do
         %{"payment_method_id" => payment_method_id},
         socket
       ) do
-    require Ysc.Logging
     current_user = socket.assigns.current_user
     user = socket.assigns.user
 

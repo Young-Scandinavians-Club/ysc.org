@@ -102,6 +102,7 @@ config :ysc, sql_sandbox_timeout: 30_000
 config :ysc, sql_sandbox: true
 
 config :phoenix_test, :endpoint, YscWeb.Endpoint
+config :phoenix_turnstile, :turnstile_module, TurnstileMock
 config :ysc, :stripe_customer, Stripe.CustomerMock
 config :ysc, :stripe_client, Ysc.TestStripeClient
 config :ysc, :stripe_subscription_retriever, Ysc.StripeSubscriptionRetrieverMock

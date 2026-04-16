@@ -13,12 +13,8 @@ defmodule YscWeb.PasskeyLoginTest do
 
   alias Ysc.Accounts
 
-  defp valid_passkey_token(user, opts \\ []) do
-    max_age = Keyword.get(opts, :max_age, 120)
-
-    Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id,
-      max_age: max_age
-    )
+  defp valid_passkey_token(user) do
+    Accounts.generate_passkey_login_token(user)
   end
 
   describe "passkey_login/2 with valid token" do
@@ -209,21 +205,23 @@ defmodule YscWeb.PasskeyLoginTest do
       assert get_session(conn, :user_token) == nil
     end
 
-    test "rejects token with non-binary payload", %{conn: conn} do
-      # Payload is valid for verify but not a user_id binary (e.g. integer)
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", 99_999,
+    test "rejects a Phoenix.Token-format token that is not a DB one-time token",
+         %{conn: conn} do
+      # The controller now validates DB one-time tokens, not Phoenix.Token signatures.
+      # Any well-formed Phoenix.Token that was never inserted into the DB must be rejected.
+      phoenix_token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", "some_user_id",
           max_age: 120
         )
 
       conn =
         conn
-        |> get(~p"/users/log-in/passkey", %{"token" => token})
+        |> get(~p"/users/log-in/passkey", %{"token" => phoenix_token})
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
-               "Invalid login session"
+               "Invalid or expired login link"
 
       assert get_session(conn, :user_token) == nil
     end
@@ -270,16 +268,18 @@ defmodule YscWeb.PasskeyLoginTest do
       assert get_session(conn, :user_token) == nil
     end
 
-    test "redirects to login when token is valid but user no longer exists", %{
-      conn: conn
-    } do
-      # Token signed with a valid ULID that is not in the database (e.g. user deleted after token issued)
-      user_id = Ecto.ULID.generate()
+    test "redirects to login when token was issued but user is deleted before it is used",
+         %{
+           conn: conn
+         } do
+      # Simulate: token issued, then user account deleted before the redirect completes.
+      # The DB token is cascade-deleted with the user, so consume returns :error.
+      user = user_fixture()
+      {:ok, user} = Accounts.mark_email_verified(user)
+      token = Accounts.generate_passkey_login_token(user)
 
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user_id,
-          max_age: 120
-        )
+      # Delete the user — cascade removes all their tokens
+      Ysc.Repo.delete!(user)
 
       conn =
         conn
@@ -288,7 +288,7 @@ defmodule YscWeb.PasskeyLoginTest do
       assert redirected_to(conn) == ~p"/users/log-in"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
-               "Invalid login session"
+               "Invalid or expired login link"
 
       assert get_session(conn, :user_token) == nil
     end

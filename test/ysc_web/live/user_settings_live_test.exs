@@ -1336,8 +1336,18 @@ defmodule YscWeb.UserSettingsLiveTest do
       user = user_fixture(%{state: :active})
       conn = log_in_user(conn, user)
 
+      # Build a signed token so the email-verification live action mounts
+      # successfully (Finding 12 fix: email is no longer passed as plaintext).
+      token =
+        Phoenix.Token.sign(
+          YscWeb.Endpoint,
+          "email_verification_pending",
+          "new@example.com",
+          max_age: 1800
+        )
+
       {:ok, view, _html} =
-        live(conn, ~p"/users/settings/email-verification?email=new@example.com")
+        live(conn, "/users/settings/email-verification?etok=#{token}")
 
       render(view)
       render_click(view, "cancel_email_verification_confirmed")

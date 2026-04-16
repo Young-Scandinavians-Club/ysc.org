@@ -37,6 +37,23 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
     %{user: user, conn: build_conn()}
   end
 
+  # Builds a correctly HMAC-SHA256-signed webhook POST so that the controller's
+  # signature verification passes in tests. The verifier_token must match what
+  # is set in the setup block above.
+  defp signed_webhook_post(conn, payload_map) do
+    verifier_token = "test_verifier_token"
+    json_body = Jason.encode!(payload_map)
+
+    signature =
+      :crypto.mac(:hmac, :sha256, verifier_token, json_body)
+      |> Base.encode64()
+
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> put_req_header("intuit-signature", signature)
+    |> post(~p"/webhooks/quickbooks", json_body)
+  end
+
   describe "end-to-end webhook flow" do
     test "processes webhook from receipt to expense report update", %{
       user: user
@@ -85,11 +102,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
       end)
 
       # Simulate webhook receipt via controller
-      conn =
-        build_conn()
-        |> put_req_header("intuit-signature", "test_signature")
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/webhooks/quickbooks", payload)
+      conn = signed_webhook_post(build_conn(), payload)
 
       assert conn.status == 200
 
@@ -181,21 +194,11 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
       end)
 
       # First webhook
-      conn1 =
-        build_conn()
-        |> put_req_header("intuit-signature", "test_signature")
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/webhooks/quickbooks", payload)
-
+      conn1 = signed_webhook_post(build_conn(), payload)
       assert conn1.status == 200
 
       # Second webhook (duplicate)
-      conn2 =
-        build_conn()
-        |> put_req_header("intuit-signature", "test_signature")
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/webhooks/quickbooks", payload)
-
+      conn2 = signed_webhook_post(build_conn(), payload)
       assert conn2.status == 200
 
       # Verify only one webhook event was created (duplicate was rejected)
@@ -251,11 +254,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
       end)
 
       # Receive webhook
-      conn =
-        build_conn()
-        |> put_req_header("intuit-signature", "test_signature")
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/webhooks/quickbooks", payload)
+      conn = signed_webhook_post(build_conn(), payload)
 
       assert conn.status == 200
 

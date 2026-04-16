@@ -29,6 +29,27 @@ defmodule YscWeb.PageControllerTest do
       assert redirected_to(conn) == ~p"/"
     end
 
+    test "redirects rejected users to the home page", %{conn: conn} do
+      rejected_user = user_fixture(%{country: "SE", state: :rejected})
+      conn = conn |> log_in_user(rejected_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects suspended users to the home page", %{conn: conn} do
+      suspended_user = user_fixture(%{country: "SE", state: :suspended})
+      conn = conn |> log_in_user(suspended_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects deleted users to the home page", %{conn: conn} do
+      deleted_user = user_fixture(%{country: "SE", state: :deleted})
+      conn = conn |> log_in_user(deleted_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
     test "renders pending review page with submission from Pacific timezone", %{
       conn: conn,
       user: _user

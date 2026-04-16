@@ -138,7 +138,7 @@ defmodule YscWeb.AuthController do
         |> delete_session(:reauth_return_to)
         |> YscWeb.Flash.put_toast(
           :error,
-          "The social account email doesn't match your account. Please use the account associated with #{current_user.email}.",
+          "The social account email doesn't match your account. Please use the social account associated with your registered email.",
           title: "Verification failed"
         )
         |> redirect(to: return_to)

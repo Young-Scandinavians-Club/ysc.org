@@ -1640,6 +1640,40 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Generates a short-lived, one-time token for completing a passkey login redirect.
+
+  Returns the raw (URL-safe Base64) token. Only the hash is stored in the DB.
+  """
+  def generate_passkey_login_token(user) do
+    {token, user_token} = UserToken.build_passkey_login_token(user)
+    Repo.insert!(user_token)
+    token
+  end
+
+  @doc """
+  Verifies a passkey login token and returns the associated user if valid.
+
+  Atomically deletes the token on a successful lookup to ensure it can only
+  be used once (preventing replay attacks within the TTL window).
+  """
+  def verify_and_consume_passkey_login_token(token) do
+    case UserToken.verify_passkey_login_token_query(token) do
+      {:ok, query} ->
+        case Repo.one(query) do
+          {user, token_record} ->
+            Repo.delete(token_record)
+            {:ok, user}
+
+          nil ->
+            {:error, :invalid_or_expired}
+        end
+
+      :error ->
+        {:error, :invalid_or_expired}
+    end
+  end
+
+  @doc """
   Gets the user with the given signed token.
   """
   def get_user_by_session_token(token) do

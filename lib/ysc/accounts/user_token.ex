@@ -137,6 +137,55 @@ defmodule Ysc.Accounts.UserToken do
     end
   end
 
+  # Passkey login tokens expire after 2 minutes (stored as seconds for query)
+  @passkey_login_validity_in_seconds 120
+
+  @doc """
+  Builds a one-time token for completing a passkey login.
+
+  The raw (unhashed) token is returned for embedding in the redirect URL.
+  Only the hash is stored in the database. The token must be consumed
+  (deleted) on first use to prevent replay attacks.
+  """
+  def build_passkey_login_token(user) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %UserToken{
+       token: hashed_token,
+       context: "passkey_login",
+       user_id: user.id
+     }}
+  end
+
+  @doc """
+  Verifies a passkey login token and returns a query for the associated user.
+
+  The token must have been issued within the last #{@passkey_login_validity_in_seconds}
+  seconds. The caller is responsible for deleting the token after a successful lookup
+  to ensure it can only be used once.
+  """
+  def verify_passkey_login_token_query(token) do
+    case Base.url_decode64(token, padding: false) do
+      {:ok, decoded_token} ->
+        hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
+
+        query =
+          from t in by_token_and_context_query(hashed_token, "passkey_login"),
+            join: user in assoc(t, :user),
+            where:
+              t.inserted_at >
+                ago(^@passkey_login_validity_in_seconds, "second"),
+            select: {user, t}
+
+        {:ok, query}
+
+      :error ->
+        :error
+    end
+  end
+
   defp days_for_context("confirm"), do: @confirm_validity_in_days
   defp days_for_context("reset_password"), do: @reset_password_validity_in_days
 

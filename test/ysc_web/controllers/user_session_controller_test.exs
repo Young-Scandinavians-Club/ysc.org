@@ -297,8 +297,7 @@ defmodule YscWeb.UserSessionControllerTest do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
 
       conn =
         get(
@@ -316,8 +315,7 @@ defmodule YscWeb.UserSessionControllerTest do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
 
       conn =
         get(
@@ -330,9 +328,13 @@ defmodule YscWeb.UserSessionControllerTest do
       assert get_session(conn, :user_token)
     end
 
-    test "rejects token whose payload is not a binary user id", %{conn: conn} do
+    test "rejects a token not present in the DB (e.g. forged Phoenix.Token)", %{
+      conn: conn
+    } do
+      # The controller now requires a DB-backed one-time token; any token that was
+      # never inserted (including a valid-looking Phoenix.Token) must be rejected.
       token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", 12_345)
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", "some_user_id")
 
       conn =
         get(
@@ -343,7 +345,7 @@ defmodule YscWeb.UserSessionControllerTest do
       assert redirected_to(conn) == ~p"/users/log-in"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid login session."
+               "Invalid or expired login link. Please sign in again."
     end
 
     test "redirects to login when token verification fails", %{conn: conn} do
@@ -373,8 +375,7 @@ defmodule YscWeb.UserSessionControllerTest do
       user = user_fixture(%{state: :suspended})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", user.id)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
 
       conn =
         get(
@@ -388,11 +389,15 @@ defmodule YscWeb.UserSessionControllerTest do
                "Your account is not currently active."
     end
 
-    test "rejects passkey login when user no longer exists", %{conn: conn} do
-      missing_id = Ecto.ULID.generate()
+    test "rejects passkey login when user is deleted after token was issued", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
 
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", missing_id)
+      # Delete the user — cascade removes all their tokens
+      Ysc.Repo.delete!(user)
 
       conn =
         get(
@@ -403,7 +408,7 @@ defmodule YscWeb.UserSessionControllerTest do
       assert redirected_to(conn) == ~p"/users/log-in"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid login session."
+               "Invalid or expired login link. Please sign in again."
     end
   end
 
