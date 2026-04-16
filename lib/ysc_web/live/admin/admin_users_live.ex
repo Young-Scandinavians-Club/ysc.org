@@ -11,7 +11,12 @@ defmodule YscWeb.AdminUsersLive do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
+  require Ysc.Logging
+
   alias Ysc.Accounts
+  alias Ysc.Customers
+  alias Ysc.Payments
+  alias Ysc.Subscriptions
 
   def render(assigns) do
     ~H"""
@@ -1017,78 +1022,60 @@ defmodule YscWeb.AdminUsersLive do
            current_user
          ) do
       {:ok, approved_application} ->
-        if approved_application.family_invite_id do
-          YscWeb.Emails.Notifier.schedule_email(
-            user.email,
-            "#{user.id}",
-            "Velkommen! You're officially a Young Scandinavian 🎉",
-            "application_approved_family_linked",
-            %{first_name: user.first_name},
-            """
-            ==============================
+        approval_status =
+          if approved_application.family_invite_id do
+            YscWeb.Emails.Notifier.schedule_email(
+              user.email,
+              "#{user.id}",
+              "Velkommen! You're officially a Young Scandinavian 🎉",
+              "application_approved_family_linked",
+              %{first_name: user.first_name},
+              """
+              ==============================
 
-            Hi #{user.email},
+              Hi #{user.email},
 
-            Your application has been approved! 🎉
+              Your application has been approved! 🎉
 
-            Because you were invited to join a family membership, your membership is immediately active—no payment required.
+              Because you were invited to join a family membership, your membership is immediately active—no payment required.
 
-            If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
+              If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
 
-            Velkommen!
+              Velkommen!
 
-            Young Scandinavians Club
+              Young Scandinavians Club
 
-            ==============================
-            """,
-            user.id
-          )
-        else
-          YscWeb.Emails.Notifier.schedule_email(
-            user.email,
-            "#{user.id}",
-            "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)",
-            "application_approved",
-            %{first_name: user.first_name},
-            """
-            ==============================
+              ==============================
+              """,
+              user.id
+            )
 
-            Hi #{user.email},
+            :family_linked_email_sent
+          else
+            attempt_membership_activation_on_approval(
+              user,
+              approved_application
+            )
+          end
 
-            Your application has been approved! 🎉
+        toast_message =
+          case approval_status do
+            :activated ->
+              "User was approved and membership activated!"
 
-            To complete your membership, please pay your membership dues by visiting the link below:
+            :family_linked_email_sent ->
+              "User was approved! Family membership invite email sent."
 
-            #{YscWeb.Endpoint.url()}/users/membership
-
-            If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
-
-
-            Velkommen!
-
-            Young Scandinavians Club
-
-            ==============================
-            """,
-            user.id
-          )
-
-          # Schedule reminder emails if user hasn't paid
-          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
-            user.id
-          )
-
-          YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
-            user.id
-          )
-        end
+            :activation_failed ->
+              "User was approved! They will receive an email with payment instructions."
+          end
 
         {:noreply,
          socket
          |> push_patch(to: ~p"/admin/users?#{socket.assigns[:params]}")
          |> YscWeb.Flash.put_toast(
            :info,
-           "User was approved and is now a member!",
+           toast_message,
            title: "Application"
          )}
 
@@ -1167,18 +1154,26 @@ defmodule YscWeb.AdminUsersLive do
             )
           end
 
+          has_payment_method =
+            not is_nil(Payments.get_default_payment_method(user))
+
           YscWeb.Emails.Notifier.schedule_email(
             user.email,
             "#{user.id}",
             "Update on your Young Scandinavians Club application",
             "application_rejected",
-            %{first_name: user.first_name},
+            %{
+              first_name: user.first_name,
+              has_payment_method: has_payment_method
+            },
             """
             ==============================
 
             Hi #{user.email},
 
             We regret to inform you that your application has been rejected.
+
+            #{if has_payment_method, do: "Your payment method on file has not been charged and will not be charged.", else: ""}
 
             If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
 
@@ -1361,4 +1356,148 @@ defmodule YscWeb.AdminUsersLive do
   end
 
   defp format_utc_date(_), do: "—"
+
+  # Attempts to auto-activate a membership by charging the user's saved payment method.
+  # Returns true if the subscription was successfully created, false otherwise.
+  # Also sends the appropriate approval email in all cases.
+  defp attempt_membership_activation_on_approval(user, approved_application) do
+    default_pm = Payments.get_default_payment_method(user)
+
+    if default_pm do
+      membership_type = approved_application.membership_type || :single
+      price_id = get_membership_price_id(membership_type)
+      return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
+
+      subscription_result =
+        if price_id do
+          Customers.create_subscription(
+            user,
+            return_url: return_url,
+            prices: [%{price: price_id, quantity: 1}],
+            default_payment_method: default_pm.provider_id,
+            expand: ["latest_invoice"]
+          )
+        else
+          Ysc.Logging.error(
+            "No Stripe price ID found for membership type on approval",
+            user_id: user.id,
+            membership_type: inspect(membership_type)
+          )
+
+          {:error, :no_price_id}
+        end
+
+      case subscription_result do
+        {:ok, stripe_subscription} ->
+          case Subscriptions.create_subscription_from_stripe(
+                 user,
+                 stripe_subscription
+               ) do
+            {:ok, _} ->
+              _ = Ysc.Accounts.MembershipCache.invalidate_user(user.id)
+
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to persist Stripe subscription locally on approval",
+                user_id: user.id,
+                stripe_subscription_id: stripe_subscription.id,
+                reason: inspect(reason)
+              )
+          end
+
+          YscWeb.Emails.Notifier.schedule_email(
+            user.email,
+            "approved_payment_success_#{user.id}",
+            "Velkommen! Your YSC Membership is Active! 🎉",
+            "application_approved_payment_success",
+            %{first_name: user.first_name},
+            """
+            ==============================
+
+            Hi #{user.email},
+
+            Your application has been approved and your membership payment has been processed! 🎉
+
+            Your membership is now active. Welcome to the Young Scandinavians Club!
+
+            Visit: #{YscWeb.Endpoint.url()}
+
+            If you have any questions, please don't hesitate to contact us at memberships@ysc.org.
+
+            Velkommen!
+
+            Young Scandinavians Club
+
+            ==============================
+            """,
+            user.id
+          )
+
+          :activated
+
+        {:error, reason} ->
+          Ysc.Logging.error("Failed to auto-charge membership on approval",
+            user_id: user.id,
+            reason: inspect(reason)
+          )
+
+          send_approved_pay_now_email(user)
+          schedule_payment_reminders(user.id)
+          :activation_failed
+      end
+    else
+      # No payment method on file
+      send_approved_pay_now_email(user)
+      schedule_payment_reminders(user.id)
+      :activation_failed
+    end
+  end
+
+  defp send_approved_pay_now_email(user) do
+    YscWeb.Emails.Notifier.schedule_email(
+      user.email,
+      "#{user.id}",
+      "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)",
+      "application_approved",
+      %{first_name: user.first_name},
+      """
+      ==============================
+
+      Hi #{user.email},
+
+      Your application has been approved! 🎉
+
+      To complete your membership, please pay your membership dues by visiting the link below:
+
+      #{YscWeb.Endpoint.url()}/users/membership
+
+      If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
+
+      Velkommen!
+
+      Young Scandinavians Club
+
+      ==============================
+      """,
+      user.id
+    )
+  end
+
+  defp schedule_payment_reminders(user_id) do
+    YscWeb.Workers.MembershipPaymentReminderWorker.schedule_7day_reminder(
+      user_id
+    )
+
+    YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
+      user_id
+    )
+  end
+
+  defp get_membership_price_id(membership_type) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    Enum.find_value(plans, fn plan ->
+      if plan.id == membership_type, do: plan[:stripe_price_id]
+    end)
+  end
 end

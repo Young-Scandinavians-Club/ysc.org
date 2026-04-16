@@ -1640,6 +1640,59 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Generates a short-lived, one-time token for completing a passkey login redirect.
+
+  Returns the raw (URL-safe Base64) token. Only the hash is stored in the DB.
+  """
+  def generate_passkey_login_token(user) do
+    {token, user_token} = UserToken.build_passkey_login_token(user)
+    Repo.insert!(user_token)
+    token
+  end
+
+  @doc """
+  Verifies a passkey login token and returns the associated user if valid.
+
+  The read and delete are executed inside a single DB transaction with a
+  `FOR UPDATE` row-level lock. This prevents two concurrent requests from
+  both reading the same token row before either has deleted it (replay
+  window), ensuring strict one-time-use semantics even under load.
+  """
+  def verify_and_consume_passkey_login_token(token) do
+    case UserToken.verify_passkey_login_token_query(token) do
+      {:ok, base_query} ->
+        result =
+          Repo.transaction(fn ->
+            # Lock the matching row so concurrent callers must queue behind
+            # this transaction rather than racing to read-then-delete.
+            locked_query = from(q in base_query, lock: "FOR UPDATE")
+
+            case Repo.one(locked_query) do
+              {user, token_record} ->
+                case Repo.delete(token_record) do
+                  {:ok, _deleted} ->
+                    user
+
+                  {:error, _changeset} ->
+                    Repo.rollback(:invalid_or_expired)
+                end
+
+              nil ->
+                Repo.rollback(:invalid_or_expired)
+            end
+          end)
+
+        case result do
+          {:ok, user} -> {:ok, user}
+          {:error, :invalid_or_expired} -> {:error, :invalid_or_expired}
+        end
+
+      :error ->
+        {:error, :invalid_or_expired}
+    end
+  end
+
+  @doc """
   Gets the user with the given signed token.
   """
   def get_user_by_session_token(token) do

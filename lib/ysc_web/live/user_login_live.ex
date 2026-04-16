@@ -355,32 +355,19 @@ defmodule YscWeb.UserLoginLive do
     # Set loading state
     socket = assign(socket, :passkey_loading, true)
 
-    # For discoverable credentials, we need to pass allow_credentials to Wax
-    # so it knows which public keys to use for verification, but we omit it
-    # from the JSON sent to the browser to enable the native account picker.
-    # Get all passkeys from the database to pass to Wax
-    # Use the same rp_id and origin as registration to ensure consistency
+    # For discoverable credentials, do not pre-load any passkeys.
+    # The browser authenticator selects the credential locally and responds with
+    # the credential_id (rawId). We look up that single passkey after the response
+    # and inject its public key into the challenge before calling Wax.authenticate.
+    # This avoids exposing all credential IDs and prevents a DoS via the DB query.
     rp_id = Application.get_env(:wax_, :rp_id) || "localhost"
     origin = Application.get_env(:wax_, :origin) || "http://localhost:4000"
-
-    # Get all passkeys from all users for discoverable credentials
-    # Wax needs to know all possible credential_ids and public keys for verification
-    all_passkeys = Ysc.Repo.all(Ysc.Accounts.UserPasskey)
-
-    # Convert to list of {credential_id, public_key} tuples for Wax
-    allow_credentials =
-      Enum.map(all_passkeys, fn passkey ->
-        public_key =
-          Ysc.Accounts.UserPasskey.decode_public_key(passkey.public_key)
-
-        {passkey.external_id, public_key}
-      end)
 
     challenge =
       Wax.new_authentication_challenge(
         rp_id: rp_id,
         origin: origin,
-        allow_credentials: allow_credentials
+        allow_credentials: []
       )
 
     Ysc.Logging.debug("[UserLoginLive] Authentication challenge created",
@@ -876,17 +863,23 @@ defmodule YscWeb.UserLoginLive do
       challenge_bytes_length: byte_size(challenge.bytes)
     )
 
-    # Verify the authentication
-    # For discoverable credentials, Wax.authenticate needs the public key to verify the signature.
-    # Since we didn't pass allow_credentials in the challenge, we need to provide the public key here.
-    # However, Wax.authenticate might not accept public_key as an option. Let's try the standard call first.
-    # If that fails, we might need to reconstruct the challenge with allow_credentials.
+    # Inject the single passkey's public key into the challenge so Wax can verify
+    # the signature. The challenge was created with allow_credentials: [] to avoid
+    # loading all passkeys at challenge-creation time; we populate it here with only
+    # the one credential that the client actually presented.
+    public_key = Ysc.Accounts.UserPasskey.decode_public_key(passkey.public_key)
+
+    challenge_with_credentials = %{
+      challenge
+      | allow_credentials: [{credential_id_to_verify, public_key}]
+    }
+
     case Wax.authenticate(
            credential_id_to_verify,
            authenticator_data,
            signature,
            client_data_json,
-           challenge
+           challenge_with_credentials
          ) do
       {:ok, auth_result} ->
         require Ysc.Logging
@@ -897,18 +890,22 @@ defmodule YscWeb.UserLoginLive do
         # The struct has fields like sign_count, not nested under :authenticator_data
         authenticator_data = auth_result
 
-        # Verify sign_count increased (replay attack prevention)
-        # For discoverable credentials, the first use might have sign_count = 0
-        # So we allow >= instead of > to handle the first use case
+        # Verify sign_count increased (replay attack prevention).
+        # Strictly require new > stored to detect cloned authenticators.
+        # The only exception is 0 == 0 for authenticators that don't support
+        # sign counts (they always report 0 per the WebAuthn spec).
         new_sign_count = authenticator_data.sign_count
 
         Ysc.Logging.debug("[UserLoginLive] Checking sign_count",
           new_sign_count: new_sign_count,
           passkey_sign_count: passkey.sign_count,
-          sign_count_valid: new_sign_count >= passkey.sign_count
+          sign_count_valid:
+            new_sign_count > passkey.sign_count or
+              (new_sign_count == 0 and passkey.sign_count == 0)
         )
 
-        if new_sign_count >= passkey.sign_count do
+        if new_sign_count > passkey.sign_count or
+             (new_sign_count == 0 and passkey.sign_count == 0) do
           Ysc.Logging.info(
             "[UserLoginLive] Sign count check passed, proceeding with login",
             user_id: user_id,
@@ -935,15 +932,11 @@ defmodule YscWeb.UserLoginLive do
               "Welcome back! 👋 Good to see you again."
             )
 
-          # One-time signed token so the controller can trust this redirect came from
-          # a successful passkey verification (prevents logging in with just a user_id).
-          token =
-            Phoenix.Token.sign(
-              YscWeb.Endpoint,
-              "passkey_login",
-              user_id,
-              max_age: 120
-            )
+          # One-time DB token so the controller can trust this redirect came from
+          # a successful passkey verification. Unlike Phoenix.Token, this token is
+          # deleted on first use, preventing replay attacks within the TTL window.
+          user = Ysc.Accounts.get_user!(passkey.user_id)
+          token = Ysc.Accounts.generate_passkey_login_token(user)
 
           query_params = %{"token" => token}
 

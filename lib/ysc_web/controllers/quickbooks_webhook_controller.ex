@@ -89,10 +89,11 @@ defmodule YscWeb.QuickbooksWebhookController do
     end
   end
 
-  # Verifies the intuit-signature header from QuickBooks
+  # Verifies the intuit-signature header from QuickBooks using HMAC-SHA256.
+  # QuickBooks signs the raw request body with the webhook verifier token and
+  # base64-encodes the result. The raw body is captured by CacheRawBody before
+  # Plug.Parsers consumes it.
   defp verify_signature(conn) do
-    # Get the verifier token from environment
-    # Try both config paths for backwards compatibility
     verifier_token =
       Application.get_env(:ysc, :quickbooks_webhook_verifier_token) ||
         get_in(Application.get_env(:ysc, :quickbooks, []), [
@@ -103,34 +104,30 @@ defmodule YscWeb.QuickbooksWebhookController do
       Ysc.Logging.warning("QuickBooks webhook verifier token not configured")
       {:error, :verifier_token_not_configured}
     else
-      # Get the intuit-signature header
-      signature_header =
+      raw_body = conn.private[:raw_body] || ""
+
+      signature =
         conn.req_headers
-        |> Enum.find(fn {key, _value} ->
-          String.downcase(key) == "intuit-signature"
+        |> Enum.find_value(fn {key, value} ->
+          if String.downcase(key) == "intuit-signature", do: value
         end)
 
-      case signature_header do
-        {_key, signature} ->
-          # QuickBooks sends the signature as a base64-encoded HMAC-SHA256
-          # of the request body using the verifier token as the key.
-          # Note: Since Plug.Parsers has already consumed the body, we can't verify
-          # the HMAC here. For now, we'll do a basic check that the header exists.
-          # In production, you should use a custom plug to capture the raw body
-          # before parsing, or verify the signature matches a configured value.
-          # For initial implementation, we'll just verify the header is present.
-          if is_binary(signature) and String.length(signature) > 0 do
-            :ok
-          else
-            {:error, :invalid_signature}
-          end
+      if is_nil(signature) || signature == "" do
+        Ysc.Logging.warning(
+          "Missing intuit-signature header in QuickBooks webhook"
+        )
 
-        nil ->
-          Ysc.Logging.warning(
-            "Missing intuit-signature header in QuickBooks webhook"
-          )
+        {:error, :missing_signature}
+      else
+        expected =
+          :crypto.mac(:hmac, :sha256, verifier_token, raw_body)
+          |> Base.encode64()
 
-          {:error, :missing_signature}
+        if Plug.Crypto.secure_compare(expected, signature) do
+          :ok
+        else
+          {:error, :invalid_signature}
+        end
       end
     end
   end

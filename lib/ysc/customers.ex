@@ -346,7 +346,7 @@ defmodule Ysc.Customers do
 
     setup_intent_params = %{
       customer: user.stripe_id,
-      payment_method_types: ["card", "us_bank_account"],
+      payment_method_types: ["card", "us_bank_account", "link"],
       usage: "off_session"
     }
 

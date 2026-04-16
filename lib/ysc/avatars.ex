@@ -31,7 +31,7 @@ defmodule Ysc.Avatars do
   def list_user_avatars(%User{} = user) do
     from(a in Avatar,
       where: a.user_id == ^user.id and a.processing_state == :completed,
-      order_by: [desc: a.inserted_at]
+      order_by: [desc: a.inserted_at, desc: a.id]
     )
     |> Repo.all()
   end

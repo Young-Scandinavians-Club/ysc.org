@@ -2,6 +2,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
   use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import Mox
 
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Repo
@@ -969,6 +970,120 @@ defmodule YscWeb.UserRegistrationLiveTest do
       html = render_submit(lv, "save", %{"user" => bad_params})
       assert html =~ "Oops, something went wrong"
       assert html =~ "Additional Questions" or html =~ "Questions"
+    end
+  end
+
+  describe "Turnstile verification" do
+    @valid_params %{
+      "email" => "turnstile@example.com",
+      "first_name" => "Tur",
+      "last_name" => "Nstile",
+      "registration_form" => %{
+        "membership_type" => "single",
+        "membership_eligibility" => ["born_in_scandinavia"],
+        "birth_date" => "1990-01-01",
+        "address" => "1 Main St",
+        "city" => "San Francisco",
+        "region" => "CA",
+        "country" => "US",
+        "postal_code" => "94105",
+        "place_of_birth" => "SE",
+        "citizenship" => "SE",
+        "most_connected_nordic_country" => "SE",
+        "agreed_to_bylaws" => true
+      }
+    }
+
+    test "renders the Turnstile widget inside the registration form", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+
+      assert has_element?(lv, "#cf-turnstile")
+    end
+
+    test "allows submission when Turnstile verification succeeds", %{conn: conn} do
+      uniq = System.unique_integer()
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:ok, %{"success" => true}}
+      end)
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      params =
+        Map.put(@valid_params, "email", "turnstile_ok#{uniq}@example.com")
+
+      render_change(form, %{"user" => params})
+      render_submit(form, %{"user" => params})
+
+      {path, _flash} = assert_redirect(lv)
+      assert path =~ "/account/setup"
+    end
+
+    test "blocks submission and shows error when Turnstile verification fails",
+         %{
+           conn: conn
+         } do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      render_change(form, %{"user" => @valid_params})
+      render_submit(form, %{"user" => @valid_params})
+
+      html = render(lv)
+      assert html =~ "Security check failed"
+      refute_redirected(lv)
+    end
+
+    test "calls Turnstile.refresh after a failed verification", %{conn: conn} do
+      test_pid = self()
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket ->
+        send(test_pid, :turnstile_refreshed)
+        socket
+      end)
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      render_change(form, %{"user" => @valid_params})
+      render_submit(form, %{"user" => @valid_params})
+
+      assert_received :turnstile_refreshed
+    end
+
+    test "does not register the user when Turnstile verification fails", %{
+      conn: conn
+    } do
+      uniq = System.unique_integer()
+      email = "blocked#{uniq}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      params = Map.put(@valid_params, "email", email)
+      render_change(form, %{"user" => params})
+      render_submit(form, %{"user" => params})
+
+      refute Accounts.get_user_by_email(email)
     end
   end
 end

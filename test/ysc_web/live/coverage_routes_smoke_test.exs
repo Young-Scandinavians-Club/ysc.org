@@ -108,7 +108,9 @@ defmodule YscWeb.CoverageRoutesSmokeTest do
       assert {:ok, _view, _html} =
                live(conn, ~p"/users/settings/phone-verification")
 
-      assert {:ok, _view, _html} =
+      # email-verification requires a signed ?etok= token in the URL (Finding 12 fix).
+      # Visiting without one redirects back to /users/settings — that is correct behaviour.
+      assert {:error, {:live_redirect, %{to: "/users/settings"}}} =
                live(conn, ~p"/users/settings/email-verification")
 
       assert {:ok, _view, _html} = live(conn, ~p"/users/settings/family")

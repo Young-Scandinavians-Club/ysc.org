@@ -72,7 +72,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assigns = %{
         first_name: user.first_name,
         last_name: user.last_name,
-        email: user.email
+        email: user.email,
+        has_payment_method: false
       }
 
       html = ApplicationRejected.render(assigns)

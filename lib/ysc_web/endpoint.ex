@@ -2,14 +2,15 @@ defmodule YscWeb.Endpoint do
   use Sentry.PlugCapture
   use Phoenix.Endpoint, otp_app: :ysc
 
-  # The session will be stored in the cookie and signed,
-  # this means its contents can be read but not tampered with.
-  # Set :encryption_salt if you would also like to encrypt it.
+  # The session will be stored in the cookie and signed.
+  # The encryption_salt causes the session to also be encrypted, so its
+  # contents cannot be read by the client (not just tamper-proof but opaque).
   # Base session options - secure flag is conditionally added based on environment
   @base_session_options [
     store: :cookie,
     key: "_ysc_key",
     signing_salt: "54CY4e5T",
+    encryption_salt: "X9K2eeWufruBYeO0xGLavgTeJq0ebDGp",
     same_site: "Lax"
   ]
 
@@ -90,7 +91,9 @@ defmodule YscWeb.Endpoint do
     pass: ["*/*"],
     # 30 MB — headroom above the 25 MB business-logic limit in TrixUploadsController
     length: 30_000_000,
-    json_decoder: Phoenix.json_library()
+    json_decoder: Phoenix.json_library(),
+    # Cache raw body so webhook controllers can verify HMAC signatures
+    body_reader: {YscWeb.Plugs.CacheRawBody, :read_body, []}
 
   plug Sentry.PlugContext
   plug RemoteIp

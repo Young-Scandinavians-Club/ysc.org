@@ -42,6 +42,10 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      While finishing your account setup, you'll have the option to save a payment method. If you do, <strong>you will not be charged unless your application is approved</strong> — but if approved, your membership will activate automatically with no extra steps needed.
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       In the meantime, feel free to check out our website or follow us on social media to learn more about our community and upcoming events:
     </mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">

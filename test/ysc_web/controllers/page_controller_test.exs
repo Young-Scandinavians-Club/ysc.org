@@ -17,21 +17,46 @@ defmodule YscWeb.PageControllerTest do
 
   describe "GET /pending-review" do
     setup %{conn: conn} do
-      # Add country code for avatar
-      user = user_fixture(%{country: "SE"})
+      user = user_fixture(%{country: "SE", state: :pending_approval})
       conn = log_in_user(conn, user)
       %{conn: conn, user: user}
+    end
+
+    test "redirects active users to the home page", %{conn: conn} do
+      active_user = user_fixture(%{country: "SE", state: :active})
+      conn = conn |> log_in_user(active_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects rejected users to the home page", %{conn: conn} do
+      rejected_user = user_fixture(%{country: "SE", state: :rejected})
+      conn = conn |> log_in_user(rejected_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects suspended users to the home page", %{conn: conn} do
+      suspended_user = user_fixture(%{country: "SE", state: :suspended})
+      conn = conn |> log_in_user(suspended_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects deleted users to the home page", %{conn: conn} do
+      deleted_user = user_fixture(%{country: "SE", state: :deleted})
+      conn = conn |> log_in_user(deleted_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) == ~p"/"
     end
 
     test "renders pending review page with submission from Pacific timezone", %{
       conn: conn,
       user: _user
     } do
-      # Setup submission date in Pacific timezone (5 minutes ago to ensure "ago" is returned)
       submitted_date = DateTime.add(DateTime.utc_now(), -300, :second)
       timezone = "America/Los_Angeles"
 
-      # Mock the get_signup_application_submission_date function
       Mox.expect(
         Ysc.AccountsMock,
         :get_signup_application_submission_date,
@@ -42,10 +67,8 @@ defmodule YscWeb.PageControllerTest do
 
       conn = get(conn, ~p"/pending-review")
 
-      # Adjust based on your actual page content
       assert html_response(conn, 200) =~ "Account Pending Review"
       assert conn.assigns.application_submitted_date != nil
-      # Since Timex.from_now returns a string with "ago"
       assert conn.assigns.time_delta =~ "ago"
     end
 
@@ -54,11 +77,9 @@ defmodule YscWeb.PageControllerTest do
            conn: conn,
            user: _user
          } do
-      # Setup submission date in a different timezone (5 minutes ago to ensure "ago" is returned)
       submitted_date = DateTime.add(DateTime.utc_now(), -300, :second)
       timezone = "Europe/Stockholm"
 
-      # Mock the get_signup_application_submission_date function
       Mox.expect(
         Ysc.AccountsMock,
         :get_signup_application_submission_date,
@@ -78,10 +99,8 @@ defmodule YscWeb.PageControllerTest do
       conn: conn,
       user: _user
     } do
-      # Setup submission date without timezone (5 minutes ago to ensure "ago" is returned)
       submitted_date = DateTime.add(DateTime.utc_now(), -300, :second)
 
-      # Mock the get_signup_application_submission_date function
       Mox.expect(
         Ysc.AccountsMock,
         :get_signup_application_submission_date,

@@ -12,6 +12,9 @@ Mox.defmock(Stripe.InvoiceMock, for: Ysc.Stripe.InvoiceBehaviour)
 # Discord HTTP mock to avoid real network calls in tests
 Mox.defmock(Ysc.Alerts.DiscordHttpMock, for: Ysc.Alerts.DiscordHttpBehaviour)
 
+# Turnstile mock to avoid real Cloudflare API calls in tests
+Mox.defmock(TurnstileMock, for: Turnstile.Behaviour)
+
 # Internal service mocks for controller testing
 Mox.defmock(Ysc.CustomersMock, for: Ysc.Customers.Behaviour)
 Mox.defmock(Ysc.PaymentsMock, for: Ysc.Payments.Behaviour)
