@@ -34,7 +34,11 @@ defmodule YscWeb.AccountSetupLive do
       </div>
 
       <div class="px-2 py-8">
-        <div :if={@current_step === 0}>
+        <div
+          :if={@current_step === 0}
+          id="email-verification-step"
+          phx-hook="ResendTimer"
+        >
           <.alert_box :if={@from_signup}>
             <.icon
               name="hero-rocket-launch"
@@ -56,7 +60,6 @@ defmodule YscWeb.AccountSetupLive do
             id="email_form"
             phx-submit="verify_code"
             phx-change="validate_email_code"
-            phx-hook="ResendTimer"
             class="pt-8"
           >
             <.input
@@ -292,7 +295,11 @@ defmodule YscWeb.AccountSetupLive do
           </.simple_form>
         </div>
 
-        <div :if={@current_step === 4 and @user_needs.phone_verification}>
+        <div
+          :if={@current_step === 4 and @user_needs.phone_verification}
+          id="phone-verification-step"
+          phx-hook="ResendTimer"
+        >
           <.header class="text-left">
             Verify Your Phone Number
             <:subtitle>
@@ -305,7 +312,6 @@ defmodule YscWeb.AccountSetupLive do
             id="phone_verification_form"
             phx-submit="verify_phone_code"
             phx-change="validate_phone_code"
-            phx-hook="ResendTimer"
             class="pt-8"
           >
             <p
