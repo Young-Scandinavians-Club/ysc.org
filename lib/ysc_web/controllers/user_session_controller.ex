@@ -440,7 +440,6 @@ defmodule YscWeb.UserSessionController do
         "[UserSessionController] Logging in user successfully",
         %{
           user_id: user.id,
-          user_email: user.email,
           validated_redirect: validated_redirect
         }
       )

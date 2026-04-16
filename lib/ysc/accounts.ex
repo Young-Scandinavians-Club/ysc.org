@@ -1653,19 +1653,38 @@ defmodule Ysc.Accounts do
   @doc """
   Verifies a passkey login token and returns the associated user if valid.
 
-  Atomically deletes the token on a successful lookup to ensure it can only
-  be used once (preventing replay attacks within the TTL window).
+  The read and delete are executed inside a single DB transaction with a
+  `FOR UPDATE` row-level lock. This prevents two concurrent requests from
+  both reading the same token row before either has deleted it (replay
+  window), ensuring strict one-time-use semantics even under load.
   """
   def verify_and_consume_passkey_login_token(token) do
     case UserToken.verify_passkey_login_token_query(token) do
-      {:ok, query} ->
-        case Repo.one(query) do
-          {user, token_record} ->
-            Repo.delete(token_record)
-            {:ok, user}
+      {:ok, base_query} ->
+        result =
+          Repo.transaction(fn ->
+            # Lock the matching row so concurrent callers must queue behind
+            # this transaction rather than racing to read-then-delete.
+            locked_query = from(q in base_query, lock: "FOR UPDATE")
 
-          nil ->
-            {:error, :invalid_or_expired}
+            case Repo.one(locked_query) do
+              {user, token_record} ->
+                case Repo.delete(token_record) do
+                  {:ok, _deleted} ->
+                    user
+
+                  {:error, _changeset} ->
+                    Repo.rollback(:invalid_or_expired)
+                end
+
+              nil ->
+                Repo.rollback(:invalid_or_expired)
+            end
+          end)
+
+        case result do
+          {:ok, user} -> {:ok, user}
+          {:error, :invalid_or_expired} -> {:error, :invalid_or_expired}
         end
 
       :error ->

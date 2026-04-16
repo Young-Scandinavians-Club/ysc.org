@@ -4502,6 +4502,8 @@ defmodule YscWeb.UserSettingsLive do
     |> assign(:pending_email_change, nil)
     |> assign(:reauth_error, nil)
     |> assign(:reauth_verified_at, DateTime.utc_now())
+    |> assign(:email_verification_error, nil)
+    |> assign(:email_code_valid, false)
     |> push_patch(to: path)
   end
 

@@ -1022,7 +1022,7 @@ defmodule YscWeb.AdminUsersLive do
            current_user
          ) do
       {:ok, approved_application} ->
-        membership_activated? =
+        approval_status =
           if approved_application.family_invite_id do
             YscWeb.Emails.Notifier.schedule_email(
               user.email,
@@ -1050,7 +1050,7 @@ defmodule YscWeb.AdminUsersLive do
               user.id
             )
 
-            false
+            :family_linked_email_sent
           else
             attempt_membership_activation_on_approval(
               user,
@@ -1059,10 +1059,16 @@ defmodule YscWeb.AdminUsersLive do
           end
 
         toast_message =
-          if membership_activated?,
-            do: "User was approved and membership activated!",
-            else:
+          case approval_status do
+            :activated ->
+              "User was approved and membership activated!"
+
+            :family_linked_email_sent ->
+              "User was approved! Family membership invite email sent."
+
+            :activation_failed ->
               "User was approved! They will receive an email with payment instructions."
+          end
 
         {:noreply,
          socket
@@ -1427,7 +1433,7 @@ defmodule YscWeb.AdminUsersLive do
             user.id
           )
 
-          true
+          :activated
 
         {:error, reason} ->
           Ysc.Logging.error("Failed to auto-charge membership on approval",
@@ -1437,13 +1443,13 @@ defmodule YscWeb.AdminUsersLive do
 
           send_approved_pay_now_email(user)
           schedule_payment_reminders(user.id)
-          false
+          :activation_failed
       end
     else
       # No payment method on file
       send_approved_pay_now_email(user)
       schedule_payment_reminders(user.id)
-      false
+      :activation_failed
     end
   end
 
