@@ -13,6 +13,7 @@ priv/static/assets/*.{gz,br,zst}
 .opencode/
 .elixir_ls/
 .unlighthouse/
+.playwright-mcp/
 
 # migration backups
 wp_backup/
