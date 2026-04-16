@@ -74,12 +74,17 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     # Allowlist for older browsers (ignored when strict-dynamic is present)
     # Allow inline scripts for older browsers that don't support strict-dynamic or nonce
     # Stripe.js — wildcard covers performance-optimized sub-origins
+    # 'unsafe-eval' is required for Cloudflare's managed challenge/bot-protection scripts
+    # (served from self via the Cloudflare proxy) which use eval() internally.
+    # Risk is limited by 'strict-dynamic': only nonce-approved scripts can execute,
+    # so eval() is only available within already-trusted script contexts.
     script_src =
       ([
          "'self'",
          "'nonce-#{nonce}'",
          "'strict-dynamic'",
          "'unsafe-inline'",
+         "'unsafe-eval'",
          "https://js.stripe.com",
          "https://*.js.stripe.com",
          "https://js.radar.com/v4.4.8/radar.min.js",
