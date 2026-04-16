@@ -21,7 +21,7 @@ export default {
 
         this.toggle = () => {
             if (this.video.paused) {
-                this.video.play();
+                this.video.play().catch(() => {});
             } else {
                 this.video.pause();
             }
@@ -31,6 +31,12 @@ export default {
         this.button.addEventListener("click", this.toggle);
         this.video.addEventListener("play", this.updateButtonState);
         this.video.addEventListener("pause", this.updateButtonState);
+
+        // Suppress unhandled rejections from autoplay being interrupted by the browser
+        // (e.g. power-saving policies, tab backgrounded during LiveView navigation)
+        if (this.video.paused) {
+            this.video.play().catch(() => {});
+        }
 
         this.updateButtonState();
     },
