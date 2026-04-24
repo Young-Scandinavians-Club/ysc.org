@@ -8,7 +8,8 @@ primary_region = 'sjc'
 kill_signal = 'SIGTERM'
 
 [build]
-  dockerfile = 'etc/docker/Dockerfile'
+  # Relative to this file (etc/fly/), not repo root — see fly.io monorepo / -c path rules.
+  dockerfile = "../docker/Dockerfile"
 
 [deploy]
   release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} /app/bin/migrate'"

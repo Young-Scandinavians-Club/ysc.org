@@ -99,6 +99,7 @@ root_timestamp() {
 }
 
 # Return JSON array of merged PRs in the time window, using GitHub search (paginated, max 1000).
+# Merges pages via temp files — jq --argjson on a large growing string exceeds argv (ARG_MAX) in CI.
 search_merged_prs() {
   local repo="$1"
   local t_start_inclusive="${2:-}" # empty => use root; else merged > this (exclusive lower)
@@ -111,33 +112,51 @@ search_merged_prs() {
     q="repo:${repo} is:pr is:merged merged:>${t_start_inclusive} merged:<=${t_end_inclusive}"
   fi
 
-  local items_json
-  items_json="[]"
+  local accf pagef
+  accf=$(mktemp)
+  pagef=$(mktemp)
+  sc_search_rm() { rm -f "$accf" "$pagef" "${accf}.m" 2>/dev/null; }
+
+  echo '[]' >"$accf"
   local page=1
   local cap=1000
   while [ "$page" -le 20 ]; do
-    local enc resp new_items n
-    enc=$(printf '%s' "$q" | jq -sRr @uri)
+    local enc resp n total_in_acc
+    enc=$(printf '%s' "$q" | jq -sRr @uri) || {
+      sc_search_rm
+      return 1
+    }
     resp=$(
       curl -fsS \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer $(github_token)" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "${GITHUB_API}/search/issues?q=${enc}&per_page=100&page=${page}"
-    )
-    new_items=$(echo "$resp" | jq '.items // []')
-    n=$(echo "$new_items" | jq 'length')
-    if [ "$n" -eq 0 ]; then
+    ) || {
+      sc_search_rm
+      return 1
+    }
+    echo "$resp" | jq '.items // []' >"$pagef" || {
+      sc_search_rm
+      return 1
+    }
+    n=$(jq 'length' "$pagef" 2>/dev/null) || n=0
+    if [ "${n:-0}" -eq 0 ]; then
       break
     fi
-    items_json=$(jq -n --argjson acc "$items_json" --argjson n "$new_items" '$acc + $n')
-    if [ "$n" -lt 100 ] || [ "$(echo "$items_json" | jq 'length')" -ge "$cap" ]; then
+    if ! jq -s '.[0] + .[1]' "$accf" "$pagef" >"${accf}.m"; then
+      sc_search_rm
+      return 1
+    fi
+    mv "${accf}.m" "$accf"
+    total_in_acc=$(jq 'length' "$accf")
+    if [ "$n" -lt 100 ] || [ "$total_in_acc" -ge "$cap" ]; then
       break
     fi
     page=$((page + 1))
   done
-  # Slim payload for the LLM; body may be GitHub-truncated.
-  echo "$items_json" | jq '
+
+  if ! jq '
     group_by(.number) | map(.[0])
     | sort_by(.number)
     | map({
@@ -145,53 +164,68 @@ search_merged_prs() {
         title: .title,
         author: .user.login,
         url: .html_url,
-        body: .body
+        body: ((.body // "") | if length > 2000 then .[0:2000] + "..." else . end)
       })
-  '
+  ' "$accf"; then
+    sc_search_rm
+    return 1
+  fi
+  sc_search_rm
 }
 
+# pr_data_path: file containing a JSON array of PR objects (avoids argv size limits for large lists).
 openrouter_changelog() {
-  local pr_data="$1"
+  local pr_data_path="$1"
   local version="$2"
   local prev_version="$3"
   local system
   system="You are a release notes writer. Given merged pull requests for a software project, write a clear, user-focused changelog in Markdown for this version. Use sections only if they help (e.g. Added, Fixed, Changed). Be concise. Link PR numbers in parentheses with URLs when present. Do not invent features not implied by the PRs. If the list is empty, write a short note that this release has no merged PRs in the GitHub search range. Output Markdown only, no surrounding quotes."
 
-  local req_body referer
+  local referer req_tmp
   referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
+  req_tmp=$(mktemp)
+  or_rm_req() { rm -f "$req_tmp" 2>/dev/null; }
 
-  req_body=$(
-    jq -n \
-      --arg model "$OPENROUTER_MODEL" \
-      --arg sys "$system" \
-      --arg ver "$version" \
-      --arg prev "${prev_version:-<none: first v* release>}" \
-      --argjson prs "$pr_data" \
-      '{
+  if ! jq -n \
+    --arg model "$OPENROUTER_MODEL" \
+    --arg sys "$system" \
+    --arg ver "$version" \
+    --arg prev "${prev_version:-<none: first v* release>}" \
+    --rawfile prs "$pr_data_path" \
+    '
+    ($prs | fromjson) as $prlist
+    | {
         model: $model,
         messages: [
           { role: "system", content: $sys },
           { role: "user", content: (
-            {
-              instruction: "Write release notes for this version.",
-              new_version: $ver,
-              previous_version_tag: $prev,
-              merged_pull_requests: $prs
-            } | tojson
-          ) }
+              {
+                instruction: "Write release notes for this version.",
+                new_version: $ver,
+                previous_version_tag: $prev,
+                merged_pull_requests: $prlist
+              } | tojson
+            ) }
         ]
-      }'
-  )
+      }
+    ' >"$req_tmp"; then
+    or_rm_req
+    return 1
+  fi
 
   local resp text
-  resp=$(
+  if ! resp=$(
     curl -fsS "$OPENROUTER_API" \
       -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
       -H "Content-Type: application/json" \
       -H "HTTP-Referer: ${referer}" \
       -H "X-Title: ysc release notes" \
-      -d "$req_body"
-  )
+      -d @"$req_tmp"
+  ); then
+    or_rm_req
+    return 1
+  fi
+  or_rm_req
   text=$(echo "$resp" | jq -r '.choices[0].message.content // empty')
   if [ -z "$text" ] || [ "$text" = "null" ]; then
     echo "${RED}Error: OpenRouter returned no text. Response:${RESET}" >&2
@@ -286,23 +320,24 @@ echo "${TEAL}Repository: $REPO_SLUG  Tag: $TAG${RESET}"
 
 PREV_TAG=$(find_previous_v_tag "$TAG")
 t_end=$(ref_timestamp "$TAG")
+pr_file=$(mktemp)
+notes_tmp=$(mktemp)
+# shellcheck disable=SC2064
+trap 'rm -f "$pr_file" "$notes_tmp"' EXIT
+
 if [ -n "$PREV_TAG" ]; then
   t_start=$(ref_timestamp "$PREV_TAG")
   echo "${TEAL}Previous tag: $PREV_TAG${RESET}"
-  PR_JSON=$(search_merged_prs "$REPO_SLUG" "$t_start" "$t_end")
+  search_merged_prs "$REPO_SLUG" "$t_start" "$t_end" >"$pr_file"
 else
   echo "${TEAL}No previous v* tag; bounding PRs from repository root to this tag.${RESET}"
-  PR_JSON=$(search_merged_prs "$REPO_SLUG" "" "$t_end")
+  search_merged_prs "$REPO_SLUG" "" "$t_end" >"$pr_file"
 fi
 
-PR_COUNT=$(echo "$PR_JSON" | jq 'length')
+PR_COUNT=$(jq 'length' "$pr_file")
 echo "${TEAL}Merged PRs in range (GitHub search): $PR_COUNT${RESET}"
 
-notes_tmp=$(mktemp)
-# shellcheck disable=SC2064
-trap 'rm -f "$notes_tmp"' EXIT
-
-openrouter_changelog "$PR_JSON" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
+openrouter_changelog "$pr_file" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "${TEAL}DRY_RUN=1 — not updating GitHub release.${RESET}"

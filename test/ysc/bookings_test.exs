@@ -1292,6 +1292,10 @@ defmodule Ysc.BookingsTest do
       )
       |> Ysc.Repo.update_all(set: [is_active: false])
 
+      # Raw update_all bypasses Bookings context — must invalidate cache or
+      # get_active_refund_policy/2 still serves a stale policy.
+      Ysc.Bookings.RefundPolicyCache.invalidate()
+
       booking = booking_fixture(%{total_price: Money.new(10_000, :USD)})
       cancellation_date = Date.utc_today()
 
