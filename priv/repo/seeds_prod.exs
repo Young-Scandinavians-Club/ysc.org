@@ -41,6 +41,21 @@ insert_site_setting = fn attrs ->
   end
 end
 
+# registration_changeset/3 does not cast verification or onboarding fields; they must
+# be set on the %User{} after insert (same pattern as priv/repo/seeds.exs).
+mark_prod_admin_fully_verified = fn user ->
+  now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+  user
+  |> Ecto.Changeset.change()
+  |> Ecto.Changeset.put_change(:confirmed_at, now)
+  |> Ecto.Changeset.put_change(:email_verified_at, now)
+  |> Ecto.Changeset.put_change(:phone_verified_at, now)
+  |> Ecto.Changeset.put_change(:password_set_at, now)
+  |> Ecto.Changeset.put_change(:post_migration_onboarding_completed_at, now)
+  |> Repo.update()
+end
+
 IO.puts("🌱 Starting production seed...")
 
 # 1. Seed SiteSettings
@@ -89,9 +104,6 @@ admin_user =
           last_name: "User",
           phone_number: "+14159009009",
           most_connected_country: "SE",
-          confirmed_at: DateTime.utc_now(),
-          email_verified_at: DateTime.utc_now(),
-          phone_verified_at: DateTime.utc_now(),
           date_of_birth: ~D[1980-01-15],
           registration_form: %{
             membership_type: "family",
@@ -129,40 +141,16 @@ admin_user =
         {:ok, nil} ->
           # Conflict occurred, fetch the existing user
           existing = Repo.get_by!(User, email: "admin@ysc.org")
-          # Ensure email and phone are verified for existing admin user
-          updated =
-            existing
-            |> User.registration_changeset(
-              %{
-                email_verified_at:
-                  existing.email_verified_at || DateTime.utc_now(),
-                phone_verified_at:
-                  existing.phone_verified_at || DateTime.utc_now()
-              }, hash_password: false, validate_email: false)
-            |> Repo.update!()
-
           IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
-          updated
+          existing
 
         {:error, changeset} ->
           # If insert fails, try to fetch again (might have been created by another process)
           existing = Repo.get_by(User, email: "admin@ysc.org")
 
           if existing do
-            # Ensure email and phone are verified for existing admin user
-            updated =
-              existing
-              |> User.registration_changeset(
-                %{
-                  email_verified_at:
-                    existing.email_verified_at || DateTime.utc_now(),
-                  phone_verified_at:
-                    existing.phone_verified_at || DateTime.utc_now()
-                }, hash_password: false, validate_email: false)
-              |> Repo.update!()
-
             IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
-            updated
+            existing
           else
             IO.puts(
               :stderr,
@@ -176,6 +164,26 @@ admin_user =
     existing_user ->
       IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
       existing_user
+  end
+
+admin_user =
+  case admin_user do
+    nil ->
+      nil
+
+    user ->
+      case mark_prod_admin_fully_verified.(user) do
+        {:ok, updated} ->
+          updated
+
+        {:error, changeset} ->
+          IO.puts(
+            :stderr,
+            "  ⚠️  Admin user verification update failed: #{inspect(changeset.errors)}"
+          )
+
+          user
+      end
   end
 
 # 3. Create seasons for Tahoe cabin
