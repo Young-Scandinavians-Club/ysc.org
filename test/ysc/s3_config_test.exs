@@ -280,11 +280,113 @@ defmodule Ysc.S3ConfigTest do
         S3Config.expense_report_file_presigned_url_args("receipts/a.pdf", 3600)
 
       assert is_map(config)
+      assert config[:scheme] == "https://"
+      assert config[:host] == "expenses.example.com"
+      assert config[:port] == nil
       assert host == "expenses.example.com"
       assert path == "receipts/a.pdf"
       assert opts[:expires_in] == 3600
       assert opts[:virtual_host] == true
       assert opts[:bucket_as_host] == true
+    end
+
+    test "expense_report_file_presigned_url_args passes scheme and non-default port to ExAws" do
+      previous = Application.get_env(:ysc, :s3_expense_reports_public_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_expense_reports_public_url)
+        else
+          Application.put_env(:ysc, :s3_expense_reports_public_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https://expenses.example.com:8443"
+      )
+
+      {config, :get, host, _path, _opts} =
+        S3Config.expense_report_file_presigned_url_args("k", 60)
+
+      assert config[:scheme] == "https://"
+      assert config[:host] == "expenses.example.com"
+      assert config[:port] == 8443
+      assert host == "expenses.example.com"
+    end
+
+    test "expense_report_file_presigned_url_args supports http origin (e.g. MinIO)" do
+      previous = Application.get_env(:ysc, :s3_expense_reports_public_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_expense_reports_public_url)
+        else
+          Application.put_env(:ysc, :s3_expense_reports_public_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "http://127.0.0.1:9000"
+      )
+
+      {config, :get, host, _, _} =
+        S3Config.expense_report_file_presigned_url_args("k", 60)
+
+      assert config[:scheme] == "http://"
+      assert config[:host] == "127.0.0.1"
+      assert config[:port] == 9000
+      assert host == "127.0.0.1"
+    end
+
+    test "expense_report_file_presigned_url_args raises on invalid public URL" do
+      previous = Application.get_env(:ysc, :s3_expense_reports_public_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_expense_reports_public_url)
+        else
+          Application.put_env(:ysc, :s3_expense_reports_public_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "expenses.example.com"
+      )
+
+      assert_raise ArgumentError, fn ->
+        S3Config.expense_report_file_presigned_url_args("k", 60)
+      end
+    end
+
+    test "expense_report_file_presigned_url_args treats whitespace-only public URL as unset" do
+      previous = Application.get_env(:ysc, :s3_expense_reports_public_url)
+      previous_bucket = Application.get_env(:ysc, :expense_reports_s3_bucket)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_expense_reports_public_url)
+        else
+          Application.put_env(:ysc, :s3_expense_reports_public_url, previous)
+        end
+
+        if previous_bucket == nil do
+          Application.delete_env(:ysc, :expense_reports_s3_bucket)
+        else
+          Application.put_env(:ysc, :expense_reports_s3_bucket, previous_bucket)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_expense_reports_public_url, "   \t  ")
+      Application.put_env(:ysc, :expense_reports_s3_bucket, "only-bucket")
+
+      assert {_c, :get, "only-bucket", "k", [expires_in: 30]} =
+               S3Config.expense_report_file_presigned_url_args("k", 30)
     end
 
     test "expense_report_file_presigned_url_args uses bucket name without public URL" do

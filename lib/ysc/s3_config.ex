@@ -49,8 +49,12 @@ defmodule Ysc.S3Config do
   end
 
   @doc """
-  Optional HTTPS origin for the expense-reports bucket (e.g. Tigris custom domain).
+  Optional origin for the expense-reports bucket (e.g. Tigris custom domain).
   Used for public object URLs and presigned GET redirects when configured.
+
+  Must be a full URL with scheme and host, e.g. `https://expenses.example.com` or
+  `http://localhost:9000` (non-default ports are preserved for signing). A bare
+  hostname or scheme-less value raises when presigned URLs are built.
   """
   def expense_reports_public_url do
     Application.get_env(:ysc, :s3_expense_reports_public_url)
@@ -242,33 +246,93 @@ defmodule Ysc.S3Config do
   Builds arguments for `ExAws.S3.presigned_url/5` for expense report file downloads.
 
   When `expense_reports_public_url/0` is set (custom domain), uses `bucket_as_host`
-  so the signed URL targets that host.
+  so the signed URL targets that host. The URL's scheme and port are merged into
+  the ExAws config so the signature matches non-default ports and `http://` (e.g. MinIO).
+
+  Raises `ArgumentError` if the env value is non-empty but not a valid `http(s)` URL with host.
   """
   def expense_report_file_presigned_url_args(normalized_path, expires_in)
       when is_binary(normalized_path) and is_integer(expires_in) do
-    config = ExAws.Config.new(:s3)
     bucket_name = expense_reports_bucket_name()
 
+    default =
+      {ExAws.Config.new(:s3), :get, bucket_name, normalized_path,
+       [expires_in: expires_in]}
+
     case expense_reports_public_url() do
-      url when is_binary(url) and url != "" ->
-        case URI.parse(url) do
-          %URI{host: host} when is_binary(host) ->
+      url when is_binary(url) ->
+        case parse_public_http_origin!(url) do
+          :none ->
+            default
+
+          {:ok, %{hostname: host, ex_aws_overrides: overrides}} ->
+            config = ExAws.Config.new(:s3, overrides)
+
             {config, :get, host, normalized_path,
              [
                expires_in: expires_in,
                virtual_host: true,
                bucket_as_host: true
              ]}
-
-          _ ->
-            {config, :get, bucket_name, normalized_path,
-             [expires_in: expires_in]}
         end
 
       _ ->
-        {config, :get, bucket_name, normalized_path, [expires_in: expires_in]}
+        default
     end
   end
+
+  defp parse_public_http_origin!(url) when is_binary(url) do
+    trimmed = String.trim(url)
+
+    cond do
+      trimmed == "" ->
+        :none
+
+      true ->
+        uri = URI.parse(trimmed)
+
+        cond do
+          uri.scheme not in ["http", "https"] ->
+            raise ArgumentError,
+                  "Invalid S3 public base URL #{inspect(url)}: scheme must be http or https " <>
+                    "(got #{inspect(uri.scheme)}). Use a full URL, e.g. https://assets.example.com"
+
+          uri.host in [nil, ""] ->
+            raise ArgumentError,
+                  "Invalid S3 public base URL #{inspect(url)}: host is required. " <>
+                    "Use a full URL with scheme, e.g. https://assets.example.com"
+
+          true ->
+            scheme = "#{uri.scheme}://"
+            port = uri_effective_port(uri)
+
+            # Explicit `port: nil` clears inherited ExAws :s3 port (e.g. MinIO in test) when the
+            # public URL uses the scheme default (443 / 80), so presigned URLs are not signed
+            # against the wrong endpoint.
+            port_kw =
+              if port in [80, 443] do
+                [port: nil]
+              else
+                [port: port]
+              end
+
+            overrides = [scheme: scheme, host: uri.host] ++ port_kw
+
+            {:ok,
+             %{
+               scheme: scheme,
+               hostname: uri.host,
+               ex_aws_overrides: overrides
+             }}
+        end
+    end
+  end
+
+  defp uri_effective_port(%URI{port: port}) when is_integer(port), do: port
+
+  defp uri_effective_port(%URI{scheme: "https"}), do: 443
+  defp uri_effective_port(%URI{scheme: "http"}), do: 80
+  defp uri_effective_port(%URI{}), do: nil
 
   defp default_base_url do
     env = Ysc.Env.current()

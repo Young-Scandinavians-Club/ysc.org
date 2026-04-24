@@ -11,7 +11,7 @@ defmodule Ysc.Avatars.Avatar do
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
-  @timestamps_opts [type: :utc_datetime]
+  @timestamps_opts [type: :utc_datetime_usec]
 
   schema "avatars" do
     belongs_to :user, Ysc.Accounts.User
