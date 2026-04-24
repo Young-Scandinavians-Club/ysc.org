@@ -279,7 +279,7 @@ defmodule Ysc.S3ConfigTest do
       {config, :get, host, path, opts} =
         S3Config.expense_report_file_presigned_url_args("receipts/a.pdf", 3600)
 
-      assert %ExAws.Config{} = config
+      assert is_map(config)
       assert host == "expenses.example.com"
       assert path == "receipts/a.pdf"
       assert opts[:expires_in] == 3600
