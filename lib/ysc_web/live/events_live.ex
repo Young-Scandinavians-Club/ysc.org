@@ -80,12 +80,19 @@ defmodule YscWeb.EventsLive do
                   Read Club News
                   <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
                 </.link>
-                <div class="border-t border-zinc-100 pt-3">
+                <div
+                  :if={
+                    @site_setting_socials_discord ||
+                      (@current_user && @site_setting_socials_whatsapp)
+                  }
+                  class="border-t border-zinc-100 pt-3"
+                >
                   <p class="text-sm text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
                     Community Chat
                   </p>
                   <div class="flex flex-col gap-2">
                     <a
+                      :if={@site_setting_socials_discord}
                       href={@site_setting_socials_discord}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -97,7 +104,7 @@ defmodule YscWeb.EventsLive do
                       /> Discord
                     </a>
                     <a
-                      :if={@current_user}
+                      :if={@current_user && @site_setting_socials_whatsapp}
                       href={@site_setting_socials_whatsapp}
                       target="_blank"
                       rel="noopener noreferrer"

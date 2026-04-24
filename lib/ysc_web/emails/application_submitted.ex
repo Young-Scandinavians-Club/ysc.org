@@ -27,10 +27,10 @@ defmodule YscWeb.Emails.ApplicationSubmitted do
   end
 
   def facebook_path() do
-    Settings.get_setting("facebook")
+    Settings.get_social_url("facebook")
   end
 
   def instagram_path() do
-    Settings.get_setting("instagram")
+    Settings.get_social_url("instagram")
   end
 end

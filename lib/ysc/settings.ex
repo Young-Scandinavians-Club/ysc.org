@@ -282,6 +282,24 @@ defmodule Ysc.Settings do
     end
   end
 
+  @doc """
+  Returns a non-empty social/link setting URL, or `nil` if the setting is missing
+  or only whitespace. Safer for templates than `get_setting/1`, which raises
+  when the row is absent.
+  """
+  def get_social_url(name) do
+    case get_setting_safe(name) do
+      url when is_binary(url) ->
+        case String.trim(url) do
+          "" -> nil
+          trimmed -> trimmed
+        end
+
+      _ ->
+        nil
+    end
+  end
+
   def settings_grouped_by_scope() do
     settings()
     |> Enum.reduce(%{}, fn setting, acc ->

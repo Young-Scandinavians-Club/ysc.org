@@ -74,7 +74,8 @@ require_cmd() {
   }
 }
 
-# Previous v* tag before TAG (version sort, newest first). Empty if TAG is the oldest v* tag.
+# Previous v* tag (immediately older in semver) before TAG. Empty if TAG is the oldest v* tag.
+# Tags must be listed oldest→newest so that when we find TAG, the previous line is the prior release.
 find_previous_v_tag() {
   local current="$1"
   local prev=""
@@ -85,7 +86,7 @@ find_previous_v_tag() {
       return 0
     fi
     prev=$t
-  done < <(git -C "$PROJECT_ROOT" tag -l 'v*' | LC_ALL=C sort -Vr)
+  done < <(git -C "$PROJECT_ROOT" tag -l 'v*' | LC_ALL=C sort -V)
   echo "${RED}Error: tag $current not found among v* tags.${RESET}" >&2
   exit 1
 }

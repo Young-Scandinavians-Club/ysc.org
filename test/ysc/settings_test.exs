@@ -317,6 +317,22 @@ defmodule Ysc.SettingsTest do
     end
   end
 
+  describe "get_social_url/1" do
+    test "returns nil when setting does not exist" do
+      assert Settings.get_social_url("no_such_social") == nil
+    end
+
+    test "returns trimmed URL and nil for blank" do
+      %SiteSetting{name: "social_x", value: "  https://example.com/x  "}
+      |> Repo.insert!()
+
+      assert Settings.get_social_url("social_x") == "https://example.com/x"
+
+      %SiteSetting{name: "social_empty", value: "   "} |> Repo.insert!()
+      assert Settings.get_social_url("social_empty") == nil
+    end
+  end
+
   describe "settings_grouped_by_scope/0" do
     test "groups settings by scope" do
       %SiteSetting{name: "setting1", value: "value1", group: "group1"}

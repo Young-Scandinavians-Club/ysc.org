@@ -56,10 +56,14 @@
         <li style="padding-bottom: 10px">
           <strong><a href="<%= latest_news_url() %>">Latest News</a></strong>
         </li>
+        <%= if facebook_path = facebook_path() do %>
         <li style="padding-bottom: 10px">
-          <strong><a href="<%= facebook_path() %>">Facebook</a></strong>
+          <strong><a href="<%= facebook_path %>">Facebook</a></strong>
         </li>
-        <li><strong><a href="<%= instagram_path() %>">Instagram</a></strong></li>
+        <% end %>
+        <%= if instagram_path = instagram_path() do %>
+        <li><strong><a href="<%= instagram_path %>">Instagram</a></strong></li>
+        <% end %>
       </ul>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
