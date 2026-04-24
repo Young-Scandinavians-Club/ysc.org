@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# release.sh - Create a new release: update version in mix.exs, create git tag, commit and push
+# release.sh - Create a new release: update version in mix.exs, create git tag, commit and push.
+# Pushing the v* tag triggers GitHub Actions production deploy (.github/workflows/fly-deploy-prod.yml).
 # shellcheck source-path=SCRIPTDIR
 
 set -euo pipefail
@@ -18,6 +19,8 @@ usage() {
   echo "  1. Updating the version in mix.exs"
   echo "  2. Creating a git tag"
   echo "  3. Committing and pushing the change and tag to main"
+  echo ""
+  echo "After push, CI deploys ysc-prod from etc/fly/fly-prod.toml (tag must be v*)."
   echo ""
   echo "TAG: Version tag (e.g. v1.0.0 or 1.0.0). If not provided, will prompt."
   exit 1
@@ -117,3 +120,5 @@ echo ""
 echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
 echo "${GREEN}${BOLD}                      Release $GIT_TAG created successfully!${RESET}"
 echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
+echo ""
+echo "${TEAL}Next: watch the GitHub Actions workflow \"Deploy Production\" for this tag.${RESET}"

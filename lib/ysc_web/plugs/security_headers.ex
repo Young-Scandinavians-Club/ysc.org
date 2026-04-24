@@ -23,7 +23,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
       s3_image_sources = get_s3_image_sources()
 
       # Get S3 storage URLs for connect sources (for uploads)
-      s3_connect_sources = get_s3_connect_sources()
+      s3_connect_sources =
+        get_s3_connect_sources() ++ S3Config.storage_csp_connect_sources()
 
       # Build CSP policy with nonce
       csp_policy =

@@ -95,13 +95,21 @@ defmodule YscWeb.ExpenseReportFileController do
          s3_path,
          expense_report
        ) do
-    bucket_name = S3Config.expense_reports_bucket_name()
     expires_in = 3600
     normalized_path = normalize_s3_path_for_presigned_url(s3_path)
-    config = ExAws.Config.new(:s3)
 
-    case ExAws.S3.presigned_url(config, :get, bucket_name, normalized_path,
-           expires_in: expires_in
+    {config, method, bucket_or_host, object_key, presign_opts} =
+      S3Config.expense_report_file_presigned_url_args(
+        normalized_path,
+        expires_in
+      )
+
+    case ExAws.S3.presigned_url(
+           config,
+           method,
+           bucket_or_host,
+           object_key,
+           presign_opts
          ) do
       {:ok, presigned_url} ->
         Ysc.Logging.debug("Generated presigned URL for expense report file",

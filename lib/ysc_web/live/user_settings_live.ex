@@ -6160,18 +6160,11 @@ defmodule YscWeb.UserSettingsLive do
     meta = %{
       uploader: "S3",
       key: key,
-      url: S3Config.upload_url() |> avatar_upload_url(),
+      url: S3Config.avatars_upload_url(),
       fields: fields
     }
 
     {:ok, meta, socket}
-  end
-
-  defp avatar_upload_url(base_url) do
-    media_bucket = S3Config.bucket_name()
-    avatars_bucket = S3Config.avatars_bucket_name()
-
-    String.replace(base_url, media_bucket, avatars_bucket)
   end
 
   defp load_user_avatars(user) do
