@@ -1,0 +1,83 @@
+# fly.toml app configuration file generated for ysc-prod on 2026-04-24T09:37:23-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'ysc-prod'
+primary_region = 'sjc'
+kill_signal = 'SIGTERM'
+
+[build]
+  dockerfile = 'etc/docker/Dockerfile'
+
+[deploy]
+  release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} /app/bin/migrate'"
+
+[env]
+  APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID = 'pass.org.ysc.membership'
+  APPLE_WALLET_ORG_NAME = 'Young Scandinavians Club'
+  APPLE_WALLET_TEAM_ID = 'FAN7NBS7AB'
+  APPLE_WALLET_TICKET_PASS_TYPE_ID = 'pass.org.ysc.tickets'
+  APP_ENV = 'production'
+  AVATARS_BUCKET_NAME = 'ysc-prod-avatars'
+  BUCKET_NAME = 'ysc-prod-assets'
+  ECTO_IPV6 = 'true'
+  EMAIL_ADMIN = 'admin@ysc.org'
+  EMAIL_BOARD = 'board@ysc.org'
+  EMAIL_CLEAR_LAKE = 'cl@ysc.org'
+  EMAIL_CONTACT = 'info@ysc.org'
+  EMAIL_FROM = 'info@ysc.org'
+  EMAIL_FROM_NAME = 'YSC'
+  EMAIL_MEMBERSHIP = 'memberships@ysc.org'
+  EMAIL_TAHOE = 'tahoe@ysc.org'
+  EMAIL_VOLUNTEER = 'volunteer@ysc.org'
+  ENVIRONMENT = 'production'
+  ERL_AFLAGS = '-proto_dist inet6_tcp'
+  EXPENSE_REPORTS_BUCKET_NAME = 'ysc-prod-expense-reports'
+  FLOWROUTE_FORCE_ENABLE = 'true'
+  LOG_LEVEL = 'warn'
+  PHX_HOST = 'beta.ysc.org'
+  PHX_SERVER = 'true'
+  PORT = '4000'
+  QUICKBOOKS_APP_ID = 'a08a8da4-d5aa-4186-a3e0-b6ce84d1028b'
+  QUICKBOOKS_BASE_URL = 'https://quickbooks.api.intuit.com/v3'
+  QUICKBOOKS_REALM_ID = '123145772177359'
+  QUICKBOOKS_STRIPE_ACCOUNT_ID = '1150040001'
+  QUICKBOOKS_BANK_ACCOUNT_ID = '383'
+  QUICKBOOKS_SYSTEM_CUSTOMER_ID = '6855'
+  QUICKBOOKS_EVENT_ITEM_ID = '652'
+  QUICKBOOKS_DONATION_ITEM_ID = '602'
+  QUICKBOOKS_TAHOE_BOOKING_ITEM_ID = '371'
+  QUICKBOOKS_CLEAR_LAKE_BOOKING_ITEM_ID = '369'
+  QUICKBOOKS_MEMBERSHIP_ITEM_ID = '340'
+  QUICKBOOKS_SINGLE_MEMBERSHIP_ITEM_ID = '372'
+  QUICKBOOKS_FAMILY_MEMBERSHIP_ITEM_ID = '370'
+  QUICKBOOKS_STRIPE_FEE_ITEM_ID = '734'
+  S3_AVATARS_PUBLIC_BASE_URL = 'https://avatars.ysc.org'
+  S3_EXPENSE_REPORTS_PUBLIC_BASE_URL = 'https://expenses.ysc.org'
+  S3_MEDIA_PUBLIC_BASE_URL = 'https://assets.ysc.org'
+  STRIPE_FAMILY_PRICE_ID = 'price_1TP6efIZd8GkARoBVD9zY8ux'
+  STRIPE_SINGLE_PRICE_ID = 'price_1TP6f0IZd8GkARoByyICLSbm'
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 800
+    soft_limit = 400
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '1gb'
+  cpus = 1
+  memory_mb = 1024
+
+[[metrics]]
+  port = 4000
+  path = '/metrics'

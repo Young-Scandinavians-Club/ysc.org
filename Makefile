@@ -181,16 +181,68 @@ release:  ## Build and tag a docker image for release
 	@docker tag $(PROJECT_NAME):$(VERSION_LONG) $(PROJECT_NAME):$(VERSION_SHORT)
 	@docker tag $(PROJECT_NAME):$(VERSION_LONG) $(PROJECT_NAME):latest
 
+##
+# Fly.io — sandbox and production use different accounts.
+#
+# Local CLI: set tokens from each org (Fly dashboard → Access Tokens), then:
+#   export FLY_SANDBOX_ACCESS_TOKEN=...   # optional if `fly auth login` is the sandbox user
+#   export FLY_PROD_ACCESS_TOKEN=...      # required for shell-prod (do not reuse sandbox token)
+# If FLY_API_TOKEN is exported in your shell (e.g. for CI), flyctl ignores `fly auth login`.
+# Sandbox targets unset it when FLY_SANDBOX_ACCESS_TOKEN is unset so login works; or run: unset FLY_API_TOKEN
+# Optional org slug checks (from `fly orgs list`) to catch wrong token:
+#   export FLY_ORG_SANDBOX=your-sandbox-org
+#   export FLY_ORG_PROD=your-prod-org
+#
+# GitHub: sandbox workflow uses secret FLY_SANDBOX_API_TOKEN (falls back to FLY_API_TOKEN);
+#         production uses FLY_PROD_API_TOKEN only.
+##
+
+.PHONY: fly-verify-sandbox
+fly-verify-sandbox:  ## Confirm credentials can access ysc-sandbox (uses FLY_SANDBOX_ACCESS_TOKEN if set)
+	@set -e; \
+	if [ -n "$${FLY_SANDBOX_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_SANDBOX_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	"$(CURDIR)/etc/scripts/fly_verify_app_access.sh" ysc-sandbox "$${FLY_ORG_SANDBOX:-}"
+
+.PHONY: fly-verify-prod
+fly-verify-prod:  ## Confirm FLY_PROD_ACCESS_TOKEN can access ysc-prod
+	@if [ -z "$${FLY_PROD_ACCESS_TOKEN:-}" ]; then \
+	  echo "$(RED)FLY_PROD_ACCESS_TOKEN is not set.$(RESET) Use a Fly token from the production org (not sandbox)." >&2; \
+	  echo "  export FLY_PROD_ACCESS_TOKEN=..." >&2; \
+	  exit 1; \
+	fi
+	@FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}" "$(CURDIR)/etc/scripts/fly_verify_app_access.sh" ysc-prod "$${FLY_ORG_PROD:-}"
+
 .PHONY: deploy-sandbox
-deploy-sandbox:  ## Deploy the sandbox application to Fly.io
+deploy-sandbox: fly-verify-sandbox  ## Deploy the sandbox application to Fly.io
 	@echo "$(BOLD)Deploying sandbox application to Fly.io...$(RESET)"
 	@echo "$(BOLD)Version: $(VERSION_LONG)$(RESET)"
-	@fly deploy --dockerfile $(DOCKER_DIR)/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --image-label $(VERSION_LONG) --build-arg BUILD_VERSION=$(VERSION_LONG)
+	@set -e; \
+	if [ -n "$${FLY_SANDBOX_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_SANDBOX_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	fly deploy --dockerfile $(DOCKER_DIR)/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --image-label $(VERSION_LONG) --build-arg BUILD_VERSION=$(VERSION_LONG)
 
 .PHONY: shell-sandbox
-shell-sandbox:  ## Open an IEx shell in the sandbox environment on Fly.io
+shell-sandbox: fly-verify-sandbox  ## Open an IEx shell in the sandbox environment on Fly.io
 	@echo "$(BOLD)Opening IEx console in sandbox environment...$(RESET)"
-	@fly ssh console -a ysc-sandbox -C "/app/bin/ysc remote"
+	@set -e; \
+	if [ -n "$${FLY_SANDBOX_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_SANDBOX_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	fly ssh console -a ysc-sandbox -C "/app/bin/ysc remote"
+
+.PHONY: shell-prod
+shell-prod: fly-verify-prod  ## Open an IEx shell in production (requires FLY_PROD_ACCESS_TOKEN)
+	@echo "$(BOLD)Opening IEx console in production...$(RESET)"
+	@FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}" fly ssh console -a ysc-prod -C "/app/bin/ysc remote"
 
 ##
 # ~~~ Make Helpers ~~~

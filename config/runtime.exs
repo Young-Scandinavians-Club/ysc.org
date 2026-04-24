@@ -344,11 +344,30 @@ if config_env() == :prod do
   # Object URLs use virtual-hosted style: https://<bucket-name>.fly.storage.tigris.dev/key
   # Set BUCKET_NAME, AWS_REGION (defaults to "auto" for Tigris), and optionally AWS_ENDPOINT_URL_S3
   # If AWS_ENDPOINT_URL_S3 is not set, defaults to Tigris endpoint.
+  #
+  # Optional public HTTPS origins for Tigris custom domains (browser uploads + public object URLs).
+  # ExAws continues to use AWS_ENDPOINT_URL_S3; these only affect upload targets, link generation,
+  # presigned GET host (expense bucket), and CSP connect-src.
   s3_bucket = System.get_env("BUCKET_NAME") || "media"
   s3_region = System.get_env("AWS_REGION") || "auto"
 
   s3_base_url =
     System.get_env("AWS_ENDPOINT_URL_S3") || "https://fly.storage.tigris.dev"
+
+  trim_public_s3_url = fn
+    nil -> nil
+    "" -> nil
+    url -> url |> String.trim() |> String.trim_trailing("/")
+  end
+
+  s3_media_public_url =
+    trim_public_s3_url.(System.get_env("S3_MEDIA_PUBLIC_BASE_URL"))
+
+  s3_avatars_public_url =
+    trim_public_s3_url.(System.get_env("S3_AVATARS_PUBLIC_BASE_URL"))
+
+  s3_expense_reports_public_url =
+    trim_public_s3_url.(System.get_env("S3_EXPENSE_REPORTS_PUBLIC_BASE_URL"))
 
   # Store S3 config for application use
   expense_reports_bucket =
@@ -372,6 +391,9 @@ if config_env() == :prod do
     s3_bucket: s3_bucket,
     s3_region: s3_region,
     s3_base_url: s3_base_url,
+    s3_media_public_url: s3_media_public_url,
+    s3_avatars_public_url: s3_avatars_public_url,
+    s3_expense_reports_public_url: s3_expense_reports_public_url,
     expense_reports_s3_bucket: expense_reports_bucket,
     avatars_s3_bucket: avatars_bucket,
     aws_access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),

@@ -153,6 +153,35 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
     assert String.contains?(csp, "https://cdn.example.com")
   end
 
+  test "adds S3 public storage URLs to connect-src for custom Tigris domains" do
+    Application.put_env(:ysc, :environment, :prod)
+    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    old_media = Application.get_env(:ysc, :s3_media_public_url)
+
+    on_exit(fn ->
+      if old_media == nil do
+        Application.delete_env(:ysc, :s3_media_public_url)
+      else
+        Application.put_env(:ysc, :s3_media_public_url, old_media)
+      end
+    end)
+
+    Application.put_env(
+      :ysc,
+      :s3_media_public_url,
+      "https://assets.example.com"
+    )
+
+    conn =
+      conn(:get, "/")
+      |> assign(:csp_nonce, "x")
+      |> SecurityHeaders.call([])
+
+    [csp] = get_resp_header(conn, "content-security-policy")
+    assert String.contains?(csp, "connect-src")
+    assert String.contains?(csp, "https://assets.example.com")
+  end
+
   test "omits MinIO connect host when code_reloader is false" do
     Application.put_env(:ysc, :environment, :dev)
     Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
