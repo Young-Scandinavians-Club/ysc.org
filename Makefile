@@ -175,6 +175,11 @@ version:  ## Print the current version
 release-tag:  ## Create a new release (update version in mix.exs, create git tag, commit and push). Use TAG=v1.0.0 to pass version
 	@./etc/scripts/release.sh $(TAG)
 
+.PHONY: release-github-notes
+release-github-notes:  ## Create/update GitHub release body for TAG from PRs (OpenRouter). Needs OPENROUTER_API_KEY, GITHUB_TOKEN, TAG. DRY_RUN=1 only prints
+	@test -n "$(TAG)" || (echo "Set TAG, e.g. make release-github-notes TAG=v1.2.0" >&2; exit 1)
+	@./etc/scripts/update_github_release_notes.sh $(TAG)
+
 .PHONY: release
 release:  ## Build and tag a docker image for release
 	@DOCKER_BUILDKIT=1 docker build -f $(RELEASE_DOCKERFILE) -t $(PROJECT_NAME):$(VERSION_LONG) .

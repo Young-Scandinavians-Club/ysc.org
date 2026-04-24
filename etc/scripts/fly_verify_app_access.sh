@@ -24,12 +24,16 @@ fly_hint_env() {
   fi
 }
 
-if ! command -v fly >/dev/null 2>&1; then
-  echo "fly CLI not found (install: https://fly.io/docs/hands-on/install-flyctl/)" >&2
+if command -v fly >/dev/null 2>&1; then
+  FLY_BIN=fly
+elif command -v flyctl >/dev/null 2>&1; then
+  FLY_BIN=flyctl
+else
+  echo "fly / flyctl not found (install: https://fly.io/docs/hands-on/install-flyctl/)" >&2
   exit 1
 fi
 
-if ! LIST_JSON=$(fly apps list --json 2>/dev/null); then
+if ! LIST_JSON=$("$FLY_BIN" apps list --json 2>/dev/null); then
   echo "fly apps list failed. Check Fly credentials." >&2
   fly_hint_env
   exit 1
