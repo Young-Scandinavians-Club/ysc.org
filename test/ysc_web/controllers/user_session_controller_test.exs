@@ -220,6 +220,28 @@ defmodule YscWeb.UserSessionControllerTest do
       assert get_session(conn, :user_token)
     end
 
+    test "second request with the same auto-login token is rejected (replay)",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      one_time_token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+
+      conn1 = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
+      assert redirected_to(conn1) == ~p"/"
+      assert get_session(conn1, :user_token)
+
+      conn2 =
+        build_conn()
+        |> get(~p"/users/log-in/auto?#{%{token: one_time_token}}")
+
+      assert redirected_to(conn2) =~ "/users/log-in"
+      assert redirected_to(conn2) =~ "reason=expired_link"
+    end
+
     test "redirects to login with invalid token (reason in query to avoid overwriting successful login session)",
          %{
            conn: conn

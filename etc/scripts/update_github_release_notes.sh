@@ -6,8 +6,10 @@
 #   OPENROUTER_API_KEY  (required)  API key for https://openrouter.ai/
 #   GITHUB_TOKEN or GH_TOKEN        (required)  token with repo / contents:write
 #   GITHUB_REPOSITORY               (optional)  "owner/name"; inferred from `git remote` if unset
-#   OPENROUTER_MODEL                (optional)  default: openai/gpt-4o-mini
+#   OPENROUTER_MODEL                (optional)  default: google/gemma-4-31b-it
 #   OPENROUTER_REFERER              (optional)  HTTP-Referer for OpenRouter (default: this repo on GitHub)
+#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 50)
+#   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 150; avoids huge / costly prompts)
 #   DRY_RUN                         (optional)  if 1, print notes to stdout; skip GitHub release API
 #
 # Usage:
@@ -25,7 +27,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 . "$SCRIPT_DIR/_colors.sh"
 
 DRY_RUN="${DRY_RUN:-0}"
-OPENROUTER_MODEL="${OPENROUTER_MODEL:-openai/gpt-4o-mini}"
+OPENROUTER_MODEL="${OPENROUTER_MODEL:-google/gemma-4-31b-it}"
 GITHUB_API="${GITHUB_API:-https://api.github.com}"
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
 
@@ -173,6 +175,28 @@ search_merged_prs() {
   sc_search_rm
 }
 
+# Rewrites the PR JSON file in place so the OpenRouter request stays within model limits (and avoids
+# HTTP 402 from oversized prompts or from hitting free-tier / credit limits for huge chats).
+pr_json_shrink_for_openrouter() {
+  local f="$1"
+  local max_bodies max_prs n
+  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-50}
+  max_prs=${OPENROUTER_MAX_PRS:-150}
+  n=$(jq 'length' "$f")
+
+  if [ "$n" -gt "$max_bodies" ]; then
+    echo "${TEAL}PR list has $n items; using title and link only (no PR bodies). Threshold OPENROUTER_MAX_FULL_PR_BODIES is $max_bodies; raise it if you need descriptions.${RESET}" >&2
+    jq 'map({ number: .number, title: .title, url: .url, author: .author })' "$f" >"${f}.t" && mv "${f}.t" "$f"
+    n=$(jq 'length' "$f")
+  fi
+  if [ "$n" -gt "$max_prs" ]; then
+    echo "${TEAL}Capping to the last $max_prs PRs by number (oldest in range dropped). Set OPENROUTER_MAX_PRS to change.${RESET}" >&2
+    jq --argjson m "$max_prs" \
+      'sort_by(.number) | (length as $L | if $L > $m then .[$L - $m : $L] else . end )' \
+      "$f" >"${f}.t" && mv "${f}.t" "$f"
+  fi
+}
+
 # pr_data_path: file containing a JSON array of PR objects (avoids argv size limits for large lists).
 openrouter_changelog() {
   local pr_data_path="$1"
@@ -213,25 +237,43 @@ openrouter_changelog() {
     return 1
   fi
 
-  local resp text
-  if ! resp=$(
-    curl -fsS "$OPENROUTER_API" \
+  local resp_tmp code text
+  resp_tmp=$(mktemp)
+  code=$(
+    curl -sS -o "$resp_tmp" -w "%{http_code}" \
       -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
       -H "Content-Type: application/json" \
       -H "HTTP-Referer: ${referer}" \
       -H "X-Title: ysc release notes" \
-      -d @"$req_tmp"
-  ); then
-    or_rm_req
+      -d @"$req_tmp" \
+      "$OPENROUTER_API"
+  )
+  or_rm_req
+  if [ "$code" != "200" ]; then
+    echo "${RED}OpenRouter request failed: HTTP $code${RESET}" >&2
+    case "$code" in
+      401) echo "Invalid or missing API key (check OPENROUTER_API_KEY)." >&2 ;;
+      402)
+        echo "HTTP 402 from OpenRouter: add credits (https://openrouter.ai/credits), confirm billing," >&2
+        echo "  or use a different OPENROUTER_MODEL. Large first releases are trimmed by OPENROUTER_MAX_*; see script header." >&2
+        ;;
+      403) echo "Request forbidden: model or key may not be allowed for this call." >&2 ;;
+      429) echo "Rate limit — retry later." >&2 ;;
+    esac
+    echo "${TEAL}Response body:${RESET}" >&2
+    cat "$resp_tmp" >&2
+    echo >&2
+    rm -f "$resp_tmp"
     return 1
   fi
-  or_rm_req
-  text=$(echo "$resp" | jq -r '.choices[0].message.content // empty')
+  text=$(jq -r '.choices[0].message.content // empty' "$resp_tmp")
   if [ -z "$text" ] || [ "$text" = "null" ]; then
     echo "${RED}Error: OpenRouter returned no text. Response:${RESET}" >&2
-    echo "$resp" | jq . >&2 || echo "$resp" >&2
-    exit 1
+    jq . "$resp_tmp" 2>/dev/null || cat "$resp_tmp" >&2
+    rm -f "$resp_tmp"
+    return 1
   fi
+  rm -f "$resp_tmp"
   printf '%s\n' "$text"
 }
 
@@ -336,6 +378,9 @@ fi
 
 PR_COUNT=$(jq 'length' "$pr_file")
 echo "${TEAL}Merged PRs in range (GitHub search): $PR_COUNT${RESET}"
+
+pr_json_shrink_for_openrouter "$pr_file"
+echo "${TEAL}Sending $(jq 'length' "$pr_file") PRs to OpenRouter (model: ${OPENROUTER_MODEL}).${RESET}"
 
 openrouter_changelog "$pr_file" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
 

@@ -105,13 +105,17 @@ defmodule YscWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :mobile_api_rate_limit do
+    plug YscWeb.Plugs.MobileAPIRateLimitPlug
+  end
+
   pipeline :mobile_api do
     plug :accepts, ["json"]
     plug YscWeb.Plugs.MobileAPIAuth
   end
 
   scope "/api/v1/mobile", YscWeb.Api do
-    pipe_through [:mobile_api]
+    pipe_through [:mobile_api_rate_limit, :mobile_api]
 
     get "/bookings/lookup", BookingsController, :lookup
     get "/bookings/calendar", BookingsController, :calendar

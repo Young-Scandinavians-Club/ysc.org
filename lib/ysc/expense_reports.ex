@@ -707,12 +707,18 @@ defmodule Ysc.ExpenseReports do
 
   ## Parameters
   - `path` - The temporary file path from the upload
-  - `opts` - Optional keyword list with:
+  - `opts` - Required:
+    - `:user_id` - Owner of the upload (prevents IDOR on unsaved-file preview; must match session user)
+  - Optional:
     - `:original_filename` - The original filename from the client (preserves file extension)
+    - `:kind` - `:receipt` (default) or `:proof` — controls `receipts/` vs `proofs/` prefix
   """
   def upload_receipt_to_s3(path, opts \\ []) do
     require Ysc.Logging
+    user_id = Keyword.fetch!(opts, :user_id)
+    kind = Keyword.get(opts, :kind, :receipt)
     original_filename = Keyword.get(opts, :original_filename)
+    prefix = upload_s3_key_prefix_for_kind(kind)
 
     # Use original filename if provided to preserve extension, otherwise use basename of temp file
     file_name =
@@ -728,9 +734,9 @@ defmodule Ysc.ExpenseReports do
         Path.basename(path)
       end
 
-    # Generate a unique key with timestamp to avoid collisions
+    # Generate a unique key with timestamp; user_id prefix prevents other users' preview URLs (IDOR)
     timestamp = System.system_time(:second)
-    unique_key = "receipts/#{timestamp}_#{file_name}"
+    unique_key = "#{prefix}/#{user_id}/#{timestamp}_#{file_name}"
     bucket_name = S3Config.expense_reports_bucket_name()
 
     Ysc.Logging.debug("Uploading receipt to S3",
@@ -834,9 +840,12 @@ defmodule Ysc.ExpenseReports do
         # File not found in any submitted expense report
         # Check if it's a recently uploaded file (for preview during form editing)
         # Files uploaded via LiveView have timestamps in their names like: receipts/1767121378_filename
-        if recently_uploaded_file?(normalized_path) do
-          # Allow access to recently uploaded files (within 24 hours)
-          # This allows users to preview their uploads before submitting the form
+        if recently_uploaded_unsaved_accessible?(
+             user,
+             normalized_path,
+             is_admin
+           ) do
+          # Unsaved in-DB: user-scoped key receipts|proofs/USER_ID/TIMESTAMP_name (24h)
           {:ok, nil}
         else
           {:error, :not_found}
@@ -846,6 +855,10 @@ defmodule Ysc.ExpenseReports do
   end
 
   def can_access_file?(_, _), do: {:error, :not_found}
+
+  defp upload_s3_key_prefix_for_kind(:receipt), do: "receipts"
+  defp upload_s3_key_prefix_for_kind(:proof), do: "proofs"
+  defp upload_s3_key_prefix_for_kind(_), do: "receipts"
 
   # Normalizes S3 path by removing bucket name prefix if present
   # The database stores just the key (e.g., "receipts/..."), not "bucket-name/receipts/..."
@@ -860,28 +873,35 @@ defmodule Ysc.ExpenseReports do
     end
   end
 
-  # Checks if a file was recently uploaded (within 24 hours) based on timestamp in filename
-  # LiveView uploads have format: receipts/TIMESTAMP_filename
-  defp recently_uploaded_file?(s3_path) do
-    # Extract timestamp from path like "receipts/1767121378_filename" or "receipts/1767121378_live_view_upload-..."
-    case Regex.run(~r/receipts\/(\d+)_/, s3_path) ||
-           Regex.run(~r/proofs\/(\d+)_/, s3_path) do
-      [_full_match, timestamp_str] ->
-        case Integer.parse(timestamp_str) do
-          {timestamp, _} ->
-            # Check if timestamp is within last 24 hours
-            file_time = DateTime.from_unix!(timestamp, :second)
-            now = DateTime.utc_now()
-            hours_ago = DateTime.diff(now, file_time, :hour)
-            hours_ago <= 24
+  # Unsaved upload preview: keys must be receipts|proofs/<user_id>/<unix_ts>_<name> and within 24h.
+  # Legacy keys without /<user_id>/ are not granted unsaved access (fixes cross-user IDOR).
+  defp recently_uploaded_unsaved_accessible?(%User{} = user, s3_path, is_admin) do
+    with {:ok, path_user_id, timestamp} <-
+           parse_user_scoped_upload_path(s3_path),
+         true <- within_last_24h_unix?(timestamp) do
+      is_admin or path_user_id == user.id
+    else
+      _ -> false
+    end
+  end
 
-          :error ->
-            false
+  defp parse_user_scoped_upload_path(s3_path) do
+    case Regex.run(~r{\A(receipts|proofs)/([^/]+)/(\d+)_}, s3_path) do
+      [_, _kind, user_id, ts] ->
+        case Integer.parse(ts) do
+          {unix, _} -> {:ok, user_id, unix}
+          :error -> :error
         end
 
       _ ->
-        false
+        :error
     end
+  end
+
+  defp within_last_24h_unix?(timestamp) do
+    file_time = DateTime.from_unix!(timestamp, :second)
+    now = DateTime.utc_now()
+    DateTime.diff(now, file_time, :hour) <= 24
   end
 
   defp expense_report_s3_upload_request!(op) do

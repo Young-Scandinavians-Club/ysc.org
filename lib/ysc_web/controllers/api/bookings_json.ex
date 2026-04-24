@@ -55,12 +55,12 @@ defmodule YscWeb.Api.BookingsJSON do
 
   defp member(nil), do: nil
 
+  # Email intentionally omitted: kiosk does not need it; limits PII if the bearer leaks.
   defp member(user) do
     %{
       id: to_string(user.id),
       first_name: user.first_name,
       last_name: user.last_name,
-      email: user.email,
       avatar_url:
         UserAvatar.url(
           Ysc.Avatars.resolve_user_avatar_url(user),

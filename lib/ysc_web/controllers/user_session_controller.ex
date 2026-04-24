@@ -19,7 +19,7 @@ defmodule YscWeb.UserSessionController do
     create(conn, params, "Welcome back! 👋 Good to see you again.")
   end
 
-  @auto_login_token_max_age 120
+  @auto_login_token_max_age 90
 
   def auto_login(conn, %{"token" => token, "redirect_to" => redirect_to}) do
     do_auto_login(conn, token, redirect_to)
@@ -43,7 +43,13 @@ defmodule YscWeb.UserSessionController do
            max_age: @auto_login_token_max_age
          ) do
       {:ok, user_id} when is_binary(user_id) ->
-        do_auto_login_with_user_id(conn, user_id, redirect_to)
+        case Ysc.AutoLoginOneTime.consume_once(token) do
+          :ok ->
+            do_auto_login_with_user_id(conn, user_id, redirect_to)
+
+          {:error, :already_used} ->
+            redirect(conn, to: ~p"/users/log-in?reason=expired_link")
+        end
 
       _ ->
         # Use query param instead of session flash so a concurrent successful

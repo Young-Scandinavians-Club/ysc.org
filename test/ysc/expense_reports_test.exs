@@ -382,17 +382,19 @@ defmodule Ysc.ExpenseReportsTest do
 
       File.write!(path, "content")
 
+      uid = Ecto.ULID.generate()
+
       try do
-        key = ExpenseReports.upload_receipt_to_s3(path)
+        key = ExpenseReports.upload_receipt_to_s3(path, user_id: uid)
         assert is_binary(key)
-        assert String.starts_with?(key, "receipts/")
+        assert String.match?(key, ~r/\Areceipts\/#{Regex.escape(uid)}\/\d+_/)
         assert String.ends_with?(key, ".pdf")
       after
         File.rm(path)
       end
     end
 
-    test "uploads file and returns S3 key using mock", %{user: _user} do
+    test "uploads file and returns S3 key using mock", %{user: user} do
       # Create a temporary file (mock is configured in test.exs so ExAws is not called)
       tmp_dir = System.tmp_dir!()
 
@@ -402,17 +404,23 @@ defmodule Ysc.ExpenseReportsTest do
       File.write!(path, "fake receipt content")
 
       try do
-        key = ExpenseReports.upload_receipt_to_s3(path)
+        key = ExpenseReports.upload_receipt_to_s3(path, user_id: user.id)
         assert is_binary(key)
-        assert String.starts_with?(key, "receipts/")
-        assert String.contains?(key, "receipt_")
+
+        assert String.match?(
+                 key,
+                 ~r/\Areceipts\/#{Regex.escape(user.id)}\/\d+_.*receipt_.*\.pdf/
+               )
+
         assert String.ends_with?(key, ".pdf")
       after
         File.rm(path)
       end
     end
 
-    test "sanitizes original_filename and preserves extension when provided" do
+    test "sanitizes original_filename and preserves extension when provided", %{
+      user: user
+    } do
       tmp_dir = System.tmp_dir!()
 
       path =
@@ -423,11 +431,17 @@ defmodule Ysc.ExpenseReportsTest do
       try do
         key =
           ExpenseReports.upload_receipt_to_s3(path,
+            user_id: user.id,
             original_filename: "My Receipt (2024).pdf"
           )
 
         assert is_binary(key)
-        assert String.starts_with?(key, "receipts/")
+
+        assert String.match?(
+                 key,
+                 ~r/\Areceipts\/#{Regex.escape(user.id)}\/\d+_/
+               )
+
         # Sanitized: parentheses and spaces -> underscores
         assert String.contains?(key, ".pdf")
       after
@@ -435,14 +449,16 @@ defmodule Ysc.ExpenseReportsTest do
       end
     end
 
-    test "uses basename of path when original_filename not provided" do
+    test "uses basename of path when original_filename not provided", %{
+      user: user
+    } do
       tmp_dir = System.tmp_dir!()
       basename = "custom_receipt_#{System.unique_integer([:positive])}.jpg"
       path = Path.join(tmp_dir, basename)
       File.write!(path, "content")
 
       try do
-        key = ExpenseReports.upload_receipt_to_s3(path)
+        key = ExpenseReports.upload_receipt_to_s3(path, user_id: user.id)
         assert String.ends_with?(key, basename)
       after
         File.rm(path)
@@ -683,7 +699,7 @@ defmodule Ysc.ExpenseReportsTest do
       user: user
     } do
       ts = DateTime.to_unix(DateTime.utc_now(), :second)
-      path = "receipts/#{ts}_preview.pdf"
+      path = "receipts/#{user.id}/#{ts}_preview.pdf"
       assert {:ok, nil} = ExpenseReports.can_access_file?(user, path)
     end
 
@@ -692,8 +708,32 @@ defmodule Ysc.ExpenseReportsTest do
            user: user
          } do
       ts = DateTime.to_unix(DateTime.utc_now(), :second)
-      path = "proofs/#{ts}_income_preview.pdf"
+      path = "proofs/#{user.id}/#{ts}_income_preview.pdf"
       assert {:ok, nil} = ExpenseReports.can_access_file?(user, path)
+    end
+
+    test "rejects other user's recent user-scoped unsaved path (IDOR fix)", %{
+      user: user
+    } do
+      other = user_fixture()
+      ts = DateTime.to_unix(DateTime.utc_now(), :second)
+      path = "receipts/#{other.id}/#{ts}_leaked.pdf"
+      assert {:error, :not_found} = ExpenseReports.can_access_file?(user, path)
+    end
+
+    test "admin may access another user's recent unsaved scoped path" do
+      owner = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      ts = DateTime.to_unix(DateTime.utc_now(), :second)
+      path = "receipts/#{owner.id}/#{ts}_admin_preview.pdf"
+      assert {:ok, nil} = ExpenseReports.can_access_file?(admin, path)
+    end
+
+    test "rejects legacy flat receipt key for unsaved preview (no user segment)" do
+      user = user_fixture()
+      ts = DateTime.to_unix(DateTime.utc_now(), :second)
+      path = "receipts/#{ts}_old_format.pdf"
+      assert {:error, :not_found} = ExpenseReports.can_access_file?(user, path)
     end
 
     test "returns {:error, :not_found} for path with old timestamp" do
@@ -2067,7 +2107,11 @@ defmodule Ysc.ExpenseReportsTest do
       File.write!(path, "content")
 
       try do
-        key = ExpenseReports.upload_receipt_to_s3(path)
+        key =
+          ExpenseReports.upload_receipt_to_s3(path,
+            user_id: Ecto.ULID.generate()
+          )
+
         assert key == "from_test_expense_reports_s3_request"
       after
         File.rm(path)

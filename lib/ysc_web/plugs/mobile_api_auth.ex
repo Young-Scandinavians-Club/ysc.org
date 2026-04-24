@@ -22,7 +22,7 @@ defmodule YscWeb.Plugs.MobileAPIAuth do
           is_nil(expected) || expected == "" ->
             halt_unauthorized(conn, "Kiosk API key not configured")
 
-          token == expected ->
+          valid_bearer_token?(token, expected) ->
             conn
 
           true ->
@@ -37,6 +37,14 @@ defmodule YscWeb.Plugs.MobileAPIAuth do
       _ -> nil
     end
   end
+
+  defp valid_bearer_token?(token, expected)
+       when is_binary(token) and is_binary(expected) do
+    byte_size(token) == byte_size(expected) and
+      Plug.Crypto.secure_compare(token, expected)
+  end
+
+  defp valid_bearer_token?(_, _), do: false
 
   defp halt_unauthorized(conn, message) do
     conn

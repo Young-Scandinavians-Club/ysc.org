@@ -41,6 +41,10 @@ defmodule Ysc.Application do
       {Ysc.NewsletterRateLimit, [clean_period: :timer.minutes(1)]},
       # QR scan rate limiting (brute-force protection)
       {Ysc.ScanRateLimit, [clean_period: :timer.minutes(1)]},
+      # Kiosk `/api/v1/mobile` JSON API (per-IP abuse / scraping)
+      {Ysc.MobileAPIRateLimit, [clean_period: :timer.minutes(1)]},
+      # Auto-login magic link: one use per token while valid
+      {Ysc.AutoLoginOneTime, [clean_period: :timer.minutes(1)]},
       # Start verification code cache
       Ysc.VerificationCache,
       # Start Apple Wallet certificate manager

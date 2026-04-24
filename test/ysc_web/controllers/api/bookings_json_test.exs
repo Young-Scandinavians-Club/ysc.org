@@ -73,7 +73,8 @@ defmodule YscWeb.Api.BookingsJSONTest do
 
       assert %{data: [row]} = BookingsJSON.index(%{bookings: [booking]})
 
-      assert row[:member][:email] == "member@example.com"
+      assert row[:member][:first_name] == "Mo"
+      refute Map.has_key?(row[:member], :email)
       assert row[:rooms] == [%{id: to_string(room.id), name: "Loft"}]
     end
   end

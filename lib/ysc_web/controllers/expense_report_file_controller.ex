@@ -10,20 +10,14 @@ defmodule YscWeb.ExpenseReportFileController do
   Only the owner of the expense report or an admin can access the file.
   """
   def show(conn, %{"encoded_path" => encoded_path}) do
-    Ysc.Logging.info("ExpenseReportFileController.show called",
-      encoded_path: encoded_path,
+    Ysc.Logging.debug("Expense report file request",
       request_path: conn.request_path
     )
 
     user = conn.assigns[:current_user]
 
-    Ysc.Logging.info("Current user check",
-      has_user: !is_nil(user),
-      user_id: if(user, do: user.id, else: nil)
-    )
-
     if is_nil(user) do
-      Ysc.Logging.warning("No current_user in ExpenseReportFileController")
+      Ysc.Logging.debug("No current_user in ExpenseReportFileController")
 
       conn
       |> put_status(:forbidden)
@@ -42,8 +36,7 @@ defmodule YscWeb.ExpenseReportFileController do
       :error ->
         Ysc.Logging.warning(
           "Invalid base64 encoded path in expense report file request",
-          user_id: user.id,
-          encoded_path: encoded_path
+          user_id: user.id
         )
 
         conn

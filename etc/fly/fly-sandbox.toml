@@ -10,7 +10,8 @@ kill_signal = 'SIGTERM'
 [build]
 
 [deploy]
-release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} /app/bin/migrate && /app/bin/seed'"
+# RELEASE_COMMAND=1 for migrate + seed — same minimal runtime as prod (config/runtime.exs).
+release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/migrate && DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/seed'"
 
 [env]
 ENVIRONMENT = 'sandbox'

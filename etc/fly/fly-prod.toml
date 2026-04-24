@@ -12,7 +12,9 @@ kill_signal = 'SIGTERM'
   dockerfile = "../docker/Dockerfile"
 
 [deploy]
-  release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} /app/bin/migrate'"
+  # RELEASE_COMMAND=1: minimal runtime (see config/runtime.exs) so migrate/seed need only DB + core config.
+  # DATABASE_URL must be set for each step (Fly expands ${RAW_DATABASE_URL} before the shell runs).
+  release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/migrate && DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/seed'"
 
 [env]
   APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID = 'pass.org.ysc.membership'

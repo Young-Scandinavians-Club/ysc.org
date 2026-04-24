@@ -18,46 +18,57 @@ alias Ysc.Bookings.{Season, RoomCategory, Room, PricingRule}
 alias Ysc.Bookings
 alias Money
 
+insert_site_setting = fn attrs ->
+  cs = SiteSetting.site_setting_changeset(%SiteSetting{}, attrs)
+
+  case Repo.insert(cs,
+         on_conflict: :nothing,
+         conflict_target: [:name]
+       ) do
+    {:ok, _} ->
+      :ok
+
+    {:ok, nil} ->
+      :ok
+
+    {:error, changeset} ->
+      name = Map.get(attrs, :name) || Map.get(attrs, "name")
+
+      IO.puts(
+        :stderr,
+        "  ⚠️  SiteSetting #{inspect(name)} skipped: #{inspect(changeset.errors)}"
+      )
+  end
+end
+
 IO.puts("🌱 Starting production seed...")
 
 # 1. Seed SiteSettings
 IO.puts("📝 Seeding SiteSettings...")
 
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "instagram",
-    value: "https://www.instagram.com/theysc"
-  }),
-  on_conflict: :nothing
-)
+insert_site_setting.(%{
+  group: "socials",
+  name: "instagram",
+  value: "https://www.instagram.com/theysc"
+})
 
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "facebook",
-    value: "https://www.facebook.com/YoungScandinaviansClub/"
-  }),
-  on_conflict: :nothing
-)
+insert_site_setting.(%{
+  group: "socials",
+  name: "facebook",
+  value: "https://www.facebook.com/YoungScandinaviansClub/"
+})
 
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "discord",
-    value: "https://discord.gg/dn2gdXRZbW"
-  }),
-  on_conflict: :nothing
-)
+insert_site_setting.(%{
+  group: "socials",
+  name: "discord",
+  value: "https://discord.gg/dn2gdXRZbW"
+})
 
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "whatsapp",
-    value: "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
-  }),
-  on_conflict: :nothing
-)
+insert_site_setting.(%{
+  group: "socials",
+  name: "whatsapp",
+  value: "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
+})
 
 IO.puts("  ✅ SiteSettings seeded")
 
@@ -70,7 +81,8 @@ admin_user =
       admin_changeset =
         User.registration_changeset(%User{}, %{
           email: "admin@ysc.org",
-          password: System.get_env("ADMIN_PASSWORD") || "change_me_in_production",
+          password:
+            System.get_env("ADMIN_PASSWORD") || "change_me_in_production",
           role: :admin,
           state: :active,
           first_name: "Admin",
@@ -83,7 +95,10 @@ admin_user =
           date_of_birth: ~D[1980-01-15],
           registration_form: %{
             membership_type: "family",
-            membership_eligibility: ["citizen_of_scandinavia", "born_in_scandinavia"],
+            membership_eligibility: [
+              "citizen_of_scandinavia",
+              "born_in_scandinavia"
+            ],
             occupation: "Administrator",
             birth_date: "1980-01-15",
             address: "123 Admin St",
@@ -117,31 +132,44 @@ admin_user =
           # Ensure email and phone are verified for existing admin user
           updated =
             existing
-            |> User.registration_changeset(%{
-              email_verified_at: existing.email_verified_at || DateTime.utc_now(),
-              phone_verified_at: existing.phone_verified_at || DateTime.utc_now()
-            }, hash_password: false, validate_email: false)
+            |> User.registration_changeset(
+              %{
+                email_verified_at:
+                  existing.email_verified_at || DateTime.utc_now(),
+                phone_verified_at:
+                  existing.phone_verified_at || DateTime.utc_now()
+              }, hash_password: false, validate_email: false)
             |> Repo.update!()
+
           IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
           updated
 
         {:error, changeset} ->
           # If insert fails, try to fetch again (might have been created by another process)
           existing = Repo.get_by(User, email: "admin@ysc.org")
+
           if existing do
             # Ensure email and phone are verified for existing admin user
             updated =
               existing
-              |> User.registration_changeset(%{
-                email_verified_at: existing.email_verified_at || DateTime.utc_now(),
-                phone_verified_at: existing.phone_verified_at || DateTime.utc_now()
-              }, hash_password: false, validate_email: false)
+              |> User.registration_changeset(
+                %{
+                  email_verified_at:
+                    existing.email_verified_at || DateTime.utc_now(),
+                  phone_verified_at:
+                    existing.phone_verified_at || DateTime.utc_now()
+                }, hash_password: false, validate_email: false)
               |> Repo.update!()
+
             IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
             updated
           else
-            IO.puts("  ❌ Failed to create admin user: #{inspect(changeset.errors)}")
-            raise("Failed to create or find admin user")
+            IO.puts(
+              :stderr,
+              "  ⚠️  Admin user seed failed (deploy continues): #{inspect(changeset.errors)}"
+            )
+
+            nil
           end
       end
 
@@ -173,7 +201,8 @@ tahoe_winter =
       season =
         Season.changeset(%Season{}, %{
           name: "Winter",
-          description: "Winter season for Tahoe cabin (Nov 1 - Apr 30, recurring annually)",
+          description:
+            "Winter season for Tahoe cabin (Nov 1 - Apr 30, recurring annually)",
           property: :tahoe,
           start_date: winter_start,
           end_date: winter_end,
@@ -198,7 +227,8 @@ tahoe_summer =
       season =
         Season.changeset(%Season{}, %{
           name: "Summer",
-          description: "Summer season for Tahoe cabin (May 1 - Oct 31, recurring annually)",
+          description:
+            "Summer season for Tahoe cabin (May 1 - Oct 31, recurring annually)",
           property: :tahoe,
           start_date: summer_start,
           end_date: summer_end,
@@ -226,7 +256,8 @@ clear_lake_winter =
       season =
         Season.changeset(%Season{}, %{
           name: "Winter",
-          description: "Winter season for Clear Lake cabin (Nov 1 - Apr 30, recurring annually)",
+          description:
+            "Winter season for Clear Lake cabin (Nov 1 - Apr 30, recurring annually)",
           property: :clear_lake,
           start_date: winter_start,
           end_date: winter_end,
@@ -251,7 +282,8 @@ clear_lake_summer =
       season =
         Season.changeset(%Season{}, %{
           name: "Summer",
-          description: "Summer season for Clear Lake cabin (May 1 - Oct 31, recurring annually)",
+          description:
+            "Summer season for Clear Lake cabin (May 1 - Oct 31, recurring annually)",
           property: :clear_lake,
           start_date: summer_start,
           end_date: summer_end,
@@ -329,7 +361,16 @@ family_category =
 # 6. Create Tahoe rooms
 IO.puts("🏔️  Creating Tahoe rooms...")
 
-room_names = ["Room 1", "Room 2", "Room 3", "Room 4", "Room 5a", "Room 5b", "Room 6", "Room 7"]
+room_names = [
+  "Room 1",
+  "Room 2",
+  "Room 3",
+  "Room 4",
+  "Room 5a",
+  "Room 5b",
+  "Room 6",
+  "Room 7"
+]
 
 tahoe_rooms =
   Enum.map(room_names, fn name ->
@@ -339,7 +380,8 @@ tahoe_rooms =
           # Single bed room
           %{
             name: name,
-            description: "Cozy single bed room with 1 single bed. Perfect for solo travelers.",
+            description:
+              "Cozy single bed room with 1 single bed. Perfect for solo travelers.",
             property: :tahoe,
             capacity_max: 1,
             min_billable_occupancy: 1,
@@ -356,7 +398,8 @@ tahoe_rooms =
           # Single bed room
           %{
             name: name,
-            description: "Cozy single bed room with 1 single bed. Perfect for solo travelers.",
+            description:
+              "Cozy single bed room with 1 single bed. Perfect for solo travelers.",
             property: :tahoe,
             capacity_max: 1,
             min_billable_occupancy: 1,
@@ -373,7 +416,8 @@ tahoe_rooms =
           # Family room
           %{
             name: name,
-            description: "Spacious family room with 1 queen bed and 3 single beds. Accommodates up to 5 guests. Minimum 2 guests required.",
+            description:
+              "Spacious family room with 1 queen bed and 3 single beds. Accommodates up to 5 guests. Minimum 2 guests required.",
             property: :tahoe,
             capacity_max: 5,
             min_billable_occupancy: 2,
@@ -390,7 +434,8 @@ tahoe_rooms =
           # Standard room - 2 guests
           %{
             name: name,
-            description: "Comfortable room with 2 single beds. Perfect for two guests.",
+            description:
+              "Comfortable room with 2 single beds. Perfect for two guests.",
             property: :tahoe,
             capacity_max: 2,
             min_billable_occupancy: 1,
@@ -407,7 +452,8 @@ tahoe_rooms =
           # Standard room - 2 guests
           %{
             name: name,
-            description: "Comfortable room with 1 queen bed. Ideal for couples or two guests.",
+            description:
+              "Comfortable room with 1 queen bed. Ideal for couples or two guests.",
             property: :tahoe,
             capacity_max: 2,
             min_billable_occupancy: 1,
@@ -424,7 +470,8 @@ tahoe_rooms =
           # Standard room - 2 guests
           %{
             name: name,
-            description: "Comfortable room with 1 queen bed. Ideal for couples or two guests.",
+            description:
+              "Comfortable room with 1 queen bed. Ideal for couples or two guests.",
             property: :tahoe,
             capacity_max: 2,
             min_billable_occupancy: 1,
@@ -441,7 +488,8 @@ tahoe_rooms =
           # Standard room - 3 guests
           %{
             name: name,
-            description: "Spacious room with 1 queen bed and 1 single bed. Accommodates up to 3 guests.",
+            description:
+              "Spacious room with 1 queen bed and 1 single bed. Accommodates up to 3 guests.",
             property: :tahoe,
             capacity_max: 3,
             min_billable_occupancy: 1,
@@ -458,7 +506,8 @@ tahoe_rooms =
           # Standard room - 2 guests
           %{
             name: name,
-            description: "Comfortable room with 1 queen bed. Ideal for couples or two guests.",
+            description:
+              "Comfortable room with 1 queen bed. Ideal for couples or two guests.",
             property: :tahoe,
             capacity_max: 2,
             min_billable_occupancy: 1,
@@ -524,7 +573,8 @@ get_or_create_pricing_rule = fn attrs ->
     end
 
   query =
-    if Map.has_key?(attrs, :room_category_id) and not is_nil(attrs.room_category_id) do
+    if Map.has_key?(attrs, :room_category_id) and
+         not is_nil(attrs.room_category_id) do
       from pr in query, where: pr.room_category_id == ^attrs.room_category_id
     else
       from pr in query, where: is_nil(pr.room_category_id)
@@ -539,12 +589,26 @@ get_or_create_pricing_rule = fn attrs ->
 
   case Repo.one(query) do
     nil ->
-      PricingRule.changeset(%PricingRule{}, attrs)
-      |> Repo.insert!()
+      case PricingRule.changeset(%PricingRule{}, attrs) |> Repo.insert() do
+        {:ok, rule} ->
+          rule
+
+        {:error, changeset} ->
+          IO.puts(
+            :stderr,
+            "  ⚠️  Pricing rule insert skipped: #{inspect(changeset.errors)} attrs=#{inspect(attrs)}"
+          )
+
+          case Repo.one(query) do
+            nil -> nil
+            existing -> existing
+          end
+      end
 
     existing ->
       # Update existing rule if children_amount is provided and not already set
-      if Map.has_key?(attrs, :children_amount) && is_nil(existing.children_amount) do
+      if Map.has_key?(attrs, :children_amount) &&
+           is_nil(existing.children_amount) do
         existing
         |> PricingRule.changeset(%{children_amount: attrs.children_amount})
         |> Repo.update!()
@@ -588,41 +652,44 @@ get_or_create_pricing_rule.(%{
 IO.puts("  ✅ Created Tahoe summer buyout pricing")
 
 # Tahoe: Base room pricing for standard rooms - $45 per person per night
-standard_rule = get_or_create_pricing_rule.(%{
-  amount: Money.new(45, :USD),
-  children_amount: Money.new(25, :USD),
-  booking_mode: :room,
-  price_unit: :per_person_per_night,
-  property: :tahoe,
-  room_category_id: standard_category.id,
-  season_id: nil
-})
+standard_rule =
+  get_or_create_pricing_rule.(%{
+    amount: Money.new(45, :USD),
+    children_amount: Money.new(25, :USD),
+    booking_mode: :room,
+    price_unit: :per_person_per_night,
+    property: :tahoe,
+    room_category_id: standard_category.id,
+    season_id: nil
+  })
 
 IO.puts("  ✅ Created Tahoe standard room pricing")
 
 # Tahoe: Single bed room pricing - $35 per person per night
-single_rule = get_or_create_pricing_rule.(%{
-  amount: Money.new(35, :USD),
-  children_amount: Money.new(25, :USD),
-  booking_mode: :room,
-  price_unit: :per_person_per_night,
-  property: :tahoe,
-  room_category_id: single_category.id,
-  season_id: nil
-})
+single_rule =
+  get_or_create_pricing_rule.(%{
+    amount: Money.new(35, :USD),
+    children_amount: Money.new(25, :USD),
+    booking_mode: :room,
+    price_unit: :per_person_per_night,
+    property: :tahoe,
+    room_category_id: single_category.id,
+    season_id: nil
+  })
 
 IO.puts("  ✅ Created Tahoe single room pricing")
 
 # Tahoe: Family room pricing - same as standard ($45 per person per night)
-family_rule = get_or_create_pricing_rule.(%{
-  amount: Money.new(45, :USD),
-  children_amount: Money.new(25, :USD),
-  booking_mode: :room,
-  price_unit: :per_person_per_night,
-  property: :tahoe,
-  room_category_id: family_category.id,
-  season_id: nil
-})
+family_rule =
+  get_or_create_pricing_rule.(%{
+    amount: Money.new(45, :USD),
+    children_amount: Money.new(25, :USD),
+    booking_mode: :room,
+    price_unit: :per_person_per_night,
+    property: :tahoe,
+    room_category_id: family_category.id,
+    season_id: nil
+  })
 
 IO.puts("  ✅ Created Tahoe family room pricing")
 
@@ -651,7 +718,8 @@ tahoe_buyout_policy =
       policy =
         Bookings.create_refund_policy!(%{
           name: "Tahoe Full Cabin Cancellation Policy",
-          description: "Cancellation policy for full cabin (buyout) bookings at Tahoe property",
+          description:
+            "Cancellation policy for full cabin (buyout) bookings at Tahoe property",
           property: :tahoe,
           booking_mode: :buyout,
           is_active: true
@@ -714,7 +782,8 @@ tahoe_room_policy =
       policy =
         Bookings.create_refund_policy!(%{
           name: "Tahoe Rooms Cancellation Policy",
-          description: "Cancellation policy for room bookings at Tahoe property",
+          description:
+            "Cancellation policy for room bookings at Tahoe property",
           property: :tahoe,
           booking_mode: :room,
           is_active: true
@@ -777,7 +846,8 @@ clear_lake_buyout_policy =
       policy =
         Bookings.create_refund_policy!(%{
           name: "Clear Lake Full Cabin Cancellation Policy",
-          description: "Cancellation policy for full cabin (buyout) bookings at Clear Lake property",
+          description:
+            "Cancellation policy for full cabin (buyout) bookings at Clear Lake property",
           property: :clear_lake,
           booking_mode: :buyout,
           is_active: true
@@ -840,7 +910,8 @@ clear_lake_day_policy =
       policy =
         Bookings.create_refund_policy!(%{
           name: "Clear Lake Day Booking Cancellation Policy",
-          description: "Cancellation policy for day bookings at Clear Lake property",
+          description:
+            "Cancellation policy for day bookings at Clear Lake property",
           property: :clear_lake,
           booking_mode: :day,
           is_active: true
@@ -903,5 +974,11 @@ IO.puts("   - Clear Lake seasons: Winter and Summer")
 IO.puts("   - Room categories: single, standard, family")
 IO.puts("   - Tahoe rooms: 8 rooms")
 IO.puts("   - Pricing rules: Tahoe and Clear Lake")
-IO.puts("   - Refund policies: Tahoe (buyout, room) and Clear Lake (buyout, day)")
-IO.puts("\n⚠️  Note: Make sure to set ADMIN_PASSWORD environment variable in production!")
+
+IO.puts(
+  "   - Refund policies: Tahoe (buyout, room) and Clear Lake (buyout, day)"
+)
+
+IO.puts(
+  "\n⚠️  Note: Make sure to set ADMIN_PASSWORD environment variable in production!"
+)

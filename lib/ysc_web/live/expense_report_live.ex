@@ -440,6 +440,7 @@ defmodule YscWeb.ExpenseReportLive do
           try do
             s3_path =
               ExpenseReports.upload_receipt_to_s3(path,
+                user_id: socket.assigns.current_user.id,
                 original_filename: original_filename
               )
 
@@ -582,6 +583,8 @@ defmodule YscWeb.ExpenseReportLive do
 
             s3_path =
               ExpenseReports.upload_receipt_to_s3(path,
+                user_id: socket.assigns.current_user.id,
+                kind: :proof,
                 original_filename: original_filename
               )
 
