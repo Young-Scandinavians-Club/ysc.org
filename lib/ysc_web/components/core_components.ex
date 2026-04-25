@@ -2924,7 +2924,8 @@ defmodule YscWeb.CoreComponents do
       id="hero-section"
       phx-hook={@video && "HeroVideoControls"}
       class={[
-        "relative w-full flex items-center justify-center overflow-x-hidden overflow-y-auto -mt-[88px] pt-[88px]",
+        "relative w-full flex items-start md:items-center justify-center overflow-x-hidden overflow-y-auto " <>
+          "-mt-28 pt-28 md:-mt-[88px] md:pt-[88px]",
         @video && "group",
         !@video && "bg-cover bg-center bg-no-repeat",
         @class
@@ -2981,7 +2982,7 @@ defmodule YscWeb.CoreComponents do
         aria-hidden="true"
       />
 
-      <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 py-12 sm:py-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
+      <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 pt-12 pb-12 sm:pt-14 sm:pb-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
         <h1
           :if={@title != []}
           class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-lg"

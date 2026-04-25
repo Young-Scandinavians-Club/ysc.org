@@ -8,8 +8,9 @@
 #   GITHUB_REPOSITORY               (optional)  "owner/name"; inferred from `git remote` if unset
 #   OPENROUTER_MODEL                (optional)  default: google/gemma-4-31b-it
 #   OPENROUTER_REFERER              (optional)  HTTP-Referer for OpenRouter (default: this repo on GitHub)
-#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 50)
-#   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 150; avoids huge / costly prompts)
+#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 20)
+#   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 40; use after git scope)
+#   When a previous v* tag exists, PRs are scoped by git (PREV..TAG), not only by merge timestamps on GitHub
 #   DRY_RUN                         (optional)  if 1, print notes to stdout; skip GitHub release API
 #
 # Usage:
@@ -101,6 +102,34 @@ root_timestamp() {
   git -C "$PROJECT_ROOT" log --reverse -1 --format=%aI
 }
 
+# PR numbers that appear in commit subjects/bodies for commits between two refs (GitHub merge + squash).
+# This matches what actually landed on `main` between tags; a GitHub "merged" timestamp search is often wider.
+pr_numbers_from_rev_range() {
+  local a="${1:-}" b="${2:-}"
+  if [ -z "$a" ] || [ -z "$b" ]; then
+    return 0
+  fi
+  if ! git -C "$PROJECT_ROOT" rev-parse --verify "$a^{commit}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! git -C "$PROJECT_ROOT" rev-parse --verify "$b^{commit}" >/dev/null 2>&1; then
+    return 0
+  fi
+  local _lf
+  _lf=$(mktemp)
+  if ! git -C "$PROJECT_ROOT" log --format="%s%n%b" "${a}..${b}" 2>/dev/null >"$_lf"; then
+    rm -f "$_lf"
+    return 0
+  fi
+  {
+    # grep can return 1; with set -e and pipefail the pipeline would abort without || true
+    grep -oE 'Merge pull request #[0-9][0-9]*' "$_lf" 2>/dev/null | sed 's/Merge pull request #//' || true
+    # Squash: (#NNN) in subject/body; tr leaves digits
+    grep -oE '\(#[0-9][0-9]*\)' "$_lf" 2>/dev/null | tr -d '()#' || true
+  } | sort -n -u
+  rm -f "$_lf"
+}
+
 # Return JSON array of merged PRs in the time window, using GitHub search (paginated, max 1000).
 # Merges pages via temp files — jq --argjson on a large growing string exceeds argv (ARG_MAX) in CI.
 search_merged_prs() {
@@ -176,13 +205,53 @@ search_merged_prs() {
   sc_search_rm
 }
 
+# Fetches merged PRs by number into a JSON array file (for when id-list ⊄ timestamp search result).
+rebuild_pr_file_from_fetched() {
+  local outf="$1" numsf="$2"
+  local token n resp line
+  token=$(github_token)
+  local _nd
+  _nd=$(mktemp)
+  : >"$_nd"
+  while IFS= read -r n; do
+    [ -z "$n" ] && continue
+    if ! [[ "$n" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
+    resp=$(
+      curl -fsS \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${token}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "${GITHUB_API}/repos/${REPO_SLUG}/pulls/${n}" 2>/dev/null
+    ) || continue
+    if ! echo "$resp" | jq -e '(.merged_at // empty | length) > 0' >/dev/null 2>&1; then
+      continue
+    fi
+    line=$(
+      echo "$resp" | jq -c '{
+        number, title, author: .user.login, url: .html_url,
+        body: ((.body // "") | if length > 2000 then .[0:2000] + "..." else . end)
+      }'
+    )
+    echo "$line" >>"$_nd"
+  done <"$numsf"
+  if [ ! -s "$_nd" ]; then
+    rm -f "$_nd"
+    return 1
+  fi
+  jq -s 'sort_by(.number)' "$_nd" >"$outf"
+  rm -f "$_nd"
+  return 0
+}
+
 # Rewrites the PR JSON file in place so the OpenRouter request stays within model limits (and avoids
 # HTTP 402 from oversized prompts or from hitting free-tier / credit limits for huge chats).
 pr_json_shrink_for_openrouter() {
   local f="$1"
   local max_bodies max_prs n
-  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-50}
-  max_prs=${OPENROUTER_MAX_PRS:-150}
+  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-20}
+  max_prs=${OPENROUTER_MAX_PRS:-40}
   n=$(jq 'length' "$f")
 
   if [ "$n" -gt "$max_bodies" ]; then
@@ -204,7 +273,15 @@ openrouter_changelog() {
   local version="$2"
   local prev_version="$3"
   local system
-  system="You are a release notes writer. Given merged pull requests for a software project, write a clear, user-focused changelog in Markdown for this version. Use sections only if they help (e.g. Added, Fixed, Changed). Be concise. Link PR numbers in parentheses with URLs when present. Do not invent features not implied by the PRs. If the list is empty, write a short note that this release has no merged PRs in the GitHub search range. Output Markdown only, no surrounding quotes."
+  system="You write SHORT GitHub release notes in Markdown for one version.
+
+The JSON lists pull requests that belong in this version only. Summarize the user-visible impact; do not produce a full catalog of every line item.
+
+Output rules (strict):
+- Default: at most one short H2, then 3–6 bullets (single level). If there are 1–2 PRs, 1 short paragraph is fine. Never more than about 200 words.
+- If there are more than 8 PRs, group by theme in at most 3–4 bullets (e.g. one bullet per theme, comma-separated or short phrases). Do not use nested Added/Fixed/Changed each with long sub-bullets.
+- Mention at most 2–3 PR numbers in total, only where helpful. Do not list a dozen (#NNN) in one line.
+- Do not invent work not implied by the PR titles/descriptions. If the list is empty, one sentence: no PRs in scope. Output Markdown only, no preamble or code fences around the whole text."
 
   local referer req_tmp
   referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
@@ -225,7 +302,7 @@ openrouter_changelog() {
           { role: "system", content: $sys },
           { role: "user", content: (
               {
-                instruction: "Write release notes for this version.",
+                instruction: "Write short user-facing release notes (see system rules). The PR list is already scoped to this version.",
                 new_version: $ver,
                 previous_version_tag: $prev,
                 merged_pull_requests: $prlist
@@ -365,20 +442,54 @@ PREV_TAG=$(find_previous_v_tag "$TAG")
 t_end=$(ref_timestamp "$TAG")
 pr_file=$(mktemp)
 notes_tmp=$(mktemp)
+nums_f=""
 # shellcheck disable=SC2064
-trap 'rm -f "$pr_file" "$notes_tmp"' EXIT
+trap 'rm -f "$pr_file" "$notes_tmp" "$nums_f" "${pr_file}.bak" 2>/dev/null' EXIT
 
 if [ -n "$PREV_TAG" ]; then
   t_start=$(ref_timestamp "$PREV_TAG")
   echo "${TEAL}Previous tag: $PREV_TAG${RESET}"
   search_merged_prs "$REPO_SLUG" "$t_start" "$t_end" >"$pr_file"
+
+  nums_f=$(mktemp)
+  pr_numbers_from_rev_range "$PREV_TAG" "$TAG" >"$nums_f"
+  n_git=$(wc -l <"$nums_f" 2>/dev/null | tr -d ' ' || true)
+  if [ "${n_git:-0}" -gt 0 ]; then
+    before=$(jq 'length' "$pr_file" 2>/dev/null) || before=0
+    nums_json=$(jq -R -s 'split("\n") | map(select(test("^[0-9]+$")) | tonumber)' <"$nums_f")
+    n_allow=$(echo "$nums_json" | jq 'length' 2>/dev/null) || n_allow=0
+    if [ "$n_allow" -gt 0 ]; then
+      cp "$pr_file" "${pr_file}.bak"
+      if jq --argjson allow "$nums_json" 'map(select(.number as $n | ($allow | index($n)) != null))' "$pr_file" >"${pr_file}.f" && mv "${pr_file}.f" "$pr_file"; then
+        after=$(jq 'length' "$pr_file" 2>/dev/null) || after=0
+        echo "${TEAL}git log ${PREV_TAG}..${TAG}: ${n_git} PR#(s) in commit messages -> ${after} row(s) after intersecting GitHub search (search had ${before}).${RESET}" >&2
+        if [ "$after" -gt 0 ]; then
+          rm -f "${pr_file}.bak"
+        else
+          if [ "$n_git" -le 200 ] && rebuild_pr_file_from_fetched "$pr_file" "$nums_f"; then
+            echo "${TEAL}No intersection with search; built PR list from the GitHub API by number.${RESET}" >&2
+            rm -f "${pr_file}.bak"
+          else
+            mv "${pr_file}.bak" "$pr_file"
+            echo "${TEAL}Falling back to full merged-timestamp list (if this is too wide, check squash/rebase commit messages for (#NN) or merge subjects).${RESET}" >&2
+          fi
+        fi
+      else
+        rm -f "${pr_file}.bak" 2>/dev/null
+      fi
+    fi
+  else
+    echo "${TEAL}No (#NN) or Merge pull request #NN in git log ${PREV_TAG}..${TAG} — using merged-timestamp search only (broader).${RESET}" >&2
+  fi
+  rm -f "$nums_f"
+  nums_f=""
 else
   echo "${TEAL}No previous v* tag; bounding PRs from repository root to this tag.${RESET}"
   search_merged_prs "$REPO_SLUG" "" "$t_end" >"$pr_file"
 fi
 
 PR_COUNT=$(jq 'length' "$pr_file")
-echo "${TEAL}Merged PRs in range (GitHub search): $PR_COUNT${RESET}"
+echo "${TEAL}PR rows for the LLM: $PR_COUNT${RESET}" >&2
 
 pr_json_shrink_for_openrouter "$pr_file"
 echo "${TEAL}Sending $(jq 'length' "$pr_file") PRs to OpenRouter (model: ${OPENROUTER_MODEL}).${RESET}"
