@@ -98,6 +98,25 @@ defmodule YscWeb.Plugs.SecurityHeaders do
          ))
       |> Enum.join(" ")
 
+    # `<script src="...">` is governed by `script-src-elem` when this directive is
+    # present; otherwise the browser uses `script-src` as a fallback. With
+    # `strict-dynamic` in `script-src`, host allowlists there are disabled, which
+    # blocks same-origin third-party injects (e.g. Cloudflare Email Address
+    # Obfuscation: /cdn-cgi/.../email-decode.min.js). A separate, non-strict
+    # `script-src-elem` restores normal `'self'` and CDN allowlists for static
+    # script tags. Inline / classic behavior still follows `script-src` (nonces,
+    # strict-dynamic for imports loaded by the boot script).
+    script_src_elem =
+      [
+        "'self'",
+        "https://js.stripe.com",
+        "https://*.js.stripe.com",
+        "https://js.radar.com/v4.4.8/radar.min.js",
+        "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js",
+        "https://challenges.cloudflare.com"
+      ]
+      |> Enum.join(" ")
+
     # Style sources - allow self, unsafe-inline, and external CDNs
     # Note: Nonces don't work for style attributes (style="..."), only for <style> tags.
     # When nonce is present, 'unsafe-inline' is ignored, so we remove nonce from style-src.
@@ -202,6 +221,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     base_policy = [
       "default-src #{default_src}",
       "script-src #{script_src}",
+      "script-src-elem #{script_src_elem}",
       "style-src #{style_src}",
       "connect-src #{connect_src}",
       "img-src #{img_src}",

@@ -40,6 +40,10 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
     [csp] = get_resp_header(conn, "content-security-policy")
     assert String.contains?(csp, "'nonce-abc123'")
     assert String.contains?(csp, "script-src")
+    assert String.contains?(csp, "script-src-elem")
+    # script-src-elem must not use strict-dynamic or host allowlists are ignored
+    # for <script src>, breaking Cloudflare-injected /cdn-cgi/... scripts.
+    assert String.contains?(csp, "script-src-elem 'self'")
     assert String.contains?(csp, "connect-src")
     assert String.contains?(csp, "img-src")
   end

@@ -128,6 +128,13 @@ defmodule Ysc.S3Config do
   @doc """
   Upload endpoint for the avatars bucket (presigned POST / XHR), respecting
   `s3_avatars_public_url` when set.
+
+  **CORS (production):** Direct browser uploads require the S3/Tigris bucket to
+  allow your site origin (e.g. `https://...` for `PHX_HOST`) in its CORS policy,
+  for both the virtual-hosted `*.fly.storage.tigris.dev` URL and any custom
+  domain set via `S3_AVATARS_PUBLIC_BASE_URL`. Tigris custom domains also require
+  a CNAME to the bucket host and [DNS-only (not proxied) at Cloudflare](https://www.tigrisdata.com/docs/buckets/custom-domain/)
+  so TLS and renewals work.
   """
   def avatars_upload_url do
     case avatars_public_url() do
