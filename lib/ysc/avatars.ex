@@ -104,18 +104,15 @@ defmodule Ysc.Avatars do
       [cache_control: "public, max-age=86400"]
       |> maybe_add_content_type(opts)
 
-    result =
-      file_path
-      |> ExAws.S3.Upload.stream_file()
-      |> ExAws.S3.upload(bucket, key, upload_opts)
-      |> ExAws.request!()
+    file_path
+    |> ExAws.S3.Upload.stream_file()
+    |> ExAws.S3.upload(bucket, key, upload_opts)
+    |> ExAws.request!()
 
-    location =
-      case result[:body][:location] do
-        "" -> S3Config.object_url(key, bucket)
-        loc when is_binary(loc) and loc != "" -> loc
-        _ -> S3Config.object_url(key, bucket)
-      end
+    # Always derive the public URL from `S3Config` (custom domain when set). ExAws
+    # / Tigris may return a `location` on the default `*.fly.storage` host, which
+    # must not be stored or exposed when `S3_AVATARS_PUBLIC_BASE_URL` is configured.
+    location = S3Config.object_url(key, bucket)
 
     {:ok, location}
   end

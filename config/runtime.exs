@@ -381,6 +381,18 @@ if config_env() == :prod do
     s3_expense_reports_public_url =
       trim_public_s3_url.(System.get_env("S3_EXPENSE_REPORTS_PUBLIC_BASE_URL"))
 
+    # ysc-prod: browser S3 direct uploads need the public bucket origin; without this,
+    # uploads fall back to <bucket>.fly.storage.tigris.dev and CORS must be set there.
+    # An empty `fly secrets set` value overrides [env] in fly.toml — fail fast in that case.
+    if System.get_env("ENVIRONMENT") == "production" and
+         s3_avatars_public_url in [nil, ""] do
+      raise """
+      S3_AVATARS_PUBLIC_BASE_URL is required when ENVIRONMENT=production (e.g. https://avatars.ysc.org). \
+      Set it in etc/fly/fly-prod.toml [env] or: fly secrets set S3_AVATARS_PUBLIC_BASE_URL='https://avatars.ysc.org' \
+      — then run `fly deploy` so machines pick it up. \
+      """
+    end
+
     # Store S3 config for application use
     expense_reports_bucket =
       System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"

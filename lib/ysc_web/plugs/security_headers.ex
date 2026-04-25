@@ -90,7 +90,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
          "https://*.js.stripe.com",
          "https://js.radar.com/v4.4.8/radar.min.js",
          "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js",
-         "https://challenges.cloudflare.com"
+         "https://challenges.cloudflare.com",
+         "https://static.cloudflareinsights.com"
        ] ++
          if(is_dev,
            do: [],
@@ -104,16 +105,19 @@ defmodule YscWeb.Plugs.SecurityHeaders do
     # blocks same-origin third-party injects (e.g. Cloudflare Email Address
     # Obfuscation: /cdn-cgi/.../email-decode.min.js). A separate, non-strict
     # `script-src-elem` restores normal `'self'` and CDN allowlists for static
-    # script tags. Inline / classic behavior still follows `script-src` (nonces,
-    # strict-dynamic for imports loaded by the boot script).
+    # script tags. Browsers also apply it to *inline* `<script>` (no `src`); those
+    # require the same `nonce-...` as in `script-src` or they are blocked.
+    # Cloudflare Web Analytics injects `https://static.cloudflareinsights.com/...`.
     script_src_elem =
       [
         "'self'",
+        "'nonce-#{nonce}'",
         "https://js.stripe.com",
         "https://*.js.stripe.com",
         "https://js.radar.com/v4.4.8/radar.min.js",
         "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js",
-        "https://challenges.cloudflare.com"
+        "https://challenges.cloudflare.com",
+        "https://static.cloudflareinsights.com"
       ]
       |> Enum.join(" ")
 

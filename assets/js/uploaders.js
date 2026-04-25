@@ -1,3 +1,6 @@
+// Presigned S3 POST target: `url` and `fields` always come from the LiveView
+// presign callback (Elixir: `S3Config.upload_url/0` or `avatars_upload_url/0`).
+
 let Uploaders = {}
 
 Uploaders.S3 = function(entries, onViewError) {

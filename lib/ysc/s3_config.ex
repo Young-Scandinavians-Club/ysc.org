@@ -3,6 +3,21 @@ defmodule Ysc.S3Config do
   Centralized S3 configuration for different environments.
   Provides environment-specific S3 bucket names, URLs, and regions.
   Uses MinIO for local dev/test and Tigris (S3-compatible) for production.
+
+  ## Public URLs, browser uploads, and presigned GETs (audit)
+
+  **Canonical public object URLs** (links stored in the DB, `<img src>`, etc.) must
+  come from `object_url/1` and `object_url/2` so
+  `S3_{MEDIA,AVATARS,EXPENSE_REPORTS}_PUBLIC_BASE_URL` apply consistently. Do not
+  persist raw `*.fly.storage.tigris.dev` URLs from ExAws response bodies when a
+  custom public base is configured.
+
+  | Flow | Elixir | JS |
+  | ---- | ------ | -- |
+  | **Presigned POST** (browser → S3) | `YscWeb.S3.SimpleS3Upload` + `upload_url/0` (media) or `avatars_upload_url/0` (avatars) | `assets/js/uploaders.js` — POST `entry.meta.url` only; no hardcoded host |
+  | **Presigned GET** (redirect to private object) | `ExAws.S3.presigned_url/5` via `expense_report_file_presigned_url_args/2` + `YscWeb.ExpenseReportFileController` | n/a — full navigation |
+  | **Server `ExAws.S3.Upload`** | `Ysc.Media.upload_file_to_s3/3`, `Ysc.Avatars.upload_to_s3/3` — return `object_url/…` for `location` | n/a |
+  | **CSP** | `YscWeb.Plugs.SecurityHeaders` + `storage_csp_connect_sources/0` | n/a |
   """
 
   @doc """

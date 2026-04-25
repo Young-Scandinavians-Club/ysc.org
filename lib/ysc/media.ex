@@ -384,23 +384,11 @@ defmodule Ysc.Media do
       |> ExAws.S3.upload(bucket_name, key, upload_opts)
       |> ExAws.request!()
 
-    # Tigris doesn't return location in response, so construct it from the key
-    location =
-      case result[:body][:location] do
-        "" ->
-          # Location is empty (Tigris behavior), construct URL from key
-          result_key = result[:body][:key] || key
-          S3Config.object_url(result_key)
-
-        loc when is_binary(loc) and loc != "" ->
-          # Location is provided (AWS S3 behavior)
-          loc
-
-        _ ->
-          # Fallback: construct from key
-          result_key = result[:body][:key] || key
-          S3Config.object_url(result_key)
-      end
+    # Always derive the public URL from `S3Config` (custom domain when set). ExAws
+    # / Tigris may return a `location` on the default host, which must not be
+    # stored when `S3_MEDIA_PUBLIC_BASE_URL` is configured.
+    result_key = result[:body][:key] || key
+    location = S3Config.object_url(result_key)
 
     # Return result with location in body for compatibility
     put_in(result, [:body, :location], location)

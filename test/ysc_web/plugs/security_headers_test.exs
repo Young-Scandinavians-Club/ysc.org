@@ -41,9 +41,11 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
     assert String.contains?(csp, "'nonce-abc123'")
     assert String.contains?(csp, "script-src")
     assert String.contains?(csp, "script-src-elem")
-    # script-src-elem must not use strict-dynamic or host allowlists are ignored
-    # for <script src>, breaking Cloudflare-injected /cdn-cgi/... scripts.
-    assert String.contains?(csp, "script-src-elem 'self'")
+
+    # script-src-elem: nonces required for inline <script> blocks; no strict-dynamic.
+    # External: Cloudflare Web Analytics, same-origin + CDNs.
+    assert String.contains?(csp, "script-src-elem 'self' 'nonce-abc123'")
+    assert String.contains?(csp, "https://static.cloudflareinsights.com")
     assert String.contains?(csp, "connect-src")
     assert String.contains?(csp, "img-src")
   end
