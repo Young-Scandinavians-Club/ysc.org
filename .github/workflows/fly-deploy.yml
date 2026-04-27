@@ -182,7 +182,14 @@ jobs:
         run: bash etc/scripts/fly_verify_app_access.sh ysc-sandbox
       - name: Deploy to Fly.io sandbox
         run: |
-          VERSION=$(git describe --first-parent --abbrev=10 --long --tags --dirty 2>/dev/null || echo "unknown")
-          flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --local-only --build-arg BUILD_VERSION=$VERSION --image-label $VERSION
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$VERSION_TAG" ]; then
+            COMMITS=$(git rev-list --count "${VERSION_TAG}..HEAD")
+            VERSION="${VERSION_TAG}-${COMMITS}-${GIT_HASH}"
+          else
+            VERSION="unknown-${GIT_HASH}"
+          fi
+          flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}

@@ -367,9 +367,17 @@ if config_env() == :prod do
       System.get_env("AWS_ENDPOINT_URL_S3") || "https://fly.storage.tigris.dev"
 
     trim_public_s3_url = fn
-      nil -> nil
-      "" -> nil
-      url -> url |> String.trim() |> String.trim_trailing("/")
+      nil ->
+        nil
+
+      "" ->
+        nil
+
+      url ->
+        case url |> String.trim() |> String.trim_trailing("/") do
+          "" -> nil
+          trimmed -> trimmed
+        end
     end
 
     s3_media_public_url =
@@ -381,15 +389,19 @@ if config_env() == :prod do
     s3_expense_reports_public_url =
       trim_public_s3_url.(System.get_env("S3_EXPENSE_REPORTS_PUBLIC_BASE_URL"))
 
-    # ysc-prod: browser S3 direct uploads need the public bucket origin; without this,
-    # uploads fall back to <bucket>.fly.storage.tigris.dev and CORS must be set there.
-    # An empty `fly secrets set` value overrides [env] in fly.toml — fail fast in that case.
-    if System.get_env("ENVIRONMENT") == "production" and
-         s3_avatars_public_url in [nil, ""] do
+    # Browser uploads POST to `avatars_upload_url/0`. Without a public base URL, that host is
+    # <bucket>.fly.storage.tigris.dev (XHR CORS often fails there even when the custom domain works).
+    # Fly secrets override [env] in fly.toml — an empty secret can clear this and force the fallback.
+    sandbox? =
+      System.get_env("ENVIRONMENT") == "sandbox" ||
+        System.get_env("APP_ENV") == "sandbox"
+
+    if not sandbox? and s3_avatars_public_url in [nil, ""] do
       raise """
-      S3_AVATARS_PUBLIC_BASE_URL is required when ENVIRONMENT=production (e.g. https://avatars.ysc.org). \
-      Set it in etc/fly/fly-prod.toml [env] or: fly secrets set S3_AVATARS_PUBLIC_BASE_URL='https://avatars.ysc.org' \
-      — then run `fly deploy` so machines pick it up. \
+      S3_AVATARS_PUBLIC_BASE_URL is required for non-sandbox production (e.g. https://avatars.ysc.org). \
+      If the browser posts to *.fly.storage.tigris.dev, this variable is unset in the running VM. \
+      Set it in etc/fly/fly-prod.toml [env], or remove an empty override: fly secrets unset S3_AVATARS_PUBLIC_BASE_URL, \
+      then redeploy. Verify: fly ssh console -a ysc-prod -C 'printenv S3_AVATARS_PUBLIC_BASE_URL' \
       """
     end
 

@@ -188,7 +188,9 @@ jobs:
 
       - name: Deploy to Fly.io production
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION_TAG="${{ github.ref_name }}"
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          VERSION="${VERSION_TAG}-${GIT_HASH}"
           flyctl deploy \
             --dockerfile etc/docker/Dockerfile \
             -a ysc-prod \

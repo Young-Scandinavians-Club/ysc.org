@@ -150,6 +150,16 @@ defmodule Ysc.S3Config do
   domain set via `S3_AVATARS_PUBLIC_BASE_URL`. Tigris custom domains also require
   a CNAME to the bucket host and [DNS-only (not proxied) at Cloudflare](https://www.tigrisdata.com/docs/buckets/custom-domain/)
   so TLS and renewals work.
+
+  Use **one CORS origin per entry** (or one rule per origin). A single field
+  like `https://a.example,https://b.example` is often stored as one literal
+  origin and **will not match** either site, so uploads fail with CORS in the
+  console.
+
+  If the browser posts to `https://<bucket>.fly.storage.tigris.dev`, the public
+  base URL is not set in the running app (`S3_AVATARS_PUBLIC_BASE_URL` missing or
+  overridden by an empty Fly secret); fixing that is preferred over relying on
+  CORS for the virtual host.
   """
   def avatars_upload_url do
     case avatars_public_url() do
