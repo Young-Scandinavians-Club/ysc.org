@@ -263,121 +263,148 @@ if config_env() == :prod do
 
   config :ex_aws, :s3, ex_aws_s3_config
 
-  unless fly_release_command? do
-    config :phoenix_turnstile,
-      site_key: System.fetch_env!("TURNSTILE_SITE_KEY"),
-      secret_key: System.fetch_env!("TURNSTILE_SECRET_KEY")
+  # ## Mailer (AWS SES) — always configured in production (not only when RELEASE_COMMAND is unset).
+  #
+  # `config/config.exs` defaults `Ysc.Mailer` to `Swoosh.Adapters.Local`. `config/prod.exs` sets
+  # `swoosh local: false`, which does not start the Local storage GenServer, so using the Local
+  # adapter raises (Oban) ** (exit) no process. The former layout applied SES only inside
+  # `unless fly_release_command?`; any code path that skipped that block (e.g. a one-off, or
+  # mis-set env) left the mailer on Local. Resolve SES the same way as S3: shared AWS creds
+  # when present; for Fly release_command (migrate/seed) without keys, use Test instead of Local.
+  ses_access_key =
+    System.get_env("SES_AWS_ACCESS_KEY_ID") ||
+      System.get_env("AWS_ACCESS_KEY_ID")
 
-    # Wax (WebAuthn) configuration for production
-    #
-    # RP ID (Relying Party ID) determines which domains can share passkeys.
-    # WebAuthn is strictly bound to a single domain - passkeys registered on one domain
-    # cannot be used on a different domain unless they share the same RP ID.
-    #
-    # For subdomain sharing (e.g., app.ysc.org, api.ysc.org, www.ysc.org):
-    #   Set WEBAUTHN_RP_ID environment variable to the base domain: "ysc.org"
-    #   This allows passkeys registered on any subdomain to work on all subdomains
-    #
-    # For separate domains (e.g., ysc-sandbox.fly.dev vs ysc.org):
-    #   Use the full hostname as RP ID (default behavior)
-    #   Each domain will have its own separate passkeys
-    #
-    # Default: Uses PHX_HOST value (e.g., "ysc-sandbox.fly.dev" or "ysc.org")
-    # Override: Set WEBAUTHN_RP_ID environment variable to customize
-    rp_id = System.get_env("WEBAUTHN_RP_ID") || host
-    origin = "https://#{host}"
+  ses_secret_key =
+    System.get_env("SES_AWS_SECRET_ACCESS_KEY") ||
+      System.get_env("AWS_SECRET_ACCESS_KEY")
 
-    config :wax_,
-      rp_id: rp_id,
-      origin: origin,
-      attestation: "none"
+  cond do
+    is_binary(ses_access_key) and ses_access_key != "" and
+      is_binary(ses_secret_key) and
+        ses_secret_key != "" ->
+      config :ysc, Ysc.Mailer,
+        adapter: Swoosh.Adapters.AmazonSES,
+        region: System.get_env("SES_AWS_REGION") || "us-west-1",
+        access_key: ses_access_key,
+        secret: ses_secret_key
 
-    # ## Stripe Configuration
-    #
-    # Configure Stripe API keys for production.
-    # These must be set at runtime for releases to work properly.
-    stripe_secret = System.get_env("STRIPE_SECRET")
-    stripe_public_key = System.get_env("STRIPE_PUBLIC_KEY")
-    stripe_webhook_secret = System.get_env("STRIPE_WEBHOOK_SECRET")
+    fly_release_command? ->
+      config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Test
 
-    if stripe_secret && stripe_public_key && stripe_webhook_secret do
-      config :stripity_stripe,
-        api_key: stripe_secret,
-        public_key: stripe_public_key,
-        webhook_secret: stripe_webhook_secret
-    else
+    true ->
       raise """
-      Missing Stripe credentials. Please set:
-      - STRIPE_SECRET
-      - STRIPE_PUBLIC_KEY
-      - STRIPE_WEBHOOK_SECRET
+      Missing AWS SES credentials. Please set either:
+      - SES_AWS_ACCESS_KEY_ID and SES_AWS_SECRET_ACCESS_KEY, or
+      - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
       """
-    end
+  end
 
-    # ## Membership Plans Configuration
-    #
-    # Configure membership plans with Stripe Price IDs for production.
-    # These must be set at runtime for releases to work properly.
-    stripe_single_price_id = System.get_env("STRIPE_SINGLE_PRICE_ID")
-    stripe_family_price_id = System.get_env("STRIPE_FAMILY_PRICE_ID")
+  config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
 
-    if stripe_single_price_id && stripe_family_price_id do
-      config :ysc,
-        membership_plans: [
-          %{
-            id: :single,
-            name: "Single",
-            interval: "year",
-            amount: 45,
-            currency: "usd",
-            trial_period_days: 0,
-            stripe_price_id: stripe_single_price_id,
-            statement_descriptor: "Single Membership",
-            description: "Membership just for yourself",
-            metadata: %{
-              "plan_type" => "membership",
-              "interval" => "year"
-            }
-          },
-          %{
-            id: :family,
-            name: "Family",
-            interval: "year",
-            amount: 65,
-            currency: "usd",
-            trial_period_days: 0,
-            stripe_price_id: stripe_family_price_id,
-            statement_descriptor: "Family Membership",
-            description: "For you, your Spouse and your children under 18",
-            metadata: %{
-              "plan_type" => "membership",
-              "interval" => "year"
-            }
-          },
-          %{
-            id: :lifetime,
-            name: "Lifetime",
-            interval: "lifetime",
-            amount: 0,
-            currency: "usd",
-            trial_period_days: 0,
-            stripe_price_id: nil,
-            statement_descriptor: "Lifetime Membership",
-            description:
-              "Lifetime membership with all Family membership perks - never expires",
-            metadata: %{
-              "plan_type" => "membership",
-              "interval" => "lifetime"
-            }
+  # Wax (WebAuthn): no third-party API keys (only `PHX_HOST` and optional `WEBAUTHN_RP_ID`).
+  # Apply for every prod process including `RELEASE_COMMAND=1` so we never fall back to
+  # dev-style defaults in `user_login_live` / `passkey_registration_live` if the block below
+  # were skipped (same class of issue as Local mailer + `swoosh local: false`).
+  webauthn_rp_id = System.get_env("WEBAUTHN_RP_ID") || host
+  webauthn_origin = "https://#{host}"
+
+  config :wax_,
+    rp_id: webauthn_rp_id,
+    origin: webauthn_origin,
+    attestation: "none"
+
+  # Kiosk + mobile API rate limit: optional env only; safe for migrate/seed VMs.
+  config :ysc, :kiosk_api_key, System.get_env("KIOSK_API_KEY")
+
+  config :ysc, Ysc.MobileAPIRateLimit, ip_limit: 120
+
+  # Skipped for `RELEASE_COMMAND=1` (Fly release_command) so first-time deploys are not
+  # blocked on every integration secret. S3, SES, mailer, and Wax are configured above;
+  # this block holds things that `fetch_env!/1`, raise, or are optional OAuth.
+  config :phoenix_turnstile,
+    site_key: System.fetch_env!("TURNSTILE_SITE_KEY"),
+    secret_key: System.fetch_env!("TURNSTILE_SECRET_KEY")
+
+  # ## Stripe Configuration
+  #
+  # Configure Stripe API keys for production.
+  # These must be set at runtime for releases to work properly.
+  stripe_secret = System.get_env("STRIPE_SECRET")
+  stripe_public_key = System.get_env("STRIPE_PUBLIC_KEY")
+  stripe_webhook_secret = System.get_env("STRIPE_WEBHOOK_SECRET")
+
+  if stripe_secret && stripe_public_key && stripe_webhook_secret do
+    config :stripity_stripe,
+      api_key: stripe_secret,
+      public_key: stripe_public_key,
+      webhook_secret: stripe_webhook_secret
+  else
+    raise """
+    Missing Stripe credentials. Please set:
+    - STRIPE_SECRET
+    - STRIPE_PUBLIC_KEY
+    - STRIPE_WEBHOOK_SECRET
+    """
+  end
+
+  # ## Membership Plans Configuration
+  #
+  # Configure membership plans with Stripe Price IDs for production.
+  # These must be set at runtime for releases to work properly.
+  stripe_single_price_id = System.get_env("STRIPE_SINGLE_PRICE_ID")
+  stripe_family_price_id = System.get_env("STRIPE_FAMILY_PRICE_ID")
+
+  if stripe_single_price_id && stripe_family_price_id do
+    config :ysc,
+      membership_plans: [
+        %{
+          id: :single,
+          name: "Single",
+          interval: "year",
+          amount: 45,
+          currency: "usd",
+          trial_period_days: 0,
+          stripe_price_id: stripe_single_price_id,
+          statement_descriptor: "Single Membership",
+          description: "Membership just for yourself",
+          metadata: %{
+            "plan_type" => "membership",
+            "interval" => "year"
           }
-        ]
-    else
-      raise """
-      Missing Stripe Price IDs. Please set:
-      - STRIPE_SINGLE_PRICE_ID
-      - STRIPE_FAMILY_PRICE_ID
-      """
-    end
+        },
+        %{
+          id: :family,
+          name: "Family",
+          interval: "year",
+          amount: 65,
+          currency: "usd",
+          trial_period_days: 0,
+          stripe_price_id: stripe_family_price_id,
+          statement_descriptor: "Family Membership",
+          description: "For you, your Spouse and your children under 18",
+          metadata: %{
+            "plan_type" => "membership",
+            "interval" => "year"
+          }
+        },
+        %{
+          id: :lifetime,
+          name: "Lifetime",
+          interval: "lifetime",
+          amount: 0,
+          currency: "usd",
+          trial_period_days: 0,
+          stripe_price_id: nil,
+          statement_descriptor: "Lifetime Membership",
+          description:
+            "Lifetime membership with all Family membership perks - never expires",
+          metadata: %{
+            "plan_type" => "membership",
+            "interval" => "lifetime"
+          }
+        }
+      ]
 
     # ## SSL Support
     #
@@ -411,68 +438,10 @@ if config_env() == :prod do
     #
     # Check `Plug.SSL` for all available options in `force_ssl`.
 
-    # ## Configuring the mailer
-    #
-    # In production you need to configure the mailer to use a different adapter.
-    # Also, you may need to configure the Swoosh API client of your choice if you
-    # are not using SMTP. Here is an example of the configuration:
-    #
-    #     config :ysc, Ysc.Mailer,
-    #       adapter: Swoosh.Adapters.Mailgun,
-    #       api_key: System.get_env("MAILGUN_API_KEY"),
-    #       domain: System.get_env("MAILGUN_DOMAIN")
-    #
-    # Swoosh API client is configured to use Finch in config/prod.exs.
-    # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
-
-    # ## Mailer Configuration (AWS SES)
-    #
-    # Configure Swoosh to use Amazon SES for sending emails in production.
-    # The adapter expects `access_key` and `secret` (not `access_key_id` and `secret_access_key`).
-    ses_access_key =
-      System.get_env("SES_AWS_ACCESS_KEY_ID") ||
-        System.get_env("AWS_ACCESS_KEY_ID")
-
-    ses_secret_key =
-      System.get_env("SES_AWS_SECRET_ACCESS_KEY") ||
-        System.get_env("AWS_SECRET_ACCESS_KEY")
-
-    if ses_access_key && ses_secret_key do
-      config :ysc, Ysc.Mailer,
-        adapter: Swoosh.Adapters.AmazonSES,
-        region: System.get_env("SES_AWS_REGION") || "us-west-1",
-        access_key: ses_access_key,
-        secret: ses_secret_key
-    else
-      raise """
-      Missing AWS SES credentials. Please set either:
-      - SES_AWS_ACCESS_KEY_ID and SES_AWS_SECRET_ACCESS_KEY, or
-      - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-      """
-    end
-
-    # ## SES Configuration Set (for open/click/bounce tracking)
-    #
-    # When set, all outgoing emails will be sent with this SES Configuration Set,
-    # enabling open, click, and bounce tracking via SNS webhooks.
-    # Events are routed to POST /webhooks/ses via an SNS subscription.
-    # If not set, tracking is disabled and emails are sent without a configuration set.
-    config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
-
     # Discord alerts configuration
     config :ysc, Ysc.Alerts.Discord,
       webhook_url: System.fetch_env!("DISCORD_WEBHOOK_URL"),
       enabled: true
-
-    # ## Kiosk API Key Configuration
-    #
-    # Static bearer for `/api/v1/mobile` (React Native kiosk). A leaked key exposes
-    # booking/PII data — rotate on a schedule, after staff departures, and on any
-    # suspicion of compromise. Prefer network restriction (e.g. edge allowlist) for
-    # fixed kiosks where possible. Set: KIOSK_API_KEY
-    config :ysc, :kiosk_api_key, System.get_env("KIOSK_API_KEY")
-
-    config :ysc, Ysc.MobileAPIRateLimit, ip_limit: 120
 
     # ## Cloak Encryption Configuration
     #

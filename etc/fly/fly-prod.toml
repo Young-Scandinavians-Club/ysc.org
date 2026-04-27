@@ -63,6 +63,7 @@ kill_signal = 'SIGTERM'
   S3_USE_CUSTOM_DOMAIN = 'true'
   STRIPE_FAMILY_PRICE_ID = 'price_1TP6efIZd8GkARoBVD9zY8ux'
   STRIPE_SINGLE_PRICE_ID = 'price_1TP6f0IZd8GkARoByyICLSbm'
+  SES_AWS_REGION = 'us-west-1'
 
 [http_service]
   internal_port = 4000
