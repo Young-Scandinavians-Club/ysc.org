@@ -5334,12 +5334,16 @@ defmodule YscWeb.UserSettingsLive do
   # Helper function to verify if Stripe customer exists
   defp verify_stripe_customer_exists(stripe_id) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Customer.retrieve(stripe_id)
+           stripe_customer_module().retrieve(stripe_id, [])
          end) do
       {:ok, _customer} -> :ok
       {:error, %Stripe.Error{code: :resource_missing}} -> {:error, :not_found}
       {:error, error} -> {:error, error}
     end
+  end
+
+  defp stripe_customer_module do
+    Application.get_env(:ysc, :stripe_customer_module, Stripe.Customer)
   end
 
   # Helper function to safely fetch user invoices

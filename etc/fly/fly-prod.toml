@@ -17,6 +17,7 @@ kill_signal = 'SIGTERM'
   release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/migrate && DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/seed'"
 
 [env]
+  DNS_CLUSTER_QUERY = 'ysc-prod.internal'
   APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID = 'pass.org.ysc.membership'
   APPLE_WALLET_ORG_NAME = 'Young Scandinavians Club'
   APPLE_WALLET_TEAM_ID = 'FAN7NBS7AB'
@@ -67,7 +68,9 @@ kill_signal = 'SIGTERM'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 1
+  # Rolling deploys need at least two started machines; CI enforces this before release.
+  min_machines_running = 2
+  max_machines_running = 3
   processes = ['app']
 
   [http_service.concurrency]

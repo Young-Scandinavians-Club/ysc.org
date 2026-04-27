@@ -370,7 +370,7 @@ defmodule Ysc.Customers do
       end
 
     Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-      Stripe.SetupIntent.create(setup_intent_params)
+      stripe_setup_intent_module().create(setup_intent_params)
     end)
   end
 
@@ -397,6 +397,14 @@ defmodule Ysc.Customers do
       :ysc,
       :stripe_payment_method_module,
       Stripe.PaymentMethod
+    )
+  end
+
+  defp stripe_setup_intent_module do
+    Application.get_env(
+      :ysc,
+      :stripe_setup_intent_module,
+      Stripe.SetupIntent
     )
   end
 

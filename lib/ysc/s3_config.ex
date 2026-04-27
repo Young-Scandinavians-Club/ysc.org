@@ -13,8 +13,10 @@ defmodule Ysc.S3Config do
   custom public base is configured.
 
   In non-sandbox production, configure **all three** public base URLs so uploads,
-  links, and CSP prefer your HTTPS hostnames; `*.fly.storage.tigris.dev` is only a
-  fallback when any of those are unset (see `include_tigris_virtual_host_in_csp?/0`).
+  links, and CSP prefer your HTTPS hostnames; leave them unset (or only set real
+  custom domains like `https://assets.example.org`) to use raw
+  `https://<bucket>.fly.storage.tigris.dev`. Hosts under `*.fly.storage.tigris.dev`
+  in env vars are ignored and treated as unset (see `custom_public_base_url/1`).
 
   | Flow | Elixir | JS |
   | ---- | ------ | -- |
@@ -85,6 +87,7 @@ defmodule Ysc.S3Config do
   def storage_csp_connect_sources do
     [media_public_url(), avatars_public_url(), expense_reports_public_url()]
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.filter(&(custom_public_base_url(&1) != nil))
     |> Enum.map(&csp_connect_origin/1)
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
@@ -114,23 +117,60 @@ defmodule Ysc.S3Config do
     end
   end
 
+  # True for `https://fly.storage.tigris.dev` (path-style endpoint) or
+  # `https://<anything>.fly.storage.tigris.dev`. Those are not "custom domains":
+  # uploads and public links must use `https://<bucket>.fly.storage.tigris.dev` from
+  # `virtual_host_upload_endpoint/1`, not a mistaken value like
+  # `https://avatars.fly.storage.tigris.dev` (wrong bucket).
+  defp tigris_fly_storage_public_origin?(url) when is_binary(url) do
+    case url |> String.trim() |> String.trim_trailing("/") |> URI.parse() do
+      %URI{host: host} when is_binary(host) ->
+        host == "fly.storage.tigris.dev" ||
+          String.ends_with?(host, ".fly.storage.tigris.dev")
+
+      _ ->
+        false
+    end
+  end
+
+  # Non-empty public base URL only when it is a real custom origin (not Fly Tigris virtual host).
+  defp custom_public_base_url(url) when is_binary(url) do
+    trimmed = url |> String.trim() |> String.trim_trailing("/")
+
+    cond do
+      trimmed == "" ->
+        nil
+
+      tigris_fly_storage_public_origin?(trimmed) ->
+        nil
+
+      true ->
+        trimmed
+    end
+  end
+
+  defp custom_public_base_url(_), do: nil
+
   @doc """
   Whether CSP should still allow `https://*.fly.storage.tigris.dev` (and the raw
   `s3_base_url` when it points at Tigris).
 
-  When **media**, **avatars**, and **expense** public base URLs are all set, browsers
-  should only talk to those custom origins for S3-facing flows, so the virtual-host
-  wildcard can be omitted for a tighter policy.
+  When **media**, **avatars**, and **expense** public base URLs are all set to **non-Tigris**
+  HTTPS origins (true custom domains), browsers can rely on those hosts only and the
+  virtual-host wildcard can be omitted for a tighter policy.
+
+  Values that point at `*.fly.storage.tigris.dev` do not count — use
+  `virtual_host_upload_endpoint/1` / `object_url/2` fallbacks instead (e.g. sandbox).
   """
   def include_tigris_virtual_host_in_csp? do
     not all_s3_public_origins_configured?()
   end
 
   defp all_s3_public_origins_configured? do
-    nonempty? = fn v -> is_binary(v) and String.trim(v) != "" end
+    custom? = fn v -> custom_public_base_url(v) != nil end
 
-    nonempty?.(media_public_url()) and nonempty?.(avatars_public_url()) and
-      nonempty?.(expense_reports_public_url())
+    custom?.(media_public_url()) and custom?.(avatars_public_url()) and
+      custom?.(expense_reports_public_url())
   end
 
   @doc """
@@ -154,9 +194,9 @@ defmodule Ysc.S3Config do
   For MinIO: Uses path-style (http://localhost:9000/<bucket>)
   """
   def upload_url do
-    case media_public_url() do
-      url when is_binary(url) and url != "" ->
-        String.trim_trailing(url, "/")
+    case custom_public_base_url(media_public_url()) do
+      url when is_binary(url) ->
+        url
 
       _ ->
         virtual_host_upload_endpoint(bucket_name())
@@ -179,15 +219,14 @@ defmodule Ysc.S3Config do
   origin and **will not match** either site, so uploads fail with CORS in the
   console.
 
-  If the browser posts to `https://<bucket>.fly.storage.tigris.dev`, the public
-  base URL is not set in the running app (`S3_AVATARS_PUBLIC_BASE_URL` missing or
-  overridden by an empty Fly secret); fixing that is preferred over relying on
-  CORS for the virtual host.
+  `S3_*_PUBLIC_BASE_URL` values that point at `*.fly.storage.tigris.dev` are **ignored**
+  (they are not custom domains): the correct raw host is always
+  `https://<AVATARS_BUCKET_NAME>.fly.storage.tigris.dev` when no real custom URL is set.
   """
   def avatars_upload_url do
-    case avatars_public_url() do
-      url when is_binary(url) and url != "" ->
-        String.trim_trailing(url, "/")
+    case custom_public_base_url(avatars_public_url()) do
+      url when is_binary(url) ->
+        url
 
       _ ->
         virtual_host_upload_endpoint(avatars_bucket_name())
@@ -297,9 +336,9 @@ defmodule Ysc.S3Config do
   def object_url(key, bucket) do
     key = String.trim_leading(key, "/")
 
-    case public_object_base_for_bucket(bucket) do
-      origin when is_binary(origin) and origin != "" ->
-        "#{String.trim_trailing(origin, "/")}/#{key}"
+    case custom_public_base_url(public_object_base_for_bucket(bucket)) do
+      origin when is_binary(origin) ->
+        "#{origin}/#{key}"
 
       _ ->
         base = base_url()
@@ -339,19 +378,23 @@ defmodule Ysc.S3Config do
 
     case expense_reports_public_url() do
       url when is_binary(url) ->
-        case parse_public_http_origin!(url) do
-          :none ->
-            default
+        if custom_public_base_url(url) do
+          case parse_public_http_origin!(url) do
+            :none ->
+              default
 
-          {:ok, %{hostname: host, ex_aws_overrides: overrides}} ->
-            config = ExAws.Config.new(:s3, overrides)
+            {:ok, %{hostname: host, ex_aws_overrides: overrides}} ->
+              config = ExAws.Config.new(:s3, overrides)
 
-            {config, :get, host, normalized_path,
-             [
-               expires_in: expires_in,
-               virtual_host: true,
-               bucket_as_host: true
-             ]}
+              {config, :get, host, normalized_path,
+               [
+                 expires_in: expires_in,
+                 virtual_host: true,
+                 bucket_as_host: true
+               ]}
+          end
+        else
+          default
         end
 
       _ ->

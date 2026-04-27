@@ -3,6 +3,38 @@ defmodule Ysc.S3ConfigTest do
 
   alias Ysc.S3Config
 
+  describe "custom_public_base_url (Tigris host ignored)" do
+    test "avatars_upload_url uses bucket virtual host when public URL is fly.storage" do
+      previous_base = Application.get_env(:ysc, :s3_base_url)
+      previous_avatars_bucket = Application.get_env(:ysc, :avatars_s3_bucket)
+      previous_avatars_pub = Application.get_env(:ysc, :s3_avatars_public_url)
+
+      on_exit(fn ->
+        for {k, v} <- [
+              {:s3_base_url, previous_base},
+              {:avatars_s3_bucket, previous_avatars_bucket},
+              {:s3_avatars_public_url, previous_avatars_pub}
+            ] do
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_base_url, "https://fly.storage.tigris.dev")
+      Application.put_env(:ysc, :avatars_s3_bucket, "ysc-sandbox-avatars")
+
+      Application.put_env(
+        :ysc,
+        :s3_avatars_public_url,
+        "https://avatars.fly.storage.tigris.dev"
+      )
+
+      assert S3Config.avatars_upload_url() ==
+               "https://ysc-sandbox-avatars.fly.storage.tigris.dev"
+    end
+  end
+
   describe "include_tigris_virtual_host_in_csp?/0" do
     test "is true unless media, avatars, and expense public URLs are all set" do
       keys = [
@@ -44,6 +76,45 @@ defmodule Ysc.S3ConfigTest do
       )
 
       refute S3Config.include_tigris_virtual_host_in_csp?()
+    end
+
+    test "is true when env URLs are only fly.storage hosts (sandbox-style)" do
+      keys = [
+        :s3_media_public_url,
+        :s3_avatars_public_url,
+        :s3_expense_reports_public_url
+      ]
+
+      previous = Enum.map(keys, &Application.get_env(:ysc, &1))
+
+      on_exit(fn ->
+        Enum.zip(keys, previous)
+        |> Enum.each(fn {k, v} ->
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
+        end)
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://ysc-sandbox-assets.fly.storage.tigris.dev"
+      )
+
+      Application.put_env(
+        :ysc,
+        :s3_avatars_public_url,
+        "https://avatars.fly.storage.tigris.dev"
+      )
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https://ysc-sandbox-expense.fly.storage.tigris.dev"
+      )
+
+      assert S3Config.include_tigris_virtual_host_in_csp?()
     end
   end
 

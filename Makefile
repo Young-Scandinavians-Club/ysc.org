@@ -191,7 +191,7 @@ release:  ## Build and tag a docker image for release
 #
 # Local CLI: set tokens from each org (Fly dashboard → Access Tokens), then:
 #   export FLY_SANDBOX_ACCESS_TOKEN=...   # optional if `fly auth login` is the sandbox user
-#   export FLY_PROD_ACCESS_TOKEN=...      # required for shell-prod (do not reuse sandbox token)
+#   export FLY_PROD_ACCESS_TOKEN=...      # optional if `fly auth login` is the production org user (do not reuse sandbox token)
 # If FLY_API_TOKEN is exported in your shell (e.g. for CI), flyctl ignores `fly auth login`.
 # Sandbox targets unset it when FLY_SANDBOX_ACCESS_TOKEN is unset so login works; or run: unset FLY_API_TOKEN
 # Optional org slug checks (from `fly orgs list`) to catch wrong token:
@@ -213,13 +213,14 @@ fly-verify-sandbox:  ## Confirm credentials can access ysc-sandbox (uses FLY_SAN
 	"$(CURDIR)/etc/scripts/fly_verify_app_access.sh" ysc-sandbox "$${FLY_ORG_SANDBOX:-}"
 
 .PHONY: fly-verify-prod
-fly-verify-prod:  ## Confirm FLY_PROD_ACCESS_TOKEN can access ysc-prod
-	@if [ -z "$${FLY_PROD_ACCESS_TOKEN:-}" ]; then \
-	  echo "$(RED)FLY_PROD_ACCESS_TOKEN is not set.$(RESET) Use a Fly token from the production org (not sandbox)." >&2; \
-	  echo "  export FLY_PROD_ACCESS_TOKEN=..." >&2; \
-	  exit 1; \
-	fi
-	@FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}" "$(CURDIR)/etc/scripts/fly_verify_app_access.sh" ysc-prod "$${FLY_ORG_PROD:-}"
+fly-verify-prod:  ## Confirm credentials can access ysc-prod (uses FLY_PROD_ACCESS_TOKEN if set)
+	@set -e; \
+	if [ -n "$${FLY_PROD_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	"$(CURDIR)/etc/scripts/fly_verify_app_access.sh" ysc-prod "$${FLY_ORG_PROD:-}"
 
 .PHONY: deploy-sandbox
 deploy-sandbox: fly-verify-sandbox  ## Deploy the sandbox application to Fly.io
@@ -245,9 +246,15 @@ shell-sandbox: fly-verify-sandbox  ## Open an IEx shell in the sandbox environme
 	fly ssh console -a ysc-sandbox -C "/app/bin/ysc remote"
 
 .PHONY: shell-prod
-shell-prod: fly-verify-prod  ## Open an IEx shell in production (requires FLY_PROD_ACCESS_TOKEN)
+shell-prod: fly-verify-prod  ## Open an IEx shell in production on Fly.io
 	@echo "$(BOLD)Opening IEx console in production...$(RESET)"
-	@FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}" fly ssh console -a ysc-prod -C "/app/bin/ysc remote"
+	@set -e; \
+	if [ -n "$${FLY_PROD_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	fly ssh console -a ysc-prod -C "/app/bin/ysc remote"
 
 ##
 # ~~~ Make Helpers ~~~

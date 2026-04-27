@@ -84,6 +84,15 @@ defmodule Ysc.DataCase do
        }}
     end)
 
+    # Stripe Customer.retrieve: e.g. UserSettingsLive verifies customer exists before setup intents
+    stub(Stripe.CustomerMock, :retrieve, fn id, _opts ->
+      {:ok,
+       %Stripe.Customer{
+         id: id,
+         invoice_settings: %{default_payment_method: nil}
+       }}
+    end)
+
     # Stripe Invoice: return empty list and not-found for retrieve/pay
     stub(Stripe.InvoiceMock, :list, fn _params ->
       {:ok,

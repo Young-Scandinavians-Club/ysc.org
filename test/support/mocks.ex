@@ -5,7 +5,6 @@ Mox.defmock(Ysc.StripeMock, for: Ysc.StripeBehaviour)
 
 # Stripe API mocks for controller testing
 Mox.defmock(Stripe.PaymentMethodMock, for: Ysc.Stripe.PaymentMethodBehaviour)
-Mox.defmock(Stripe.SetupIntentMock, for: Ysc.Stripe.SetupIntentBehaviour)
 Mox.defmock(Stripe.PaymentIntentMock, for: Ysc.Stripe.PaymentIntentBehaviour)
 Mox.defmock(Stripe.InvoiceMock, for: Ysc.Stripe.InvoiceBehaviour)
 

@@ -23,7 +23,7 @@ config :ysc,
 # Configure Stripe mocks for testing
 config :ysc,
   stripe_payment_method_module: Stripe.PaymentMethodMock,
-  stripe_setup_intent_module: Stripe.SetupIntentMock,
+  stripe_setup_intent_module: Ysc.TestStripeSetupIntent,
   stripe_payment_intent_module: Stripe.PaymentIntentMock,
   stripe_customer_module: Stripe.CustomerMock,
   stripe_invoice_module: Stripe.InvoiceMock,
