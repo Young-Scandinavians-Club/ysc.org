@@ -17,7 +17,6 @@ kill_signal = 'SIGTERM'
   release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/migrate && DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/seed'"
 
 [env]
-  RELEASE_COOKIE = 'hTyZjF2x1FiJrX'
   DNS_CLUSTER_QUERY = 'ysc-prod.internal'
   APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID = 'pass.org.ysc.membership'
   APPLE_WALLET_ORG_NAME = 'Young Scandinavians Club'
