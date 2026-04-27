@@ -98,10 +98,12 @@ if config_env() == :prod do
 
   database_url =
     System.get_env("DATABASE_URL") ||
-      raise """
-      environment variable DATABASE_URL is missing.
-      For example: ecto://USER:PASS@HOST/DATABASE
-      """
+      unless fly_release_command?,
+        do:
+          raise("""
+          environment variable DATABASE_URL is missing.
+          For example: ecto://USER:PASS@HOST/DATABASE
+          """)
 
   maybe_ipv6 =
     if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
@@ -126,10 +128,12 @@ if config_env() == :prod do
   # variable instead.
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
-      raise """
-      environment variable SECRET_KEY_BASE is missing.
-      You can generate one by calling: mix phx.gen.secret
-      """
+      unless fly_release_command?,
+        do:
+          raise("""
+          environment variable SECRET_KEY_BASE is missing.
+          You can generate one by calling: mix phx.gen.secret
+          """)
 
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
@@ -334,19 +338,10 @@ if config_env() == :prod do
   stripe_public_key = System.get_env("STRIPE_PUBLIC_KEY")
   stripe_webhook_secret = System.get_env("STRIPE_WEBHOOK_SECRET")
 
-  if stripe_secret && stripe_public_key && stripe_webhook_secret do
-    config :stripity_stripe,
-      api_key: stripe_secret,
-      public_key: stripe_public_key,
-      webhook_secret: stripe_webhook_secret
-  else
-    raise """
-    Missing Stripe credentials. Please set:
-    - STRIPE_SECRET
-    - STRIPE_PUBLIC_KEY
-    - STRIPE_WEBHOOK_SECRET
-    """
-  end
+  config :stripity_stripe,
+    api_key: stripe_secret,
+    public_key: stripe_public_key,
+    webhook_secret: stripe_webhook_secret
 
   # ## Membership Plans Configuration
   #
@@ -451,10 +446,12 @@ if config_env() == :prod do
     # to read from the CLOAK_ENCRYPTION_KEY environment variable.
     _cloak_key =
       System.get_env("CLOAK_ENCRYPTION_KEY") ||
-        raise """
-        Missing CLOAK_ENCRYPTION_KEY environment variable.
-        Generate one with: :crypto.strong_rand_bytes(32) |> Base.encode64()
-        """
+        unless fly_release_command?,
+          do:
+            raise("""
+            Missing CLOAK_ENCRYPTION_KEY environment variable.
+            Generate one with: :crypto.strong_rand_bytes(32) |> Base.encode64()
+            """)
 
     # ## OAuth Configuration
     #

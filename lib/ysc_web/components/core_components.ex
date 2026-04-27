@@ -718,7 +718,7 @@ defmodule YscWeb.CoreComponents do
   def input(%{type: "phone-input"} = assigns) do
     ~H"""
     <div>
-      <.label for={"live_phone-" <> @id}>{@label}</.label>
+      <.label for={"live_phone-tel-" <> @id}>{@label}</.label>
       <.live_component
         module={LivePhone}
         id={@id}

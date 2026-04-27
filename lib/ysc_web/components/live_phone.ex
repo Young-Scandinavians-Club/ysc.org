@@ -65,6 +65,7 @@ defmodule LivePhone do
 
       <input
         type="tel"
+        id={"live_phone-tel-#{@id}"}
         class={[
           "live_phone-input text-zinc-900 border-1 rounded-r w-full focus:ring-0 focus:border-zinc-400 sm:text-sm sm:leading-6 bg-none flex-1",
           @class
