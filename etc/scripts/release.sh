@@ -26,11 +26,25 @@ usage() {
   exit 1
 }
 
+# Latest existing tag (chronological: most recently created), for interactive bump context
+latest_version_tag() {
+  git -C "$PROJECT_ROOT" tag -l --sort=-creatordate 2>/dev/null | head -n 1
+}
+
 # Get tag from argument or prompt
 if [ -n "${1:-}" ]; then
   TAG="$1"
 else
   echo "${BOLD}Create new release${RESET}"
+  echo ""
+  # Best-effort sync of tags so "latest" matches origin when you're online
+  git -C "$PROJECT_ROOT" fetch -q --tags origin 2>/dev/null || true
+  PREV_TAG="$(latest_version_tag)"
+  if [ -n "$PREV_TAG" ]; then
+    echo "${TEAL}Latest tag (most recent, chronological): ${BOLD}${PREV_TAG}${RESET}"
+  else
+    echo "${TEAL}Latest tag (most recent, chronological): ${BOLD}(none yet)${RESET}"
+  fi
   echo ""
   read -rp "Enter version tag (e.g. v1.0.0): " TAG
   if [ -z "$TAG" ]; then

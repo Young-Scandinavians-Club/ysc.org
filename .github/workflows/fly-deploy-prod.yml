@@ -179,12 +179,17 @@ jobs:
           git fetch origin main
           git merge-base --is-ancestor "${{ github.sha }}" origin/main
 
-      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # v1.5
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
 
       - name: Verify Fly token can access production app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-prod
+
+      - name: Verify at least two started machines (rolling deploy)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
+        run: bash etc/scripts/fly_verify_min_started_machines.sh ysc-prod 2
 
       - name: Deploy to Fly.io production
         run: |
