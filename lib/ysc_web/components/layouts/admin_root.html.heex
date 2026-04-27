@@ -5,6 +5,9 @@
     "[scrollbar-gutter:stable]",
     assigns[:sidebar_collapsed] && "sidebar-collapsed"
   ]}
+  data-s3-use-custom-domain={
+    if Ysc.S3Config.use_custom_s3_domain?(), do: "true", else: "false"
+  }
 >
   <head>
     <meta charset="utf-8" />

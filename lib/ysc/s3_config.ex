@@ -18,9 +18,19 @@ defmodule Ysc.S3Config do
   `https://<bucket>.fly.storage.tigris.dev`. Hosts under `*.fly.storage.tigris.dev`
   in env vars are ignored and treated as unset (see `custom_public_base_url/1`).
 
+  **`S3_USE_CUSTOM_DOMAIN`** (runtime `s3_use_custom_domain`): when true, public base URLs
+  are used **verbatim** (after trim) for uploads and objects—no Tigris-host stripping.
+  Combine with Fly `etc/fly/fly-prod.toml` `[env]` so presigned POST targets your CDN host.
+  Root layouts set `data-s3-use-custom-domain` from `use_custom_s3_domain?/0`; the JS uploader
+  rejects `*.fly.storage.tigris.dev` POST URLs when that flag is set.
+
+  **Presign call sites (must use `upload_url/0` / `avatars_upload_url/0` only):**
+  `YscWeb.Live.UserSettingsLive` (avatars), `YscWeb.Live.Admin.AdminMediaLive` (media),
+  `YscWeb.ImageUploadComponent` (media).
+
   | Flow | Elixir | JS |
   | ---- | ------ | -- |
-  | **Presigned POST** (browser → S3) | `YscWeb.S3.SimpleS3Upload` + `upload_url/0` (media) or `avatars_upload_url/0` (avatars) | `assets/js/uploaders.js` — POST `entry.meta.url` only; no hardcoded host |
+  | **Presigned POST** (browser → S3) | `YscWeb.S3.SimpleS3Upload` + `upload_url/0` (media) or `avatars_upload_url/0` (avatars) | `assets/js/uploaders.js` — POST `entry.meta.url` only; validates against `data-s3-use-custom-domain` on `<html>` |
   | **Presigned GET** (redirect to private object) | `ExAws.S3.presigned_url/5` via `expense_report_file_presigned_url_args/2` + `YscWeb.ExpenseReportFileController` | n/a — full navigation |
   | **Server `ExAws.S3.Upload`** | `Ysc.Media.upload_file_to_s3/3`, `Ysc.Avatars.upload_to_s3/3` — return `object_url/…` for `location` | n/a |
   | **CSP** | `YscWeb.Plugs.SecurityHeaders` + `storage_csp_connect_sources/0` | n/a |
@@ -82,12 +92,47 @@ defmodule Ysc.S3Config do
   end
 
   @doc """
+  True when `S3_USE_CUSTOM_DOMAIN` was set at runtime (prod). Public URLs are then taken
+  literally for browser uploads and link generation.
+  """
+  def use_custom_s3_domain? do
+    Application.get_env(:ysc, :s3_use_custom_domain, false) == true
+  end
+
+  @doc """
+  Raises if `S3_USE_CUSTOM_DOMAIN` is enabled but `url` is a Fly Tigris virtual-host origin.
+  Call from LiveView presign callbacks after resolving `upload_url/0` or `avatars_upload_url/0`.
+  """
+  def assert_direct_upload_url!(url, kind)
+      when kind in [:avatars, :media] and is_binary(url) do
+    if use_custom_s3_domain?() do
+      case URI.parse(url) do
+        %URI{host: host} when is_binary(host) ->
+          if host == "fly.storage.tigris.dev" ||
+               String.ends_with?(host, ".fly.storage.tigris.dev") do
+            raise ArgumentError,
+                  "direct S3 upload must use a custom origin when S3_USE_CUSTOM_DOMAIN is enabled (#{kind}); got #{inspect(url)}"
+          end
+
+        _ ->
+          :ok
+      end
+    end
+
+    :ok
+  end
+
+  @doc """
   Origins to add to CSP `connect-src` so LiveView S3 XHR uploads can reach custom domains.
   """
   def storage_csp_connect_sources do
     [media_public_url(), avatars_public_url(), expense_reports_public_url()]
     |> Enum.reject(&(is_nil(&1) or &1 == ""))
-    |> Enum.filter(&(custom_public_base_url(&1) != nil))
+    |> Enum.filter(fn url ->
+      if use_custom_s3_domain?(),
+        do: trimmed_nonempty_public_url(url) != nil,
+        else: custom_public_base_url(url) != nil
+    end)
     |> Enum.map(&csp_connect_origin/1)
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
@@ -151,6 +196,15 @@ defmodule Ysc.S3Config do
 
   defp custom_public_base_url(_), do: nil
 
+  defp trimmed_nonempty_public_url(url) when is_binary(url) do
+    case url |> String.trim() |> String.trim_trailing("/") do
+      "" -> nil
+      t -> t
+    end
+  end
+
+  defp trimmed_nonempty_public_url(_), do: nil
+
   @doc """
   Whether CSP should still allow `https://*.fly.storage.tigris.dev` (and the raw
   `s3_base_url` when it points at Tigris).
@@ -167,10 +221,15 @@ defmodule Ysc.S3Config do
   end
 
   defp all_s3_public_origins_configured? do
-    custom? = fn v -> custom_public_base_url(v) != nil end
+    ok? =
+      if use_custom_s3_domain?() do
+        fn v -> trimmed_nonempty_public_url(v) != nil end
+      else
+        fn v -> custom_public_base_url(v) != nil end
+      end
 
-    custom?.(media_public_url()) and custom?.(avatars_public_url()) and
-      custom?.(expense_reports_public_url())
+    ok?.(media_public_url()) and ok?.(avatars_public_url()) and
+      ok?.(expense_reports_public_url())
   end
 
   @doc """
@@ -194,12 +253,25 @@ defmodule Ysc.S3Config do
   For MinIO: Uses path-style (http://localhost:9000/<bucket>)
   """
   def upload_url do
-    case custom_public_base_url(media_public_url()) do
-      url when is_binary(url) ->
-        url
+    cond do
+      use_custom_s3_domain?() ->
+        case trimmed_nonempty_public_url(media_public_url()) do
+          nil ->
+            raise ArgumentError,
+                  "S3_MEDIA_PUBLIC_BASE_URL is required when S3_USE_CUSTOM_DOMAIN is true"
 
-      _ ->
-        virtual_host_upload_endpoint(bucket_name())
+          url ->
+            url
+        end
+
+      true ->
+        case custom_public_base_url(media_public_url()) do
+          url when is_binary(url) ->
+            url
+
+          _ ->
+            virtual_host_upload_endpoint(bucket_name())
+        end
     end
   end
 
@@ -219,17 +291,31 @@ defmodule Ysc.S3Config do
   origin and **will not match** either site, so uploads fail with CORS in the
   console.
 
-  `S3_*_PUBLIC_BASE_URL` values that point at `*.fly.storage.tigris.dev` are **ignored**
-  (they are not custom domains): the correct raw host is always
-  `https://<AVATARS_BUCKET_NAME>.fly.storage.tigris.dev` when no real custom URL is set.
+  With **`S3_USE_CUSTOM_DOMAIN`**, `S3_AVATARS_PUBLIC_BASE_URL` is required and used as-is.
+
+  Otherwise, `S3_*_PUBLIC_BASE_URL` values under `*.fly.storage.tigris.dev` are ignored in favor
+  of `https://<AVATARS_BUCKET_NAME>.fly.storage.tigris.dev`.
   """
   def avatars_upload_url do
-    case custom_public_base_url(avatars_public_url()) do
-      url when is_binary(url) ->
-        url
+    cond do
+      use_custom_s3_domain?() ->
+        case trimmed_nonempty_public_url(avatars_public_url()) do
+          nil ->
+            raise ArgumentError,
+                  "S3_AVATARS_PUBLIC_BASE_URL is required when S3_USE_CUSTOM_DOMAIN is true"
 
-      _ ->
-        virtual_host_upload_endpoint(avatars_bucket_name())
+          url ->
+            url
+        end
+
+      true ->
+        case custom_public_base_url(avatars_public_url()) do
+          url when is_binary(url) ->
+            url
+
+          _ ->
+            virtual_host_upload_endpoint(avatars_bucket_name())
+        end
     end
   end
 
@@ -335,12 +421,26 @@ defmodule Ysc.S3Config do
   """
   def object_url(key, bucket) do
     key = String.trim_leading(key, "/")
+    raw = public_object_base_for_bucket(bucket)
 
-    case custom_public_base_url(public_object_base_for_bucket(bucket)) do
+    resolved =
+      if use_custom_s3_domain?() do
+        trimmed_nonempty_public_url(raw)
+      else
+        custom_public_base_url(raw)
+      end
+
+    case resolved do
       origin when is_binary(origin) ->
         "#{origin}/#{key}"
 
       _ ->
+        if use_custom_s3_domain?() and is_binary(raw) and
+             trimmed_nonempty_public_url(raw) == nil do
+          raise ArgumentError,
+                "invalid S3 public base URL for bucket #{inspect(bucket)} while S3_USE_CUSTOM_DOMAIN is enabled"
+        end
+
         base = base_url()
 
         case base do
@@ -378,7 +478,12 @@ defmodule Ysc.S3Config do
 
     case expense_reports_public_url() do
       url when is_binary(url) ->
-        if custom_public_base_url(url) do
+        use_host? =
+          if use_custom_s3_domain?(),
+            do: trimmed_nonempty_public_url(url) != nil,
+            else: custom_public_base_url(url) != nil
+
+        if use_host? do
           case parse_public_http_origin!(url) do
             :none ->
               default

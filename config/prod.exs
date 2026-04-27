@@ -27,6 +27,8 @@ config :swoosh, api_client: Swoosh.ApiClient.Finch, finch_name: Ysc.Finch
 # Disable Swoosh Local Memory Storage
 config :swoosh, local: false
 
+config :ysc, s3_use_custom_domain: true
+
 # Mailer configuration is moved to runtime.exs for runtime evaluation
 
 # Do not print debug messages in production

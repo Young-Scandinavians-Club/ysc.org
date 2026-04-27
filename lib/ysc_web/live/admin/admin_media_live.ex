@@ -929,10 +929,13 @@ defmodule YscWeb.AdminMediaLive do
         server_side_encryption: S3Config.server_side_encryption?()
       )
 
+    upload_url = S3Config.upload_url()
+    :ok = S3Config.assert_direct_upload_url!(upload_url, :media)
+
     meta = %{
       uploader: "S3",
       key: key,
-      url: S3Config.upload_url(),
+      url: upload_url,
       fields: fields
     }
 

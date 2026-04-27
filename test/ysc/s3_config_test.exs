@@ -3,17 +3,123 @@ defmodule Ysc.S3ConfigTest do
 
   alias Ysc.S3Config
 
+  describe "assert_direct_upload_url!/2" do
+    test "allows any host when custom domain flag is off" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+      end)
+
+      Application.delete_env(:ysc, :s3_use_custom_domain)
+
+      assert :ok ==
+               S3Config.assert_direct_upload_url!(
+                 "https://y.fly.storage.tigris.dev",
+                 :media
+               )
+    end
+
+    test "rejects fly.storage host when custom domain flag is on" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+
+      assert_raise ArgumentError, fn ->
+        S3Config.assert_direct_upload_url!(
+          "https://y.fly.storage.tigris.dev",
+          :avatars
+        )
+      end
+
+      assert :ok ==
+               S3Config.assert_direct_upload_url!(
+                 "https://avatars.ysc.org",
+                 :avatars
+               )
+    end
+  end
+
+  describe "S3_USE_CUSTOM_DOMAIN (s3_use_custom_domain)" do
+    test "avatars_upload_url uses public URL verbatim when flag is true" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_pub = Application.get_env(:ysc, :s3_avatars_public_url)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+
+        if previous_pub == nil do
+          Application.delete_env(:ysc, :s3_avatars_public_url)
+        else
+          Application.put_env(:ysc, :s3_avatars_public_url, previous_pub)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+
+      Application.put_env(
+        :ysc,
+        :s3_avatars_public_url,
+        "https://avatars.ysc.org"
+      )
+
+      assert S3Config.avatars_upload_url() == "https://avatars.ysc.org"
+    end
+
+    test "avatars_upload_url raises when flag is true but public URL missing" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_pub = Application.get_env(:ysc, :s3_avatars_public_url)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+
+        if previous_pub == nil do
+          Application.delete_env(:ysc, :s3_avatars_public_url)
+        else
+          Application.put_env(:ysc, :s3_avatars_public_url, previous_pub)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.delete_env(:ysc, :s3_avatars_public_url)
+
+      assert_raise ArgumentError, fn -> S3Config.avatars_upload_url() end
+    end
+  end
+
   describe "custom_public_base_url (Tigris host ignored)" do
     test "avatars_upload_url uses bucket virtual host when public URL is fly.storage" do
       previous_base = Application.get_env(:ysc, :s3_base_url)
       previous_avatars_bucket = Application.get_env(:ysc, :avatars_s3_bucket)
       previous_avatars_pub = Application.get_env(:ysc, :s3_avatars_public_url)
+      previous_use_custom = Application.get_env(:ysc, :s3_use_custom_domain)
 
       on_exit(fn ->
         for {k, v} <- [
               {:s3_base_url, previous_base},
               {:avatars_s3_bucket, previous_avatars_bucket},
-              {:s3_avatars_public_url, previous_avatars_pub}
+              {:s3_avatars_public_url, previous_avatars_pub},
+              {:s3_use_custom_domain, previous_use_custom}
             ] do
           if v == nil,
             do: Application.delete_env(:ysc, k),
@@ -21,6 +127,7 @@ defmodule Ysc.S3ConfigTest do
         end
       end)
 
+      Application.delete_env(:ysc, :s3_use_custom_domain)
       Application.put_env(:ysc, :s3_base_url, "https://fly.storage.tigris.dev")
       Application.put_env(:ysc, :avatars_s3_bucket, "ysc-sandbox-avatars")
 

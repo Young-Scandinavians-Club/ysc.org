@@ -60,6 +60,7 @@ kill_signal = 'SIGTERM'
   S3_AVATARS_PUBLIC_BASE_URL = 'https://avatars.ysc.org'
   S3_EXPENSE_REPORTS_PUBLIC_BASE_URL = 'https://expenses.ysc.org'
   S3_MEDIA_PUBLIC_BASE_URL = 'https://assets.ysc.org'
+  S3_USE_CUSTOM_DOMAIN = 'true'
   STRIPE_FAMILY_PRICE_ID = 'price_1TP6efIZd8GkARoBVD9zY8ux'
   STRIPE_SINGLE_PRICE_ID = 'price_1TP6f0IZd8GkARoByyICLSbm'
 

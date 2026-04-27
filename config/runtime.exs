@@ -153,6 +153,116 @@ if config_env() == :prod do
 
   config :ysc, dns_cluster_query: System.get_env("DNS_CLUSTER_QUERY")
 
+  # S3 + ExAws: always applied for prod (including release_command one-offs). This must not
+  # live only inside `unless fly_release_command?`: if RELEASE_COMMAND were set on app VMs, or
+  # the optional block were skipped, `s3_avatars_public_url` / `avatars_s3_bucket` would be
+  # missing and uploads would fall back to https://avatars.fly.storage.tigris.dev (wrong bucket).
+  s3_bucket = System.get_env("BUCKET_NAME") || "media"
+  s3_region = System.get_env("AWS_REGION") || "auto"
+
+  s3_base_url =
+    System.get_env("AWS_ENDPOINT_URL_S3") || "https://fly.storage.tigris.dev"
+
+  trim_public_s3_url = fn
+    nil ->
+      nil
+
+    "" ->
+      nil
+
+    url ->
+      case url |> String.trim() |> String.trim_trailing("/") do
+        "" -> nil
+        trimmed -> trimmed
+      end
+  end
+
+  s3_media_public_url =
+    trim_public_s3_url.(System.get_env("S3_MEDIA_PUBLIC_BASE_URL"))
+
+  s3_avatars_public_url =
+    trim_public_s3_url.(System.get_env("S3_AVATARS_PUBLIC_BASE_URL"))
+
+  s3_expense_reports_public_url =
+    trim_public_s3_url.(System.get_env("S3_EXPENSE_REPORTS_PUBLIC_BASE_URL"))
+
+  s3_use_custom_domain =
+    System.get_env("S3_USE_CUSTOM_DOMAIN") in ~w(true 1 yes)
+
+  sandbox? =
+    System.get_env("ENVIRONMENT") == "sandbox" ||
+      System.get_env("APP_ENV") == "sandbox"
+
+  missing_public =
+    [
+      {"S3_MEDIA_PUBLIC_BASE_URL", s3_media_public_url},
+      {"S3_AVATARS_PUBLIC_BASE_URL", s3_avatars_public_url},
+      {"S3_EXPENSE_REPORTS_PUBLIC_BASE_URL", s3_expense_reports_public_url}
+    ]
+    |> Enum.filter(fn {_, v} -> v in [nil, ""] end)
+    |> Enum.map(&elem(&1, 0))
+
+  # Release command (migrate/seed) may run before all secrets exist; full VMs must have URLs.
+  if not sandbox? and not fly_release_command? and missing_public != [] do
+    raise """
+    Non-sandbox production requires custom public origins for all S3 buckets so clients use HTTPS hosts you control (CORS, CSP), not only *.fly.storage.tigris.dev. \
+    Set in etc/fly/fly-prod.toml [env] or fly secrets: #{Enum.join(missing_public, ", ")}. \
+    With S3_USE_CUSTOM_DOMAIN=true, uploads and object URLs require these (see S3Config). \
+    Remove empty secret overrides if they hide [env] values. \
+    """
+  end
+
+  expense_reports_bucket =
+    System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"
+
+  avatars_bucket =
+    case System.get_env("AVATARS_BUCKET_NAME") do
+      value when is_binary(value) and value != "" ->
+        value
+
+      _ ->
+        if config_env() == :prod,
+          do:
+            raise(
+              "AVATARS_BUCKET_NAME environment variable is required in production"
+            ),
+          else: "avatars"
+    end
+
+  config :ysc,
+    s3_bucket: s3_bucket,
+    s3_region: s3_region,
+    s3_base_url: s3_base_url,
+    s3_media_public_url: s3_media_public_url,
+    s3_avatars_public_url: s3_avatars_public_url,
+    s3_expense_reports_public_url: s3_expense_reports_public_url,
+    s3_use_custom_domain: s3_use_custom_domain,
+    expense_reports_s3_bucket: expense_reports_bucket,
+    avatars_s3_bucket: avatars_bucket,
+    aws_access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
+
+  config :ex_aws,
+    debug_requests: false,
+    json_codec: Jason,
+    access_key_id: {:system, "AWS_ACCESS_KEY_ID"},
+    secret_access_key: {:system, "AWS_SECRET_ACCESS_KEY"}
+
+  uri = URI.parse(s3_base_url)
+  s3_scheme = (uri.scheme || "https") <> "://"
+  s3_host = uri.host || "fly.storage.tigris.dev"
+
+  ex_aws_s3_config =
+    [
+      scheme: s3_scheme,
+      host: s3_host,
+      region: s3_region
+    ]
+    |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
+    |> Enum.reject(fn {_, v} -> is_nil(v) end)
+
+  config :ex_aws, :s3, ex_aws_s3_config
+
   unless fly_release_command? do
     config :phoenix_turnstile,
       site_key: System.fetch_env!("TURNSTILE_SITE_KEY"),
@@ -348,132 +458,6 @@ if config_env() == :prod do
     # Events are routed to POST /webhooks/ses via an SNS subscription.
     # If not set, tracking is disabled and emails are sent without a configuration set.
     config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
-
-    # ## S3 Configuration (Tigris)
-    #
-    # Configure Tigris storage settings (S3-compatible) based on environment variables.
-    # For production: Uses Tigris endpoint (https://fly.storage.tigris.dev)
-    # Object URLs use virtual-hosted style: https://<bucket-name>.fly.storage.tigris.dev/key
-    # Set BUCKET_NAME, AWS_REGION (defaults to "auto" for Tigris), and optionally AWS_ENDPOINT_URL_S3
-    # If AWS_ENDPOINT_URL_S3 is not set, defaults to Tigris endpoint.
-    #
-    # Optional public HTTPS origins for Tigris custom domains (browser uploads + public object URLs).
-    # ExAws continues to use AWS_ENDPOINT_URL_S3; these only affect upload targets, link generation,
-    # presigned GET host (expense bucket), and CSP connect-src.
-    s3_bucket = System.get_env("BUCKET_NAME") || "media"
-    s3_region = System.get_env("AWS_REGION") || "auto"
-
-    s3_base_url =
-      System.get_env("AWS_ENDPOINT_URL_S3") || "https://fly.storage.tigris.dev"
-
-    trim_public_s3_url = fn
-      nil ->
-        nil
-
-      "" ->
-        nil
-
-      url ->
-        case url |> String.trim() |> String.trim_trailing("/") do
-          "" -> nil
-          trimmed -> trimmed
-        end
-    end
-
-    s3_media_public_url =
-      trim_public_s3_url.(System.get_env("S3_MEDIA_PUBLIC_BASE_URL"))
-
-    s3_avatars_public_url =
-      trim_public_s3_url.(System.get_env("S3_AVATARS_PUBLIC_BASE_URL"))
-
-    s3_expense_reports_public_url =
-      trim_public_s3_url.(System.get_env("S3_EXPENSE_REPORTS_PUBLIC_BASE_URL"))
-
-    # Prefer Tigris custom domains for every browser-visible bucket (uploads, `<img src>`, presigned redirects).
-    # Without these, URLs fall back to <bucket>.fly.storage.tigris.dev. Fly secrets override [env] in fly.toml.
-    sandbox? =
-      System.get_env("ENVIRONMENT") == "sandbox" ||
-        System.get_env("APP_ENV") == "sandbox"
-
-    missing_public =
-      [
-        {"S3_MEDIA_PUBLIC_BASE_URL", s3_media_public_url},
-        {"S3_AVATARS_PUBLIC_BASE_URL", s3_avatars_public_url},
-        {"S3_EXPENSE_REPORTS_PUBLIC_BASE_URL", s3_expense_reports_public_url}
-      ]
-      |> Enum.filter(fn {_, v} -> v in [nil, ""] end)
-      |> Enum.map(&elem(&1, 0))
-
-    if not sandbox? and missing_public != [] do
-      raise """
-      Non-sandbox production requires custom public origins for all S3 buckets so clients use HTTPS hosts you control (CORS, CSP), not only *.fly.storage.tigris.dev. \
-      Set in etc/fly/fly-prod.toml [env] or fly secrets: #{Enum.join(missing_public, ", ")}. \
-      Remove empty secret overrides if they hide [env] values. Example: \
-      S3_MEDIA_PUBLIC_BASE_URL, S3_AVATARS_PUBLIC_BASE_URL, S3_EXPENSE_REPORTS_PUBLIC_BASE_URL. \
-      """
-    end
-
-    # Store S3 config for application use
-    expense_reports_bucket =
-      System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"
-
-    avatars_bucket =
-      case System.get_env("AVATARS_BUCKET_NAME") do
-        value when is_binary(value) and value != "" ->
-          value
-
-        _ ->
-          if config_env() == :prod,
-            do:
-              raise(
-                "AVATARS_BUCKET_NAME environment variable is required in production"
-              ),
-            else: "avatars"
-      end
-
-    config :ysc,
-      s3_bucket: s3_bucket,
-      s3_region: s3_region,
-      s3_base_url: s3_base_url,
-      s3_media_public_url: s3_media_public_url,
-      s3_avatars_public_url: s3_avatars_public_url,
-      s3_expense_reports_public_url: s3_expense_reports_public_url,
-      expense_reports_s3_bucket: expense_reports_bucket,
-      avatars_s3_bucket: avatars_bucket,
-      aws_access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
-      aws_secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
-
-    # Configure ExAws for S3 access to Tigris
-    # Following Tigris documentation format
-    # IMPORTANT: These credentials are used for ALL S3 operations including:
-    # - Media bucket uploads/downloads
-    # - Expense reports bucket uploads/downloads
-    # Ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY have appropriate permissions:
-    # - Read/Write access to the media bucket
-    # - Read/Write access to the expense-reports bucket
-    config :ex_aws,
-      debug_requests: false,
-      json_codec: Jason,
-      access_key_id: {:system, "AWS_ACCESS_KEY_ID"},
-      secret_access_key: {:system, "AWS_SECRET_ACCESS_KEY"}
-
-    # Configure ExAws S3 endpoint
-    # Dev/Test: Uses MinIO (localhost:9000, path-style)
-    # Production: Uses Tigris endpoint (fly.storage.tigris.dev for Fly, or t3.storage.dev for general Tigris)
-    uri = URI.parse(s3_base_url)
-    s3_scheme = (uri.scheme || "https") <> "://"
-    s3_host = uri.host || "fly.storage.tigris.dev"
-
-    ex_aws_s3_config =
-      [
-        scheme: s3_scheme,
-        host: s3_host,
-        region: s3_region
-      ]
-      |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
-      |> Enum.reject(fn {_, v} -> is_nil(v) end)
-
-    config :ex_aws, :s3, ex_aws_s3_config
 
     # Discord alerts configuration
     config :ysc, Ysc.Alerts.Discord,
