@@ -3,6 +3,50 @@ defmodule Ysc.S3ConfigTest do
 
   alias Ysc.S3Config
 
+  describe "include_tigris_virtual_host_in_csp?/0" do
+    test "is true unless media, avatars, and expense public URLs are all set" do
+      keys = [
+        :s3_media_public_url,
+        :s3_avatars_public_url,
+        :s3_expense_reports_public_url
+      ]
+
+      previous = Enum.map(keys, &Application.get_env(:ysc, &1))
+
+      on_exit(fn ->
+        Enum.zip(keys, previous)
+        |> Enum.each(fn {k, v} ->
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
+        end)
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://assets.example.com"
+      )
+
+      Application.put_env(
+        :ysc,
+        :s3_avatars_public_url,
+        "https://avatars.example.com"
+      )
+
+      Application.delete_env(:ysc, :s3_expense_reports_public_url)
+      assert S3Config.include_tigris_virtual_host_in_csp?()
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https://expenses.example.com"
+      )
+
+      refute S3Config.include_tigris_virtual_host_in_csp?()
+    end
+  end
+
   describe "bucket_name/0" do
     test "returns bucket name" do
       bucket = S3Config.bucket_name()
@@ -143,6 +187,40 @@ defmodule Ysc.S3ConfigTest do
              )
 
       assert String.ends_with?(url, "path/to/file.png")
+    end
+
+    test "object_url/2 uses bucket name, not a virtual-hosted endpoint hostname label" do
+      previous_base = Application.get_env(:ysc, :s3_base_url)
+      previous_bucket = Application.get_env(:ysc, :s3_bucket)
+
+      on_exit(fn ->
+        if previous_base == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous_base)
+        end
+
+        if previous_bucket == nil do
+          Application.delete_env(:ysc, :s3_bucket)
+        else
+          Application.put_env(:ysc, :s3_bucket, previous_bucket)
+        end
+      end)
+
+      # Endpoint already virtual-hosted for avatars; media URLs must still use media bucket.
+      Application.put_env(
+        :ysc,
+        :s3_base_url,
+        "https://ysc-prod-avatars.fly.storage.tigris.dev"
+      )
+
+      Application.put_env(:ysc, :s3_bucket, "ysc-prod-assets")
+
+      assert S3Config.object_url("media/x.jpg", "ysc-prod-assets") ==
+               "https://ysc-prod-assets.fly.storage.tigris.dev/media/x.jpg"
+
+      assert S3Config.upload_url() ==
+               "https://ysc-prod-assets.fly.storage.tigris.dev"
     end
 
     test "upload_url falls back to Tigris virtual host when base URL is blank" do

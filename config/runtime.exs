@@ -389,19 +389,27 @@ if config_env() == :prod do
     s3_expense_reports_public_url =
       trim_public_s3_url.(System.get_env("S3_EXPENSE_REPORTS_PUBLIC_BASE_URL"))
 
-    # Browser uploads POST to `avatars_upload_url/0`. Without a public base URL, that host is
-    # <bucket>.fly.storage.tigris.dev (XHR CORS often fails there even when the custom domain works).
-    # Fly secrets override [env] in fly.toml — an empty secret can clear this and force the fallback.
+    # Prefer Tigris custom domains for every browser-visible bucket (uploads, `<img src>`, presigned redirects).
+    # Without these, URLs fall back to <bucket>.fly.storage.tigris.dev. Fly secrets override [env] in fly.toml.
     sandbox? =
       System.get_env("ENVIRONMENT") == "sandbox" ||
         System.get_env("APP_ENV") == "sandbox"
 
-    if not sandbox? and s3_avatars_public_url in [nil, ""] do
+    missing_public =
+      [
+        {"S3_MEDIA_PUBLIC_BASE_URL", s3_media_public_url},
+        {"S3_AVATARS_PUBLIC_BASE_URL", s3_avatars_public_url},
+        {"S3_EXPENSE_REPORTS_PUBLIC_BASE_URL", s3_expense_reports_public_url}
+      ]
+      |> Enum.filter(fn {_, v} -> v in [nil, ""] end)
+      |> Enum.map(&elem(&1, 0))
+
+    if not sandbox? and missing_public != [] do
       raise """
-      S3_AVATARS_PUBLIC_BASE_URL is required for non-sandbox production (e.g. https://avatars.ysc.org). \
-      If the browser posts to *.fly.storage.tigris.dev, this variable is unset in the running VM. \
-      Set it in etc/fly/fly-prod.toml [env], or remove an empty override: fly secrets unset S3_AVATARS_PUBLIC_BASE_URL, \
-      then redeploy. Verify: fly ssh console -a ysc-prod -C 'printenv S3_AVATARS_PUBLIC_BASE_URL' \
+      Non-sandbox production requires custom public origins for all S3 buckets so clients use HTTPS hosts you control (CORS, CSP), not only *.fly.storage.tigris.dev. \
+      Set in etc/fly/fly-prod.toml [env] or fly secrets: #{Enum.join(missing_public, ", ")}. \
+      Remove empty secret overrides if they hide [env] values. Example: \
+      S3_MEDIA_PUBLIC_BASE_URL, S3_AVATARS_PUBLIC_BASE_URL, S3_EXPENSE_REPORTS_PUBLIC_BASE_URL. \
       """
     end
 

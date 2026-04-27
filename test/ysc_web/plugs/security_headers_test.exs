@@ -159,6 +159,58 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
     assert String.contains?(csp, "https://cdn.example.com")
   end
 
+  test "omits Tigris virtual-host wildcard from connect-src when all S3 public URLs are set" do
+    Application.put_env(:ysc, :environment, :prod)
+    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    Application.put_env(:ysc, :s3_base_url, "https://fly.storage.tigris.dev")
+
+    keys = [
+      :s3_media_public_url,
+      :s3_avatars_public_url,
+      :s3_expense_reports_public_url
+    ]
+
+    previous = Enum.map(keys, &Application.get_env(:ysc, &1))
+
+    on_exit(fn ->
+      Enum.zip(keys, previous)
+      |> Enum.each(fn {k, v} ->
+        if v == nil,
+          do: Application.delete_env(:ysc, k),
+          else: Application.put_env(:ysc, k, v)
+      end)
+    end)
+
+    Application.put_env(
+      :ysc,
+      :s3_media_public_url,
+      "https://assets.example.com"
+    )
+
+    Application.put_env(
+      :ysc,
+      :s3_avatars_public_url,
+      "https://avatars.example.com"
+    )
+
+    Application.put_env(
+      :ysc,
+      :s3_expense_reports_public_url,
+      "https://expenses.example.com"
+    )
+
+    conn =
+      conn(:get, "/")
+      |> assign(:csp_nonce, "x")
+      |> SecurityHeaders.call([])
+
+    [csp] = get_resp_header(conn, "content-security-policy")
+    assert String.contains?(csp, "https://assets.example.com")
+    assert String.contains?(csp, "https://avatars.example.com")
+    assert String.contains?(csp, "https://expenses.example.com")
+    refute String.contains?(csp, "fly.storage.tigris.dev")
+  end
+
   test "adds S3 public storage URLs to connect-src for custom Tigris domains" do
     Application.put_env(:ysc, :environment, :prod)
     Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
