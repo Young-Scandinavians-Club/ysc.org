@@ -251,19 +251,22 @@ defmodule YscWeb.Plugs.SecurityHeaders do
 
   # Get S3 storage URLs that should be allowed for connect operations (uploads)
   defp get_s3_connect_sources do
+    include_tigris = S3Config.include_tigris_virtual_host_in_csp?()
     base_url = S3Config.base_url()
-    sources = []
 
     sources =
-      if base_url && base_url != "" do
-        add_base_url_source(sources, base_url)
+      if include_tigris && base_url && base_url != "" do
+        add_base_url_source([], base_url)
       else
-        sources
+        []
       end
 
     sources =
-      ["https://*.fly.storage.tigris.dev" | sources]
-      |> Enum.uniq()
+      if include_tigris do
+        ["https://*.fly.storage.tigris.dev" | sources] |> Enum.uniq()
+      else
+        sources
+      end
 
     sources =
       if Application.get_env(:ysc, YscWeb.Endpoint)[:code_reloader] == true do
@@ -309,19 +312,22 @@ defmodule YscWeb.Plugs.SecurityHeaders do
 
   # Get S3 storage URLs that should be allowed for images
   defp get_s3_image_sources do
+    include_tigris = S3Config.include_tigris_virtual_host_in_csp?()
     base_url = S3Config.base_url()
-    sources = []
 
     sources =
-      if base_url && base_url != "" do
-        add_base_url_source(sources, base_url)
+      if include_tigris && base_url && base_url != "" do
+        add_base_url_source([], base_url)
       else
-        sources
+        []
       end
 
     sources =
-      ["https://*.fly.storage.tigris.dev" | sources]
-      |> Enum.uniq()
+      if include_tigris do
+        ["https://*.fly.storage.tigris.dev" | sources] |> Enum.uniq()
+      else
+        sources
+      end
 
     sources =
       if Application.get_env(:ysc, YscWeb.Endpoint)[:code_reloader] == true do

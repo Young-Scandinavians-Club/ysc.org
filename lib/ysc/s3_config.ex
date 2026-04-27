@@ -12,6 +12,10 @@ defmodule Ysc.S3Config do
   persist raw `*.fly.storage.tigris.dev` URLs from ExAws response bodies when a
   custom public base is configured.
 
+  In non-sandbox production, configure **all three** public base URLs so uploads,
+  links, and CSP prefer your HTTPS hostnames; `*.fly.storage.tigris.dev` is only a
+  fallback when any of those are unset (see `include_tigris_virtual_host_in_csp?/0`).
+
   | Flow | Elixir | JS |
   | ---- | ------ | -- |
   | **Presigned POST** (browser → S3) | `YscWeb.S3.SimpleS3Upload` + `upload_url/0` (media) or `avatars_upload_url/0` (avatars) | `assets/js/uploaders.js` — POST `entry.meta.url` only; no hardcoded host |
@@ -111,6 +115,25 @@ defmodule Ysc.S3Config do
   end
 
   @doc """
+  Whether CSP should still allow `https://*.fly.storage.tigris.dev` (and the raw
+  `s3_base_url` when it points at Tigris).
+
+  When **media**, **avatars**, and **expense** public base URLs are all set, browsers
+  should only talk to those custom origins for S3-facing flows, so the virtual-host
+  wildcard can be omitted for a tighter policy.
+  """
+  def include_tigris_virtual_host_in_csp? do
+    not all_s3_public_origins_configured?()
+  end
+
+  defp all_s3_public_origins_configured? do
+    nonempty? = fn v -> is_binary(v) and String.trim(v) != "" end
+
+    nonempty?.(media_public_url()) and nonempty?.(avatars_public_url()) and
+      nonempty?.(expense_reports_public_url())
+  end
+
+  @doc """
   Returns the S3 base URL for the current environment.
   For MinIO (dev/test): http://localhost:9000
   For production: Uses Tigris endpoint (https://fly.storage.tigris.dev)
@@ -179,17 +202,47 @@ defmodule Ysc.S3Config do
         base_url = String.trim_trailing(url, "/")
 
         if String.contains?(base_url, "tigris.dev") do
-          base_url
-          |> String.replace(
-            "fly.storage.tigris.dev",
-            "#{bucket}.fly.storage.tigris.dev"
-          )
+          tigris_bucket_virtual_host_url(bucket)
         else
           "#{base_url}/#{bucket}"
         end
 
       _ ->
-        "https://#{bucket}.fly.storage.tigris.dev"
+        tigris_bucket_virtual_host_url(bucket)
+    end
+  end
+
+  # Fly Tigris virtual-hosted URLs are always https://<bucket>.fly.storage.tigris.dev
+  # (scheme / non-default port may come from AWS_ENDPOINT_URL_S3). Do not derive the
+  # bucket label from the configured endpoint host: if the endpoint is already virtual-hosted
+  # (e.g. .../ysc-prod-avatars.fly.storage.tigris.dev) but this call is for another bucket,
+  # String.replace would produce a malformed double subdomain.
+  defp tigris_bucket_virtual_host_url(bucket) when is_binary(bucket) do
+    {scheme, port_frag} = tigris_scheme_and_port_frag()
+
+    "#{scheme}://#{bucket}.fly.storage.tigris.dev#{port_frag}"
+  end
+
+  defp tigris_scheme_and_port_frag do
+    case base_url() do
+      url when is_binary(url) and url != "" ->
+        u = url |> String.trim_trailing("/") |> URI.parse()
+
+        scheme =
+          if u.scheme in ["http", "https"], do: u.scheme, else: "https"
+
+        frag =
+          case u.port do
+            nil -> ""
+            80 -> ""
+            443 -> ""
+            p -> ":#{p}"
+          end
+
+        {scheme, frag}
+
+      _ ->
+        {"https", ""}
     end
   end
 
@@ -256,20 +309,13 @@ defmodule Ysc.S3Config do
             base_url = String.trim_trailing(url, "/")
 
             if String.contains?(base_url, "tigris.dev") do
-              virtual_hosted_url =
-                base_url
-                |> String.replace(
-                  "fly.storage.tigris.dev",
-                  "#{bucket}.fly.storage.tigris.dev"
-                )
-
-              "#{virtual_hosted_url}/#{key}"
+              "#{tigris_bucket_virtual_host_url(bucket)}/#{key}"
             else
               "#{base_url}/#{bucket}/#{key}"
             end
 
           _ ->
-            "https://#{bucket}.fly.storage.tigris.dev/#{key}"
+            "#{tigris_bucket_virtual_host_url(bucket)}/#{key}"
         end
     end
   end
