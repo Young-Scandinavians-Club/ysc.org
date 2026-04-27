@@ -234,6 +234,32 @@ deploy-sandbox: fly-verify-sandbox  ## Deploy the sandbox application to Fly.io
 	fi; \
 	fly deploy --dockerfile $(DOCKER_DIR)/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --image-label $(VERSION_LONG) --build-arg BUILD_VERSION=$(VERSION_LONG)
 
+.PHONY: deploy-prod
+deploy-prod: fly-verify-prod  ## Deploy production to Fly (ensures 2+ started machines first; same prep as CI)
+	@echo "$(BOLD)Ensuring at least 2 started machines on ysc-prod...$(RESET)"
+	@set -e; \
+	if [ -n "$${FLY_PROD_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	"$(CURDIR)/etc/scripts/fly_ensure_min_started_machines.sh" ysc-prod 2
+	@echo "$(BOLD)Deploying production application to Fly.io...$(RESET)"
+	@echo "$(BOLD)Version: $(VERSION_LONG)$(RESET)"
+	@set -e; \
+	if [ -n "$${FLY_PROD_ACCESS_TOKEN:-}" ]; then \
+	  export FLY_API_TOKEN="$${FLY_PROD_ACCESS_TOKEN}"; \
+	else \
+	  unset FLY_API_TOKEN; \
+	fi; \
+	fly deploy \
+	  --dockerfile $(DOCKER_DIR)/Dockerfile \
+	  -a ysc-prod \
+	  -c etc/fly/fly-prod.toml \
+	  --local-only \
+	  --build-arg BUILD_VERSION=$(VERSION_LONG) \
+	  --image-label $(VERSION_LONG)
+
 .PHONY: shell-sandbox
 shell-sandbox: fly-verify-sandbox  ## Open an IEx shell in the sandbox environment on Fly.io
 	@echo "$(BOLD)Opening IEx console in sandbox environment...$(RESET)"
