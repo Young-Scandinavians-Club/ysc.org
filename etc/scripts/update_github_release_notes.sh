@@ -10,6 +10,8 @@
 #   OPENROUTER_REFERER              (optional)  HTTP-Referer for OpenRouter (default: this repo on GitHub)
 #   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 20)
 #   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 40; use after git scope)
+#   OPENROUTER_SMALL_RELEASE_MAX_COMMITS (opt.)  if previous tag exists and rev-list --count PREV..TAG is at most this, do not
+#                                   cap LLM input (no OPENROUTER_MAX_* trim; per-PR body fetch up to 1M chars) (default: 8; 0 disables)
 #   When a previous v* tag exists, PRs are scoped by git (PREV..TAG), not only by merge timestamps on GitHub
 #   DRY_RUN                         (optional)  if 1, print notes to stdout; skip GitHub release API
 #
@@ -130,6 +132,73 @@ pr_numbers_from_rev_range() {
   rm -f "$_lf"
 }
 
+# PR numbers from GitHub's "pull requests associated with a commit" API for each commit in a..b.
+# Catches squashes/rebases where the subject has no "(#NN)"; avoids relying on a broad merged-date search.
+# Exits 0; prints one number per line, sorted -u. Caps API calls to avoid rate limits.
+pr_numbers_from_commits_api() {
+  local a="${1:-}" b="${2:-}"
+  if [ -z "$a" ] || [ -z "$b" ]; then
+    return 0
+  fi
+  if ! git -C "$PROJECT_ROOT" rev-parse --verify "$a^{commit}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! git -C "$PROJECT_ROOT" rev-parse --verify "$b^{commit}" >/dev/null 2>&1; then
+    return 0
+  fi
+  local token n_shas resp
+  token=$(github_token)
+  n_shas=0
+  while IFS= read -r _sha; do
+    [ -z "$_sha" ] && continue
+    n_shas=$((n_shas + 1))
+    if [ "$n_shas" -gt 100 ]; then
+      break
+    fi
+    if ! resp=$(
+      curl -fsS \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${token}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "${GITHUB_API}/repos/${REPO_SLUG}/commits/${_sha}/pulls" 2>/dev/null
+    ); then
+      continue
+    fi
+    echo "$resp" | jq -r '.[] | .number' 2>/dev/null
+  done < <(git -C "$PROJECT_ROOT" log --format=%H "${a}..${b}" 2>/dev/null) | sort -n -u
+}
+
+# JSON array of { "subject": "..." } for each commit in a..b (for LLM when no PRs are in scope).
+commits_in_range_json() {
+  local a="${1:-}" b="${2:-}"
+  if [ -z "$a" ] || [ -z "$b" ]; then
+    echo '[]'
+    return 0
+  fi
+  git -C "$PROJECT_ROOT" log --format=%s "${a}..${b}" 2>/dev/null | jq -R -s 'split("\n") | map(select(length>0) | {subject: .})'
+}
+
+# Write OpenRouter user payload: merged_pull_requests (array). When the PR list is empty and
+# range is set, include commits_in_range from git; otherwise commits_in_range is [].
+write_openrouter_input_file() {
+  local out="$1" prs_jsonf="$2" range_from="${3:-}" range_to="${4:-}"
+  local npr cj
+  npr=$(jq 'length' "$prs_jsonf" 2>/dev/null) || npr=0
+  if [ "$npr" -eq 0 ] && [ -n "$range_from" ] && [ -n "$range_to" ]; then
+    cj=$(commits_in_range_json "$range_from" "$range_to")
+  else
+    cj='[]'
+  fi
+  if ! jq -n --argjson prs "$(cat "$prs_jsonf")" --argjson c "$cj" \
+    '{
+       merged_pull_requests: $prs,
+       commits_in_range: $c
+     }' >"$out"; then
+    return 1
+  fi
+  return 0
+}
+
 # Return JSON array of merged PRs in the time window, using GitHub search (paginated, max 1000).
 # Merges pages via temp files — jq --argjson on a large growing string exceeds argv (ARG_MAX) in CI.
 search_merged_prs() {
@@ -206,8 +275,10 @@ search_merged_prs() {
 }
 
 # Fetches merged PRs by number into a JSON array file (for when id-list ⊄ timestamp search result).
+# Optional 3rd arg: max body length before truncation in JSON (default 2000). Use a large value when not capping LLM input.
 rebuild_pr_file_from_fetched() {
   local outf="$1" numsf="$2"
+  local body_max="${3:-2000}"
   local token n resp line
   token=$(github_token)
   local _nd
@@ -229,9 +300,9 @@ rebuild_pr_file_from_fetched() {
       continue
     fi
     line=$(
-      echo "$resp" | jq -c '{
+      echo "$resp" | jq -c --argjson lim "$body_max" '{
         number, title, author: .user.login, url: .html_url,
-        body: ((.body // "") | if length > 2000 then .[0:2000] + "..." else . end)
+        body: ((.body // "") | if length > $lim then .[0:$lim] + "..." else . end)
       }'
     )
     echo "$line" >>"$_nd"
@@ -247,11 +318,18 @@ rebuild_pr_file_from_fetched() {
 
 # Rewrites the PR JSON file in place so the OpenRouter request stays within model limits (and avoids
 # HTTP 402 from oversized prompts or from hitting free-tier / credit limits for huge chats).
+# Optional 2nd arg: if 1, do not apply caps (for very small tag ranges with few commits).
 pr_json_shrink_for_openrouter() {
   local f="$1"
+  local no_cap="${2:-0}"
   local max_bodies max_prs n
   max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-20}
   max_prs=${OPENROUTER_MAX_PRS:-40}
+  if [ "$no_cap" = "1" ]; then
+    max_bodies=999999
+    max_prs=999999
+    echo "${TEAL}Small release: not applying OPENROUTER_MAX_PRS / OPENROUTER_MAX_FULL_PR_BODIES trim.${RESET}" >&2
+  fi
   n=$(jq 'length' "$f")
 
   if [ "$n" -gt "$max_bodies" ]; then
@@ -267,7 +345,7 @@ pr_json_shrink_for_openrouter() {
   fi
 }
 
-# pr_data_path: file containing a JSON array of PR objects (avoids argv size limits for large lists).
+# pr_data_path: JSON object { merged_pull_requests, commits_in_range } (see write_openrouter_input_file).
 openrouter_changelog() {
   local pr_data_path="$1"
   local version="$2"
@@ -275,13 +353,18 @@ openrouter_changelog() {
   local system
   system="You write SHORT GitHub release notes in Markdown for one version.
 
-The JSON lists pull requests that belong in this version only. Summarize the user-visible impact; do not produce a full catalog of every line item.
+The user JSON has merged_pull_requests and commits_in_range (git commit subjects in this tag range, newest first). These are the ONLY sources: do not mention features, tickets, or areas not supported by the PR titles/bodies or commit subjects you were given. Never invent product areas, past releases, or themes that do not appear in the data.
+
+Scoping rules (strict):
+- If merged_pull_requests is non-empty: use PR titles and short bodies (when present) as the primary source. You may use commits_in_range only as a tie-break or to phrase titles; it must not add new themes beyond the PRs.
+- If merged_pull_requests is empty and commits_in_range is non-empty: summarize SOLELY from those commit subjects (and version bump / chore lines). One short H2 and a few bullets; match the real scope. Do not invent work not in those subjects.
+- If both are empty: one sentence, e.g. no merged PRs or commits in range.
 
 Output rules (strict):
-- Default: at most one short H2, then 3–6 bullets (single level). If there are 1–2 PRs, 1 short paragraph is fine. Never more than about 200 words.
-- If there are more than 8 PRs, group by theme in at most 3–4 bullets (e.g. one bullet per theme, comma-separated or short phrases). Do not use nested Added/Fixed/Changed each with long sub-bullets.
-- Mention at most 2–3 PR numbers in total, only where helpful. Do not list a dozen (#NNN) in one line.
-- Do not invent work not implied by the PR titles/descriptions. If the list is empty, one sentence: no PRs in scope. Output Markdown only, no preamble or code fences around the whole text."
+- Default: at most one short H2, then 3–6 bullets (single level). If there are 1–2 items, 1 short paragraph is fine. Never more than about 200 words.
+- If there are more than 8 PRs, group by theme in at most 3–4 bullets. Do not use nested Added/Fixed/Changed each with long sub-bullets.
+- Mention at most 2–3 PR numbers in total, only where helpful.
+- Output Markdown only, no preamble or code fences around the whole text."
 
   local referer req_tmp
   referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
@@ -293,19 +376,20 @@ Output rules (strict):
     --arg sys "$system" \
     --arg ver "$version" \
     --arg prev "${prev_version:-<none: first v* release>}" \
-    --rawfile prs "$pr_data_path" \
+    --rawfile payload "$pr_data_path" \
     '
-    ($prs | fromjson) as $prlist
+    ($payload | fromjson) as $p
     | {
         model: $model,
         messages: [
           { role: "system", content: $sys },
           { role: "user", content: (
               {
-                instruction: "Write short user-facing release notes (see system rules). The PR list is already scoped to this version.",
+                instruction: "Write short user-facing release notes (see system rules).",
                 new_version: $ver,
                 previous_version_tag: $prev,
-                merged_pull_requests: $prlist
+                merged_pull_requests: ($p.merged_pull_requests // []),
+                commits_in_range: ($p.commits_in_range // [])
               } | tojson
             ) }
         ]
@@ -440,49 +524,53 @@ echo "${TEAL}Repository: $REPO_SLUG  Tag: $TAG${RESET}"
 
 PREV_TAG=$(find_previous_v_tag "$TAG")
 t_end=$(ref_timestamp "$TAG")
+
+# How many commits land between tags? Very small ranges skip OPENROUTER_MAX_* caps and widen PR body fetch.
+COMMIT_IN_RELEASE=0
+NO_CAP=0
+PR_BODY_MAX=2000
+if [ -n "$PREV_TAG" ]; then
+  COMMIT_IN_RELEASE=$(git -C "$PROJECT_ROOT" rev-list --count "$PREV_TAG".."$TAG" 2>/dev/null || echo 0)
+  # OPENROUTER_SMALL_RELEASE_MAX_COMMITS=0 means never auto-relax (always use caps and 2k PR bodies)
+  _sr_max="${OPENROUTER_SMALL_RELEASE_MAX_COMMITS:-8}"
+  if [ "$_sr_max" != "0" ] && [ "$COMMIT_IN_RELEASE" -le "$_sr_max" ]; then
+    NO_CAP=1
+    PR_BODY_MAX=1000000
+  fi
+  echo "${TEAL}Commits in ${PREV_TAG}..${TAG}: ${COMMIT_IN_RELEASE} (auto skip LLM input caps when ≤${_sr_max} commits, enabled: $([ "$NO_CAP" = "1" ] && echo yes || echo no))${RESET}" >&2
+else
+  echo "${TEAL}No previous v* tag; standard LLM input caps and 2k PR body fetch apply.${RESET}" >&2
+fi
+
 pr_file=$(mktemp)
+or_payload=$(mktemp)
 notes_tmp=$(mktemp)
-nums_f=""
+NUMS_F=""
 # shellcheck disable=SC2064
-trap 'rm -f "$pr_file" "$notes_tmp" "$nums_f" "${pr_file}.bak" 2>/dev/null' EXIT
+trap 'rm -f "$pr_file" "$or_payload" "$notes_tmp" "${pr_file}.bak" "${NUMS_F:-}" 2>/dev/null' EXIT
 
 if [ -n "$PREV_TAG" ]; then
-  t_start=$(ref_timestamp "$PREV_TAG")
   echo "${TEAL}Previous tag: $PREV_TAG${RESET}"
-  search_merged_prs "$REPO_SLUG" "$t_start" "$t_end" >"$pr_file"
-
-  nums_f=$(mktemp)
-  pr_numbers_from_rev_range "$PREV_TAG" "$TAG" >"$nums_f"
-  n_git=$(wc -l <"$nums_f" 2>/dev/null | tr -d ' ' || true)
-  if [ "${n_git:-0}" -gt 0 ]; then
-    before=$(jq 'length' "$pr_file" 2>/dev/null) || before=0
-    nums_json=$(jq -R -s 'split("\n") | map(select(test("^[0-9]+$")) | tonumber)' <"$nums_f")
-    n_allow=$(echo "$nums_json" | jq 'length' 2>/dev/null) || n_allow=0
-    if [ "$n_allow" -gt 0 ]; then
-      cp "$pr_file" "${pr_file}.bak"
-      if jq --argjson allow "$nums_json" 'map(select(.number as $n | ($allow | index($n)) != null))' "$pr_file" >"${pr_file}.f" && mv "${pr_file}.f" "$pr_file"; then
-        after=$(jq 'length' "$pr_file" 2>/dev/null) || after=0
-        echo "${TEAL}git log ${PREV_TAG}..${TAG}: ${n_git} PR#(s) in commit messages -> ${after} row(s) after intersecting GitHub search (search had ${before}).${RESET}" >&2
-        if [ "$after" -gt 0 ]; then
-          rm -f "${pr_file}.bak"
-        else
-          if [ "$n_git" -le 200 ] && rebuild_pr_file_from_fetched "$pr_file" "$nums_f"; then
-            echo "${TEAL}No intersection with search; built PR list from the GitHub API by number.${RESET}" >&2
-            rm -f "${pr_file}.bak"
-          else
-            mv "${pr_file}.bak" "$pr_file"
-            echo "${TEAL}Falling back to full merged-timestamp list (if this is too wide, check squash/rebase commit messages for (#NN) or merge subjects).${RESET}" >&2
-          fi
-        fi
-      else
-        rm -f "${pr_file}.bak" 2>/dev/null
-      fi
+  NUMS_F=$(mktemp)
+  {
+    pr_numbers_from_rev_range "$PREV_TAG" "$TAG"
+    pr_numbers_from_commits_api "$PREV_TAG" "$TAG"
+  } | sort -n -u | sed '/^$/d' >"$NUMS_F"
+  n_nums=$(wc -l <"$NUMS_F" 2>/dev/null | tr -d ' ' || true)
+  n_nums=${n_nums:-0}
+  if [ "$n_nums" -gt 0 ]; then
+    if rebuild_pr_file_from_fetched "$pr_file" "$NUMS_F" "$PR_BODY_MAX"; then
+      echo "${TEAL}Scope ${PREV_TAG}..${TAG}: ${n_nums} PR id(s) (git + commit→PR API) -> $(jq 'length' "$pr_file") merged PR(s) fetched from API.${RESET}" >&2
+    else
+      echo "${YELLOW}Could not build PR list from ids; using commit-only release notes (no wide merged-date search).${RESET}" >&2
+      echo '[]' >"$pr_file"
     fi
   else
-    echo "${TEAL}No (#NN) or Merge pull request #NN in git log ${PREV_TAG}..${TAG} — using merged-timestamp search only (broader).${RESET}" >&2
+    echo "${TEAL}No PR numbers in ${PREV_TAG}..${TAG} (log + commit-PR API) — release notes from git commits only (not merged-PR time window).${RESET}" >&2
+    echo '[]' >"$pr_file"
   fi
-  rm -f "$nums_f"
-  nums_f=""
+  rm -f "$NUMS_F"
+  NUMS_F=""
 else
   echo "${TEAL}No previous v* tag; bounding PRs from repository root to this tag.${RESET}"
   search_merged_prs "$REPO_SLUG" "" "$t_end" >"$pr_file"
@@ -491,10 +579,16 @@ fi
 PR_COUNT=$(jq 'length' "$pr_file")
 echo "${TEAL}PR rows for the LLM: $PR_COUNT${RESET}" >&2
 
-pr_json_shrink_for_openrouter "$pr_file"
-echo "${TEAL}Sending $(jq 'length' "$pr_file") PRs to OpenRouter (model: ${OPENROUTER_MODEL}).${RESET}"
+pr_json_shrink_for_openrouter "$pr_file" "$NO_CAP"
 
-openrouter_changelog "$pr_file" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
+if [ -n "$PREV_TAG" ]; then
+  write_openrouter_input_file "$or_payload" "$pr_file" "$PREV_TAG" "$TAG"
+else
+  write_openrouter_input_file "$or_payload" "$pr_file" "" ""
+fi
+echo "${TEAL}Sending OpenRouter request (model: ${OPENROUTER_MODEL}, PRs: $(jq '.merged_pull_requests | length' "$or_payload"), commits_in_range: $(jq '.commits_in_range | length' "$or_payload")).${RESET}" >&2
+
+openrouter_changelog "$or_payload" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "${TEAL}DRY_RUN=1 — not updating GitHub release.${RESET}"
