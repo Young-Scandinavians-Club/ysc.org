@@ -384,7 +384,7 @@ defmodule YscWeb.UserRegistrationLive do
               </.inputs_for>
             </div>
 
-            <Turnstile.widget appearance="interaction-only" />
+            <Turnstile.widget appearance="interaction-only" theme="light" />
 
             <div
               id="registration-actions"

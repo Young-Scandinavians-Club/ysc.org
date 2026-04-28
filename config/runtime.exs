@@ -25,6 +25,15 @@ config :ysc, :flowroute,
   secret_key: System.get_env("FLOWROUTE_SECRET_KEY"),
   from_number: System.get_env("FLOWROUTE_FROM_NUMBER")
 
+# Radar Maps — publishable key must be resolved at runtime so release builds pick up RADAR_PUBLIC_KEY
+# from the host (Fly secrets, etc.). Reading it only in config.exs would bake in the dev default at compile time.
+config :ysc, :radar,
+  public_key:
+    System.get_env(
+      "RADAR_PUBLIC_KEY",
+      "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966"
+    )
+
 # ## Email Address Configuration
 #
 # Configure email addresses for outgoing emails and contact information.
