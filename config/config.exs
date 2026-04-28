@@ -162,12 +162,8 @@ config :stripity_stripe, :retries,
   base_backoff: 500,
   max_backoff: 2_000
 
-config :ysc, :radar,
-  public_key:
-    System.get_env(
-      "RADAR_PUBLIC_KEY",
-      "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966"
-    )
+# Radar publishable key — set in config/runtime.exs so releases read RADAR_PUBLIC_KEY at VM start
+# (compile-time env in config.exs is empty during Docker build and would bake in the test default).
 
 # Email configuration defaults for dev/test environments
 # Production runtime configuration is in config/runtime.exs

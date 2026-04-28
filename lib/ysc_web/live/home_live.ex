@@ -261,11 +261,16 @@ defmodule YscWeb.HomeLive do
         <%!-- Constrained content block on mobile for balanced measure and centering --%>
         <div class="mx-auto w-full max-w-2xl md:max-w-none flex flex-col items-center">
           <div class="max-w-full">
-            <span class="block font-serif italic text-xl sm:text-2xl md:text-2xl lg:text-4xl mb-3 sm:mb-4 text-white/80 font-light tracking-tight">
+            <span class={[
+              "block font-serif italic text-xl sm:text-2xl md:text-2xl lg:text-4xl mb-3 sm:mb-4 text-white/80 font-light tracking-tight",
+              "[@media(max-height:600px)]:hidden"
+            ]}>
               Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years of
             </span>
-            <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-9xl font-black text-white drop-shadow-2xl break-words hyphens-auto max-w-full leading-tight">
-              Young Scandinavians Club
+            <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-9xl font-black text-white drop-shadow-2xl max-w-full leading-tight">
+              <span class="block whitespace-nowrap">Young</span>
+              <span class="block whitespace-nowrap">Scandinavians</span>
+              <span class="block whitespace-nowrap">Club</span>
             </h1>
           </div>
 
@@ -293,7 +298,7 @@ defmodule YscWeb.HomeLive do
           </div>
 
           <%!-- Stats as a single grouped unit on mobile for visual balance --%>
-          <div class="mt-10 sm:mt-12 md:mt-16 w-full max-w-none mx-auto px-0 py-0">
+          <div class="hidden md:block mt-10 sm:mt-12 md:mt-16 w-full max-w-none mx-auto px-0 py-0">
             <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:gap-8 text-white/70">
               <div class="text-center min-w-0 flex-none basis-auto">
                 <div class="text-2xl sm:text-3xl font-bold text-white">500+</div>
@@ -1081,7 +1086,7 @@ defmodule YscWeb.HomeLive do
                 </.button>
               </div>
               <%!-- Invisible Turnstile verification --%>
-              <Turnstile.widget appearance="interaction-only" />
+              <Turnstile.widget appearance="interaction-only" theme="light" />
             </div>
             <p
               :if={@newsletter_error}

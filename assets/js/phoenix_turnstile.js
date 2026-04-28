@@ -28,6 +28,7 @@ export const Turnstile = {
     mounted() {
         waitForTurnstile(() => {
             turnstile.render(this.el, {
+                theme: "light",
                 callback: callbackEvent(this, "success"),
                 "error-callback": callbackEvent(this, "error"),
                 "expired-callback": callbackEvent(this, "expired"),
