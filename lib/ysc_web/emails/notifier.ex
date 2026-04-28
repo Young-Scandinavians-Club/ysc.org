@@ -76,6 +76,8 @@ defmodule YscWeb.Emails.Notifier do
     "event_update_notification" => YscWeb.Emails.EventUpdateNotification
   }
 
+  # Legacy call sites pass the configurable reply-to address as the 8th argument (binary).
+  # New call sites pass keyword options (reply_to:, cc:, etc.).
   def schedule_email(
         recipient,
         idempotency_key,
@@ -84,7 +86,41 @@ defmodule YscWeb.Emails.Notifier do
         variables,
         text_body,
         user_id,
-        opts \\ []
+        reply_to_or_opts \\ []
+      )
+
+  def schedule_email(
+        recipient,
+        idempotency_key,
+        subject,
+        template,
+        variables,
+        text_body,
+        user_id,
+        reply_to
+      )
+      when is_binary(reply_to) or is_nil(reply_to) do
+    schedule_email(
+      recipient,
+      idempotency_key,
+      subject,
+      template,
+      variables,
+      text_body,
+      user_id,
+      reply_to: reply_to
+    )
+  end
+
+  def schedule_email(
+        recipient,
+        idempotency_key,
+        subject,
+        template,
+        variables,
+        text_body,
+        user_id,
+        opts
       )
       when is_list(opts) do
     reply_to_override = Keyword.get(opts, :reply_to)
