@@ -249,7 +249,9 @@ defmodule YscWeb.NewsletterArchiveLive do
           </.button>
         </div>
 
-        <Turnstile.widget appearance="interaction-only" theme="light" />
+        <div class="mt-3 w-full flex justify-center">
+          <Turnstile.widget appearance="interaction-only" theme="light" />
+        </div>
 
         <p :if={@newsletter_error} class="mt-3 text-sm text-red-600" role="alert">
           {@newsletter_error}
