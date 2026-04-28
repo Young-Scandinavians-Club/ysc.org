@@ -6,7 +6,7 @@ defmodule YscWeb.LayoutsTest do
   alias YscWeb.Layouts
 
   describe "toasts_sync_with_flash/1" do
-    test "promotes Welcome back info into a dedicated toast and strips info flash" do
+    test "promotes Welcome back info into a dedicated toast and keeps info flash for LiveToast" do
       msg = "Welcome back, friend"
 
       assert {toasts, flash} =
@@ -16,7 +16,7 @@ defmodule YscWeb.LayoutsTest do
                })
 
       assert [%LiveToast{title: "Welcome back! 👋", msg: ^msg}] = toasts
-      refute Map.has_key?(flash, "info")
+      assert flash["info"] == msg
     end
 
     test "promotes flash with title for info, error, and warning" do
@@ -34,9 +34,12 @@ defmodule YscWeb.LayoutsTest do
                })
 
       assert length(toasts) == 3
-      refute Map.has_key?(flash, "info")
-      refute Map.has_key?(flash, "error")
-      refute Map.has_key?(flash, "warning")
+      assert flash["info"] == "i"
+      assert flash["error"] == "e"
+      assert flash["warning"] == "w"
+      assert flash["info_toast_title"] == "It"
+      assert flash["error_toast_title"] == "Et"
+      assert flash["warning_toast_title"] == "Wt"
     end
 
     test "normalizes atom flash keys when promoting" do
@@ -45,7 +48,8 @@ defmodule YscWeb.LayoutsTest do
                  flash: %{info: "hello", info_toast_title: "T"}
                })
 
-      refute Map.has_key?(flash, "info")
+      assert flash["info"] == "hello"
+      assert flash["info_toast_title"] == "T"
     end
 
     test "prepends promoted toasts to existing toasts_sync" do
