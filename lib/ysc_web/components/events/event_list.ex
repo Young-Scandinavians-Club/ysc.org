@@ -222,7 +222,9 @@ defmodule YscWeb.EventsListLive do
               Read Latest News <.icon name="hero-newspaper" class="w-5 h-5 ml-2" />
             </.link>
             <.link
-              navigate={~p"/contact"}
+              navigate={
+                ~p"/contact?subject=Events&message=#{URI.encode("Hi, I have an idea for an event I'd love to host with YSC. Here's what I had in mind: ")}"
+              }
               class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-white border border-zinc-200 text-zinc-600 rounded-md font-bold hover:bg-zinc-50 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2"
             >
               Suggest an Event

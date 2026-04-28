@@ -22,13 +22,26 @@ usage() {
   echo ""
   echo "After push, CI deploys ysc-prod from etc/fly/fly-prod.toml (tag must be v*)."
   echo ""
-  echo "TAG: Version tag (e.g. v1.0.0 or 1.0.0). If not provided, will prompt."
+  echo "TAG: Version tag (e.g. v1.0.0 or 1.0.0). If not provided, prompts (default: minor bump from latest tag)."
   exit 1
 }
 
 # Latest existing tag (chronological: most recently created), for interactive bump context
 latest_version_tag() {
   git -C "$PROJECT_ROOT" tag -l --sort=-creatordate 2>/dev/null | head -n 1
+}
+
+# Next minor from semver core x.y.z in a tag (e.g. v1.2.3 -> 1.3.0). No prior tag or unparseable -> 0.1.0
+suggest_next_minor() {
+  local tag="${1:-}"
+  local base="${tag#v}"
+  if [[ "$base" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+    local major="${BASH_REMATCH[1]}"
+    local minor="${BASH_REMATCH[2]}"
+    echo "${major}.$((minor + 1)).0"
+  else
+    echo "0.1.0"
+  fi
 }
 
 # Get tag from argument or prompt
@@ -45,11 +58,13 @@ else
   else
     echo "${TEAL}Latest tag (most recent, chronological): ${BOLD}(none yet)${RESET}"
   fi
+  DEFAULT_MIX="$(suggest_next_minor "$PREV_TAG")"
+  DEFAULT_GIT_TAG="v${DEFAULT_MIX}"
   echo ""
-  read -rp "Enter version tag (e.g. v1.0.0): " TAG
+  echo "${TEAL}Default is a minor bump: ${BOLD}${DEFAULT_GIT_TAG}${RESET} — press ${BOLD}Enter${RESET} to use it, or type another version (e.g. v1.0.0 or 1.0.0)."
+  read -rp "Version tag: " TAG
   if [ -z "$TAG" ]; then
-    echo "${RED}Error: Tag cannot be empty${RESET}"
-    exit 1
+    TAG="$DEFAULT_GIT_TAG"
   fi
 fi
 

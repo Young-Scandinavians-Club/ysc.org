@@ -6005,13 +6005,19 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
 
   defmodule NotifierScheduleError do
     @moduledoc false
-    def schedule_email(_, _, _, _, _, _, _),
+    def schedule_email(a, b, c, d, e, f, g),
+      do: schedule_email(a, b, c, d, e, f, g, nil)
+
+    def schedule_email(_, _, _, _, _, _, _, _),
       do: {:error, :coverage_schedule_failed}
   end
 
   defmodule NotifierScheduleRaise do
     @moduledoc false
-    def schedule_email(_, _, _, _, _, _, _),
+    def schedule_email(a, b, c, d, e, f, g),
+      do: schedule_email(a, b, c, d, e, f, g, nil)
+
+    def schedule_email(_, _, _, _, _, _, _, _),
       do: raise("coverage notifier raise")
   end
 

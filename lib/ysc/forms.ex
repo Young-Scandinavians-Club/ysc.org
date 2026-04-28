@@ -6,6 +6,7 @@ defmodule Ysc.Forms do
   """
   require Ysc.Logging
   import Ecto.Query, warn: false
+  alias Ysc.Forms.ContactForm
   alias Ysc.Repo
 
   defp email_notifier do
@@ -322,12 +323,15 @@ defmodule Ysc.Forms do
         contact_form_id: contact_form.id
       )
 
+      board_cc = ContactForm.department_cc_for_subject(contact_form.subject)
+
       board_result =
         email_notifier().schedule_email_to_board(
           board_idempotency_key,
           "New Contact Form: #{contact_form.subject}",
           "contact_form_board_notification",
-          board_variables
+          board_variables,
+          board_cc
         )
 
       case board_result do
