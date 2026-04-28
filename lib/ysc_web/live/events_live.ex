@@ -44,7 +44,7 @@ defmodule YscWeb.EventsLive do
               <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
                 Upcoming Events
               </h4>
-              <p class="text-sm text-zinc-600 leading-relaxed">
+              <p class="text-base text-zinc-600 leading-relaxed">
                 Explore our curated calendar of events. From social gatherings to cultural celebrations, there's always something happening at YSC.
               </p>
             </div>
