@@ -10,6 +10,11 @@ defmodule YscWeb.Layouts do
   have a custom title (from redirects via YscWeb.Flash) into full toasts with
   title and icon. Welcome-back message gets a dedicated title and icon.
   Uses stable UUIDs for promoted toasts so re-renders don't duplicate.
+
+  Flash keys for promoted messages are **left in** `flash` passed to `toast_group`. The
+  bundled `LiveToast.LiveComponent` merges each `toasts_sync` item with the matching
+  flash entry, streams the rich toast, then clears that flash key—if we stripped here
+  first, redirect toasts (e.g. OAuth errors) would never match and would not render.
   """
   def toasts_sync_with_flash(assigns) do
     base = assigns[:toasts_sync] || []
@@ -18,16 +23,16 @@ defmodule YscWeb.Layouts do
 
     info_msg = flash["info"]
 
-    {toasts_sync, flash} =
+    {toasts_sync, flash_out} =
       if info_msg && is_binary(info_msg) &&
            String.contains?(info_msg, "Welcome back") do
-        {[welcome_toast(info_msg) | base], Map.delete(flash, "info")}
+        {[welcome_toast(info_msg) | base], flash}
       else
         promoted = promote_flash_to_toasts(flash)
-        {promoted ++ base, strip_promoted_keys(flash, promoted)}
+        {promoted ++ base, flash}
       end
 
-    {toasts_sync, flash}
+    {toasts_sync, flash_out}
   end
 
   defp welcome_toast(info_msg) do
@@ -63,18 +68,6 @@ defmodule YscWeb.Layouts do
       else
         []
       end
-    end)
-  end
-
-  defp strip_promoted_keys(flash, []), do: flash
-
-  defp strip_promoted_keys(flash, promoted) do
-    Enum.reduce(promoted, flash, fn %LiveToast{kind: kind}, acc ->
-      key = to_string(kind)
-
-      acc
-      |> Map.delete(key)
-      |> Map.delete("#{key}_toast_title")
     end)
   end
 
