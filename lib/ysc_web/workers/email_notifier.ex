@@ -53,7 +53,8 @@ defmodule YscWeb.Workers.EmailNotifier do
           text_body: text_body,
           user_id: user_id,
           category: category,
-          reply_to: Map.get(args, "reply_to")
+          reply_to: Map.get(args, "reply_to"),
+          cc: Map.get(args, "cc")
         }
 
         perform_with_args(email_params)
@@ -83,7 +84,8 @@ defmodule YscWeb.Workers.EmailNotifier do
               text_body: text_body,
               user_id: user_id,
               category: category,
-              reply_to: Map.get(legacy_args, "reply_to")
+              reply_to: Map.get(legacy_args, "reply_to"),
+              cc: Map.get(legacy_args, "cc")
             }
 
             perform_with_args(email_params)
@@ -162,7 +164,7 @@ defmodule YscWeb.Workers.EmailNotifier do
             atomized_params,
             params.text_body,
             final_user_id,
-            params[:reply_to]
+            email_send_opts(params)
           )
 
         case result do
@@ -242,6 +244,16 @@ defmodule YscWeb.Workers.EmailNotifier do
   def atomize_keys(other) do
     other
   end
+
+  defp email_send_opts(params) do
+    []
+    |> maybe_put_send_opt(:reply_to, params[:reply_to])
+    |> maybe_put_send_opt(:cc, params[:cc])
+  end
+
+  defp maybe_put_send_opt(kw, _key, nil), do: kw
+  defp maybe_put_send_opt(kw, _key, ""), do: kw
+  defp maybe_put_send_opt(kw, key, val), do: Keyword.put(kw, key, val)
 
   # Normalize recipient to a string format
   # Handles cases where recipient might be a list, tuple, or other format

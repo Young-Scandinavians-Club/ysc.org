@@ -84,8 +84,12 @@ defmodule YscWeb.Emails.Notifier do
         variables,
         text_body,
         user_id,
-        reply_to_override \\ nil
-      ) do
+        opts \\ []
+      )
+      when is_list(opts) do
+    reply_to_override = Keyword.get(opts, :reply_to)
+    cc = Keyword.get(opts, :cc)
+
     reply_to =
       reply_to_override || Ysc.Accounts.EmailCategories.get_reply_to(template)
 
@@ -97,7 +101,7 @@ defmodule YscWeb.Emails.Notifier do
       variables,
       text_body,
       user_id,
-      reply_to
+      %{reply_to: reply_to, cc: cc}
     )
   end
 
@@ -116,7 +120,8 @@ defmodule YscWeb.Emails.Notifier do
       template,
       variables,
       text_body,
-      nil
+      nil,
+      []
     )
   end
 
@@ -128,7 +133,7 @@ defmodule YscWeb.Emails.Notifier do
          variables,
          text_body,
          user_id,
-         reply_to
+         %{reply_to: reply_to, cc: cc}
        ) do
     category = Ysc.Accounts.EmailCategories.get_category(template)
 
@@ -144,10 +149,9 @@ defmodule YscWeb.Emails.Notifier do
     }
 
     job_args =
-      case reply_to do
-        nil -> base_job_args
-        rt -> Map.put(base_job_args, "reply_to", rt)
-      end
+      base_job_args
+      |> put_reply_to_job_arg(reply_to)
+      |> put_cc_job_arg(cc)
 
     job = YscWeb.Workers.EmailNotifier.new(job_args)
 
@@ -177,7 +181,24 @@ defmodule YscWeb.Emails.Notifier do
     end
   end
 
-  def schedule_email_to_board(idempotency_key, subject, template, variables) do
+  defp put_reply_to_job_arg(args, nil), do: args
+
+  defp put_reply_to_job_arg(args, reply_to),
+    do: Map.put(args, "reply_to", reply_to)
+
+  defp put_cc_job_arg(args, nil), do: args
+  defp put_cc_job_arg(args, ""), do: args
+  defp put_cc_job_arg(args, cc) when is_binary(cc), do: Map.put(args, "cc", cc)
+
+  def schedule_email_to_board(
+        idempotency_key,
+        subject,
+        template,
+        variables,
+        cc \\ nil
+      ) do
+    board_opts = if(cc, do: [cc: cc], else: [])
+
     schedule_email(
       from_email(),
       idempotency_key,
@@ -185,7 +206,8 @@ defmodule YscWeb.Emails.Notifier do
       template,
       variables,
       "",
-      nil
+      nil,
+      board_opts
     )
   end
 
@@ -197,8 +219,12 @@ defmodule YscWeb.Emails.Notifier do
         variables,
         text_body,
         user_id,
-        reply_to \\ nil
-      ) do
+        opts \\ []
+      )
+      when is_list(opts) do
+    reply_to = Keyword.get(opts, :reply_to)
+    cc = Keyword.get(opts, :cc)
+
     rendered = template.render(variables)
     template_name = template.get_template_name()
 
@@ -218,6 +244,7 @@ defmodule YscWeb.Emails.Notifier do
       |> from({from_name(), from_email()})
       |> subject(subject)
       |> maybe_reply_to(reply_to)
+      |> add_cc_recipients(cc)
       |> html_body(rendered)
       |> text_body(text_body)
 
@@ -228,6 +255,12 @@ defmodule YscWeb.Emails.Notifier do
 
   defp maybe_reply_to(email, reply_to) when is_binary(reply_to),
     do: reply_to(email, reply_to)
+
+  defp add_cc_recipients(email, nil), do: email
+  defp add_cc_recipients(email, ""), do: email
+
+  defp add_cc_recipients(email, cc) when is_binary(cc),
+    do: Swoosh.Email.cc(email, cc)
 
   def send_email_idempotent(
         recipient,
@@ -244,7 +277,8 @@ defmodule YscWeb.Emails.Notifier do
       template,
       variables,
       text_body,
-      nil
+      nil,
+      []
     )
   end
 
@@ -256,7 +290,8 @@ defmodule YscWeb.Emails.Notifier do
       template,
       variables,
       "",
-      nil
+      nil,
+      []
     )
   end
 

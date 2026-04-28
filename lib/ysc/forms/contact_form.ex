@@ -24,6 +24,24 @@ defmodule Ysc.Forms.ContactForm do
     timestamps()
   end
 
+  @department_cc_emails %{
+    "Choir" => "choir@ysc.org",
+    "Tahoe Cabin" => "tahoe@ysc.org",
+    "Clear Lake Cabin" => "cl@ysc.org",
+    "Membership" => "memberships@ysc.org",
+    "Events" => "events@ysc.org",
+    "Website" => "webtech@ysc.org",
+    "Board of Directors" => "board@ysc.org"
+  }
+
+  @doc """
+  Returns the department address to CC on board notifications for a contact
+  subject line, or `nil` when there is no routed address.
+  """
+  def department_cc_for_subject(subject) when is_binary(subject) do
+    Map.get(@department_cc_emails, subject)
+  end
+
   @doc false
   def changeset(contact_form, attrs) do
     contact_form

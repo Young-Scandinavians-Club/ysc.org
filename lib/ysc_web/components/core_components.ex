@@ -2982,7 +2982,7 @@ defmodule YscWeb.CoreComponents do
         aria-hidden="true"
       />
 
-      <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 pt-12 pb-12 sm:pt-14 sm:pb-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
+      <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 pt-20 pb-12 sm:pt-20 sm:pb-14 md:pt-16 md:pb-16 text-center text-white box-border flex flex-col items-center justify-center">
         <h1
           :if={@title != []}
           class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-lg"

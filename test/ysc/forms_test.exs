@@ -366,6 +366,59 @@ defmodule Ysc.FormsTest do
         )
       end)
     end
+
+    test "board notification job CCs department address for routed subject", %{
+      user: user
+    } do
+      attrs = %{
+        name: "Choir Test",
+        email: "choir-contact@example.com",
+        subject: "Choir",
+        message:
+          "This is a test message with enough characters to pass validation.",
+        user_id: user.id
+      }
+
+      changeset =
+        Ysc.Forms.ContactForm.changeset(%Ysc.Forms.ContactForm{}, attrs)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _contact} = Forms.create_contact_form(changeset)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "contact_form_board_notification",
+            "cc" => "choir@ysc.org"
+          }
+        )
+      end)
+    end
+
+    test "board notification job omits CC for general inquiry subject", %{
+      user: user
+    } do
+      attrs = %{
+        name: "General Test",
+        email: "general@example.com",
+        subject: "General Inquiry",
+        message:
+          "This is a test message with enough characters to pass validation.",
+        user_id: user.id
+      }
+
+      changeset =
+        Ysc.Forms.ContactForm.changeset(%Ysc.Forms.ContactForm{}, attrs)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _contact} = Forms.create_contact_form(changeset)
+
+        assert [job] =
+                 all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+
+        refute Map.has_key?(job.args, "cc")
+      end)
+    end
   end
 
   describe "create_volunteer/1 email jobs" do
@@ -690,7 +743,7 @@ defmodule Ysc.FormsTest.EmailScheduleErrorPaths do
     def schedule_email(_, _, _, _, _, _),
       do: {:error, :stubbed_schedule_failure}
 
-    def schedule_email_to_board(_, _, _, _),
+    def schedule_email_to_board(_, _, _, _, _ \\ nil),
       do: {:error, :stubbed_schedule_failure}
   end
 
@@ -792,35 +845,37 @@ defmodule Ysc.FormsTest.NotifierSuccessAndPartialErrors do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: %Oban.Job{id: 11}
 
-    def schedule_email_to_board(_, _, _, _), do: %Oban.Job{id: 22}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil), do: %Oban.Job{id: 22}
   end
 
   defmodule NotifierConfirmFailsBoardOk do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: {:error, :confirmation_failed}
 
-    def schedule_email_to_board(_, _, _, _), do: %Oban.Job{id: 33}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil), do: %Oban.Job{id: 33}
   end
 
   defmodule NotifierConfirmOkBoardFails do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: %Oban.Job{id: 44}
 
-    def schedule_email_to_board(_, _, _, _), do: {:error, :board_failed}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil),
+      do: {:error, :board_failed}
   end
 
   defmodule NotifierRaisesOnSchedule do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: raise("notifier boom")
 
-    def schedule_email_to_board(_, _, _, _), do: %Oban.Job{id: 1}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil), do: %Oban.Job{id: 1}
   end
 
   defmodule NotifierRaisesOnBoardOnly do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: %Oban.Job{id: 1}
 
-    def schedule_email_to_board(_, _, _, _), do: raise("board notifier boom")
+    def schedule_email_to_board(_, _, _, _, _ \\ nil),
+      do: raise("board notifier boom")
   end
 
   defp with_notifier(module, fun) do
