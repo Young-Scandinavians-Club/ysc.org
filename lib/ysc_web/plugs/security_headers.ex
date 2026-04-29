@@ -88,7 +88,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
          "'unsafe-eval'",
          "https://js.stripe.com",
          "https://*.js.stripe.com",
-         "https://js.radar.com/v4.4.8/radar.min.js",
+         "https://js.radar.com/v5.1.0/radar.min.js",
+         "https://js.radar.com/maps/v1.0.0/radar-maps.min.js",
          "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js",
          "https://challenges.cloudflare.com",
          "https://static.cloudflareinsights.com"
@@ -114,7 +115,8 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         "'nonce-#{nonce}'",
         "https://js.stripe.com",
         "https://*.js.stripe.com",
-        "https://js.radar.com/v4.4.8/radar.min.js",
+        "https://js.radar.com/v5.1.0/radar.min.js",
+        "https://js.radar.com/maps/v1.0.0/radar-maps.min.js",
         "https://unpkg.com/glightbox@3.3.1/dist/js/glightbox.min.js",
         "https://challenges.cloudflare.com",
         "https://static.cloudflareinsights.com"
@@ -130,7 +132,7 @@ defmodule YscWeb.Plugs.SecurityHeaders do
         "'self'",
         # Required for inline style attributes and <style> tags
         "'unsafe-inline'",
-        "https://js.radar.com/v4.4.8/radar.css",
+        "https://js.radar.com/maps/v1.0.0/radar-maps.css",
         "https://unpkg.com/glightbox@3.3.1/dist/css/glightbox.min.css",
         # MJML NIF injects Ubuntu font from Google Fonts into compiled email HTML;
         # the admin email preview iframe loads this stylesheet.

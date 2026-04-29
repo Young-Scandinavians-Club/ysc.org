@@ -60,6 +60,9 @@ defmodule YscWeb.Endpoint do
       gzip: true,
       brotli: true,
       only: YscWeb.static_paths(),
+      # Digested root icons use the first path segment as `favicon-<digest>.ico`, etc.
+      # `:only` matches exact segment names only; `:only_matching` allows those prefixes.
+      only_matching: ~w(favicon apple-touch-icon android-chrome),
       # Aggressive caching for Cloudflare - Phoenix digest ensures all assets are hashed
       # 1 year cache (31536000 seconds) with immutable flag since hashed assets never change
       cache_control_for_etags: "public, max-age=31536000, immutable"

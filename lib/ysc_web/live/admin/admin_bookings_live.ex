@@ -2642,6 +2642,14 @@ defmodule YscWeb.AdminBookingsLive do
                       </div>
                     </div>
                     <div class="text-right ml-4">
+                      <div class="text-sm text-zinc-600 mb-2">
+                        <span class="font-medium text-zinc-700">
+                          Total booking:
+                        </span>
+                        {MoneyHelper.format_money!(
+                          pending_refund.booking.total_price
+                        )}
+                      </div>
                       <div class="text-lg font-semibold text-zinc-900 mb-1">
                         Policy Refund: {MoneyHelper.format_money!(
                           pending_refund.policy_refund_amount

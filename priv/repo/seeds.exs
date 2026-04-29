@@ -2324,7 +2324,7 @@ if tahoe_buyout_policy do
         refund_percentage: Decimal.new("50"),
         description:
           "Reservations cancelled less than 21 days prior to date of arrival are subject to forfeiture of 50% of the cost",
-        priority: 0
+        priority: 1
       })
 
     _ ->
@@ -2384,7 +2384,7 @@ if tahoe_room_policy do
         refund_percentage: Decimal.new("50"),
         description:
           "Reservations cancelled less than 14 days prior to date of arrival are subject to forfeiture of 50% of the cost",
-        priority: 0
+        priority: 1
       })
 
     _ ->

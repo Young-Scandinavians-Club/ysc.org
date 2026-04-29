@@ -1,8 +1,55 @@
 import { loadScript, loadStylesheet } from "./load_external_asset";
 
+/** Radar Web SDK core bundle — https://docs.radar.com/maps/maps */
+const RADAR_VERSION = "5.1.0";
+
+/** Maps plugin — registers `Radar.ui`; required from Radar SDK v5+ (core SDK alone has no `Radar.ui`). */
+const RADAR_MAPS_VERSION = "1.0.0";
+
+/**
+ * Radar serves glyph PBFs at paths like `/fonts/Graphik Regular,Noto Sans Regular/0-255.pbf`.
+ * Some Radar API deployments return 500 when commas/spaces are left unencoded in the path.
+ * Rewriting only Radar `/fonts/*.pbf` URLs keeps tiles/sprites untouched.
+ *
+ * @param {string} url
+ * @returns {{ url: string }}
+ */
+function radarGlyphTransformRequest(url) {
+    try {
+        const u = new URL(url);
+        if (!u.hostname.endsWith("api.radar.io")) return { url };
+        if (!u.pathname.endsWith(".pbf") || !u.pathname.includes("/fonts/")) return { url };
+
+        const marker = "/fonts/";
+        const start = u.pathname.indexOf(marker);
+        if (start === -1) return { url };
+
+        const afterFonts = u.pathname.slice(start + marker.length);
+        const slashIdx = afterFonts.indexOf("/");
+        if (slashIdx === -1) return { url };
+
+        const fontstack = afterFonts.slice(0, slashIdx);
+        const rest = afterFonts.slice(slashIdx);
+
+        if (!/[,\s]/.test(fontstack)) return { url };
+
+        const encodedFontstack = encodeURIComponent(fontstack);
+        const newPath =
+            u.pathname.slice(0, start + marker.length) + encodedFontstack + rest;
+
+        u.pathname = newPath;
+        return { url: u.toString() };
+    } catch {
+        return { url };
+    }
+}
+
 export default RadarMap = {
     async mounted() {
-        loadStylesheet("radar-css", "https://js.radar.com/v4.4.8/radar.css");
+        loadStylesheet(
+            "radar-maps-css",
+            `https://js.radar.com/maps/v${RADAR_MAPS_VERSION}/radar-maps.css`,
+        );
 
         if (!window.radarPublicKey) {
             window.radarPublicKey = document.querySelector("meta[name='radar-public-key']")?.getAttribute("content");
@@ -41,17 +88,51 @@ export default RadarMap = {
         });
 
         try {
-            await loadScript("radar-js", "https://js.radar.com/v4.4.8/radar.min.js");
+            await loadScript("radar-js", `https://js.radar.com/v${RADAR_VERSION}/radar.min.js`);
+            await loadScript(
+                "radar-maps-js",
+                `https://js.radar.com/maps/v${RADAR_MAPS_VERSION}/radar-maps.min.js`,
+            );
         } catch (e) {
             console.error("Radar failed to load:", e);
             return;
         }
 
         const radarKey = window.radarPublicKey || "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966";
+
+        const radarSetupError =
+            "Radar Maps plugin is missing: load radar-maps.min.js after radar.min.js (see Radar docs).";
+
+        if (!window.Radar || typeof window.Radar.initialize !== "function") {
+            console.error(radarSetupError);
+            return;
+        }
+
         window.Radar.initialize(radarKey);
 
-        map = Radar.ui.map({
+        if (!window.Radar.ui?.map) {
+            console.error(radarSetupError);
+            return;
+        }
+
+        map = window.Radar.ui.map({
             container: elementID,
+            transformRequest: radarGlyphTransformRequest,
+        });
+
+        // Radar styles sometimes reference sprite icons (e.g. "viewpoint") not present for every zoom/style combo.
+        map.on("styleimagemissing", (e) => {
+            try {
+                if (e.id !== "viewpoint") return;
+                if (typeof map.hasImage === "function" && map.hasImage(e.id)) return;
+                map.addImage(e.id, {
+                    width: 1,
+                    height: 1,
+                    data: new Uint8Array(4),
+                });
+            } catch {
+                /* ignore — avoid breaking map load */
+            }
         });
 
         const verifyMarker = (marker) => {

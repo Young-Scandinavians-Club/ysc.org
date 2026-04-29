@@ -748,7 +748,10 @@ defmodule YscWeb.BookingReceiptLive do
                             Full Buyout
                             ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
-                            )} × {@price_breakdown.nights})
+                            )} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                 1,
+                                                               do: "night",
+                                                               else: "nights"})
                           </span>
                           <span class={
                             if(@booking.status == :canceled,
@@ -772,12 +775,15 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           }>
                             Spot Rental
-                            ({@price_breakdown.guests_count} × {@price_breakdown.nights} night{if @price_breakdown.nights !=
-                                                                                                    1,
-                                                                                                  do:
-                                                                                                    "s",
-                                                                                                  else:
-                                                                                                    ""})
+                            ({@price_breakdown.guests_count} {if @price_breakdown.guests_count ==
+                                                                   1,
+                                                                 do: "adult",
+                                                                 else: "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                                                                   1,
+                                                                                                                 do:
+                                                                                                                   "night",
+                                                                                                                 else:
+                                                                                                                   "nights"})
                           </span>
                           <span class={
                             if(@booking.status == :canceled,
@@ -814,7 +820,12 @@ defmodule YscWeb.BookingReceiptLive do
                                                                                                do:
                                                                                                  "adult",
                                                                                                else:
-                                                                                                 "adults"} × {@price_breakdown.nights})
+                                                                                                 "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                                                                                             1,
+                                                                                                                                           do:
+                                                                                                                                             "night",
+                                                                                                                                           else:
+                                                                                                                                             "nights"})
                               <% end %>
                             </span>
                             <span class={
@@ -836,7 +847,18 @@ defmodule YscWeb.BookingReceiptLive do
                               )
                             }>
                               Children
-                              ({@price_breakdown[:children_count]} × {@price_breakdown.nights})
+                              ({@price_breakdown[:children_count]} {if @price_breakdown[
+                                                                         :children_count
+                                                                       ] ==
+                                                                         1,
+                                                                       do: "child",
+                                                                       else:
+                                                                         "children"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                                                                       1,
+                                                                                                                     do:
+                                                                                                                       "night",
+                                                                                                                     else:
+                                                                                                                       "nights"})
                             </span>
                             <span class={
                               if(@booking.status == :canceled,

@@ -2275,7 +2275,10 @@ defmodule YscWeb.TahoeBookingLive do
                           <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
                             ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
-                            )} × {@price_breakdown.nights})
+                            )} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                 1,
+                                                               do: "night",
+                                                               else: "nights"})
                           <% end %>
                         </span>
                         <span class="font-semibold text-zinc-900">
@@ -2307,7 +2310,12 @@ defmodule YscWeb.TahoeBookingLive do
                                   @price_breakdown[:guests_count] ||
                                   0 %> ({adult_count} {if adult_count == 1,
                                 do: "adult",
-                                else: "adults"} × {@price_breakdown.nights})
+                                else: "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                                  1,
+                                                                                do:
+                                                                                  "night",
+                                                                                else:
+                                                                                  "nights"})
                             <% end %>
                           </span>
                           <span class="font-semibold text-zinc-900">
@@ -2325,7 +2333,17 @@ defmodule YscWeb.TahoeBookingLive do
                           <span class="text-zinc-600">
                             Children
                             <%= if @price_breakdown.nights do %>
-                              ({@price_breakdown[:children_count] || 0} × {@price_breakdown.nights})
+                              <% ch = @price_breakdown[:children_count] || 0 %> ({ch} {if ch ==
+                                                                                            1,
+                                                                                          do:
+                                                                                            "child",
+                                                                                          else:
+                                                                                            "children"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                                                                                          1,
+                                                                                                                                        do:
+                                                                                                                                          "night",
+                                                                                                                                        else:
+                                                                                                                                          "nights"})
                             <% end %>
                           </span>
                           <span class="font-semibold text-zinc-900">

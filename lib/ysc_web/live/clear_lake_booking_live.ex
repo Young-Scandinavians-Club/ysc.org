@@ -1237,12 +1237,11 @@ defmodule YscWeb.ClearLakeBookingLive do
                           <% total_guest_nights = nights * @guests_count %>
                           <div class="flex justify-between items-center text-zinc-600">
                             <span>
-                              Spot Rental ({@guests_count} × {nights} night{if nights !=
-                                                                                 1,
-                                                                               do:
-                                                                                 "s",
-                                                                               else:
-                                                                                 ""})
+                              Spot Rental ({@guests_count} {if @guests_count == 1,
+                                do: "adult",
+                                else: "adults"} × {nights} {if nights == 1,
+                                do: "night",
+                                else: "nights"})
                             </span>
                             <span class="font-bold text-zinc-900">
                               {MoneyHelper.format_money!(
