@@ -764,150 +764,153 @@
           </div>
         </div>
       </div>
-      <div class="border-t border-zinc-100 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between mt-4 pt-4">
-        <div class="text-sm text-zinc-600 text-center sm:text-left flex flex-wrap items-baseline justify-center sm:justify-start gap-x-1">
-          <span class="whitespace-nowrap">
-            © {DateTime.utc_now().year} <.link
-              navigate={~p"/"}
-              class="hover:text-zinc-900 transition-colors font-medium"
-            >Young Scandinavians Club</.link>.
-          </span>
-          <span
-            class="relative inline-block overflow-hidden"
-            style="min-height: 1.25rem;"
-          >
-            <span
-              id="footer-rotator"
-              phx-hook="FooterRotator"
-              class="inline-block"
-              style="transform: translateY(0); opacity: 1; transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;"
-            >
-              Made with ❤️ by the YSC WebTech Team.
+      <div class="border-t border-zinc-100 mt-4 pt-4 space-y-3">
+        <div class="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+          <div class="text-sm text-zinc-600 text-center sm:text-left flex flex-wrap items-baseline justify-center sm:justify-start gap-x-1">
+            <span class="whitespace-nowrap">
+              © {DateTime.utc_now().year} <.link
+                navigate={~p"/"}
+                class="hover:text-zinc-900 transition-colors font-medium"
+              >Young Scandinavians Club</.link>.
             </span>
-          </span>
-          <span>
-            YSC is a 501(c)(7) nonprofit organization.
-          </span>
+            <span
+              class="relative inline-block overflow-hidden"
+              style="min-height: 1.25rem;"
+            >
+              <span
+                id="footer-rotator"
+                phx-hook="FooterRotator"
+                class="inline-block"
+                style="transform: translateY(0); opacity: 1; transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;"
+              >
+                Made with ❤️ by the YSC WebTech Team.
+              </span>
+            </span>
+          </div>
+
+          <ul
+            :if={
+              @site_setting_socials_facebook || @site_setting_socials_instagram ||
+                @site_setting_socials_discord ||
+                (@current_user && @site_setting_socials_whatsapp)
+            }
+            class="flex flex-wrap items-center justify-center sm:items-start sm:justify-start gap-2"
+          >
+            <li :if={@site_setting_socials_facebook} class="">
+              <.link
+                href={@site_setting_socials_facebook}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  x="0px"
+                  y="0px"
+                  viewBox="0 0 64 64"
+                  class="w-10 h-10 transition duration-300 fill-current text-zinc-600 hover:text-blue-700"
+                >
+                  <path d="M48,7H16c-4.418,0-8,3.582-8,8v32c0,4.418,3.582,8,8,8h17V38h-6v-7h6v-5c0-7,4-11,10-11c3.133,0,5,1,5,1v6h-4 c-2.86,0-4,2.093-4,4v5h7l-1,7h-6v17h8c4.418,0,8-3.582,8-8V15C56,10.582,52.418,7,48,7z">
+                  </path>
+                </svg>
+                <span class="sr-only">Facebook</span>
+              </.link>
+            </li>
+
+            <li :if={@site_setting_socials_instagram}>
+              <.link
+                href={@site_setting_socials_instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+              >
+                <div class="relative w-10 h-10">
+                  <svg
+                    style="width:0;height:0;position:absolute;"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <linearGradient id="insta-gradient" y1="1">
+                      <stop stop-color="#405de6" />
+                      <stop offset=".2" stop-color="#5851db" />
+                      <stop offset=".4" stop-color="#833ab4" />
+                      <stop offset=".6" stop-color="#c13584" />
+                      <stop offset=".8" stop-color="#e1306c" />
+                      <stop offset="1" stop-color="#fd1d1d" />
+                    </linearGradient>
+                  </svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    x="0px"
+                    y="0px"
+                    viewBox="0 0 64 64"
+                    class="absolute z-10 w-10 h-10 transition duration-300 fill-current text-zinc-600 hover:opacity-0"
+                  >
+                    <path d="M 21.580078 7 C 13.541078 7 7 13.544938 7 21.585938 L 7 42.417969 C 7 50.457969 13.544938 57 21.585938 57 L 42.417969 57 C 50.457969 57 57 50.455062 57 42.414062 L 57 21.580078 C 57 13.541078 50.455062 7 42.414062 7 L 21.580078 7 z M 47 15 C 48.104 15 49 15.896 49 17 C 49 18.104 48.104 19 47 19 C 45.896 19 45 18.104 45 17 C 45 15.896 45.896 15 47 15 z M 32 19 C 39.17 19 45 24.83 45 32 C 45 39.17 39.169 45 32 45 C 24.83 45 19 39.169 19 32 C 19 24.831 24.83 19 32 19 z M 32 23 C 27.029 23 23 27.029 23 32 C 23 36.971 27.029 41 32 41 C 36.971 41 41 36.971 41 32 C 41 27.029 36.971 23 32 23 z">
+                    </path>
+                  </svg>
+                  <svg
+                    fill="url(#insta-gradient)"
+                    xmlns="http://www.w3.org/2000/svg"
+                    x="0px"
+                    y="0px"
+                    viewBox="0 0 64 64"
+                    class="absolute w-10 h-10 transition duration-300 z-1"
+                  >
+                    <path d="M 21.580078 7 C 13.541078 7 7 13.544938 7 21.585938 L 7 42.417969 C 7 50.457969 13.544938 57 21.585938 57 L 42.417969 57 C 50.457969 57 57 50.455062 57 42.414062 L 57 21.580078 C 57 13.541078 50.455062 7 42.414062 7 L 21.580078 7 z M 47 15 C 48.104 15 49 15.896 49 17 C 49 18.104 48.104 19 47 19 C 45.896 19 45 18.104 45 17 C 45 15.896 45.896 15 47 15 z M 32 19 C 39.17 19 45 24.83 45 32 C 45 39.17 39.169 45 32 45 C 24.83 45 19 39.169 19 32 C 19 24.831 24.83 19 32 19 z M 32 23 C 27.029 23 23 27.029 23 32 C 23 36.971 27.029 41 32 41 C 36.971 41 41 36.971 41 32 C 41 27.029 36.971 23 32 23 z">
+                    </path>
+                  </svg>
+                </div>
+                <span class="sr-only">Instagram</span>
+              </.link>
+            </li>
+
+            <li
+              :if={@site_setting_socials_discord}
+              class="w-10 h-10 flex text-center items-center justify-center"
+            >
+              <.link
+                href={@site_setting_socials_discord}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Discord"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                  class="w-8 h-8 transition text-center duration-300 fill-current text-zinc-600 hover:text-[#5865F2] items-center justify-center"
+                >
+                  <path d="M105 0h302c57.928.155 104.845 47.072 105 104.996V407c-.155 57.926-47.072 104.844-104.996 104.998L105 512C47.074 511.844.156 464.926.002 407.003L0 105C.156 47.072 47.074.155 104.997 0H105zm263.896 153.382a269.459 269.459 0 00-67.117-20.638 186.784 186.784 0 00-8.571 17.476 250.18 250.18 0 00-37.246-2.8c-12.447 0-24.956.945-37.25 2.776-2.512-5.927-5.428-11.804-8.592-17.455a271.746 271.746 0 00-67.133 20.681c-42.48 62.842-53.992 124.112-48.236 184.513a270.634 270.634 0 0082.308 41.312c6.637-8.959 12.583-18.497 17.63-28.422a174.021 174.021 0 01-27.772-13.253c2.329-1.689 4.606-3.428 6.805-5.118 25.727 12.083 53.837 18.385 82.277 18.385 28.442 0 56.552-6.302 82.279-18.386 2.226 1.816 4.503 3.556 6.805 5.117a175.079 175.079 0 01-27.822 13.289 197.895 197.895 0 0017.63 28.4 269.527 269.527 0 0082.363-41.306l-.007.007c6.754-70.044-11.537-130.753-48.351-184.578zM201.969 300.789c-16.04 0-29.293-14.556-29.293-32.464s12.791-32.593 29.241-32.593 29.599 14.685 29.318 32.593c-.282 17.908-12.919 32.464-29.266 32.464zm108.061 0c-16.066 0-29.266-14.556-29.266-32.464s12.791-32.593 29.266-32.593c16.475 0 29.523 14.685 29.241 32.593-.281 17.908-12.893 32.464-29.241 32.464z" />
+                </svg>
+              </.link>
+            </li>
+
+            <li
+              :if={@current_user && @site_setting_socials_whatsapp}
+              class="w-10 h-10 flex text-center items-center justify-center"
+            >
+              <.link
+                href={@site_setting_socials_whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="20 20 472 472"
+                  class="w-8 h-8 transition duration-300 fill-current text-zinc-600 hover:text-[#25d366]"
+                >
+                  <path d="M256,122.2c-73,0-132.4,59.4-132.5,132.4c0,25,7,49.4,20.3,70.4l3.1,5l-13.4,48.8l50.1-13.2l4.8,2.9   c20.3,12.1,43.6,18.5,67.4,18.5h0.1c72.9,0,133.9-59.4,133.9-132.4c0-35.4-15.3-68.6-40.3-93.6C324.5,136,291.4,122.2,256,122.2   L256,122.2z M333.8,311.4c-3.3,9.3-19.2,17.8-26.8,18.9c-12.7,1.9-22.5,0.9-47.7-9.9c-39.9-17.3-66-57.5-68-60.1   c-2-2.6-16.3-21.6-16.3-41.2s10.2-29.2,14-33.2c3.6-4,7.9-5,10.6-5c2.6,0,5.3,0,7.6,0.1c2.4,0.1,5.7-0.9,8.9,6.8   c3.3,7.9,11.2,27.5,12.3,29.5c1,2,1.7,4.3,0.3,6.9c-7.6,15.3-15.8,14.7-11.7,21.7c15.4,26.4,30.7,35.6,54.1,47.3c4,2,6.3,1.7,8.6-1   c2.3-2.6,9.9-11.7,12.6-15.6c2.6-4,5.3-3.3,8.9-2s23.2,10.9,27.2,13c4,2,6.6,3,7.6,4.6C337.2,294.2,337.2,302.2,333.8,311.4z    M432.8,31H79.2C52.6,31,31,52.6,31,79.2v353.6c0,26.6,21.6,48.2,48.2,48.2h353.6c26.6,0,48.2-21.6,48.2-48.2V79.2   C481,52.6,459.4,31,432.8,31z M255.9,413.9c-26.7,0-52.9-6.7-76.1-19.4l-84.5,22.2l22.6-82.6c-14-24.1-21.3-51.5-21.3-79.7   c0.1-87.8,71.5-159.2,159.3-159.2c42.6,0,82.6,16.6,112.7,46.7c30,30.1,48.1,70.1,48.1,112.7C416.7,342.5,343.7,413.9,255.9,413.9   L255.9,413.9z" />
+                </svg>
+                <span class="sr-only">WhatsApp</span>
+              </.link>
+            </li>
+          </ul>
         </div>
 
-        <ul
-          :if={
-            @site_setting_socials_facebook || @site_setting_socials_instagram ||
-              @site_setting_socials_discord ||
-              (@current_user && @site_setting_socials_whatsapp)
-          }
-          class="flex flex-wrap items-center justify-center sm:items-start sm:justify-start gap-2"
-        >
-          <li :if={@site_setting_socials_facebook} class="">
-            <.link
-              href={@site_setting_socials_facebook}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Facebook"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                x="0px"
-                y="0px"
-                viewBox="0 0 64 64"
-                class="w-10 h-10 transition duration-300 fill-current text-zinc-600 hover:text-blue-700"
-              >
-                <path d="M48,7H16c-4.418,0-8,3.582-8,8v32c0,4.418,3.582,8,8,8h17V38h-6v-7h6v-5c0-7,4-11,10-11c3.133,0,5,1,5,1v6h-4 c-2.86,0-4,2.093-4,4v5h7l-1,7h-6v17h8c4.418,0,8-3.582,8-8V15C56,10.582,52.418,7,48,7z">
-                </path>
-              </svg>
-              <span class="sr-only">Facebook</span>
-            </.link>
-          </li>
-
-          <li :if={@site_setting_socials_instagram}>
-            <.link
-              href={@site_setting_socials_instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-            >
-              <div class="relative w-10 h-10">
-                <svg
-                  style="width:0;height:0;position:absolute;"
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <linearGradient id="insta-gradient" y1="1">
-                    <stop stop-color="#405de6" />
-                    <stop offset=".2" stop-color="#5851db" />
-                    <stop offset=".4" stop-color="#833ab4" />
-                    <stop offset=".6" stop-color="#c13584" />
-                    <stop offset=".8" stop-color="#e1306c" />
-                    <stop offset="1" stop-color="#fd1d1d" />
-                  </linearGradient>
-                </svg>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  x="0px"
-                  y="0px"
-                  viewBox="0 0 64 64"
-                  class="absolute z-10 w-10 h-10 transition duration-300 fill-current text-zinc-600 hover:opacity-0"
-                >
-                  <path d="M 21.580078 7 C 13.541078 7 7 13.544938 7 21.585938 L 7 42.417969 C 7 50.457969 13.544938 57 21.585938 57 L 42.417969 57 C 50.457969 57 57 50.455062 57 42.414062 L 57 21.580078 C 57 13.541078 50.455062 7 42.414062 7 L 21.580078 7 z M 47 15 C 48.104 15 49 15.896 49 17 C 49 18.104 48.104 19 47 19 C 45.896 19 45 18.104 45 17 C 45 15.896 45.896 15 47 15 z M 32 19 C 39.17 19 45 24.83 45 32 C 45 39.17 39.169 45 32 45 C 24.83 45 19 39.169 19 32 C 19 24.831 24.83 19 32 19 z M 32 23 C 27.029 23 23 27.029 23 32 C 23 36.971 27.029 41 32 41 C 36.971 41 41 36.971 41 32 C 41 27.029 36.971 23 32 23 z">
-                  </path>
-                </svg>
-                <svg
-                  fill="url(#insta-gradient)"
-                  xmlns="http://www.w3.org/2000/svg"
-                  x="0px"
-                  y="0px"
-                  viewBox="0 0 64 64"
-                  class="absolute w-10 h-10 transition duration-300 z-1"
-                >
-                  <path d="M 21.580078 7 C 13.541078 7 7 13.544938 7 21.585938 L 7 42.417969 C 7 50.457969 13.544938 57 21.585938 57 L 42.417969 57 C 50.457969 57 57 50.455062 57 42.414062 L 57 21.580078 C 57 13.541078 50.455062 7 42.414062 7 L 21.580078 7 z M 47 15 C 48.104 15 49 15.896 49 17 C 49 18.104 48.104 19 47 19 C 45.896 19 45 18.104 45 17 C 45 15.896 45.896 15 47 15 z M 32 19 C 39.17 19 45 24.83 45 32 C 45 39.17 39.169 45 32 45 C 24.83 45 19 39.169 19 32 C 19 24.831 24.83 19 32 19 z M 32 23 C 27.029 23 23 27.029 23 32 C 23 36.971 27.029 41 32 41 C 36.971 41 41 36.971 41 32 C 41 27.029 36.971 23 32 23 z">
-                  </path>
-                </svg>
-              </div>
-              <span class="sr-only">Instagram</span>
-            </.link>
-          </li>
-
-          <li
-            :if={@site_setting_socials_discord}
-            class="w-10 h-10 flex text-center items-center justify-center"
-          >
-            <.link
-              href={@site_setting_socials_discord}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Discord"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 512 512"
-                class="w-8 h-8 transition text-center duration-300 fill-current text-zinc-600 hover:text-[#5865F2] items-center justify-center"
-              >
-                <path d="M105 0h302c57.928.155 104.845 47.072 105 104.996V407c-.155 57.926-47.072 104.844-104.996 104.998L105 512C47.074 511.844.156 464.926.002 407.003L0 105C.156 47.072 47.074.155 104.997 0H105zm263.896 153.382a269.459 269.459 0 00-67.117-20.638 186.784 186.784 0 00-8.571 17.476 250.18 250.18 0 00-37.246-2.8c-12.447 0-24.956.945-37.25 2.776-2.512-5.927-5.428-11.804-8.592-17.455a271.746 271.746 0 00-67.133 20.681c-42.48 62.842-53.992 124.112-48.236 184.513a270.634 270.634 0 0082.308 41.312c6.637-8.959 12.583-18.497 17.63-28.422a174.021 174.021 0 01-27.772-13.253c2.329-1.689 4.606-3.428 6.805-5.118 25.727 12.083 53.837 18.385 82.277 18.385 28.442 0 56.552-6.302 82.279-18.386 2.226 1.816 4.503 3.556 6.805 5.117a175.079 175.079 0 01-27.822 13.289 197.895 197.895 0 0017.63 28.4 269.527 269.527 0 0082.363-41.306l-.007.007c6.754-70.044-11.537-130.753-48.351-184.578zM201.969 300.789c-16.04 0-29.293-14.556-29.293-32.464s12.791-32.593 29.241-32.593 29.599 14.685 29.318 32.593c-.282 17.908-12.919 32.464-29.266 32.464zm108.061 0c-16.066 0-29.266-14.556-29.266-32.464s12.791-32.593 29.266-32.593c16.475 0 29.523 14.685 29.241 32.593-.281 17.908-12.893 32.464-29.241 32.464z" />
-              </svg>
-            </.link>
-          </li>
-
-          <li
-            :if={@current_user && @site_setting_socials_whatsapp}
-            class="w-10 h-10 flex text-center items-center justify-center"
-          >
-            <.link
-              href={@site_setting_socials_whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="20 20 472 472"
-                class="w-8 h-8 transition duration-300 fill-current text-zinc-600 hover:text-[#25d366]"
-              >
-                <path d="M256,122.2c-73,0-132.4,59.4-132.5,132.4c0,25,7,49.4,20.3,70.4l3.1,5l-13.4,48.8l50.1-13.2l4.8,2.9   c20.3,12.1,43.6,18.5,67.4,18.5h0.1c72.9,0,133.9-59.4,133.9-132.4c0-35.4-15.3-68.6-40.3-93.6C324.5,136,291.4,122.2,256,122.2   L256,122.2z M333.8,311.4c-3.3,9.3-19.2,17.8-26.8,18.9c-12.7,1.9-22.5,0.9-47.7-9.9c-39.9-17.3-66-57.5-68-60.1   c-2-2.6-16.3-21.6-16.3-41.2s10.2-29.2,14-33.2c3.6-4,7.9-5,10.6-5c2.6,0,5.3,0,7.6,0.1c2.4,0.1,5.7-0.9,8.9,6.8   c3.3,7.9,11.2,27.5,12.3,29.5c1,2,1.7,4.3,0.3,6.9c-7.6,15.3-15.8,14.7-11.7,21.7c15.4,26.4,30.7,35.6,54.1,47.3c4,2,6.3,1.7,8.6-1   c2.3-2.6,9.9-11.7,12.6-15.6c2.6-4,5.3-3.3,8.9-2s23.2,10.9,27.2,13c4,2,6.6,3,7.6,4.6C337.2,294.2,337.2,302.2,333.8,311.4z    M432.8,31H79.2C52.6,31,31,52.6,31,79.2v353.6c0,26.6,21.6,48.2,48.2,48.2h353.6c26.6,0,48.2-21.6,48.2-48.2V79.2   C481,52.6,459.4,31,432.8,31z M255.9,413.9c-26.7,0-52.9-6.7-76.1-19.4l-84.5,22.2l22.6-82.6c-14-24.1-21.3-51.5-21.3-79.7   c0.1-87.8,71.5-159.2,159.3-159.2c42.6,0,82.6,16.6,112.7,46.7c30,30.1,48.1,70.1,48.1,112.7C416.7,342.5,343.7,413.9,255.9,413.9   L255.9,413.9z" />
-              </svg>
-              <span class="sr-only">WhatsApp</span>
-            </.link>
-          </li>
-        </ul>
+        <p class="text-xs text-zinc-500 text-center sm:text-left max-w-prose">
+          YSC is a 501(c)(7) non-profit incoporated in the State of California.
+        </p>
       </div>
     </div>
   </footer>

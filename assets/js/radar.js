@@ -99,16 +99,23 @@ export default RadarMap = {
         }
 
         const radarKey = window.radarPublicKey || "prj_test_pk_5bcfd56661bb7fc596d70d5f21f0e2c6049b0966";
-        window.Radar.initialize(radarKey);
 
-        if (!window.Radar?.ui?.map) {
-            console.error(
-                "Radar Maps plugin is missing: load radar-maps.min.js after radar.min.js (see Radar docs).",
-            );
+        const radarSetupError =
+            "Radar Maps plugin is missing: load radar-maps.min.js after radar.min.js (see Radar docs).";
+
+        if (!window.Radar || typeof window.Radar.initialize !== "function") {
+            console.error(radarSetupError);
             return;
         }
 
-        map = Radar.ui.map({
+        window.Radar.initialize(radarKey);
+
+        if (!window.Radar.ui?.map) {
+            console.error(radarSetupError);
+            return;
+        }
+
+        map = window.Radar.ui.map({
             container: elementID,
             transformRequest: radarGlyphTransformRequest,
         });
