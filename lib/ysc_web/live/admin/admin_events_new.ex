@@ -16,6 +16,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
+  alias YscWeb.AdminEventsLive.TicketTierManagement
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -1793,11 +1794,20 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCreated{
-           ticket_reservation: _reservation
+           ticket_reservation: reservation
          }},
         socket
       ) do
-    # Component handles this, but we need to catch it to prevent crashes
+    socket =
+      send_ticket_tier_management_reservation_update(
+        socket,
+        reservation.ticket_tier_id,
+        close_reserve_modal: true,
+        notify:
+          {:info, "Ticket reservation created successfully",
+           [title: "Reservation"]}
+      )
+
     {:noreply, socket}
   end
 
@@ -1805,11 +1815,17 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationFulfilled{
-           ticket_reservation: _reservation
+           ticket_reservation: reservation
          }},
         socket
       ) do
-    # Component handles this, but we need to catch it to prevent crashes
+    socket =
+      send_ticket_tier_management_reservation_update(
+        socket,
+        reservation.ticket_tier_id,
+        close_reserve_modal: false
+      )
+
     {:noreply, socket}
   end
 
@@ -1817,11 +1833,17 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCancelled{
-           ticket_reservation: _reservation
+           ticket_reservation: reservation
          }},
         socket
       ) do
-    # Component handles this, but we need to catch it to prevent crashes
+    socket =
+      send_ticket_tier_management_reservation_update(
+        socket,
+        reservation.ticket_tier_id,
+        close_reserve_modal: false
+      )
+
     {:noreply, socket}
   end
 
@@ -1856,25 +1878,41 @@ defmodule YscWeb.AdminEventsNewLive do
   @impl true
   def handle_info({Ysc.Events, _msg}, socket), do: {:noreply, socket}
 
-  @impl true
-  def handle_info({:ticket_reservation_created, event_id}, socket) do
-    # Component handles this, but we need to catch it to prevent crashes
-    # Only process if it's for the current event
-    if socket.assigns[:event] && socket.assigns.event.id == event_id do
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
-  end
+  defp send_ticket_tier_management_reservation_update(socket, tier_id, opts) do
+    close_reserve? = Keyword.get(opts, :close_reserve_modal, false)
+    notify = Keyword.get(opts, :notify)
 
-  @impl true
-  def handle_info({:redirect_to_tickets, event_id}, socket) do
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Ticket reservation created successfully",
-       title: "Tickets"
-     )
-     |> push_patch(to: ~p"/admin/events/#{event_id}/tickets")}
+    with %{id: event_id} <- socket.assigns[:event],
+         :tickets <- socket.assigns[:live_action],
+         %{event_id: ^event_id} <- Events.get_ticket_tier(tier_id) do
+      component_assigns =
+        if close_reserve? do
+          [
+            id: "ticket-tier-management-#{event_id}",
+            close_reserve_modal: true
+          ]
+        else
+          [
+            id: "ticket-tier-management-#{event_id}",
+            reservation_epoch: :erlang.unique_integer([:positive])
+          ]
+        end
+
+      send_update(TicketTierManagement, component_assigns)
+
+      socket =
+        case notify do
+          {:info, msg, flash_opts} ->
+            YscWeb.Flash.put_toast(socket, :info, msg, flash_opts)
+
+          _ ->
+            socket
+        end
+
+      socket
+    else
+      _ -> socket
+    end
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do

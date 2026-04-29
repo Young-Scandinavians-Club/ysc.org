@@ -295,30 +295,8 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
       |> normalize_expires_at()
 
     case Events.create_ticket_reservation(reservation_params) do
-      {:ok, reservation} ->
-        # Get event_id from ticket_tier if not directly assigned
-        event_id =
-          cond do
-            socket.assigns[:event_id] ->
-              socket.assigns[:event_id]
-
-            socket.assigns[:ticket_tier] &&
-                socket.assigns[:ticket_tier].event_id ->
-              socket.assigns[:ticket_tier].event_id
-
-            reservation.ticket_tier_id ->
-              tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-              tier && tier.event_id
-
-            true ->
-              nil
-          end
-
-        # Send message to parent LiveView to redirect to tickets page
-        if event_id do
-          send(self(), {:redirect_to_tickets, event_id})
-        end
-
+      {:ok, _reservation} ->
+        # PubSub + parent LiveView send_update refresh the ticket tier UI and close the modal
         {:noreply, socket}
 
       {:error, changeset} ->

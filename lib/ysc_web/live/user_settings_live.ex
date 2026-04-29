@@ -1527,12 +1527,12 @@ defmodule YscWeb.UserSettingsLive do
                         )
                     }
                     phx-click="reactivate-membership"
-                    phx-disable-with="Reactivating..."
+                    phx-disable-with="Saving..."
                     color="green"
                     disabled={!@user_is_active}
                     class="w-full sm:w-auto justify-center"
                   >
-                    Reactivate Membership
+                    Turn on auto-renewal
                   </.button>
                   <.button
                     :if={
@@ -1543,19 +1543,19 @@ defmodule YscWeb.UserSettingsLive do
                         @active_plan_type != :lifetime
                     }
                     phx-click="cancel-membership"
-                    phx-disable-with="Cancelling..."
-                    color="red"
+                    phx-disable-with="Saving..."
                     variant="outline"
+                    color="amber"
                     disabled={
                       !@user_is_active ||
                         Subscriptions.scheduled_for_cancellation?(
                           @current_membership
                         )
                     }
-                    data-confirm="Are you sure you want to cancel your membership?"
+                    data-confirm="Turn off automatic renewal? You keep full membership benefits until the end of your current billing period, and you can turn auto-renewal back on anytime before then."
                     class="w-full sm:w-auto justify-center"
                   >
-                    Cancel Membership
+                    Turn off auto-renewal
                   </.button>
                 </div>
               </div>
@@ -4253,11 +4253,11 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to cancel your membership.",
+         "You must have an approved account to manage auto-renewal.",
          title: "Membership"
        )}
     else
-      # Schedule cancellation at end of current period in Stripe and persist locally
+      # Turn off auto-renewal at period end in Stripe (membership stays active until then)
       case Subscriptions.cancel(socket.assigns.current_membership) do
         {:ok, _subscription} ->
           # Cache invalidation is handled in Subscriptions.cancel
@@ -4269,7 +4269,10 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :info, "Membership cancelled.",
+           YscWeb.Flash.put_toast(
+             socket,
+             :info,
+             "Auto-renewal is off. You'll keep access until the end of your current billing period.",
              title: "Membership"
            )
            |> push_patch(to: ~p"/users/membership")}
@@ -4283,7 +4286,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to cancel membership. Please try again.",
+             "Couldn't turn off auto-renewal. Please try again.",
              title: "Membership"
            )}
       end
@@ -4334,7 +4337,7 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to cancel your membership.",
+         "You must have an approved account to manage auto-renewal.",
          title: "Membership"
        )}
     else
@@ -4353,7 +4356,10 @@ defmodule YscWeb.UserSettingsLive do
           end)
 
           {:noreply,
-           YscWeb.Flash.put_toast(socket, :info, "Membership reactivated.",
+           YscWeb.Flash.put_toast(
+             socket,
+             :info,
+             "Auto-renewal is on. Your membership will renew as usual.",
              title: "Membership"
            )
            |> push_patch(to: ~p"/users/membership")}

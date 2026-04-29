@@ -425,6 +425,22 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def update(assigns, socket) do
+    # Parent send_update/2 only passes a few keys; merge with prior component assigns
+    # so required fields (e.g. event_id) are always present.
+    assigns =
+      socket.assigns
+      |> Map.take([
+        :event_id,
+        :event,
+        :current_user,
+        :show_add_modal,
+        :show_edit_modal,
+        :show_reserve_modal,
+        :reserving_tier,
+        :editing_ticket_tier
+      ])
+      |> Map.merge(assigns)
+
     # Check if this is an update to close the reserve modal
     close_modal = Map.get(assigns, :close_reserve_modal, false)
 
@@ -752,95 +768,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     if ticket_tier.event_id == socket.assigns.event_id do
       ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
       {:noreply, assign(socket, :ticket_tiers, ticket_tiers)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info({:ticket_reservation_created, event_id}, socket) do
-    if event_id == socket.assigns.event_id do
-      reservations_by_tier = refresh_reservations(event_id)
-      ticket_tiers = Events.list_ticket_tiers_for_event(event_id)
-
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(
-         :info,
-         "Ticket reservation created successfully",
-         title: "Reservation"
-       )
-       |> assign(:show_reserve_modal, false)
-       |> assign(:reserving_tier, nil)
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:reservations_by_tier, reservations_by_tier)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketReservationCreated{
-           ticket_reservation: reservation
-         }},
-        socket
-      ) do
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier && ticket_tier.event_id == socket.assigns.event_id do
-      reservations_by_tier = refresh_reservations(socket.assigns.event_id)
-      ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
-
-      {:noreply,
-       socket
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:reservations_by_tier, reservations_by_tier)
-       |> assign(:show_reserve_modal, false)
-       |> assign(:reserving_tier, nil)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketReservationFulfilled{
-           ticket_reservation: reservation
-         }},
-        socket
-      ) do
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier && ticket_tier.event_id == socket.assigns.event_id do
-      reservations_by_tier = refresh_reservations(socket.assigns.event_id)
-      ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
-
-      {:noreply,
-       socket
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:reservations_by_tier, reservations_by_tier)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketReservationCancelled{
-           ticket_reservation: reservation
-         }},
-        socket
-      ) do
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier && ticket_tier.event_id == socket.assigns.event_id do
-      reservations_by_tier = refresh_reservations(socket.assigns.event_id)
-      ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
-
-      {:noreply,
-       socket
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:reservations_by_tier, reservations_by_tier)}
     else
       {:noreply, socket}
     end
