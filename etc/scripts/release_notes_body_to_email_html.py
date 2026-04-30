@@ -52,10 +52,17 @@ def link_plain_https(s: str) -> str:
     """
 
     def repl(m: re.Match[str]) -> str:
-        enc = m.group(1).rstrip(").,;:\"]")
+        original = m.group(1)
+        enc = original.rstrip(").,;:\"]")
+        suffix = original[len(enc):]
         raw_u = html.unescape(enc)
 
-        return f'<a href="{html.escape(raw_u, quote=True)}">{html.escape(raw_u)}</a>'
+        anchor = (
+            f'<a href="{html.escape(raw_u, quote=True)}">'
+            f"{html.escape(raw_u)}"
+            f"</a>"
+        )
+        return anchor + html.escape(suffix)
 
     return re.sub(r"\b(https?://\S+)", repl, s)
 
