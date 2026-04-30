@@ -47,6 +47,7 @@ defmodule Ysc.Accounts.User do
     field :role, UserAccountRole
 
     field :board_position, BoardMemberPosition
+    field :board_bio, :string
 
     field :first_name, :string, redact: true
     field :last_name, :string, redact: true
@@ -261,6 +262,7 @@ defmodule Ysc.Accounts.User do
       :phone_number,
       :most_connected_country,
       :board_position,
+      :board_bio,
       :stripe_id,
       :quickbooks_customer_id,
       :lifetime_membership_awarded_at,
@@ -269,9 +271,11 @@ defmodule Ysc.Accounts.User do
     ])
     |> validate_length(:first_name, min: 1, max: 150)
     |> validate_length(:last_name, min: 1, max: 150)
+    |> validate_length(:board_bio, max: 3000)
     |> validate_required([:first_name, :last_name])
     |> validate_phone_optional(opts)
     |> validate_date_of_birth()
+    |> clear_board_bio_when_no_board_position()
   end
 
   @doc """
@@ -299,6 +303,7 @@ defmodule Ysc.Accounts.User do
       :phone_number,
       :most_connected_country,
       :board_position,
+      :board_bio,
       :stripe_id,
       :quickbooks_customer_id,
       :lifetime_membership_awarded_at,
@@ -315,9 +320,11 @@ defmodule Ysc.Accounts.User do
     end)
     |> validate_length(:first_name, min: 1, max: 150)
     |> validate_length(:last_name, min: 1, max: 150)
+    |> validate_length(:board_bio, max: 3000)
     |> validate_required([:first_name, :last_name])
     |> validate_phone_optional(opts)
     |> validate_date_of_birth()
+    |> clear_board_bio_when_no_board_position()
   end
 
   def update_user_state_changeset(user, attrs, _opts \\ []) do
@@ -631,6 +638,14 @@ defmodule Ysc.Accounts.User do
     user
     |> cast(attrs, [:password_set_at])
     |> validate_required([:password_set_at])
+  end
+
+  defp clear_board_bio_when_no_board_position(changeset) do
+    if is_nil(get_field(changeset, :board_position)) do
+      put_change(changeset, :board_bio, nil)
+    else
+      changeset
+    end
   end
 
   defp copy_date_of_birth_from_application(changeset) do

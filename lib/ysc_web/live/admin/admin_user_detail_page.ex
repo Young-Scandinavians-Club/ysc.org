@@ -319,6 +319,31 @@ defmodule YscWeb.AdminUserDetailsLive do
                 ]}
                 label="Board Position"
               />
+
+              <.input
+                :if={
+                  "#{@role}" == "admin" &&
+                    board_position_selected?(@form, @selected_user)
+                }
+                type="textarea"
+                field={@form[:board_bio]}
+                id="board_bio"
+                label="Board bio"
+                placeholder="Short biography shown on the public Board of Directors page."
+              />
+              <p
+                :if={
+                  "#{@role}" == "admin" &&
+                    board_position_selected?(@form, @selected_user)
+                }
+                class="text-xs text-zinc-600 -mt-2"
+              >
+                This text is public on
+                <.link navigate={~p"/board"} class="text-blue-600 hover:underline">
+                  /board
+                </.link>
+                for members who hold a board position.
+              </p>
             </div>
             <!-- Address Information -->
             <div class="space-y-4">
@@ -3729,6 +3754,19 @@ defmodule YscWeb.AdminUserDetailsLive do
     end)
   end
 
+  defp board_position_selected?(form, user) do
+    persisted? = user.board_position != nil
+
+    form_selected? =
+      case form[:board_position].value do
+        nil -> false
+        "" -> false
+        _ -> true
+      end
+
+    persisted? or form_selected?
+  end
+
   defp extract_form_data(form) do
     # Get form parameters for current input values
     params = form.params || %{}
@@ -3790,6 +3828,8 @@ defmodule YscWeb.AdminUserDetailsLive do
       "role" => to_string(params["role"] || form[:role].value || ""),
       "board_position" =>
         to_string(params["board_position"] || form[:board_position].value || ""),
+      "board_bio" =>
+        to_string(params["board_bio"] || form[:board_bio].value || ""),
       "billing_address" => %{
         "address" =>
           to_string(

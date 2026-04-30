@@ -1455,10 +1455,19 @@ defmodule Ysc.AccountsTest do
     test "remove_board_position clears user board_position and closes open history record" do
       user = user_fixture()
       {:ok, user} = Accounts.assign_board_position(user, :secretary)
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          board_bio: "Bio text cleared when leaving board."
+        })
+        |> Repo.update()
+
       today = Date.utc_today()
 
       assert {:ok, updated_user} = Accounts.remove_board_position(user)
       assert updated_user.board_position == nil
+      assert updated_user.board_bio == nil
 
       history = Accounts.list_board_position_history(updated_user)
       assert length(history) == 1

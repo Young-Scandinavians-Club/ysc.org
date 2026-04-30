@@ -49,6 +49,29 @@ defmodule YscWeb.PageHTMLTest do
 
       assert html =~ "Secretary"
     end
+
+    test "renders board_bio when present and escapes HTML" do
+      html =
+        YscWeb.PageHTML.board(%{
+          bod_members: [
+            %{
+              first_name: "T",
+              last_name: "U",
+              email: "t@example.com",
+              id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              most_connected_country: "US",
+              board_position: :president,
+              board_bio: "Line one.\n\n<script>x</script>"
+            }
+          ],
+          vacant_positions: MapSet.new([])
+        })
+        |> rendered_to_binary()
+
+      assert html =~ "Line one."
+      assert html =~ "&lt;script&gt;"
+      refute html =~ "<script>x</script>"
+    end
   end
 
   describe "contact/1" do

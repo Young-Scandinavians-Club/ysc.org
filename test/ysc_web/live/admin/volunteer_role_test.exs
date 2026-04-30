@@ -373,6 +373,32 @@ defmodule YscWeb.VolunteerRoleTest do
 
       assert html =~ "Board Position"
     end
+
+    test "board bio field shown when admin user holds a board seat", %{
+      conn: conn
+    } do
+      target_user = user_fixture(%{role: "admin"})
+
+      {:ok, target_user} =
+        Ysc.Accounts.assign_board_position(target_user, :secretary)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{target_user.id}/details")
+
+      assert has_element?(view, "#board_bio")
+      assert has_element?(view, ~s(label[for="board_bio"]))
+    end
+
+    test "board bio field hidden when admin user has no board seat", %{
+      conn: conn
+    } do
+      target_user = user_fixture(%{role: "admin"})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{target_user.id}/details")
+
+      refute has_element?(view, "#board_bio")
+    end
   end
 
   # ---------------------------------------------------------------------------
