@@ -365,6 +365,44 @@ Enum.each(0..n_approved_users, fn n ->
   end
 end)
 
+# Board members + bios for /board (skip when any seat already assigned — avoids duplicate history on re-seed)
+bod_positions = [
+  :president,
+  :vice_president,
+  :secretary,
+  :treasurer,
+  :clear_lake_cabin_master,
+  :tahoe_cabin_master,
+  :event_director,
+  :member_outreach,
+  :membership_director
+]
+
+existing_board_count =
+  Repo.aggregate(from(u in User, where: not is_nil(u.board_position)), :count)
+
+if existing_board_count == 0 do
+  candidates =
+    Repo.all(
+      from u in User,
+        where: u.state == :active,
+        order_by: [asc: u.inserted_at],
+        limit: ^length(bod_positions),
+        select: u
+    )
+
+  Enum.each(Enum.zip(candidates, bod_positions), fn {user, position} ->
+    {:ok, user} = Ysc.Accounts.assign_board_position(user, position)
+
+    bio =
+      "Local seed bio (#{position}).\n\nServing on the YSC board — dummy copy for development only."
+
+    user
+    |> Ecto.Changeset.change(%{board_bio: bio})
+    |> Repo.update!()
+  end)
+end
+
 Enum.each(0..n_pending_users, fn n ->
   membership_type =
     if rem(n, 2) == 0 do

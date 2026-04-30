@@ -1104,7 +1104,7 @@ defmodule Ysc.Accounts do
       |> Repo.update_all(set: [ended_on: today])
 
       user
-      |> Ecto.Changeset.change(%{board_position: nil})
+      |> Ecto.Changeset.change(%{board_position: nil, board_bio: nil})
       |> Repo.update!()
     end)
   end
