@@ -662,6 +662,16 @@ make deploy-sandbox
 
 The production environment is hosted on Fly.io. For detailed deployment instructions, please refer to the official Phoenix deployment guides.
 
+#### GitHub Actions (version tags)
+
+Pushing a `v*` tag on `main` runs [.github/workflows/fly-deploy-prod.yml](.github/workflows/fly-deploy-prod.yml): CI, Fly deploy to `ysc-prod`, optional LLM-generated GitHub release notes, then (when notes were generated and deploy succeeded) an email via [Resend](https://resend.com) to **ysc-web-committee@googlegroups.com** from **webtech@ysc.org**.
+
+Repository secrets used by that workflow:
+
+- **`FLY_PROD_API_TOKEN`** — Deploy to Fly production (not sandbox).
+- **`OPENROUTER_API_KEY`** — If unset, LLM release notes are skipped (no committee email either).
+- **`RESEND_API_KEY`** — Required when release notes ran; verifies **webtech@ysc.org** / domain **ysc.org** are set up in the Resend dashboard.
+
 ## Architecture
 
 This is a web application built with the Phoenix framework, written in Elixir. It follows the standard Phoenix project structure:
