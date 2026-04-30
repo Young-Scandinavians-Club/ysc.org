@@ -6,6 +6,7 @@
 #   GITHUB_REF_NAME         (required) tag e.g. v1.2.3
 #   GITHUB_TOKEN or GH_TOKEN (required) for gh api (contents: read)
 #   RESEND_API_KEY          (required) Resend API key
+#   GITHUB_SHA              (optional) full SHA for Idempotency-Key — set in Actions; fallback: git rev-parse HEAD
 #   DRY_RUN                 (optional) if 1, skip HTTP POST and exit 0
 #
 # Usage (from repo root): env ... bash etc/scripts/notify_release_committee_resend.sh
@@ -20,6 +21,26 @@ FROM_EMAIL="webtech@ysc.org"
 REPO="${GITHUB_REPOSITORY:?Set GITHUB_REPOSITORY}"
 TAG="${GITHUB_REF_NAME:?Set GITHUB_REF_NAME}"
 RESEND_KEY="${RESEND_API_KEY:?Set RESEND_API_KEY}"
+
+GIT_SHA_FULL="${GITHUB_SHA:-}"
+if [[ -z "$GIT_SHA_FULL" ]]; then
+  SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  if git -C "$SCRIPT_ROOT" rev-parse HEAD >/dev/null 2>&1; then
+    GIT_SHA_FULL="$(git -C "$SCRIPT_ROOT" rev-parse HEAD)"
+  fi
+fi
+if [[ -z "$GIT_SHA_FULL" ]]; then
+  echo "Error: Set GITHUB_SHA or run from a git checkout." >&2
+  exit 1
+fi
+
+# Resend Idempotency-Key: ≤256 chars (repo + tag + SHA ⇒ one logical send per prod release retry).
+_REPO_FLAT="${REPO//\//-}"
+IDEMPOTENCY_KEY="${_REPO_FLAT}-committee-release-notes-${TAG}-${GIT_SHA_FULL}"
+_MAX_IDEM=256
+if [[ "${#IDEMPOTENCY_KEY}" -gt ${_MAX_IDEM} ]]; then
+  IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:0:${_MAX_IDEM}}"
+fi
 
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   export GH_TOKEN="$GITHUB_TOKEN"
@@ -53,13 +74,14 @@ payload="$(
 )"
 
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
-  echo "DRY_RUN=1 — would send Resend email (subject: ${subject})"
+  echo "DRY_RUN=1 — would send Resend email (subject: ${subject}, Idempotency-Key: …${IDEMPOTENCY_KEY: -24})"
   exit 0
 fi
 
 curl -fsS https://api.resend.com/emails \
   -H "Authorization: Bearer ${RESEND_KEY}" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: ${IDEMPOTENCY_KEY}" \
   -d "$payload"
 
 echo "Release notification emailed to ${COMMITTEE_EMAIL}."
