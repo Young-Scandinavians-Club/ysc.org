@@ -16,6 +16,8 @@ priv/static/assets/*.{gz,br,zst}
 .playwright-mcp/
 .pytest_cache/
 
+__pycache__/
+
 # migration backups
 wp_backup/
 
