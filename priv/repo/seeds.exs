@@ -378,6 +378,10 @@ bod_positions = [
   :membership_director
 ]
 
+default_seed_board_bio = fn position ->
+  "Local seed bio (#{position}).\n\nServing on the YSC board — dummy copy for development only."
+end
+
 existing_board_count =
   Repo.aggregate(from(u in User, where: not is_nil(u.board_position)), :count)
 
@@ -394,14 +398,25 @@ if existing_board_count == 0 do
   Enum.each(Enum.zip(candidates, bod_positions), fn {user, position} ->
     {:ok, user} = Ysc.Accounts.assign_board_position(user, position)
 
-    bio =
-      "Local seed bio (#{position}).\n\nServing on the YSC board — dummy copy for development only."
-
     user
-    |> Ecto.Changeset.change(%{board_bio: bio})
+    |> Ecto.Changeset.change(%{board_bio: default_seed_board_bio.(position)})
     |> Repo.update!()
   end)
 end
+
+missing_bio_board_members =
+  Repo.all(
+    from u in User,
+      where: not is_nil(u.board_position) and is_nil(u.board_bio)
+  )
+
+Enum.each(missing_bio_board_members, fn user ->
+  bio = default_seed_board_bio.(user.board_position)
+
+  user
+  |> Ecto.Changeset.change(%{board_bio: bio})
+  |> Repo.update!()
+end)
 
 Enum.each(0..n_pending_users, fn n ->
   membership_type =
