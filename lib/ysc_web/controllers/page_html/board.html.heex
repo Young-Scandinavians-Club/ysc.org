@@ -18,12 +18,12 @@
     </p>
   </div>
 
-  <%!-- Two Column Layout --%>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+  <%!-- Two Column Layout — wider member list, narrower “Help shape…” sidebar --%>
+  <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-12 lg:gap-14 lg:items-start">
     <%!-- Left Column: Active Board Members --%>
     <div
       :if={@bod_members != []}
-      class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0"
+      class="prose prose-zinc prose-a:text-blue-600 max-w-none w-full min-w-0"
     >
       <h2>Current Board Members</h2>
       <div class="not-prose">
@@ -33,7 +33,7 @@
               <.user_avatar_image
                 user={member}
                 size={:large}
-                class="h-36 w-36 rounded-full flex-shrink-0 object-cover"
+                class="h-64 w-64 rounded-full flex-shrink-0 object-cover"
               />
               <div class="flex-1 min-w-0">
                 <h3 class="text-xl font-bold text-zinc-900">
@@ -55,9 +55,9 @@
     <%!-- Right Column: Join the Board Section --%>
     <div
       :if={@vacant_positions != []}
-      class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0"
+      class="prose prose-zinc prose-a:text-blue-600 max-w-none w-full min-w-0 lg:max-w-md lg:justify-self-end"
     >
-      <div class="p-8 bg-blue-50 rounded-3xl border border-blue-100 h-fit sticky top-8">
+      <div class="p-6 lg:p-7 bg-blue-50 rounded-3xl border border-blue-100 h-fit sticky top-8">
         <div class="prose prose-zinc max-w-none mb-6">
           <h2>Help Shape the Future of YSC</h2>
           <p>
@@ -128,7 +128,7 @@
               <.user_avatar_image
                 user={member}
                 size={:large}
-                class="h-40 w-40 rounded-full flex-shrink-0 object-cover"
+                class="h-64 w-64 rounded-full flex-shrink-0 object-cover"
               />
               <div class="flex-1 min-w-0">
                 <h3 class="text-xl font-bold text-zinc-900">
