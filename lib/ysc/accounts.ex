@@ -1062,29 +1062,33 @@ defmodule Ysc.Accounts do
       when not is_nil(position) do
     today = Date.utc_today()
 
-    Repo.transaction(fn ->
-      # Close any open board position for this user
-      from(bp in BoardPosition,
-        where: bp.user_id == ^user.id,
-        where: is_nil(bp.ended_on)
-      )
-      |> Repo.update_all(set: [ended_on: today])
+    result =
+      Repo.transaction(fn ->
+        # Close any open board position for this user
+        from(bp in BoardPosition,
+          where: bp.user_id == ^user.id,
+          where: is_nil(bp.ended_on)
+        )
+        |> Repo.update_all(set: [ended_on: today])
 
-      # Insert new board position record
-      %BoardPosition{}
-      |> BoardPosition.changeset(%{
-        user_id: user.id,
-        position: position,
-        started_on: today,
-        ended_on: nil
-      })
-      |> Repo.insert!()
+        # Insert new board position record
+        %BoardPosition{}
+        |> BoardPosition.changeset(%{
+          user_id: user.id,
+          position: position,
+          started_on: today,
+          ended_on: nil
+        })
+        |> Repo.insert!()
 
-      # Update user's current board position
-      user
-      |> Ecto.Changeset.change(%{board_position: position})
-      |> Repo.update!()
-    end)
+        # Update user's current board position
+        user
+        |> Ecto.Changeset.change(%{board_position: position})
+        |> Repo.update!()
+      end)
+
+    enqueue_board_volunteer_stripe_sync(result)
+    result
   end
 
   @doc """
@@ -1096,18 +1100,30 @@ defmodule Ysc.Accounts do
   def remove_board_position(%User{} = user) do
     today = Date.utc_today()
 
-    Repo.transaction(fn ->
-      from(bp in BoardPosition,
-        where: bp.user_id == ^user.id,
-        where: is_nil(bp.ended_on)
-      )
-      |> Repo.update_all(set: [ended_on: today])
+    result =
+      Repo.transaction(fn ->
+        from(bp in BoardPosition,
+          where: bp.user_id == ^user.id,
+          where: is_nil(bp.ended_on)
+        )
+        |> Repo.update_all(set: [ended_on: today])
 
-      user
-      |> Ecto.Changeset.change(%{board_position: nil, board_bio: nil})
-      |> Repo.update!()
+        user
+        |> Ecto.Changeset.change(%{board_position: nil, board_bio: nil})
+        |> Repo.update!()
+      end)
+
+    enqueue_board_volunteer_stripe_sync(result)
+    result
+  end
+
+  defp enqueue_board_volunteer_stripe_sync({:ok, %User{} = user}) do
+    Task.start(fn ->
+      Ysc.Subscriptions.BoardVolunteerBilling.sync_for_user(user)
     end)
   end
+
+  defp enqueue_board_volunteer_stripe_sync(_), do: :ok
 
   @doc """
   Returns all board position records for a user, most recent first.
