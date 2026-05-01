@@ -1,6 +1,6 @@
 # See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
 # CI runs tests, linter, and mix deps.audit in parallel; deploy only runs if all CI passes on main branch.
-# Production: tag push (v*) on a commit in main → .github/workflows/fly-deploy-prod.yml
+# Production: tag push (v*) → .github/workflows/fly-deploy-prod.yml (sandbox deploy gate, then prod; CI not duplicated there).
 #
 # Secrets: use FLY_SANDBOX_API_TOKEN for the sandbox Fly org (recommended). If unset, FLY_API_TOKEN
 # is used so existing repos keep working — do not point FLY_API_TOKEN at production.
