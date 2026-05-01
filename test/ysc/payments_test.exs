@@ -429,6 +429,78 @@ defmodule Ysc.PaymentsTest do
       assert updated.last_four == "9999"
     end
 
+    test "upsert does not reassign a payment method row owned by another user" do
+      victim = user_fixture()
+      attacker = user_fixture()
+      pm_id = "pm_idor_#{System.unique_integer([:positive])}"
+
+      {:ok, _} =
+        Payments.insert_payment_method(%{
+          user_id: victim.id,
+          provider: :stripe,
+          provider_id: pm_id,
+          provider_customer_id: "cus_victim",
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_attacker",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "0000",
+          exp_month: 6,
+          exp_year: 2041,
+          brand: "visa"
+        }
+      }
+
+      assert {:error, :payment_method_owned_by_another_user} =
+               Payments.upsert_payment_method_from_stripe(attacker, stripe_pm)
+
+      victim_pm = Payments.get_payment_method_by_provider(:stripe, pm_id)
+      assert victim_pm.user_id == victim.id
+
+      refute Enum.any?(Payments.list_payment_methods(attacker), &(&1.provider_id == pm_id))
+    end
+
+    test "sync does not update a payment method row owned by another user" do
+      victim = user_fixture()
+      attacker = user_fixture()
+      pm_id = "pm_sync_idor_#{System.unique_integer([:positive])}"
+
+      {:ok, _} =
+        Payments.insert_payment_method(%{
+          user_id: victim.id,
+          provider: :stripe,
+          provider_id: pm_id,
+          provider_customer_id: "cus_v2",
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_attacker",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "8888",
+          exp_month: 7,
+          exp_year: 2042,
+          brand: "visa"
+        }
+      }
+
+      assert {:error, :payment_method_owned_by_another_user} =
+               Payments.sync_payment_method_from_stripe(attacker, stripe_pm)
+
+      victim_pm = Payments.get_payment_method_by_provider(:stripe, pm_id)
+      assert victim_pm.last_four != "8888"
+    end
+
     test "sync_payment_method_from_stripe inserts when missing" do
       user = user_fixture()
       pm_id = "pm_sync_#{System.unique_integer([:positive])}"

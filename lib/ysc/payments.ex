@@ -21,6 +21,21 @@ defmodule Ysc.Payments do
     Repo.get_by(PaymentMethod, provider: provider, provider_id: provider_id)
   end
 
+  defp get_payment_method_by_provider_for_user(user, provider, provider_id) do
+    Repo.get_by(PaymentMethod,
+      provider: provider,
+      provider_id: provider_id,
+      user_id: user.id
+    )
+  end
+
+  defp payment_method_provider_conflict?(user, provider, provider_id) do
+    case get_payment_method_by_provider(provider, provider_id) do
+      nil -> false
+      %PaymentMethod{user_id: id} -> id != user.id
+    end
+  end
+
   @doc """
   Gets a single payment method by id.
   """
@@ -369,16 +384,20 @@ defmodule Ysc.Payments do
       payload: stripe_payment_method_to_map(stripe_payment_method)
     }
 
-    case get_payment_method_by_provider(:stripe, stripe_payment_method.id) do
+    case get_payment_method_by_provider_for_user(user, :stripe, stripe_payment_method.id) do
       nil ->
-        # For new payment methods, set as default if user has no default
-        insert_payment_method(attrs)
-        |> case do
-          {:ok, payment_method} ->
-            set_default_payment_method_if_none(user, payment_method)
+        if payment_method_provider_conflict?(user, :stripe, stripe_payment_method.id) do
+          {:error, :payment_method_owned_by_another_user}
+        else
+          # For new payment methods, set as default if user has no default
+          insert_payment_method(attrs)
+          |> case do
+            {:ok, payment_method} ->
+              set_default_payment_method_if_none(user, payment_method)
 
-          error ->
-            error
+            error ->
+              error
+          end
         end
 
       existing_payment_method ->
@@ -421,9 +440,13 @@ defmodule Ysc.Payments do
     }
 
     result =
-      case get_payment_method_by_provider(:stripe, stripe_payment_method.id) do
+      case get_payment_method_by_provider_for_user(user, :stripe, stripe_payment_method.id) do
         nil ->
-          insert_payment_method(attrs)
+          if payment_method_provider_conflict?(user, :stripe, stripe_payment_method.id) do
+            {:error, :payment_method_owned_by_another_user}
+          else
+            insert_payment_method(attrs)
+          end
 
         existing_payment_method ->
           # Preserve the is_default field when updating

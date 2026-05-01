@@ -105,6 +105,13 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
         message: "Payment method stored and set as default successfully"
       })
     else
+      {:error, :payment_method_owned_by_another_user} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{
+          error: "This payment method is already associated with another account"
+        })
+
       {:error, :stripe_error} ->
         conn
         |> put_status(:bad_request)
