@@ -2,6 +2,8 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
   @moduledoc false
   use YscWeb, :admin_live_view
 
+  require Ysc.Logging
+
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   import YscWeb.Components.Autocomplete
@@ -123,6 +125,31 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
                title: "Grant benefit"
              )
              |> assign(:entitlement_form, to_form(cs, as: :entitlement))}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Booking entitlement created but post-grant step failed",
+              error: inspect(reason),
+              extra: %{user_id: attrs.user_id, admin_id: admin_id}
+            )
+
+            list =
+              Entitlements.list_outstanding(
+                property: socket.assigns.filter_property
+              )
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :warning,
+               "Benefit granted, but notifying the member failed. The benefit is active; do not retry unless you intended a second grant.",
+               title: "Grant benefit"
+             )
+             |> assign(:entitlement_form, entitlement_form())
+             |> assign(:grant_selected_user, nil)
+             |> assign(:grant_user_search, "")
+             |> assign(:grant_user_results, [])
+             |> assign(:outstanding_entitlements, list)}
         end
     end
   end
