@@ -741,6 +741,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <button
                   type="submit"
                   id="grant-entitlement-submit"
+                  phx-disable-with="Granting..."
                   class="mt-4 px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700"
                 >
                   Grant benefit & email member
@@ -2602,6 +2603,25 @@ defmodule YscWeb.AdminUserDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(:error, msg, title: "Bookings")
          |> assign(:entitlement_form, to_form(cs, as: :entitlement))}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Booking entitlement created but post-grant step failed",
+          error: inspect(reason),
+          extra: %{user_id: user_id, admin_id: admin_id}
+        )
+
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :warning,
+           "Benefit granted, but notifying the member failed. The benefit is active; do not retry unless you intended a second grant.",
+           title: "Bookings"
+         )
+         |> assign(:entitlement_form, entitlement_form_defaults())
+         |> start_async(:load_booking_entitlements, fn ->
+           Entitlements.list_all_for_user(user_id)
+         end)}
     end
   end
 

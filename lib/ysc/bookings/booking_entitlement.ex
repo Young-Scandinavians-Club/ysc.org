@@ -74,10 +74,12 @@ defmodule Ysc.Bookings.BookingEntitlement do
         changeset
         |> validate_required([:free_nights, :buyout_max_discount])
         |> validate_number(:free_nights, greater_than: 0)
+        |> validate_positive_money(:buyout_max_discount)
 
       :percent_off ->
         changeset
         |> validate_required([:percent_off, :buyout_max_discount])
+        |> validate_positive_money(:buyout_max_discount)
         |> validate_change(:percent_off, fn _, p ->
           cond do
             Decimal.compare(p, Decimal.new(0)) != :gt ->
@@ -92,11 +94,19 @@ defmodule Ysc.Bookings.BookingEntitlement do
         end)
 
       :fixed_amount_off ->
-        validate_required(changeset, [:amount_off])
+        changeset
+        |> validate_required([:amount_off])
+        |> validate_positive_money(:amount_off)
 
       _ ->
         changeset
     end
+  end
+
+  defp validate_positive_money(changeset, field) do
+    validate_change(changeset, field, fn _, %Money{} = m ->
+      if Money.positive?(m), do: [], else: [{field, "must be greater than 0"}]
+    end)
   end
 
   def revoke_changeset(%__MODULE__{} = ent) do

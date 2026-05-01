@@ -12,6 +12,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
   import Ecto.Query
 
   defp ensure_clear_lake_day_pricing_rule do
+    Ysc.Bookings.SeasonCache.invalidate()
+    Cachex.clear(:ysc_cache)
+
     {:ok, _} =
       Bookings.create_pricing_rule(%{
         amount: Money.new(:USD, 30),

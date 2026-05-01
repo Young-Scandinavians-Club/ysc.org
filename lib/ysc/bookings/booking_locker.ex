@@ -179,7 +179,7 @@ defmodule Ysc.Bookings.BookingLocker do
           })
 
         _ ->
-          {:error, :pricing_calculation_failed}
+          Repo.rollback(:pricing_calculation_failed)
       end
     end)
     |> case do
@@ -570,10 +570,10 @@ defmodule Ysc.Bookings.BookingLocker do
             create_room_booking_hold(hold_params)
 
           {nil, _} ->
-            {:error, :pricing_calculation_failed}
+            Repo.rollback(:pricing_calculation_failed)
 
           {_, nil} ->
-            {:error, :pricing_calculation_failed}
+            Repo.rollback(:pricing_calculation_failed)
         end
       end)
       |> case do
@@ -947,7 +947,7 @@ defmodule Ysc.Bookings.BookingLocker do
           })
 
         _ ->
-          {:error, :pricing_calculation_failed}
+          Repo.rollback(:pricing_calculation_failed)
       end
     end)
     |> case do

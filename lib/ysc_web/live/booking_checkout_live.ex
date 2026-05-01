@@ -2672,7 +2672,14 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "nights"}
             </span>
             <span class="font-medium">
-              {MoneyHelper.format_money!(@total_price)}
+              {MoneyHelper.format_money!(
+                if(
+                  @price_breakdown[:entitlement_discount] &&
+                    Money.positive?(@price_breakdown[:entitlement_discount]),
+                  do: @price_breakdown[:entitlement_subtotal] || @total_price,
+                  else: @total_price
+                )
+              )}
             </span>
           </div>
         <% end %>
