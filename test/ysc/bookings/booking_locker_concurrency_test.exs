@@ -27,6 +27,15 @@ defmodule Ysc.Bookings.BookingLockerConcurrencyTest do
         season_id: nil
       })
 
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(:USD, 30),
+        booking_mode: :day,
+        price_unit: :per_guest_per_day,
+        property: :clear_lake,
+        season_id: nil
+      })
+
     tahoe_room1 =
       %Room{
         name: "Tahoe Room 1",

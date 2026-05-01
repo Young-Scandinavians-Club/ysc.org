@@ -47,6 +47,7 @@ defmodule Ysc.Repo.Migrations.CreateBookingEntitlements do
     end
 
     create index(:booking_entitlements, [:user_id])
+    create index(:booking_entitlements, [:user_id, :status])
     create index(:booking_entitlements, [:status])
     create index(:booking_entitlements, [:expires_at])
     create index(:booking_entitlements, [:property])

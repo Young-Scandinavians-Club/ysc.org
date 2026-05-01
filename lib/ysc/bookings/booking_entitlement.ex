@@ -42,10 +42,7 @@ defmodule Ysc.Bookings.BookingEntitlement do
   end
 
   @create_cast [
-    :user_id,
-    :issued_by_user_id,
     :benefit_kind,
-    :status,
     :property,
     :room_id,
     :max_guests,
@@ -60,7 +57,8 @@ defmodule Ysc.Bookings.BookingEntitlement do
   def create_changeset(struct, attrs) do
     struct
     |> cast(attrs, @create_cast)
-    |> validate_required([:user_id, :benefit_kind])
+    |> validate_required([:benefit_kind])
+    |> validate_inclusion(:status, [:active])
     |> validate_number(:max_guests, greater_than: 0)
     |> validate_benefit_fields()
     |> foreign_key_constraint(:user_id)
@@ -82,9 +80,6 @@ defmodule Ysc.Bookings.BookingEntitlement do
         |> validate_required([:percent_off, :buyout_max_discount])
         |> validate_change(:percent_off, fn _, p ->
           cond do
-            is_nil(p) ->
-              []
-
             Decimal.compare(p, Decimal.new(0)) != :gt ->
               [{:percent_off, "must be greater than 0"}]
 

@@ -133,10 +133,7 @@ defmodule Ysc.Bookings.Booking do
         :status,
         :hold_expires_at,
         :total_price,
-        :subtotal_price,
-        :discount_total,
         :pricing_items,
-        :applied_booking_entitlement_id,
         :user_id,
         :checked_in
       ])

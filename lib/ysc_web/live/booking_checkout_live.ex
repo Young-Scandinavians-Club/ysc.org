@@ -1830,7 +1830,12 @@ defmodule YscWeb.BookingCheckoutLive do
                 else
                   %{
                     nights: nights,
-                    price_per_night: Money.div(total, nights) |> elem(1),
+                    price_per_night:
+                      checkout_price_per_night_buyout(
+                        total,
+                        nights,
+                        booking.guests_count
+                      ),
                     entitlement_discount: priced.discount,
                     entitlement_subtotal: priced.subtotal,
                     entitlement_summary:
@@ -1931,11 +1936,11 @@ defmodule YscWeb.BookingCheckoutLive do
                   })
                 else
                   price_per_guest_per_night =
-                    if nights > 0 and booking.guests_count > 0 do
-                      Money.div(total, nights * booking.guests_count) |> elem(1)
-                    else
-                      Money.new(0, :USD)
-                    end
+                    checkout_price_per_guest_per_night(
+                      total,
+                      nights,
+                      booking.guests_count
+                    )
 
                   %{
                     nights: nights,
@@ -1959,6 +1964,33 @@ defmodule YscWeb.BookingCheckoutLive do
         {:error, :invalid_booking_mode}
     end
   end
+
+  @dialyzer {:nowarn_function,
+             checkout_price_per_night_buyout: 3,
+             checkout_price_per_guest_per_night: 3}
+  defp checkout_price_per_night_buyout(%Money{} = total, nights, guests_count)
+       when nights > 0 and guests_count > 0 do
+    case Money.div(total, nights) do
+      {:ok, m} -> m
+      {:error, _} -> Money.new(0, total.currency)
+    end
+  end
+
+  defp checkout_price_per_night_buyout(_, _, _), do: Money.new(0, :USD)
+
+  defp checkout_price_per_guest_per_night(
+         %Money{} = total,
+         nights,
+         guests_count
+       )
+       when nights > 0 and guests_count > 0 do
+    case Money.div(total, nights * guests_count) do
+      {:ok, m} -> m
+      {:error, _} -> Money.new(0, total.currency)
+    end
+  end
+
+  defp checkout_price_per_guest_per_night(_, _, _), do: Money.new(0, :USD)
 
   defp create_payment_intent(booking, total_amount, user) do
     amount_cents = money_to_cents(total_amount)

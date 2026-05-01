@@ -31,6 +31,7 @@ defmodule Ysc.Bookings.BookingLocker do
   """
 
   import Ecto.Query, warn: false
+  import Ecto.Changeset, only: [put_change: 3]
   import RetryOn, only: [retry_on_stale: 2]
   require Ysc.Logging
 
@@ -141,48 +142,51 @@ defmodule Ysc.Bookings.BookingLocker do
       update_property_inventory_for_buyout(prop_inv, property)
 
       # Calculate pricing
-      {base_total, base_items} =
-        calculate_buyout_pricing(
-          property,
-          checkin_date,
-          checkout_date,
-          guests_count
-        )
+      case calculate_buyout_pricing(
+             property,
+             checkin_date,
+             checkout_date,
+             guests_count
+           ) do
+        {base_total, base_items}
+        when not is_nil(base_total) and not is_nil(base_items) ->
+          {total_price, pricing_items, subtotal, discount, ent_id} =
+            Entitlements.apply_best_entitlement(
+              user_id,
+              property,
+              :buyout,
+              checkin_date,
+              checkout_date,
+              base_total,
+              base_items,
+              guests_count: guests_count,
+              children_count: 0,
+              room_ids: []
+            )
 
-      {total_price, pricing_items, subtotal, discount, ent_id} =
-        Entitlements.apply_best_entitlement(
-          user_id,
-          property,
-          :buyout,
-          checkin_date,
-          checkout_date,
-          base_total,
-          base_items,
-          guests_count: guests_count,
-          children_count: 0,
-          room_ids: []
-        )
+          create_buyout_booking_hold(%{
+            user_id: user_id,
+            property: property,
+            checkin_date: checkin_date,
+            checkout_date: checkout_date,
+            guests_count: guests_count,
+            hold_expires_at: hold_expires_at,
+            total_price: total_price,
+            pricing_items: pricing_items,
+            subtotal_price: subtotal,
+            discount_total: discount,
+            applied_booking_entitlement_id: ent_id
+          })
 
-      # Create booking in :hold
-      booking =
-        create_buyout_booking_hold(%{
-          user_id: user_id,
-          property: property,
-          checkin_date: checkin_date,
-          checkout_date: checkout_date,
-          guests_count: guests_count,
-          hold_expires_at: hold_expires_at,
-          total_price: total_price,
-          pricing_items: pricing_items,
-          subtotal_price: subtotal,
-          discount_total: discount,
-          applied_booking_entitlement_id: ent_id
-        })
-
-      booking
+        _ ->
+          {:error, :pricing_calculation_failed}
+      end
     end)
     |> case do
-      {:ok, booking} ->
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:ok, %Booking{} = booking} ->
         # Emit telemetry event for booking creation
         :telemetry.execute(
           [:ysc, :bookings, :booking_created],
@@ -363,19 +367,24 @@ defmodule Ysc.Bookings.BookingLocker do
         :guests_count,
         :hold_expires_at,
         :total_price,
-        :pricing_items,
-        :subtotal_price,
-        :discount_total,
-        :applied_booking_entitlement_id
+        :pricing_items
       ])
       |> Map.merge(%{
         booking_mode: :buyout,
         status: :hold
       })
 
-    case %Booking{}
-         |> Booking.changeset(attrs, skip_validation: true)
-         |> Repo.insert_with_reference_retry(Booking) do
+    changeset =
+      %Booking{}
+      |> Booking.changeset(attrs, skip_validation: true)
+      |> put_change(:subtotal_price, a[:subtotal_price])
+      |> put_change(:discount_total, a[:discount_total])
+      |> put_change(
+        :applied_booking_entitlement_id,
+        a[:applied_booking_entitlement_id]
+      )
+
+    case Repo.insert_with_reference_retry(changeset, Booking) do
       {:ok, booking} ->
         booking
 
@@ -737,11 +746,18 @@ defmodule Ysc.Bookings.BookingLocker do
         total_price: params.total_price,
         pricing_items: params.pricing_items
       }
-      |> Map.merge(extras)
 
-    case %Booking{}
-         |> Booking.changeset(attrs, rooms: params.rooms, skip_validation: true)
-         |> Repo.insert_with_reference_retry(Booking) do
+    changeset =
+      %Booking{}
+      |> Booking.changeset(attrs, rooms: params.rooms, skip_validation: true)
+      |> put_change(:subtotal_price, extras[:subtotal_price])
+      |> put_change(:discount_total, extras[:discount_total])
+      |> put_change(
+        :applied_booking_entitlement_id,
+        extras[:applied_booking_entitlement_id]
+      )
+
+    case Repo.insert_with_reference_retry(changeset, Booking) do
       {:ok, booking} ->
         # Preload rooms for return
         Repo.preload(booking, :rooms)
@@ -894,48 +910,51 @@ defmodule Ysc.Bookings.BookingLocker do
       update_property_inventory_for_per_guest(prop_inv, property, guests_count)
 
       # Calculate pricing
-      {base_total, base_items} =
-        calculate_per_guest_pricing(
-          property,
-          checkin_date,
-          checkout_date,
-          guests_count
-        )
+      case calculate_per_guest_pricing(
+             property,
+             checkin_date,
+             checkout_date,
+             guests_count
+           ) do
+        {base_total, base_items}
+        when not is_nil(base_total) and not is_nil(base_items) ->
+          {total_price, pricing_items, subtotal, discount, ent_id} =
+            Entitlements.apply_best_entitlement(
+              user_id,
+              property,
+              :day,
+              checkin_date,
+              checkout_date,
+              base_total,
+              base_items,
+              guests_count: guests_count,
+              children_count: 0,
+              room_ids: []
+            )
 
-      {total_price, pricing_items, subtotal, discount, ent_id} =
-        Entitlements.apply_best_entitlement(
-          user_id,
-          property,
-          :day,
-          checkin_date,
-          checkout_date,
-          base_total,
-          base_items,
-          guests_count: guests_count,
-          children_count: 0,
-          room_ids: []
-        )
+          create_per_guest_booking_hold(%{
+            user_id: user_id,
+            property: property,
+            checkin_date: checkin_date,
+            checkout_date: checkout_date,
+            guests_count: guests_count,
+            hold_expires_at: hold_expires_at,
+            total_price: total_price,
+            pricing_items: pricing_items,
+            subtotal_price: subtotal,
+            discount_total: discount,
+            applied_booking_entitlement_id: ent_id
+          })
 
-      # Create booking :hold
-      booking =
-        create_per_guest_booking_hold(%{
-          user_id: user_id,
-          property: property,
-          checkin_date: checkin_date,
-          checkout_date: checkout_date,
-          guests_count: guests_count,
-          hold_expires_at: hold_expires_at,
-          total_price: total_price,
-          pricing_items: pricing_items,
-          subtotal_price: subtotal,
-          discount_total: discount,
-          applied_booking_entitlement_id: ent_id
-        })
-
-      booking
+        _ ->
+          {:error, :pricing_calculation_failed}
+      end
     end)
     |> case do
-      {:ok, booking} ->
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:ok, %Booking{} = booking} ->
         # Emit telemetry event for booking creation
         :telemetry.execute(
           [:ysc, :bookings, :booking_created],
@@ -1080,19 +1099,24 @@ defmodule Ysc.Bookings.BookingLocker do
         :guests_count,
         :hold_expires_at,
         :total_price,
-        :pricing_items,
-        :subtotal_price,
-        :discount_total,
-        :applied_booking_entitlement_id
+        :pricing_items
       ])
       |> Map.merge(%{
         booking_mode: :day,
         status: :hold
       })
 
-    case %Booking{}
-         |> Booking.changeset(attrs, skip_validation: true)
-         |> Repo.insert_with_reference_retry(Booking) do
+    changeset =
+      %Booking{}
+      |> Booking.changeset(attrs, skip_validation: true)
+      |> put_change(:subtotal_price, a[:subtotal_price])
+      |> put_change(:discount_total, a[:discount_total])
+      |> put_change(
+        :applied_booking_entitlement_id,
+        a[:applied_booking_entitlement_id]
+      )
+
+    case Repo.insert_with_reference_retry(changeset, Booking) do
       {:ok, booking} ->
         booking
 
@@ -1690,14 +1714,14 @@ defmodule Ysc.Bookings.BookingLocker do
            |> Booking.changeset(
              %{
                status: :canceled,
-               hold_expires_at: nil,
-               applied_booking_entitlement_id: nil,
-               subtotal_price: nil,
-               discount_total: nil
+               hold_expires_at: nil
              },
              rooms: booking.rooms,
              skip_validation: true
            )
+           |> put_change(:applied_booking_entitlement_id, nil)
+           |> put_change(:subtotal_price, nil)
+           |> put_change(:discount_total, nil)
            |> Repo.update() do
         {:ok, updated_booking} ->
           updated_booking

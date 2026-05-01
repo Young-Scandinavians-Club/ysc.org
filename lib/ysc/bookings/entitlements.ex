@@ -4,6 +4,8 @@ defmodule Ysc.Bookings.Entitlements do
   """
   import Ecto.Query, warn: false
 
+  import Ecto.Changeset, only: [put_change: 3]
+
   alias Ysc.Repo
   alias Ysc.Bookings.{BookingEntitlement, EntitlementDiscount}
   alias YscWeb.Emails.BookingEntitlementGranted
@@ -385,28 +387,66 @@ defmodule Ysc.Bookings.Entitlements do
   defp expires_on_to_utc_datetime(s) when s in [nil, ""], do: nil
 
   defp expires_on_to_utc_datetime(iso_date) do
-    case Date.from_iso8601(to_string(iso_date)) do
-      {:ok, date} ->
-        DateTime.new!(date, ~T[23:59:59], "Etc/UTC")
+    tz = Application.get_env(:ysc, :default_timezone, "America/Los_Angeles")
 
-      _ ->
-        nil
+    with {:ok, date} <- Date.from_iso8601(to_string(iso_date)),
+         {:ok, local_dt} <- date_end_of_day_local(date, tz) do
+      DateTime.shift_zone!(local_dt, "Etc/UTC")
+    else
+      _ -> nil
+    end
+  end
+
+  defp date_end_of_day_local(date, tz) do
+    case DateTime.new(date, ~T[23:59:59], tz) do
+      {:ok, dt} ->
+        {:ok, dt}
+
+      {:ambiguous, dt1, dt2} ->
+        later =
+          if DateTime.compare(dt1, dt2) == :gt do
+            dt1
+          else
+            dt2
+          end
+
+        {:ok, later}
+
+      {:gap, _, _} ->
+        {:error, :gap}
+
+      {:error, _} = err ->
+        err
     end
   end
 
   def create_entitlement(attrs, opts \\ []) do
     send_mail? = Keyword.get(opts, :send_notification, true)
 
-    %BookingEntitlement{}
-    |> BookingEntitlement.create_changeset(attrs)
+    user_id = Map.get(attrs, :user_id)
+    issued_by_user_id = Map.get(attrs, :issued_by_user_id)
+    rest = Map.drop(attrs, [:user_id, :issued_by_user_id])
+
+    changeset =
+      %BookingEntitlement{}
+      |> BookingEntitlement.create_changeset(rest)
+      |> put_change(:user_id, user_id)
+      |> put_change(:issued_by_user_id, issued_by_user_id)
+      |> Ecto.Changeset.validate_required([:user_id])
+
+    changeset
     |> Repo.insert()
     |> case do
       {:ok, ent} = ok ->
         if send_mail? do
-          schedule_granted_email(ent)
+          case schedule_granted_email(ent) do
+            nil -> ok
+            {:error, _} = err -> err
+            _job -> ok
+          end
+        else
+          ok
         end
-
-        ok
 
       other ->
         other

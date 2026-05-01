@@ -23,6 +23,8 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Tickets
   alias YscWeb.Workers.MembershipRenewalReminderWorker
 
+  require Ysc.Logging
+
   def render(assigns) do
     ~H"""
     <.side_menu
@@ -2501,8 +2503,6 @@ defmodule YscWeb.AdminUserDetailsLive do
   end
 
   def handle_async(:load_booking_entitlements, {:exit, reason}, socket) do
-    require Ysc.Logging
-
     Ysc.Logging.error("Failed to load booking entitlements",
       error: inspect(reason)
     )
@@ -2515,7 +2515,6 @@ defmodule YscWeb.AdminUserDetailsLive do
   end
 
   def handle_async(:load_notifications, {:exit, reason}, socket) do
-    require Ysc.Logging
     Ysc.Logging.error("Failed to load notifications", error: inspect(reason))
     {:noreply, socket}
   end
@@ -2657,8 +2656,6 @@ defmodule YscWeb.AdminUserDetailsLive do
 
       {:error, changeset} ->
         # Log the actual error for debugging
-        require Ysc.Logging
-
         Ysc.Logging.error(
           "Failed to update user with address: #{inspect(changeset.errors)}"
         )
@@ -2756,8 +2753,6 @@ defmodule YscWeb.AdminUserDetailsLive do
 
                 {:error, error} ->
                   # Log error but don't fail the lifetime membership update
-                  require Ysc.Logging
-
                   Ysc.Logging.warning(
                     "Failed to cancel subscription when awarding lifetime membership",
                     user_id: updated_user.id,

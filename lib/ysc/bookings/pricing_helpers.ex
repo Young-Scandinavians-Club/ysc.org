@@ -133,14 +133,14 @@ defmodule Ysc.Bookings.PricingHelpers do
            guests_count: guests_count,
            children_count: children_count
          ) do
-      {:ok, price, breakdown} ->
-        {price, breakdown} =
+      {:ok, base_price, base_breakdown} ->
+        {calculated_price, price_breakdown} =
           apply_entitlement_discount_to_preview(
             socket,
             property,
             :buyout,
-            price,
-            Map.merge(breakdown, %{
+            base_price,
+            Map.merge(base_breakdown, %{
               guests_count: guests_count,
               children_count: children_count
             }),
@@ -150,8 +150,8 @@ defmodule Ysc.Bookings.PricingHelpers do
           )
 
         assign(socket,
-          calculated_price: price,
-          price_breakdown: breakdown,
+          calculated_price: calculated_price,
+          price_breakdown: price_breakdown,
           price_error: nil
         )
 
@@ -194,14 +194,14 @@ defmodule Ysc.Bookings.PricingHelpers do
              children_count: children_count,
              use_actual_guests: true
            ) do
-        {:ok, price, breakdown} ->
+        {:ok, base_price, base_breakdown} ->
           # Ensure billable_people is set correctly in the breakdown
           # This is important for display - it should reflect the minimum occupancy calculation
           # Check if minimum occupancy pricing is being applied (billable_people > actual guests_count)
           using_minimum_pricing = billable_people > guests_count
 
-          final_breakdown =
-            breakdown
+          merged_breakdown =
+            base_breakdown
             |> Map.merge(%{
               room_count: room_count,
               guests_count: guests_count,
@@ -213,21 +213,21 @@ defmodule Ysc.Bookings.PricingHelpers do
             |> Map.put(:billable_people, billable_people)
             |> Map.put(:using_minimum_pricing, using_minimum_pricing)
 
-          {price, final_breakdown} =
+          {calculated_price, price_breakdown} =
             apply_entitlement_discount_to_preview(
               socket,
               property,
               :room,
-              price,
-              final_breakdown,
+              base_price,
+              merged_breakdown,
               guests_count: billable_people,
               children_count: children_count,
               room_ids: room_ids
             )
 
           assign(socket,
-            calculated_price: price,
-            price_breakdown: final_breakdown,
+            calculated_price: calculated_price,
+            price_breakdown: price_breakdown,
             price_error: nil
           )
 
@@ -247,14 +247,14 @@ defmodule Ysc.Bookings.PricingHelpers do
            :day,
            guests_count: guests_count
          ) do
-      {:ok, price, breakdown} ->
-        {price, breakdown} =
+      {:ok, base_price, base_breakdown} ->
+        {calculated_price, price_breakdown} =
           apply_entitlement_discount_to_preview(
             socket,
             property,
             :day,
-            price,
-            Map.merge(breakdown, %{
+            base_price,
+            Map.merge(base_breakdown, %{
               guests_count: guests_count
             }),
             guests_count: guests_count,
@@ -263,8 +263,8 @@ defmodule Ysc.Bookings.PricingHelpers do
           )
 
         assign(socket,
-          calculated_price: price,
-          price_breakdown: breakdown,
+          calculated_price: calculated_price,
+          price_breakdown: price_breakdown,
           price_error: nil
         )
 
