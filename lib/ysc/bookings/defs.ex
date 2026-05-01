@@ -39,3 +39,17 @@ defmodule Ysc.Bookings.BookingStatus do
     type: :booking_status,
     enums: [:draft, :hold, :complete, :refunded, :canceled]
 end
+
+defmodule Ysc.Bookings.BookingEntitlementBenefitKind do
+  @moduledoc false
+  use EctoEnum,
+    type: :booking_entitlement_benefit_kind,
+    enums: [:free_nights, :percent_off, :fixed_amount_off]
+end
+
+defmodule Ysc.Bookings.BookingEntitlementStatus do
+  @moduledoc false
+  use EctoEnum,
+    type: :booking_entitlement_status,
+    enums: [:active, :consumed, :revoked]
+end

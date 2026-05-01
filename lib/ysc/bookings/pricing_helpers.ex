@@ -10,6 +10,7 @@ defmodule Ysc.Bookings.PricingHelpers do
   """
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.Entitlements
   import Phoenix.Component, only: [assign: 2]
 
   @doc """
@@ -133,13 +134,24 @@ defmodule Ysc.Bookings.PricingHelpers do
            children_count: children_count
          ) do
       {:ok, price, breakdown} ->
-        assign(socket,
-          calculated_price: price,
-          price_breakdown:
+        {price, breakdown} =
+          apply_entitlement_discount_to_preview(
+            socket,
+            property,
+            :buyout,
+            price,
             Map.merge(breakdown, %{
               guests_count: guests_count,
               children_count: children_count
             }),
+            guests_count: guests_count,
+            children_count: children_count,
+            room_ids: []
+          )
+
+        assign(socket,
+          calculated_price: price,
+          price_breakdown: breakdown,
           price_error: nil
         )
 
@@ -201,6 +213,18 @@ defmodule Ysc.Bookings.PricingHelpers do
             |> Map.put(:billable_people, billable_people)
             |> Map.put(:using_minimum_pricing, using_minimum_pricing)
 
+          {price, final_breakdown} =
+            apply_entitlement_discount_to_preview(
+              socket,
+              property,
+              :room,
+              price,
+              final_breakdown,
+              guests_count: billable_people,
+              children_count: children_count,
+              room_ids: room_ids
+            )
+
           assign(socket,
             calculated_price: price,
             price_breakdown: final_breakdown,
@@ -224,12 +248,23 @@ defmodule Ysc.Bookings.PricingHelpers do
            guests_count: guests_count
          ) do
       {:ok, price, breakdown} ->
-        assign(socket,
-          calculated_price: price,
-          price_breakdown:
+        {price, breakdown} =
+          apply_entitlement_discount_to_preview(
+            socket,
+            property,
+            :day,
+            price,
             Map.merge(breakdown, %{
               guests_count: guests_count
             }),
+            guests_count: guests_count,
+            children_count: 0,
+            room_ids: []
+          )
+
+        assign(socket,
+          calculated_price: price,
+          price_breakdown: breakdown,
           price_error: nil
         )
 
@@ -245,6 +280,42 @@ defmodule Ysc.Bookings.PricingHelpers do
       price_breakdown: nil,
       price_error: error_message
     )
+  end
+
+  defp apply_entitlement_discount_to_preview(
+         socket,
+         property,
+         booking_mode,
+         gross,
+         breakdown,
+         opts
+       ) do
+    user = socket.assigns[:current_user]
+
+    if user do
+      {final_total, _items, subtotal, discount, ent_id} =
+        Entitlements.apply_best_entitlement(
+          user.id,
+          property,
+          booking_mode,
+          socket.assigns.checkin_date,
+          socket.assigns.checkout_date,
+          gross,
+          %{},
+          opts
+        )
+
+      bd =
+        Map.merge(breakdown, %{
+          entitlement_subtotal: subtotal,
+          entitlement_discount: discount,
+          applied_entitlement_id: ent_id
+        })
+
+      {final_total, bd}
+    else
+      {gross, breakdown}
+    end
   end
 
   defp get_selected_room_ids(socket, can_select_multiple_rooms_fn) do

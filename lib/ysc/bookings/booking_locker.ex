@@ -38,6 +38,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
   alias Ysc.Bookings.{
     Booking,
+    Entitlements,
     PropertyInventory,
     RoomInventory,
     Room
@@ -140,7 +141,7 @@ defmodule Ysc.Bookings.BookingLocker do
       update_property_inventory_for_buyout(prop_inv, property)
 
       # Calculate pricing
-      {total_price, pricing_items} =
+      {base_total, base_items} =
         calculate_buyout_pricing(
           property,
           checkin_date,
@@ -148,18 +149,35 @@ defmodule Ysc.Bookings.BookingLocker do
           guests_count
         )
 
-      # Create booking in :hold
-      booking =
-        create_buyout_booking_hold(
+      {total_price, pricing_items, subtotal, discount, ent_id} =
+        Entitlements.apply_best_entitlement(
           user_id,
           property,
+          :buyout,
           checkin_date,
           checkout_date,
-          guests_count,
-          hold_expires_at,
-          total_price,
-          pricing_items
+          base_total,
+          base_items,
+          guests_count: guests_count,
+          children_count: 0,
+          room_ids: []
         )
+
+      # Create booking in :hold
+      booking =
+        create_buyout_booking_hold(%{
+          user_id: user_id,
+          property: property,
+          checkin_date: checkin_date,
+          checkout_date: checkout_date,
+          guests_count: guests_count,
+          hold_expires_at: hold_expires_at,
+          total_price: total_price,
+          pricing_items: pricing_items,
+          subtotal_price: subtotal,
+          discount_total: discount,
+          applied_booking_entitlement_id: ent_id
+        })
 
       booking
     end)
@@ -334,28 +352,26 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp create_buyout_booking_hold(
-         user_id,
-         property,
-         checkin_date,
-         checkout_date,
-         guests_count,
-         hold_expires_at,
-         total_price,
-         pricing_items
-       ) do
-    attrs = %{
-      property: property,
-      checkin_date: checkin_date,
-      checkout_date: checkout_date,
-      booking_mode: :buyout,
-      guests_count: guests_count,
-      user_id: user_id,
-      status: :hold,
-      hold_expires_at: hold_expires_at,
-      total_price: total_price,
-      pricing_items: pricing_items
-    }
+  defp create_buyout_booking_hold(%{} = a) do
+    attrs =
+      a
+      |> Map.take([
+        :user_id,
+        :property,
+        :checkin_date,
+        :checkout_date,
+        :guests_count,
+        :hold_expires_at,
+        :total_price,
+        :pricing_items,
+        :subtotal_price,
+        :discount_total,
+        :applied_booking_entitlement_id
+      ])
+      |> Map.merge(%{
+        booking_mode: :buyout,
+        status: :hold
+      })
 
     case %Booking{}
          |> Booking.changeset(attrs, skip_validation: true)
@@ -503,8 +519,30 @@ defmodule Ysc.Bookings.BookingLocker do
                guests_count,
                children_count
              ) do
-          {total_price, pricing_items}
-          when not is_nil(total_price) and not is_nil(pricing_items) ->
+          {base_total, base_items}
+          when not is_nil(base_total) and not is_nil(base_items) ->
+            room_ids = Enum.map(rooms, & &1.id)
+
+            {total_price, pricing_items, subtotal, discount, ent_id} =
+              Entitlements.apply_best_entitlement(
+                user_id,
+                property,
+                :room,
+                checkin_date,
+                checkout_date,
+                base_total,
+                base_items,
+                guests_count: guests_count,
+                children_count: children_count,
+                room_ids: room_ids
+              )
+
+            pricing_extras = %{
+              subtotal_price: subtotal,
+              discount_total: discount,
+              applied_booking_entitlement_id: ent_id
+            }
+
             # Create booking :hold with all rooms
             hold_params = %{
               user_id: user_id,
@@ -516,6 +554,7 @@ defmodule Ysc.Bookings.BookingLocker do
               hold_expires_at: hold_expires_at,
               total_price: total_price,
               pricing_items: pricing_items,
+              pricing_extras: pricing_extras,
               rooms: rooms
             }
 
@@ -682,19 +721,23 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp create_room_booking_hold(params) do
-    attrs = %{
-      property: params.property,
-      checkin_date: params.checkin_date,
-      checkout_date: params.checkout_date,
-      booking_mode: :room,
-      guests_count: params.guests_count,
-      children_count: params.children_count,
-      user_id: params.user_id,
-      status: :hold,
-      hold_expires_at: params.hold_expires_at,
-      total_price: params.total_price,
-      pricing_items: params.pricing_items
-    }
+    extras = Map.get(params, :pricing_extras, %{})
+
+    attrs =
+      %{
+        property: params.property,
+        checkin_date: params.checkin_date,
+        checkout_date: params.checkout_date,
+        booking_mode: :room,
+        guests_count: params.guests_count,
+        children_count: params.children_count,
+        user_id: params.user_id,
+        status: :hold,
+        hold_expires_at: params.hold_expires_at,
+        total_price: params.total_price,
+        pricing_items: params.pricing_items
+      }
+      |> Map.merge(extras)
 
     case %Booking{}
          |> Booking.changeset(attrs, rooms: params.rooms, skip_validation: true)
@@ -851,7 +894,7 @@ defmodule Ysc.Bookings.BookingLocker do
       update_property_inventory_for_per_guest(prop_inv, property, guests_count)
 
       # Calculate pricing
-      {total_price, pricing_items} =
+      {base_total, base_items} =
         calculate_per_guest_pricing(
           property,
           checkin_date,
@@ -859,18 +902,35 @@ defmodule Ysc.Bookings.BookingLocker do
           guests_count
         )
 
-      # Create booking :hold
-      booking =
-        create_per_guest_booking_hold(
+      {total_price, pricing_items, subtotal, discount, ent_id} =
+        Entitlements.apply_best_entitlement(
           user_id,
           property,
+          :day,
           checkin_date,
           checkout_date,
-          guests_count,
-          hold_expires_at,
-          total_price,
-          pricing_items
+          base_total,
+          base_items,
+          guests_count: guests_count,
+          children_count: 0,
+          room_ids: []
         )
+
+      # Create booking :hold
+      booking =
+        create_per_guest_booking_hold(%{
+          user_id: user_id,
+          property: property,
+          checkin_date: checkin_date,
+          checkout_date: checkout_date,
+          guests_count: guests_count,
+          hold_expires_at: hold_expires_at,
+          total_price: total_price,
+          pricing_items: pricing_items,
+          subtotal_price: subtotal,
+          discount_total: discount,
+          applied_booking_entitlement_id: ent_id
+        })
 
       booking
     end)
@@ -1009,28 +1069,26 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp create_per_guest_booking_hold(
-         user_id,
-         property,
-         checkin_date,
-         checkout_date,
-         guests_count,
-         hold_expires_at,
-         total_price,
-         pricing_items
-       ) do
-    attrs = %{
-      property: property,
-      checkin_date: checkin_date,
-      checkout_date: checkout_date,
-      booking_mode: :day,
-      guests_count: guests_count,
-      user_id: user_id,
-      status: :hold,
-      hold_expires_at: hold_expires_at,
-      total_price: total_price,
-      pricing_items: pricing_items
-    }
+  defp create_per_guest_booking_hold(%{} = a) do
+    attrs =
+      a
+      |> Map.take([
+        :user_id,
+        :property,
+        :checkin_date,
+        :checkout_date,
+        :guests_count,
+        :hold_expires_at,
+        :total_price,
+        :pricing_items,
+        :subtotal_price,
+        :discount_total,
+        :applied_booking_entitlement_id
+      ])
+      |> Map.merge(%{
+        booking_mode: :day,
+        status: :hold
+      })
 
     case %Booking{}
          |> Booking.changeset(attrs, skip_validation: true)
@@ -1146,13 +1204,30 @@ defmodule Ysc.Bookings.BookingLocker do
       # Update booking status
       # Pass existing rooms to avoid Ecto thinking we're removing them
       case booking
-           |> Booking.changeset(%{status: :complete, hold_expires_at: nil},
+           |> Booking.changeset(
+             %{
+               status: :complete,
+               hold_expires_at: nil
+             },
              rooms: booking.rooms,
              skip_validation: true
            )
            |> Repo.update() do
         {:ok, updated_booking} ->
-          updated_booking
+          if updated_booking.applied_booking_entitlement_id do
+            case Entitlements.consume_for_booking!(
+                   updated_booking.applied_booking_entitlement_id,
+                   updated_booking.id
+                 ) do
+              :ok ->
+                updated_booking
+
+              {:error, reason} ->
+                Repo.rollback({:error, reason})
+            end
+          else
+            updated_booking
+          end
 
         {:error, changeset} ->
           Repo.rollback({:error, changeset})
@@ -1612,7 +1687,14 @@ defmodule Ysc.Bookings.BookingLocker do
       # Update booking status to canceled
       # Pass existing rooms to avoid Ecto thinking we're removing them
       case booking
-           |> Booking.changeset(%{status: :canceled, hold_expires_at: nil},
+           |> Booking.changeset(
+             %{
+               status: :canceled,
+               hold_expires_at: nil,
+               applied_booking_entitlement_id: nil,
+               subtotal_price: nil,
+               discount_total: nil
+             },
              rooms: booking.rooms,
              skip_validation: true
            )

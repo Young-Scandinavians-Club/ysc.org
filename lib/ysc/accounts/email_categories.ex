@@ -63,6 +63,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "save_the_date_available" => :event,
     # Booking notifications (can be disabled)
     "booking_confirmation" => :account,
+    "booking_entitlement_granted" => :account,
     "booking_refund_processed" => :account,
     "booking_refund_pending" => :account,
     "account_setup_verification" => :account,

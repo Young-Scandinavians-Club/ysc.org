@@ -1,0 +1,53 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Cabin booking benefit</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hello <%= @first_name %>!</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We've added a booking benefit to your Young Scandinavians Club account <strong>for your next eligible cabin booking</strong>.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-wrapper background-color="#f0f9ff" border-radius="8px" padding="8px">
+      <mj-section background-color="#f0f9ff" border-radius="8px" padding="20px 24px">
+        <mj-column padding="0" vertical-align="top" width="100%">
+          <mj-text align="left" color="#0c4a6e" font-size="17px" font-weight="700" line-height="1.4" padding="0px">
+            Your next booking
+          </mj-text>
+          <mj-spacer height="8px"></mj-spacer>
+          <mj-text align="left" color="#0f172a" font-size="17px" line-height="1.55" padding="0px">
+            <%= @next_booking_notice %>
+          </mj-text>
+        </mj-column>
+      </mj-section>
+    </mj-wrapper>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong><%= @benefit_description %></strong></mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @property_line %></mj-text>
+    <%= if @buyout_cap_line != "" do %>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @buyout_cap_line %></mj-text>
+    <% end %>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @expiry_line %></mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <%= if @show_tahoe_link do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><a href="<%= @tahoe_book_url %>" style="color: #1447e6;">Book Lake Tahoe</a></mj-text>
+    <% end %>
+    <%= if @show_clear_lake_link do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><a href="<%= @clear_lake_book_url %>" style="color: #1447e6;">Book Clear Lake</a></mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @manage_bookings_hint %></mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Skål!</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
+  </mj-column>
+</mj-section>
