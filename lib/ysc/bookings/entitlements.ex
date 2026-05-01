@@ -13,6 +13,7 @@ defmodule Ysc.Bookings.Entitlements do
 
   def get_entitlement!(id), do: Repo.get!(BookingEntitlement, id)
 
+  def get_entitlement(nil), do: nil
   def get_entitlement(id), do: Repo.get(BookingEntitlement, id)
 
   @doc """
@@ -188,10 +189,13 @@ defmodule Ysc.Bookings.Entitlements do
       end
 
     base
-    |> Map.put("subtotal", money_to_map(subtotal))
-    |> Map.put("discount_total", money_to_map(discount))
+    |> Map.put("subtotal", money_to_map(money_or_zero(subtotal)))
+    |> Map.put("discount_total", money_to_map(money_or_zero(discount)))
     |> Map.put("discounts", disc_entry)
   end
+
+  defp money_or_zero(nil), do: Money.new(0, :USD)
+  defp money_or_zero(%Money{} = m), do: m
 
   defp money_to_map(%Money{} = m) do
     %{
@@ -249,16 +253,18 @@ defmodule Ysc.Bookings.Entitlements do
             {:error, :entitlement_not_eligible_for_booking}
 
           true ->
+            total_base = subtotal || Money.new(0, :USD)
+
             discount =
               EntitlementDiscount.discount_for(
                 ent,
                 booking_mode,
-                subtotal,
+                total_base,
                 nights,
                 headcount
               )
 
-            case Money.sub(subtotal, discount) do
+            case Money.sub(total_base, discount) do
               {:ok, total} ->
                 {:ok,
                  %{

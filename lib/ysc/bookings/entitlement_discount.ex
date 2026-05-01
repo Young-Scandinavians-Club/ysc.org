@@ -77,10 +77,21 @@ defmodule Ysc.Bookings.EntitlementDiscount do
   @spec discount_for(
           BookingEntitlement.t(),
           atom(),
-          Money.t(),
+          Money.t() | nil,
           pos_integer(),
           pos_integer()
         ) :: Money.t()
+  def discount_for(
+        %BookingEntitlement{} = ent,
+        booking_mode,
+        nil,
+        nights,
+        headcount
+      )
+      when nights > 0 do
+    discount_for(ent, booking_mode, Money.new(0, :USD), nights, headcount)
+  end
+
   def discount_for(
         %BookingEntitlement{} = ent,
         booking_mode,
@@ -197,9 +208,9 @@ defmodule Ysc.Bookings.EntitlementDiscount do
           atom(),
           [binary()],
           non_neg_integer(),
-          Money.t(),
+          Money.t() | nil,
           pos_integer()
-        ) :: {BookingEntitlement.t() | nil, Money.t(), Money.t()}
+        ) :: {BookingEntitlement.t() | nil, Money.t(), Money.t() | nil}
   def pick_best(
         entitlements,
         property,
@@ -209,10 +220,12 @@ defmodule Ysc.Bookings.EntitlementDiscount do
         subtotal,
         nights
       ) do
+    total_base = subtotal || Money.new(0, :USD)
+
     entitlements
     |> Enum.filter(&eligible?(&1, property, booking_mode, room_ids, headcount))
     |> Enum.map(fn ent ->
-      d = discount_for(ent, booking_mode, subtotal, nights, headcount)
+      d = discount_for(ent, booking_mode, total_base, nights, headcount)
       {ent, d}
     end)
     |> reduce_best_pair()
@@ -221,7 +234,7 @@ defmodule Ysc.Bookings.EntitlementDiscount do
         {nil, Money.new(0, :USD), subtotal}
 
       {ent, discount} ->
-        case Money.sub(subtotal, discount) do
+        case Money.sub(total_base, discount) do
           {:ok, total} -> {ent, discount, total}
           _ -> {ent, discount, Money.new(0, :USD)}
         end
