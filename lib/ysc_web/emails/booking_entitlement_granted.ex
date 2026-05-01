@@ -28,8 +28,12 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
           {false, true, nil, "#{base}/bookings/clear-lake"}
       end
 
+    {header_image_url, header_image_alt} = header_image(ent.property, base)
+
     %{
       first_name: first_name,
+      header_image_url: header_image_url,
+      header_image_alt: header_image_alt,
       benefit_description: benefit_description(ent),
       property_line: property_line(ent),
       buyout_cap_line: buyout_cap_line(ent),
@@ -62,6 +66,19 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     #{vars.manage_bookings_hint}
     """
     |> String.trim()
+  end
+
+  defp header_image(:tahoe, base) do
+    {base <> "/images/tahoe-cabin-feature.jpg", "Lake Tahoe cabin"}
+  end
+
+  defp header_image(:clear_lake, base) do
+    {base <> "/images/clear_lake/clear_lake_cabin.webp", "Clear Lake cabin"}
+  end
+
+  defp header_image(nil, base) do
+    {base <> "/images/clear_lake/clear_lake_main.webp",
+     "YSC cabin getaway — book Lake Tahoe or Clear Lake"}
   end
 
   defp next_booking_notice do

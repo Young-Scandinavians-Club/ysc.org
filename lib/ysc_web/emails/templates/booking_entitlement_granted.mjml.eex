@@ -1,5 +1,6 @@
-<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="16px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px 48px 16px 48px">
   <mj-column padding="0">
+    <mj-image src="<%= @header_image_url %>" alt="<%= @header_image_alt %>" border-radius="8px" padding="0px" fluid-on-mobile="true"></mj-image>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
       <strong>Cabin booking benefit</strong>
@@ -38,10 +39,13 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @expiry_line %></mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%= if @show_tahoe_link do %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><a href="<%= @tahoe_book_url %>" style="color: #1447e6;">Book Lake Tahoe</a></mj-text>
+    <mj-button href="<%= @tahoe_book_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Book Lake Tahoe →</mj-button>
+    <% end %>
+    <%= if @show_tahoe_link && @show_clear_lake_link do %>
+    <mj-spacer height="12px"></mj-spacer>
     <% end %>
     <%= if @show_clear_lake_link do %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><a href="<%= @clear_lake_book_url %>" style="color: #1447e6;">Book Clear Lake</a></mj-text>
+    <mj-button href="<%= @clear_lake_book_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Book Clear Lake →</mj-button>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @manage_bookings_hint %></mj-text>
