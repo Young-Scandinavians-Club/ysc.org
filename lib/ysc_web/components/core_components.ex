@@ -2678,9 +2678,15 @@ defmodule YscWeb.CoreComponents do
             }
             class="text-sm text-green-900 mt-2"
           >
-            Your membership will renew on <strong class="text-green-900">
-            <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
-          </strong>.
+            Auto-renewal is on. Your membership will
+            <strong class="text-green-900">automatically renew</strong>
+            on
+            <strong class="text-green-900">
+              {format_utc_date_display(
+                get_membership_renewal_date(@current_membership)
+              )}
+            </strong>
+            unless you turn it off beforehand.
           </p>
 
           <p

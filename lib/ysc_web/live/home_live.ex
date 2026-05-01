@@ -2016,7 +2016,7 @@ defmodule YscWeb.HomeLive do
               "Your #{membership_type} membership is scheduled for cancellation. You are still an active member until #{format_membership_date(renewal_date)}. Your membership will not automatically renew."
 
             renewal_date ->
-              "You have an active #{membership_type} membership. Your membership will renew on #{format_membership_date(renewal_date)}."
+              "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date)} unless you turn it off beforehand."
 
             true ->
               "You have an active #{membership_type} membership."
