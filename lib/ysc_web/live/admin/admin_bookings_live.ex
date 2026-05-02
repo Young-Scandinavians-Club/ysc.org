@@ -1814,10 +1814,23 @@ defmodule YscWeb.AdminBookingsLive do
         </.simple_form>
       </.modal>
 
-      <div class="flex justify-between py-6">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-6 gap-3">
         <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
           {atom_to_readable(@selected_property)} Bookings
         </h1>
+        <.link
+          navigate={~p"/admin/bookings/entitlements"}
+          class={[
+            "inline-flex items-center justify-center gap-2 shrink-0",
+            "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3",
+            "transition duration-150 ease-in-out font-semibold leading-6 text-sm",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+            "bg-blue-700 hover:bg-blue-800 text-zinc-100",
+            "active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
+          ]}
+        >
+          <.icon name="hero-gift" class="w-5 h-5" /> Booking Entitlements
+        </.link>
       </div>
       <!-- Property Tabs -->
       <div class="border-b border-zinc-200 mb-6">

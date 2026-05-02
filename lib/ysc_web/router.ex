@@ -419,6 +419,11 @@ defmodule YscWeb.Router do
       live "/users/:id/details", AdminUserDetailsLive, :profile
       live "/users/:id/details/orders", AdminUserDetailsLive, :orders
       live "/users/:id/details/bookings", AdminUserDetailsLive, :bookings
+
+      live "/users/:id/details/booking-benefits",
+           AdminUserDetailsLive,
+           :booking_benefits
+
       live "/users/:id/details/application", AdminUserDetailsLive, :application
       live "/users/:id/details/membership", AdminUserDetailsLive, :membership
 
@@ -448,6 +453,11 @@ defmodule YscWeb.Router do
 
       # Tahoe and Clear Lake settings etc, see bookings
       live "/bookings", AdminBookingsLive, :index
+
+      live "/bookings/entitlements",
+           AdminBookingEntitlementsLive,
+           :index
+
       live "/bookings/:id", AdminBookingsLive, :view_booking
       live "/bookings/pricing-rules/new", AdminBookingsLive, :new_pricing_rule
 

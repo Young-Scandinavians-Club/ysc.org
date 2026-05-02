@@ -69,8 +69,14 @@ defmodule Ysc.Bookings.Booking do
     field :status, Ysc.Bookings.BookingStatus, default: :draft
     field :hold_expires_at, :utc_datetime
     field :total_price, Money.Ecto.Composite.Type, default_currency: :USD
+    field :subtotal_price, Money.Ecto.Composite.Type, default_currency: :USD
+    field :discount_total, Money.Ecto.Composite.Type, default_currency: :USD
     field :pricing_items, :map
     field :checked_in, :boolean, default: false
+
+    belongs_to :applied_booking_entitlement, Ysc.Bookings.BookingEntitlement,
+      foreign_key: :applied_booking_entitlement_id,
+      references: :id
 
     many_to_many :rooms, Ysc.Bookings.Room,
       join_through: Ysc.Bookings.BookingRoom,

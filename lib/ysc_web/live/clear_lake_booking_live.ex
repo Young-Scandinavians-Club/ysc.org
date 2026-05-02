@@ -1235,6 +1235,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                               end
                             end %>
                           <% total_guest_nights = nights * @guests_count %>
+                          <% line_gross =
+                            @price_breakdown[:entitlement_subtotal] ||
+                              Money.mult(
+                                price_per_guest_per_night,
+                                total_guest_nights
+                              )
+                              |> elem(1) %>
                           <div class="flex justify-between items-center text-zinc-600">
                             <span>
                               Spot Rental ({@guests_count} {if @guests_count == 1,
@@ -1244,13 +1251,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 else: "nights"})
                             </span>
                             <span class="font-bold text-zinc-900">
-                              {MoneyHelper.format_money!(
-                                Money.mult(
-                                  price_per_guest_per_night,
-                                  total_guest_nights
-                                )
-                                |> elem(1)
-                              )}
+                              {MoneyHelper.format_money!(line_gross)}
                             </span>
                           </div>
                         </span>
@@ -1269,6 +1270,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 Money.new(0, :USD)
                               end
                             end %>
+                          <% buyout_gross =
+                            @price_breakdown[:entitlement_subtotal] ||
+                              Money.mult(price_per_night, nights) |> elem(1) %>
                           <div class="flex justify-between items-center text-zinc-600">
                             <span>
                               Full Buyout ({nights} night{if nights != 1,
@@ -1276,12 +1280,29 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 else: ""})
                             </span>
                             <span class="font-bold text-zinc-900">
-                              {MoneyHelper.format_money!(
-                                Money.mult(price_per_night, nights)
-                                |> elem(1)
-                              )}
+                              {MoneyHelper.format_money!(buyout_gross)}
                             </span>
                           </div>
+                        </span>
+                      </div>
+
+                      <div
+                        :if={
+                          @price_breakdown &&
+                            @price_breakdown[:entitlement_discount] &&
+                            Money.positive?(@price_breakdown[:entitlement_discount])
+                        }
+                        class="flex justify-between text-sm text-emerald-800"
+                      >
+                        <span>
+                          Member benefit<%= if @price_breakdown[:entitlement_summary] do %>
+                            ({@price_breakdown[:entitlement_summary]})
+                          <% end %>
+                        </span>
+                        <span>
+                          −{MoneyHelper.format_money!(
+                            @price_breakdown[:entitlement_discount]
+                          )}
                         </span>
                       </div>
 
