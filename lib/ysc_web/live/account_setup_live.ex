@@ -927,6 +927,23 @@ defmodule YscWeb.AccountSetupLive do
     # Handle both OTP array format and single string format
     code = normalize_verification_code(entered_code)
 
+    user_id = socket.assigns.user.id
+
+    with :ok <- Ysc.EmailVerificationRateLimit.check(user_id) do
+      do_verify_email_code(socket, code)
+    else
+      :rate_limited ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Too many verification attempts. Please wait a minute and try again.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
+    end
+  end
+
+  defp do_verify_email_code(socket, code) do
     # In dev/sandbox, always accept 000000 as valid code
     verification_result =
       if dev_or_sandbox?() and code == "000000" do
