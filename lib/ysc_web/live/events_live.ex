@@ -505,7 +505,7 @@ defmodule YscWeb.EventsLive do
   defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
   defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
 
-  defp event_image_url(nil), do: "/images/ysc_logo.png"
+  defp event_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp event_image_url(%Image{optimized_image_path: nil} = image),
     do: image.raw_image_path

@@ -17,14 +17,16 @@ defmodule YscWeb.VolunteerLive do
           </p>
         </div>
         <div class="not-prose">
-          <%!-- Placeholder for volunteer photo --%>
-          <img
-            src="/images/ysc_group_photo.jpg"
-            alt="Group of YSC Members and Volunteers"
-            class="w-full h-full object-cover rounded-2xl aspect-video flex items-center justify-center"
-            fetchpriority="high"
-            loading="eager"
-          />
+          <picture>
+            <source srcset={~p"/images/ysc_group_photo.webp"} type="image/webp" />
+            <img
+              src={~p"/images/ysc_group_photo.jpg"}
+              alt="Group of YSC Members and Volunteers"
+              class="w-full h-full object-cover rounded-2xl aspect-video flex items-center justify-center"
+              fetchpriority="high"
+              loading="eager"
+            />
+          </picture>
         </div>
       </div>
 
