@@ -428,7 +428,7 @@ defmodule YscWeb.MediaPickerComponent do
   defp thumbnail_url(%{raw_image_path: path})
        when is_binary(path) and path != "", do: path
 
-  defp thumbnail_url(_), do: "/images/ysc_logo.png"
+  defp thumbnail_url(_), do: "/images/ysc_logo.webp"
 
   defp error_to_string(:too_large), do: "Too large"
 

@@ -1635,7 +1635,7 @@ defmodule YscWeb.BookingReceiptLive do
     case property do
       :tahoe -> ~p"/images/tahoe/tahoe_cabin_main.webp"
       :clear_lake -> ~p"/images/clear_lake/clear_lake_dock.webp"
-      _ -> ~p"/images/ysc_logo.png"
+      _ -> ~p"/images/ysc_logo.webp"
     end
   end
 

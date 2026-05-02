@@ -111,10 +111,17 @@ defmodule YscWeb.VolunteerLiveTest do
     end
 
     test "displays volunteer photo", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/volunteer")
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
 
-      assert html =~ "ysc_group_photo.jpg"
-      assert html =~ "Group of YSC Members and Volunteers"
+      assert has_element?(
+               view,
+               "picture source[type='image/webp'][srcset*='ysc_group_photo.webp']"
+             )
+
+      assert has_element?(
+               view,
+               "picture img[src*='ysc_group_photo.jpg'][alt='Group of YSC Members and Volunteers']"
+             )
     end
   end
 
