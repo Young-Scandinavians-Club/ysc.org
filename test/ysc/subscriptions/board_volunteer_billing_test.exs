@@ -122,7 +122,11 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
                BoardVolunteerBilling.stripe_pause_collection_params(false)
 
       expected_now = BoardVolunteerBilling.grace_resume_at_unix_from(now)
-      expected_next = BoardVolunteerBilling.grace_resume_at_unix_from(DateTime.add(now, 1, :second))
+
+      expected_next =
+        BoardVolunteerBilling.grace_resume_at_unix_from(
+          DateTime.add(now, 1, :second)
+        )
 
       assert unix in [expected_now, expected_next]
     end
