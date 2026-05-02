@@ -7138,7 +7138,7 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp get_room_blur_hash(%Ysc.Media.Image{blur_hash: blur_hash}), do: blur_hash
 
-  defp get_room_image_url(nil), do: "/images/ysc_logo.png"
+  defp get_room_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp get_room_image_url(%Ysc.Media.Image{} = image) do
     # Prefer thumbnail for room cards (smaller, faster loading)
@@ -7146,7 +7146,7 @@ defmodule YscWeb.TahoeBookingLive do
       not is_nil(image.thumbnail_path) -> image.thumbnail_path
       not is_nil(image.optimized_image_path) -> image.optimized_image_path
       not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.png"
+      true -> "/images/ysc_logo.webp"
     end
   end
 

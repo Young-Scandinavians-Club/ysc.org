@@ -87,7 +87,7 @@ defmodule YscWeb.Components.Image do
     cond do
       not is_nil(image.optimized_image_path) -> image.optimized_image_path
       not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.png"
+      true -> "/images/ysc_logo.webp"
     end
   end
 
@@ -97,13 +97,13 @@ defmodule YscWeb.Components.Image do
       not is_nil(image.thumbnail_path) -> image.thumbnail_path
       not is_nil(image.optimized_image_path) -> image.optimized_image_path
       not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.png"
+      true -> "/images/ysc_logo.webp"
     end
   end
 
   # Prefer raw image only
   defp image_url(%Image{} = image, :raw) do
-    image.raw_image_path || "/images/ysc_logo.png"
+    image.raw_image_path || "/images/ysc_logo.webp"
   end
 
   # Default: thumbnail > optimized > raw (backward compatible)
@@ -112,7 +112,7 @@ defmodule YscWeb.Components.Image do
       not is_nil(image.thumbnail_path) -> image.thumbnail_path
       not is_nil(image.optimized_image_path) -> image.optimized_image_path
       not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.png"
+      true -> "/images/ysc_logo.webp"
     end
   end
 

@@ -17,6 +17,7 @@ defmodule YscWeb.Emails.HeaderBlock do
     """
   end
 
+  @doc "PNG (not WebP) for broad HTML email client support."
   def logo_path() do
     "#{YscWeb.Endpoint.url()}/images/ysc_logo.png"
   end
