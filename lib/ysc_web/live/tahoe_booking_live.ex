@@ -2282,10 +2282,12 @@ defmodule YscWeb.TahoeBookingLive do
                           <% end %>
                         </span>
                         <span class="font-semibold text-zinc-900">
-                          {MoneyHelper.format_money!(@calculated_price)}
+                          {MoneyHelper.format_money!(
+                            @price_breakdown[:entitlement_subtotal] ||
+                              @calculated_price
+                          )}
                         </span>
                       </div>
-                      <!-- Room Price Breakdown -->
                       <div :if={@selected_booking_mode == :room}>
                         <div
                           :if={@price_breakdown[:using_minimum_pricing]}
@@ -2350,6 +2352,25 @@ defmodule YscWeb.TahoeBookingLive do
                             {MoneyHelper.format_money!(@price_breakdown.children)}
                           </span>
                         </div>
+                      </div>
+
+                      <div
+                        :if={
+                          @price_breakdown[:entitlement_discount] &&
+                            Money.positive?(@price_breakdown[:entitlement_discount])
+                        }
+                        class="flex justify-between text-sm text-emerald-800 pt-1"
+                      >
+                        <span>
+                          Member benefit<%= if @price_breakdown[:entitlement_summary] do %>
+                            ({@price_breakdown[:entitlement_summary]})
+                          <% end %>
+                        </span>
+                        <span>
+                          −{MoneyHelper.format_money!(
+                            @price_breakdown[:entitlement_discount]
+                          )}
+                        </span>
                       </div>
                     </div>
 

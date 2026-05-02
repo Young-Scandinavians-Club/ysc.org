@@ -39,6 +39,7 @@ defmodule YscWeb.Emails.Notifier do
     "ticket_purchase_confirmation" => YscWeb.Emails.TicketPurchaseConfirmation,
     "ticket_order_refund" => YscWeb.Emails.TicketOrderRefund,
     "booking_confirmation" => YscWeb.Emails.BookingConfirmation,
+    "booking_entitlement_granted" => YscWeb.Emails.BookingEntitlementGranted,
     "booking_refund_processed" => YscWeb.Emails.BookingRefundProcessed,
     "booking_refund_pending" => YscWeb.Emails.BookingRefundPending,
     "volunteer_confirmation" => YscWeb.Emails.VolunteerConfirmation,

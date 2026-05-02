@@ -11,6 +11,20 @@ defmodule Ysc.Bookings.BookingLockerTest do
   import Ysc.AccountsFixtures
   import Ecto.Query
 
+  defp ensure_clear_lake_day_pricing_rule do
+    Ysc.Bookings.SeasonCache.invalidate()
+    Cachex.clear(:ysc_cache)
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(:USD, 30),
+        booking_mode: :day,
+        price_unit: :per_guest_per_day,
+        property: :clear_lake,
+        season_id: nil
+      })
+  end
+
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
 
@@ -858,6 +872,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
     test "refunds a complete Clear Lake day booking and sets status to refunded",
          %{user: user} do
+      ensure_clear_lake_day_pricing_rule()
+
       checkin = Date.utc_today() |> Date.add(414)
       checkout = Date.add(checkin, 2)
 
@@ -949,6 +965,11 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "Clear Lake per-guest capacity" do
+    setup do
+      ensure_clear_lake_day_pricing_rule()
+      :ok
+    end
+
     test "create_per_guest_booking succeeds within capacity", %{user: user} do
       checkin = Date.utc_today() |> Date.add(30)
       checkout = Date.add(checkin, 2)
@@ -1103,6 +1124,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
     test "returns inventory_update_failed when property inventory rows are missing after per-guest hold",
          %{user: user} do
+      ensure_clear_lake_day_pricing_rule()
+
       checkin = Date.utc_today() |> Date.add(211)
       checkout = Date.add(checkin, 2)
 
@@ -1268,6 +1291,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "releases Clear Lake per-guest hold and restores capacity_held", %{
       user: user
     } do
+      ensure_clear_lake_day_pricing_rule()
+
       checkin = Date.utc_today() |> Date.add(125)
       checkout = Date.add(checkin, 2)
       guests = 3
@@ -1388,6 +1413,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{
            user: user
          } do
+      ensure_clear_lake_day_pricing_rule()
+
       checkin = Date.utc_today() |> Date.add(202)
       checkout = Date.add(checkin, 2)
       guests = 3
@@ -1671,6 +1698,11 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "create_buyout_booking/6 Clear Lake vs per-guest capacity" do
+    setup do
+      ensure_clear_lake_day_pricing_rule()
+      :ok
+    end
+
     test "returns property_unavailable when per-guest hold consumes Clear Lake capacity",
          %{
            user: user
@@ -1752,6 +1784,11 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "confirm_booking/1 Clear Lake per-guest" do
+    setup do
+      ensure_clear_lake_day_pricing_rule()
+      :ok
+    end
+
     test "confirms a per-guest hold and completes booking", %{user: user} do
       checkin = Date.utc_today() |> Date.add(124)
       checkout = Date.add(checkin, 2)

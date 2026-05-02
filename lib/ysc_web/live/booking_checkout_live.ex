@@ -2,7 +2,7 @@ defmodule YscWeb.BookingCheckoutLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, BookingLocker}
+  alias Ysc.Bookings.{Booking, BookingLocker, Entitlements}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   import Ecto.Query
@@ -102,6 +102,20 @@ defmodule YscWeb.BookingCheckoutLive do
           price_breakdown,
           timezone
         )
+
+      {:error, reason}
+      when reason in [
+             :entitlement_no_longer_valid,
+             :entitlement_not_eligible_for_booking
+           ] ->
+        {:ok,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Your booking benefit is no longer valid for this reservation. Please start a new booking.",
+           title: "Checkout"
+         )
+         |> redirect(to: get_property_redirect_path(booking.property))}
 
       {:error, reason} ->
         {:ok,
@@ -1771,6 +1785,21 @@ defmodule YscWeb.BookingCheckoutLive do
   defp calculate_booking_price(booking) do
     nights = Date.diff(booking.checkout_date, booking.checkin_date)
 
+    room_opts = fn ->
+      room_ids =
+        if Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [] do
+          Enum.map(booking.rooms, & &1.id)
+        else
+          []
+        end
+
+      [
+        guests_count: booking.guests_count,
+        children_count: booking.children_count || 0,
+        room_ids: room_ids
+      ]
+    end
+
     case booking.booking_mode do
       :buyout ->
         case Bookings.calculate_booking_price(
@@ -1782,18 +1811,40 @@ defmodule YscWeb.BookingCheckoutLive do
                children_count: 0
              ) do
           {:ok, total, breakdown} ->
-            # Use breakdown if available, otherwise create a simple one
-            final_breakdown =
-              if breakdown && is_map(breakdown) do
-                Map.merge(breakdown, %{nights: nights})
-              else
-                %{
-                  nights: nights,
-                  price_per_night: Money.div(total, nights) |> elem(1)
-                }
-              end
+            with {:ok, priced} <-
+                   Entitlements.price_with_locked_entitlement(
+                     booking,
+                     total,
+                     :buyout,
+                     room_opts.()
+                   ) do
+              final_breakdown =
+                if breakdown && is_map(breakdown) do
+                  Map.merge(breakdown, %{
+                    nights: nights,
+                    entitlement_discount: priced.discount,
+                    entitlement_subtotal: priced.subtotal,
+                    entitlement_summary:
+                      priced.breakdown_additions[:entitlement_summary]
+                  })
+                else
+                  %{
+                    nights: nights,
+                    price_per_night:
+                      checkout_price_per_night_buyout(
+                        total,
+                        nights,
+                        booking.guests_count
+                      ),
+                    entitlement_discount: priced.discount,
+                    entitlement_subtotal: priced.subtotal,
+                    entitlement_summary:
+                      priced.breakdown_additions[:entitlement_summary]
+                  }
+                end
 
-            {:ok, total, final_breakdown}
+              {:ok, priced.total, final_breakdown}
+            end
 
           error ->
             error
@@ -1826,7 +1877,21 @@ defmodule YscWeb.BookingCheckoutLive do
                  nights
                ) do
             {:ok, recalculated_total, breakdown} ->
-              {:ok, recalculated_total, breakdown}
+              with {:ok, priced} <-
+                     Entitlements.price_with_locked_entitlement(
+                       booking,
+                       recalculated_total,
+                       :room,
+                       room_opts.()
+                     ) do
+                {:ok, priced.total,
+                 Map.merge(breakdown, %{
+                   entitlement_discount: priced.discount,
+                   entitlement_subtotal: priced.subtotal,
+                   entitlement_summary:
+                     priced.breakdown_additions[:entitlement_summary]
+                 })}
+              end
 
             error ->
               # Fallback to stored pricing if recalculation fails
@@ -1852,29 +1917,44 @@ defmodule YscWeb.BookingCheckoutLive do
                children_count: 0
              ) do
           {:ok, total, breakdown} ->
-            # Use breakdown if available, otherwise create a simple one
-            final_breakdown =
-              if breakdown && is_map(breakdown) do
-                Map.merge(breakdown, %{
-                  nights: nights,
-                  guests_count: booking.guests_count
-                })
-              else
-                price_per_guest_per_night =
-                  if nights > 0 and booking.guests_count > 0 do
-                    Money.div(total, nights * booking.guests_count) |> elem(1)
-                  else
-                    Money.new(0, :USD)
-                  end
+            with {:ok, priced} <-
+                   Entitlements.price_with_locked_entitlement(
+                     booking,
+                     total,
+                     :day,
+                     room_opts.()
+                   ) do
+              final_breakdown =
+                if breakdown && is_map(breakdown) do
+                  Map.merge(breakdown, %{
+                    nights: nights,
+                    guests_count: booking.guests_count,
+                    entitlement_discount: priced.discount,
+                    entitlement_subtotal: priced.subtotal,
+                    entitlement_summary:
+                      priced.breakdown_additions[:entitlement_summary]
+                  })
+                else
+                  price_per_guest_per_night =
+                    checkout_price_per_guest_per_night(
+                      total,
+                      nights,
+                      booking.guests_count
+                    )
 
-                %{
-                  nights: nights,
-                  guests_count: booking.guests_count,
-                  price_per_guest_per_night: price_per_guest_per_night
-                }
-              end
+                  %{
+                    nights: nights,
+                    guests_count: booking.guests_count,
+                    price_per_guest_per_night: price_per_guest_per_night,
+                    entitlement_discount: priced.discount,
+                    entitlement_subtotal: priced.subtotal,
+                    entitlement_summary:
+                      priced.breakdown_additions[:entitlement_summary]
+                  }
+                end
 
-            {:ok, total, final_breakdown}
+              {:ok, priced.total, final_breakdown}
+            end
 
           error ->
             error
@@ -1884,6 +1964,33 @@ defmodule YscWeb.BookingCheckoutLive do
         {:error, :invalid_booking_mode}
     end
   end
+
+  @dialyzer {:nowarn_function,
+             checkout_price_per_night_buyout: 3,
+             checkout_price_per_guest_per_night: 3}
+  defp checkout_price_per_night_buyout(%Money{} = total, nights, guests_count)
+       when nights > 0 and guests_count > 0 do
+    case Money.div(total, nights) do
+      {:ok, m} -> m
+      {:error, _} -> Money.new(0, total.currency)
+    end
+  end
+
+  defp checkout_price_per_night_buyout(_, _, _), do: Money.new(0, :USD)
+
+  defp checkout_price_per_guest_per_night(
+         %Money{} = total,
+         nights,
+         guests_count
+       )
+       when nights > 0 and guests_count > 0 do
+    case Money.div(total, nights * guests_count) do
+      {:ok, m} -> m
+      {:error, _} -> Money.new(0, total.currency)
+    end
+  end
+
+  defp checkout_price_per_guest_per_night(_, _, _), do: Money.new(0, :USD)
 
   defp create_payment_intent(booking, total_amount, user) do
     amount_cents = money_to_cents(total_amount)
@@ -2565,11 +2672,31 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "nights"}
             </span>
             <span class="font-medium">
-              {MoneyHelper.format_money!(@total_price)}
+              {MoneyHelper.format_money!(
+                if(
+                  @price_breakdown[:entitlement_discount] &&
+                    Money.positive?(@price_breakdown[:entitlement_discount]),
+                  do: @price_breakdown[:entitlement_subtotal] || @total_price,
+                  else: @total_price
+                )
+              )}
             </span>
           </div>
         <% end %>
       <% end %>
+    <% end %>
+    <%= if @price_breakdown[:entitlement_discount] &&
+          Money.positive?(@price_breakdown[:entitlement_discount]) do %>
+      <div class="flex justify-between text-sm text-emerald-800 mt-3 pt-3 border-t border-zinc-100">
+        <span>
+          Member benefit<%= if @price_breakdown[:entitlement_summary] do %>
+            ({@price_breakdown[:entitlement_summary]})
+          <% end %>
+        </span>
+        <span class="tabular-nums">
+          −{MoneyHelper.format_money!(@price_breakdown[:entitlement_discount])}
+        </span>
+      </div>
     <% end %>
     """
   end

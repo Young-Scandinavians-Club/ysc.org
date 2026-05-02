@@ -14,6 +14,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Accounts
   alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Bookings
+  alias Ysc.Bookings.Entitlements
   alias Ysc.ExpenseReports
   alias Ysc.Ledgers
   alias Ysc.Messages
@@ -21,6 +22,8 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Subscriptions
   alias Ysc.Tickets
   alias YscWeb.Workers.MembershipRenewalReminderWorker
+
+  require Ysc.Logging
 
   def render(assigns) do
     ~H"""
@@ -649,6 +652,164 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <.icon name="hero-chevron-right" class="w-4 h-4" />
               </:next>
             </Flop.Phoenix.pagination>
+          </div>
+
+          <div class="mt-12 pt-10 border-t border-zinc-200 max-w-4xl space-y-8">
+            <div>
+              <h2 class="text-xl font-semibold text-zinc-800">
+                Cabin booking benefits
+              </h2>
+              <p class="text-sm text-zinc-500 mt-1">
+                Grants apply automatically when this member books an eligible stay (
+                <.link
+                  navigate={~p"/admin/bookings/entitlements"}
+                  class="text-blue-600 hover:underline"
+                >
+                  view all outstanding
+                </.link>
+                ).
+              </p>
+            </div>
+
+            <div class="rounded-lg border border-zinc-200 p-4 bg-white">
+              <h3 class="text-sm font-semibold text-zinc-800 mb-3">
+                Grant new benefit
+              </h3>
+              <.form
+                for={@entitlement_form}
+                id="grant-entitlement-form"
+                phx-submit="grant_booking_entitlement"
+              >
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <.input
+                    field={@entitlement_form[:benefit_kind]}
+                    type="select"
+                    label="Benefit type"
+                    options={[
+                      {"Percent off stay", "percent_off"},
+                      {"Free nights (proportional)", "free_nights"},
+                      {"Fixed amount off", "fixed_amount_off"}
+                    ]}
+                  />
+                  <.input
+                    field={@entitlement_form[:property]}
+                    type="select"
+                    label="Property"
+                    options={[
+                      {"Any property", ""},
+                      {"Lake Tahoe", "tahoe"},
+                      {"Clear Lake", "clear_lake"}
+                    ]}
+                  />
+                  <.input
+                    field={@entitlement_form[:max_guests]}
+                    type="number"
+                    label="Max guests (optional)"
+                  />
+                  <.input
+                    field={@entitlement_form[:free_nights]}
+                    type="number"
+                    label="Free nights count"
+                  />
+                  <.input
+                    field={@entitlement_form[:percent_off]}
+                    type="text"
+                    label="Percent off (e.g. 50)"
+                  />
+                  <.input
+                    field={@entitlement_form[:buyout_max_discount]}
+                    type="text"
+                    label="Buyout max discount (USD)"
+                  />
+                  <.input
+                    field={@entitlement_form[:amount_off]}
+                    type="text"
+                    label="Fixed amount off (USD)"
+                  />
+                  <.input
+                    field={@entitlement_form[:expires_on]}
+                    type="date"
+                    label="Expires (optional)"
+                  />
+                </div>
+                <.input
+                  field={@entitlement_form[:internal_note]}
+                  type="textarea"
+                  label="Internal note (optional)"
+                  class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
+                />
+                <button
+                  type="submit"
+                  id="grant-entitlement-submit"
+                  phx-disable-with="Granting..."
+                  class="mt-4 px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700"
+                >
+                  Grant benefit & email member
+                </button>
+              </.form>
+            </div>
+
+            <div class="overflow-x-auto rounded-lg border border-zinc-200">
+              <table class="min-w-full text-sm">
+                <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+                  <tr>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Benefit</th>
+                    <th class="px-4 py-3">Property</th>
+                    <th class="px-4 py-3">Created</th>
+                    <th class="px-4 py-3">Expires</th>
+                    <th class="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
+                    <td class="px-4 py-3">
+                      <span class="font-medium text-zinc-800">{ent.status}</span>
+                    </td>
+                    <td class="px-4 py-3 text-zinc-700">
+                      {admin_entitlement_summary(ent)}
+                    </td>
+                    <td class="px-4 py-3 text-zinc-600">
+                      <%= cond do %>
+                        <% is_nil(ent.property) -> %>
+                          Any
+                        <% ent.property == :tahoe -> %>
+                          Tahoe
+                        <% true -> %>
+                          Clear Lake
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                      {Calendar.strftime(ent.inserted_at, "%Y-%m-%d")}
+                    </td>
+                    <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                      <%= if ent.expires_at do %>
+                        {Date.to_iso8601(DateTime.to_date(ent.expires_at))}
+                      <% else %>
+                        —
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <button
+                        :if={ent.status == :active}
+                        type="button"
+                        phx-click="revoke_booking_entitlement"
+                        phx-value-id={ent.id}
+                        class="text-red-600 hover:underline text-xs font-semibold"
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p
+                :if={@booking_entitlements == []}
+                class="px-4 py-6 text-center text-zinc-500 text-sm"
+              >
+                No entitlements yet for this member.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -2143,6 +2304,8 @@ defmodule YscWeb.AdminUserDetailsLive do
         :note_form,
         to_form(note_changeset(%{category: "general"}), as: "note")
       )
+      |> assign(:booking_entitlements, [])
+      |> assign(:entitlement_form, entitlement_form_defaults())
       |> assign(form: user_form)
 
     socket =
@@ -2215,68 +2378,81 @@ defmodule YscWeb.AdminUserDetailsLive do
     list_params = Map.drop(params, ["id"])
     socket = assign(socket, :list_params, list_params)
 
-    socket =
-      case socket.assigns.live_action do
-        :orders ->
-          socket
-          |> stream(:ticket_orders, [], reset: true)
-          |> start_async(:load_ticket_orders, fn ->
-            Tickets.list_user_ticket_orders_paginated(user_id, params)
-          end)
-
-        :bookings ->
-          socket
-          |> stream(:bookings, [], reset: true)
-          |> start_async(:load_bookings, fn ->
-            Bookings.list_user_bookings_paginated(user_id, params)
-          end)
-
-        :notifications ->
-          user_email = socket.assigns.selected_user.email
-
-          start_async(socket, :load_notifications, fn ->
-            Messages.list_user_messages(user_id, limit: 100, email: user_email)
-          end)
-
-        :bank_accounts ->
-          if socket.assigns.is_treasurer do
-            start_async(socket, :load_bank_accounts, fn ->
-              user = Accounts.get_user!(user_id)
-              ExpenseReports.list_bank_accounts(user)
-            end)
-          else
+    if socket.assigns.live_action == :booking_benefits do
+      {:noreply,
+       push_navigate(socket,
+         to: ~p"/admin/users/#{user_id}/details/bookings?#{list_params}"
+       )}
+    else
+      socket =
+        case socket.assigns.live_action do
+          :orders ->
             socket
-          end
+            |> stream(:ticket_orders, [], reset: true)
+            |> start_async(:load_ticket_orders, fn ->
+              Tickets.list_user_ticket_orders_paginated(user_id, params)
+            end)
 
-        :family ->
-          selected_user = socket.assigns.selected_user
+          :bookings ->
+            socket
+            |> stream(:bookings, [], reset: true)
+            |> start_async(:load_bookings, fn ->
+              Bookings.list_user_bookings_paginated(user_id, params)
+            end)
+            |> start_async(:load_booking_entitlements, fn ->
+              Entitlements.list_all_for_user(user_id)
+            end)
 
-          start_async(socket, :load_family, fn ->
-            fetch_family_assigns(selected_user)
-          end)
+          :notifications ->
+            user_email = socket.assigns.selected_user.email
 
-        :membership ->
-          selected_user = socket.assigns.selected_user
+            start_async(socket, :load_notifications, fn ->
+              Messages.list_user_messages(user_id,
+                limit: 100,
+                email: user_email
+              )
+            end)
 
-          start_async(socket, :load_family, fn ->
-            fetch_family_assigns(selected_user)
-          end)
+          :bank_accounts ->
+            if socket.assigns.is_treasurer do
+              start_async(socket, :load_bank_accounts, fn ->
+                user = Accounts.get_user!(user_id)
+                ExpenseReports.list_bank_accounts(user)
+              end)
+            else
+              socket
+            end
 
-        :logs ->
-          start_async(socket, :load_user_notes, fn ->
-            Accounts.list_user_notes(user_id)
-          end)
+          :family ->
+            selected_user = socket.assigns.selected_user
 
-        :application ->
-          start_async(socket, :load_rejection_notes, fn ->
-            Accounts.list_user_notes_by_category(user_id, :rejection)
-          end)
+            start_async(socket, :load_family, fn ->
+              fetch_family_assigns(selected_user)
+            end)
 
-        _ ->
-          socket
-      end
+          :membership ->
+            selected_user = socket.assigns.selected_user
 
-    {:noreply, socket}
+            start_async(socket, :load_family, fn ->
+              fetch_family_assigns(selected_user)
+            end)
+
+          :logs ->
+            start_async(socket, :load_user_notes, fn ->
+              Accounts.list_user_notes(user_id)
+            end)
+
+          :application ->
+            start_async(socket, :load_rejection_notes, fn ->
+              Accounts.list_user_notes_by_category(user_id, :rejection)
+            end)
+
+          _ ->
+            socket
+        end
+
+      {:noreply, socket}
+    end
   end
 
   def handle_async(:load_downgrade_info, {:ok, info}, socket) do
@@ -2323,12 +2499,23 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply, socket}
   end
 
+  def handle_async(:load_booking_entitlements, {:ok, list}, socket) do
+    {:noreply, assign(socket, :booking_entitlements, list)}
+  end
+
+  def handle_async(:load_booking_entitlements, {:exit, reason}, socket) do
+    Ysc.Logging.error("Failed to load booking entitlements",
+      error: inspect(reason)
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_async(:load_notifications, {:ok, notifications}, socket) do
     {:noreply, assign(socket, :notifications, notifications)}
   end
 
   def handle_async(:load_notifications, {:exit, reason}, socket) do
-    require Ysc.Logging
     Ysc.Logging.error("Failed to load notifications", error: inspect(reason))
     {:noreply, socket}
   end
@@ -2390,6 +2577,92 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply, assign(socket, :panel_width, width)}
   end
 
+  def handle_event("grant_booking_entitlement", %{"entitlement" => p}, socket) do
+    user_id = socket.assigns.user_id
+    admin_id = socket.assigns.current_user.id
+    attrs = Entitlements.grant_attrs_from_entitlement_form(p, admin_id, user_id)
+
+    case Entitlements.create_entitlement(attrs) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Benefit granted. Member will receive an email.",
+           title: "Bookings"
+         )
+         |> assign(:entitlement_form, entitlement_form_defaults())
+         |> start_async(:load_booking_entitlements, fn ->
+           Entitlements.list_all_for_user(user_id)
+         end)}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        msg = format_changeset_errors(cs)
+
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, msg, title: "Bookings")
+         |> assign(:entitlement_form, to_form(cs, as: :entitlement))}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Booking entitlement created but post-grant step failed",
+          error: inspect(reason),
+          extra: %{user_id: user_id, admin_id: admin_id}
+        )
+
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :warning,
+           "Benefit granted, but notifying the member failed. The benefit is active; do not retry unless you intended a second grant.",
+           title: "Bookings"
+         )
+         |> assign(:entitlement_form, entitlement_form_defaults())
+         |> start_async(:load_booking_entitlements, fn ->
+           Entitlements.list_all_for_user(user_id)
+         end)}
+    end
+  end
+
+  def handle_event("revoke_booking_entitlement", %{"id" => id}, socket) do
+    user_id = socket.assigns.user_id
+
+    case Entitlements.get_entitlement(id) do
+      nil ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Entitlement not found.",
+           title: "Bookings"
+         )}
+
+      ent ->
+        if ent.user_id != user_id do
+          {:noreply,
+           YscWeb.Flash.put_toast(socket, :error, "Invalid entitlement.",
+             title: "Bookings"
+           )}
+        else
+          case Entitlements.revoke_entitlement(ent) do
+            {:ok, _} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:info, "Benefit revoked.",
+                 title: "Bookings"
+               )
+               |> start_async(:load_booking_entitlements, fn ->
+                 Entitlements.list_all_for_user(user_id)
+               end)}
+
+            {:error, _} ->
+              {:noreply,
+               YscWeb.Flash.put_toast(socket, :error, "Could not revoke.",
+                 title: "Bookings"
+               )}
+          end
+        end
+    end
+  end
+
   def handle_event("save", %{"user" => user_params}, socket) do
     current_user = socket.assigns[:current_user]
     assigned = socket.assigns[:selected_user]
@@ -2403,8 +2676,6 @@ defmodule YscWeb.AdminUserDetailsLive do
 
       {:error, changeset} ->
         # Log the actual error for debugging
-        require Ysc.Logging
-
         Ysc.Logging.error(
           "Failed to update user with address: #{inspect(changeset.errors)}"
         )
@@ -2502,8 +2773,6 @@ defmodule YscWeb.AdminUserDetailsLive do
 
                 {:error, error} ->
                   # Log error but don't fail the lifetime membership update
-                  require Ysc.Logging
-
                   Ysc.Logging.warning(
                     "Failed to cancel subscription when awarding lifetime membership",
                     user_id: updated_user.id,
@@ -3927,4 +4196,24 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp review_outcome_to_badge_type(:approved), do: "green"
   defp review_outcome_to_badge_type(:rejected), do: "red"
   defp review_outcome_to_badge_type(_), do: "default"
+
+  defp entitlement_form_defaults do
+    to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)
+  end
+
+  defp admin_entitlement_summary(ent) do
+    case ent.benefit_kind do
+      :free_nights ->
+        "#{ent.free_nights || "?"} free night(s), buyout cap #{format_admin_money(ent.buyout_max_discount)}"
+
+      :percent_off ->
+        "#{Decimal.to_string(ent.percent_off || Decimal.new(0))}% off, buyout cap #{format_admin_money(ent.buyout_max_discount)}"
+
+      :fixed_amount_off ->
+        "#{format_admin_money(ent.amount_off)} off"
+    end
+  end
+
+  defp format_admin_money(nil), do: "—"
+  defp format_admin_money(m), do: Ysc.MoneyHelper.format_money!(m)
 end
