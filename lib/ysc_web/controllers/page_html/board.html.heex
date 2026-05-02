@@ -29,13 +29,13 @@
       <div class="not-prose">
         <div class="space-y-4">
           <%= for member <- @bod_members do %>
-            <div class="flex items-start gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
+            <div class="flex flex-col items-center gap-5 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200 sm:flex-row sm:items-start sm:gap-6">
               <.user_avatar_image
                 user={member}
                 size={:large}
-                class="h-64 w-64 rounded-full flex-shrink-0 object-cover"
+                class="h-64 w-64 shrink-0 rounded-full object-cover mx-auto sm:mx-0"
               />
-              <div class="flex-1 min-w-0">
+              <div class="flex-1 min-w-0 w-full text-center sm:text-left">
                 <h3 class="text-xl font-bold text-zinc-900">
                   {member.first_name} {member.last_name}
                 </h3>
@@ -130,13 +130,13 @@
       <div class="not-prose">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <%= for member <- @bod_members do %>
-            <div class="flex items-start gap-6 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
+            <div class="flex flex-col items-center gap-5 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200 sm:flex-row sm:items-start sm:gap-6">
               <.user_avatar_image
                 user={member}
                 size={:large}
-                class="h-64 w-64 rounded-full flex-shrink-0 object-cover"
+                class="h-64 w-64 shrink-0 rounded-full object-cover mx-auto sm:mx-0"
               />
-              <div class="flex-1 min-w-0">
+              <div class="flex-1 min-w-0 w-full text-center sm:text-left">
                 <h3 class="text-xl font-bold text-zinc-900">
                   {member.first_name} {member.last_name}
                 </h3>

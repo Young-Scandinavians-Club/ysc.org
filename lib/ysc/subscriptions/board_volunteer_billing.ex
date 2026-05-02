@@ -15,7 +15,8 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   subscription(s) based on whether anyone in the user's family group holds a
   board position.
 
-  - While volunteering: `pause_collection` with `behavior: "void"` and no `resumes_at`.
+  - While volunteering: `pause_collection` with `behavior: "void"` and `resumes_at` cleared
+    (empty string) so a prior grace-period `resumes_at` does not linger on Stripe.
   - When the last volunteer leaves: same pause with `resumes_at` six calendar months ahead.
   - No-op in test environment (no Stripe calls).
   """
@@ -51,14 +52,7 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
       household_on_board? = any_family_board_member?(user)
       subs = list_membership_subscriptions_for_pause(primary)
 
-      params =
-        if household_on_board? do
-          %{pause_collection: %{behavior: "void"}}
-        else
-          unix = grace_resume_at_unix_from(DateTime.utc_now())
-
-          %{pause_collection: %{behavior: "void", resumes_at: unix}}
-        end
+      params = stripe_pause_collection_params(household_on_board?)
 
       Enum.each(subs, fn sub ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -81,6 +75,19 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
 
       :ok
     end
+  end
+
+  # Stripe merges subscription updates: if we only sent `behavior: "void"` while
+  # on the board, a prior grace-period `resumes_at` would remain and incorrectly
+  # auto-unpause billing. Pass empty `resumes_at` to clear it (Stripe API pattern).
+  @doc false
+  def stripe_pause_collection_params(true) do
+    %{pause_collection: %{behavior: "void", resumes_at: ""}}
+  end
+
+  def stripe_pause_collection_params(false) do
+    unix = grace_resume_at_unix_from(DateTime.utc_now())
+    %{pause_collection: %{behavior: "void", resumes_at: unix}}
   end
 
   defp any_family_board_member?(%User{} = user) do

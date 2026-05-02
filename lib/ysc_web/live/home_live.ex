@@ -387,12 +387,15 @@ defmodule YscWeb.HomeLive do
               />
             </div>
             <div class="hidden lg:block absolute -bottom-12 -left-20 z-20 w-64 h-64 rounded-3xl overflow-hidden shadow-2xl border-8 border-white transform -rotate-6">
-              <img
-                src={~p"/images/ysc_group_photo.jpg"}
-                alt="YSC Group Photo"
-                class="w-full h-full object-cover"
-                loading="lazy"
-              />
+              <picture>
+                <source srcset={~p"/images/ysc_group_photo.webp"} type="image/webp" />
+                <img
+                  src={~p"/images/ysc_group_photo.jpg"}
+                  alt="YSC Group Photo"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </picture>
             </div>
           </div>
         </div>
@@ -2016,7 +2019,7 @@ defmodule YscWeb.HomeLive do
               "Your #{membership_type} membership is scheduled for cancellation. You are still an active member until #{format_membership_date(renewal_date)}. Your membership will not automatically renew."
 
             renewal_date ->
-              "You have an active #{membership_type} membership. Your membership will renew on #{format_membership_date(renewal_date)}."
+              "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date)} unless you turn it off beforehand."
 
             true ->
               "You have an active #{membership_type} membership."
@@ -2754,27 +2757,27 @@ defmodule YscWeb.HomeLive do
 
   defp days_since_inserted(_), do: 999
 
-  defp event_image_url(nil), do: "/images/ysc_logo.png"
+  defp event_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp event_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.png"
+    do: image.raw_image_path || "/images/ysc_logo.webp"
 
   defp event_image_url(%Image{optimized_image_path: optimized_path}),
     do: optimized_path
 
-  defp event_image_url(_), do: "/images/ysc_logo.png"
+  defp event_image_url(_), do: "/images/ysc_logo.webp"
 
-  defp featured_image_url_for_news(nil), do: "/images/ysc_logo.png"
+  defp featured_image_url_for_news(nil), do: "/images/ysc_logo.webp"
 
   defp featured_image_url_for_news(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.png"
+    do: image.raw_image_path || "/images/ysc_logo.webp"
 
   defp featured_image_url_for_news(%Image{
          optimized_image_path: optimized_path
        }),
        do: optimized_path
 
-  defp featured_image_url_for_news(_), do: "/images/ysc_logo.png"
+  defp featured_image_url_for_news(_), do: "/images/ysc_logo.webp"
 
   defp reading_time_for_news(%Post{rendered_body: nil}), do: 1
 
@@ -2802,7 +2805,7 @@ defmodule YscWeb.HomeLive do
       |> String.slice(0, 150)
       |> Kernel.<>("...")
 
-  defp thumbnail_image_url(nil), do: "/images/ysc_logo.png"
+  defp thumbnail_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp thumbnail_image_url(%Image{thumbnail_path: nil} = image),
     do: image.raw_image_path

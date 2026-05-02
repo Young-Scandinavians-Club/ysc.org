@@ -2120,15 +2120,17 @@ defmodule YscWeb.CoreComponents do
 
   def ysc_logo(assigns) do
     ~H"""
-    <img
-      :if={!@no_circle}
-      class={["object-contain", @class]}
-      src={~p"/images/ysc_logo.png"}
-      alt="The Young Scandinavian Club Logo"
-      width={@width}
-      height={@height}
-      fetchpriority={@fetchpriority}
-    />
+    <picture :if={!@no_circle}>
+      <source srcset={~p"/images/ysc_logo.webp"} type="image/webp" />
+      <img
+        class={["object-contain", @class]}
+        src={~p"/images/ysc_logo.png"}
+        alt="The Young Scandinavian Club Logo"
+        width={@width}
+        height={@height}
+        fetchpriority={@fetchpriority}
+      />
+    </picture>
     <img
       :if={@no_circle}
       class={["object-contain", @class]}
@@ -2678,9 +2680,15 @@ defmodule YscWeb.CoreComponents do
             }
             class="text-sm text-green-900 mt-2"
           >
-            Your membership will renew on <strong class="text-green-900">
-            <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
-          </strong>.
+            Auto-renewal is on. Your membership will
+            <strong class="text-green-900">automatically renew</strong>
+            on
+            <strong class="text-green-900">
+              {format_utc_date_display(
+                get_membership_renewal_date(@current_membership)
+              )}
+            </strong>
+            unless you turn it off beforehand.
           </p>
 
           <p
