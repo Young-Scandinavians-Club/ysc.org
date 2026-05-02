@@ -384,9 +384,17 @@ defmodule Ysc.Payments do
       payload: stripe_payment_method_to_map(stripe_payment_method)
     }
 
-    case get_payment_method_by_provider_for_user(user, :stripe, stripe_payment_method.id) do
+    case get_payment_method_by_provider_for_user(
+           user,
+           :stripe,
+           stripe_payment_method.id
+         ) do
       nil ->
-        if payment_method_provider_conflict?(user, :stripe, stripe_payment_method.id) do
+        if payment_method_provider_conflict?(
+             user,
+             :stripe,
+             stripe_payment_method.id
+           ) do
           {:error, :payment_method_owned_by_another_user}
         else
           # For new payment methods, set as default if user has no default
@@ -440,9 +448,17 @@ defmodule Ysc.Payments do
     }
 
     result =
-      case get_payment_method_by_provider_for_user(user, :stripe, stripe_payment_method.id) do
+      case get_payment_method_by_provider_for_user(
+             user,
+             :stripe,
+             stripe_payment_method.id
+           ) do
         nil ->
-          if payment_method_provider_conflict?(user, :stripe, stripe_payment_method.id) do
+          if payment_method_provider_conflict?(
+               user,
+               :stripe,
+               stripe_payment_method.id
+             ) do
             {:error, :payment_method_owned_by_another_user}
           else
             insert_payment_method(attrs)

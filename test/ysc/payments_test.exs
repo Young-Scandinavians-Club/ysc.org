@@ -463,7 +463,10 @@ defmodule Ysc.PaymentsTest do
       victim_pm = Payments.get_payment_method_by_provider(:stripe, pm_id)
       assert victim_pm.user_id == victim.id
 
-      refute Enum.any?(Payments.list_payment_methods(attacker), &(&1.provider_id == pm_id))
+      refute Enum.any?(
+               Payments.list_payment_methods(attacker),
+               &(&1.provider_id == pm_id)
+             )
     end
 
     test "sync does not update a payment method row owned by another user" do

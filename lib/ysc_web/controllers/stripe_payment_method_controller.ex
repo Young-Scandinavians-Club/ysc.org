@@ -109,7 +109,8 @@ defmodule Ysc.Controllers.StripePaymentMethodController do
         conn
         |> put_status(:forbidden)
         |> json(%{
-          error: "This payment method is already associated with another account"
+          error:
+            "This payment method is already associated with another account"
         })
 
       {:error, :stripe_error} ->
