@@ -123,7 +123,7 @@ defmodule YscWeb.Components.News.NewsCard do
   defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
   defp get_blur_hash(_), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
 
-  defp featured_image_url(nil), do: "/images/ysc_logo.png"
+  defp featured_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp featured_image_url(%Image{optimized_image_path: nil} = image),
     do: image.raw_image_path
@@ -131,7 +131,7 @@ defmodule YscWeb.Components.News.NewsCard do
   defp featured_image_url(%Image{optimized_image_path: optimized_path}),
     do: optimized_path
 
-  defp featured_image_url(_), do: "/images/ysc_logo.png"
+  defp featured_image_url(_), do: "/images/ysc_logo.webp"
 
   defp image_srcset(nil), do: nil
   defp image_srcset(%Image{thumbnail_path: nil}), do: nil

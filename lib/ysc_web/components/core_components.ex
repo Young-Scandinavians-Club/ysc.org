@@ -2120,15 +2120,17 @@ defmodule YscWeb.CoreComponents do
 
   def ysc_logo(assigns) do
     ~H"""
-    <img
-      :if={!@no_circle}
-      class={["object-contain", @class]}
-      src={~p"/images/ysc_logo.png"}
-      alt="The Young Scandinavian Club Logo"
-      width={@width}
-      height={@height}
-      fetchpriority={@fetchpriority}
-    />
+    <picture :if={!@no_circle}>
+      <source srcset={~p"/images/ysc_logo.webp"} type="image/webp" />
+      <img
+        class={["object-contain", @class]}
+        src={~p"/images/ysc_logo.png"}
+        alt="The Young Scandinavian Club Logo"
+        width={@width}
+        height={@height}
+        fetchpriority={@fetchpriority}
+      />
+    </picture>
     <img
       :if={@no_circle}
       class={["object-contain", @class]}

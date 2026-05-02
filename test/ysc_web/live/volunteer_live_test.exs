@@ -113,6 +113,7 @@ defmodule YscWeb.VolunteerLiveTest do
     test "displays volunteer photo", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/volunteer")
 
+      assert html =~ "ysc_group_photo.webp"
       assert html =~ "ysc_group_photo.jpg"
       assert html =~ "Group of YSC Members and Volunteers"
     end
