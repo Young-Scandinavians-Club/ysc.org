@@ -405,7 +405,7 @@ defmodule YscWeb.NewsLive do
   defp featured_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp featured_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path
+    do: image.raw_image_path || "/images/ysc_logo.webp"
 
   defp featured_image_url(%Image{optimized_image_path: optimized_path}),
     do: optimized_path

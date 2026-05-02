@@ -203,7 +203,7 @@ defmodule Ysc.GoogleWallet do
   defp build_event_ticket_class(event, issuer_id) do
     logo_url =
       YscWeb.Endpoint.url() <>
-        YscWeb.Endpoint.static_path("/images/ysc_logo.webp")
+        YscWeb.Endpoint.static_path("/images/ysc_logo.png")
 
     %{
       "id" => event_class_id(issuer_id, event.reference_id),
@@ -330,7 +330,7 @@ defmodule Ysc.GoogleWallet do
   defp build_generic_class(issuer_id) do
     logo_url =
       YscWeb.Endpoint.url() <>
-        YscWeb.Endpoint.static_path("/images/ysc_logo.webp")
+        YscWeb.Endpoint.static_path("/images/ysc_logo.png")
 
     %{
       "id" => membership_class_id(issuer_id),
