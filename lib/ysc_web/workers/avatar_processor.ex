@@ -165,7 +165,14 @@ defmodule YscWeb.Workers.AvatarProcessor do
 
   # sobelow_skip ["Traversal.FileModule"]
   defp download_from_url!(url, dest_path) do
-    case Req.get(url, max_redirects: 5, receive_timeout: 30_000) do
+    # Disable Req's built-in GET retries (`:safe_transient` retries :econnrefused with
+    # exponential backoff). Oban already retries failed jobs; duplicate HTTP retries
+    # only slow failures and can stall tests.
+    case Req.get(url,
+           max_redirects: 5,
+           receive_timeout: 30_000,
+           retry: false
+         ) do
       {:ok, %Req.Response{status: 200, body: body}} ->
         File.write!(dest_path, body)
 

@@ -10,11 +10,11 @@ defmodule Ysc.Stripe.PaymentIntentHelpers do
   When `latest_charge` is only a charge id string, returns `nil` (use `charge_id/1`).
   """
   @spec first_expanded_charge(term()) :: Stripe.Charge.t() | map() | nil
-  def first_expanded_charge(%Stripe.PaymentIntent{latest_charge: lc}) do
+  def first_expanded_charge(%Stripe.PaymentIntent{latest_charge: lc} = pi) do
     cond do
       is_struct(lc, Stripe.Charge) -> lc
       is_map(lc) -> lc
-      true -> nil
+      true -> first_expanded_charge(Map.from_struct(pi))
     end
   end
 
@@ -43,12 +43,12 @@ defmodule Ysc.Stripe.PaymentIntentHelpers do
   Returns a Stripe charge id for the payment intent, from `latest_charge` or legacy `charges`.
   """
   @spec charge_id(term()) :: String.t() | nil
-  def charge_id(%Stripe.PaymentIntent{latest_charge: lc}) do
+  def charge_id(%Stripe.PaymentIntent{latest_charge: lc} = pi) do
     cond do
       is_binary(lc) -> lc
       is_struct(lc, Stripe.Charge) -> lc.id
       is_map(lc) -> Map.get(lc, :id) || Map.get(lc, "id")
-      true -> nil
+      true -> charge_id(Map.from_struct(pi))
     end
   end
 

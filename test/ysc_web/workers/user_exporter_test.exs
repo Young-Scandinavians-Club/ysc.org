@@ -34,6 +34,13 @@ defmodule YscWeb.Workers.UserExporterTest do
     }
   end
 
+  defp require_csv_row!(rows, user_id) do
+    case Enum.find(rows, &(&1["id"] == user_id)) do
+      nil -> flunk("expected CSV row for user id #{user_id}")
+      row -> row
+    end
+  end
+
   defp run_export(channel, job) do
     YscWeb.Endpoint.subscribe(channel)
     :ok = UserExporter.perform(job)
@@ -88,7 +95,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert Map.has_key?(row, "membership_renewal_date")
       assert Map.has_key?(row, "membership_renewal_time")
@@ -104,7 +111,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       # The date column should be just a date string, not a combined datetime+tz string
       date_val = Map.get(row, "membership_renewal_date")
@@ -122,7 +129,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert Map.get(row, "membership_renewal_date") == @expected_renewal_date
       assert Map.get(row, "membership_renewal_time") == @expected_renewal_time
@@ -136,7 +143,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert Map.get(row, "membership_renewal_date") in [nil, ""]
       assert Map.get(row, "membership_renewal_time") in [nil, ""]
@@ -159,7 +166,7 @@ defmodule YscWeb.Workers.UserExporterTest do
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
 
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert Map.get(row, "membership_renewal_date") == "Never"
       assert Map.get(row, "membership_renewal_time") in [nil, ""]
@@ -280,7 +287,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == sub.id))
+      row = require_csv_row!(rows, sub.id)
 
       assert row["membership_inherited"] == "Yes"
       assert row["primary_user_email"] == primary.email
@@ -324,7 +331,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert Map.has_key?(row, "id")
       assert Map.has_key?(row, "email")
@@ -357,7 +364,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "address"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert Map.has_key?(row, "address")
       assert Map.has_key?(row, "city")
@@ -378,7 +385,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "address"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert row["address"] in [nil, ""]
       assert row["city"] in [nil, ""]
@@ -403,7 +410,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       refute Map.has_key?(row, "address")
       refute Map.has_key?(row, "city")
@@ -424,7 +431,7 @@ defmodule YscWeb.Workers.UserExporterTest do
         )
 
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
       assert row["id"]
       assert row["email"]
     end
@@ -459,7 +466,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
 
       assert row["membership_type"] == "Single"
     end
@@ -479,7 +486,7 @@ defmodule YscWeb.Workers.UserExporterTest do
         )
 
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == user.id))
+      row = require_csv_row!(rows, user.id)
       assert row["id"]
       assert row["email"]
     end
@@ -516,7 +523,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
         path = run_export(channel, oban_job(channel, ["id"], false))
         rows = parse_csv(path)
-        row = Enum.find(rows, &(&1["id"] == user.id))
+        row = require_csv_row!(rows, user.id)
 
         assert row["membership_type"] in [nil, ""]
       after
@@ -562,7 +569,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
         path = run_export(channel, oban_job(channel, ["id"], false))
         rows = parse_csv(path)
-        row = Enum.find(rows, &(&1["id"] == user.id))
+        row = require_csv_row!(rows, user.id)
 
         assert row["membership_type"] == "Unknown"
       after
@@ -581,7 +588,7 @@ defmodule YscWeb.Workers.UserExporterTest do
 
       path = run_export(channel, oban_job(channel, ["id", "email"], false))
       rows = parse_csv(path)
-      row = Enum.find(rows, &(&1["id"] == sub.id))
+      row = require_csv_row!(rows, sub.id)
 
       assert row["membership_inherited"] == "No"
       assert row["primary_user_email"] == primary.email

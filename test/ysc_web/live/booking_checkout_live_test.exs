@@ -393,6 +393,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert html =~ "No payment is required"
       assert html =~ "confirm-complimentary-booking"
+      refute has_element?(view, "#stripe-payment-container")
       refute html =~ "Failed to initialize payment"
 
       assert {:error, {:live_redirect, %{to: receipt_path}}} =

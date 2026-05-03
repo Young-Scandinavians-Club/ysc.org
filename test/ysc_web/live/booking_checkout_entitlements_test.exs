@@ -1223,12 +1223,34 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
              room_id: nil,
              room_category_id: nil
            }) do
-        {:ok, _} -> :ok
-        {:error, _} -> :ok
+        {:ok, _} ->
+          :ok
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          if duplicate_buyout_base_pricing_rule?(cs) do
+            :ok
+          else
+            flunk(
+              "unexpected Bookings.create_pricing_rule failure in ensure_buyout_base_pricing!: #{inspect(cs.errors)}"
+            )
+          end
+
+        {:error, other} ->
+          flunk(
+            "unexpected Bookings.create_pricing_rule result in ensure_buyout_base_pricing!: #{inspect(other)}"
+          )
       end
     end
 
     :ok
+  end
+
+  defp duplicate_buyout_base_pricing_rule?(%Ecto.Changeset{} = cs) do
+    # Any unique violation on this insert is the global buyout rule already present
+    # (seeds or a prior test); other validation failures must still fail fast.
+    Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
+      meta[:constraint] == :unique
+    end)
   end
 
   defp buyout_stay_dates do
@@ -1265,15 +1287,18 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
   end
 
   defp checkout_shows_complimentary?(conn, %Booking{} = booking) do
-    {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
-    html =~ "No payment is required" and html =~ "confirm-complimentary-booking"
+    {:ok, view, _} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+    has_element?(view, "#confirm-complimentary-booking") and
+      not has_element?(view, "#stripe-payment-container")
   end
 
   defp checkout_shows_paid_stripe?(conn, %Booking{} = booking) do
-    {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+    {:ok, view, _} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-    html =~ "stripe-payment-container" and html =~ "submit-payment" and
-      not (html =~ "confirm-complimentary-booking")
+    has_element?(view, "#stripe-payment-container") and
+      has_element?(view, "#submit-payment") and
+      not has_element?(view, "#confirm-complimentary-booking")
   end
 
   defp confirm_complimentary(conn, %Booking{} = booking) do

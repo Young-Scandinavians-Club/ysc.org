@@ -218,7 +218,8 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
       {:ok, avatar} =
         Avatars.create_avatar(user, %{
           source: :upload,
-          # Port 1 is not open — econnrefused happens immediately
+          # Port 1 is not open (econnrefused). Req retries that by default; the worker
+          # passes `retry: false` so failures stay fast and Oban handles retries.
           original_path: "http://127.0.0.1:1/avatar.png"
         })
 
@@ -349,8 +350,8 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     } do
       {_user, avatar} = create_avatar_for_user(image_port)
 
-      # Simulate image-processing failure by temporarily pointing at a bad URL.
-      # We just use a connection-refused port; the file-level cleanup still runs.
+      # Simulate download failure after a valid avatar row exists (same as unreachable
+      # URL / refused port once Req retries are disabled on the worker).
       failing_avatar =
         avatar
         |> Ecto.Changeset.change(original_path: "http://127.0.0.1:1/bad.png")

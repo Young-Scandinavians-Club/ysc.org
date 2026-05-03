@@ -110,15 +110,15 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
   end
 
   describe "stripe_pause_collection_params/1" do
-    test "household on board clears resumes_at so Stripe drops a stale grace date" do
-      assert %{pause_collection: %{behavior: "void", resumes_at: ""}} ==
+    test "household on board uses void pause without resumes_at so Stripe drops a stale grace date" do
+      assert %{pause_collection: %{behavior: :void}} ==
                BoardVolunteerBilling.stripe_pause_collection_params(true)
     end
 
     test "household off board sets resumes_at six months ahead" do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-      assert %{pause_collection: %{behavior: "void", resumes_at: unix}} =
+      assert %{pause_collection: %{behavior: :void, resumes_at: unix}} =
                BoardVolunteerBilling.stripe_pause_collection_params(false)
 
       expected_now = BoardVolunteerBilling.grace_resume_at_unix_from(now)

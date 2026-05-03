@@ -14,6 +14,16 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
+
+    # Other LiveView tests set Mox-based StripeMock and may not restore; cancellation
+    # calls `retrieve_payment_intent/2` on whatever client is configured.
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
     :ok
   end
 

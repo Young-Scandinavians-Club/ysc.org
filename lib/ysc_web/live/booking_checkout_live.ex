@@ -991,10 +991,14 @@ defmodule YscWeb.BookingCheckoutLive do
             class="flex-1"
             disabled={!all_guests_valid?(@guest_info_form, @booking)}
           >
-            Continue to Payment<.icon
-              name="hero-arrow-right"
-              class="w-5 h-5 -mt-1 ms-1"
-            />
+            <span class="font-semibold">
+              <%= if @complimentary_checkout do %>
+                Continue to confirmation
+              <% else %>
+                Continue to Payment
+              <% end %>
+            </span>
+            <.icon name="hero-arrow-right" class="w-5 h-5 -mt-1 ms-1" />
           </.button>
         </div>
       </div>
@@ -2183,27 +2187,14 @@ defmodule YscWeb.BookingCheckoutLive do
     reloaded_booking =
       Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
 
-    if reloaded_booking.status == :complete do
-      {:ok, reloaded_booking}
-    else
-      zero = Money.new(0, :USD)
-      external_payment_id = "booking_complimentary_#{booking.reference_id}"
+    cond do
+      reloaded_booking.status == :complete ->
+        {:ok, reloaded_booking}
 
-      with {:ok, _} <-
-             Ysc.Ledgers.process_payment(%{
-               user_id: booking.user_id,
-               amount: zero,
-               entity_type: :booking,
-               entity_id: booking.id,
-               external_payment_id: external_payment_id,
-               stripe_fee: nil,
-               description: "Complimentary booking - #{booking.reference_id}",
-               property: booking.property,
-               payment_method_id: nil
-             }) do
+      true ->
         case BookingLocker.confirm_booking(reloaded_booking.id) do
           {:ok, confirmed_booking} ->
-            {:ok, confirmed_booking}
+            post_complimentary_ledger_payment(booking, confirmed_booking)
 
           {:error, :invalid_status} ->
             final_booking =
@@ -2211,7 +2202,7 @@ defmodule YscWeb.BookingCheckoutLive do
               |> Repo.preload([:rooms, :user])
 
             if final_booking.status == :complete do
-              {:ok, final_booking}
+              post_complimentary_ledger_payment(booking, final_booking)
             else
               {:error, :booking_confirmation_failed}
             end
@@ -2219,7 +2210,35 @@ defmodule YscWeb.BookingCheckoutLive do
           {:error, reason} ->
             {:error, reason}
         end
-      end
+    end
+  end
+
+  defp post_complimentary_ledger_payment(booking, confirmed_booking) do
+    zero = Money.new(0, :USD)
+    external_payment_id = "booking_complimentary_#{booking.reference_id}"
+
+    case Ysc.Ledgers.process_payment(%{
+           user_id: booking.user_id,
+           amount: zero,
+           entity_type: :booking,
+           entity_id: booking.id,
+           external_payment_id: external_payment_id,
+           stripe_fee: nil,
+           description: "Complimentary booking - #{booking.reference_id}",
+           property: booking.property,
+           payment_method_id: nil
+         }) do
+      {:ok, _} ->
+        {:ok, confirmed_booking}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Complimentary booking confirmed but ledger payment recording failed",
+          booking_id: booking.id,
+          error: inspect(reason)
+        )
+
+        {:error, {:ledger_payment_failed, reason}}
     end
   end
 

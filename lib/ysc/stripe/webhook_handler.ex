@@ -2328,7 +2328,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           Application.get_env(:ysc, :subscription_retrieve_for_webhook_callback) ||
             fn id, opts -> Stripe.Subscription.retrieve(id, opts) end
 
-        case retrieve_fn.(event.id, expand: ["items.data.price"]) do
+        case retrieve_fn.(event.id, %{expand: ["items.data.price"]}) do
           {:ok, stripe_subscription} ->
             case Subscriptions.create_subscription_from_stripe(
                    user,
@@ -3671,9 +3671,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Helper function to get membership type from Stripe subscription API
   defp get_membership_type_from_stripe_subscription(subscription_id) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Subscription.retrieve(subscription_id,
+           Stripe.Subscription.retrieve(subscription_id, %{
              expand: ["items.data.price"]
-           )
+           })
          end) do
       {:ok, stripe_subscription} ->
         membership_type =
