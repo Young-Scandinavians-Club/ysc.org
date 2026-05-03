@@ -146,9 +146,10 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert render(view) =~ "Invalid verification code"
     end
 
-    test "email verification is rate limited after repeated invalid submissions", %{
-      conn: conn
-    } do
+    test "email verification is rate limited after repeated invalid submissions",
+         %{
+           conn: conn
+         } do
       user = unverified_pending_user()
       {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
 

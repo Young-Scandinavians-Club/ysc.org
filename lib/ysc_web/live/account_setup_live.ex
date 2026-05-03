@@ -929,80 +929,14 @@ defmodule YscWeb.AccountSetupLive do
 
     user_id = socket.assigns.user.id
 
-    with :ok <- Ysc.EmailVerificationRateLimit.check(user_id) do
-      do_verify_email_code(socket, code)
-    else
+    case Ysc.EmailVerificationRateLimit.check(user_id) do
+      :ok ->
+        do_verify_email_code(socket, code)
+
       :rate_limited ->
         YscWeb.Flash.send_toast(
           :error,
           "Too many verification attempts. Please wait a minute and try again.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-    end
-  end
-
-  defp do_verify_email_code(socket, code) do
-    # In dev/sandbox, always accept 000000 as valid code
-    verification_result =
-      if dev_or_sandbox?() and code == "000000" do
-        {:ok, :verified}
-      else
-        Accounts.verify_email_verification_code(socket.assigns.user, code)
-      end
-
-    case verification_result do
-      {:ok, :verified} ->
-        # Mark email as verified in database
-        {:ok, updated_user} = Accounts.mark_email_verified(socket.assigns.user)
-        updated_user_needs = compute_user_needs(updated_user)
-
-        # Determine next step based on what still needs to be completed
-        # New order: 1=payment, 2=password, 3=phone setup, 4=phone verify
-        next_step =
-          cond do
-            updated_user_needs.payment_method_setup -> 1
-            updated_user_needs.password_setup -> 2
-            updated_user_needs.phone_setup -> 3
-            updated_user_needs.phone_verification -> 4
-            true -> 5
-          end
-
-        # Short-lived one-time token for auto-login (verified by controller, then session created)
-        one_time_token =
-          Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
-
-        # Redirect to auto-login to establish session, then back to account setup
-        {:noreply,
-         socket
-         |> Phoenix.LiveView.redirect(
-           to:
-             ~p"/users/log-in/auto?#{%{token: one_time_token, redirect_to: "/account/setup/#{updated_user.id}?step=#{next_step}"}}"
-         )}
-
-      {:error, :not_found} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "No verification code found. Please request a new one.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-
-      {:error, :expired} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Verification code has expired. Please request a new one.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-
-      {:error, :invalid_code} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Invalid verification code. Please try again.",
           title: "Email verification"
         )
 
@@ -1621,6 +1555,73 @@ defmodule YscWeb.AccountSetupLive do
 
           {:noreply, socket}
       end
+    end
+  end
+
+  defp do_verify_email_code(socket, code) do
+    # In dev/sandbox, always accept 000000 as valid code
+    verification_result =
+      if dev_or_sandbox?() and code == "000000" do
+        {:ok, :verified}
+      else
+        Accounts.verify_email_verification_code(socket.assigns.user, code)
+      end
+
+    case verification_result do
+      {:ok, :verified} ->
+        # Mark email as verified in database
+        {:ok, updated_user} = Accounts.mark_email_verified(socket.assigns.user)
+        updated_user_needs = compute_user_needs(updated_user)
+
+        # Determine next step based on what still needs to be completed
+        # New order: 1=payment, 2=password, 3=phone setup, 4=phone verify
+        next_step =
+          cond do
+            updated_user_needs.payment_method_setup -> 1
+            updated_user_needs.password_setup -> 2
+            updated_user_needs.phone_setup -> 3
+            updated_user_needs.phone_verification -> 4
+            true -> 5
+          end
+
+        # Short-lived one-time token for auto-login (verified by controller, then session created)
+        one_time_token =
+          Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
+
+        # Redirect to auto-login to establish session, then back to account setup
+        {:noreply,
+         socket
+         |> Phoenix.LiveView.redirect(
+           to:
+             ~p"/users/log-in/auto?#{%{token: one_time_token, redirect_to: "/account/setup/#{updated_user.id}?step=#{next_step}"}}"
+         )}
+
+      {:error, :not_found} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "No verification code found. Please request a new one.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
+
+      {:error, :expired} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Verification code has expired. Please request a new one.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
+
+      {:error, :invalid_code} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Invalid verification code. Please try again.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
     end
   end
 
