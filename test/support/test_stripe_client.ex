@@ -17,7 +17,7 @@ defmodule Ysc.TestStripeClient do
 
     payment_intent = %Stripe.PaymentIntent{
       id: id,
-      charges: %Stripe.List{data: [charge]}
+      latest_charge: charge
     }
 
     {:ok, payment_intent}

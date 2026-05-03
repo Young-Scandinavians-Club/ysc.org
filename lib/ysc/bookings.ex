@@ -22,6 +22,7 @@ defmodule Ysc.Bookings do
   alias Ysc.Repo
   alias Stripe
   alias Ysc.Ledgers
+  alias Ysc.Stripe.PaymentIntentHelpers
 
   alias Ysc.Bookings.{
     Season,
@@ -3522,16 +3523,10 @@ defmodule Ysc.Bookings do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{
-           expand: ["charges"]
+           expand: ["latest_charge"]
          }) do
       {:ok, payment_intent} ->
-        # Get the charge ID from the payment intent
-        charge_id =
-          case payment_intent.charges do
-            %Stripe.List{data: [%Stripe.Charge{id: charge_id} | _]} -> charge_id
-            [%Stripe.Charge{id: charge_id} | _] -> charge_id
-            _ -> nil
-          end
+        charge_id = PaymentIntentHelpers.charge_id(payment_intent)
 
         if charge_id do
           # Extract metadata from payment intent for refund metadata

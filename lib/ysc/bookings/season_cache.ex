@@ -146,7 +146,7 @@ defmodule Ysc.Bookings.SeasonCache do
     case Cachex.get(@cache_name, @cache_version_key) do
       {:ok, version} when is_integer(version) ->
         Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
-          ttl: ttl_ms
+          expire: ttl_ms
         )
 
       _ ->
@@ -155,7 +155,7 @@ defmodule Ysc.Bookings.SeasonCache do
         Cachex.put(@cache_name, @cache_version_key, version)
 
         Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
-          ttl: ttl_ms
+          expire: ttl_ms
         )
     end
   end

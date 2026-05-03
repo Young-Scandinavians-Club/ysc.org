@@ -2,9 +2,11 @@ defmodule YscWeb.AdminDashboardLiveTest do
   # LiveView + connected?/async can race; keep this module sync for stable WS.
   use YscWeb.ConnCase, async: false
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts.User
   alias Ysc.Repo
 
   defp create_admin(%{conn: conn}) do
@@ -46,7 +48,10 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert render(view) =~ "Pending User"
 
       view
-      |> element("#review-applications-section button", "Review")
+      |> element(
+        "#review-applications-section button[phx-value-user-id=\"#{pending_user.id}\"]",
+        "Review"
+      )
       |> render_click()
 
       params = %{
@@ -69,6 +74,12 @@ defmodule YscWeb.AdminDashboardLiveTest do
     test "shows empty pending applications state when queue is empty", %{
       conn: conn
     } do
+      # Other tests in this module (or the suite) may leave users in pending_approval;
+      # ExUnit order is random, so normalize before asserting the empty UI.
+      Repo.update_all(from(u in User, where: u.state == :pending_approval),
+        set: [state: :active]
+      )
+
       {:ok, view, _html} = live(conn, ~p"/admin")
       html = render(view)
 

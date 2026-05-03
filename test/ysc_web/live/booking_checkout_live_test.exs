@@ -8,13 +8,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   import Mox
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{BookingRoom, RoomCategory}
+  alias Ysc.Bookings.{BookingLocker, BookingRoom, RoomCategory}
+  alias Ysc.Bookings.Entitlements
   alias Ysc.Ledgers
   alias Ysc.Repo
   alias Ysc.StripeMock
 
   setup :set_mox_global
-  setup :verify_on_exit!
 
   setup %{conn: conn} do
     Ledgers.ensure_basic_accounts()
@@ -270,6 +270,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         })
 
       assert html =~ "Failed to process payment" or html =~ "payment"
+      Mox.verify!(StripeMock)
     end
 
     test "payment-success when intent status is not succeeded shows error", %{
@@ -293,6 +294,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         })
 
       assert html =~ "Failed to process payment"
+      Mox.verify!(StripeMock)
     end
 
     test "handle_info :check_booking_expiration reschedules when hold still valid",
@@ -351,25 +353,58 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "expired" or html =~ "Complete Your Booking"
     end
 
-    test "mount with Stripe payment intent creation error shows payment_error on page",
+    test "buyout with full entitlement discount skips Stripe and confirms from checkout",
          %{
            conn: conn,
            user: user
          } do
-      # Mount may invoke create_payment_intent more than once (static + connected).
-      expect(StripeMock, :create_payment_intent, 2, fn _params, _opts ->
-        {:error,
-         %Stripe.Error{
-           source: :stripe,
-           code: :card_error,
-           message: "card error"
-         }}
-      end)
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
 
-      booking = booking_fixture(user_id: user.id, status: :hold)
-      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
 
-      assert html =~ "Failed to initialize payment" or html =~ "payment"
+      {:ok, ent} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :percent_off,
+            property: :tahoe,
+            percent_off: Decimal.new("100"),
+            buyout_max_discount: Money.new(500_000, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> change(%{applied_booking_entitlement_id: ent.id})
+        |> Repo.update!()
+
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "No payment is required"
+      assert html =~ "confirm-complimentary-booking"
+      refute html =~ "Failed to initialize payment"
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               view
+               |> element("#confirm-complimentary-booking")
+               |> render_click()
+
+      assert receipt_path =~ "/bookings/"
+      assert receipt_path =~ "/receipt"
+
+      reloaded = Repo.get!(Bookings.Booking, booking.id)
+      assert reloaded.status == :complete
     end
 
     test "select-guest-attendee without index is ignored", %{

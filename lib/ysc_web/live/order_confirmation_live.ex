@@ -5,6 +5,7 @@ defmodule YscWeb.OrderConfirmationLive do
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
+  alias Ysc.Stripe.PaymentIntentHelpers
   import Ecto.Query
   alias HtmlSanitizeEx
 
@@ -835,7 +836,7 @@ defmodule YscWeb.OrderConfirmationLive do
         Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
       case stripe_client.retrieve_payment_intent(payment.external_payment_id, %{
-             expand: ["payment_method", "charges.data.payment_method"]
+             expand: ["payment_method", "latest_charge"]
            }) do
         {:ok, payment_intent} ->
           # Try to get payment method type from payment intent
@@ -857,21 +858,24 @@ defmodule YscWeb.OrderConfirmationLive do
                   _ -> nil
                 end
 
-              # Try to get from charges
-              payment_intent.charges && payment_intent.charges.data &&
-                  payment_intent.charges.data != [] ->
-                first_charge = List.first(payment_intent.charges.data)
+              # Try to get from expanded latest charge
+              (first_charge =
+                 PaymentIntentHelpers.first_expanded_charge(payment_intent)) !=
+                  nil ->
+                pm_on_charge =
+                  Map.get(first_charge, :payment_method) ||
+                    Map.get(first_charge, "payment_method")
 
                 cond do
-                  is_map(first_charge.payment_method) &&
-                      Map.has_key?(first_charge.payment_method, :type) ->
-                    first_charge.payment_method.type
+                  is_map(pm_on_charge) &&
+                      (Map.has_key?(pm_on_charge, :type) ||
+                         Map.has_key?(pm_on_charge, "type")) ->
+                    Map.get(pm_on_charge, :type) ||
+                      Map.get(pm_on_charge, "type")
 
-                  is_binary(first_charge.payment_method) ->
+                  is_binary(pm_on_charge) ->
                     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                           Stripe.PaymentMethod.retrieve(
-                             first_charge.payment_method
-                           )
+                           Stripe.PaymentMethod.retrieve(pm_on_charge)
                          end) do
                       {:ok, pm} -> pm.type
                       _ -> nil

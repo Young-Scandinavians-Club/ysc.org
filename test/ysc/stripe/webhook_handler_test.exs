@@ -2967,12 +2967,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
         id: "pi_fee_#{System.unique_integer()}",
         object: "payment_intent",
         amount: 10_000,
-        charges: %Stripe.List{
-          data: [%{"amount" => 1000}],
-          has_more: false,
-          object: "list",
-          url: "/v1/charges"
-        }
+        latest_charge: %{"amount" => 1000}
       }
 
       fee = WebhookHandler.extract_stripe_fee_from_payment_intent(pi)
@@ -3178,7 +3173,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       # link_charge_to_payout is tested via the public relink helper by
       # stubbing out the Stripe API calls it makes internally. Since we cannot
-      # intercept Stripe.BalanceTransaction.all in tests, we instead validate
+      # intercept Stripe.BalanceTransaction.list in tests, we instead validate
       # the extract_id_from_expandable + get_payment_by_external_id path
       # directly to guarantee the expected DB lookup occurs.
       extracted_id =

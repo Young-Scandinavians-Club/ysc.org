@@ -588,7 +588,7 @@ defmodule Ysc.Subscriptions do
   """
   def cancel_immediately(%Subscription{} = subscription) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Subscription.delete(subscription.stripe_id)
+           Stripe.Subscription.cancel(subscription.stripe_id)
          end) do
       {:ok, _stripe_subscription} ->
         mark_as_cancelled(subscription)

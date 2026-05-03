@@ -2291,7 +2291,7 @@ defmodule Ysc.Quickbooks.Client do
               end)
 
               # Cache the full map
-              Cachex.put(:ysc_cache, cache_key, classes_map, ttl: :infinity)
+              Cachex.put(:ysc_cache, cache_key, classes_map, expire: :infinity)
 
               Ysc.Logging.info(
                 "[QB Client] query_all_classes: Found and cached classes",
@@ -2312,7 +2312,7 @@ defmodule Ysc.Quickbooks.Client do
               cache_class_id(individual_cache_key, id)
 
               # Cache the full map
-              Cachex.put(:ysc_cache, cache_key, classes_map, ttl: :infinity)
+              Cachex.put(:ysc_cache, cache_key, classes_map, expire: :infinity)
 
               Ysc.Logging.info(
                 "[QB Client] query_all_classes: Found and cached single class",
@@ -2365,7 +2365,7 @@ defmodule Ysc.Quickbooks.Client do
                       end)
 
                       Cachex.put(:ysc_cache, cache_key, classes_map,
-                        ttl: :infinity
+                        expire: :infinity
                       )
 
                       {:ok, classes_map}
@@ -2380,7 +2380,7 @@ defmodule Ysc.Quickbooks.Client do
                       cache_class_id(individual_cache_key, id)
 
                       Cachex.put(:ysc_cache, cache_key, classes_map,
-                        ttl: :infinity
+                        expire: :infinity
                       )
 
                       {:ok, classes_map}
@@ -3521,7 +3521,7 @@ defmodule Ysc.Quickbooks.Client do
 
   defp cache_class_id(cache_key, class_id) do
     # Cache with no expiration (these don't change)
-    case Cachex.put(:ysc_cache, cache_key, class_id, ttl: :infinity) do
+    case Cachex.put(:ysc_cache, cache_key, class_id, expire: :infinity) do
       {:ok, true} ->
         Ysc.Logging.debug(
           "[QB Client] cache_class_id: Successfully cached class",
@@ -3554,7 +3554,7 @@ defmodule Ysc.Quickbooks.Client do
 
   defp cache_account_id(cache_key, account_id) do
     # Cache with no expiration (these don't change)
-    case Cachex.put(:ysc_cache, cache_key, account_id, ttl: :infinity) do
+    case Cachex.put(:ysc_cache, cache_key, account_id, expire: :infinity) do
       {:ok, true} ->
         Ysc.Logging.debug(
           "[QB Client] cache_account_id: Successfully cached account",
