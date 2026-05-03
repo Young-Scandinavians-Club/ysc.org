@@ -146,6 +146,30 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert render(view) =~ "Invalid verification code"
     end
 
+    test "email verification is rate limited after repeated invalid submissions",
+         %{
+           conn: conn
+         } do
+      user = unverified_pending_user()
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      for _ <- 1..12 do
+        view
+        |> form("#email_form", %{"verification_code" => @invalid_otp})
+        |> render_submit()
+      end
+
+      view
+      |> form("#email_form", %{"verification_code" => @invalid_otp})
+      |> render_submit()
+
+      html = render(view)
+      assert html =~ "Too many verification attempts"
+
+      # Earlier invalid attempts leave error copy in the DOM (e.g. flash mirror / toast history),
+      # so we only assert the rate-limit outcome here.
+    end
+
     test "valid code redirects to auto-login pointing at step 1 for pending users",
          %{conn: conn} do
       user = unverified_pending_user()
