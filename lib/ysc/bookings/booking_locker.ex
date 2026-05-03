@@ -201,6 +201,9 @@ defmodule Ysc.Bookings.BookingLocker do
 
         {:ok, booking}
 
+      {:error, :pricing_calculation_failed} ->
+        {:error, :pricing_calculation_failed}
+
       error ->
         error
     end
@@ -595,6 +598,9 @@ defmodule Ysc.Bookings.BookingLocker do
         {:ok, {:error, reason}} ->
           {:error, reason}
 
+        {:error, :pricing_calculation_failed} ->
+          {:error, :pricing_calculation_failed}
+
         error ->
           error
       end
@@ -968,6 +974,9 @@ defmodule Ysc.Bookings.BookingLocker do
         )
 
         {:ok, booking}
+
+      {:error, :pricing_calculation_failed} ->
+        {:error, :pricing_calculation_failed}
 
       error ->
         error
