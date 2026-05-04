@@ -41,7 +41,7 @@ defmodule YscWeb.UserRegistrationLive do
           </.header>
 
           <p class="mt-2 mb-6 text-sm leading-6 text-zinc-600">
-            We are excited to have you join us! The application is quick—we'll email you as soon as your membership is approved.
+            We are excited to have you join us! The application is quick—we'll email you when the board has reviewed your application.
           </p>
         </div>
 

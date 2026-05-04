@@ -27,8 +27,10 @@ defmodule YscWeb.Authorization.EnsureApprovedUserPlug do
 
   defp maybe_halt(_any, conn) do
     conn
-    |> YscWeb.Flash.put_toast(:error, "Your account is pending approval",
-      title: "Account"
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "That page is for active members. Your membership application is still being reviewed—we'll email you when there is an update.",
+      title: "Application under review"
     )
     |> Controller.redirect(to: not_approved_path(conn))
     |> halt()
