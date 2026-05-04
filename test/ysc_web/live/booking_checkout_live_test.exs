@@ -15,6 +15,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   alias Ysc.StripeMock
 
   setup :set_mox_global
+  setup :verify_on_exit!
 
   setup %{conn: conn} do
     Ledgers.ensure_basic_accounts()
