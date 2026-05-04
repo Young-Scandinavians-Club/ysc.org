@@ -349,6 +349,35 @@ defmodule Ysc.BookingsTest do
       assert is_map(breakdown)
     end
 
+    test "room mode uses property-wide per_person_per_night rule when no room-specific rule exists" do
+      property = :tahoe
+      checkin = Date.utc_today() |> Date.add(31)
+      checkout = Date.add(checkin, 2)
+      room = create_room_fixture(%{property: property})
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      assert {:ok, total_price, breakdown} =
+               Bookings.calculate_booking_price(
+                 property,
+                 checkin,
+                 checkout,
+                 :room,
+                 room_id: room.id,
+                 guests_count: 2
+               )
+
+      assert is_struct(total_price, Money)
+      assert is_map(breakdown)
+    end
+
     test "returns error for invalid booking dates" do
       property = :tahoe
       checkin = Date.utc_today() |> Date.add(30)
