@@ -1972,6 +1972,19 @@ defmodule Ysc.BookingsTest do
 
   describe "calculate_booking_price/4 room mode errors" do
     test "returns no_pricing_rules_found when no rules match the room" do
+      # Room pricing falls back to property-wide rules (nil room_id and nil
+      # room_category_id). Seeded Tahoe defaults would otherwise price any room.
+      from(pr in Ysc.Bookings.PricingRule,
+        where: pr.property == :tahoe,
+        where: pr.booking_mode == :room,
+        where: pr.price_unit == :per_person_per_night,
+        where: is_nil(pr.room_id),
+        where: is_nil(pr.room_category_id)
+      )
+      |> Repo.delete_all()
+
+      Ysc.Bookings.PricingRuleCache.invalidate()
+
       category = create_room_category_fixture()
 
       {:ok, room} =
