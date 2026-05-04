@@ -460,6 +460,23 @@ defmodule Ysc.Bookings.Entitlements do
   end
 
   @doc """
+  Locks an active entitlement row for update within the current transaction.
+
+  Call this immediately before `consume_for_booking!/2` so concurrent confirm
+  attempts serialize on the entitlement row and cannot double-consume.
+  """
+  def lock_entitlement_for_consume(nil), do: nil
+
+  def lock_entitlement_for_consume(entitlement_id)
+      when is_binary(entitlement_id) do
+    from(e in BookingEntitlement,
+      where: e.id == ^entitlement_id and e.status == :active,
+      lock: "FOR UPDATE"
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Marks an entitlement consumed when a booking is confirmed. Must run in same DB transaction.
   """
   def consume_for_booking!(entitlement_id, booking_id) do

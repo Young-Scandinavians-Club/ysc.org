@@ -1248,6 +1248,11 @@ defmodule Ysc.Bookings.BookingLocker do
            |> Repo.update() do
         {:ok, updated_booking} ->
           if updated_booking.applied_booking_entitlement_id do
+            _ =
+              Entitlements.lock_entitlement_for_consume(
+                updated_booking.applied_booking_entitlement_id
+              )
+
             case Entitlements.consume_for_booking!(
                    updated_booking.applied_booking_entitlement_id,
                    updated_booking.id
