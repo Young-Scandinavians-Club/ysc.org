@@ -39,7 +39,8 @@ defmodule YscWeb.Workers.AvatarProcessor do
     try do
       Avatars.set_processing_state(avatar, :processing)
 
-      download_from_url!(avatar.original_path, raw_path)
+      {:ok, original_key} = resolve_original_s3_key(avatar)
+      download_original_from_s3!(original_key, raw_path)
 
       {:ok, parsed} = Image.open(raw_path)
       {:ok, clean} = Image.remove_metadata(parsed, [:exif, :iptc, :xmp])
@@ -47,21 +48,13 @@ defmodule YscWeb.Workers.AvatarProcessor do
       stripped_path = "#{base}_stripped.webp"
       {:ok, _} = Image.write(clean, stripped_path, quality: @webp_quality)
 
-      # Re-upload stripped original
-      original_key = key_from_url(avatar.original_path)
-
-      if original_key do
-        Avatars.upload_to_s3(stripped_path, original_key,
-          content_type: "image/webp"
-        )
-      end
+      # Re-upload stripped original (same S3 key as the raw upload)
+      Avatars.upload_to_s3(stripped_path, original_key,
+        content_type: "image/webp"
+      )
 
       stripped_url =
-        if original_key do
-          S3Config.object_url(original_key, S3Config.avatars_bucket_name())
-        else
-          avatar.original_path
-        end
+        S3Config.object_url(original_key, S3Config.avatars_bucket_name())
 
       # Generate square-cropped variants
       {:ok, square} = crop_to_square(clean)
@@ -163,24 +156,52 @@ defmodule YscWeb.Workers.AvatarProcessor do
     end
   end
 
+  @doc false
+  def resolve_original_s3_key(%{user_id: user_id, original_path: url})
+      when is_binary(url) do
+    prefix = "#{user_id}/"
+    bucket = S3Config.avatars_bucket_name()
+    bucket_prefix = bucket <> "/"
+
+    case key_from_url(url) do
+      key when is_binary(key) and key != "" ->
+        key =
+          if String.starts_with?(key, bucket_prefix) do
+            String.replace_prefix(key, bucket_prefix, "")
+          else
+            key
+          end
+
+        cond do
+          not String.starts_with?(key, prefix) ->
+            {:error, :invalid_avatar_original_path}
+
+          String.contains?(key, "..") or String.contains?(key, <<0>>) ->
+            {:error, :invalid_avatar_original_path}
+
+          true ->
+            {:ok, key}
+        end
+
+      _ ->
+        {:error, :invalid_avatar_original_path}
+    end
+  end
+
   # sobelow_skip ["Traversal.FileModule"]
-  defp download_from_url!(url, dest_path) do
-    # Disable Req's built-in GET retries (`:safe_transient` retries :econnrefused with
-    # exponential backoff). Oban already retries failed jobs; duplicate HTTP retries
-    # only slow failures and can stall tests.
-    case Req.get(url,
-           max_redirects: 5,
-           receive_timeout: 30_000,
-           retry: false
-         ) do
-      {:ok, %Req.Response{status: 200, body: body}} ->
+  defp download_original_from_s3!(key, dest_path) do
+    bucket = S3Config.avatars_bucket_name()
+
+    case ExAws.S3.get_object(bucket, key) |> ExAws.request() do
+      {:ok, %{body: body}}
+      when is_binary(body) and byte_size(body) > 0 ->
         File.write!(dest_path, body)
 
-      {:ok, %Req.Response{status: status}} ->
-        raise "Avatar download failed: HTTP #{status} for #{url}"
+      {:ok, %{body: body}} ->
+        raise "Avatar S3 download returned empty body for key #{inspect(key)}, size #{inspect(byte_size(body || ""))}"
 
       {:error, reason} ->
-        raise "Avatar download failed: #{inspect(reason)} for #{url}"
+        raise "Avatar S3 download failed: #{inspect(reason)} for key #{inspect(key)}"
     end
   end
 
@@ -189,8 +210,6 @@ defmodule YscWeb.Workers.AvatarProcessor do
     key = path |> String.trim_leading("/") |> URI.decode()
     if key != "", do: key, else: nil
   end
-
-  defp key_from_url(_), do: nil
 
   # sobelow_skip ["Traversal.FileModule"]
   defp ensure_temp_dir do

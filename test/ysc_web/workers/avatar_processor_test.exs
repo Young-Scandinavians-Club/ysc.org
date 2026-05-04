@@ -1,21 +1,8 @@
-defmodule Ysc.Test.AvatarProcessor.Serve404Plug do
+defmodule Ysc.Test.AvatarProcessor.MockS3Plug do
   @moduledoc false
   import Plug.Conn
 
-  def init(opts), do: opts
-
-  def call(conn, _opts) do
-    conn
-    |> put_resp_content_type("text/plain")
-    |> send_resp(404, "not found")
-  end
-end
-
-defmodule Ysc.Test.AvatarProcessor.MockImagePlug do
-  @moduledoc false
-  import Plug.Conn
-
-  # 1x1 pixel PNG, inline to avoid file-path resolution at compile time
+  # 1x1 pixel PNG (same as MockImagePlug) for ExAws S3 get_object mocks
   @tiny_png Base.decode64!(
               "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
             )
@@ -23,21 +10,29 @@ defmodule Ysc.Test.AvatarProcessor.MockImagePlug do
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    conn
-    |> put_resp_content_type("image/png")
-    |> send_resp(200, @tiny_png)
-  end
-end
-
-defmodule Ysc.Test.AvatarProcessor.MockS3Plug do
-  @moduledoc false
-  import Plug.Conn
-
-  def init(opts), do: opts
-
-  def call(conn, _opts) do
     conn = fetch_query_params(conn)
     dispatch(conn)
+  end
+
+  # ExAws get_object: GET /{bucket}/{key} (path-style, e.g. MinIO / test config)
+  defp dispatch(%{method: "GET"} = conn) do
+    path = conn.request_path |> String.trim_leading("/")
+
+    cond do
+      # Force a non-200 S3 read for failure tests (key must still match user prefix in DB)
+      String.contains?(path, "/fail-trigger/original") ->
+        conn
+        |> put_resp_content_type("application/xml")
+        |> send_resp(404, "")
+
+      String.starts_with?(path, "avatars/") ->
+        conn
+        |> put_resp_content_type("image/png")
+        |> send_resp(200, @tiny_png)
+
+      true ->
+        send_resp(conn, 404, "not found")
+    end
   end
 
   # Initiate multipart upload: POST /{bucket}/{key}?uploads
@@ -90,10 +85,8 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
   @moduledoc """
   Tests for AvatarProcessor Oban worker.
 
-  The happy-path tests spin up two lightweight Cowboy HTTP servers:
-    - An image server that serves a 1×1 PNG (mocks the original avatar download).
-    - An S3-compatible server that speaks the multipart-upload protocol
-      (mocks ExAws S3 uploads without needing a real MinIO instance).
+  Spins up a lightweight Cowboy HTTP server that mocks S3: `GET` for the raw
+  object (download), and multipart upload `POST`/`PUT` for `ExAws.S3.Upload`.
 
   Because the S3 mock requires overriding the global `Application.put_env(:ex_aws, :s3, …)`
   config, this module runs with `async: false`.
@@ -160,15 +153,18 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end)
   end
 
-  # Creates a user + an avatar whose original_path points to a locally running
-  # image server.  Returns {user, avatar}.
-  defp create_avatar_for_user(image_port, source \\ :upload) do
+  # Creates a user + avatar with `original_path` shaped like our real S3 public URL
+  # (path includes `avatars/` prefix for MinIO path-style). ExAws uses `:ex_aws` host/port.
+  defp create_avatar_for_user(s3_port, source \\ :upload) do
     user = user_fixture()
+    suffix = Ecto.ULID.generate()
+    key = "#{user.id}/#{suffix}/original.png"
+    public_url = "http://127.0.0.1:#{s3_port}/avatars/#{key}"
 
     {:ok, avatar} =
       Avatars.create_avatar(user, %{
         source: source,
-        original_path: "http://127.0.0.1:#{image_port}/avatar.png"
+        original_path: public_url
       })
 
     {user, avatar}
@@ -207,36 +203,68 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end
   end
 
+  describe "resolve_original_s3_key/1" do
+    test "rejects URLs whose object key is not under the avatar owner's user id" do
+      user = user_fixture()
+
+      assert {:error, :invalid_avatar_original_path} =
+               AvatarProcessor.resolve_original_s3_key(%{
+                 user_id: user.id,
+                 original_path:
+                   "https://cdn.example.org/other-user-id/x/original.webp"
+               })
+    end
+  end
+
   # -------------------------------------------------------------------------
   # perform/1 - download failures
   # -------------------------------------------------------------------------
 
   describe "perform/1 when the image download fails" do
-    test "returns error and marks the avatar as failed when the server is unreachable" do
+    test "returns error and marks the avatar as failed when S3 is unreachable" do
       user = user_fixture()
+      suffix = Ecto.ULID.generate()
+      key = "#{user.id}/#{suffix}/original.png"
 
       {:ok, avatar} =
         Avatars.create_avatar(user, %{
           source: :upload,
-          # Port 1 is not open (econnrefused). Req retries that by default; the worker
-          # passes `retry: false` so failures stay fast and Oban handles retries.
-          original_path: "http://127.0.0.1:1/avatar.png"
+          original_path: "http://127.0.0.1:99999/avatars/#{key}"
         })
+
+      original = Application.get_env(:ex_aws, :s3)
+
+      Application.put_env(:ex_aws, :s3,
+        scheme: "http://",
+        host: "127.0.0.1",
+        port: 1
+      )
+
+      on_exit(fn ->
+        if original do
+          Application.put_env(:ex_aws, :s3, original)
+        else
+          Application.delete_env(:ex_aws, :s3)
+        end
+      end)
 
       assert {:error, _} = AvatarProcessor.perform(make_oban_job(avatar.id))
 
       assert Repo.get!(Avatars.Avatar, avatar.id).processing_state == :failed
     end
 
-    test "returns error and marks the avatar as failed when the server returns a non-200 status" do
-      port = start_http_server(Ysc.Test.AvatarProcessor.Serve404Plug)
+    test "returns error and marks the avatar as failed when S3 returns non-200 for get_object" do
+      s3_port = start_http_server(Ysc.Test.AvatarProcessor.MockS3Plug)
+      override_exaws_s3_port(s3_port)
 
       user = user_fixture()
+      suffix = Ecto.ULID.generate()
+      key = "#{user.id}/#{suffix}/fail-trigger/original.png"
 
       {:ok, avatar} =
         Avatars.create_avatar(user, %{
           source: :upload,
-          original_path: "http://127.0.0.1:#{port}/avatar.png"
+          original_path: "http://127.0.0.1:#{s3_port}/avatars/#{key}"
         })
 
       assert {:error, _} = AvatarProcessor.perform(make_oban_job(avatar.id))
@@ -249,18 +277,15 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
   # perform/1 - happy path
   # -------------------------------------------------------------------------
 
-  describe "perform/1 happy path (image server + S3 mock)" do
+  describe "perform/1 happy path (S3 mock)" do
     setup do
-      image_port = start_http_server(Ysc.Test.AvatarProcessor.MockImagePlug)
       s3_port = start_http_server(Ysc.Test.AvatarProcessor.MockS3Plug)
       override_exaws_s3_port(s3_port)
-      {:ok, image_port: image_port}
+      {:ok, s3_port: s3_port}
     end
 
-    test "returns :ok and marks the avatar as completed", %{
-      image_port: image_port
-    } do
-      {_user, avatar} = create_avatar_for_user(image_port)
+    test "returns :ok and marks the avatar as completed", %{s3_port: s3_port} do
+      {_user, avatar} = create_avatar_for_user(s3_port)
 
       assert :ok = AvatarProcessor.perform(make_oban_job(avatar.id))
 
@@ -272,9 +297,9 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end
 
     test "sets the user's current avatar when the user has none", %{
-      image_port: image_port
+      s3_port: s3_port
     } do
-      {user, avatar} = create_avatar_for_user(image_port, :upload)
+      {user, avatar} = create_avatar_for_user(s3_port, :upload)
 
       # Confirm no current avatar before processing
       assert is_nil(Repo.reload!(user).current_avatar_id)
@@ -284,10 +309,8 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
       assert Repo.reload!(user).current_avatar_id == avatar.id
     end
 
-    test "upload source always replaces the current avatar", %{
-      image_port: image_port
-    } do
-      {user, new_avatar} = create_avatar_for_user(image_port, :upload)
+    test "upload source always replaces the current avatar", %{s3_port: s3_port} do
+      {user, new_avatar} = create_avatar_for_user(s3_port, :upload)
       existing = set_existing_current_avatar(user)
 
       assert Repo.reload!(user).current_avatar_id == existing.id
@@ -299,9 +322,9 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end
 
     test "OAuth source does not replace an existing current avatar", %{
-      image_port: image_port
+      s3_port: s3_port
     } do
-      {user, oauth_avatar} = create_avatar_for_user(image_port, :google)
+      {user, oauth_avatar} = create_avatar_for_user(s3_port, :google)
       existing = set_existing_current_avatar(user)
 
       assert Repo.reload!(user).current_avatar_id == existing.id
@@ -313,9 +336,9 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end
 
     test "OAuth source sets the current avatar when the user has none", %{
-      image_port: image_port
+      s3_port: s3_port
     } do
-      {user, oauth_avatar} = create_avatar_for_user(image_port, :google)
+      {user, oauth_avatar} = create_avatar_for_user(s3_port, :google)
 
       assert is_nil(Repo.reload!(user).current_avatar_id)
 
@@ -325,9 +348,9 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end
 
     test "cleans up all temp files after successful processing", %{
-      image_port: image_port
+      s3_port: s3_port
     } do
-      {_user, avatar} = create_avatar_for_user(image_port)
+      {_user, avatar} = create_avatar_for_user(s3_port)
 
       assert :ok = AvatarProcessor.perform(make_oban_job(avatar.id))
 
@@ -346,16 +369,36 @@ defmodule YscWeb.Workers.AvatarProcessorTest do
     end
 
     test "cleans up all temp files after a processing failure", %{
-      image_port: image_port
+      s3_port: s3_port
     } do
-      {_user, avatar} = create_avatar_for_user(image_port)
+      {_user, avatar} = create_avatar_for_user(s3_port)
 
-      # Simulate download failure after a valid avatar row exists (same as unreachable
-      # URL / refused port once Req retries are disabled on the worker).
+      suffix = Ecto.ULID.generate()
+      user_id = avatar.user_id
+      bad_key = "#{user_id}/#{suffix}/original.png"
+
       failing_avatar =
         avatar
-        |> Ecto.Changeset.change(original_path: "http://127.0.0.1:1/bad.png")
+        |> Ecto.Changeset.change(
+          original_path: "http://127.0.0.1:99999/avatars/#{bad_key}"
+        )
         |> Repo.update!()
+
+      original = Application.get_env(:ex_aws, :s3)
+
+      Application.put_env(:ex_aws, :s3,
+        scheme: "http://",
+        host: "127.0.0.1",
+        port: 1
+      )
+
+      on_exit(fn ->
+        if original do
+          Application.put_env(:ex_aws, :s3, original)
+        else
+          Application.delete_env(:ex_aws, :s3)
+        end
+      end)
 
       assert {:error, _} =
                AvatarProcessor.perform(make_oban_job(failing_avatar.id))
