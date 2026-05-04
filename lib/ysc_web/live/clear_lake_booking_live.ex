@@ -3296,8 +3296,8 @@ defmodule YscWeb.ClearLakeBookingLive do
     if user.state != :active do
       {
         false,
-        "Membership Pending Approval",
-        "Your membership application is pending approval. You will be able to make bookings once your application has been approved."
+        "Application under review",
+        "Your membership application is still being reviewed by the board. You'll be able to make bookings after your application is approved and your membership is active."
       }
     else
       # Check if user has active membership

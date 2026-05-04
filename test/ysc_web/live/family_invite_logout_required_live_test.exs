@@ -97,7 +97,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
 
       assert html =~ "Log Out to Accept Invitation"
       assert html =~ invite.email
-      assert has_element?(view, "button", "Log out and create new linked user")
+      assert has_element?(view, "button", "Log out and continue with")
 
       assert render(view) =~
                ~p"/family-invite/#{invite.token}/accept"

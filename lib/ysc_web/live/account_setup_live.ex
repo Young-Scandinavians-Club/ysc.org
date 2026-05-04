@@ -44,7 +44,7 @@ defmodule YscWeb.AccountSetupLive do
               name="hero-rocket-launch"
               class="w-12 h-12 text-blue-800 me-3 mt-1"
             />
-            Your application is submitted and is currently being reviewed by the board. We will email you as soon as your membership is approved.<br /><br />
+            Your application is submitted and is currently being reviewed by the board. We will email you when the board has made a decision.<br /><br />
             While you wait, let's finish setting up your account!
           </.alert_box>
 
