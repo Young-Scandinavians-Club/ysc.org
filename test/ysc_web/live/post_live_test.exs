@@ -131,6 +131,23 @@ defmodule YscWeb.PostLiveTest do
       assert html =~ "This is the main content of the article."
     end
 
+    test "sanitizes stored post HTML before rendering (no script or inline handlers)", %{
+      conn: conn
+    } do
+      post =
+        create_post(%{
+          title: "Sanitization test",
+          raw_body:
+            "<p>Legitimate copy</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ "Legitimate copy"
+      refute html =~ "<script"
+      refute html =~ "onerror="
+    end
+
     test "displays author information", %{conn: conn} do
       author = user_fixture(%{first_name: "Jane", last_name: "Doe"})
       post = create_post(%{title: "Test", author: author})

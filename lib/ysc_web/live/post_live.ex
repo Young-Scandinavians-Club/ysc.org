@@ -125,7 +125,7 @@ defmodule YscWeb.PostLive do
             class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-normal border-l border-zinc-100 ml-[-2rem] pl-8"
             phx-hook="GLightboxHook"
           >
-            {raw(@post.raw_body)}
+            {raw(Scrubber.scrub(@post.raw_body || "", Scrubber.BasicHTML))}
           </div>
         </article>
       </div>
