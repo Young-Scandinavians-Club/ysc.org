@@ -1975,11 +1975,11 @@ defmodule Ysc.BookingsTest do
       # Room pricing falls back to property-wide rules (nil room_id and nil
       # room_category_id). Seeded Tahoe defaults would otherwise price any room.
       from(pr in Ysc.Bookings.PricingRule,
-        where: pr.property == :tahoe,
         where: pr.booking_mode == :room,
         where: pr.price_unit == :per_person_per_night,
         where: is_nil(pr.room_id),
-        where: is_nil(pr.room_category_id)
+        where: is_nil(pr.room_category_id),
+        where: pr.property == :tahoe or is_nil(pr.property)
       )
       |> Repo.delete_all()
 

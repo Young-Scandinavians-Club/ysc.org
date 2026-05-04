@@ -1,6 +1,7 @@
 defmodule Ysc.Bookings.EntitlementsTest do
   use Ysc.DataCase, async: false
 
+  alias Money
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingLocker, Entitlements}
   alias Ysc.Repo
@@ -31,6 +32,17 @@ defmodule Ysc.Bookings.EntitlementsTest do
           name: "Ent lock category #{System.unique_integer([:positive])}"
         })
         |> Repo.insert()
+
+      assert {:ok, _} =
+               Bookings.create_pricing_rule(%{
+                 amount: Money.new(:USD, 100),
+                 booking_mode: :room,
+                 price_unit: :per_person_per_night,
+                 property: :tahoe,
+                 season_id: nil,
+                 room_id: nil,
+                 room_category_id: category.id
+               })
 
       {:ok, room_a} =
         Bookings.create_room(%{

@@ -396,6 +396,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       refute has_element?(view, "#stripe-payment-container")
       refute html =~ "Failed to initialize payment"
 
+      # Complimentary flow must not hit Stripe; deny replaces the module setup stub for this MFA.
+      deny(StripeMock, :create_payment_intent, 2)
+
       assert {:error, {:live_redirect, %{to: receipt_path}}} =
                view
                |> element("#confirm-complimentary-booking")
