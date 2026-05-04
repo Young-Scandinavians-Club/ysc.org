@@ -5,6 +5,7 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.Bookings.{Booking, BookingLocker, Entitlements}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
+  alias Ysc.Stripe.PaymentIntentHelpers
   import Ecto.Query
   require Ysc.Logging
 
@@ -150,6 +151,7 @@ defmodule YscWeb.BookingCheckoutLive do
         payment_intent: nil,
         payment_error: nil,
         show_payment_form: false,
+        complimentary_checkout: Money.zero?(total_price),
         is_expired: is_expired,
         timezone: timezone,
         checkout_step: checkout_step,
@@ -213,16 +215,27 @@ defmodule YscWeb.BookingCheckoutLive do
          user,
          :payment
        ) do
-    case create_payment_intent(booking, total_price, user) do
-      {:ok, payment_intent} ->
-        {:ok,
-         assign(socket, payment_intent: payment_intent, show_payment_form: true)}
+    if Money.zero?(total_price) do
+      {:ok,
+       assign(socket,
+         payment_intent: nil,
+         show_payment_form: false
+       )}
+    else
+      case create_payment_intent(booking, total_price, user) do
+        {:ok, payment_intent} ->
+          {:ok,
+           assign(socket,
+             payment_intent: payment_intent,
+             show_payment_form: true
+           )}
 
-      {:error, reason} ->
-        {:ok,
-         assign(socket,
-           payment_error: "Failed to initialize payment: #{reason}"
-         )}
+        {:error, reason} ->
+          {:ok,
+           assign(socket,
+             payment_error: "Failed to initialize payment: #{reason}"
+           )}
+      end
     end
   end
 
@@ -700,7 +713,13 @@ defmodule YscWeb.BookingCheckoutLive do
                     class="flex-1 w-full text-lg py-3.5"
                     disabled={!all_guests_valid?(@guest_info_form, @booking)}
                   >
-                    <span class="text-lg font-semibold">Continue to Payment</span>
+                    <span class="text-lg font-semibold">
+                      <%= if @complimentary_checkout do %>
+                        Continue to confirmation
+                      <% else %>
+                        Continue to Payment
+                      <% end %>
+                    </span>
                     <.icon name="hero-arrow-right" class="w-5 h-5 -mt-1 ms-1" />
                   </.button>
                   <button
@@ -721,13 +740,53 @@ defmodule YscWeb.BookingCheckoutLive do
             :if={@checkout_step == :payment}
             class="bg-white rounded-lg border border-zinc-200 p-8 shadow-sm"
           >
-            <h2 class="text-xl font-bold mb-6">Secure Payment</h2>
+            <h2 class="text-xl font-bold mb-6">
+              <%= if @complimentary_checkout do %>
+                Confirm your booking
+              <% else %>
+                Secure Payment
+              <% end %>
+            </h2>
             <!-- Payment Error -->
             <div
               :if={@payment_error}
+              id="checkout-payment-error"
               class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
             >
               <p class="text-sm text-red-800">{@payment_error}</p>
+            </div>
+            <!-- Complimentary checkout (entitlement / discount covers full amount) -->
+            <div :if={@complimentary_checkout && !@is_expired}>
+              <p class="text-sm text-zinc-600 mb-6">
+                No payment is required. Your total after discounts is {MoneyHelper.format_money!(
+                  @total_price
+                )}.
+                Click below to confirm your reservation.
+              </p>
+              <div class="pt-2 border-t border-zinc-100 space-y-4">
+                <div class="flex flex-col sm:flex-row gap-4">
+                  <.button
+                    id="confirm-complimentary-booking"
+                    type="button"
+                    phx-click="confirm-complimentary-booking"
+                    phx-disable-with="Confirming..."
+                    class="flex-1 w-full text-lg py-3.5"
+                    disabled={@is_expired}
+                  >
+                    <.icon name="hero-check-circle" class="w-5 h-5 -mt-1 me-1" />
+                    <span class="text-lg font-semibold">Confirm booking</span>
+                  </.button>
+                  <button
+                    type="button"
+                    phx-click="cancel-booking"
+                    phx-disable-with="Cancelling..."
+                    phx-confirm="Are you sure you want to cancel this booking? The availability will be released immediately."
+                    class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
             <!-- Payment Form -->
             <div :if={@show_payment_form && @payment_intent && !@is_expired}>
@@ -932,10 +991,14 @@ defmodule YscWeb.BookingCheckoutLive do
             class="flex-1"
             disabled={!all_guests_valid?(@guest_info_form, @booking)}
           >
-            Continue to Payment<.icon
-              name="hero-arrow-right"
-              class="w-5 h-5 -mt-1 ms-1"
-            />
+            <span class="font-semibold">
+              <%= if @complimentary_checkout do %>
+                Continue to confirmation
+              <% else %>
+                Continue to Payment
+              <% end %>
+            </span>
+            <.icon name="hero-arrow-right" class="w-5 h-5 -mt-1 ms-1" />
           </.button>
         </div>
       </div>
@@ -1569,37 +1632,55 @@ defmodule YscWeb.BookingCheckoutLive do
                 rooms: :room_category
               ])
 
-            # Create payment intent now that guests are saved
+            # Create payment intent now that guests are saved (skip Stripe when total is $0)
             user = socket.assigns.current_user
 
-            case create_payment_intent(
-                   booking,
-                   socket.assigns.total_price,
-                   user
-                 ) do
-              {:ok, payment_intent} ->
-                {:noreply,
-                 socket
-                 |> assign(
-                   booking: booking,
-                   checkout_step: :payment,
-                   payment_intent: payment_intent,
-                   show_payment_form: true,
-                   guest_info_form: nil,
-                   guest_info_errors: %{}
-                 )
-                 |> YscWeb.Flash.put_toast(
-                   :info,
-                   "Guest information saved. Please complete payment.",
-                   title: "Checkout"
-                 )}
+            if Money.zero?(socket.assigns.total_price) do
+              {:noreply,
+               socket
+               |> assign(
+                 booking: booking,
+                 checkout_step: :payment,
+                 payment_intent: nil,
+                 show_payment_form: false,
+                 guest_info_form: nil,
+                 guest_info_errors: %{}
+               )
+               |> YscWeb.Flash.put_toast(
+                 :info,
+                 "Guest information saved. No payment is required for this booking.",
+                 title: "Checkout"
+               )}
+            else
+              case create_payment_intent(
+                     booking,
+                     socket.assigns.total_price,
+                     user
+                   ) do
+                {:ok, payment_intent} ->
+                  {:noreply,
+                   socket
+                   |> assign(
+                     booking: booking,
+                     checkout_step: :payment,
+                     payment_intent: payment_intent,
+                     show_payment_form: true,
+                     guest_info_form: nil,
+                     guest_info_errors: %{}
+                   )
+                   |> YscWeb.Flash.put_toast(
+                     :info,
+                     "Guest information saved. Please complete payment.",
+                     title: "Checkout"
+                   )}
 
-              {:error, reason} ->
-                {:noreply,
-                 assign(socket,
-                   payment_error: "Failed to initialize payment: #{reason}",
-                   checkout_step: :payment
-                 )}
+                {:error, reason} ->
+                  {:noreply,
+                   assign(socket,
+                     payment_error: "Failed to initialize payment: #{reason}",
+                     checkout_step: :payment
+                   )}
+              end
             end
 
           {:error, changeset} ->
@@ -1670,6 +1751,60 @@ defmodule YscWeb.BookingCheckoutLive do
      |> YscWeb.Flash.put_toast(:error, "Guest information is required.",
        title: "Checkout"
      )}
+  end
+
+  @impl true
+  def handle_event("confirm-complimentary-booking", _params, socket) do
+    booking = socket.assigns.booking
+
+    cond do
+      not socket.assigns.complimentary_checkout or
+          not Money.zero?(socket.assigns.total_price) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This booking requires payment.",
+           title: "Checkout"
+         )}
+
+      socket.assigns.checkout_step != :payment ->
+        {:noreply, socket}
+
+      booking_expired?(booking) ->
+        {:noreply,
+         socket
+         |> assign(
+           payment_error:
+             "This booking has expired and is no longer available for payment.",
+           show_payment_form: false
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This booking has expired. Please create a new booking.",
+           title: "Checkout"
+         )}
+
+      true ->
+        case process_complimentary_booking_confirmation(booking) do
+          {:ok, confirmed} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Your booking is confirmed.",
+               title: "Booking confirmed",
+               icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+             )
+             |> push_navigate(
+               to: ~p"/bookings/#{confirmed.id}/receipt?confetti=true"
+             )}
+
+          {:error, reason} ->
+            {:noreply,
+             assign(socket,
+               payment_error: "Could not confirm booking: #{inspect(reason)}"
+             )}
+        end
+    end
   end
 
   @impl true
@@ -2048,6 +2183,65 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
+  defp process_complimentary_booking_confirmation(booking) do
+    reloaded_booking =
+      Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
+
+    cond do
+      reloaded_booking.status == :complete ->
+        {:ok, reloaded_booking}
+
+      true ->
+        case BookingLocker.confirm_booking(reloaded_booking.id) do
+          {:ok, confirmed_booking} ->
+            post_complimentary_ledger_payment(booking, confirmed_booking)
+
+          {:error, :invalid_status} ->
+            final_booking =
+              Repo.get!(Booking, reloaded_booking.id)
+              |> Repo.preload([:rooms, :user])
+
+            if final_booking.status == :complete do
+              post_complimentary_ledger_payment(booking, final_booking)
+            else
+              {:error, :booking_confirmation_failed}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  defp post_complimentary_ledger_payment(booking, confirmed_booking) do
+    zero = Money.new(0, :USD)
+    external_payment_id = "booking_complimentary_#{booking.reference_id}"
+
+    case Ysc.Ledgers.process_payment(%{
+           user_id: booking.user_id,
+           amount: zero,
+           entity_type: :booking,
+           entity_id: booking.id,
+           external_payment_id: external_payment_id,
+           stripe_fee: nil,
+           description: "Complimentary booking - #{booking.reference_id}",
+           property: booking.property,
+           payment_method_id: nil
+         }) do
+      {:ok, _} ->
+        {:ok, confirmed_booking}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Complimentary booking confirmed but ledger payment recording failed",
+          booking_id: booking.id,
+          error: inspect(reason)
+        )
+
+        {:error, {:ledger_payment_failed, reason}}
+    end
+  end
+
   defp process_payment_success(booking, payment_intent_id_or_secret) do
     # Extract payment intent ID if a client secret was passed
     payment_intent_id =
@@ -2059,11 +2253,13 @@ defmodule YscWeb.BookingCheckoutLive do
         payment_intent_id_or_secret
       end
 
-    # Retrieve payment intent to verify (expand payment_method and charges)
+    # Retrieve payment intent to verify. Stripe rejects expanding
+    # `latest_charge.payment_method`; use top-level `payment_method` and
+    # `latest_charge` (charge may still expose `payment_method` as an id string).
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{
-           expand: ["payment_method", "charges"]
+           expand: ["payment_method", "latest_charge"]
          }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
@@ -2411,18 +2607,22 @@ defmodule YscWeb.BookingCheckoutLive do
         is_map(payment_intent.payment_method) ->
           payment_intent.payment_method.id
 
-        # Or get it from the first charge (charges is a List struct with data field)
-        payment_intent.charges && payment_intent.charges.data &&
-            payment_intent.charges.data != [] ->
-          first_charge = List.first(payment_intent.charges.data)
-          # Payment method might be a string ID or an expanded object
-          cond do
-            is_binary(first_charge.payment_method) ->
-              first_charge.payment_method
+        # Or get it from the expanded latest charge
+        (first_charge =
+           PaymentIntentHelpers.first_expanded_charge(payment_intent)) !=
+            nil ->
+          pm_on_charge =
+            Map.get(first_charge, :payment_method) ||
+              Map.get(first_charge, "payment_method")
 
-            is_map(first_charge.payment_method) &&
-                Map.has_key?(first_charge.payment_method, :id) ->
-              first_charge.payment_method.id
+          cond do
+            is_binary(pm_on_charge) ->
+              pm_on_charge
+
+            is_map(pm_on_charge) &&
+                (Map.has_key?(pm_on_charge, :id) ||
+                   Map.has_key?(pm_on_charge, "id")) ->
+              Map.get(pm_on_charge, :id) || Map.get(pm_on_charge, "id")
 
             true ->
               nil

@@ -38,10 +38,11 @@
       #
       plugins: [],
       #
-      # If you create your own checks, you must specify the source files for
-      # them here, so they can be loaded by Credo before running the analysis.
+      # Custom checks in dev/ysc/credo/ are compiled via mix.exs elixirc_paths
+      # (:dev and :test). Do not list them in requires — that would reload the
+      # sources and emit "redefining module" warnings.
       #
-      requires: ["dev/ysc/credo/"],
+      requires: [],
       #
       # If you want to enforce a style guide and need a more traditional linting
       # experience, you can change `strict` to `true` below:

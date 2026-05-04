@@ -36,7 +36,7 @@ defmodule Ysc.Sitemap do
 
   defp build_and_cache do
     xml = build_xml()
-    Cachex.put(:ysc_cache, @cache_key, xml, ttl: @cache_ttl)
+    Cachex.put(:ysc_cache, @cache_key, xml, expire: @cache_ttl)
     xml
   end
 

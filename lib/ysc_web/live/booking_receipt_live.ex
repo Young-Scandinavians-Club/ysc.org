@@ -6,6 +6,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
+  alias Ysc.Stripe.PaymentIntentHelpers
   require Ysc.Logging
   import Ecto.Query
   alias Phoenix.LiveView.JS
@@ -1239,10 +1240,10 @@ defmodule YscWeb.BookingReceiptLive do
         payment_intent_id_or_secret
       end
 
-    # Retrieve payment intent to verify (expand payment_method and charges)
+    # Stripe rejects `expand[]=latest_charge.payment_method` on PaymentIntent retrieve.
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
            Stripe.PaymentIntent.retrieve(payment_intent_id, %{
-             expand: ["payment_method", "charges"]
+             expand: ["payment_method", "latest_charge"]
            })
          end) do
       {:ok, payment_intent} ->
@@ -1328,18 +1329,22 @@ defmodule YscWeb.BookingReceiptLive do
         is_map(payment_intent.payment_method) ->
           payment_intent.payment_method.id
 
-        # Or get it from the first charge (charges is a List struct with data field)
-        payment_intent.charges.data != nil &&
-            payment_intent.charges.data != [] ->
-          first_charge = List.first(payment_intent.charges.data)
-          # Payment method might be a string ID or an expanded object
-          cond do
-            is_binary(first_charge.payment_method) ->
-              first_charge.payment_method
+        # Or get it from the expanded latest charge
+        (first_charge =
+           PaymentIntentHelpers.first_expanded_charge(payment_intent)) !=
+            nil ->
+          pm_on_charge =
+            Map.get(first_charge, :payment_method) ||
+              Map.get(first_charge, "payment_method")
 
-            is_map(first_charge.payment_method) &&
-                Map.has_key?(first_charge.payment_method, :id) ->
-              first_charge.payment_method.id
+          cond do
+            is_binary(pm_on_charge) ->
+              pm_on_charge
+
+            is_map(pm_on_charge) &&
+                (Map.has_key?(pm_on_charge, :id) ||
+                   Map.has_key?(pm_on_charge, "id")) ->
+              Map.get(pm_on_charge, :id) || Map.get(pm_on_charge, "id")
 
             true ->
               nil

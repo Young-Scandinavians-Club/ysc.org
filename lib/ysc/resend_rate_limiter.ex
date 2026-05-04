@@ -60,7 +60,7 @@ defmodule Ysc.ResendRateLimiter do
     cache_key = cache_key(identifier, type)
     ttl_ms = :timer.seconds(rate_limit_seconds)
 
-    case Cachex.put(:ysc_cache, cache_key, true, ttl: ttl_ms) do
+    case Cachex.put(:ysc_cache, cache_key, true, expire: ttl_ms) do
       {:ok, _} ->
         :ok
 

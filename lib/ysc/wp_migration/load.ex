@@ -1790,7 +1790,7 @@ defmodule Ysc.WpMigration.Load do
                     )
 
                     Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                      Stripe.Subscription.delete(stripe_sub.id)
+                      Stripe.Subscription.cancel(stripe_sub.id)
                     end)
                 end
 

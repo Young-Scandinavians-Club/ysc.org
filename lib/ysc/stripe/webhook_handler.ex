@@ -53,6 +53,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Accounts
+  alias Ysc.Stripe.PaymentIntentHelpers
 
   # Maximum age for webhook events (5 minutes in seconds)
   @webhook_max_age_seconds 300
@@ -2327,7 +2328,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           Application.get_env(:ysc, :subscription_retrieve_for_webhook_callback) ||
             fn id, opts -> Stripe.Subscription.retrieve(id, opts) end
 
-        case retrieve_fn.(event.id, expand: ["items.data.price"]) do
+        case retrieve_fn.(event.id, %{expand: ["items.data.price"]}) do
           {:ok, stripe_subscription} ->
             case Subscriptions.create_subscription_from_stripe(
                    user,
@@ -2524,7 +2525,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
 
       {:error, _reason} ->
-        # Fallback: try to retrieve payment intent with charges expanded
+        # Fallback: try to retrieve payment intent with latest_charge expanded
         case retrieve_payment_intent_with_charges(payment_intent_id) do
           {:ok, payment_intent_with_charges} ->
             case get_charge_from_payment_intent(payment_intent_with_charges) do
@@ -2557,28 +2558,21 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp get_payment_intent_id(%{"id" => id}) when is_binary(id), do: id
   defp get_payment_intent_id(_), do: nil
 
-  # Helper to get charge from payment intent
-  defp get_charge_from_payment_intent(%{
-         charges: %Stripe.List{data: [charge | _]}
-       })
-       when is_map(charge),
-       do: {:ok, charge}
+  # Helper to get charge from payment intent (latest_charge or legacy charges maps)
+  defp get_charge_from_payment_intent(payment_intent) do
+    case PaymentIntentHelpers.first_expanded_charge(payment_intent) do
+      nil ->
+        case PaymentIntentHelpers.charge_id(payment_intent) do
+          id when is_binary(id) -> {:ok, %{id: id}}
+          _ -> {:error, :no_charge_found}
+        end
 
-  defp get_charge_from_payment_intent(%{"charges" => %{"data" => [charge | _]}})
-       when is_map(charge),
-       do: {:ok, charge}
+      charge ->
+        {:ok, charge}
+    end
+  end
 
-  defp get_charge_from_payment_intent(%{latest_charge: charge_id})
-       when is_binary(charge_id),
-       do: {:ok, %{id: charge_id}}
-
-  defp get_charge_from_payment_intent(%{"latest_charge" => charge_id})
-       when is_binary(charge_id),
-       do: {:ok, %{id: charge_id}}
-
-  defp get_charge_from_payment_intent(_), do: {:error, :no_charge_found}
-
-  # Helper to retrieve payment intent with charges expanded
+  # Helper to retrieve payment intent with latest charge expanded (for fee lookup)
   @dialyzer {:nowarn_function, retrieve_payment_intent_with_charges: 1}
   defp retrieve_payment_intent_with_charges(nil),
     do: {:error, :no_payment_intent_id}
@@ -2586,7 +2580,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   defp retrieve_payment_intent_with_charges(payment_intent_id) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
            Stripe.PaymentIntent.retrieve(payment_intent_id, %{
-             expand: ["charges.data.balance_transaction"]
+             expand: ["latest_charge.balance_transaction"]
            })
          end) do
       {:ok, payment_intent} -> {:ok, payment_intent}
@@ -2888,7 +2882,7 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   # Fetches ALL balance transactions for a given payout ID, handling pagination.
-  # Uses Stripe.BalanceTransaction.all with expand to get source objects (charges/refunds).
+  # Uses Stripe.BalanceTransaction.list with expand to get source objects (charges/refunds).
   defp list_payout_transactions(payout_id) do
     do_fetch_transactions(payout_id, [], nil)
   end
@@ -3472,6 +3466,17 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   end
 
+  # stripity_stripe 3.x only generates `Stripe.Refund.retrieve/4` nested under a charge ID.
+  # Stripe still documents GET /v1/refunds/:id; `Stripe.Request` is the supported escape hatch.
+  @dialyzer {:nowarn_function, retrieve_refund_by_id: 1}
+  @dialyzer {:nowarn_function, retrieve_refund_by_id: 2}
+  defp retrieve_refund_by_id(refund_id, opts \\ []) do
+    Stripe.Request.new_request(opts)
+    |> Stripe.Request.put_endpoint("/v1/refunds/#{refund_id}")
+    |> Stripe.Request.put_method(:get)
+    |> Stripe.Request.make_request()
+  end
+
   # Helper function to link a Stripe refund to a payout
   # source may be an expanded Refund object or nil (if we need to fetch by ID)
   defp link_stripe_refund_to_payout(payout, source, stripe_refund_id) do
@@ -3497,7 +3502,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           is_binary(stripe_refund_id) ->
             # Source is just an ID, fetch the refund
             case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                   Stripe.Refund.retrieve(stripe_refund_id)
+                   retrieve_refund_by_id(stripe_refund_id)
                  end) do
               {:ok, refund} ->
                 refund
@@ -3666,9 +3671,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   # Helper function to get membership type from Stripe subscription API
   defp get_membership_type_from_stripe_subscription(subscription_id) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Subscription.retrieve(subscription_id,
+           Stripe.Subscription.retrieve(subscription_id, %{
              expand: ["items.data.price"]
-           )
+           })
          end) do
       {:ok, stripe_subscription} ->
         membership_type =

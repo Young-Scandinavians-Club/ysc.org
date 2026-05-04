@@ -142,7 +142,7 @@ defmodule Ysc.Accounts.MembershipCache do
 
   defp cache_with_ttl(key, value) do
     ttl_ms = get_ttl()
-    Cachex.put(@cache_name, key, value, ttl: ttl_ms)
+    Cachex.put(@cache_name, key, value, expire: ttl_ms)
   end
 
   defp get_ttl do

@@ -279,7 +279,7 @@ defmodule Ysc.Accounts.MembershipCacheTest do
                  :ysc_cache,
                  "membership:#{user.id}:active",
                  expired,
-                 ttl: :timer.minutes(5)
+                 expire: :timer.minutes(5)
                )
 
       user = Accounts.get_user!(user.id, [:subscriptions])

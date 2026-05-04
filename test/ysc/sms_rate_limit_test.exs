@@ -71,7 +71,7 @@ defmodule Ysc.SmsRateLimitTest do
         now - 2000
       ]
 
-      Cachex.put(:ysc_cache, cache_key, timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, timestamps, expire: 60 * 60 * 1000)
 
       # Should be allowed (19 < 20 per hour, and only 4 in last minute)
       assert {:ok, :allowed} = SmsRateLimit.check_rate_limit(phone_number)
@@ -123,7 +123,7 @@ defmodule Ysc.SmsRateLimitTest do
         now - 2500
       ]
 
-      Cachex.put(:ysc_cache, cache_key, timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, timestamps, expire: 60 * 60 * 1000)
 
       # 21st SMS should be blocked by per-hour limit (20 already sent)
       assert {:error, :rate_limit_exceeded, reason} =
@@ -176,7 +176,7 @@ defmodule Ysc.SmsRateLimitTest do
         now - 7200
       ]
 
-      Cachex.put(:ysc_cache, cache_key, old_timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, old_timestamps, expire: 60 * 60 * 1000)
 
       # Should be allowed since old timestamps are filtered out
       assert {:ok, :allowed} = SmsRateLimit.check_rate_limit(phone_number)
@@ -222,7 +222,7 @@ defmodule Ysc.SmsRateLimitTest do
         now - 100
       ]
 
-      Cachex.put(:ysc_cache, cache_key, old_timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, old_timestamps, expire: 60 * 60 * 1000)
 
       # Record new SMS
       SmsRateLimit.record_sms_send(phone_number)
@@ -304,7 +304,7 @@ defmodule Ysc.SmsRateLimitTest do
 
       # Manually create 20 timestamps spread over the last hour
       timestamps = Enum.map(1..20, fn i -> now - i * 100 end)
-      Cachex.put(:ysc_cache, cache_key, timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, timestamps, expire: 60 * 60 * 1000)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)
 
@@ -329,7 +329,7 @@ defmodule Ysc.SmsRateLimitTest do
         now - 10
       ]
 
-      Cachex.put(:ysc_cache, cache_key, timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, timestamps, expire: 60 * 60 * 1000)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)
 
@@ -362,7 +362,7 @@ defmodule Ysc.SmsRateLimitTest do
 
       # Manually insert more than the limit (shouldn't happen in practice, but test edge case)
       timestamps = Enum.map(1..25, fn _ -> now - :rand.uniform(100) end)
-      Cachex.put(:ysc_cache, cache_key, timestamps, ttl: 60 * 60 * 1000)
+      Cachex.put(:ysc_cache, cache_key, timestamps, expire: 60 * 60 * 1000)
 
       status = SmsRateLimit.get_rate_limit_status(phone_number)
 

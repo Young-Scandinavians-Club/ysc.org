@@ -38,5 +38,5 @@ defmodule Ysc.StripeClient do
     do: stripe_retry(fn -> Stripe.Payout.retrieve(id, opts) end)
 
   def list_balance_transactions(params, opts \\ []),
-    do: stripe_retry(fn -> Stripe.BalanceTransaction.all(params, opts) end)
+    do: stripe_retry(fn -> Stripe.BalanceTransaction.list(params, opts) end)
 end

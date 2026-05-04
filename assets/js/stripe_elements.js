@@ -46,6 +46,8 @@ const StripeElements = {
         this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
         this.isDestroyed = false;
         this.initializing = false;
+        // Stable reference so removeEventListener matches across `initializeStripe` re-runs
+        this._boundHandleSubmit = (e) => this.handleSubmit(e);
         this.initializeStripe();
     },
 
@@ -213,11 +215,13 @@ const StripeElements = {
                 }
             }
 
-            // Handle form submission
-            this.handleSubmit = this.handleSubmit.bind(this);
+            // Handle form submission (remove first: `initializeStripe` can run again when
+            // LiveView refreshes with a new client secret, otherwise one click registers
+            // multiple handlers and Stripe gets duplicate confirmPayment calls).
             const submitButton = document.getElementById('submit-payment');
-            if (submitButton) {
-                submitButton.addEventListener('click', this.handleSubmit);
+            if (submitButton && this._boundHandleSubmit) {
+                submitButton.removeEventListener('click', this._boundHandleSubmit);
+                submitButton.addEventListener('click', this._boundHandleSubmit);
             }
 
         } catch (error) {
@@ -230,6 +234,10 @@ const StripeElements = {
 
     async handleSubmit(event) {
         event.preventDefault();
+
+        if (this._paymentConfirmInFlight) {
+            return;
+        }
 
         // Check if hook is being destroyed
         if (this.isDestroyed) {
@@ -298,6 +306,8 @@ const StripeElements = {
             submitButton.textContent = 'Processing...';
         }
 
+        this._paymentConfirmInFlight = true;
+
         try {
             // Get booking ID or ticket order ID from data attributes for redirect URL
             const bookingId = this.el.dataset.bookingId;
@@ -333,6 +343,21 @@ const StripeElements = {
             });
 
             if (error) {
+                const pi = error.payment_intent;
+                const alreadySucceeded =
+                    error.code === 'payment_intent_unexpected_state' &&
+                    pi &&
+                    pi.status === 'succeeded';
+
+                if (alreadySucceeded) {
+                    this.showMessage('Payment successful! Processing your order...', true);
+                    this.pushEvent('payment-success', {
+                        payment_intent_id: pi.id || this.clientSecret.split('_secret_')[0]
+                    });
+                    return;
+                }
+
+                this._paymentConfirmInFlight = false;
                 // Show error to customer
                 this.showMessage(error.message);
                 if (submitButton) {
@@ -350,6 +375,7 @@ const StripeElements = {
             }
         } catch (err) {
             console.error('Payment confirmation error:', err);
+            this._paymentConfirmInFlight = false;
             this.showMessage('An unexpected error occurred. Please try again.');
             if (submitButton) {
                 submitButton.disabled = false;
@@ -384,8 +410,8 @@ const StripeElements = {
 
         // Clean up event listeners
         const submitButton = document.getElementById('submit-payment');
-        if (submitButton && this.handleSubmit) {
-            submitButton.removeEventListener('click', this.handleSubmit);
+        if (submitButton && this._boundHandleSubmit) {
+            submitButton.removeEventListener('click', this._boundHandleSubmit);
         }
 
         // Unmount Stripe Elements

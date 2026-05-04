@@ -112,7 +112,7 @@ defmodule Ysc.SmsRateLimit do
       end
 
     # Store back in cache with TTL
-    Cachex.put(@cache_name, cache_key, timestamps, ttl: @cache_ttl_ms)
+    Cachex.put(@cache_name, cache_key, timestamps, expire: @cache_ttl_ms)
 
     :ok
   end

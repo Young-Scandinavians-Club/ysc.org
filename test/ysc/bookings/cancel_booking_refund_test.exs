@@ -52,7 +52,7 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
       {:ok,
        %Stripe.PaymentIntent{
          id: id,
-         charges: %Stripe.List{data: [charge]},
+         latest_charge: charge,
          metadata: %{}
        }}
     end)

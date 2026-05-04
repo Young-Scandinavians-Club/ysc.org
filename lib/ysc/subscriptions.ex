@@ -588,7 +588,7 @@ defmodule Ysc.Subscriptions do
   """
   def cancel_immediately(%Subscription{} = subscription) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Subscription.delete(subscription.stripe_id)
+           Stripe.Subscription.cancel(subscription.stripe_id)
          end) do
       {:ok, _stripe_subscription} ->
         mark_as_cancelled(subscription)
@@ -884,9 +884,9 @@ defmodule Ysc.Subscriptions do
         end
 
     with {:ok, stripe_sub} <-
-           initial_retrieve_fn.(subscription.stripe_id,
+           initial_retrieve_fn.(subscription.stripe_id, %{
              expand: ["items.data.price"]
-           ),
+           }),
          [first_item | _] when first_item != nil <- stripe_sub.items.data do
       current_price_id =
         if is_binary(first_item.price),
@@ -1354,9 +1354,9 @@ defmodule Ysc.Subscriptions do
           {:ok, _paid_invoice} ->
             stripe_subscription =
               case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                     Stripe.Subscription.retrieve(stripe_subscription.id,
+                     Stripe.Subscription.retrieve(stripe_subscription.id, %{
                        expand: ["items.data.price"]
-                     )
+                     })
                    end) do
                 {:ok, sub} -> sub
                 {:error, _} -> stripe_subscription
