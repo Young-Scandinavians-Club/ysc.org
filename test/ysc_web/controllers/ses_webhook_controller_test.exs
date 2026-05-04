@@ -42,6 +42,8 @@ defmodule YscWeb.SesWebhookControllerTest do
   # Signature verification is skipped in test via config :ysc, :sns_skip_signature_verification, true
 
   describe "webhook/2 - SubscriptionConfirmation (SubscribeURL HTTP outcomes)" do
+    # SubscribeURL is fetched with Req.get in the controller; use only loopback
+    # URLs (e.g. Plug.Cowboy below) so tests never hit AWS or the public internet.
     test "logs success when Req.get to SubscribeURL returns 2xx", %{conn: conn} do
       port = start_subscription_http_server(SubscriptionConfirm200Plug)
 
@@ -112,26 +114,6 @@ defmodule YscWeb.SesWebhookControllerTest do
           "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
         })
         |> Map.delete("SubscribeURL")
-
-      conn =
-        conn
-        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
-        |> put_req_header("content-type", "application/json")
-        |> post("/webhooks/ses", payload)
-
-      assert conn.status == 200
-      assert conn.resp_body == "OK"
-    end
-
-    test "confirms SNS subscription by fetching SubscribeURL", %{conn: conn} do
-      # Req.get is called for the SubscribeURL in production, but in tests we
-      # don't have a real URL to confirm. We just verify the endpoint returns 200.
-      # The Req.get call will fail gracefully and the controller still returns 200.
-      payload =
-        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
-          "SubscribeURL" => "https://sns.amazonaws.com/confirm?token=test",
-          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
-        })
 
       conn =
         conn

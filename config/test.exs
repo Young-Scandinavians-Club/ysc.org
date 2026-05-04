@@ -69,9 +69,14 @@ config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Test
 
 # ExAws: static credentials + MinIO-style host so presigned URL generation
 # (e.g. expense report file redirects) works in CI without EC2 instance metadata.
+#
+# Default ExAws retries (10 attempts, exponential backoff up to 10s) make
+# intentional connection-failure tests (e.g. AvatarProcessor on a closed port)
+# very slow; a single attempt is enough in test.
 config :ex_aws,
   access_key_id: "minioadmin",
   secret_access_key: "minioadmin",
+  retries: [max_attempts: 1],
   s3: [
     scheme: "http://",
     host: "localhost",
