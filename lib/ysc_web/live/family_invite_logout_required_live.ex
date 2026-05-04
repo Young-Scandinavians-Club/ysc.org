@@ -104,7 +104,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
               <%= if @existing_user do %>
                 Log out and log in using {@invite.email} to accept
               <% else %>
-                Log out and create new linked user
+                Log out and continue with {@invite.email}
               <% end %>
             </button>
           </form>

@@ -61,7 +61,7 @@ defmodule YscWeb.Authorization.EnsureApprovedUserPlugTest do
       assert redirected_to(result_conn) == "/pending-review"
 
       assert Phoenix.Flash.get(result_conn.assigns.flash, :error) ==
-               "Your account is pending approval"
+               "That page is for active members. Your membership application is still being reviewed—we'll email you when there is an update."
     end
 
     test "halts and redirects when user is suspended", %{conn: conn} do
