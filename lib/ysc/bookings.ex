@@ -1629,6 +1629,14 @@ defmodule Ysc.Bookings do
         room_category_id,
         :room,
         :per_person_per_night
+      ) ||
+      PricingRule.find_most_specific(
+        property,
+        season_id,
+        nil,
+        nil,
+        :room,
+        :per_person_per_night
       )
   end
 
