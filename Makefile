@@ -102,6 +102,23 @@ tests-failed: test-failed
 test-failed:  ## Run the test suite for failed tests from previous run
 	@MIX_ENV=test mix test --trace --failed
 
+##@ Query EXPLAIN
+
+.PHONY: query-explain-staged
+query-explain-staged:  ## EXPLAIN + SQL for CI targets matching staged lib/*.ex (MIX_ENV=test → .query-explain/)
+	@echo "$(BOLD)Query EXPLAIN (staged vs HEAD)$(RESET)"
+	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d postgres || true
+	@DBNAME=postgres ./etc/scripts/_wait_db_connection.sh true
+	@MIX_ENV=test bash "$(CURDIR)/etc/scripts/ci/query_explain_local.sh" staged
+
+.PHONY: query-explain-main
+query-explain-main:  ## EXPLAIN + SQL for CI targets vs main since merge-base (fetches origin/main; .query-explain/)
+	@echo "$(BOLD)Query EXPLAIN (vs origin/main)$(RESET)"
+	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d postgres || true
+	@DBNAME=postgres ./etc/scripts/_wait_db_connection.sh true
+	@git fetch origin main --quiet 2>/dev/null || true
+	@MIX_ENV=test bash "$(CURDIR)/etc/scripts/ci/query_explain_local.sh" main
+
 # Shell scripts to lint/format (exclude vendor and build dirs)
 SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' 2>/dev/null)
 

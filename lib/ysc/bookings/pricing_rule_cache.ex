@@ -186,8 +186,10 @@ defmodule Ysc.Bookings.PricingRuleCache do
   This should be called when pricing rules are created, updated, or deleted.
   """
   def invalidate do
-    # Bump version to invalidate all cached rules
-    new_version = System.system_time(:second)
+    # Monotonic version so two invalidations in the same wall-clock second still
+    # bump the global version (unix seconds alone matched embedded entry versions
+    # and served stale rules after DB deletes — see pricing_calculation_test setup).
+    new_version = next_cache_version()
     Cachex.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
@@ -239,9 +241,11 @@ defmodule Ysc.Bookings.PricingRuleCache do
 
       _ ->
         # No version set yet - initialize it
-        version = System.system_time(:second)
+        version = next_cache_version()
         Cachex.put(@cache_name, @cache_version_key, version)
         Cachex.put(@cache_name, key, {:version, version, value})
     end
   end
+
+  defp next_cache_version, do: System.unique_integer([:monotonic])
 end

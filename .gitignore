@@ -12,9 +12,11 @@ priv/static/assets/*.{gz,br,zst}
 .vscode/
 .opencode/
 .elixir_ls/
+.query-explain/
 .unlighthouse/
 .playwright-mcp/
 .pytest_cache/
+.query-explain/
 
 __pycache__/
 
