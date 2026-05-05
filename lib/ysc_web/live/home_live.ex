@@ -103,13 +103,24 @@ defmodule YscWeb.HomeLive do
            ~p"/video/tahoe_hero_captions.vtt"}
       end
 
-    # Load events and news synchronously for SEO
-    # These queries are lightweight and essential for crawlers to index the page
-    upcoming_events =
-      Events.list_upcoming_events(3)
-      |> Enum.reject(&(&1.state == :cancelled))
-
-    latest_news = Posts.list_posts(3)
+    # Load events and news in parallel for SEO (same HTML; less wall-clock on DB round-trips)
+    %{
+      guest_events: upcoming_events,
+      guest_news: latest_news
+    } =
+      [
+        {:guest_events,
+         fn ->
+           Events.list_upcoming_events(3)
+           |> Enum.reject(&(&1.state == :cancelled))
+         end},
+        {:guest_news, fn -> Posts.list_posts(3) end}
+      ]
+      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+        timeout: :infinity,
+        max_concurrency: 2
+      )
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc -> Map.put(acc, key, value) end)
 
     # Get remote IP for Turnstile verification
     remote_ip = get_connect_info(socket, :peer_data).address
