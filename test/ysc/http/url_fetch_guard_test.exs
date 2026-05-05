@@ -12,6 +12,13 @@ defmodule Ysc.Http.UrlFetchGuardTest do
                UrlFetchGuard.validate_url_for_server_fetch("/relative/path.jpg")
     end
 
+    test "rejects URLs with embedded credentials" do
+      assert {:error, :userinfo_not_allowed} =
+               UrlFetchGuard.validate_url_for_server_fetch(
+                 "http://user:pass@example.com/file.jpg"
+               )
+    end
+
     test "rejects localhost hostname" do
       assert {:error, :blocked_host} =
                UrlFetchGuard.validate_url_for_server_fetch(

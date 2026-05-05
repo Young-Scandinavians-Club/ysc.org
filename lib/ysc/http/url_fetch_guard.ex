@@ -26,6 +26,7 @@ defmodule Ysc.Http.UrlFetchGuard do
     uri = URI.parse(url)
 
     with :ok <- validate_scheme(uri),
+         :ok <- validate_no_userinfo(uri),
          :ok <- validate_host_present(uri) do
       host = host_string(uri)
 
@@ -35,6 +36,10 @@ defmodule Ysc.Http.UrlFetchGuard do
       end
     end
   end
+
+  defp validate_no_userinfo(%URI{userinfo: nil}), do: :ok
+  defp validate_no_userinfo(%URI{userinfo: ""}), do: :ok
+  defp validate_no_userinfo(_), do: {:error, :userinfo_not_allowed}
 
   defp validate_scheme(%URI{scheme: scheme}) when scheme in ["http", "https"],
     do: :ok
@@ -86,23 +91,21 @@ defmodule Ysc.Http.UrlFetchGuard do
 
   defp validate_resolved_addresses(host) do
     if strict_fetch?() do
-      case :inet.gethostbyname(String.to_charlist(host)) do
-        {:ok, {:hostent, _name, _aliases, :inet, _len, addrs}} ->
-          if Enum.all?(addrs, &(not private_or_special_ip?(&1))) do
-            :ok
-          else
-            {:error, :blocked_resolved_ip}
-          end
+      host_cl = String.to_charlist(host)
 
-        {:ok, {:hostent, _name, _aliases, :inet6, _len, addrs}} ->
-          if Enum.all?(addrs, &(not private_or_special_ip?(&1))) do
-            :ok
-          else
-            {:error, :blocked_resolved_ip}
-          end
+      ipv4s = :inet_res.lookup(host_cl, :in, :a)
+      ipv6s = :inet_res.lookup(host_cl, :in, :aaaa)
+      addrs = ipv4s ++ ipv6s
 
-        {:error, _} ->
+      cond do
+        addrs == [] ->
           {:error, :dns_resolution_failed}
+
+        Enum.all?(addrs, &(not private_or_special_ip?(&1))) ->
+          :ok
+
+        true ->
+          {:error, :blocked_resolved_ip}
       end
     else
       :ok
@@ -124,6 +127,8 @@ defmodule Ysc.Http.UrlFetchGuard do
       a == 169 and b == 254 -> true
       a == 100 and b in 64..127 -> true
       a == 255 and b == 255 and c == 255 and d == 255 -> true
+      # Multicast and historically "reserved" IPv4 space (not routable on the public Internet)
+      a >= 224 -> true
       true -> false
     end
   end
@@ -142,6 +147,10 @@ defmodule Ysc.Http.UrlFetchGuard do
 
       # IPv6 link-local fe80::/10 (fe80:: – febf:ffff:...)
       a >= 0xFE80 and a <= 0xFEBF ->
+        true
+
+      # IPv6 multicast ff00::/8
+      band(a, 0xFF00) == 0xFF00 ->
         true
 
       # IPv4-mapped IPv6 ::ffff:x.x.x.x
