@@ -199,6 +199,8 @@ On pull requests to `main`, GitHub Actions may post a sticky comment with render
 - **Fork PRs:** `pull_request` workflows from forks often cannot post comments with the default `GITHUB_TOKEN` (read-only). Same-repo branches work as-is; for forks use a PAT or accept no comment.
 - **OpenRouter:** If the repository secret `OPENROUTER_API_KEY` is set, an optional LLM summary is appended. Without it, the comment still contains raw SQL and plans.
 
+**Local:** `make query-explain-staged` (staged `lib/**/*.ex` vs `HEAD`) or `make query-explain-main` (commits on this branch vs `origin/main` using `merge-base...HEAD`). Writes `.query-explain/result.json` and `.query-explain/comment.md`. Set `QUERY_EXPLAIN_OUT` to use another directory; for the main target, set `QUERY_EXPLAIN_BASE` if your default branch is not `origin/main` / `main`.
+
 ## Next Steps
 
 1. Run `Ecto.Adapters.SQL.explain/3` on identified complex queries

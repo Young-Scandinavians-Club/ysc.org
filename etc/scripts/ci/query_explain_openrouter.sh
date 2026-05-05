@@ -52,7 +52,7 @@ if ! jq -n \
 fi
 
 code=$(
-  curl -sS -o "$resp_tmp" -w "%{http_code}" \
+  curl -sS --max-time 30 -o "$resp_tmp" -w "%{http_code}" \
     -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
     -H "Content-Type: application/json" \
     -H "HTTP-Referer: ${referer}" \
