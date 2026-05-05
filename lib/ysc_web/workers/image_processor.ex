@@ -8,11 +8,12 @@ defmodule YscWeb.Workers.ImageProcessor do
 
   use Oban.Worker, queue: :media
 
-  alias HTTP
+  alias Ysc.Http.UrlFetchGuard
   alias Ysc.Media
   alias YscWeb.Validators.FileValidator
 
   @temp_dir "/tmp/image_processor"
+  @download_timeout_ms 120_000
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"id" => id} = _args}) do
@@ -40,59 +41,58 @@ defmodule YscWeb.Workers.ImageProcessor do
         # Start working on this image
         Media.set_image_processing_state(image, :processing)
 
-        # Download from the internet and cache locally
-        {:ok, :saved_to_file} =
-          :httpc.request(
-            :get,
-            {to_charlist(URI.encode(image.raw_image_path)), []},
-            [],
-            stream: to_charlist(tmp_output_file)
-          )
+        case download_raw_to_temp(image, tmp_output_file) do
+          {:error, _} = err ->
+            err
 
-        # Validate file MIME type before processing (security check for external uploads)
-        case FileValidator.validate_image(tmp_output_file, [
-               ".jpg",
-               ".jpeg",
-               ".png",
-               ".gif",
-               ".webp"
-             ]) do
-          {:ok, _mime_type} ->
-            :ok
+          :ok ->
+            # Validate file MIME type before processing (security check for external uploads)
+            case FileValidator.validate_image(tmp_output_file, [
+                   ".jpg",
+                   ".jpeg",
+                   ".png",
+                   ".gif",
+                   ".webp"
+                 ]) do
+              {:ok, _mime_type} ->
+                :ok
 
-          {:error, reason} ->
-            Ysc.Logging.error(
-              "Image validation failed for #{image.id}: #{reason}"
+              {:error, reason} ->
+                Ysc.Logging.error(
+                  "Image validation failed for #{image.id}: #{reason}"
+                )
+
+                Media.set_image_processing_state(image, :failed)
+                raise "File validation failed: #{reason}"
+            end
+
+            result =
+              Media.process_image_upload(
+                image,
+                tmp_output_file,
+                thumbnail_output_path,
+                optimized_output_path
+              )
+
+            # Strip EXIF/metadata from raw and overwrite on S3 so the raw URL also serves clean bytes
+            strip_and_replace_raw_on_s3(image, tmp_output_file)
+
+            Ysc.Logging.info(
+              "Image processing completed successfully for: #{image.id}"
             )
 
-            Media.set_image_processing_state(image, :failed)
-            raise "File validation failed: #{reason}"
+            Ysc.Logging.info("Result: #{inspect(result)}")
+
+            # Get the actual file paths with correct extensions for cleanup
+            # The process_image_upload function will have set the correct extensions
+            # We need to detect them from the uploaded paths or use a pattern
+            _optimized_path =
+              find_file_with_pattern("#{tmp_output_file}_optimized")
+
+            _thumbnail_path = find_file_with_pattern("#{tmp_output_file}_thumb")
+
+            {:ok, result}
         end
-
-        result =
-          Media.process_image_upload(
-            image,
-            tmp_output_file,
-            thumbnail_output_path,
-            optimized_output_path
-          )
-
-        # Strip EXIF/metadata from raw and overwrite on S3 so the raw URL also serves clean bytes
-        strip_and_replace_raw_on_s3(image, tmp_output_file)
-
-        Ysc.Logging.info(
-          "Image processing completed successfully for: #{image.id}"
-        )
-
-        Ysc.Logging.info("Result: #{inspect(result)}")
-
-        # Get the actual file paths with correct extensions for cleanup
-        # The process_image_upload function will have set the correct extensions
-        # We need to detect them from the uploaded paths or use a pattern
-        _optimized_path = find_file_with_pattern("#{tmp_output_file}_optimized")
-        _thumbnail_path = find_file_with_pattern("#{tmp_output_file}_thumb")
-
-        {:ok, result}
       rescue
         e ->
           Ysc.Logging.error(
@@ -136,6 +136,105 @@ defmodule YscWeb.Workers.ImageProcessor do
         cleanup_file_with_extensions("#{tmp_output_file}_thumb")
         cleanup_file_with_extensions("#{tmp_output_file}.stripped")
       end
+    end
+  end
+
+  defp download_raw_to_temp(%Media.Image{} = image, dest_path) do
+    url = image.raw_image_path
+
+    case UrlFetchGuard.validate_url_for_server_fetch(url) do
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "ImageProcessor: raw_image URL rejected by UrlFetchGuard",
+          error: RuntimeError.exception("url_fetch_guard: #{inspect(reason)}"),
+          extra: %{
+            image_id: image.id,
+            guard_reason: reason,
+            url_summary: safe_url_summary(url)
+          },
+          tags: %{
+            worker: "YscWeb.Workers.ImageProcessor",
+            stage: "url_fetch_guard"
+          }
+        )
+
+        Media.set_image_processing_state(image, :failed)
+        {:error, {:url_not_allowed, reason}}
+
+      :ok ->
+        # Redirects are not re-validated here; keeping max_redirects at 0 avoids SSRF via Location:
+        # hops to metadata / internal URLs after an allowed first URL.
+        case Req.get(url,
+               into: dest_path,
+               receive_timeout: @download_timeout_ms,
+               max_redirects: 0,
+               retry: false
+             ) do
+          {:ok, %Req.Response{status: status}} when status in 200..299 ->
+            :ok
+
+          {:ok, %Req.Response{status: status}} ->
+            Ysc.Logging.error(
+              "ImageProcessor: raw image download returned non-success HTTP status",
+              error:
+                RuntimeError.exception(
+                  "raw_image download HTTP status #{status}"
+                ),
+              extra: %{
+                image_id: image.id,
+                http_status: status,
+                url_summary: safe_url_summary(url)
+              },
+              tags: %{
+                worker: "YscWeb.Workers.ImageProcessor",
+                stage: "download_http_status"
+              }
+            )
+
+            Media.set_image_processing_state(image, :failed)
+            {:error, {:http_status, status}}
+
+          {:error, exception} ->
+            Ysc.Logging.error(
+              "ImageProcessor: raw image download request failed",
+              error: exception,
+              extra: %{
+                image_id: image.id,
+                url_summary: safe_url_summary(url)
+              },
+              tags: %{
+                worker: "YscWeb.Workers.ImageProcessor",
+                stage: "download_transport"
+              }
+            )
+
+            Media.set_image_processing_state(image, :failed)
+            {:error, {:download_failed, exception}}
+        end
+    end
+  end
+
+  # Scheme/host/port only — avoids logging presigned query strings or paths into Sentry.
+  defp safe_url_summary(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, port: port}
+      when is_binary(host) and is_binary(scheme) ->
+        default = URI.default_port(scheme)
+
+        cond do
+          is_integer(port) and port != default ->
+            "#{scheme}://#{host}:#{port}"
+
+          true ->
+            "#{scheme}://#{host}"
+        end
+
+      %URI{scheme: scheme, host: host}
+      when is_binary(host) and is_binary(scheme) ->
+        "#{scheme}://#{host}"
+
+      _ ->
+        "(unparseable URL)"
     end
   end
 
@@ -194,8 +293,6 @@ defmodule YscWeb.Workers.ImageProcessor do
     key = path |> String.trim_leading("/") |> URI.decode()
     if key != "", do: key, else: nil
   end
-
-  defp key_from_object_url(_), do: nil
 
   # Find file with any image extension
   defp find_file_with_pattern(base_path) do
