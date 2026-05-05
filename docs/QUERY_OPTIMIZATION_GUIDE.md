@@ -192,6 +192,13 @@ ORDER BY idx_scan DESC;
 - Use appropriate TTLs based on data freshness requirements
 - Implement cache invalidation strategies
 
+## Pull request CI (SQL + EXPLAIN comments)
+
+On pull requests to `main`, GitHub Actions may post a sticky comment with rendered SQL and `EXPLAIN` (without `ANALYZE`) for targets listed in `priv/ci/query_explain_targets.exs`. The job runs only when the diff adds query-shaped lines under `lib/` (excluding `*_test.exs`). Each target’s `source_paths` must overlap changed files for that target to run.
+
+- **Fork PRs:** `pull_request` workflows from forks often cannot post comments with the default `GITHUB_TOKEN` (read-only). Same-repo branches work as-is; for forks use a PAT or accept no comment.
+- **OpenRouter:** If the repository secret `OPENROUTER_API_KEY` is set, an optional LLM summary is appended. Without it, the comment still contains raw SQL and plans.
+
 ## Next Steps
 
 1. Run `Ecto.Adapters.SQL.explain/3` on identified complex queries

@@ -662,13 +662,8 @@ defmodule Ysc.Events do
     end
   end
 
-  @doc """
-  Fetch upcoming events as full Event structs with given preloads.
-
-  Use for admin pickers (e.g. newsletter) where full structs and cover_image are needed.
-  Single query + preload, no N+1.
-  """
-  def list_upcoming_events_with_preload(limit \\ 36, preloads \\ [:cover_image]) do
+  @doc false
+  def upcoming_events_with_preload_query(limit \\ 36) do
     from(e in Event,
       where: e.start_date > ^DateTime.utc_now(),
       where: e.state in [:published, :cancelled],
@@ -679,6 +674,17 @@ defmodule Ysc.Events do
       ],
       limit: ^limit
     )
+  end
+
+  @doc """
+  Fetch upcoming events as full Event structs with given preloads.
+
+  Use for admin pickers (e.g. newsletter) where full structs and cover_image are needed.
+  Single query + preload, no N+1.
+  """
+  def list_upcoming_events_with_preload(limit \\ 36, preloads \\ [:cover_image]) do
+    limit
+    |> upcoming_events_with_preload_query()
     |> Repo.all()
     |> Repo.preload(preloads)
   end

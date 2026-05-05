@@ -20,6 +20,7 @@ defmodule Ysc.MixProject do
         tool: ExCoveralls,
         ignore_modules: [
           Mix.Tasks.CheckQuickbooksSync,
+          Mix.Tasks.Ci.QueryExplain,
           Mix.Tasks.CopyVendorAssets,
           Mix.Tasks.DebugEmails,
           Mix.Tasks.ExpireCheckoutSessions,
@@ -40,6 +41,7 @@ defmodule Ysc.MixProject do
           Mix.Tasks.Ysc.WpValidate,
           Ysc.Application,
           Ysc.Alerts.DiscordHttpClient,
+          Ysc.Ci.QueryExplain,
           Ysc.Cldr,
           Ysc.Cldr.Currency,
           Ysc.Cldr.DateTime.Format,
