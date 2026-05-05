@@ -120,7 +120,9 @@ defmodule YscWeb.HomeLive do
         timeout: :infinity,
         max_concurrency: 2
       )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc -> Map.put(acc, key, value) end)
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
+        Map.put(acc, key, value)
+      end)
 
     # Get remote IP for Turnstile verification
     remote_ip = get_connect_info(socket, :peer_data).address
