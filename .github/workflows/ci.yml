@@ -227,3 +227,93 @@ jobs:
 
       - name: Check unused deps
         run: mix deps.unlock --check-unused
+
+  # For pull_request from forks, GITHUB_TOKEN is read-only; PR comments may fail unless
+  # you use a PAT secret or a different trigger. Same-repo PRs work with defaults.
+  query_explain_pr:
+    name: PR Query EXPLAIN
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    services:
+      postgres:
+        image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.4"
+          otp-version: "27.3"
+
+      - name: Restore dependencies cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-query-explain-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-query-explain-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile
+        env:
+          MIX_ENV: test
+        run: mix compile --warnings-as-errors
+
+      - name: Prepare test database
+        env:
+          MIX_ENV: test
+        run: |
+          mix ecto.create --quiet
+          mix ecto.migrate --quiet
+          mix run priv/repo/test_seeds.exs
+
+      - name: Run PR query EXPLAIN
+        id: explain
+        env:
+          MIX_ENV: test
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: bash etc/scripts/ci/pr_query_explain.sh
+
+      - name: Find query-explain comment
+        id: find
+        if: steps.explain.outputs.skip != 'true'
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3.1.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: "<!-- ci-query-explain -->"
+
+      - name: Create or update PR comment
+        if: steps.explain.outputs.skip != 'true'
+        continue-on-error: true
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body-path: ${{ steps.explain.outputs.comment_path }}
+          edit-mode: replace
