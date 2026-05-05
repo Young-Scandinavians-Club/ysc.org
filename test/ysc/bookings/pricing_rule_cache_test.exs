@@ -439,18 +439,14 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
     end
 
     test "invalidation bumps cache version" do
-      # Set version to a known past value
-      past_version = System.system_time(:second) - 10
-      Cachex.put(:ysc_cache, "pricing_rule:version", past_version)
-
-      {:ok, version1} = Cachex.get(:ysc_cache, "pricing_rule:version")
-      assert version1 == past_version
-
-      # Invalidate sets version to now()
       PricingRuleCache.invalidate()
+      {:ok, version1} = Cachex.get(:ysc_cache, "pricing_rule:version")
 
+      PricingRuleCache.invalidate()
       {:ok, version2} = Cachex.get(:ysc_cache, "pricing_rule:version")
 
+      assert is_integer(version1)
+      assert is_integer(version2)
       assert version2 > version1
     end
 
