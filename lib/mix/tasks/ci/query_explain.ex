@@ -69,15 +69,28 @@ defmodule Mix.Tasks.Ci.QueryExplain do
       Path.join(File.cwd!(), "priv/ci/query_explain_targets.exs")
 
     targets =
-      case Code.eval_file(registry_path) do
-        {result, _} ->
-          if is_list(result) do
-            result
-          else
-            Mix.raise(
-              "expected list from #{registry_path}, got: #{inspect(result)}"
-            )
-          end
+      try do
+        case Code.eval_file(registry_path) do
+          {result, _} ->
+            if is_list(result) do
+              result
+            else
+              Mix.raise(
+                "expected list from #{registry_path}, got: #{inspect(result)}"
+              )
+            end
+        end
+      rescue
+        e in Mix.Error ->
+          reraise(e, __STACKTRACE__)
+
+        e ->
+          Mix.raise(
+            "failed to evaluate query explain registry at #{registry_path}: " <>
+              Exception.message(e) <>
+              "\n" <>
+              Exception.format_stacktrace(__STACKTRACE__)
+          )
       end
 
     selected =
