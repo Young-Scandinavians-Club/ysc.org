@@ -331,11 +331,8 @@ defmodule Ysc.Tickets.BookingValidator do
 
   defp get_user_reserved_quantity(tier_id, user_id) do
     TicketReservation
-    |> where(
-      [tr],
-      tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id and
-        tr.status == "active"
-    )
+    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id)
+    |> Events.where_ticket_reservation_hold_active()
     |> select([tr], sum(tr.quantity))
     |> Repo.one()
     |> case do
@@ -346,7 +343,8 @@ defmodule Ysc.Tickets.BookingValidator do
 
   defp count_reserved_tickets_for_tier(tier_id) do
     TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.status == "active")
+    |> where([tr], tr.ticket_tier_id == ^tier_id)
+    |> Events.where_ticket_reservation_hold_active()
     |> select([tr], sum(tr.quantity))
     |> Repo.one()
     |> case do
@@ -358,11 +356,8 @@ defmodule Ysc.Tickets.BookingValidator do
   defp user_has_reservations_for_event?(user_id, event_id) do
     TicketReservation
     |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
-    |> where(
-      [tr, tt],
-      tr.user_id == ^user_id and tt.event_id == ^event_id and
-        tr.status == "active"
-    )
+    |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+    |> Events.where_ticket_reservation_hold_active()
     |> Repo.exists?()
   end
 

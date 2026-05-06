@@ -411,6 +411,38 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert Money.positive?(order.discount_amount)
     end
 
+    test "reservation past expires_at does not apply discount", %{
+      user: user,
+      event: event,
+      tier: tier,
+      organizer: organizer
+    } do
+      {:ok, reservation} =
+        %TicketReservation{}
+        |> TicketReservation.changeset(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          quantity: 1,
+          created_by_id: organizer.id,
+          discount_percentage: Decimal.new(50),
+          status: "active",
+          expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
+        })
+        |> Repo.insert()
+
+      reservation
+      |> Ecto.Changeset.change(%{
+        expires_at: DateTime.add(DateTime.utc_now(), -120, :second)
+      })
+      |> Repo.update!()
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+
+      assert Money.equal?(order.total_amount, Money.new(25, :USD))
+      assert Money.equal?(order.discount_amount, Money.new(0, :USD))
+    end
+
     test "event capacity check is bypassed when user has an active reservation",
          %{
            organizer: organizer

@@ -764,7 +764,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <tbody class="divide-y divide-zinc-100">
                   <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
                     <td class="px-4 py-3">
-                      <span class="font-medium text-zinc-800">{ent.status}</span>
+                      <span class="font-medium text-zinc-800">
+                        {format_entitlement_status(ent.status)}
+                      </span>
                     </td>
                     <td class="px-4 py-3 text-zinc-700">
                       {admin_entitlement_summary(ent)}
@@ -4200,6 +4202,12 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp entitlement_form_defaults do
     to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)
   end
+
+  defp format_entitlement_status(:active), do: "Active"
+  defp format_entitlement_status(:consumed), do: "Consumed"
+  defp format_entitlement_status(:revoked), do: "Revoked"
+  defp format_entitlement_status(:expired), do: "Expired"
+  defp format_entitlement_status(other), do: to_string(other)
 
   defp admin_entitlement_summary(ent) do
     case ent.benefit_kind do

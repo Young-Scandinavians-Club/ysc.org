@@ -1,6 +1,8 @@
 # See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
 # CI runs tests, linter, and mix deps.audit in parallel; deploy only runs if all CI passes on main branch.
 # Production: tag push (v*) → .github/workflows/fly-deploy-prod.yml (sandbox deploy gate, then prod; CI not duplicated there).
+# If a v* tag already points at the commit after CI, the Fly deploy steps are skipped so only Deploy
+# Production deploys sandbox (one deploy, no duplicate work). The job still runs so branch checks stay green.
 #
 # Secrets: use FLY_SANDBOX_API_TOKEN for the sandbox Fly org (recommended). If unset, FLY_API_TOKEN
 # is used so existing repos keep working — do not point FLY_API_TOKEN at production.
@@ -174,13 +176,27 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
-          fetch-depth: 0  # Full history needed for git describe
+          fetch-depth: 0
+          fetch-tags: true
+      - id: sandbox_skip
+        name: Skip Fly deploy if v* tag on commit
+        run: |
+          git fetch --tags --quiet origin 2>/dev/null || true
+          if git tag --points-at "$GITHUB_SHA" | grep -qE '^v[0-9]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "v* tag on this commit — sandbox Fly deploy runs only in Deploy Production."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+        if: steps.sandbox_skip.outputs.skip != 'true'
       - name: Verify Fly token can access sandbox app
+        if: steps.sandbox_skip.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-sandbox
       - name: Deploy to Fly.io sandbox
+        if: steps.sandbox_skip.outputs.skip != 'true'
         run: |
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
