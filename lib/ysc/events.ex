@@ -2052,7 +2052,14 @@ defmodule Ysc.Events do
   `expires_at <= DateTime.utc_now/0` are processed (same rows as
   `list_expired_active_reservations_for_tier/1`). Indefinite holds are skipped.
 
-  Uses `cancel_ticket_reservation/1` per row so PubSub and validations stay consistent.
+  Atomically cancels each candidate row only if it is still `active` and past
+  `expires_at`. That avoids a race where checkout fulfills the hold after the
+  expiry job selected the id but before cancellation — `Repo.get/1` plus
+  `cancel_ticket_reservation/1` could otherwise overwrite `fulfilled` with
+  `cancelled`.
+
+  Successful cancellations broadcast `TicketReservationCancelled` like
+  `cancel_ticket_reservation/1`.
 
   ## Options
 
@@ -2088,15 +2095,9 @@ defmodule Ysc.Events do
 
     {cancelled, failed} =
       Enum.reduce(ids, {0, 0}, fn id, {c_acc, f_acc} ->
-        case Repo.get(TicketReservation, id) do
-          %TicketReservation{status: "active"} = reservation ->
-            case cancel_ticket_reservation(reservation) do
-              {:ok, _} -> {c_acc + 1, f_acc}
-              {:error, _} -> {c_acc, f_acc + 1}
-            end
-
-          _ ->
-            {c_acc, f_acc}
+        case cancel_expired_ticket_reservation_atomically(id, now) do
+          {:ok, _} -> {c_acc + 1, f_acc}
+          :skipped -> {c_acc, f_acc}
         end
       end)
 
@@ -2109,6 +2110,29 @@ defmodule Ysc.Events do
        total_pending: total_pending,
        backlog_remaining: backlog_remaining
      }}
+  end
+
+  defp cancel_expired_ticket_reservation_atomically(reservation_id, now) do
+    case Repo.update_all(
+           from(tr in TicketReservation,
+             where: tr.id == ^reservation_id,
+             where: tr.status == "active",
+             where: not is_nil(tr.expires_at) and tr.expires_at <= ^now
+           ),
+           set: [status: "cancelled", cancelled_at: now]
+         ) do
+      {1, _} ->
+        reservation = Repo.get!(TicketReservation, reservation_id)
+
+        broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
+          ticket_reservation: reservation
+        })
+
+        {:ok, reservation}
+
+      {0, _} ->
+        :skipped
+    end
   end
 
   @doc """
