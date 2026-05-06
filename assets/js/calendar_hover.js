@@ -1,4 +1,15 @@
 const CalendarHover = {
+    pushIfConnected(event, payload) {
+        if (!this.el.isConnected) return;
+        try {
+            const view = this.__view();
+            if (!view || !view.isConnected()) return;
+        } catch (_) {
+            return;
+        }
+        this.pushEvent(event, payload);
+    },
+
     mounted() {
         this.handleMouseMove = (e) => {
             const cell = e.target.closest('[data-date]');
@@ -17,13 +28,13 @@ const CalendarHover = {
                         params.room_id = roomId;
                     }
 
-                    this.pushEvent("hover-date", params);
+                    this.pushIfConnected("hover-date", params);
                 }
             }
         };
 
         this.handleMouseLeave = () => {
-            this.pushEvent("clear-hover");
+            this.pushIfConnected("clear-hover");
         };
 
         this.handleContextMenu = (e) => {
@@ -33,7 +44,7 @@ const CalendarHover = {
                 // Prevent default context menu
                 e.preventDefault();
                 // Cancel the selection
-                this.pushEvent("cancel-date-selection");
+                this.pushIfConnected("cancel-date-selection");
             }
         };
 

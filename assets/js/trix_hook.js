@@ -1,7 +1,13 @@
 import Trix from "../vendor/trix";
 
 function emitEditorUpdateEvent(source, el) {
-  if (!el) return;
+  if (!el || !el.isConnected) return;
+  try {
+    const view = source.__view();
+    if (!view || !view.isConnected()) return;
+  } catch (_) {
+    return;
+  }
   source.pushEvent("editor-update", { field: el.name, value: el.value });
 }
 
@@ -130,19 +136,13 @@ module.exports = {
   mounted() {
     window.Trix = Trix;
 
-    document.addEventListener("trix-change", () => {
-      // Defer one microtask to ensure Trix has fully synced the hidden input
-      // value before we read it. Trix 2.x may dispatch trix-change before
-      // completing the hidden-input sync for certain operations (e.g. hard
-      // breaks inserted via Shift+Enter).
+    this.onTrixChange = () => {
       requestAnimationFrame(() => emitEditorUpdateEvent(this, this.el));
-    });
-
-    document.addEventListener("trix-blur", () => {
+    };
+    this.onTrixBlur = () => {
       emitEditorUpdateEvent(this, this.el);
-    });
-
-    document.addEventListener("trix-attachment-add", (event) => {
+    };
+    this.onTrixAttachmentAdd = (event) => {
       if (event.attachment.file) {
         const postID = this.el.getAttribute("data-post-id");
         const editorEl = document.querySelector(
@@ -150,7 +150,16 @@ module.exports = {
         );
         uploadFileAttachment(event.attachment, postID, editorEl);
       }
-    });
+    };
+    this.onTrixInitialize = (event) => {
+      if (event.target.getAttribute("input") === this.el.id) {
+        addCustomToolbarButtons(event.target, this.el);
+      }
+    };
+
+    document.addEventListener("trix-change", this.onTrixChange);
+    document.addEventListener("trix-blur", this.onTrixBlur);
+    document.addEventListener("trix-attachment-add", this.onTrixAttachmentAdd);
 
     this.handleEvent("insert-trix-image", ({ url, href, alt, target_input_id }) => {
       if (this.el.id !== target_input_id) return;
@@ -174,12 +183,14 @@ module.exports = {
       addCustomToolbarButtons(editorEl, this.el);
     }
 
-    const hookEl = this.el;
-    document.addEventListener("trix-initialize", (event) => {
-      if (event.target.getAttribute("input") === hookEl.id) {
-        addCustomToolbarButtons(event.target, hookEl);
-      }
-    });
+    document.addEventListener("trix-initialize", this.onTrixInitialize);
+  },
+
+  destroyed() {
+    document.removeEventListener("trix-change", this.onTrixChange);
+    document.removeEventListener("trix-blur", this.onTrixBlur);
+    document.removeEventListener("trix-attachment-add", this.onTrixAttachmentAdd);
+    document.removeEventListener("trix-initialize", this.onTrixInitialize);
   },
 
   updated() {},
