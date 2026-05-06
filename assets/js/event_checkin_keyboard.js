@@ -93,6 +93,13 @@ const EventCheckInKeyboard = {
                 e.preventDefault();
                 this._selectedIndex = -1;
                 this._applyHighlight(-1);
+                if (!this.el.isConnected) break;
+                try {
+                    const view = this.__view();
+                    if (!view || !view.isConnected()) break;
+                } catch (_) {
+                    break;
+                }
                 this.pushEvent("clear-search", {});
                 break;
         }
