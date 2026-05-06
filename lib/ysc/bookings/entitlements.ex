@@ -6,8 +6,6 @@ defmodule Ysc.Bookings.Entitlements do
 
   import Ecto.Changeset, only: [put_change: 3]
 
-  require Ysc.Logging
-
   alias Ysc.Repo
   alias Ysc.Bookings.{BookingEntitlement, EntitlementDiscount}
   alias YscWeb.Emails.BookingEntitlementGranted
@@ -483,7 +481,7 @@ defmodule Ysc.Bookings.Entitlements do
     limit = Keyword.get(opts, :limit, 500)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    ids =
+    candidate_subq =
       from(e in BookingEntitlement,
         where: e.status == :active,
         where: not is_nil(e.expires_at) and e.expires_at <= ^now,
@@ -491,36 +489,15 @@ defmodule Ysc.Bookings.Entitlements do
         limit: ^limit,
         select: e.id
       )
-      |> Repo.all()
 
-    {expired_count, failed} =
-      Enum.reduce(ids, {0, 0}, fn id, {ok_acc, err_acc} ->
-        case Repo.get(BookingEntitlement, id) do
-          %BookingEntitlement{status: :active} = ent ->
-            case ent
-                 |> BookingEntitlement.expire_changeset()
-                 |> Repo.update() do
-              {:ok, _} ->
-                {ok_acc + 1, err_acc}
+    {expired_count, _} =
+      from(e in BookingEntitlement,
+        where: e.id in subquery(candidate_subq),
+        where: e.status == :active
+      )
+      |> Repo.update_all(set: [status: "expired", updated_at: now])
 
-              {:error, changeset} ->
-                Ysc.Logging.error(
-                  "Booking entitlement auto-expire failed",
-                  extra: %{
-                    entitlement_id: id,
-                    errors: changeset.errors
-                  }
-                )
-
-                {ok_acc, err_acc + 1}
-            end
-
-          _ ->
-            {ok_acc, err_acc}
-        end
-      end)
-
-    {:ok, %{expired: expired_count, failed: failed}}
+    {:ok, %{expired: expired_count, failed: 0}}
   end
 
   @doc """

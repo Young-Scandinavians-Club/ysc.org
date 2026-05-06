@@ -112,9 +112,4 @@ defmodule Ysc.Bookings.BookingEntitlement do
   def revoke_changeset(%__MODULE__{} = ent) do
     change(ent, %{status: :revoked})
   end
-
-  @doc false
-  def expire_changeset(%__MODULE__{} = ent) do
-    change(ent, %{status: :expired})
-  end
 end
