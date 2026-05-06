@@ -115,6 +115,15 @@ defmodule YscWeb.UserAuthTest do
       assert %{max_age: 0} = conn.resp_cookies[@remember_me_cookie]
       assert redirected_to(conn) == ~p"/"
     end
+
+    test "does not redirect to URL-encoded external targets after logout", %{conn: conn} do
+      conn =
+        conn
+        |> fetch_cookies()
+        |> UserAuth.log_out_user("/%2f%2fevil.com")
+
+      assert redirected_to(conn) == ~p"/"
+    end
   end
 
   describe "fetch_current_user/2" do
@@ -528,6 +537,12 @@ defmodule YscWeb.UserAuthTest do
       refute UserAuth.valid_internal_redirect?("//evil.com/path")
     end
 
+    test "rejects URL-encoded protocol-relative paths (open redirect bypass)" do
+      refute UserAuth.valid_internal_redirect?("/%2f%2fevil.com")
+      refute UserAuth.valid_internal_redirect?("/%252f%252fevil.com")
+      refute UserAuth.valid_internal_redirect?("/foo/%2f%2fevil.com")
+    end
+
     test "rejects javascript: protocol (XSS)" do
       refute UserAuth.valid_internal_redirect?("javascript:alert('xss')")
       refute UserAuth.valid_internal_redirect?("javascript:alert(1)")
@@ -590,6 +605,17 @@ defmodule YscWeb.UserAuthTest do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       conn = UserAuth.log_in_user(conn, user, %{}, "javascript:alert(1)")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "ignores URL-encoded protocol-relative redirect_to", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn = UserAuth.log_in_user(conn, user, %{}, "/%2f%2fevil.com")
 
       assert redirected_to(conn) == ~p"/"
     end

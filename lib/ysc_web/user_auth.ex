@@ -166,8 +166,7 @@ defmodule YscWeb.UserAuth do
     end
 
     redirect_path =
-      if redirect_to && String.starts_with?(redirect_to, "/") &&
-           !String.starts_with?(redirect_to, "//") do
+      if redirect_to && valid_internal_redirect?(redirect_to) do
         redirect_to
       else
         ~p"/"
@@ -642,26 +641,22 @@ defmodule YscWeb.UserAuth do
       false
   """
   def valid_internal_redirect?(path) when is_binary(path) do
-    # First check for dangerous patterns in the raw string
-    if String.contains?(path, ["//", "javascript:", "data:", "vbscript:", "://"]) do
+    normalized = repeatedly_percent_decode_redirect_target(path)
+
+    # Apply checks after decoding so bypasses like "/%2f%2fevil.com" cannot reach open redirects.
+    if String.contains?(normalized, ["//", "javascript:", "data:", "vbscript:", "://"]) do
       false
     else
-      # Parse the path to check if it's a valid URI
-      case URI.parse(path) do
-        # Must be a relative path (no scheme, no host)
+      case URI.parse(normalized) do
         %URI{scheme: nil, host: nil, path: path_part} when is_binary(path_part) ->
-          # Check that path starts with / (relative internal path)
           String.starts_with?(path_part, "/")
 
-        # Reject any URI with a scheme (http://, https://, etc.)
         %URI{scheme: scheme} when not is_nil(scheme) ->
           false
 
-        # Reject any URI with a host (external domain)
         %URI{host: host} when not is_nil(host) ->
           false
 
-        # Reject malformed URIs or empty paths
         _ ->
           false
       end
@@ -669,6 +664,26 @@ defmodule YscWeb.UserAuth do
   end
 
   def valid_internal_redirect?(_), do: false
+
+  # Decode percent-encoding repeatedly so "%252f" (encoded "%2f") cannot hide protocol-relative URLs.
+  defp repeatedly_percent_decode_redirect_target(path, iterations \\ 0)
+
+  defp repeatedly_percent_decode_redirect_target(path, 12), do: path
+
+  defp repeatedly_percent_decode_redirect_target(path, iterations) do
+    decoded =
+      try do
+        URI.decode(path)
+      rescue
+        ArgumentError -> path
+      end
+
+    if decoded == path do
+      path
+    else
+      repeatedly_percent_decode_redirect_target(decoded, iterations + 1)
+    end
+  end
 
   @doc """
   Checks if a membership is active.
