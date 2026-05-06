@@ -262,9 +262,7 @@ defmodule EventDetailsLiveHelpers do
       iex> money_to_cents(Money.new(25, :USD))
       2500
   """
-  def money_to_cents(%Money{amount: amount}) do
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
+  def money_to_cents(money) do
+    Ysc.MoneyHelper.money_to_cents(money)
   end
 end

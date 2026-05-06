@@ -104,11 +104,15 @@ defmodule YscWeb.AdminBookingsLive do
                 </button>
               </div>
               <div class="flex gap-2">
-                <.button phx-click={
-                  JS.patch(
-                    ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
-                  )
-                }>
+                <.button
+                  type="button"
+                  phx-click={
+                    JS.patch(
+                      ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
+                    )
+                  }
+                  phx-disable-with="Loading..."
+                >
                   Cancel
                 </.button>
                 <.button
@@ -255,21 +259,25 @@ defmodule YscWeb.AdminBookingsLive do
                 </button>
               </div>
               <div class="flex gap-2">
-                <.button phx-click={
-                  query_params =
-                    build_booking_modal_close_params(
-                      @selected_property,
-                      @calendar_start_date,
-                      @calendar_end_date,
-                      @current_section,
-                      @reservation_params
-                    )
+                <.button
+                  type="button"
+                  phx-click={
+                    query_params =
+                      build_booking_modal_close_params(
+                        @selected_property,
+                        @calendar_start_date,
+                        @calendar_end_date,
+                        @current_section,
+                        @reservation_params
+                      )
 
-                  query_string =
-                    URI.encode_query(flatten_query_params(query_params))
+                    query_string =
+                      URI.encode_query(flatten_query_params(query_params))
 
-                  JS.patch("/admin/bookings?#{query_string}")
-                }>
+                    JS.patch("/admin/bookings?#{query_string}")
+                  }
+                  phx-disable-with="Loading..."
+                >
                   Cancel
                 </.button>
                 <.button
@@ -388,11 +396,15 @@ defmodule YscWeb.AdminBookingsLive do
             <div class="flex justify-between w-full">
               <div></div>
               <div class="flex gap-2">
-                <.button phx-click={
-                  JS.patch(
-                    ~p"/admin/bookings?property=#{@selected_property}&section=config"
-                  )
-                }>
+                <.button
+                  type="button"
+                  phx-click={
+                    JS.patch(
+                      ~p"/admin/bookings?property=#{@selected_property}&section=config"
+                    )
+                  }
+                  phx-disable-with="Loading..."
+                >
                   Cancel
                 </.button>
                 <.button type="submit" phx-disable-with="Updating...">
@@ -460,7 +472,11 @@ defmodule YscWeb.AdminBookingsLive do
 
           <:actions>
             <div class="flex justify-end gap-2">
-              <.button phx-click="close-approve-refund-modal" type="button">
+              <.button
+                phx-click="close-approve-refund-modal"
+                type="button"
+                phx-disable-with="Closing..."
+              >
                 Cancel
               </.button>
               <.button
@@ -512,7 +528,11 @@ defmodule YscWeb.AdminBookingsLive do
 
           <:actions>
             <div class="flex justify-end gap-2">
-              <.button phx-click="close-reject-refund-modal" type="button">
+              <.button
+                phx-click="close-reject-refund-modal"
+                type="button"
+                phx-disable-with="Closing..."
+              >
                 Cancel
               </.button>
               <.button type="submit" phx-disable-with="Rejecting..." color="red">
@@ -990,6 +1010,7 @@ defmodule YscWeb.AdminBookingsLive do
                   "/admin/bookings/bookings/#{@booking.id}/edit?#{query_string}"
                 )
               }
+              phx-disable-with="Loading..."
               class="w-full sm:w-auto"
             >
               <.icon name="hero-pencil" class="w-4 h-4 -mt-0.5" />
@@ -1011,6 +1032,7 @@ defmodule YscWeb.AdminBookingsLive do
                 query_string = URI.encode_query(flatten_query_params(query_params))
                 JS.patch("/admin/bookings?#{query_string}")
               }
+              phx-disable-with="Loading..."
               class="w-full sm:w-auto"
             >
               <.icon name="hero-x-mark" class="w-4 h-4 -mt-0.5" />
@@ -1079,7 +1101,11 @@ defmodule YscWeb.AdminBookingsLive do
 
           <:actions>
             <div class="flex justify-end gap-2 w-full">
-              <.button type="button" phx-click="close-booking-refund-modal">
+              <.button
+                type="button"
+                phx-click="close-booking-refund-modal"
+                phx-disable-with="Closing..."
+              >
                 Cancel
               </.button>
               <.button
@@ -1184,6 +1210,7 @@ defmodule YscWeb.AdminBookingsLive do
                       type="button"
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
+                      phx-disable-with="Opening..."
                       class="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                     >
                       View
@@ -1196,7 +1223,11 @@ defmodule YscWeb.AdminBookingsLive do
         </div>
 
         <div class="flex justify-end mt-6 pt-4 border-t border-zinc-200">
-          <.button phx-click="close-day-guests-modal" type="button">
+          <.button
+            phx-click="close-day-guests-modal"
+            type="button"
+            phx-disable-with="Closing..."
+          >
             Close
           </.button>
         </div>
@@ -1276,11 +1307,14 @@ defmodule YscWeb.AdminBookingsLive do
           </.input>
 
           <:actions>
-            <.button phx-click={
-              JS.patch(
-                ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
-              )
-            }>
+            <.button
+              phx-click={
+                JS.patch(
+                  ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
+                )
+              }
+              phx-disable-with="Loading..."
+            >
               Cancel
             </.button>
             <.button
@@ -1434,19 +1468,22 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
 
           <div class="flex justify-end mt-6 pt-4 border-t border-zinc-200">
-            <.button phx-click={
-              query_params =
-                build_booking_modal_close_params(
-                  @selected_property,
-                  @calendar_start_date,
-                  @calendar_end_date,
-                  @current_section,
-                  @reservation_params
-                )
+            <.button
+              phx-click={
+                query_params =
+                  build_booking_modal_close_params(
+                    @selected_property,
+                    @calendar_start_date,
+                    @calendar_end_date,
+                    @current_section,
+                    @reservation_params
+                  )
 
-              query_string = URI.encode_query(flatten_query_params(query_params))
-              JS.patch("/admin/bookings?#{query_string}")
-            }>
+                query_string = URI.encode_query(flatten_query_params(query_params))
+                JS.patch("/admin/bookings?#{query_string}")
+              }
+              phx-disable-with="Loading..."
+            >
               Close
             </.button>
           </div>
@@ -1606,11 +1643,14 @@ defmodule YscWeb.AdminBookingsLive do
                 </button>
               </div>
               <div class="flex gap-2">
-                <.button phx-click={
-                  JS.patch(
-                    ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
-                  )
-                }>
+                <.button
+                  phx-click={
+                    JS.patch(
+                      ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
+                    )
+                  }
+                  phx-disable-with="Loading..."
+                >
                   Cancel
                 </.button>
                 <.button
@@ -1791,11 +1831,14 @@ defmodule YscWeb.AdminBookingsLive do
                 </button>
               </div>
               <div class="flex gap-2">
-                <.button phx-click={
-                  JS.patch(
-                    ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
-                  )
-                }>
+                <.button
+                  phx-click={
+                    JS.patch(
+                      ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
+                    )
+                  }
+                  phx-disable-with="Loading..."
+                >
                   Cancel
                 </.button>
                 <.button
@@ -1841,6 +1884,7 @@ defmodule YscWeb.AdminBookingsLive do
           >
             <button
               phx-click={JS.patch(~p"/admin/bookings?property=tahoe")}
+              phx-disable-with="Loading..."
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@selected_property == :tahoe,
@@ -1859,6 +1903,7 @@ defmodule YscWeb.AdminBookingsLive do
           >
             <button
               phx-click={JS.patch(~p"/admin/bookings?property=clear_lake")}
+              phx-disable-with="Loading..."
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@selected_property == :clear_lake,
@@ -1879,6 +1924,7 @@ defmodule YscWeb.AdminBookingsLive do
           <button
             phx-click="select-section"
             phx-value-section="calendar"
+            phx-disable-with="Loading..."
             class={[
               "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
               if(@current_section == :calendar,
@@ -1893,6 +1939,7 @@ defmodule YscWeb.AdminBookingsLive do
           <button
             phx-click="select-section"
             phx-value-section="reservations"
+            phx-disable-with="Loading..."
             class={[
               "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
               if(@current_section == :reservations,
@@ -1907,6 +1954,7 @@ defmodule YscWeb.AdminBookingsLive do
           <button
             phx-click="select-section"
             phx-value-section="config"
+            phx-disable-with="Loading..."
             class={[
               "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
               if(@current_section == :config,
@@ -1922,6 +1970,7 @@ defmodule YscWeb.AdminBookingsLive do
             <button
               phx-click="select-section"
               phx-value-section="pending_refunds"
+              phx-disable-with="Loading..."
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@current_section == :pending_refunds,
@@ -1982,6 +2031,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <.button
                   phx-click="prev-month"
                   title="Previous 30 days"
+                  phx-disable-with="Loading..."
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <.icon name="hero-arrow-left" class="w-5 h-5" />
@@ -1989,6 +2039,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <.button
                   phx-click="today"
                   title="Go to current month"
+                  phx-disable-with="Loading..."
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <span class="hidden sm:inline">Today</span>
@@ -1997,6 +2048,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <.button
                   phx-click="next-month"
                   title="Next 30 days"
+                  phx-disable-with="Loading..."
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <.icon name="hero-arrow-right" class="w-5 h-5" />
@@ -2116,6 +2168,7 @@ defmodule YscWeb.AdminBookingsLive do
                             type="button"
                             phx-click="show-day-guests"
                             phx-value-date={Date.to_string(date)}
+                            phx-disable-with="Loading..."
                             class="text-sm font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer transition-colors"
                           >
                             {availability_info.day_bookings_count} guests
@@ -2165,6 +2218,7 @@ defmodule YscWeb.AdminBookingsLive do
                     style={"grid-column: #{i + 1}; grid-row: 1;"}
                     phx-click="select-date-blackout"
                     phx-value-date={if date, do: Date.to_string(date), else: ""}
+                    phx-disable-with="Loading..."
                     data-date={if date, do: Date.to_string(date), else: ""}
                     data-selection-type={
                       if @date_selection_type == :blackout, do: "blackout", else: ""
@@ -2220,6 +2274,7 @@ defmodule YscWeb.AdminBookingsLive do
                     style={"grid-column: #{i + 1}; grid-row: 1;"}
                     phx-click="select-date-buyout"
                     phx-value-date={if date, do: Date.to_string(date), else: ""}
+                    phx-disable-with="Loading..."
                     data-date={if date, do: Date.to_string(date), else: ""}
                     data-selection-type={
                       if @date_selection_type == :buyout, do: "buyout", else: ""
@@ -2279,6 +2334,7 @@ defmodule YscWeb.AdminBookingsLive do
                       phx-click="select-date-room"
                       phx-value-date={if date, do: Date.to_string(date), else: ""}
                       phx-value-room-id={room.id}
+                      phx-disable-with="Loading..."
                       data-date={if date, do: Date.to_string(date), else: ""}
                       data-selection-type={
                         if @date_selection_type == :room &&
@@ -2504,6 +2560,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <button
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
+                      phx-disable-with="Opening..."
                       class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm whitespace-nowrap"
                     >
                       View
@@ -2522,6 +2579,7 @@ defmodule YscWeb.AdminBookingsLive do
                           "/admin/bookings/bookings/#{booking.id}/edit?#{query_string}"
                         )
                       }
+                      phx-disable-with="Loading..."
                       class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm whitespace-nowrap"
                     >
                       Edit
@@ -2549,6 +2607,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <button
                     class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
                     phx-click="clear-reservation-filters"
+                    phx-disable-with="Clearing..."
                   >
                     <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" />
                     Clear filters
@@ -2681,6 +2740,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <.button
                       phx-click="approve-refund"
                       phx-value-id={pending_refund.id}
+                      phx-disable-with="Approving..."
                       class="bg-green-600 hover:bg-green-700 text-white"
                     >
                       <.icon name="hero-check" class="w-4 h-4 me-1" />
@@ -2689,6 +2749,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <.button
                       phx-click="show-approve-refund-modal"
                       phx-value-id={pending_refund.id}
+                      phx-disable-with="Loading..."
                       class="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <.icon name="hero-pencil" class="w-4 h-4 me-1" />
@@ -2697,6 +2758,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <.button
                       phx-click="show-reject-refund-modal"
                       phx-value-id={pending_refund.id}
+                      phx-disable-with="Loading..."
                       color="red"
                     >
                       <.icon name="hero-x-circle" class="w-4 h-4 me-1" /> Reject
@@ -2933,6 +2995,7 @@ defmodule YscWeb.AdminBookingsLive do
                           ~p"/admin/bookings/seasons/#{season.id}/edit?property=#{@selected_property}&section=config"
                         )
                       }
+                      phx-disable-with="Loading..."
                       class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                     >
                       Edit
@@ -2952,11 +3015,14 @@ defmodule YscWeb.AdminBookingsLive do
                 Pricing rules use hierarchical specificity (room → category → property)
               </p>
             </div>
-            <.button phx-click={
-              JS.patch(
-                ~p"/admin/bookings/pricing-rules/new?property=#{@selected_property}&section=#{@current_section}"
-              )
-            }>
+            <.button
+              phx-click={
+                JS.patch(
+                  ~p"/admin/bookings/pricing-rules/new?property=#{@selected_property}&section=#{@current_section}"
+                )
+              }
+              phx-disable-with="Loading..."
+            >
               <.icon name="hero-plus" class="w-5 h-5 -mt-1" />
               <span class="ms-1">
                 New Pricing Rule
@@ -3033,6 +3099,7 @@ defmodule YscWeb.AdminBookingsLive do
                           ~p"/admin/bookings/pricing-rules/#{rule.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                         )
                       }
+                      phx-disable-with="Loading..."
                       class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                     >
                       Edit
@@ -3052,11 +3119,14 @@ defmodule YscWeb.AdminBookingsLive do
                 Configure cancellation and refund policies for bookings
               </p>
             </div>
-            <.button phx-click={
-              JS.patch(
-                ~p"/admin/bookings/refund-policies/new?property=#{@selected_property}&section=#{@current_section}"
-              )
-            }>
+            <.button
+              phx-click={
+                JS.patch(
+                  ~p"/admin/bookings/refund-policies/new?property=#{@selected_property}&section=#{@current_section}"
+                )
+              }
+              phx-disable-with="Loading..."
+            >
               <.icon name="hero-plus" class="w-5 h-5 -mt-1" />
               <span class="ms-1">
                 New Refund Policy
@@ -3121,6 +3191,7 @@ defmodule YscWeb.AdminBookingsLive do
                             ~p"/admin/bookings/refund-policies/#{policy.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                           )
                         }
+                        phx-disable-with="Loading..."
                         class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                       >
                         Edit
@@ -3131,6 +3202,7 @@ defmodule YscWeb.AdminBookingsLive do
                             ~p"/admin/bookings/refund-policies/#{policy.id}/rules?property=#{@selected_property}&section=#{@current_section}"
                           )
                         }
+                        phx-disable-with="Loading..."
                         class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                       >
                         Rules
@@ -3157,11 +3229,14 @@ defmodule YscWeb.AdminBookingsLive do
                 Configure rooms for {atom_to_readable(@selected_property)}
               </p>
             </div>
-            <.button phx-click={
-              JS.patch(
-                ~p"/admin/bookings/rooms/new?property=#{@selected_property}&section=#{@current_section}"
-              )
-            }>
+            <.button
+              phx-click={
+                JS.patch(
+                  ~p"/admin/bookings/rooms/new?property=#{@selected_property}&section=#{@current_section}"
+                )
+              }
+              phx-disable-with="Loading..."
+            >
               <.icon name="hero-plus" class="w-5 h-5 -mt-1" />
               <span class="ms-1">
                 New Room
@@ -3281,6 +3356,7 @@ defmodule YscWeb.AdminBookingsLive do
                           ~p"/admin/bookings/rooms/#{room.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                         )
                       }
+                      phx-disable-with="Loading..."
                       class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
                     >
                       Edit
@@ -4903,6 +4979,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:error, reason} ->
         error_message =
           case reason do
+            {:refund_failed, msg} when is_binary(msg) -> msg
             {:refund_failed, _} -> "Failed to process refund. Please try again."
           end
 
@@ -4970,6 +5047,7 @@ defmodule YscWeb.AdminBookingsLive do
       {:error, reason} ->
         error_message =
           case reason do
+            {:refund_failed, msg} when is_binary(msg) -> msg
             {:refund_failed, _} -> "Failed to process refund. Please try again."
           end
 
@@ -6630,6 +6708,7 @@ defmodule YscWeb.AdminBookingsLive do
       title="#{escaped_title_str}"
       phx-click="view-blackout"
       phx-value-blackout-id="#{blackout.id}"
+      phx-disable-with="Opening..."
     >
       <div class="truncate px-2 font-semibold">#{escaped_reason_str}</div>
       #{right_indicator}
@@ -6733,6 +6812,7 @@ defmodule YscWeb.AdminBookingsLive do
       title="#{escaped_title_str}"
       phx-click="view-booking"
       phx-value-booking-id="#{booking.id}"
+      phx-disable-with="Opening..."
     >
       <div class="truncate px-2 font-semibold flex items-center gap-1.5">
         <span class="truncate">#{escaped_user_name_str}</span>
