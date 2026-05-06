@@ -232,6 +232,68 @@ defmodule Ysc.Events.TicketReservationTest do
       assert "must be in the future" in errors_on(changeset).expires_at
     end
 
+    test "invalid update when status stays active and expires_at is in the past" do
+      past = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      reservation = %TicketReservation{
+        ticket_tier_id: Ecto.ULID.generate(),
+        user_id: Ecto.ULID.generate(),
+        created_by_id: Ecto.ULID.generate(),
+        quantity: 1,
+        status: "active",
+        expires_at: past
+      }
+
+      changeset =
+        TicketReservation.changeset(reservation, %{notes: "updated note"})
+
+      refute changeset.valid?
+      assert "must be in the future" in errors_on(changeset).expires_at
+    end
+
+    test "valid update to fulfilled when stored expires_at is in the past" do
+      past = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      reservation = %TicketReservation{
+        ticket_tier_id: Ecto.ULID.generate(),
+        user_id: Ecto.ULID.generate(),
+        created_by_id: Ecto.ULID.generate(),
+        quantity: 1,
+        status: "active",
+        expires_at: past
+      }
+
+      changeset =
+        TicketReservation.changeset(reservation, %{
+          status: "fulfilled",
+          fulfilled_at: DateTime.utc_now(),
+          ticket_order_id: Ecto.ULID.generate()
+        })
+
+      assert changeset.valid?
+    end
+
+    test "valid update to cancelled when stored expires_at is in the past" do
+      past = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      reservation = %TicketReservation{
+        ticket_tier_id: Ecto.ULID.generate(),
+        user_id: Ecto.ULID.generate(),
+        created_by_id: Ecto.ULID.generate(),
+        quantity: 1,
+        status: "active",
+        expires_at: past
+      }
+
+      changeset =
+        TicketReservation.changeset(reservation, %{
+          status: "cancelled",
+          cancelled_at: DateTime.utc_now()
+        })
+
+      assert changeset.valid?
+    end
+
     test "valid changeset when expires_at is in the future" do
       attrs = %{
         ticket_tier_id: Ecto.ULID.generate(),

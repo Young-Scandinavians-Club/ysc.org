@@ -247,6 +247,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                 <%= if !is_donation do %>
                   <% reservations =
                     Map.get(@reservations_by_tier, ticket_tier.id, []) %>
+                  <% expired_reservations =
+                    Map.get(@expired_reservations_by_tier, ticket_tier.id, []) %>
                   <%= if length(reservations) > 0 do %>
                     <div class="mt-4 pt-4 border-t border-zinc-200">
                       <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
@@ -287,6 +289,54 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                               phx-disable-with="Cancelling..."
                               data-confirm="Are you sure you want to cancel this reservation?"
                               class="p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <.icon name="hero-x-mark" class="w-4 h-4" />
+                            </button>
+                          </div>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+                  <%= if length(expired_reservations) > 0 do %>
+                    <div class="mt-4 pt-4 border-t border-zinc-200">
+                      <p class="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">
+                        Expired Reservations
+                      </p>
+                      <p class="text-xs text-zinc-500 mb-2">
+                        Past end date — no checkout discount until cancelled or reissued.
+                      </p>
+                      <div class="space-y-2">
+                        <%= for reservation <- expired_reservations do %>
+                          <div class="flex items-center justify-between p-2 bg-zinc-100 rounded border border-zinc-300">
+                            <div class="flex-1">
+                              <p class="text-sm font-medium text-zinc-900">
+                                {reservation.user.first_name} {reservation.user.last_name}
+                              </p>
+                              <p class="text-xs text-zinc-600">
+                                {reservation.user.email} • {reservation.quantity} ticket{if reservation.quantity !=
+                                                                                              1,
+                                                                                            do:
+                                                                                              "s"}
+                                <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
+                                  <span class="text-green-600 font-medium">
+                                    • {Decimal.to_float(
+                                      reservation.discount_percentage
+                                    )
+                                    |> Float.round(2)}% off
+                                  </span>
+                                <% end %>
+                                <span class="text-red-700 font-medium">
+                                  • Ended {format_date(reservation.expires_at)}
+                                </span>
+                              </p>
+                            </div>
+                            <button
+                              phx-click="cancel-reservation"
+                              phx-value-id={reservation.id}
+                              phx-target={@myself}
+                              phx-disable-with="Cancelling..."
+                              data-confirm="Are you sure you want to cancel this reservation?"
+                              class="p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             >
                               <.icon name="hero-x-mark" class="w-4 h-4" />
                             </button>
@@ -448,14 +498,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     ticket_tiers = Events.list_ticket_tiers_for_event(assigns.event_id)
     ticket_purchases = Events.get_ticket_purchase_summary(assigns.event_id)
 
-    # Load reservations for each tier
-    reservations_by_tier =
-      ticket_tiers
-      |> Enum.map(fn tier ->
-        reservations = Events.list_active_reservations_for_tier(tier.id)
-        {tier.id, reservations}
-      end)
-      |> Map.new()
+    # Load reservations for each tier (valid holds vs lapsed `active` rows)
+    {reservations_by_tier, expired_reservations_by_tier} =
+      load_reservations_maps(ticket_tiers)
 
     socket =
       socket
@@ -464,6 +509,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       |> assign(:ticket_tiers, ticket_tiers)
       |> assign(:ticket_purchases, ticket_purchases)
       |> assign(:reservations_by_tier, reservations_by_tier)
+      |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
       |> assign(:editing_ticket_tier, nil)
       |> assign(:current_user, assigns[:current_user])
 
@@ -712,19 +758,17 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
     case Events.cancel_ticket_reservation(reservation) do
       {:ok, _reservation} ->
-        # Refresh reservations
-        reservations_by_tier = refresh_reservations(socket.assigns.event_id)
-
-        ticket_tiers =
-          Events.list_ticket_tiers_for_event(socket.assigns.event_id)
+        # Refresh reservation maps using tiers already on the socket
+        {reservations_by_tier, expired_reservations_by_tier} =
+          load_reservations_maps(socket.assigns.ticket_tiers)
 
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "Reservation cancelled successfully",
            title: "Reservation"
          )
-         |> assign(:ticket_tiers, ticket_tiers)
-         |> assign(:reservations_by_tier, reservations_by_tier)}
+         |> assign(:reservations_by_tier, reservations_by_tier)
+         |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)}
 
       {:error, _changeset} ->
         {:noreply,
@@ -773,15 +817,22 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     end
   end
 
-  defp refresh_reservations(event_id) do
-    ticket_tiers = Events.list_ticket_tiers_for_event(event_id)
+  defp load_reservations_maps(ticket_tiers) do
+    reservations_by_tier =
+      ticket_tiers
+      |> Enum.map(fn tier ->
+        {tier.id, Events.list_active_reservations_for_tier(tier.id)}
+      end)
+      |> Map.new()
 
-    ticket_tiers
-    |> Enum.map(fn tier ->
-      reservations = Events.list_active_reservations_for_tier(tier.id)
-      {tier.id, reservations}
-    end)
-    |> Map.new()
+    expired_reservations_by_tier =
+      ticket_tiers
+      |> Enum.map(fn tier ->
+        {tier.id, Events.list_expired_active_reservations_for_tier(tier.id)}
+      end)
+      |> Map.new()
+
+    {reservations_by_tier, expired_reservations_by_tier}
   end
 
   defp get_reserved_count(tier_id, reservations_by_tier) do

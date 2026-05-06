@@ -85,6 +85,17 @@ defmodule Ysc.Events.TicketReservation do
   end
 
   defp validate_expires_at(changeset) do
+    # Terminal states should not re-validate the hold window (clock vs :utc_datetime).
+    case get_field(changeset, :status) do
+      status when status in ["fulfilled", "cancelled"] ->
+        changeset
+
+      _ ->
+        validate_expires_at_active(changeset)
+    end
+  end
+
+  defp validate_expires_at_active(changeset) do
     expires_at = get_field(changeset, :expires_at)
 
     case expires_at do

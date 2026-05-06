@@ -8,6 +8,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
   import Ecto.Query, warn: false
   alias Ysc.Repo
+  alias Ysc.Events
   alias Ysc.Events.{Event, TicketTier, Ticket, TicketReservation}
   alias Ysc.Tickets.TicketOrder
 
@@ -283,11 +284,8 @@ defmodule Ysc.Tickets.BookingLocker do
 
   defp get_user_reserved_quantity_locked(tier_id, user_id) do
     TicketReservation
-    |> where(
-      [tr],
-      tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id and
-        tr.status == "active"
-    )
+    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id)
+    |> Events.where_ticket_reservation_hold_active()
     |> select([tr], sum(tr.quantity))
     |> Repo.one()
     |> case do
@@ -298,7 +296,8 @@ defmodule Ysc.Tickets.BookingLocker do
 
   defp count_reserved_tickets_for_tier_locked(tier_id) do
     TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.status == "active")
+    |> where([tr], tr.ticket_tier_id == ^tier_id)
+    |> Events.where_ticket_reservation_hold_active()
     |> select([tr], sum(tr.quantity))
     |> Repo.one()
     |> case do
@@ -310,11 +309,8 @@ defmodule Ysc.Tickets.BookingLocker do
   defp user_has_reservations_for_event?(user_id, event_id) do
     TicketReservation
     |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
-    |> where(
-      [tr, tt],
-      tr.user_id == ^user_id and tt.event_id == ^event_id and
-        tr.status == "active"
-    )
+    |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+    |> Events.where_ticket_reservation_hold_active()
     |> Repo.exists?()
   end
 
@@ -328,11 +324,8 @@ defmodule Ysc.Tickets.BookingLocker do
     reservations =
       TicketReservation
       |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
-      |> where(
-        [tr, tt],
-        tr.user_id == ^user_id and tt.event_id == ^event_id and
-          tr.status == "active"
-      )
+      |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+      |> Events.where_ticket_reservation_hold_active()
       |> order_by([tr], asc: tr.inserted_at)
       |> Repo.all()
 
@@ -477,11 +470,8 @@ defmodule Ysc.Tickets.BookingLocker do
     active_reservations =
       TicketReservation
       |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
-      |> where(
-        [tr, tt],
-        tr.user_id == ^user_id and tt.event_id == ^event_id and
-          tr.status == "active"
-      )
+      |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+      |> Events.where_ticket_reservation_hold_active()
       |> order_by([tr], asc: tr.inserted_at)
       |> Repo.all()
 
