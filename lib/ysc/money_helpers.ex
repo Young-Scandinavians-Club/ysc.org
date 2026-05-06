@@ -75,20 +75,23 @@ defmodule Ysc.MoneyHelper do
   def cents_to_dollars(_), do: Decimal.new("0.0")
 
   @doc """
-  Converts Money to cents (integer).
+  Converts Money to cents (integer) for Stripe and similar APIs.
 
-  Examples:
-    iex> money_to_cents(%Money{amount: Decimal.new("10.99"), currency: :USD})
-    1099
+  Rounds to the currency's minor units (`Money.round/1`) before converting so
+  fractional-cent arithmetic does not truncate to 0 cents or raise when
+  converting to an integer.
   """
-  def money_to_cents(%Money{amount: amount}) when is_struct(amount, Decimal) do
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
+  def money_to_cents(%Money{} = money) do
+    case Money.round(money, rounding_mode: :half_up) do
+      %Money{amount: amount} ->
+        amount
+        |> Decimal.mult(100)
+        |> Decimal.round(0, :half_up)
+        |> Decimal.to_integer()
 
-  def money_to_cents(%Money{amount: amount}) when is_integer(amount) do
-    amount * 100
+      {:error, _} ->
+        0
+    end
   end
 
   def money_to_cents(_), do: 0

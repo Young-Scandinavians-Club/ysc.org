@@ -2365,39 +2365,45 @@ defmodule Ysc.Bookings do
 
                     if payment_intent_id && payment.external_provider == :stripe do
                       # Convert refund amount to cents for Stripe
-                      refund_amount_cents = money_to_cents(actual_refund_amount)
+                      refund_amount_cents =
+                        Ysc.MoneyHelper.money_to_cents(actual_refund_amount)
 
-                      # Create refund in Stripe
-                      case create_stripe_refund(
-                             payment_intent_id,
-                             refund_amount_cents,
-                             refund_reason
-                           ) do
-                        {:ok, stripe_refund} ->
-                          # Refund created in Stripe - ledger will be updated via webhook
-                          # Send cancellation confirmation to user
-                          send_booking_cancellation_confirmation_email(
-                            canceled_booking,
-                            payment,
-                            actual_refund_amount,
-                            false,
-                            reason
-                          )
+                      if refund_amount_cents < 1 do
+                        {:error,
+                         {:refund_failed,
+                          "Refund amount must be at least $0.01 (Stripe minimum)."}}
+                      else
+                        case create_stripe_refund(
+                               payment_intent_id,
+                               refund_amount_cents,
+                               refund_reason
+                             ) do
+                          {:ok, stripe_refund} ->
+                            # Refund created in Stripe - ledger will be updated via webhook
+                            # Send cancellation confirmation to user
+                            send_booking_cancellation_confirmation_email(
+                              canceled_booking,
+                              payment,
+                              actual_refund_amount,
+                              false,
+                              reason
+                            )
 
-                          # Send cancellation notifications to cabin master and treasurer
-                          send_booking_cancellation_notifications(
-                            canceled_booking,
-                            payment,
-                            nil,
-                            reason
-                          )
+                            # Send cancellation notifications to cabin master and treasurer
+                            send_booking_cancellation_notifications(
+                              canceled_booking,
+                              payment,
+                              nil,
+                              reason
+                            )
 
-                          # Return the refund ID so we can track it
-                          {:ok, canceled_booking, actual_refund_amount,
-                           stripe_refund.id}
+                            # Return the refund ID so we can track it
+                            {:ok, canceled_booking, actual_refund_amount,
+                             stripe_refund.id}
 
-                        {:error, reason} ->
-                          {:error, {:refund_failed, reason}}
+                          {:error, reason} ->
+                            {:error, {:refund_failed, reason}}
+                        end
                       end
                     else
                       {:error,
@@ -2997,7 +3003,10 @@ defmodule Ysc.Bookings do
   - `reviewed_by`: The admin user approving the refund
 
   ## Returns
-  - `{:ok, pending_refund, refund_transaction}` if successful
+  - `{:ok, pending_refund, stripe_refund_id}` if successful. When the approved
+    amount rounds to **zero** cents, Stripe is not called and the third value is
+    `nil` (ledger refund records are not created).
+  - `{:error, :invalid_refund_amount}` when the approved amount is negative.
   - `{:error, reason}` if processing fails
   """
   def approve_pending_refund(
@@ -3008,8 +3017,16 @@ defmodule Ysc.Bookings do
       ) do
     alias Ysc.MoneyHelper
 
-    # Use admin amount if provided, otherwise use policy amount
+    pending_refund = Repo.get!(PendingRefund, pending_refund.id)
+
+    # Use admin amount if provided, otherwise use policy amount (rounded to USD cents)
     refund_amount = admin_refund_amount || pending_refund.policy_refund_amount
+
+    refund_amount =
+      case Money.round(refund_amount) do
+        %Money{} = rounded -> rounded
+        {:error, _} -> refund_amount
+      end
 
     refund_reason =
       if admin_notes do
@@ -3022,56 +3039,257 @@ defmodule Ysc.Bookings do
     payment = Repo.get!(Ysc.Ledgers.Payment, pending_refund.payment_id)
 
     if payment.external_payment_id && payment.external_provider == :stripe do
-      # Convert refund amount to cents for Stripe
-      refund_amount_cents = money_to_cents(refund_amount)
+      refund_amount_cents = Ysc.MoneyHelper.money_to_cents(refund_amount)
 
-      # Create refund in Stripe
-      case create_stripe_refund(
-             payment.external_payment_id,
-             refund_amount_cents,
-             refund_reason
-           ) do
-        {:ok, stripe_refund} ->
-          # Process refund in ledger immediately (creates refund record, ledger entries, and sends email)
-          # The webhook will handle idempotency if it arrives later
-          ledger_result =
-            Ledgers.process_refund(%{
-              payment_id: payment.id,
-              refund_amount: refund_amount,
-              reason: refund_reason,
-              external_refund_id: stripe_refund.id
-            })
-
-          # Update pending refund status
-          updated_pending_refund =
-            pending_refund
-            |> PendingRefund.changeset(%{
-              status: :approved,
-              admin_refund_amount: refund_amount,
-              admin_notes: admin_notes,
-              reviewed_by_id: reviewed_by.id,
-              reviewed_at: DateTime.utc_now()
-            })
-            |> Repo.update!()
-
-          # Log if ledger processing had issues (but don't fail - refund was created in Stripe)
-          log_ledger_result(
-            ledger_result,
-            pending_refund,
-            payment,
-            stripe_refund
+      cond do
+        refund_amount_cents < 0 ->
+          Ysc.Logging.error(
+            "Negative pending refund amount rejected",
+            pending_refund_id: pending_refund.id,
+            payment_id: payment.id,
+            refund_amount_cents: refund_amount_cents
           )
 
-          {:ok, updated_pending_refund, stripe_refund.id}
+          {:error, :invalid_refund_amount}
 
-        {:error, reason} ->
-          {:error, {:refund_failed, reason}}
+        refund_amount_cents == 0 ->
+          if pending_refund.status != :pending do
+            {:error,
+             {:refund_failed, "Pending refund is not awaiting approval"}}
+          else
+            # Policy or admin amount is $0.00 — approve administratively; no Stripe charge-back.
+            Ysc.Logging.info(
+              "Pending refund approved with no Stripe refund (zero approved amount)",
+              pending_refund_id: pending_refund.id,
+              payment_id: payment.id
+            )
+
+            updated_pending_refund =
+              pending_refund
+              |> PendingRefund.changeset(%{
+                status: :approved,
+                admin_refund_amount: refund_amount,
+                admin_notes: admin_notes,
+                reviewed_by_id: reviewed_by.id,
+                reviewed_at: DateTime.utc_now()
+              })
+              |> Repo.update!()
+
+            {:ok, updated_pending_refund, nil}
+          end
+
+        true ->
+          approve_pending_refund_with_stripe(
+            pending_refund,
+            payment,
+            refund_amount,
+            refund_amount_cents,
+            refund_reason,
+            admin_notes,
+            reviewed_by
+          )
       end
     else
       {:error,
        {:refund_failed,
         "Payment does not have a valid Stripe payment intent ID"}}
     end
+  end
+
+  defp approve_pending_refund_with_stripe(
+         pending_refund,
+         payment,
+         refund_amount,
+         refund_amount_cents,
+         refund_reason,
+         admin_notes,
+         reviewed_by
+       ) do
+    pending_refund = Repo.get!(PendingRefund, pending_refund.id)
+
+    case pending_refund.status do
+      :approved ->
+        {:ok, pending_refund,
+         latest_stripe_refund_external_id_for_payment(payment.id)}
+
+      :pending ->
+        case claim_pending_refund_processing(pending_refund.id) do
+          {:claimed, pr} ->
+            finalize_stripe_pending_refund_approval(
+              pr,
+              payment,
+              refund_amount,
+              refund_amount_cents,
+              refund_reason,
+              admin_notes,
+              reviewed_by
+            )
+
+          {:skipped, pr} ->
+            case pr.status do
+              :approved ->
+                {:ok, pr,
+                 latest_stripe_refund_external_id_for_payment(payment.id)}
+
+              :processing ->
+                finalize_stripe_pending_refund_approval(
+                  pr,
+                  payment,
+                  refund_amount,
+                  refund_amount_cents,
+                  refund_reason,
+                  admin_notes,
+                  reviewed_by
+                )
+
+              :pending ->
+                {:error,
+                 {:refund_failed,
+                  "Could not claim pending refund for processing"}}
+
+              _ ->
+                {:error, {:refund_failed, "Invalid pending refund status"}}
+            end
+        end
+
+      :processing ->
+        finalize_stripe_pending_refund_approval(
+          pending_refund,
+          payment,
+          refund_amount,
+          refund_amount_cents,
+          refund_reason,
+          admin_notes,
+          reviewed_by
+        )
+
+      _ ->
+        {:error, {:refund_failed, "Pending refund is not awaiting approval"}}
+    end
+  end
+
+  defp claim_pending_refund_processing(pending_refund_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+    {count, _} =
+      from(pr in PendingRefund,
+        where: pr.id == ^pending_refund_id and pr.status == :pending
+      )
+      |> Repo.update_all(set: [status: :processing, updated_at: now])
+
+    pr = Repo.get!(PendingRefund, pending_refund_id)
+
+    if count == 1 do
+      {:claimed, pr}
+    else
+      {:skipped, pr}
+    end
+  end
+
+  defp reset_pending_refund_after_stripe_failure(pending_refund_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+    Repo.update_all(
+      from(pr in PendingRefund,
+        where: pr.id == ^pending_refund_id and pr.status == :processing
+      ),
+      set: [status: :pending, updated_at: now]
+    )
+  end
+
+  defp finalize_stripe_pending_refund_approval(
+         pending_refund,
+         payment,
+         refund_amount,
+         refund_amount_cents,
+         refund_reason,
+         admin_notes,
+         reviewed_by
+       ) do
+    pending_refund = Repo.get!(PendingRefund, pending_refund.id)
+
+    cond do
+      pending_refund.status == :approved ->
+        {:ok, pending_refund,
+         latest_stripe_refund_external_id_for_payment(payment.id)}
+
+      pending_refund.status != :processing ->
+        {:error, {:refund_failed, "Pending refund is not in processing state"}}
+
+      true ->
+        idempotency_key = "approve_pending_refund_#{pending_refund.id}"
+
+        case create_stripe_refund(
+               payment.external_payment_id,
+               refund_amount_cents,
+               refund_reason,
+               idempotency_key: idempotency_key
+             ) do
+          {:ok, stripe_refund} ->
+            ledger_result =
+              Ledgers.process_refund(%{
+                payment_id: payment.id,
+                refund_amount: refund_amount,
+                reason: refund_reason,
+                external_refund_id: stripe_refund.id
+              })
+
+            changes =
+              PendingRefund.changeset(pending_refund, %{
+                status: :approved,
+                admin_refund_amount: refund_amount,
+                admin_notes: admin_notes,
+                reviewed_by_id: reviewed_by.id,
+                reviewed_at: DateTime.utc_now()
+              })
+
+            case Repo.update(changes) do
+              {:ok, updated_pending_refund} ->
+                log_ledger_result(
+                  ledger_result,
+                  pending_refund,
+                  payment,
+                  stripe_refund
+                )
+
+                {:ok, updated_pending_refund, stripe_refund.id}
+
+              {:error, _} ->
+                reloaded = Repo.get!(PendingRefund, pending_refund.id)
+
+                if reloaded.status == :approved do
+                  log_ledger_result(
+                    ledger_result,
+                    pending_refund,
+                    payment,
+                    stripe_refund
+                  )
+
+                  {:ok, reloaded, stripe_refund.id}
+                else
+                  {:error,
+                   {:refund_failed,
+                    "Could not finalize approved pending refund"}}
+                end
+            end
+
+          {:error, reason} ->
+            _ = reset_pending_refund_after_stripe_failure(pending_refund.id)
+            {:error, {:refund_failed, reason}}
+        end
+    end
+  end
+
+  defp latest_stripe_refund_external_id_for_payment(payment_id) do
+    from(r in Ysc.Ledgers.Refund,
+      where: r.payment_id == ^payment_id,
+      where: r.external_provider == :stripe,
+      where: not is_nil(r.external_refund_id),
+      order_by: [desc: r.inserted_at],
+      limit: 1,
+      select: r.external_refund_id
+    )
+    |> Repo.one()
   end
 
   @doc """
@@ -3478,26 +3696,6 @@ defmodule Ysc.Bookings do
 
   ## Private Functions
 
-  # Helper function to safely convert Money to cents
-  defp money_to_cents(%Money{amount: amount, currency: :USD}) do
-    # Use Decimal for precise conversion to avoid floating-point errors
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(%Money{amount: amount, currency: _currency}) do
-    # For other currencies, use same conversion
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(_) do
-    # Fallback for invalid money values
-    0
-  end
-
   @doc """
   Creates a refund in Stripe for a payment intent (public version for admin use).
 
@@ -3524,7 +3722,7 @@ defmodule Ysc.Bookings do
   # ## Returns
   # - `{:ok, %Stripe.Refund{}}` on success
   # - `{:error, reason}` on failure
-  defp create_stripe_refund(payment_intent_id, amount_cents, reason) do
+  defp create_stripe_refund(payment_intent_id, amount_cents, reason, opts \\ []) do
     require Ysc.Logging
 
     # First, retrieve the payment intent to get the charge ID
@@ -3560,7 +3758,8 @@ defmodule Ysc.Bookings do
           handle_stripe_refund_creation(
             refund_params,
             payment_intent_id,
-            amount_cents
+            amount_cents,
+            opts
           )
         else
           Ysc.Logging.error("No charge found in payment intent",
@@ -3638,14 +3837,19 @@ defmodule Ysc.Bookings do
     end
   end
 
-  @dialyzer {:nowarn_function, handle_stripe_refund_creation: 3}
+  @dialyzer {:nowarn_function, handle_stripe_refund_creation: 4}
   defp handle_stripe_refund_creation(
          refund_params,
          payment_intent_id,
-         amount_cents
+         amount_cents,
+         opts
        ) do
+    idempotency_key = Keyword.get(opts, :idempotency_key)
+
     if Ysc.Env.test?() do
-      refund = %Stripe.Refund{id: "re_test_#{payment_intent_id}"}
+      refund = %Stripe.Refund{
+        id: "re_test_#{idempotency_key || payment_intent_id}"
+      }
 
       Ysc.Logging.info("Stripe refund created successfully (test stub)",
         refund_id: refund.id,
@@ -3655,8 +3859,14 @@ defmodule Ysc.Bookings do
 
       {:ok, refund}
     else
+      stripe_opts =
+        case idempotency_key do
+          nil -> []
+          key -> [idempotency_key: key]
+        end
+
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Refund.create(refund_params)
+             Stripe.Refund.create(refund_params, stripe_opts)
            end) do
         {:ok, refund} ->
           Ysc.Logging.info("Stripe refund created successfully",

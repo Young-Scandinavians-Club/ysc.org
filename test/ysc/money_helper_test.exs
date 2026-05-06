@@ -87,6 +87,12 @@ defmodule Ysc.MoneyHelperTest do
       assert MoneyHelper.money_to_cents(integer_amount) == 5000
     end
 
+    test "rounds sub-cent policy amounts to the nearest cent before converting" do
+      assert MoneyHelper.money_to_cents(Money.new!(:USD, "0.009")) == 1
+      assert MoneyHelper.money_to_cents(Money.new!(:USD, "0.005")) == 1
+      assert MoneyHelper.money_to_cents(Money.new!(:USD, "0.004")) == 0
+    end
+
     test "returns zero for non-Money values" do
       assert MoneyHelper.money_to_cents(nil) == 0
     end

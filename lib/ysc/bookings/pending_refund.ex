@@ -24,7 +24,7 @@ defmodule Ysc.Bookings.PendingRefund do
     field :admin_refund_amount, Money.Ecto.Composite.Type
 
     field :status, Ecto.Enum,
-      values: [:pending, :approved, :rejected],
+      values: [:pending, :processing, :approved, :rejected],
       default: :pending
 
     field :cancellation_reason, :string
@@ -59,6 +59,6 @@ defmodule Ysc.Bookings.PendingRefund do
       :policy_refund_amount,
       :status
     ])
-    |> validate_inclusion(:status, [:pending, :approved, :rejected])
+    |> validate_inclusion(:status, [:pending, :processing, :approved, :rejected])
   end
 end
