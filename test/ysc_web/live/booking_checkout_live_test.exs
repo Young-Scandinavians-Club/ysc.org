@@ -178,7 +178,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert {:error, {:redirect, %{to: path, flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      assert flash["error"] =~ "calculate price"
+      assert flash["error"] =~ "couldn't load the pricing"
       assert path in [~p"/bookings/tahoe", ~p"/bookings/clear-lake", ~p"/"]
     end
 
@@ -269,7 +269,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
           "payment_intent_id" => "pi_test_123"
         })
 
-      assert html =~ "Failed to process payment" or html =~ "payment"
+      assert html =~ "Something went wrong while confirming your booking"
       Mox.verify!(StripeMock)
     end
 
@@ -293,7 +293,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
           "payment_intent_id" => "pi_test_123"
         })
 
-      assert html =~ "Failed to process payment"
+      assert html =~ "Something went wrong while confirming your booking"
       Mox.verify!(StripeMock)
     end
 
