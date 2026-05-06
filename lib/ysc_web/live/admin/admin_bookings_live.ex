@@ -105,6 +105,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button
+                  type="button"
                   phx-click={
                     JS.patch(
                       ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
@@ -259,6 +260,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button
+                  type="button"
                   phx-click={
                     query_params =
                       build_booking_modal_close_params(
@@ -395,6 +397,7 @@ defmodule YscWeb.AdminBookingsLive do
               <div></div>
               <div class="flex gap-2">
                 <.button
+                  type="button"
                   phx-click={
                     JS.patch(
                       ~p"/admin/bookings?property=#{@selected_property}&section=config"

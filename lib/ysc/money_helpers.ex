@@ -82,7 +82,7 @@ defmodule Ysc.MoneyHelper do
   converting to an integer.
   """
   def money_to_cents(%Money{} = money) do
-    case Money.round(money) do
+    case Money.round(money, rounding_mode: :half_up) do
       %Money{amount: amount} ->
         amount
         |> Decimal.mult(100)
