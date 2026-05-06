@@ -802,7 +802,7 @@ defmodule YscWeb.UserSettingsLive do
                   field={@profile_form[:phone_number]}
                 />
                 <p class="text-xs text-zinc-600 mt-1">
-                  <strong>Young Scandinavians Club (YSC)</strong>: By voluntarily providing your phone number and explicitly opting in to text messaging, you agree to receive account security codes and booking reminders from Young Scandinavians Club(YSC). Message frequency may vary. Message & data rates may apply. Reply HELP for support or STOP to unsubscribe. Your phone number will not be shared with third parties for marketing or promotional purposes. You can also opt out at any time in your notification settings. See our
+                  <strong>Young Scandinavians Club (YSC)</strong>: By voluntarily providing your phone number and explicitly opting in to text messaging, you agree to receive account security codes and booking reminders from Young Scandinavians Club (YSC). Message frequency may vary. Message and data rates may apply. Reply HELP for support or STOP to unsubscribe. Your phone number will not be shared with third parties for marketing or promotional purposes. You can also opt out at any time in your notification settings. See our
                   <.link
                     navigate={~p"/privacy-policy"}
                     class="text-blue-600 hover:underline"
@@ -1975,7 +1975,7 @@ defmodule YscWeb.UserSettingsLive do
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                 <p class="text-sm text-blue-900">
                   <strong>SMS Consent:</strong>
-                  By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club(YSC). Message and data rates may apply. You can opt out at any time by unchecking the SMS options below or sending a STOP message to the number you receive messages from. See our
+                  By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the SMS options below or sending a STOP message to the number you receive messages from. See our
                   <.link
                     navigate={~p"/privacy-policy"}
                     class="text-blue-700 hover:underline font-semibold"
