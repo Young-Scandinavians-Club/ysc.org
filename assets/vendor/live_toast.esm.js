@@ -181,7 +181,6 @@ var Animation = class {
     const interpolate$1 = interpolate(keyframes, offset, isEasingList(easing) ? easing.map(getEasingFunction) : noopReturn);
     this.tick = (timestamp) => {
       var _a;
-      delay = delay;
       let t = 0;
       if (this.pauseTime !== void 0) {
         t = this.pauseTime;
