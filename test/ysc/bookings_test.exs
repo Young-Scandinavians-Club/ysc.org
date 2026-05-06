@@ -1685,6 +1685,58 @@ defmodule Ysc.BookingsTest do
       assert updated.reviewed_by_id == admin.id
     end
 
+    test "approve_pending_refund/4 approves $0 policy refund without Stripe or ledger refund" do
+      user = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      booking = booking_fixture(%{user_id: user.id})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_approve_zero_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      zero_policy = Money.new!(:USD, "0")
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: zero_policy,
+          status: :pending
+        })
+        |> Ysc.Repo.insert()
+
+      assert {:ok, updated, nil} =
+               Bookings.approve_pending_refund(pr, nil, nil, admin)
+
+      assert updated.status == :approved
+      assert updated.reviewed_by_id == admin.id
+      assert Money.equal?(updated.admin_refund_amount, zero_policy)
+
+      ref_count =
+        Ysc.Repo.aggregate(
+          from(r in Ysc.Ledgers.Refund, where: r.payment_id == ^payment.id),
+          :count
+        )
+
+      assert ref_count == 0
+    end
+
     test "approve_pending_refund/4 uses custom admin_refund_amount and nil admin_notes" do
       user = user_fixture()
       admin = user_fixture(%{role: :admin})
