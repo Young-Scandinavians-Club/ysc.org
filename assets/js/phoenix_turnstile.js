@@ -1,9 +1,13 @@
+import { pushEventToIfConnected } from "./live_view_safe_push";
+
 function callbackEvent(self, name, eventName) {
     return (payload) => {
+        if (self._turnstileDestroyed || !self.el?.isConnected) return;
+
         const events = self.el.dataset.events || "";
 
         if (events.split(",").indexOf(name) > -1) {
-            self.pushEventTo(self.el, `turnstile:${eventName || name}`, payload);
+            pushEventToIfConnected(self, self.el, `turnstile:${eventName || name}`, payload);
         }
     };
 }
@@ -26,7 +30,10 @@ function waitForTurnstile(callback, maxAttempts = 50, attempt = 0) {
 
 export const Turnstile = {
     mounted() {
+        this._turnstileDestroyed = false;
+
         waitForTurnstile(() => {
+            if (this._turnstileDestroyed || !this.el?.isConnected) return;
             turnstile.render(this.el, {
                 theme: "light",
                 callback: callbackEvent(this, "success"),
@@ -50,6 +57,7 @@ export const Turnstile = {
         this.handleEvent("turnstile:refresh", (event) => {
             if (!event.id || event.id === this.el.id) {
                 waitForTurnstile(() => {
+                    if (this._turnstileDestroyed || !this.el?.isConnected) return;
                     turnstile.reset(this.el);
                 });
             }
@@ -58,10 +66,15 @@ export const Turnstile = {
         this.handleEvent("turnstile:remove", (event) => {
             if (!event.id || event.id === this.el.id) {
                 waitForTurnstile(() => {
+                    if (this._turnstileDestroyed || !this.el?.isConnected) return;
                     turnstile.remove(this.el);
                 });
             }
         });
+    },
+
+    destroyed() {
+        this._turnstileDestroyed = true;
     },
 };
 
