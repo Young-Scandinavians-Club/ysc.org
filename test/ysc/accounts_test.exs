@@ -1802,6 +1802,22 @@ defmodule Ysc.AccountsTest do
              } = stats
     end
 
+    test "get_membership_joins_ytd_comparison returns comparable YTD join stats" do
+      cmp = Accounts.get_membership_joins_ytd_comparison()
+
+      assert %{
+               current_ytd_joins: a,
+               prior_ytd_joins: b,
+               prior_year_label: y,
+               joins_ytd_change_percent: pct
+             } = cmp
+
+      assert is_integer(a) and a >= 0
+      assert is_integer(b) and b >= 0
+      assert is_binary(y) and y != ""
+      assert pct == nil or is_integer(pct)
+    end
+
     test "get_membership_stats and list_memberships include lifetime and family primaries" do
       lifetime_primary =
         user_with_lifetime_membership(%{phone_number: unique_user_phone()})

@@ -718,6 +718,34 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
+  Lists recently sent newsletter editions with engagement counts for dashboards.
+
+  Returns a list of maps: `%{edition: %Edition{}, opens: integer(), clicks: integer()}`.
+  """
+  def list_recent_sent_editions_with_stats(limit \\ 5)
+      when is_integer(limit) and limit > 0 do
+    editions =
+      from(e in Edition,
+        where: e.status == :sent,
+        where: not is_nil(e.sent_at),
+        order_by: [desc: e.sent_at],
+        limit: ^limit,
+        select: struct(e, ^@edition_list_fields)
+      )
+      |> Repo.all()
+
+    Enum.map(editions, fn edition ->
+      counts = count_email_events_by_type(edition.id)
+
+      %{
+        edition: edition,
+        opens: Map.get(counts, "open", 0),
+        clicks: Map.get(counts, "click", 0)
+      }
+    end)
+  end
+
+  @doc """
   Returns total click counts per link URL for a given edition,
   sorted by most clicked first, with resolved titles for event and post URLs.
 

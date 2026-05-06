@@ -13,7 +13,7 @@ defmodule YscWeb.AdminSearchComponent do
     <div id={"admin-search-#{@id}"} class="relative w-full" phx-hook="AdminSearch">
       <form phx-change="search" phx-target={@myself} class="relative">
         <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
-          <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500 z-10" />
+          <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
         </div>
         <input
           type="search"
@@ -27,7 +27,7 @@ defmodule YscWeb.AdminSearchComponent do
           spellcheck="false"
           placeholder="Search events, posts, tickets, users, bookings..."
           tabindex="0"
-          class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200/50 rounded w-full bg-white/60 backdrop-blur-md shadow-sm focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all"
+          class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
         />
       </form>
 

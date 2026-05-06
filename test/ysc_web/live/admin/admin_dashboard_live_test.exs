@@ -26,13 +26,22 @@ defmodule YscWeb.AdminDashboardLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin")
       assert html =~ "Overview"
       assert html =~ "Applications"
-      assert html =~ "Total Revenue"
+      assert html =~ "Financials"
     end
 
     test "shows admin stats row for admin users", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
       assert has_element?(view, "#admin-stats-row")
       refute has_element?(view, "#volunteer-stats-row")
+    end
+
+    test "shows admin dashboard sections and event timeline", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(view, "#dashboard-events-timeline")
+      assert has_element?(view, "#dashboard-financials")
+      assert has_element?(view, "#dashboard-newsletters")
+      assert has_element?(view, "#dashboard-recent-discussions")
     end
 
     test "navigates to user review from pending applications", %{conn: conn} do
@@ -83,7 +92,7 @@ defmodule YscWeb.AdminDashboardLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin")
       html = render(view)
 
-      assert html =~ "Review Applications"
+      assert html =~ "Review applications"
       assert html =~ "No pending applications"
     end
 
@@ -126,6 +135,8 @@ defmodule YscWeb.AdminDashboardLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin")
       assert has_element?(view, "#volunteer-stats-row")
       refute has_element?(view, "#admin-stats-row")
+      assert has_element?(view, "#dashboard-events-timeline")
+      refute has_element?(view, "#dashboard-financials")
     end
 
     test "shows volunteer shortcuts to events, posts, and newsletters", %{
