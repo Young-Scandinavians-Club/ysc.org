@@ -278,10 +278,8 @@ var Animation = class {
 };
 
 // node_modules/hey-listen/dist/hey-listen.es.js
-var warning = function() {
-};
-var invariant = function() {
-};
+var warning;
+var invariant;
 if (true) {
   warning = function(check, message) {
     if (!check && typeof console !== "undefined") {
