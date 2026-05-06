@@ -76,7 +76,11 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
         reservation = insert_reservation_past_expiry!(tier, buyer, organizer)
 
         order =
-          TicketsFixtures.ticket_order_fixture(%{user: buyer, event: event, tier: tier})
+          TicketsFixtures.ticket_order_fixture(%{
+            user: buyer,
+            event: event,
+            tier: tier
+          })
 
         expiry_task =
           Task.async(fn ->

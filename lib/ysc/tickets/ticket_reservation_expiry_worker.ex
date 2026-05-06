@@ -2,8 +2,10 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorker do
   @moduledoc """
   Periodically cancels event ticket reservations past their `expires_at`.
 
-  Rows become `status: \"cancelled\"` via `Ysc.Events.cancel_ticket_reservation/1`, so
-  they disappear from admin hold lists and are excluded from checkout and capacity math.
+  Work is delegated to `Ysc.Events.expire_passed_ticket_reservations/0`, which uses a
+  conditional `UPDATE` so a concurrent checkout cannot be overwritten from `fulfilled`
+  back to `cancelled`. Cancelled rows drop out of admin hold lists and checkout capacity
+  math the same as `Ysc.Events.cancel_ticket_reservation/1` would.
   """
 
   use Oban.Worker, queue: :default, max_attempts: 3
