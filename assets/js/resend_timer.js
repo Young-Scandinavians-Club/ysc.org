@@ -18,8 +18,9 @@ export default {
 
                     if (isNaN(remaining) || remaining <= 0) {
                         const timerType = element.dataset.timerType || 'unknown';
-                        pushEventIfConnected(this, 'resend_timer_expired', { type: timerType });
+                        element.removeAttribute('data-countdown');
                         element.style.display = 'none';
+                        pushEventIfConnected(this, 'resend_timer_expired', { type: timerType });
                         return;
                     }
 
@@ -28,8 +29,9 @@ export default {
                         element.textContent = `resend in ${remaining - 1}s`;
                     } else {
                         const timerType = element.dataset.timerType || 'unknown';
-                        pushEventIfConnected(this, 'resend_timer_expired', { type: timerType });
+                        element.removeAttribute('data-countdown');
                         element.style.display = 'none';
+                        pushEventIfConnected(this, 'resend_timer_expired', { type: timerType });
                     }
                 });
             }

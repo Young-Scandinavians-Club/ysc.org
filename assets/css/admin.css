@@ -13,7 +13,7 @@ html.sidebar-collapsed #admin-collapse-chevron {
     transform: rotate(180deg);
 }
 
-/* Sidebar nav scroll area — thin track that matches zinc-900, thumb aligned with nav hovers / blue accent */
+/* Sidebar nav scroll area — thin track that matches zinc-600 (#52525b), thumb aligned with nav hovers / blue accent */
 #admin-sidebar-menu-scroll {
     scrollbar-width: thin;
     scrollbar-color: #52525b transparent;

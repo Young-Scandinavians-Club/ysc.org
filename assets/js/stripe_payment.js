@@ -36,6 +36,8 @@ let StripeInput = {
             const cardErrors = document.getElementById("card-errors");
             if (!submitButton || !cardErrors || !this._stripe || !this._elements) return;
 
+            let submitted = false;
+
             try {
                 cardErrors.textContent = "";
                 submitButton.disabled = true;
@@ -51,7 +53,10 @@ let StripeInput = {
                     },
                 });
 
-                if (this._destroyed || !this.el.isConnected) return;
+                if (this._destroyed || !this.el.isConnected) {
+                    submitted = true;
+                    return;
+                }
 
                 if (error) {
                     console.error(error);
@@ -62,8 +67,9 @@ let StripeInput = {
                 safePushEvent(this, "payment-method-set", {
                     payment_method_id: setupIntent.payment_method,
                 });
+                submitted = true;
             } finally {
-                if (submitButton) {
+                if (!submitted && submitButton && !this._destroyed && this.el.isConnected) {
                     submitButton.disabled = false;
                     submitButton.classList.remove("phx-submit-loading");
                 }
