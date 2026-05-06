@@ -232,10 +232,11 @@ defmodule Ysc.Bookings.EntitlementsTest do
                Entitlements.expire_passed_entitlements()
     end
 
-    test "expire_passed_entitlements/1 respects :limit and oldest expires_at first", %{
-      user: user,
-      admin: admin
-    } do
+    test "expire_passed_entitlements/1 respects :limit and oldest expires_at first",
+         %{
+           user: user,
+           admin: admin
+         } do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
       oldest = DateTime.add(now, -10 * 86_400, :second)
       middle = DateTime.add(now, -5 * 86_400, :second)
