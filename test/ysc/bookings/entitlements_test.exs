@@ -232,6 +232,49 @@ defmodule Ysc.Bookings.EntitlementsTest do
                Entitlements.expire_passed_entitlements()
     end
 
+    test "expire_passed_entitlements/1 respects :limit and oldest expires_at first", %{
+      user: user,
+      admin: admin
+    } do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      oldest = DateTime.add(now, -10 * 86_400, :second)
+      middle = DateTime.add(now, -5 * 86_400, :second)
+      newest = DateTime.add(now, -1 * 86_400, :second)
+
+      for expires_at <- [newest, middle, oldest] do
+        assert {:ok, _} =
+                 Entitlements.create_entitlement(
+                   %{
+                     user_id: user.id,
+                     issued_by_user_id: admin.id,
+                     benefit_kind: :fixed_amount_off,
+                     amount_off: Money.new(:USD, 1),
+                     expires_at: expires_at
+                   },
+                   send_notification: false
+                 )
+      end
+
+      assert {:ok, %{expired: 2, failed: 0}} =
+               Entitlements.expire_passed_entitlements(limit: 2)
+
+      active_count =
+        from(e in Ysc.Bookings.BookingEntitlement,
+          where: e.user_id == ^user.id,
+          where: e.status == :active,
+          select: count(e.id)
+        )
+        |> Ysc.Repo.one()
+
+      assert active_count == 1
+
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements(limit: 2)
+
+      assert {:ok, %{expired: 0, failed: 0}} =
+               Entitlements.expire_passed_entitlements(limit: 2)
+    end
+
     test "revoke_entitlement only succeeds for active rows", %{
       user: user,
       admin: admin
