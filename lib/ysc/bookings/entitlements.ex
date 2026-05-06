@@ -6,6 +6,8 @@ defmodule Ysc.Bookings.Entitlements do
 
   import Ecto.Changeset, only: [put_change: 3]
 
+  require Ysc.Logging
+
   alias Ysc.Repo
   alias Ysc.Bookings.{BookingEntitlement, EntitlementDiscount}
   alias YscWeb.Emails.BookingEntitlementGranted
@@ -498,8 +500,19 @@ defmodule Ysc.Bookings.Entitlements do
             case ent
                  |> BookingEntitlement.expire_changeset()
                  |> Repo.update() do
-              {:ok, _} -> {ok_acc + 1, err_acc}
-              {:error, _} -> {ok_acc, err_acc + 1}
+              {:ok, _} ->
+                {ok_acc + 1, err_acc}
+
+              {:error, changeset} ->
+                Ysc.Logging.error(
+                  "Booking entitlement auto-expire failed",
+                  extra: %{
+                    entitlement_id: id,
+                    errors: changeset.errors
+                  }
+                )
+
+                {ok_acc, err_acc + 1}
             end
 
           _ ->

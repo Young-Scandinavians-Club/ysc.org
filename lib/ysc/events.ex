@@ -2058,16 +2058,29 @@ defmodule Ysc.Events do
 
   - `:limit` — max reservations to process in one run (default `500`).
 
-  Returns `{:ok, %{cancelled: integer, failed: integer}}`.
+  Returns `{:ok, %{cancelled: integer, failed: integer, total_pending: integer,
+  backlog_remaining: integer}}` where `total_pending` is the count of rows
+  matching the expiry criteria before this batch, and `backlog_remaining` is
+  `max(0, total_pending - cancelled)` (rows still to clear on later runs,
+  including failed attempts and any not yet processed due to `:limit`).
   """
   def expire_passed_ticket_reservations(opts \\ []) do
     limit = Keyword.get(opts, :limit, 500)
     now = DateTime.utc_now()
 
+    pending_query =
+      from(tr in TicketReservation,
+        where: tr.status == "active",
+        where: not is_nil(tr.expires_at) and tr.expires_at <= ^now
+      )
+
+    total_pending =
+      pending_query
+      |> select([tr], count(tr.id))
+      |> Repo.one()
+
     ids =
-      TicketReservation
-      |> where([tr], tr.status == "active")
-      |> where([tr], not is_nil(tr.expires_at) and tr.expires_at <= ^now)
+      pending_query
       |> order_by([tr], asc: tr.expires_at)
       |> limit(^limit)
       |> select([tr], tr.id)
@@ -2087,7 +2100,15 @@ defmodule Ysc.Events do
         end
       end)
 
-    {:ok, %{cancelled: cancelled, failed: failed}}
+    backlog_remaining = max(0, total_pending - cancelled)
+
+    {:ok,
+     %{
+       cancelled: cancelled,
+       failed: failed,
+       total_pending: total_pending,
+       backlog_remaining: backlog_remaining
+     }}
   end
 
   @doc """

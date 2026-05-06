@@ -500,7 +500,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
     # Load reservations for each tier (valid holds vs lapsed `active` rows)
     {reservations_by_tier, expired_reservations_by_tier} =
-      load_reservations_maps(assigns.event_id)
+      load_reservations_maps(ticket_tiers)
 
     socket =
       socket
@@ -758,19 +758,15 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
     case Events.cancel_ticket_reservation(reservation) do
       {:ok, _reservation} ->
-        # Refresh reservations
+        # Refresh reservation maps using tiers already on the socket
         {reservations_by_tier, expired_reservations_by_tier} =
-          refresh_reservations(socket.assigns.event_id)
-
-        ticket_tiers =
-          Events.list_ticket_tiers_for_event(socket.assigns.event_id)
+          load_reservations_maps(socket.assigns.ticket_tiers)
 
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "Reservation cancelled successfully",
            title: "Reservation"
          )
-         |> assign(:ticket_tiers, ticket_tiers)
          |> assign(:reservations_by_tier, reservations_by_tier)
          |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)}
 
@@ -821,11 +817,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     end
   end
 
-  defp refresh_reservations(event_id), do: load_reservations_maps(event_id)
-
-  defp load_reservations_maps(event_id) do
-    ticket_tiers = Events.list_ticket_tiers_for_event(event_id)
-
+  defp load_reservations_maps(ticket_tiers) do
     reservations_by_tier =
       ticket_tiers
       |> Enum.map(fn tier ->

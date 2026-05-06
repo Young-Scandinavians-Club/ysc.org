@@ -177,11 +177,9 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
-          fetch-tags: true
       - id: sandbox_skip
         name: Skip Fly deploy if v* tag on commit
         run: |
-          git fetch --tags --quiet origin 2>/dev/null || true
           if git tag --points-at "$GITHUB_SHA" | grep -qE '^v[0-9]'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "v* tag on this commit — sandbox Fly deploy runs only in Deploy Production."

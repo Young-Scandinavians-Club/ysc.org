@@ -52,8 +52,11 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
       tier = ticket_tier_fixture(%{event_id: event.id})
       reservation = insert_reservation_past_expiry!(tier, buyer, organizer)
 
-      assert {:ok, %{cancelled: 1, failed: 0}} =
-               Events.expire_passed_ticket_reservations()
+      assert {:ok, stats} = Events.expire_passed_ticket_reservations()
+      assert stats.cancelled == 1
+      assert stats.failed == 0
+      assert stats.total_pending == 1
+      assert stats.backlog_remaining == 0
 
       updated = Repo.get!(TicketReservation, reservation.id)
       assert updated.status == "cancelled"
@@ -76,8 +79,11 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
       })
       |> Repo.insert!()
 
-      assert {:ok, %{cancelled: 0, failed: 0}} =
-               Events.expire_passed_ticket_reservations()
+      assert {:ok, stats} = Events.expire_passed_ticket_reservations()
+      assert stats.cancelled == 0
+      assert stats.failed == 0
+      assert stats.total_pending == 0
+      assert stats.backlog_remaining == 0
     end
 
     test "does not cancel reservations still before expires_at" do
@@ -86,6 +92,11 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
       event = event_fixture(%{organizer_id: organizer.id})
       tier = ticket_tier_fixture(%{event_id: event.id})
 
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
       %TicketReservation{}
       |> TicketReservation.changeset(%{
         ticket_tier_id: tier.id,
@@ -93,12 +104,15 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
         quantity: 1,
         created_by_id: organizer.id,
         status: "active",
-        expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
+        expires_at: future
       })
       |> Repo.insert!()
 
-      assert {:ok, %{cancelled: 0, failed: 0}} =
-               Events.expire_passed_ticket_reservations()
+      assert {:ok, stats} = Events.expire_passed_ticket_reservations()
+      assert stats.cancelled == 0
+      assert stats.failed == 0
+      assert stats.total_pending == 0
+      assert stats.backlog_remaining == 0
     end
   end
 
