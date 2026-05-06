@@ -822,9 +822,16 @@ function doAnimations(delayTime, maxItems, elToRemove) {
     toast.style.zIndex = (50 - toast.order).toString();
     window.setTimeout(() => {
       if (toast.order > max) {
-        if (!this.el.isConnected) return;
         try {
-          this.pushEventTo("#toast-group", "clear", { id: toast.id });
+          const view = this.__view();
+          if (!view.isConnected()) return;
+          const toastHook = view.getHook(toast);
+          const pushOwner =
+            toastHook && toastHook.el && toastHook.el.isConnected
+              ? toastHook
+              : this;
+          if (!pushOwner.el || !pushOwner.el.isConnected) return;
+          pushOwner.pushEventTo("#toast-group", "clear", { id: toast.id });
         } catch (_) {}
       }
     }, delayTime + removalTime);
@@ -874,15 +881,17 @@ function createLiveToastHook(duration = 6e3, maxItems = 3) {
           return;
         }
       }
-      this.__liveToastOnClearFlash = (e) => {
-        if (!this.el.isConnected) return;
-        try {
-          this.pushEvent("lv:clear-flash", {
-            key: e.detail.key
-          });
-        } catch (_) {}
-      };
-      window.addEventListener("phx:clear-flash", this.__liveToastOnClearFlash);
+      if (isFlash(this.el)) {
+        this.__liveToastOnClearFlash = (e) => {
+          if (!this.el.isConnected) return;
+          try {
+            this.pushEvent("lv:clear-flash", {
+              key: e.detail.key
+            });
+          } catch (_) {}
+        };
+        window.addEventListener("phx:clear-flash", this.__liveToastOnClearFlash);
+      }
       this.__liveToastOnFlashLeave = async (event) => {
         if (event.target === this.el) {
           doAnimations.bind(this, duration, maxItems, this.el)();
@@ -896,7 +905,10 @@ function createLiveToastHook(duration = 6e3, maxItems = 3) {
       }
       let durationOverride = duration;
       if (this.el.dataset.duration !== void 0) {
-        durationOverride = Number.parseInt(this.el.dataset.duration);
+        const parsed = Number.parseInt(this.el.dataset.duration, 10);
+        if (Number.isFinite(parsed)) {
+          durationOverride = parsed;
+        }
       }
       this.__liveToastDismissTimer = window.setTimeout(async () => {
         await animateOut.bind(this)();
