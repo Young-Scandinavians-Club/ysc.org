@@ -644,11 +644,18 @@ defmodule YscWeb.UserAuth do
     normalized = repeatedly_percent_decode_redirect_target(path)
 
     # Apply checks after decoding so bypasses like "/%2f%2fevil.com" cannot reach open redirects.
-    if String.contains?(normalized, ["//", "javascript:", "data:", "vbscript:", "://"]) do
+    if String.contains?(normalized, [
+         "//",
+         "javascript:",
+         "data:",
+         "vbscript:",
+         "://"
+       ]) do
       false
     else
       case URI.parse(normalized) do
-        %URI{scheme: nil, host: nil, path: path_part} when is_binary(path_part) ->
+        %URI{scheme: nil, host: nil, path: path_part}
+        when is_binary(path_part) ->
           String.starts_with?(path_part, "/")
 
         %URI{scheme: scheme} when not is_nil(scheme) ->

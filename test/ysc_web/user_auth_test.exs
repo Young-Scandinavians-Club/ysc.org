@@ -116,7 +116,9 @@ defmodule YscWeb.UserAuthTest do
       assert redirected_to(conn) == ~p"/"
     end
 
-    test "does not redirect to URL-encoded external targets after logout", %{conn: conn} do
+    test "does not redirect to URL-encoded external targets after logout", %{
+      conn: conn
+    } do
       conn =
         conn
         |> fetch_cookies()
