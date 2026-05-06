@@ -17,6 +17,16 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
   end
 
   defp insert_reservation_past_expiry!(tier, user, organizer) do
+    future =
+      DateTime.utc_now()
+      |> DateTime.add(3600, :second)
+      |> DateTime.truncate(:second)
+
+    past =
+      DateTime.utc_now()
+      |> DateTime.add(-120, :second)
+      |> DateTime.truncate(:second)
+
     {:ok, reservation} =
       %TicketReservation{}
       |> TicketReservation.changeset(%{
@@ -25,14 +35,12 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
         quantity: 1,
         created_by_id: organizer.id,
         status: "active",
-        expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
+        expires_at: future
       })
       |> Repo.insert()
 
     reservation
-    |> Ecto.Changeset.change(%{
-      expires_at: DateTime.add(DateTime.utc_now(), -120, :second)
-    })
+    |> Ecto.Changeset.change(%{expires_at: past})
     |> Repo.update!()
   end
 

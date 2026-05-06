@@ -417,6 +417,16 @@ defmodule Ysc.Tickets.BookingLockerTest do
       tier: tier,
       organizer: organizer
     } do
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-120, :second)
+        |> DateTime.truncate(:second)
+
       {:ok, reservation} =
         %TicketReservation{}
         |> TicketReservation.changeset(%{
@@ -426,21 +436,20 @@ defmodule Ysc.Tickets.BookingLockerTest do
           created_by_id: organizer.id,
           discount_percentage: Decimal.new(50),
           status: "active",
-          expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
+          expires_at: future
         })
         |> Repo.insert()
 
       reservation
-      |> Ecto.Changeset.change(%{
-        expires_at: DateTime.add(DateTime.utc_now(), -120, :second)
-      })
+      |> Ecto.Changeset.change(%{expires_at: past})
       |> Repo.update!()
 
       assert {:ok, order} =
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
 
       assert Money.equal?(order.total_amount, Money.new(25, :USD))
-      assert Money.equal?(order.discount_amount, Money.new(0, :USD))
+      discount = order.discount_amount || Money.new(0, :USD)
+      assert Money.equal?(discount, Money.new(0, :USD))
     end
 
     test "event capacity check is bypassed when user has an active reservation",
