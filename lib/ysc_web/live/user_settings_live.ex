@@ -999,6 +999,11 @@ defmodule YscWeb.UserSettingsLive do
                   Leave family membership
                 </.button>
               </div>
+              <.board_pause_notice
+                :if={@membership_paused_by_board != nil}
+                board_member={@membership_paused_by_board}
+                current_user={@current_user}
+              />
               <.membership_status
                 current_membership={@current_membership}
                 primary_user={@primary_user}
@@ -1422,6 +1427,11 @@ defmodule YscWeb.UserSettingsLive do
               <div class="rounded border border-zinc-100 p-6 space-y-4">
                 <h2 class="text-zinc-900 font-bold text-xl">Current Membership</h2>
 
+                <.board_pause_notice
+                  :if={@membership_paused_by_board != nil}
+                  board_member={@membership_paused_by_board}
+                  current_user={@current_user}
+                />
                 <.membership_status
                   current_membership={@current_membership}
                   primary_user={@primary_user}
@@ -2640,6 +2650,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:show_membership_qr, false)
       |> assign(:membership_qr_token, nil)
       |> assign(:membership_qr_details, nil)
+      |> assign(:membership_paused_by_board, nil)
       |> assign(
         :apple_wallet_membership_enabled?,
         Ysc.AppleWallet.configured?(:membership)
@@ -2756,11 +2767,14 @@ defmodule YscWeb.UserSettingsLive do
       live_action == :payment_method && all_payment_methods == [] &&
         not is_nil(payment_intent_secret)
 
+    board_member = Accounts.household_board_member(user)
+
     {:noreply,
      socket
      |> assign(:user, user)
      |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
      |> assign(:primary_user, primary_user)
+     |> assign(:membership_paused_by_board, board_member)
      |> assign(:payment_intent_secret, payment_intent_secret)
      |> assign(:default_payment_method, default_payment_method)
      |> assign(:all_payment_methods, all_payment_methods)

@@ -2582,6 +2582,54 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Renders a notice banner explaining that membership billing is paused because a
+  household member holds a board position.
+
+  Pass `board_member` (the `%User{}` with the board position) and `current_user`
+  (the signed-in user) so the copy can be personalised:
+  - If `current_user` is the board member themselves, the copy uses "you".
+  - Otherwise it names the relevant household member.
+
+  ## Examples
+
+      <.board_pause_notice board_member={@membership_paused_by_board} current_user={@current_user} />
+
+  """
+  attr :board_member, :any, required: true
+  attr :current_user, :any, required: true
+
+  def board_pause_notice(assigns) do
+    ~H"""
+    <div
+      id="board-pause-notice"
+      class="bg-blue-50 border border-blue-200 rounded-md p-4"
+    >
+      <div class="flex gap-3">
+        <.icon
+          name="hero-shield-check"
+          class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+        />
+        <div class="text-sm text-blue-800 space-y-1">
+          <p class="font-semibold">Membership billing paused — board volunteer</p>
+          <p>
+            <%= if @board_member.id == @current_user.id do %>
+              Your membership billing is currently paused while you serve as <span class="font-medium">{Ysc.Accounts.format_board_position(@board_member.board_position)}</span>.
+            <% else %>
+              Your membership billing is currently paused because
+              <span class="font-medium">
+                {@board_member.first_name} {@board_member.last_name}
+              </span>
+              serves as <span class="font-medium">{Ysc.Accounts.format_board_position(@board_member.board_position)}</span>.
+            <% end %>
+            Billing will resume automatically 6 months after the board service ends.
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a membership status display component.
 
   ## Examples
