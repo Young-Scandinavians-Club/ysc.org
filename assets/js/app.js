@@ -58,7 +58,7 @@ import AutoResizeIframe from "./auto_resize_iframe";
 import TicketSlider from "./ticket_slider";
 import WalletPlatform, { detectWalletPlatform } from "./wallet_platform";
 import AvatarCropper from "./avatar_cropper";
-import { createLiveToastHook } from "../../deps/live_toast";
+import { createLiveToastHook } from "../vendor/live_toast.esm.js";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
 const TOAST_DURATION_MS = 6000;
