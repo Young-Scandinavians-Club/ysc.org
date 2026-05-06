@@ -1168,7 +1168,7 @@ defmodule YscWeb.HomeLive do
                   Sign in faster with Passkeys
                 </p>
                 <p class="mt-1 text-sm text-blue-800/80 leading-snug max-w-xl">
-                  Use FaceID, TouchID, or your device passcode instead of a password.
+                  Use Face ID, Touch ID, or your device passcode instead of a password.
                 </p>
               </div>
             </div>
