@@ -119,11 +119,16 @@ defmodule YscWeb.BookingCheckoutLive do
          |> redirect(to: get_property_redirect_path(booking.property))}
 
       {:error, reason} ->
+        Ysc.Logging.error("[BookingCheckout] Failed to calculate booking price",
+          reason: inspect(reason),
+          booking_id: booking.id
+        )
+
         {:ok,
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to calculate price: #{inspect(reason)}",
+           "We couldn't load the pricing for this booking. Please go back and try again, or contact us if this keeps happening.",
            title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
@@ -231,9 +236,21 @@ defmodule YscWeb.BookingCheckoutLive do
            )}
 
         {:error, reason} ->
+          message =
+            if is_binary(reason) do
+              reason
+            else
+              Ysc.Logging.error("[BookingCheckout] Payment intent setup failed",
+                reason: inspect(reason),
+                booking_id: booking.id
+              )
+
+              "We couldn't set up payment. Please try again or contact us for help."
+            end
+
           {:ok,
            assign(socket,
-             payment_error: "Failed to initialize payment: #{reason}"
+             payment_error: message
            )}
       end
     end
@@ -1675,9 +1692,22 @@ defmodule YscWeb.BookingCheckoutLive do
                    )}
 
                 {:error, reason} ->
+                  message =
+                    if is_binary(reason) do
+                      reason
+                    else
+                      Ysc.Logging.error(
+                        "[BookingCheckout] Payment intent setup failed",
+                        reason: inspect(reason),
+                        booking_id: booking.id
+                      )
+
+                      "We couldn't set up payment. Please try again or contact us for help."
+                    end
+
                   {:noreply,
                    assign(socket,
-                     payment_error: "Failed to initialize payment: #{reason}",
+                     payment_error: message,
                      checkout_step: :payment
                    )}
               end
@@ -1799,9 +1829,16 @@ defmodule YscWeb.BookingCheckoutLive do
              )}
 
           {:error, reason} ->
+            Ysc.Logging.error(
+              "[BookingCheckout] Complimentary booking confirmation failed",
+              reason: inspect(reason),
+              booking_id: socket.assigns.booking.id
+            )
+
             {:noreply,
              assign(socket,
-               payment_error: "Could not confirm booking: #{inspect(reason)}"
+               payment_error:
+                 "We couldn't confirm your booking. Please try again or contact us for help."
              )}
         end
     end
@@ -1824,11 +1861,16 @@ defmodule YscWeb.BookingCheckoutLive do
          |> redirect(to: redirect_path)}
 
       {:error, reason} ->
+        Ysc.Logging.error("[BookingCheckout] Failed to cancel booking hold",
+          reason: inspect(reason),
+          booking_id: socket.assigns.booking.id
+        )
+
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to cancel booking: #{inspect(reason)}. Please try again or contact support.",
+           "We couldn't cancel this booking from here. Please try again, or contact us if you need help.",
            title: "Checkout"
          )}
     end
@@ -1876,9 +1918,16 @@ defmodule YscWeb.BookingCheckoutLive do
            )}
 
         {:error, reason} ->
+          Ysc.Logging.error(
+            "[BookingCheckout] Payment succeeded but booking confirmation failed",
+            reason: inspect(reason),
+            booking_id: socket.assigns.booking.id
+          )
+
           {:noreply,
            assign(socket,
-             payment_error: "Failed to process payment: #{inspect(reason)}"
+             payment_error:
+               "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
            )}
       end
     end
