@@ -910,133 +910,131 @@ defmodule YscWeb.OrderConfirmationLive do
 
   # Extract payment method details from Stripe PaymentMethod object
   defp extract_payment_method_details(stripe_pm) do
-    # Get the base type
-    base_type =
-      Map.get(stripe_pm, :type) || Map.get(stripe_pm, "type") ||
-        Map.get(stripe_pm, :type) || Map.get(stripe_pm, "type")
+    base_type = stripe_pm_base_type_string(stripe_pm)
+    actual_type = resolve_stripe_string_actual_type(base_type, stripe_pm)
+    last_four = extract_stripe_pm_last_four_for_type(base_type, stripe_pm)
 
-    # Check for wallet payments
-    actual_type =
-      if base_type == "card" do
-        card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
-
-        if card do
-          wallet = Map.get(card, :wallet) || Map.get(card, "wallet")
-
-          if wallet do
-            wallet_type =
-              Map.get(wallet, :type) || Map.get(wallet, "type")
-
-            case wallet_type do
-              "link" -> "link"
-              _ -> base_type
-            end
-          else
-            brand = Map.get(card, :brand) || Map.get(card, "brand")
-            if brand == "link", do: "link", else: base_type
-          end
-        else
-          base_type
-        end
-      else
-        base_type
-      end
-
-    # Get last four digits
-    last_four =
-      cond do
-        # Check for wallet dynamic_last4 first (for tokenized payments)
-        base_type == "card" ->
-          card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
-
-          if card do
-            wallet = Map.get(card, :wallet) || Map.get(card, "wallet")
-
-            if wallet do
-              Map.get(wallet, :dynamic_last4) ||
-                Map.get(wallet, "dynamic_last4") ||
-                Map.get(card, :last4) || Map.get(card, "last4")
-            else
-              Map.get(card, :last4) || Map.get(card, "last4")
-            end
-          else
-            nil
-          end
-
-        base_type == "us_bank_account" ->
-          bank = Map.get(stripe_pm, :us_bank_account) || Map.get(stripe_pm, "us_bank_account")
-
-          if bank do
-            Map.get(bank, :last4) || Map.get(bank, "last4")
-          else
-            nil
-          end
-
-        base_type == "link" ->
-          link = Map.get(stripe_pm, :link) || Map.get(stripe_pm, "link")
-
-          if link do
-            Map.get(link, :last4) || Map.get(link, "last4")
-          else
-            nil
-          end
-
-        base_type == "cashapp" ->
-          cashapp = Map.get(stripe_pm, :cashapp) || Map.get(stripe_pm, "cashapp")
-
-          if cashapp do
-            Map.get(cashapp, :last4) || Map.get(cashapp, "last4")
-          else
-            nil
-          end
-
-        true ->
-          nil
-      end
-
-    # Get display brand
     display_brand =
-      cond do
-        base_type == "card" ->
-          card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
-
-          if card do
-            wallet = Map.get(card, :wallet) || Map.get(card, "wallet")
-
-            if wallet do
-              wallet_type =
-                Map.get(wallet, :type) || Map.get(wallet, "type")
-
-              case wallet_type do
-                "link" -> "Link"
-                "apple_pay" -> "Apple Pay"
-                "google_pay" -> "Google Pay"
-                _ -> Map.get(card, :display_brand) || Map.get(card, "display_brand") || Map.get(card, :brand) || Map.get(card, "brand")
-              end
-            else
-              Map.get(card, :display_brand) ||
-                Map.get(card, "display_brand") || Map.get(card, :brand) ||
-                Map.get(card, "brand")
-            end
-          else
-            nil
-          end
-
-        base_type == "us_bank_account" ->
-          bank = Map.get(stripe_pm, :us_bank_account) || Map.get(stripe_pm, "us_bank_account")
-
-          if bank do
-            Map.get(bank, :bank_name) || Map.get(bank, "bank_name")
-          else
-            nil
-          end
-
-        true ->
-          nil
-      end
+      extract_stripe_pm_display_brand_for_type(base_type, stripe_pm)
 
     {actual_type, last_four, display_brand}
   end
+
+  defp stripe_pm_base_type_string(stripe_pm) do
+    Map.get(stripe_pm, :type) || Map.get(stripe_pm, "type")
+  end
+
+  defp resolve_stripe_string_actual_type("card", stripe_pm) do
+    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
+
+    if card do
+      wallet = Map.get(card, :wallet) || Map.get(card, "wallet")
+
+      if wallet do
+        wallet_type = Map.get(wallet, :type) || Map.get(wallet, "type")
+
+        case wallet_type do
+          "link" -> "link"
+          _ -> "card"
+        end
+      else
+        brand = Map.get(card, :brand) || Map.get(card, "brand")
+        if brand == "link", do: "link", else: "card"
+      end
+    else
+      "card"
+    end
+  end
+
+  defp resolve_stripe_string_actual_type(base_type, _stripe_pm), do: base_type
+
+  defp extract_stripe_pm_last_four_for_type("card", stripe_pm) do
+    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
+
+    if card do
+      wallet = Map.get(card, :wallet) || Map.get(card, "wallet")
+
+      if wallet do
+        Map.get(wallet, :dynamic_last4) ||
+          Map.get(wallet, "dynamic_last4") ||
+          Map.get(card, :last4) || Map.get(card, "last4")
+      else
+        Map.get(card, :last4) || Map.get(card, "last4")
+      end
+    else
+      nil
+    end
+  end
+
+  defp extract_stripe_pm_last_four_for_type("us_bank_account", stripe_pm) do
+    bank =
+      Map.get(stripe_pm, :us_bank_account) ||
+        Map.get(stripe_pm, "us_bank_account")
+
+    if bank, do: Map.get(bank, :last4) || Map.get(bank, "last4"), else: nil
+  end
+
+  defp extract_stripe_pm_last_four_for_type("link", stripe_pm) do
+    link = Map.get(stripe_pm, :link) || Map.get(stripe_pm, "link")
+
+    if link, do: Map.get(link, :last4) || Map.get(link, "last4"), else: nil
+  end
+
+  defp extract_stripe_pm_last_four_for_type("cashapp", stripe_pm) do
+    cashapp = Map.get(stripe_pm, :cashapp) || Map.get(stripe_pm, "cashapp")
+
+    if cashapp,
+      do: Map.get(cashapp, :last4) || Map.get(cashapp, "last4"),
+      else: nil
+  end
+
+  defp extract_stripe_pm_last_four_for_type(_, _), do: nil
+
+  defp extract_stripe_pm_display_brand_for_type("card", stripe_pm) do
+    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
+
+    if card do
+      wallet = Map.get(card, :wallet) || Map.get(card, "wallet")
+
+      if wallet do
+        wallet_type = Map.get(wallet, :type) || Map.get(wallet, "type")
+
+        case wallet_type do
+          "link" ->
+            "Link"
+
+          "apple_pay" ->
+            "Apple Pay"
+
+          "google_pay" ->
+            "Google Pay"
+
+          _ ->
+            Map.get(card, :display_brand) ||
+              Map.get(card, "display_brand") || Map.get(card, :brand) ||
+              Map.get(card, "brand")
+        end
+      else
+        Map.get(card, :display_brand) ||
+          Map.get(card, "display_brand") || Map.get(card, :brand) ||
+          Map.get(card, "brand")
+      end
+    else
+      nil
+    end
+  end
+
+  defp extract_stripe_pm_display_brand_for_type("us_bank_account", stripe_pm) do
+    bank =
+      Map.get(stripe_pm, :us_bank_account) ||
+        Map.get(stripe_pm, "us_bank_account")
+
+    if bank,
+      do: Map.get(bank, :bank_name) || Map.get(bank, "bank_name"),
+      else: nil
+  end
+
+  defp extract_stripe_pm_display_brand_for_type(_, _), do: nil
 
   # Format payment method with available details
   defp format_payment_method_with_details(type, last_four, display_brand) do
@@ -1126,7 +1124,7 @@ defmodule YscWeb.OrderConfirmationLive do
       :us_bank_account ->
         if payment_method && payment_method.last_four do
           bank_name =
-            (payment_method.bank_name || payment_method.display_brand) ||
+            payment_method.bank_name || payment_method.display_brand ||
               "Bank"
 
           "#{bank_name} Account ending in #{payment_method.last_four}"
@@ -1137,7 +1135,7 @@ defmodule YscWeb.OrderConfirmationLive do
       :bank_account ->
         if payment_method && payment_method.last_four do
           bank_name =
-            (payment_method.bank_name || payment_method.display_brand) ||
+            payment_method.bank_name || payment_method.display_brand ||
               "Bank"
 
           "#{bank_name} Account ending in #{payment_method.last_four}"
@@ -1172,7 +1170,10 @@ defmodule YscWeb.OrderConfirmationLive do
 
   defp format_alternative_payment_method(type, payment_method)
        when is_binary(type) do
-    format_alternative_payment_method(normalize_payment_type(type), payment_method)
+    format_alternative_payment_method(
+      normalize_payment_type(type),
+      payment_method
+    )
   end
 
   defp format_alternative_payment_method(_, _), do: "Payment Method"
