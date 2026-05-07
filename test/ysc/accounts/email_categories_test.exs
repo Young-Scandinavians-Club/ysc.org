@@ -29,6 +29,11 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
     test "maps newsletter_edition to :newsletter" do
       assert EmailCategories.get_category("newsletter_edition") == :newsletter
     end
+
+    test "maps newsletter stats snapshot to account notifications" do
+      assert EmailCategories.get_category("newsletter_stats_snapshot") ==
+               :account
+    end
   end
 
   describe "get_reply_to/1" do

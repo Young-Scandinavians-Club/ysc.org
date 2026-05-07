@@ -54,6 +54,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "volunteer_board_notification" => :account,
     "contact_form_board_notification" => :account,
     "expense_report_treasurer_notification" => :account,
+    "newsletter_stats_snapshot" => :account,
     # Event notifications (can be disabled)
     "ticket_purchase_confirmation" => :account,
     "ticket_order_refund" => :account,

@@ -74,7 +74,8 @@ defmodule YscWeb.Emails.Notifier do
       YscWeb.Emails.BookingCancellationTreasurerNotification,
     "booking_cancellation_confirmation" =>
       YscWeb.Emails.BookingCancellationConfirmation,
-    "event_update_notification" => YscWeb.Emails.EventUpdateNotification
+    "event_update_notification" => YscWeb.Emails.EventUpdateNotification,
+    "newsletter_stats_snapshot" => YscWeb.Emails.NewsletterStatsSnapshot
   }
 
   # Legacy call sites pass the configurable reply-to address as the 8th argument (binary).
