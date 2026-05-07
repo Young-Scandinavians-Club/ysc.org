@@ -1180,51 +1180,64 @@ defmodule Ysc.Subscriptions do
   @doc """
   Creates a subscription in Stripe.
 
+  Returns `{:error, :user_already_has_active_subscription}` if the user already has
+  an active subscription (including paused subscriptions which remain active in Stripe).
+  This prevents double subscriptions that would lead to double billing.
+
   ## Examples
 
       iex> create_stripe_subscription(user, %{prices: [%{price: "price_123", quantity: 1}]})
       {:ok, %Stripe.Subscription{}}
 
+      iex> create_stripe_subscription(user_with_active_subscription, %{prices: [%{price: "price_123", quantity: 1}]})
+      {:error, :user_already_has_active_subscription}
+
   """
   @dialyzer {:nowarn_function, create_stripe_subscription: 2}
   def create_stripe_subscription(user, params) do
-    # Handle both keyword lists and maps
-    prices = params[:prices] || params["prices"] || params.prices
-    expand = params[:expand] || params["expand"] || []
-    idempotency_key = params[:idempotency_key] || params["idempotency_key"]
-
-    stripe_params = %{
-      customer: user.stripe_id,
-      items:
-        Enum.map(prices, fn price ->
-          %{price: price.price, quantity: price.quantity}
-        end),
-      expand: expand,
-      metadata: %{
-        user_id: user.id
-      }
-    }
-
-    stripe_params =
-      if params[:default_payment_method] || params["default_payment_method"] do
-        default_pm =
-          params[:default_payment_method] || params["default_payment_method"]
-
-        Map.put(stripe_params, :default_payment_method, default_pm)
-      else
-        stripe_params
-      end
-
-    if idempotency_key do
-      Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-        Stripe.Subscription.create(stripe_params,
-          headers: %{"Idempotency-Key" => idempotency_key}
-        )
-      end)
+    # Check if user already has an active subscription (including paused ones)
+    # to prevent double subscriptions that would lead to double billing
+    if get_active_subscription(user) != nil do
+      {:error, :user_already_has_active_subscription}
     else
-      Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-        Stripe.Subscription.create(stripe_params)
-      end)
+      # Handle both keyword lists and maps
+      prices = params[:prices] || params["prices"] || params.prices
+      expand = params[:expand] || params["expand"] || []
+      idempotency_key = params[:idempotency_key] || params["idempotency_key"]
+
+      stripe_params = %{
+        customer: user.stripe_id,
+        items:
+          Enum.map(prices, fn price ->
+            %{price: price.price, quantity: price.quantity}
+          end),
+        expand: expand,
+        metadata: %{
+          user_id: user.id
+        }
+      }
+
+      stripe_params =
+        if params[:default_payment_method] || params["default_payment_method"] do
+          default_pm =
+            params[:default_payment_method] || params["default_payment_method"]
+
+          Map.put(stripe_params, :default_payment_method, default_pm)
+        else
+          stripe_params
+        end
+
+      if idempotency_key do
+        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+          Stripe.Subscription.create(stripe_params,
+            headers: %{"Idempotency-Key" => idempotency_key}
+          )
+        end)
+      else
+        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+          Stripe.Subscription.create(stripe_params)
+        end)
+      end
     end
   end
 
