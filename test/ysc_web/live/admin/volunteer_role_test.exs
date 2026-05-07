@@ -156,14 +156,14 @@ defmodule YscWeb.VolunteerRoleTest do
       assert has_element?(view, "#review-applications-section")
     end
 
-    test "shows ticket sales sidebar", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-      assert html =~ "Ticket Sales"
+    test "shows events timeline section", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#dashboard-events-timeline")
     end
 
     test "shows recent discussions section", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-      assert html =~ "Recent Discussions"
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#dashboard-recent-discussions")
     end
   end
 
@@ -189,14 +189,14 @@ defmodule YscWeb.VolunteerRoleTest do
       refute has_element?(view, "#review-applications-section")
     end
 
-    test "shows ticket sales sidebar", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-      assert html =~ "Ticket Sales"
+    test "shows events timeline section", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#dashboard-events-timeline")
     end
 
     test "shows recent discussions section", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-      assert html =~ "Recent Discussions"
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#dashboard-recent-discussions")
     end
 
     test "volunteer stats row contains events, posts, and newsletters links", %{
