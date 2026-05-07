@@ -661,6 +661,149 @@ defmodule Ysc.SubscriptionsTest do
     end
   end
 
+  describe "create_stripe_subscription/2" do
+    test "returns {:error, :user_already_has_active_subscription} when user has active subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      {:ok, _existing_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_existing_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Existing Active Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      assert Subscriptions.create_stripe_subscription(user, params) ==
+               {:error, :user_already_has_active_subscription}
+    end
+
+    test "returns {:error, :user_already_has_active_subscription} when user has trialing subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      {:ok, _existing_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_trialing_#{System.unique_integer()}",
+          stripe_status: "trialing",
+          name: "Trialing Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day),
+          trial_ends_at: DateTime.add(DateTime.utc_now(), 14, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      assert Subscriptions.create_stripe_subscription(user, params) ==
+               {:error, :user_already_has_active_subscription}
+    end
+
+    test "returns {:error, :user_already_has_active_subscription} for paused subscription (board volunteer)" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      # Paused subscriptions remain "active" in Stripe with pause_collection behavior
+      {:ok, _paused_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_paused_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Paused Board Volunteer Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      assert Subscriptions.create_stripe_subscription(user, params) ==
+               {:error, :user_already_has_active_subscription}
+    end
+
+    test "allows creating subscription when user has no active subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      # Create a cancelled subscription (not active)
+      {:ok, _cancelled_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cancelled_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Cancelled Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -30, :day)
+        })
+
+      # Mock Stripe API call
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      # The function will try to call Stripe API, which will fail in test
+      # We're just verifying it doesn't return the double subscription error
+      result = Subscriptions.create_stripe_subscription(user, params)
+
+      # Should not return the double subscription error
+      refute result == {:error, :user_already_has_active_subscription}
+    end
+
+    test "allows creating subscription when user has expired subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      # Create an expired subscription (active status but period ended)
+      {:ok, _expired_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_expired_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      result = Subscriptions.create_stripe_subscription(user, params)
+
+      # Should not return the double subscription error
+      refute result == {:error, :user_already_has_active_subscription}
+    end
+
+    test "allows creating subscription when user has subscription with ends_at in the past" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      # Create a subscription scheduled to end (cancelled)
+      {:ok, _ending_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_ending_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Ending Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day),
+          ends_at: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      result = Subscriptions.create_stripe_subscription(user, params)
+
+      # Should not return the double subscription error
+      refute result == {:error, :user_already_has_active_subscription}
+    end
+  end
+
   defp build_fake_stripe_subscription(plan, now_unix) do
     period_end = now_unix + 365 * 24 * 60 * 60
 

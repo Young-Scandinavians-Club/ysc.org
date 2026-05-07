@@ -1199,6 +1199,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:ok, _subscription} ->
             {:noreply, advance_to_next_step(socket, @step_payment)}
 
+          {:error, :user_already_has_active_subscription} ->
+            Ysc.Logging.error(
+              "User already has active subscription during onboarding",
+              user_id: user.id
+            )
+
+            YscWeb.Flash.send_toast(
+              :error,
+              "You already have an active subscription.",
+              title: "Subscription Error"
+            )
+
+            {:noreply, socket}
+
           {:error, reason} ->
             Ysc.Logging.error("Failed to create subscription during onboarding",
               user_id: user.id,
