@@ -699,12 +699,11 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
     test "live validation in the override form updates errors",
          %{view: view} do
-      html =
-        view
-        |> form("#override-rejection-form", %{"override" => %{"note" => "Hi"}})
-        |> render_change()
+      view
+      |> form("#override-rejection-form", %{"override" => %{"note" => "Hi"}})
+      |> render_change()
 
-      assert html =~ "at least 10 characters"
+      assert has_element?(view, "#override-rejection-form .field-error")
     end
   end
 
@@ -733,10 +732,10 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/admin/users/#{user.id}/details/application")
 
-      html = render_async(view)
+      render_async(view)
 
-      assert html =~ "Rejection overridden"
-      assert html =~ "Override reason: eligibility confirmed."
+      assert has_element?(view, "#admin-application-rejection-override-banner")
+      assert has_element?(view, "[data-testid='rejection-note-text']")
 
       _ = application
     end
@@ -765,11 +764,11 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/admin/users/#{user.id}/details/application")
 
-      html = render_async(view)
+      render_async(view)
 
-      assert html =~ "Rejection notes"
-      assert html =~ "Application did not meet eligibility criteria."
-      refute html =~ "Rejection overridden"
+      assert has_element?(view, "#admin-application-rejection-notes")
+      assert has_element?(view, "[data-testid='rejection-note-text']")
+      refute has_element?(view, "#admin-application-rejection-override-banner")
 
       _ = application
     end

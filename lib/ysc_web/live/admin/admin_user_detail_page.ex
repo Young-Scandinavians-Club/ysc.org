@@ -870,6 +870,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 @selected_user_application.review_outcome == :rejected &&
                   @selected_user.state == :active
               }
+              id="admin-application-rejection-override-banner"
               class="flex items-start gap-3 rounded-lg bg-amber-50 border border-amber-200 p-4"
             >
               <.icon
@@ -1081,6 +1082,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
             <section
               :if={length(@rejection_notes) > 0}
+              id="admin-application-rejection-notes"
               class="pt-6 border-t border-zinc-200"
             >
               <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
@@ -1103,7 +1105,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                       {format_datetime_for_display(note.inserted_at)}
                     </p>
                   </div>
-                  <p class="text-sm text-zinc-800 whitespace-pre-wrap">
+                  <p
+                    class="text-sm text-zinc-800 whitespace-pre-wrap"
+                    data-testid="rejection-note-text"
+                  >
                     {note.note}
                   </p>
                 </div>
@@ -3482,54 +3487,77 @@ defmodule YscWeb.AdminUserDetailsLive do
     selected_user = socket.assigns[:selected_user]
     pending_params = socket.assigns[:pending_activation_params]
 
-    changeset =
-      params |> override_rejection_changeset() |> Map.put(:action, :validate)
+    if is_nil(pending_params) or not is_map(pending_params) or
+         map_size(pending_params) == 0 do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "Pending profile changes are missing. Save again from the profile tab, then confirm the override.",
+         title: "Error"
+       )}
+    else
+      changeset =
+        params |> override_rejection_changeset() |> Map.put(:action, :validate)
 
-    if changeset.valid? do
-      note_text = Ecto.Changeset.get_field(changeset, :note)
+      if changeset.valid? do
+        note_text = Ecto.Changeset.get_field(changeset, :note)
 
-      with {:ok, updated_user} <-
-             Accounts.update_user_with_address(
+        case Accounts.update_user_with_address_and_rejection_override_note(
                selected_user,
                pending_params,
-               current_user
-             ),
-           {:ok, _note} <-
-             Accounts.create_user_note(
-               selected_user,
-               %{"note" => note_text, "category" => "rejection"},
+               note_text,
                current_user
              ) do
-        {:noreply,
-         socket
-         |> assign(:pending_activation_params, nil)
-         |> assign(
-           :override_rejection_form,
-           to_form(override_rejection_changeset(%{}), as: "override")
-         )
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "User activated and override note saved.", title: "Profile")
-         |> push_patch(to: ~p"/admin/users/#{updated_user.id}/details")}
-      else
-        {:error, changeset} ->
-          Ysc.Logging.error(
-            "Failed to activate user with rejection override: #{inspect(changeset.errors)}"
-          )
+          {:ok, updated_user} ->
+            {:noreply,
+             socket
+             |> assign(:pending_activation_params, nil)
+             |> assign(
+               :override_rejection_form,
+               to_form(override_rejection_changeset(%{}), as: "override")
+             )
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "User activated and override note saved.",
+               title: "Profile"
+             )
+             |> push_patch(to: ~p"/admin/users/#{updated_user.id}/details")}
 
-          {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "Failed to activate user. Please try again.", title: "Error")}
+          {:error, %Ecto.Changeset{} = failed_changeset} ->
+            Ysc.Logging.error(
+              "Failed to activate user with rejection override: #{inspect(failed_changeset.errors)}"
+            )
+
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to activate user. Please try again.",
+               title: "Error"
+             )}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Rejected rejection override activation: #{inspect(reason)}"
+            )
+
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "You are not allowed to perform this action.",
+               title: "Error"
+             )}
+        end
+      else
+        {:noreply,
+         assign(
+           socket,
+           :override_rejection_form,
+           to_form(changeset, as: "override")
+         )}
       end
-    else
-      {:noreply,
-       assign(
-         socket,
-         :override_rejection_form,
-         to_form(changeset, as: "override")
-       )}
     end
   end
 
