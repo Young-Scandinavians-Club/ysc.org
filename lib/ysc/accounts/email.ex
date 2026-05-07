@@ -62,8 +62,8 @@ defmodule Ysc.Accounts.Email do
   """
   @spec gmail?(String.t()) :: boolean()
   def gmail?(email) when is_binary(email) do
-    case String.split(email, "@") do
-      [_local, domain] -> domain in @gmail_domains
+    case email |> String.trim() |> String.downcase() |> String.split("@") do
+      [local, domain] when local != "" -> domain in @gmail_domains
       _ -> false
     end
   end
