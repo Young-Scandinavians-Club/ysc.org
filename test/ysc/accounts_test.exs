@@ -105,6 +105,49 @@ defmodule Ysc.AccountsTest do
       %{id: id} = user = user_fixture(%{phone_number: "+14159098268"})
       assert %User{id: ^id} = Accounts.get_user_by_email(user.email)
     end
+
+    test "normalizes Gmail addresses - finds user by email without dots" do
+      %{id: id} = user_fixture(%{email: "johndoe@gmail.com"})
+      assert %User{id: ^id} = Accounts.get_user_by_email("john.doe@gmail.com")
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("j.o.h.n.d.o.e@gmail.com")
+    end
+
+    test "normalizes Gmail addresses - finds user by email without plus-addressing" do
+      %{id: id} = user_fixture(%{email: "testuser@gmail.com"})
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("testuser+tag@gmail.com")
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("testuser+work@gmail.com")
+    end
+
+    test "normalizes Gmail addresses - finds user with dots and plus-addressing variations" do
+      %{id: id} = user_fixture(%{email: "johndoe@gmail.com"})
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("john.doe+test@gmail.com")
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("j.o.h.n.doe+work@gmail.com")
+    end
+
+    test "normalizes Googlemail addresses the same as Gmail" do
+      %{id: id} = user_fixture(%{email: "johndoe@googlemail.com"})
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("john.doe@googlemail.com")
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("johndoe+test@googlemail.com")
+    end
+
+    test "does not apply Gmail normalization to other email providers" do
+      user_fixture(%{email: "john.doe@example.com"})
+      refute Accounts.get_user_by_email("johndoe@example.com")
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -813,6 +856,75 @@ defmodule Ysc.AccountsTest do
         })
 
       assert "has already been taken" in errors_on(changeset).email
+    end
+
+    test "prevents duplicate Gmail signups with dots in email" do
+      user_fixture(%{email: "johndoe@gmail.com", phone_number: "+14159098268"})
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: "john.doe@gmail.com",
+          phone_number: "+14159098260",
+          first_name: "John",
+          last_name: "Doe",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+    end
+
+    test "prevents duplicate Gmail signups with plus-addressing" do
+      user_fixture(%{email: "testuser@gmail.com", phone_number: "+14159098268"})
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: "testuser+tag@gmail.com",
+          phone_number: "+14159098260",
+          first_name: "Test",
+          last_name: "User",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+    end
+
+    test "prevents duplicate Gmail signups with dots and plus-addressing combined" do
+      user_fixture(%{email: "johndoe@gmail.com", phone_number: "+14159098268"})
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: "john.doe+test@gmail.com",
+          phone_number: "+14159098260",
+          first_name: "John",
+          last_name: "Doe",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+    end
+
+    test "normalizes Gmail email when registering new user" do
+      {:ok, user} =
+        Accounts.register_user(
+          valid_user_attributes(%{
+            email: "john.doe+test@gmail.com",
+            phone_number: "+14159098268"
+          })
+        )
+
+      assert user.email == "johndoe@gmail.com"
+    end
+
+    test "does not apply Gmail normalization to non-Gmail addresses" do
+      {:ok, user} =
+        Accounts.register_user(
+          valid_user_attributes(%{
+            email: "john.doe+test@example.com",
+            phone_number: "+14159098268"
+          })
+        )
+
+      assert user.email == "john.doe+test@example.com"
     end
 
     test "registers users with a hashed password" do

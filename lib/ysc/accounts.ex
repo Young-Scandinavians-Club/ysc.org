@@ -14,6 +14,7 @@ defmodule Ysc.Accounts do
   alias Ysc.Accounts.{
     Address,
     BoardPosition,
+    Email,
     FamilyInvite,
     MembershipCache,
     User,
@@ -32,6 +33,9 @@ defmodule Ysc.Accounts do
   @doc """
   Gets a user by email.
 
+  Normalizes the email before lookup to handle Gmail aliases
+  (dots and plus-addressing).
+
   ## Examples
 
       iex> get_user_by_email("foo@example.com")
@@ -42,7 +46,8 @@ defmodule Ysc.Accounts do
 
   """
   def get_user_by_email(email) when is_binary(email) do
-    Repo.get_by(User, email: email)
+    normalized_email = Email.normalize(email)
+    Repo.get_by(User, email: normalized_email)
   end
 
   @doc """
@@ -137,6 +142,9 @@ defmodule Ysc.Accounts do
   @doc """
   Gets a user by email and password.
 
+  Normalizes the email before lookup to handle Gmail aliases
+  (dots and plus-addressing).
+
   ## Examples
 
       iex> get_user_by_email_and_password("foo@example.com", "correct_password")
@@ -148,7 +156,8 @@ defmodule Ysc.Accounts do
   """
   def get_user_by_email_and_password(email, password)
       when is_binary(email) and is_binary(password) do
-    user = Repo.get_by(User, email: email)
+    normalized_email = Email.normalize(email)
+    user = Repo.get_by(User, email: normalized_email)
     if User.valid_password?(user, password), do: user
   end
 
@@ -232,9 +241,14 @@ defmodule Ysc.Accounts do
 
   @doc """
   Gets a user by email with passkeys preloaded.
+
+  Normalizes the email before lookup to handle Gmail aliases
+  (dots and plus-addressing).
   """
   def get_user_by_email_for_passkey(email) when is_binary(email) do
-    case Repo.get_by(User, email: email) do
+    normalized_email = Email.normalize(email)
+
+    case Repo.get_by(User, email: normalized_email) do
       nil -> nil
       user -> Repo.preload(user, :passkeys)
     end
