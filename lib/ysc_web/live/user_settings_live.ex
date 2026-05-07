@@ -1008,8 +1008,55 @@ defmodule YscWeb.UserSettingsLive do
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
-                scheduled_downgrade_info={@scheduled_downgrade_info}
               />
+              <div
+                :if={@scheduled_downgrade_info}
+                data-testid="scheduled-downgrade-notice"
+                class="bg-amber-50 border border-amber-200 rounded-lg p-4"
+              >
+                <div class="flex gap-3">
+                  <.icon
+                    name="hero-arrow-trending-down"
+                    class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5"
+                  />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-amber-800">
+                      Downgrade Scheduled
+                    </h3>
+                    <p class="text-sm text-amber-700 mt-1">
+                      <%= if @primary_user do %>
+                        The membership from
+                        <strong>
+                          {@primary_user.first_name} {@primary_user.last_name}
+                        </strong>
+                        will change to
+                      <% else %>
+                        The primary account membership will change to
+                      <% end %>
+                      <strong>
+                        {String.capitalize(
+                          to_string(@scheduled_downgrade_info.target_plan)
+                        )}
+                      </strong>
+                      after <strong>
+                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %>
+                      </strong>. You will keep your current benefits until that date.
+                    </p>
+                    <div class="mt-3">
+                      <.button
+                        id="cancel-scheduled-downgrade-btn"
+                        phx-click="cancel-scheduled-downgrade"
+                        phx-disable-with="Cancelling..."
+                        variant="outline"
+                        color="amber"
+                        data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                      >
+                        Cancel downgrade
+                      </.button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <.button
                 :if={@current_membership != nil}
                 phx-click="show_membership_qr"
@@ -1062,8 +1109,47 @@ defmodule YscWeb.UserSettingsLive do
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
-                scheduled_downgrade_info={@scheduled_downgrade_info}
               />
+              <div
+                :if={@scheduled_downgrade_info}
+                data-testid="scheduled-downgrade-notice"
+                class="bg-amber-50 border border-amber-200 rounded-lg p-4"
+              >
+                <div class="flex gap-3">
+                  <.icon
+                    name="hero-arrow-trending-down"
+                    class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5"
+                  />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-amber-800">
+                      Downgrade Scheduled
+                    </h3>
+                    <p class="text-sm text-amber-700 mt-1">
+                      Your membership will change to
+                      <strong>
+                        {String.capitalize(
+                          to_string(@scheduled_downgrade_info.target_plan)
+                        )}
+                      </strong>
+                      after <strong>
+                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %>
+                      </strong>. You will keep your current benefits until that date.
+                    </p>
+                    <div class="mt-3">
+                      <.button
+                        id="cancel-scheduled-downgrade-btn"
+                        phx-click="cancel-scheduled-downgrade"
+                        phx-disable-with="Cancelling..."
+                        variant="outline"
+                        color="amber"
+                        data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                      >
+                        Cancel downgrade
+                      </.button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <.button phx-click="show_membership_qr">
                 <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
                 My Membership QR
