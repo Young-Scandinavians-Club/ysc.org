@@ -90,9 +90,15 @@ defmodule YscWeb.ConnCase do
           t
 
         nil ->
-          case Regex.run(~r/<meta\s+content="([^"]+)"\s+name="csrf-token"/, html) do
-            [_, t] -> t
-            nil -> raise ArgumentError, "no csrf-token meta tag in HTML response"
+          case Regex.run(
+                 ~r/<meta\s+content="([^"]+)"\s+name="csrf-token"/,
+                 html
+               ) do
+            [_, t] ->
+              t
+
+            nil ->
+              raise ArgumentError, "no csrf-token meta tag in HTML response"
           end
       end
 

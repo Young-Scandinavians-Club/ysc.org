@@ -1465,7 +1465,12 @@ defmodule YscWeb.CoreComponents do
             </p>
           </div>
         </div>
-        <form id="stop-impersonation-form" action={~p"/admin/stop-impersonation"} method="post" class="inline m-0">
+        <form
+          id="stop-impersonation-form"
+          action={~p"/admin/stop-impersonation"}
+          method="post"
+          class="inline m-0"
+        >
           <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
           <button
             type="submit"

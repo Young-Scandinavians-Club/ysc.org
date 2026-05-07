@@ -10,7 +10,9 @@ defmodule YscWeb.ImpersonationControllerTest do
       {conn, token} = fetch_conn_csrf_from_html(conn)
 
       conn =
-        post(conn, ~p"/admin/impersonate/#{target.id}", %{"_csrf_token" => token})
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "sign in"
@@ -28,7 +30,9 @@ defmodule YscWeb.ImpersonationControllerTest do
       {conn, token} = fetch_conn_csrf_from_html(conn)
 
       conn =
-        post(conn, ~p"/admin/impersonate/#{target.id}", %{"_csrf_token" => token})
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/"
 
@@ -73,7 +77,9 @@ defmodule YscWeb.ImpersonationControllerTest do
       {conn, token} = fetch_conn_csrf_from_html(conn)
 
       conn =
-        post(conn, ~p"/admin/impersonate/#{target.id}", %{"_csrf_token" => token})
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Impersonating"
@@ -95,7 +101,9 @@ defmodule YscWeb.ImpersonationControllerTest do
       {conn, token} = fetch_conn_csrf_from_html(conn)
 
       conn =
-        post(conn, ~p"/admin/impersonate/#{target.id}", %{"_csrf_token" => token})
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/"
       conn = get(conn, ~p"/")
