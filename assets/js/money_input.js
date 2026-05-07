@@ -1,16 +1,16 @@
+import { pushEventIfConnected } from "./live_view_safe_push";
+
 let MoneyInput = {
     mounted() {
         const input = this.el;
         const hook = this;
+        this._debounceTimer = null;
 
-        // Debounce timer
-        let debounceTimer = null;
-
-        // Push value to LiveView (only for donation inputs)
         const pushValue = (value) => {
-        const tierId = input.getAttribute("data-tier-id") ||
-            input.getAttribute("phx-value-tier-id") ||
-            input.closest("[data-tier-id]")?.getAttribute("data-tier-id");
+            const tierId =
+                input.getAttribute("data-tier-id") ||
+                input.getAttribute("phx-value-tier-id") ||
+                input.closest("[data-tier-id]")?.getAttribute("data-tier-id");
 
             // Only push event if this is a donation input (has data-tier-id)
             // Regular price inputs in admin forms should not trigger this event
@@ -20,7 +20,7 @@ let MoneyInput = {
 
             const name = input.getAttribute("name");
 
-            // Get the value without formatting (remove commas)ke
+            // Get the value without formatting (remove commas)
             const cleanValue = value.replace(/,/g, "");
 
             // Build the event payload with the input name as a dynamic key
@@ -29,37 +29,29 @@ let MoneyInput = {
             };
             eventPayload[name] = cleanValue;
 
-            // Push to LiveView with the input name and tier-id
-            hook.pushEvent("update-donation-amount", eventPayload);
+            pushEventIfConnected(hook, "update-donation-amount", eventPayload);
         };
 
-        // Debounced push function
         const debouncedPush = (value) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => pushValue(value), 300);
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = setTimeout(() => pushValue(value), 300);
         };
 
-        // Handle input changes
         input.addEventListener("input", (e) => {
-            // Remove any non-numeric characters except decimal point
             let value = e.target.value.replace(/[^\d.]/g, "");
 
-            // Ensure only one decimal point
             const decimalPoints = value.match(/\./g);
             if (decimalPoints && decimalPoints.length > 1) {
                 const parts = value.split(".");
                 value = parts[0] + "." + parts.slice(1).join("");
             }
 
-            // Limit to two decimal places
             const parts = value.split(".");
             if (parts[1] && parts[1].length > 2) {
                 parts[1] = parts[1].substring(0, 2);
                 value = parts.join(".");
             }
 
-            // Optional: Format with thousand separators as user types
-            // Only format the part before the decimal
             if (parts[0].length > 3) {
                 parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
                 value = parts.join(".");
@@ -67,17 +59,14 @@ let MoneyInput = {
 
             e.target.value = value;
 
-            // Push value to LiveView (debounced)
             debouncedPush(value);
         });
 
-        // Remove formatting when focusing
         input.addEventListener("focus", (e) => {
             const value = e.target.value.replace(/,/g, "");
             e.target.value = value;
         });
 
-        // Reapply formatting when leaving field
         input.addEventListener("blur", (e) => {
             if (e.target.value) {
                 const num = parseFloat(e.target.value.replace(/,/g, ""));
@@ -92,6 +81,13 @@ let MoneyInput = {
             }
         });
     },
+
+    destroyed() {
+        if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
+        }
+    }
 };
 
 export default MoneyInput;

@@ -1,3 +1,5 @@
+import { pushEventIfConnected } from "./live_view_safe_push";
+
 // Unified countdown hook for Phoenix LiveView.
 //
 // Data attributes:
@@ -84,7 +86,7 @@ const Countdown = {
         if (expired) {
             this._cleanup();
             const event = this.el.dataset.expireEvent;
-            if (event) this.pushEvent(event, {});
+            if (event) pushEventIfConnected(this, event, {});
         }
     },
 
