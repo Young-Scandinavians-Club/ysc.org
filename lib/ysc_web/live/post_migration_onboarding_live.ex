@@ -1200,7 +1200,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             {:noreply, advance_to_next_step(socket, @step_payment)}
 
           {:error, :user_already_has_active_subscription} ->
-            Ysc.Logging.error("User already has active subscription during onboarding",
+            Ysc.Logging.error(
+              "User already has active subscription during onboarding",
               user_id: user.id
             )
 

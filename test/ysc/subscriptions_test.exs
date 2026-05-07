@@ -663,7 +663,8 @@ defmodule Ysc.SubscriptionsTest do
 
   describe "create_stripe_subscription/2" do
     test "returns {:error, :user_already_has_active_subscription} when user has active subscription" do
-      user = user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
       {:ok, _existing_sub} =
         Subscriptions.create_subscription(%{
@@ -683,7 +684,8 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:error, :user_already_has_active_subscription} when user has trialing subscription" do
-      user = user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
       {:ok, _existing_sub} =
         Subscriptions.create_subscription(%{
@@ -704,7 +706,8 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "returns {:error, :user_already_has_active_subscription} for paused subscription (board volunteer)" do
-      user = user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
       # Paused subscriptions remain "active" in Stripe with pause_collection behavior
       {:ok, _paused_sub} =
@@ -725,7 +728,8 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "allows creating subscription when user has no active subscription" do
-      user = user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
       # Create a cancelled subscription (not active)
       {:ok, _cancelled_sub} =
@@ -751,7 +755,8 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "allows creating subscription when user has expired subscription" do
-      user = user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
       # Create an expired subscription (active status but period ended)
       {:ok, _expired_sub} =
@@ -774,7 +779,8 @@ defmodule Ysc.SubscriptionsTest do
     end
 
     test "allows creating subscription when user has subscription with ends_at in the past" do
-      user = user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
       # Create a subscription scheduled to end (cancelled)
       {:ok, _ending_sub} =
