@@ -188,67 +188,181 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
             </div>
           </div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
+            <span class="font-bold text-zinc-400 uppercase">
+              Renewing in 30 days
+            </span>
+            <span class="font-black text-zinc-700 tabular-nums">
+              {@memberships_renewing_30_days}
+            </span>
+          </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             View all memberships →
           </p>
         </.link>
-        <.link
-          :if={@pending_refunds_summary.total > 0}
-          navigate={pending_refunds_bookings_path(@pending_refunds_summary)}
+        <div
           id="dashboard-pending-refunds"
-          class="bg-rose-50 p-5 rounded-lg border border-rose-200 flex flex-col justify-between hover:ring-2 hover:ring-rose-300 transition-all group"
+          class={[
+            "p-5 rounded-lg border flex flex-col justify-between transition-all",
+            if(@pending_refunds_summary.total > 0,
+              do: "bg-rose-50 border-rose-200",
+              else: "bg-white border-zinc-200"
+            )
+          ]}
         >
-          <div>
-            <p class="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-2">
-              Refunds to review
-            </p>
-            <p class="text-3xl font-black text-rose-900">
-              {@pending_refunds_summary.total}
-            </p>
-            <p class="text-xs text-rose-700 mt-2 space-x-2">
-              <span :if={@pending_refunds_summary.tahoe > 0}>
-                Tahoe {@pending_refunds_summary.tahoe}
-              </span>
-              <span :if={@pending_refunds_summary.clear_lake > 0}>
-                Clear Lake {@pending_refunds_summary.clear_lake}
-              </span>
-            </p>
-          </div>
-          <p class="text-xs text-rose-800 font-semibold mt-3 group-hover:underline">
-            Open pending refunds →
-          </p>
-        </.link>
+          <%= if @pending_refunds_summary.total > 0 do %>
+            <div>
+              <p class="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-2">
+                Refunds to review
+              </p>
+              <p class="text-3xl font-black text-rose-900">
+                {@pending_refunds_summary.total}
+              </p>
+              <p class="text-xs text-rose-700 mt-2 space-x-2">
+                <span :if={@pending_refunds_summary.tahoe > 0}>
+                  Tahoe {@pending_refunds_summary.tahoe}
+                </span>
+                <span :if={@pending_refunds_summary.clear_lake > 0}>
+                  Clear Lake {@pending_refunds_summary.clear_lake}
+                </span>
+              </p>
+            </div>
+            <.link
+              navigate={pending_refunds_bookings_path(@pending_refunds_summary)}
+              class="text-xs text-rose-800 font-semibold mt-3 hover:underline"
+            >
+              Open pending refunds →
+            </.link>
+          <% else %>
+            <div>
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+                Pending Refunds
+              </p>
+              <div class="flex items-baseline gap-2 mt-1">
+                <p class="text-3xl font-black text-emerald-600">0</p>
+                <.badge type="green">All clear</.badge>
+              </div>
+              <p class="text-xs text-zinc-400 font-medium mt-2">
+                No refunds awaiting review
+              </p>
+            </div>
+            <.link
+              navigate={~p"/admin/bookings"}
+              class="text-xs text-zinc-400 font-medium mt-3 hover:underline"
+            >
+              View bookings →
+            </.link>
+          <% end %>
+        </div>
         <.link
           navigate={~p"/admin/bookings"}
           class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
-              Staying Now
+              Today at the Cabins
             </p>
             <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
               {@active_guests_count}
             </p>
             <p class="text-xs text-zinc-500 mt-1 font-medium">
-              Guests across properties
+              Guests staying now
             </p>
           </div>
-          <div class="mt-4 flex -space-x-2 overflow-hidden">
-            <div :for={user <- @active_guests_sample} class="relative">
-              <.user_avatar_image
-                user={user}
-                class="inline-block h-6 w-6 rounded-full ring-2 ring-white"
-              />
+          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-xs">
+            <div class="rounded-lg bg-emerald-50 border border-emerald-100 p-2">
+              <p class="font-bold text-emerald-700 uppercase text-[10px]">
+                Checking in
+              </p>
+              <p class="font-black text-emerald-800 text-lg tabular-nums">
+                {@checkins_today}
+              </p>
             </div>
-            <div
-              :if={@active_guests_count > length(@active_guests_sample)}
-              class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-500 ring-2 ring-white"
-            >
-              +{@active_guests_count - length(@active_guests_sample)}
+            <div class="rounded-lg bg-amber-50 border border-amber-100 p-2">
+              <p class="font-bold text-amber-700 uppercase text-[10px]">
+                Checking out
+              </p>
+              <p class="font-black text-amber-800 text-lg tabular-nums">
+                {@checkouts_today}
+              </p>
             </div>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             View all bookings →
+          </p>
+        </.link>
+      </div>
+
+      <%!-- Admin-only: upcoming cabin occupancy (next 14 days) --%>
+      <div
+        :if={@admin_role == :admin}
+        id="dashboard-cabin-occupancy"
+        class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8"
+      >
+        <.link
+          navigate={~p"/admin/bookings?property=tahoe"}
+          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <div class="flex items-start justify-between">
+              <p class="text-xs font-black text-sky-600 uppercase tracking-[0.2em] mb-2">
+                Tahoe · Next 14 days
+              </p>
+              <.icon name="hero-home" class="w-4 h-4 text-sky-200 -mt-0.5 shrink-0" />
+            </div>
+            <div class="flex items-baseline gap-2">
+              <p class="text-3xl font-black text-zinc-900 group-hover:text-sky-600 transition-colors tabular-nums">
+                {@occupancy_tahoe_bookings}
+              </p>
+              <span class="text-xs font-bold text-zinc-400">
+                {if(@occupancy_tahoe_bookings == 1, do: "booking", else: "bookings")}
+              </span>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
+            <span class="font-bold text-zinc-400 uppercase">Expected guests</span>
+            <span class="font-black text-zinc-700 tabular-nums">
+              {@occupancy_tahoe_guests}
+            </span>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            View Tahoe bookings →
+          </p>
+        </.link>
+        <.link
+          navigate={~p"/admin/bookings?property=clear_lake"}
+          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+        >
+          <div>
+            <div class="flex items-start justify-between">
+              <p class="text-xs font-black text-teal-600 uppercase tracking-[0.2em] mb-2">
+                Clear Lake · Next 14 days
+              </p>
+              <.icon
+                name="hero-home"
+                class="w-4 h-4 text-teal-200 -mt-0.5 shrink-0"
+              />
+            </div>
+            <div class="flex items-baseline gap-2">
+              <p class="text-3xl font-black text-zinc-900 group-hover:text-teal-600 transition-colors tabular-nums">
+                {@occupancy_clear_lake_bookings}
+              </p>
+              <span class="text-xs font-bold text-zinc-400">
+                {if(@occupancy_clear_lake_bookings == 1,
+                  do: "booking",
+                  else: "bookings"
+                )}
+              </span>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
+            <span class="font-bold text-zinc-400 uppercase">Expected guests</span>
+            <span class="font-black text-zinc-700 tabular-nums">
+              {@occupancy_clear_lake_guests}
+            </span>
+          </div>
+          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+            View Clear Lake bookings →
           </p>
         </.link>
       </div>
@@ -270,6 +384,16 @@ defmodule YscWeb.AdminDashboardLive do
             <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
               {@upcoming_events_count}
             </p>
+            <%= if @events_with_tickets != [] do %>
+              <p class="text-xs font-semibold text-zinc-700 mt-2 truncate">
+                {hd(@events_with_tickets).event.title}
+              </p>
+              <p class="text-[10px] text-blue-600 font-bold mt-0.5">
+                {event_start_pst_label(hd(@events_with_tickets).event)}
+              </p>
+            <% else %>
+              <p class="text-xs text-zinc-400 mt-2">No upcoming events</p>
+            <% end %>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             Manage events →
@@ -286,7 +410,18 @@ defmodule YscWeb.AdminDashboardLive do
             <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
               {@published_posts_count}
             </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">published</p>
+            <p class="text-xs text-zinc-500 mt-1 font-medium">
+              published
+              <span
+                :if={@draft_posts_count > 0}
+                class="text-amber-600 font-bold ml-1"
+              >
+                · {@draft_posts_count} draft{if(@draft_posts_count == 1,
+                  do: "",
+                  else: "s"
+                )}
+              </span>
+            </p>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             Manage posts →
@@ -303,7 +438,18 @@ defmodule YscWeb.AdminDashboardLive do
             <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
               {@newsletter_editions_count}
             </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">editions</p>
+            <p class="text-xs text-zinc-500 mt-1 font-medium">
+              editions sent
+              <span
+                :if={@draft_newsletter_count > 0}
+                class="text-amber-600 font-bold ml-1"
+              >
+                · {@draft_newsletter_count} draft{if(@draft_newsletter_count == 1,
+                  do: "",
+                  else: "s"
+                )}
+              </span>
+            </p>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             Manage newsletters →
@@ -446,6 +592,14 @@ defmodule YscWeb.AdminDashboardLive do
               <p class="text-2xl font-black text-emerald-600 mt-1 tabular-nums">
                 {format_money(@current_month_revenue)}
               </p>
+              <div class="flex items-baseline gap-2 mt-1.5 mb-1">
+                <p class="text-xs font-bold text-zinc-400 uppercase">
+                  YTD {@ytd_revenue_label}
+                </p>
+                <p class="text-sm font-black text-zinc-700 tabular-nums">
+                  {format_money(@ytd_revenue)}
+                </p>
+              </div>
               <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs font-bold">
                 <span class={[
                   "inline-flex items-center",
@@ -545,6 +699,23 @@ defmodule YscWeb.AdminDashboardLive do
                 >
                 </div>
               </div>
+              <div class="flex items-center gap-3 mb-3">
+                <span class="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <span class="inline-block w-2 h-2 rounded-sm bg-blue-600 shrink-0">
+                  </span>
+                  Bookings
+                </span>
+                <span class="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <span class="inline-block w-2 h-2 rounded-sm bg-purple-500 shrink-0">
+                  </span>
+                  Events
+                </span>
+                <span class="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 shrink-0">
+                  </span>
+                  Memberships
+                </span>
+              </div>
               <div class="space-y-1.5 text-xs">
                 <div class="flex justify-between">
                   <span class="text-zinc-500">Bookings</span>
@@ -603,12 +774,26 @@ defmodule YscWeb.AdminDashboardLive do
             class="bg-white rounded-lg border border-zinc-200 p-5 shadow-sm"
           >
             <div class="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
-              <h2 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
-                Recent newsletters
-              </h2>
+              <div>
+                <h2 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
+                  Recent newsletters
+                </h2>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  <span class="font-bold text-zinc-700">
+                    {@newsletter_subscriber_count}
+                  </span>
+                  active subscribers
+                  <span
+                    :if={@newsletter_subscribers_this_month > 0}
+                    class="text-emerald-600 font-bold ml-1"
+                  >
+                    +{@newsletter_subscribers_this_month} this month
+                  </span>
+                </p>
+              </div>
               <.link
                 navigate={~p"/admin/newsletters"}
-                class="text-xs font-bold text-blue-600 hover:underline"
+                class="text-xs font-bold text-blue-600 hover:underline shrink-0"
               >
                 All
               </.link>
@@ -645,11 +830,19 @@ defmodule YscWeb.AdminDashboardLive do
                   <span class="rounded-md bg-zinc-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
                     Sent {row.edition.sent_count}
                   </span>
-                  <span class="rounded-md bg-sky-100 px-2 py-1 text-xs font-black tabular-nums text-sky-900 ring-1 ring-sky-300/80 shadow-sm">
-                    Opens {row.opens}
+                  <span class="rounded-md bg-sky-100 px-2 py-1 text-[10px] font-black tabular-nums text-sky-900 ring-1 ring-sky-300/80 shadow-sm">
+                    {format_newsletter_stat(
+                      row.opens,
+                      row.edition.sent_count,
+                      "opened"
+                    )}
                   </span>
-                  <span class="rounded-md bg-emerald-100 px-2 py-1 text-xs font-black tabular-nums text-emerald-900 ring-1 ring-emerald-300/80 shadow-sm">
-                    Clicks {row.clicks}
+                  <span class="rounded-md bg-emerald-100 px-2 py-1 text-[10px] font-black tabular-nums text-emerald-900 ring-1 ring-emerald-300/80 shadow-sm">
+                    {format_newsletter_stat(
+                      row.clicks,
+                      row.edition.sent_count,
+                      "clicked"
+                    )}
                   </span>
                 </div>
               </li>
@@ -749,11 +942,19 @@ defmodule YscWeb.AdminDashboardLive do
 
       <div
         id="dashboard-recent-discussions"
-        class="bg-white rounded-lg border border-zinc-200 p-5 shadow-sm pb-16"
+        class="bg-white rounded-lg border border-zinc-200 p-5 shadow-sm mb-8"
       >
-        <h3 class="text-sm font-black text-zinc-900 uppercase tracking-widest mb-4">
-          Recent discussions
-        </h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
+            Recent discussions
+          </h3>
+          <.link
+            navigate={~p"/admin/posts"}
+            class="text-xs font-bold text-blue-600 hover:underline"
+          >
+            View all posts
+          </.link>
+        </div>
         <div
           :if={Enum.empty?(@latest_comments)}
           class="text-center py-8 border-2 border-dashed border-zinc-100 rounded-lg"
@@ -853,6 +1054,8 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:recent_newsletters_with_stats, [])
       |> assign(:active_guests_count, 0)
       |> assign(:active_guests_sample, [])
+      |> assign(:checkins_today, 0)
+      |> assign(:checkouts_today, 0)
       |> assign(:membership_stats, %{
         total: 0,
         single: 0,
@@ -863,10 +1066,21 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:membership_joins_prior_ytd, 0)
       |> assign(:membership_joins_prior_year_label, "—")
       |> assign(:membership_joins_ytd_change_percent, nil)
+      |> assign(:memberships_renewing_30_days, 0)
+      |> assign(:ytd_revenue, Money.new(:USD, 0))
+      |> assign(:ytd_revenue_label, "—")
+      |> assign(:newsletter_subscriber_count, 0)
+      |> assign(:newsletter_subscribers_this_month, 0)
+      |> assign(:occupancy_tahoe_bookings, 0)
+      |> assign(:occupancy_tahoe_guests, 0)
+      |> assign(:occupancy_clear_lake_bookings, 0)
+      |> assign(:occupancy_clear_lake_guests, 0)
       # Volunteer-only placeholders
       |> assign(:upcoming_events_count, 0)
       |> assign(:published_posts_count, 0)
       |> assign(:newsletter_editions_count, 0)
+      |> assign(:draft_posts_count, 0)
+      |> assign(:draft_newsletter_count, 0)
 
     if connected?(socket) do
       send(self(), :load_dashboard_data)
@@ -890,7 +1104,9 @@ defmodule YscWeb.AdminDashboardLive do
      |> assign(:events_with_tickets, events_with_tickets)
      |> assign(:upcoming_events_count, length(events_with_tickets))
      |> assign(:published_posts_count, get_published_posts_count())
-     |> assign(:newsletter_editions_count, get_newsletter_editions_count())}
+     |> assign(:newsletter_editions_count, get_newsletter_editions_count())
+     |> assign(:draft_posts_count, get_draft_posts_count())
+     |> assign(:draft_newsletter_count, get_draft_newsletter_count())}
   end
 
   @impl true
@@ -909,8 +1125,16 @@ defmodule YscWeb.AdminDashboardLive do
       get_application_statistics()
 
     {active_guests_count, active_guests_sample} = get_active_guests()
+    {checkins_today, checkouts_today} = get_today_cabin_activity()
     membership_stats = Accounts.get_membership_stats()
     joins_ytd = Accounts.get_membership_joins_ytd_comparison()
+    memberships_renewing_30_days = get_renewals_in_30_days()
+    {ytd_revenue, ytd_revenue_label} = calculate_ytd_revenue()
+
+    {newsletter_subscriber_count, newsletter_subscribers_this_month} =
+      get_newsletter_subscriber_stats()
+
+    occupancy = get_upcoming_occupancy()
 
     socket =
       socket
@@ -927,6 +1151,8 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:applications_year_change, applications_year_change)
       |> assign(:active_guests_count, active_guests_count)
       |> assign(:active_guests_sample, active_guests_sample)
+      |> assign(:checkins_today, checkins_today)
+      |> assign(:checkouts_today, checkouts_today)
       |> assign(:membership_stats, membership_stats)
       |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
       |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
@@ -935,6 +1161,18 @@ defmodule YscWeb.AdminDashboardLive do
         :membership_joins_ytd_change_percent,
         joins_ytd.joins_ytd_change_percent
       )
+      |> assign(:memberships_renewing_30_days, memberships_renewing_30_days)
+      |> assign(:ytd_revenue, ytd_revenue)
+      |> assign(:ytd_revenue_label, ytd_revenue_label)
+      |> assign(:newsletter_subscriber_count, newsletter_subscriber_count)
+      |> assign(
+        :newsletter_subscribers_this_month,
+        newsletter_subscribers_this_month
+      )
+      |> assign(:occupancy_tahoe_bookings, occupancy.tahoe_bookings)
+      |> assign(:occupancy_tahoe_guests, occupancy.tahoe_guests)
+      |> assign(:occupancy_clear_lake_bookings, occupancy.clear_lake_bookings)
+      |> assign(:occupancy_clear_lake_guests, occupancy.clear_lake_guests)
       |> assign(:recent_newsletters_with_stats, recent_newsletters)
       |> assign(:pending_refunds_summary, pending_refund_summary)
       |> then(fn s ->
@@ -1077,100 +1315,64 @@ defmodule YscWeb.AdminDashboardLive do
      applications_year_change}
   end
 
-  defp get_status_pillar_color(user) do
+  defp hours_waiting(user) do
     if user.registration_form && user.registration_form.completed do
-      submitted_at = user.registration_form.completed
-      hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
-
-      cond do
-        hours_ago < 24 -> "bg-emerald-500"
-        hours_ago >= 24 && hours_ago <= 48 -> "bg-amber-500"
-        hours_ago > 48 -> "bg-rose-500"
-        true -> "bg-zinc-400"
-      end
+      DateTime.diff(DateTime.utc_now(), user.registration_form.completed, :hour)
     else
-      "bg-zinc-400"
+      nil
+    end
+  end
+
+  defp get_status_pillar_color(user) do
+    case hours_waiting(user) do
+      nil -> "bg-zinc-400"
+      h when h < 24 -> "bg-emerald-500"
+      h when h <= 48 -> "bg-amber-500"
+      _ -> "bg-rose-500"
     end
   end
 
   defp get_application_card_classes(user) do
-    if user.registration_form && user.registration_form.completed do
-      submitted_at = user.registration_form.completed
-      hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
-
-      base_classes = "bg-white border-zinc-100"
-
-      if hours_ago > 48 do
-        "#{base_classes} border-l-4 border-l-rose-500"
-      else
-        base_classes
-      end
-    else
-      "bg-zinc-50/50 border-zinc-100"
+    case hours_waiting(user) do
+      nil -> "bg-zinc-50/50 border-zinc-100"
+      h when h > 48 -> "bg-white border-zinc-100 border-l-4 border-l-rose-500"
+      _ -> "bg-white border-zinc-100"
     end
   end
 
   defp get_time_waiting_text(user) do
-    if user.registration_form && user.registration_form.completed do
-      submitted_at = user.registration_form.completed
-      hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
-
-      cond do
-        hours_ago < 1 -> "just now"
-        hours_ago == 1 -> "1 hour ago"
-        hours_ago < 24 -> "#{hours_ago} hours ago"
-        hours_ago < 48 -> "#{div(hours_ago, 24)} day ago"
-        true -> "#{div(hours_ago, 24)} days ago"
-      end
-    else
-      "Submission date not available"
+    case hours_waiting(user) do
+      nil -> "Submission date not available"
+      0 -> "just now"
+      1 -> "1 hour ago"
+      h when h < 24 -> "#{h} hours ago"
+      h when h < 48 -> "#{div(h, 24)} day ago"
+      h -> "#{div(h, 24)} days ago"
     end
   end
 
   defp get_status_badge_type(user) do
-    if user.registration_form && user.registration_form.completed do
-      submitted_at = user.registration_form.completed
-      hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
-
-      cond do
-        hours_ago < 24 -> "green"
-        hours_ago >= 24 && hours_ago <= 48 -> "yellow"
-        hours_ago > 48 -> "red"
-        true -> "dark"
-      end
-    else
-      "dark"
+    case hours_waiting(user) do
+      nil -> "dark"
+      h when h < 24 -> "green"
+      h when h <= 48 -> "yellow"
+      _ -> "red"
     end
   end
 
   defp get_status_badge_text(user) do
-    if user.registration_form && user.registration_form.completed do
-      submitted_at = user.registration_form.completed
-      hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
-
-      cond do
-        hours_ago < 24 -> "New"
-        hours_ago >= 24 && hours_ago <= 48 -> "Pending"
-        hours_ago > 48 -> "Overdue"
-        true -> "Review"
-      end
-    else
-      "Review"
+    case hours_waiting(user) do
+      nil -> "Review"
+      h when h < 24 -> "New"
+      h when h <= 48 -> "Pending"
+      _ -> "Overdue"
     end
   end
 
   defp get_review_button_text(user) do
-    if user.registration_form && user.registration_form.completed do
-      submitted_at = user.registration_form.completed
-      hours_ago = DateTime.diff(DateTime.utc_now(), submitted_at, :hour)
-
-      if hours_ago > 48 do
-        "Review Now"
-      else
-        "Review"
-      end
-    else
-      "Review"
+    case hours_waiting(user) do
+      h when is_integer(h) and h > 48 -> "Review Now"
+      _ -> "Review"
     end
   end
 
@@ -1623,6 +1825,15 @@ defmodule YscWeb.AdminDashboardLive do
     Money.to_string!(money, symbol: true, separator: ",", delimiter: ".")
   end
 
+  defp format_newsletter_stat(count, sent_count, label)
+       when is_integer(sent_count) and sent_count > 0 and is_integer(count) do
+    pct = round(count / sent_count * 100)
+    "#{pct}% #{label} (#{count})"
+  end
+
+  defp format_newsletter_stat(count, _sent_count, label),
+    do: "#{count} #{label}"
+
   defp get_active_guests do
     alias Ysc.Repo
     import Ecto.Query
@@ -1675,6 +1886,205 @@ defmodule YscWeb.AdminDashboardLive do
   end
 
   defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+  defp get_today_cabin_activity do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    today = pst_today()
+
+    checkins =
+      Repo.one(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where: b.checkin_date == ^today,
+          select: count()
+      ) || 0
+
+    checkouts =
+      Repo.one(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where: b.checkout_date == ^today,
+          select: count()
+      ) || 0
+
+    {checkins, checkouts}
+  end
+
+  defp get_renewals_in_30_days do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    now = DateTime.utc_now()
+    in_30_days = DateTime.add(now, 30, :day)
+
+    Repo.one(
+      from s in Ysc.Subscriptions.Subscription,
+        where: s.stripe_status in ["active", "trialing"],
+        where: not is_nil(s.current_period_end),
+        where: s.current_period_end >= ^now,
+        where: s.current_period_end <= ^in_30_days,
+        select: count()
+    ) || 0
+  end
+
+  defp calculate_ytd_revenue do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    now = DateTime.utc_now()
+
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    revenue_account_names = [
+      "membership_revenue",
+      "event_revenue",
+      "tahoe_booking_revenue",
+      "clear_lake_booking_revenue",
+      "donation_revenue"
+    ]
+
+    account_ids =
+      from(a in Ysc.Ledgers.LedgerAccount,
+        where: a.name in ^revenue_account_names,
+        select: a.id
+      )
+      |> Repo.all()
+
+    entries =
+      Repo.all(
+        from e in Ysc.Ledgers.LedgerEntry,
+          where: e.account_id in ^account_ids,
+          where: e.inserted_at >= ^year_start,
+          where: e.inserted_at < ^now,
+          select: %{
+            amount: fragment("ABS((?.amount).amount)", e),
+            debit_credit: e.debit_credit
+          }
+      )
+
+    total =
+      Enum.reduce(entries, Decimal.new(0), fn entry, acc ->
+        debit_credit =
+          case entry.debit_credit do
+            atom when is_atom(atom) -> to_string(atom)
+            str when is_binary(str) -> str
+            _ -> "debit"
+          end
+
+        amount = entry.amount || Decimal.new(0)
+
+        signed =
+          if debit_credit == "credit", do: amount, else: Decimal.negate(amount)
+
+        Decimal.add(acc, signed)
+      end)
+
+    label =
+      year_start
+      |> DateTime.shift_zone!("America/Los_Angeles")
+      |> Timex.format!("Jan–{Mshort} {YYYY}")
+
+    {Money.new(total, :USD), label}
+  end
+
+  defp get_newsletter_subscriber_stats do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    now = DateTime.utc_now()
+
+    month_start = %DateTime{
+      now
+      | day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    total =
+      Repo.one(
+        from s in Ysc.Newsletter.Subscriber,
+          where: s.subscribed == true,
+          select: count()
+      ) || 0
+
+    new_this_month =
+      Repo.one(
+        from s in Ysc.Newsletter.Subscriber,
+          where: s.subscribed == true,
+          where: not is_nil(s.subscribed_at),
+          where: s.subscribed_at >= ^month_start,
+          select: count()
+      ) || 0
+
+    {total, new_this_month}
+  end
+
+  defp get_upcoming_occupancy do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    today = pst_today()
+    two_weeks_out = Date.add(today, 14)
+
+    bookings =
+      Repo.all(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where:
+            fragment(
+              "(? <= ? AND ? >= ?)",
+              b.checkin_date,
+              ^two_weeks_out,
+              b.checkout_date,
+              ^today
+            ),
+          select: %{property: b.property, guests_count: b.guests_count}
+      )
+
+    tahoe = Enum.filter(bookings, &(&1.property == :tahoe))
+    clear_lake = Enum.filter(bookings, &(&1.property == :clear_lake))
+
+    %{
+      tahoe_bookings: length(tahoe),
+      tahoe_guests: Enum.sum(Enum.map(tahoe, &(&1.guests_count || 0))),
+      clear_lake_bookings: length(clear_lake),
+      clear_lake_guests: Enum.sum(Enum.map(clear_lake, &(&1.guests_count || 0)))
+    }
+  end
+
+  defp get_draft_posts_count do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    Repo.one(
+      from p in Ysc.Posts.Post,
+        where: p.state == "draft",
+        select: count()
+    ) || 0
+  end
+
+  defp get_draft_newsletter_count do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    Repo.one(
+      from e in Ysc.Newsletter.Edition,
+        where: e.status in [:draft, :scheduled],
+        select: count()
+    ) || 0
+  end
 
   defp format_admin_datetime(%DateTime{} = dt) do
     dt
