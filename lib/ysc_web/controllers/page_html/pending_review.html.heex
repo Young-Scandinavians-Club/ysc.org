@@ -44,14 +44,14 @@
         </div>
       <% else %>
         <div class="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm">
-          You haven't added a payment method yet. You can
+          You haven't added a payment method yet.
           <.link
             href={~p"/account/setup/#{@current_user.id}?step=1"}
             class="underline font-medium"
           >
-            add one now
+            Add a card or bank account now
           </.link>
-          to enable automatic activation if approved, or you'll be prompted to pay after approval.
+          if you would like your membership to start automatically once you're approved. If you prefer to wait, we will email you a secure link to pay your dues after approval.
         </div>
       <% end %>
 
