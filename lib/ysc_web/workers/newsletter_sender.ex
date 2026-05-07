@@ -159,6 +159,9 @@ defmodule YscWeb.Workers.NewsletterSender do
 
         Newsletter.broadcast_edition_sent(Repo.preload(sent_edition, :creator))
 
+        # Schedule stats email to be sent 24 hours after newsletter was sent
+        schedule_stats_email(sent_edition)
+
         Ysc.Logging.info("NewsletterSender: completed",
           edition_id: edition.id,
           sent_count: sent_count,
@@ -191,5 +194,34 @@ defmodule YscWeb.Workers.NewsletterSender do
     ]
     |> Enum.filter(&(is_binary(&1) and &1 != ""))
     |> Enum.join("\n")
+  end
+
+  defp schedule_stats_email(edition) do
+    # Schedule stats email 24 hours after the newsletter was sent
+    scheduled_at =
+      edition.sent_at
+      |> DateTime.add(24, :hour)
+      |> DateTime.truncate(:second)
+
+    %{edition_id: edition.id}
+    |> YscWeb.Workers.NewsletterStatsWorker.new(scheduled_at: scheduled_at)
+    |> Oban.insert()
+    |> case do
+      {:ok, _job} ->
+        Ysc.Logging.info("NewsletterSender: scheduled stats email",
+          edition_id: edition.id,
+          scheduled_at: scheduled_at
+        )
+
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.error("NewsletterSender: failed to schedule stats email",
+          edition_id: edition.id,
+          error: inspect(reason)
+        )
+
+        :ok
+    end
   end
 end

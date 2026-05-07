@@ -750,6 +750,9 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert Notifier.get_template_module("contact_form_board_notification") ==
                YscWeb.Emails.ContactFormBoardNotification
+
+      assert Notifier.get_template_module("newsletter_stats_snapshot") ==
+               YscWeb.Emails.NewsletterStatsSnapshot
     end
 
     test "get_template_module returns nil for unknown template" do

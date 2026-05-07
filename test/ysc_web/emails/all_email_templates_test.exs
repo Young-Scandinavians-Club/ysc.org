@@ -46,7 +46,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     MembershipPaymentReminder30Day,
     EventNotification,
     ExpenseReportConfirmation,
-    ExpenseReportTreasurerNotification
+    ExpenseReportTreasurerNotification,
+    NewsletterStatsSnapshot
   }
 
   setup do
@@ -972,7 +973,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "booking_cancellation_cabin_master_notification" =>
           BookingCancellationCabinMasterNotification,
         "booking_cancellation_treasurer_notification" =>
-          BookingCancellationTreasurerNotification
+          BookingCancellationTreasurerNotification,
+        "newsletter_stats_snapshot" => NewsletterStatsSnapshot
       }
 
       for {template_name, expected_module} <- template_mappings do
