@@ -1046,7 +1046,9 @@ defmodule YscWeb.AccountSetupLive do
 
       {:noreply, assign(socket, phone_form: phone_form)}
     else
-      YscWeb.Flash.send_toast(:error, "Please complete password setup first.",
+      YscWeb.Flash.send_toast(
+        :error,
+        "Phone details can only be entered on the Phone step, after earlier setup steps. Please return to Account setup and continue in order.",
         title: "Account setup"
       )
 

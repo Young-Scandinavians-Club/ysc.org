@@ -670,7 +670,7 @@ defmodule YscWeb.UserLoginLive do
                      YscWeb.Flash.put_toast(
                        socket,
                        :error,
-                       "Passkey credential ID mismatch. Please try again or use another sign-in method."
+                       "We couldn't finish passkey sign-in. Please try again, or sign in with your email and password, Google, or Facebook."
                      )
                      |> assign(:passkey_loading, false)
                      |> assign(:passkey_challenge, nil)
@@ -716,7 +716,7 @@ defmodule YscWeb.UserLoginLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Passkey credential ID mismatch. Please try again or use another sign-in method."
+                 "We couldn't finish passkey sign-in. Please try again, or sign in with your email and password, Google, or Facebook."
                )
                |> assign(:passkey_loading, false)
                |> assign(:passkey_challenge, nil)
