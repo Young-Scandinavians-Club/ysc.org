@@ -506,12 +506,14 @@ defmodule YscWeb.AdminMediaLive do
     search_query = query_params["search"] || query_params[:search] || ""
 
     # Store current URL parameters in assigns for use when building return URLs
-    socket = 
+    socket =
       socket
       |> assign(:url_year_param, year_param)
       |> assign(:search_query, search_query)
 
-    Ysc.Logging.debug("Year param: #{inspect(year_param)}, Search query: #{inspect(search_query)}")
+    Ysc.Logging.debug(
+      "Year param: #{inspect(year_param)}, Search query: #{inspect(search_query)}"
+    )
 
     # Load images based on year param and search query, even when on edit route
     # But only load if stream is empty or year/search has changed
@@ -576,7 +578,12 @@ defmodule YscWeb.AdminMediaLive do
         not_initialized = not socket.assigns.stream_initialized?
 
         if has_year_filter || search_changed || not_initialized do
-          images = Media.list_images_cursor(limit: socket.assigns.per_page, search: search_query)
+          images =
+            Media.list_images_cursor(
+              limit: socket.assigns.per_page,
+              search: search_query
+            )
+
           {years_set, years_list} = years_from_images(images)
           stream_items = Timeline.inject_date_headers(images)
 
@@ -1168,7 +1175,8 @@ defmodule YscWeb.AdminMediaLive do
     {years_set, years_list}
   end
 
-  defp filter_images_by_search(images, search_query) when is_binary(search_query) do
+  defp filter_images_by_search(images, search_query)
+       when is_binary(search_query) do
     normalized_search = String.downcase(search_query)
 
     Enum.filter(images, fn image ->
