@@ -545,6 +545,27 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert html =~ "Method"
     end
 
+    test "does not show free while paid order payment is still attaching",
+         %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+
+      order =
+        create_ticket_order(user, event, %{
+          total_amount: Money.new(5000, :USD)
+        })
+
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(view, "#order-confirmation-payment-method")
+      refute has_element?(view, "#order-confirmation-payment-method", "Free")
+    end
+
     test "shows payment summary heading", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})

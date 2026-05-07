@@ -1,6 +1,7 @@
 defmodule YscWeb.OrderConfirmationLive do
   use YscWeb, :live_view
 
+  alias YscWeb.PaymentMethodLogo
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
@@ -70,6 +71,10 @@ defmodule YscWeb.OrderConfirmationLive do
             |> assign(
               :payment_method_description,
               payment_method_description_without_stripe(ticket_order.payment)
+            )
+            |> assign(
+              :payment_method_logo,
+              PaymentMethodLogo.path_for_payment(ticket_order.payment)
             )
             |> assign(:async_data_loaded, false)
 
@@ -622,7 +627,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 </div>
               <% end %>
               <div class={[
-                "flex justify-between",
+                "flex justify-between items-center gap-2",
                 if(
                   @ticket_order.status == :cancelled ||
                     (@refund_data && @refund_data.total_refunded),
@@ -640,16 +645,23 @@ defmodule YscWeb.OrderConfirmationLive do
                 }>
                   Method
                 </span>
-                <span>
-                  {if @ticket_order.payment do
-                    @payment_method_description ||
-                      if(@async_data_loaded,
-                        do: "Credit Card (Stripe)",
-                        else: "…"
-                      )
-                  else
-                    "Free"
-                  end}
+                <span class="inline-flex items-center gap-2 justify-end text-right min-w-0">
+                  <%= if @payment_method_logo do %>
+                    <img
+                      src={@payment_method_logo}
+                      alt=""
+                      class="h-6 w-auto max-w-[4rem] object-contain shrink-0"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  <% end %>
+                  <span id="order-confirmation-payment-method" class="min-w-0">
+                    {payment_method_label(
+                      @ticket_order,
+                      @payment_method_description,
+                      @async_data_loaded
+                    )}
+                  </span>
                 </span>
               </div>
               <div class="flex justify-between">
@@ -811,9 +823,10 @@ defmodule YscWeb.OrderConfirmationLive do
         case payment_type do
           :card ->
             if payment_method.last_four do
-              brand = payment_method.display_brand || "Card"
+              brand =
+                payment_brand_label(payment_method.display_brand || "Card")
 
-              "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
+              "#{brand} ending in #{payment_method.last_four}"
             else
               "Credit Card"
             end
@@ -835,79 +848,92 @@ defmodule YscWeb.OrderConfirmationLive do
     end
   end
 
-  # Get payment method type from Stripe payment intent when not synced to database
+  # Get payment method label + logo from Stripe when not synced to database
   defp get_payment_method_from_stripe(payment) do
-    if payment.external_payment_id do
-      stripe_client =
-        Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+    get_payment_method_from_stripe_id(payment.external_payment_id)
+  end
 
-      case stripe_client.retrieve_payment_intent(payment.external_payment_id, %{
-             expand: ["payment_method", "latest_charge"]
-           }) do
-        {:ok, payment_intent} ->
-          # Try to get payment method details from payment intent
-          {payment_method_type, last_four, display_brand} =
-            cond do
-              # Payment method is expanded as an object
-              is_map(payment_intent.payment_method) &&
-                  Map.has_key?(payment_intent.payment_method, :type) ->
-                extract_payment_method_details(payment_intent.payment_method)
+  defp get_payment_method_from_stripe_id(nil),
+    do: stripe_payment_method_fallback()
 
-              # Payment method is a string ID - retrieve it
-              is_binary(payment_intent.payment_method) ->
-                case stripe_client.retrieve_payment_method(
-                       payment_intent.payment_method
-                     ) do
-                  {:ok, pm} -> extract_payment_method_details(pm)
-                  _ -> {nil, nil, nil}
-                end
+  defp get_payment_method_from_stripe_id(payment_intent_id) do
+    stripe_client =
+      Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
-              # Try to get from expanded latest charge
-              (first_charge =
-                 PaymentIntentHelpers.first_expanded_charge(payment_intent)) !=
-                  nil ->
-                pm_on_charge =
-                  Map.get(first_charge, :payment_method) ||
-                    Map.get(first_charge, "payment_method")
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["payment_method", "latest_charge"]
+         }) do
+      {:ok, payment_intent} ->
+        {payment_method_type, last_four, display_brand} =
+          cond do
+            is_map(payment_intent.payment_method) &&
+                Map.has_key?(payment_intent.payment_method, :type) ->
+              extract_payment_method_details(payment_intent.payment_method)
 
-                cond do
-                  is_map(pm_on_charge) &&
-                      (Map.has_key?(pm_on_charge, :type) ||
-                         Map.has_key?(pm_on_charge, "type")) ->
-                    extract_payment_method_details(pm_on_charge)
+            is_binary(payment_intent.payment_method) ->
+              case stripe_client.retrieve_payment_method(
+                     payment_intent.payment_method
+                   ) do
+                {:ok, pm} -> extract_payment_method_details(pm)
+                _ -> {nil, nil, nil}
+              end
 
-                  is_binary(pm_on_charge) ->
-                    case stripe_client.retrieve_payment_method(pm_on_charge) do
-                      {:ok, pm} -> extract_payment_method_details(pm)
-                      _ -> {nil, nil, nil}
-                    end
+            (first_charge =
+               PaymentIntentHelpers.first_expanded_charge(payment_intent)) !=
+                nil ->
+              pm_on_charge =
+                Map.get(first_charge, :payment_method) ||
+                  Map.get(first_charge, "payment_method")
 
-                  true ->
-                    {nil, nil, nil}
-                end
+              cond do
+                is_map(pm_on_charge) &&
+                    (Map.has_key?(pm_on_charge, :type) ||
+                       Map.has_key?(pm_on_charge, "type")) ->
+                  extract_payment_method_details(pm_on_charge)
 
-              true ->
-                {nil, nil, nil}
-            end
+                is_binary(pm_on_charge) ->
+                  case stripe_client.retrieve_payment_method(pm_on_charge) do
+                    {:ok, pm} -> extract_payment_method_details(pm)
+                    _ -> {nil, nil, nil}
+                  end
 
-          case payment_method_type do
-            nil ->
-              "Credit Card (Stripe)"
+                true ->
+                  {nil, nil, nil}
+              end
 
-            type ->
-              format_payment_method_with_details(
-                normalize_payment_type(type),
-                last_four,
-                display_brand
-              )
+            true ->
+              {nil, nil, nil}
           end
 
-        {:error, _} ->
-          "Credit Card (Stripe)"
-      end
-    else
-      "Credit Card (Stripe)"
+        case payment_method_type do
+          nil ->
+            stripe_payment_method_fallback()
+
+          type ->
+            normalized = normalize_payment_type(type)
+
+            %{
+              description:
+                format_payment_method_with_details(
+                  normalized,
+                  last_four,
+                  display_brand
+                ),
+              logo_path:
+                PaymentMethodLogo.path_for_stripe_summary(
+                  normalized,
+                  display_brand
+                )
+            }
+        end
+
+      {:error, _} ->
+        stripe_payment_method_fallback()
     end
+  end
+
+  defp stripe_payment_method_fallback do
+    %{description: "Credit Card (Stripe)", logo_path: nil}
   end
 
   # Extract payment method details from Stripe PaymentMethod object
@@ -1003,7 +1029,7 @@ defmodule YscWeb.OrderConfirmationLive do
 
         case wallet_type do
           "link" ->
-            "Link"
+            card_display_brand(card)
 
           "apple_pay" ->
             "Apple Pay"
@@ -1043,18 +1069,14 @@ defmodule YscWeb.OrderConfirmationLive do
     case type do
       :card ->
         if last_four do
-          brand = display_brand || "Card"
-          "#{String.capitalize(brand)} ending in #{last_four}"
+          brand = payment_brand_label(display_brand || "Card")
+          "#{brand} ending in #{last_four}"
         else
           "Credit Card"
         end
 
       :link ->
-        if last_four do
-          "Link ending in #{last_four}"
-        else
-          "Link"
-        end
+        format_link_payment_method(last_four, display_brand)
 
       :bank_account ->
         if last_four do
@@ -1117,11 +1139,10 @@ defmodule YscWeb.OrderConfirmationLive do
         "Google Pay"
 
       :link ->
-        if payment_method && payment_method.last_four do
-          "Link ending in #{payment_method.last_four}"
-        else
-          "Link"
-        end
+        last_four = payment_method && payment_method.last_four
+        display_brand = payment_method && payment_method.display_brand
+
+        format_link_payment_method(last_four, display_brand)
 
       :us_bank_account ->
         if payment_method && payment_method.last_four do
@@ -1154,8 +1175,8 @@ defmodule YscWeb.OrderConfirmationLive do
 
       :card ->
         if payment_method && payment_method.last_four do
-          brand = payment_method.display_brand || "Card"
-          "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
+          brand = payment_brand_label(payment_method.display_brand || "Card")
+          "#{brand} ending in #{payment_method.last_four}"
         else
           "Credit Card"
         end
@@ -1180,22 +1201,97 @@ defmodule YscWeb.OrderConfirmationLive do
 
   defp format_alternative_payment_method(_, _), do: "Payment Method"
 
+  defp format_link_payment_method(last_four, display_brand) do
+    card_brand =
+      display_brand
+      |> payment_brand_label()
+      |> non_link_brand()
+
+    cond do
+      last_four && card_brand ->
+        "Link · #{card_brand} ending in #{last_four}"
+
+      last_four ->
+        "Link ending in #{last_four}"
+
+      card_brand ->
+        "Link · #{card_brand}"
+
+      true ->
+        "Link"
+    end
+  end
+
+  defp card_display_brand(card) do
+    Map.get(card, :display_brand) ||
+      Map.get(card, "display_brand") ||
+      Map.get(card, :brand) ||
+      Map.get(card, "brand")
+  end
+
+  defp payment_brand_label(nil), do: nil
+
+  defp payment_brand_label(brand) when is_binary(brand) do
+    case String.downcase(brand) do
+      "amex" -> "Amex"
+      "american_express" -> "American Express"
+      "mastercard" -> "Mastercard"
+      "visa" -> "Visa"
+      "link" -> "Link"
+      _ -> brand |> String.replace("_", " ") |> String.capitalize()
+    end
+  end
+
+  defp non_link_brand("Link"), do: nil
+  defp non_link_brand(brand), do: brand
+
+  defp payment_method_label(ticket_order, description, async_data_loaded?) do
+    cond do
+      ticket_order.payment ->
+        description ||
+          if(async_data_loaded? && ticket_order.payment.external_payment_id,
+            do: "Credit Card (Stripe)",
+            else: "…"
+          )
+
+      free_order?(ticket_order) ->
+        "Free"
+
+      async_data_loaded? && ticket_order.payment_intent_id ->
+        "Credit Card (Stripe)"
+
+      true ->
+        "…"
+    end
+  end
+
+  defp free_order?(%{total_amount: %Money{} = total_amount}) do
+    Money.zero?(total_amount)
+  end
+
+  defp free_order?(_ticket_order), do: false
+
   # Load order data asynchronously after WebSocket connection
   defp load_order_data_async(socket, ticket_order) do
     start_async(socket, :load_order_data, fn ->
       refund_data = get_refund_data_for_order(ticket_order)
 
-      stripe_payment_method_description =
-        if ticket_order.payment &&
-             is_nil(ticket_order.payment.payment_method) do
-          get_payment_method_from_stripe(ticket_order.payment)
-        else
-          nil
+      stripe_payment_summary =
+        cond do
+          ticket_order.payment && is_nil(ticket_order.payment.payment_method) ->
+            get_payment_method_from_stripe(ticket_order.payment)
+
+          is_nil(ticket_order.payment) && !free_order?(ticket_order) &&
+              ticket_order.payment_intent_id ->
+            get_payment_method_from_stripe_id(ticket_order.payment_intent_id)
+
+          true ->
+            nil
         end
 
       %{
         refund_data: refund_data,
-        stripe_payment_method_description: stripe_payment_method_description
+        stripe_payment_summary: stripe_payment_summary
       }
     end)
   end
@@ -1208,14 +1304,14 @@ defmodule YscWeb.OrderConfirmationLive do
       |> assign(:async_data_loaded, true)
 
     socket =
-      if results.stripe_payment_method_description do
-        assign(
-          socket,
-          :payment_method_description,
-          results.stripe_payment_method_description
-        )
-      else
-        socket
+      case results.stripe_payment_summary do
+        %{description: description, logo_path: logo} ->
+          socket
+          |> assign(:payment_method_description, description)
+          |> assign(:payment_method_logo, logo)
+
+        _ ->
+          socket
       end
 
     {:noreply, socket}

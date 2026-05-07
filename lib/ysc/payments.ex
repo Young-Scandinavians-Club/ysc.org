@@ -566,7 +566,7 @@ defmodule Ysc.Payments do
   defp get_display_brand(%{card: %{wallet: %{type: wallet_type}} = card})
        when not is_nil(wallet_type) do
     case wallet_type do
-      "link" -> "Link"
+      "link" -> Map.get(card, :display_brand) || Map.get(card, :brand)
       "apple_pay" -> "Apple Pay"
       "google_pay" -> "Google Pay"
       "samsung_pay" -> "Samsung Pay"

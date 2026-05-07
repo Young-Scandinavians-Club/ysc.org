@@ -1,6 +1,7 @@
 defmodule YscWeb.BookingReceiptLive do
   use YscWeb, :live_view
 
+  alias YscWeb.PaymentMethodLogo
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
   alias Ysc.Ledgers.Refund
@@ -119,6 +120,7 @@ defmodule YscWeb.BookingReceiptLive do
             |> assign(:show_door_code, false)
             |> assign(:refund_data, nil)
             |> assign(:payment_method_description, nil)
+            |> assign(:payment_method_logo, nil)
             |> assign(:async_data_loaded, false)
 
           if connected?(socket) do
@@ -999,7 +1001,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <% end %>
                 <% end %>
                 <div class={[
-                  "flex justify-between",
+                  "flex justify-between items-center gap-2",
                   if(@booking.status == :canceled,
                     do: "border-t border-red-200 pt-4",
                     else: "border-t border-zinc-800 pt-4"
@@ -1013,7 +1015,18 @@ defmodule YscWeb.BookingReceiptLive do
                   }>
                     Method
                   </span>
-                  <span>{@payment_method_description}</span>
+                  <span class="inline-flex items-center gap-2 justify-end text-right min-w-0">
+                    <%= if @payment_method_logo do %>
+                      <img
+                        src={@payment_method_logo}
+                        alt=""
+                        class="h-6 w-auto max-w-[4rem] object-contain shrink-0"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    <% end %>
+                    <span class="min-w-0">{@payment_method_description}</span>
+                  </span>
                 </div>
                 <div class="flex justify-between">
                   <span class={
@@ -1442,11 +1455,11 @@ defmodule YscWeb.BookingReceiptLive do
     # Get refund data for cancelled bookings
     refund_data = get_refund_data_for_booking(booking, payment)
 
-    payment_method_description =
+    payment_summary =
       if payment do
-        build_payment_method_description(payment)
+        build_payment_method_summary(payment)
       else
-        nil
+        %{description: nil, logo_path: nil}
       end
 
     %{
@@ -1455,7 +1468,8 @@ defmodule YscWeb.BookingReceiptLive do
       door_code: door_code,
       show_door_code: show_door_code,
       refund_data: refund_data,
-      payment_method_description: payment_method_description
+      payment_method_description: payment_summary.description,
+      payment_method_logo: payment_summary.logo_path
     }
   end
 
@@ -1469,6 +1483,7 @@ defmodule YscWeb.BookingReceiptLive do
      |> assign(:show_door_code, results.show_door_code)
      |> assign(:refund_data, results.refund_data)
      |> assign(:payment_method_description, results.payment_method_description)
+     |> assign(:payment_method_logo, results.payment_method_logo)
      |> assign(:async_data_loaded, true)}
   end
 
@@ -1612,7 +1627,9 @@ defmodule YscWeb.BookingReceiptLive do
 
   defp parse_money_from_map(_), do: nil
 
-  defp build_payment_method_description(payment) do
+  defp build_payment_method_summary(payment) do
+    local_logo = PaymentMethodLogo.path_for_payment(payment)
+
     case payment.payment_method do
       nil ->
         get_payment_method_from_stripe(payment)
@@ -1626,31 +1643,41 @@ defmodule YscWeb.BookingReceiptLive do
 
         case payment_type do
           :card ->
-            if payment_method.last_four do
-              brand = payment_method.display_brand || "Card"
+            desc =
+              if payment_method.last_four do
+                brand =
+                  payment_brand_label(payment_method.display_brand || "Card")
 
-              "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
-            else
-              "Credit Card"
-            end
+                "#{brand} ending in #{payment_method.last_four}"
+              else
+                "Credit Card"
+              end
+
+            %{description: desc, logo_path: local_logo}
 
           :bank_account ->
-            if payment_method.last_four do
-              bank_name = payment_method.bank_name || "Bank"
-              "#{bank_name} Account ending in #{payment_method.last_four}"
-            else
-              "Bank Account"
-            end
+            desc =
+              if payment_method.last_four do
+                bank_name = payment_method.bank_name || "Bank"
+                "#{bank_name} Account ending in #{payment_method.last_four}"
+              else
+                "Bank Account"
+              end
+
+            %{description: desc, logo_path: local_logo}
 
           :link ->
-            if payment_method.last_four do
-              "Link ending in #{payment_method.last_four}"
-            else
-              "Link"
-            end
+            desc =
+              format_link_payment_method(
+                payment_method.last_four,
+                payment_method.display_brand
+              )
+
+            %{description: desc, logo_path: local_logo}
 
           type when not is_nil(type) ->
-            format_alternative_payment_method(type, payment_method)
+            desc = format_alternative_payment_method(type, payment_method)
+            %{description: desc, logo_path: local_logo}
 
           _ ->
             get_payment_method_from_stripe(payment)
@@ -1658,8 +1685,8 @@ defmodule YscWeb.BookingReceiptLive do
     end
   end
 
-  # Get payment method type from Stripe payment intent when not synced to database
   defp get_payment_method_from_stripe(payment) do
+    stripe_fallback = %{description: "Credit Card (Stripe)", logo_path: nil}
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     if payment.external_payment_id do
@@ -1667,43 +1694,58 @@ defmodule YscWeb.BookingReceiptLive do
              expand: ["payment_method"]
            }) do
         {:ok, payment_intent} ->
-          payment_method_description_from_intent(payment_intent, stripe_client)
+          payment_method_summary_from_intent(payment_intent, stripe_client)
 
         {:error, _} ->
-          "Credit Card (Stripe)"
+          stripe_fallback
       end
     else
-      "Credit Card (Stripe)"
+      stripe_fallback
     end
   end
 
-  defp payment_method_description_from_intent(payment_intent, stripe_client) do
+  defp payment_method_summary_from_intent(payment_intent, stripe_client) do
+    stripe_fallback = %{description: "Credit Card (Stripe)", logo_path: nil}
+
     cond do
       is_map(payment_intent.payment_method) &&
           Map.has_key?(payment_intent.payment_method, :type) ->
-        format_from_stripe_payment_method(payment_intent.payment_method)
+        summary_from_stripe_payment_method(payment_intent.payment_method)
 
       is_binary(payment_intent.payment_method) ->
         case stripe_client.retrieve_payment_method(
                payment_intent.payment_method
              ) do
-          {:ok, stripe_pm} -> format_from_stripe_payment_method(stripe_pm)
-          _ -> "Credit Card (Stripe)"
+          {:ok, stripe_pm} -> summary_from_stripe_payment_method(stripe_pm)
+          _ -> stripe_fallback
         end
 
       true ->
-        "Credit Card (Stripe)"
+        stripe_fallback
     end
   end
 
-  defp format_from_stripe_payment_method(stripe_pm) do
+  defp summary_from_stripe_payment_method(stripe_pm) do
     type = normalize_payment_type(stripe_pm.type)
 
     actual_type =
-      if type == :card && stripe_pm.card && stripe_pm.card.wallet do
-        case stripe_pm.card.wallet.type do
-          "link" -> :link
-          _ -> :card
+      if type == :card && stripe_pm.card do
+        wallet = Map.get(stripe_pm.card, :wallet)
+
+        cond do
+          wallet &&
+              (Map.get(wallet, :type) || Map.get(wallet, "type")) == "link" ->
+            :link
+
+          wallet ->
+            :card
+
+          (Map.get(stripe_pm.card, :brand) || Map.get(stripe_pm.card, "brand")) ==
+              "link" ->
+            :link
+
+          true ->
+            :card
         end
       else
         type
@@ -1712,20 +1754,36 @@ defmodule YscWeb.BookingReceiptLive do
     last_four = stripe_last_four_from_pm(stripe_pm)
     display_brand = stripe_display_brand_from_pm(stripe_pm)
 
-    format_payment_method_with_details(actual_type, last_four, display_brand)
+    %{
+      description:
+        format_payment_method_with_details(
+          actual_type,
+          last_four,
+          display_brand
+        ),
+      logo_path:
+        PaymentMethodLogo.path_for_stripe_summary(actual_type, display_brand)
+    }
   end
 
   defp stripe_last_four_from_pm(stripe_pm) do
+    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
+    wallet = card && (Map.get(card, :wallet) || Map.get(card, "wallet"))
+
+    bank =
+      Map.get(stripe_pm, :us_bank_account) ||
+        Map.get(stripe_pm, "us_bank_account")
+
     cond do
-      stripe_pm.card && stripe_pm.card.wallet &&
-          stripe_pm.card.wallet.dynamic_last4 ->
-        stripe_pm.card.wallet.dynamic_last4
+      wallet &&
+          (Map.get(wallet, :dynamic_last4) || Map.get(wallet, "dynamic_last4")) ->
+        Map.get(wallet, :dynamic_last4) || Map.get(wallet, "dynamic_last4")
 
-      stripe_pm.card && stripe_pm.card.last4 ->
-        stripe_pm.card.last4
+      card && (Map.get(card, :last4) || Map.get(card, "last4")) ->
+        Map.get(card, :last4) || Map.get(card, "last4")
 
-      stripe_pm.us_bank_account && stripe_pm.us_bank_account.last4 ->
-        stripe_pm.us_bank_account.last4
+      bank && (Map.get(bank, :last4) || Map.get(bank, "last4")) ->
+        Map.get(bank, :last4) || Map.get(bank, "last4")
 
       true ->
         nil
@@ -1733,20 +1791,20 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp stripe_display_brand_from_pm(stripe_pm) do
+    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
+    wallet = card && (Map.get(card, :wallet) || Map.get(card, "wallet"))
+
     cond do
-      stripe_pm.card && stripe_pm.card.wallet ->
-        case stripe_pm.card.wallet.type do
-          "link" -> "Link"
+      wallet ->
+        case Map.get(wallet, :type) || Map.get(wallet, "type") do
+          "link" -> card_display_brand(card)
           "apple_pay" -> "Apple Pay"
           "google_pay" -> "Google Pay"
-          _ -> stripe_pm.card.display_brand || stripe_pm.card.brand
+          _ -> card_display_brand(card)
         end
 
-      stripe_pm.card && stripe_pm.card.display_brand ->
-        stripe_pm.card.display_brand
-
-      stripe_pm.card && stripe_pm.card.brand ->
-        stripe_pm.card.brand
+      card ->
+        card_display_brand(card)
 
       true ->
         nil
@@ -1758,18 +1816,14 @@ defmodule YscWeb.BookingReceiptLive do
     case type do
       :card ->
         if last_four do
-          brand = display_brand || "Card"
-          "#{String.capitalize(brand)} ending in #{last_four}"
+          brand = payment_brand_label(display_brand || "Card")
+          "#{brand} ending in #{last_four}"
         else
           "Credit Card"
         end
 
       :link ->
-        if last_four do
-          "Link ending in #{last_four}"
-        else
-          "Link"
-        end
+        format_link_payment_method(last_four, display_brand)
 
       :bank_account ->
         if last_four do
@@ -1837,11 +1891,10 @@ defmodule YscWeb.BookingReceiptLive do
         "Google Pay"
 
       :link ->
-        if payment_method && payment_method.last_four do
-          "Link ending in #{payment_method.last_four}"
-        else
-          "Link"
-        end
+        last_four = payment_method && payment_method.last_four
+        display_brand = payment_method && payment_method.display_brand
+
+        format_link_payment_method(last_four, display_brand)
 
       :us_bank_account ->
         if payment_method && payment_method.last_four do
@@ -1874,8 +1927,8 @@ defmodule YscWeb.BookingReceiptLive do
 
       :card ->
         if payment_method && payment_method.last_four do
-          brand = payment_method.display_brand || "Card"
-          "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
+          brand = payment_brand_label(payment_method.display_brand || "Card")
+          "#{brand} ending in #{payment_method.last_four}"
         else
           "Credit Card"
         end
@@ -1888,6 +1941,50 @@ defmodule YscWeb.BookingReceiptLive do
         |> Enum.map_join(" ", &String.capitalize/1)
     end
   end
+
+  defp format_link_payment_method(last_four, display_brand) do
+    card_brand =
+      display_brand
+      |> payment_brand_label()
+      |> non_link_brand()
+
+    cond do
+      last_four && card_brand ->
+        "Link · #{card_brand} ending in #{last_four}"
+
+      last_four ->
+        "Link ending in #{last_four}"
+
+      card_brand ->
+        "Link · #{card_brand}"
+
+      true ->
+        "Link"
+    end
+  end
+
+  defp card_display_brand(card) do
+    Map.get(card, :display_brand) ||
+      Map.get(card, "display_brand") ||
+      Map.get(card, :brand) ||
+      Map.get(card, "brand")
+  end
+
+  defp payment_brand_label(nil), do: nil
+
+  defp payment_brand_label(brand) when is_binary(brand) do
+    case String.downcase(brand) do
+      "amex" -> "Amex"
+      "american_express" -> "American Express"
+      "mastercard" -> "Mastercard"
+      "visa" -> "Visa"
+      "link" -> "Link"
+      _ -> brand |> String.replace("_", " ") |> String.capitalize()
+    end
+  end
+
+  defp non_link_brand("Link"), do: nil
+  defp non_link_brand(brand), do: brand
 
   defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
   defp format_property_name(:clear_lake), do: "Clear Lake Cabin"
