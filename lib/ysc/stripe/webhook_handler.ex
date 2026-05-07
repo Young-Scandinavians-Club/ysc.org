@@ -71,60 +71,69 @@ defmodule Ysc.Stripe.WebhookHandler do
   def handle_event(event) do
     require Ysc.Logging
 
-    Ysc.Logging.info("Processing Stripe webhook event",
-      event_id: event.id,
-      event_type: event.type
-    )
-
-    # Emit telemetry event for webhook received
-    :telemetry.execute(
-      [:ysc, :payments, :stripe_webhook_received],
-      %{count: 1},
-      %{
+    if wordpress_originated_event?(event) do
+      Ysc.Logging.info("Skipping WordPress-originated Stripe webhook",
         event_id: event.id,
         event_type: event.type
-      }
-    )
+      )
 
-    start_time = System.monotonic_time()
-
-    # Check for replay attacks - reject webhooks older than 5 minutes
-    result =
-      case check_webhook_age(event) do
-        :ok ->
-          process_webhook(event)
-
-        {:error, :webhook_too_old} = error ->
-          Ysc.Logging.warning(
-            "Rejecting old webhook event (possible replay attack)",
-            event_id: event.id,
-            event_type: event.type,
-            event_created: event.created,
-            age_seconds:
-              DateTime.diff(
-                DateTime.utc_now(),
-                DateTime.from_unix!(event.created)
-              )
-          )
-
-          error
-      end
-
-    # Emit telemetry event for webhook processing duration
-    duration = System.monotonic_time() - start_time
-    duration_ms = System.convert_time_unit(duration, :native, :millisecond)
-
-    :telemetry.execute(
-      [:ysc, :payments, :stripe_webhook_processing_duration],
-      %{duration: duration_ms},
-      %{
+      :ok
+    else
+      Ysc.Logging.info("Processing Stripe webhook event",
         event_id: event.id,
-        event_type: event.type,
-        status: if(match?(:ok, result), do: "success", else: "failure")
-      }
-    )
+        event_type: event.type
+      )
 
-    result
+      # Emit telemetry event for webhook received
+      :telemetry.execute(
+        [:ysc, :payments, :stripe_webhook_received],
+        %{count: 1},
+        %{
+          event_id: event.id,
+          event_type: event.type
+        }
+      )
+
+      start_time = System.monotonic_time()
+
+      # Check for replay attacks - reject webhooks older than 5 minutes
+      result =
+        case check_webhook_age(event) do
+          :ok ->
+            process_webhook(event)
+
+          {:error, :webhook_too_old} = error ->
+            Ysc.Logging.warning(
+              "Rejecting old webhook event (possible replay attack)",
+              event_id: event.id,
+              event_type: event.type,
+              event_created: event.created,
+              age_seconds:
+                DateTime.diff(
+                  DateTime.utc_now(),
+                  DateTime.from_unix!(event.created)
+                )
+            )
+
+            error
+        end
+
+      # Emit telemetry event for webhook processing duration
+      duration = System.monotonic_time() - start_time
+      duration_ms = System.convert_time_unit(duration, :native, :millisecond)
+
+      :telemetry.execute(
+        [:ysc, :payments, :stripe_webhook_processing_duration],
+        %{duration: duration_ms},
+        %{
+          event_id: event.id,
+          event_type: event.type,
+          status: if(match?(:ok, result), do: "success", else: "failure")
+        }
+      )
+
+      result
+    end
   end
 
   # Normalizes currency strings to atoms safely, preventing atom exhaustion
@@ -174,6 +183,21 @@ defmodule Ysc.Stripe.WebhookHandler do
     else
       :ok
     end
+  end
+
+  # Returns true for events that originated from the WordPress/WooCommerce site.
+  # WooCommerce injects site_url and order_key (with a "wc_order_" prefix) into
+  # payment intent metadata. These fields are never set by this application, so
+  # they are reliable discriminators regardless of which domain this site uses.
+  defp wordpress_originated_event?(event) do
+    metadata =
+      case event do
+        %{data: %{object: %{metadata: m}}} when is_map(m) -> m
+        _ -> %{}
+      end
+
+    Map.get(metadata, "site_url") == "https://ysc.org" or
+      String.starts_with?(Map.get(metadata, "order_key", ""), "wc_order_")
   end
 
   # Process webhook after age validation
