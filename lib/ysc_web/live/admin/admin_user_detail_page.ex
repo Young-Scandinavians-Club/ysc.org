@@ -864,6 +864,28 @@ defmodule YscWeb.AdminUserDetailsLive do
               </span>
             </div>
 
+            <%!-- Override banner: shown when rejection was overridden and user is now active --%>
+            <div
+              :if={
+                @selected_user_application.review_outcome == :rejected &&
+                  @selected_user.state == :active
+              }
+              class="flex items-start gap-3 rounded-lg bg-amber-50 border border-amber-200 p-4"
+            >
+              <.icon
+                name="hero-exclamation-triangle"
+                class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"
+              />
+              <div>
+                <p class="text-sm font-semibold text-amber-800">
+                  Rejection overridden
+                </p>
+                <p class="text-sm text-amber-700 mt-0.5">
+                  This application was rejected but an admin has overridden the decision and activated the account. See the override note at the bottom of this page.
+                </p>
+              </div>
+            </div>
+
             <section>
               <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
                 Applicant Details
@@ -1058,10 +1080,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </section>
 
             <section
-              :if={
-                @selected_user_application.review_outcome == :rejected &&
-                  length(@rejection_notes) > 0
-              }
+              :if={length(@rejection_notes) > 0}
               class="pt-6 border-t border-zinc-200"
             >
               <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
@@ -2214,6 +2233,60 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
       </div>
     </.side_menu>
+
+    <.modal
+      :if={@pending_activation_params != nil}
+      id="rejection-override-modal"
+      show={true}
+      on_cancel={JS.push("cancel_activation_override")}
+      max_width="max-w-lg"
+    >
+      <div class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+            <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h2
+              id="rejection-override-modal-title"
+              class="text-lg font-semibold text-zinc-900"
+            >
+              Override Rejection Decision
+            </h2>
+            <p class="text-sm text-zinc-600 mt-1">
+              This user's membership application was <span class="font-semibold text-red-600">rejected</span>. You must provide a
+              reason for overriding this decision before activating the account.
+            </p>
+          </div>
+        </div>
+        <.simple_form
+          for={@override_rejection_form}
+          phx-change="validate_override_note"
+          phx-submit="confirm_activation_override"
+          id="override-rejection-form"
+        >
+          <.input
+            field={@override_rejection_form[:note]}
+            type="textarea"
+            label="Reason for override"
+            placeholder="Explain why you are overriding the rejection decision..."
+            rows="4"
+          />
+          <div class="flex flex-row justify-end gap-3 pt-2">
+            <button
+              type="button"
+              phx-click="cancel_activation_override"
+              class="px-4 py-2 rounded-md text-sm font-medium border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+            >
+              Cancel
+            </button>
+            <.button phx-disable-with="Activating..." type="submit">
+              Activate & Save Note
+            </.button>
+          </div>
+        </.simple_form>
+      </div>
+    </.modal>
     """
   end
 
@@ -2313,6 +2386,11 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(
         :note_form,
         to_form(note_changeset(%{category: "general"}), as: "note")
+      )
+      |> assign(:pending_activation_params, nil)
+      |> assign(
+        :override_rejection_form,
+        to_form(override_rejection_changeset(%{}), as: "override")
       )
       |> assign(:booking_entitlements, [])
       |> assign(:entitlement_form, entitlement_form_defaults())
@@ -2680,7 +2758,28 @@ defmodule YscWeb.AdminUserDetailsLive do
   def handle_event("save", %{"user" => user_params}, socket) do
     current_user = socket.assigns[:current_user]
     assigned = socket.assigns[:selected_user]
+    application = socket.assigns[:selected_user_application]
 
+    activating_rejected_user? =
+      user_params["state"] == "active" &&
+        assigned.state == :rejected &&
+        application != nil &&
+        application.review_outcome == :rejected
+
+    if activating_rejected_user? do
+      {:noreply,
+       socket
+       |> assign(:pending_activation_params, user_params)
+       |> assign(
+         :override_rejection_form,
+         to_form(override_rejection_changeset(%{}), as: "override")
+       )}
+    else
+      do_save_user(socket, assigned, user_params, current_user)
+    end
+  end
+
+  defp do_save_user(socket, assigned, user_params, current_user) do
     case Accounts.update_user_with_address(assigned, user_params, current_user) do
       {:ok, updated_user} ->
         {:noreply,
@@ -3349,6 +3448,88 @@ defmodule YscWeb.AdminUserDetailsLive do
            "Failed to add note: #{format_changeset_errors(changeset)}",
            title: "Note"
          )}
+    end
+  end
+
+  def handle_event("cancel_activation_override", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:pending_activation_params, nil)
+     |> assign(
+       :override_rejection_form,
+       to_form(override_rejection_changeset(%{}), as: "override")
+     )}
+  end
+
+  def handle_event("validate_override_note", %{"override" => params}, socket) do
+    changeset =
+      params |> override_rejection_changeset() |> Map.put(:action, :validate)
+
+    {:noreply,
+     assign(
+       socket,
+       :override_rejection_form,
+       to_form(changeset, as: "override")
+     )}
+  end
+
+  def handle_event(
+        "confirm_activation_override",
+        %{"override" => params},
+        socket
+      ) do
+    current_user = socket.assigns[:current_user]
+    selected_user = socket.assigns[:selected_user]
+    pending_params = socket.assigns[:pending_activation_params]
+
+    changeset =
+      params |> override_rejection_changeset() |> Map.put(:action, :validate)
+
+    if changeset.valid? do
+      note_text = Ecto.Changeset.get_field(changeset, :note)
+
+      with {:ok, updated_user} <-
+             Accounts.update_user_with_address(
+               selected_user,
+               pending_params,
+               current_user
+             ),
+           {:ok, _note} <-
+             Accounts.create_user_note(
+               selected_user,
+               %{"note" => note_text, "category" => "rejection"},
+               current_user
+             ) do
+        {:noreply,
+         socket
+         |> assign(:pending_activation_params, nil)
+         |> assign(
+           :override_rejection_form,
+           to_form(override_rejection_changeset(%{}), as: "override")
+         )
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "User activated and override note saved.", title: "Profile")
+         |> push_patch(to: ~p"/admin/users/#{updated_user.id}/details")}
+      else
+        {:error, changeset} ->
+          Ysc.Logging.error(
+            "Failed to activate user with rejection override: #{inspect(changeset.errors)}"
+          )
+
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to activate user. Please try again.", title: "Error")}
+      end
+    else
+      {:noreply,
+       assign(
+         socket,
+         :override_rejection_form,
+         to_form(changeset, as: "override")
+       )}
     end
   end
 
@@ -4155,6 +4336,21 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> Ecto.Changeset.validate_required([:note, :category])
     |> Ecto.Changeset.validate_length(:note, min: 1, max: 5000)
     |> Ecto.Changeset.validate_inclusion(:category, ["general", "violation"])
+  end
+
+  defp override_rejection_changeset(params) do
+    types = %{note: :string}
+
+    {%{}, types}
+    |> Ecto.Changeset.cast(params, [:note])
+    |> Ecto.Changeset.validate_required([:note],
+      message: "Please provide a reason for overriding the rejection."
+    )
+    |> Ecto.Changeset.validate_length(:note,
+      min: 10,
+      max: 5000,
+      message: "Please provide a more detailed reason (at least 10 characters)."
+    )
   end
 
   defp format_changeset_errors(changeset) do
