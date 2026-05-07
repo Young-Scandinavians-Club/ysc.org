@@ -50,7 +50,13 @@ defmodule Ysc.WpMigration.Load do
           MapSet.new([String.downcase(email)])
 
         emails when is_list(emails) ->
-          MapSet.new(Enum.map(emails, &String.downcase/1))
+          valid =
+            emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
+
+          if valid == [], do: nil, else: MapSet.new(valid)
+
+        _ ->
+          nil
       end
 
     if export_dir do
@@ -89,7 +95,12 @@ defmodule Ysc.WpMigration.Load do
     users_data = read_json(users_json) |> filter_by_emails(only_emails)
 
     only_wp_user_ids =
-      if only_emails, do: MapSet.new(users_data, & &1["wp_user_id"]), else: nil
+      if only_emails do
+        users_data
+        |> Enum.map(& &1["wp_user_id"])
+        |> Enum.reject(&is_nil/1)
+        |> MapSet.new()
+      end
 
     if only_emails do
       Ysc.Logging.info(

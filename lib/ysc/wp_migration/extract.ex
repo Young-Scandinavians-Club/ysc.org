@@ -36,7 +36,13 @@ defmodule Ysc.WpMigration.Extract do
           MapSet.new([String.downcase(email)])
 
         emails when is_list(emails) ->
-          MapSet.new(Enum.map(emails, &String.downcase/1))
+          valid =
+            emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
+
+          if valid == [], do: nil, else: MapSet.new(valid)
+
+        _ ->
+          nil
       end
 
     if is_nil(db) or db == "" do
@@ -125,7 +131,10 @@ defmodule Ysc.WpMigration.Extract do
   # Returns a MapSet of wp_user_id values from a list of user rows.
   # When only_emails is nil (no filter), returns nil so downstream filters are skipped.
   defp wp_user_id_set(users) do
-    MapSet.new(users, & &1["wp_user_id"])
+    users
+    |> Enum.map(& &1["wp_user_id"])
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new()
   end
 
   # Filters rows whose `email_field` (downcased) is in the given MapSet.
