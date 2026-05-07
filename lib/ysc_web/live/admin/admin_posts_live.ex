@@ -221,12 +221,22 @@ defmodule YscWeb.AdminPostsLive do
                     </span>
                   </div>
 
-                  <button
-                    phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                  >
-                    Edit
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <a
+                      :if={post.state == :published}
+                      href={~p"/posts/#{post.id}"}
+                      target="_blank"
+                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                    >
+                      View Live
+                    </a>
+                    <button
+                      phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
+                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </div>
               </div>
             <% end %>
@@ -341,12 +351,22 @@ defmodule YscWeb.AdminPostsLive do
               </:action>
 
               <:action :let={{_, post}} label="Action">
-                <button
-                  phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                >
-                  Edit
-                </button>
+                <div class="flex items-center gap-3">
+                  <a
+                    :if={post.state == :published}
+                    href={~p"/posts/#{post.id}"}
+                    target="_blank"
+                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    View Live
+                  </a>
+                  <button
+                    phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
+                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
               </:action>
             </Flop.Phoenix.table>
           </div>

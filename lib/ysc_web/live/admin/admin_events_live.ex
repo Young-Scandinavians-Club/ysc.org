@@ -200,6 +200,14 @@ defmodule YscWeb.AdminEventsLive do
                   </div>
 
                   <div class="flex items-center gap-2">
+                    <a
+                      :if={event.state in [:published, :scheduled]}
+                      href={~p"/events/#{event.id}"}
+                      target="_blank"
+                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                    >
+                      View Live
+                    </a>
                     <button
                       phx-click="copy-event"
                       phx-value-id={event.id}
@@ -312,6 +320,14 @@ defmodule YscWeb.AdminEventsLive do
 
               <:action :let={{_, event}} label="Action">
                 <div class="flex items-center gap-3">
+                  <a
+                    :if={event.state in [:published, :scheduled]}
+                    href={~p"/events/#{event.id}"}
+                    target="_blank"
+                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    View Live
+                  </a>
                   <button
                     phx-click="copy-event"
                     phx-value-id={event.id}
