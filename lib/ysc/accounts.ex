@@ -2646,9 +2646,11 @@ defmodule Ysc.Accounts do
       "Vice President"
 
       iex> Ysc.Accounts.format_board_position(:member_outreach)
-      "Member Outreach"
+      "Member Outreach & Events"
 
   """
+  def format_board_position(:member_outreach), do: "Member Outreach & Events"
+
   def format_board_position(position) when not is_nil(position) do
     position
     |> to_string()

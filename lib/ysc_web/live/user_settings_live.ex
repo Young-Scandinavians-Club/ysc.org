@@ -4468,12 +4468,15 @@ defmodule YscWeb.UserSettingsLive do
     pending_family_invites =
       FamilyInvites.list_pending_invites_for_email(user.email)
 
+    board_member = Accounts.household_board_member(user)
+
     socket
     |> assign(:user, user)
     |> assign(:current_membership, current_membership)
     |> assign(:active_plan_type, active_plan)
     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
     |> assign(:pending_family_invites, pending_family_invites)
+    |> assign(:membership_paused_by_board, board_member)
     |> assign(:change_membership_button, false)
     |> assign(:membership_change_info, nil)
     |> assign(

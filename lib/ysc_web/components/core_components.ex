@@ -2617,7 +2617,7 @@ defmodule YscWeb.CoreComponents do
             <% else %>
               Your membership billing is currently paused because
               <span class="font-medium">
-                {@board_member.first_name} {@board_member.last_name}
+                {board_member_display_name(@board_member)}
               </span>
               serves as <span class="font-medium">{Ysc.Accounts.format_board_position(@board_member.board_position)}</span>.
             <% end %>
@@ -2627,6 +2627,15 @@ defmodule YscWeb.CoreComponents do
       </div>
     </div>
     """
+  end
+
+  defp board_member_display_name(%{first_name: first, last_name: last}) do
+    case {first, last} do
+      {nil, nil} -> "a household member"
+      {nil, last} -> last
+      {first, nil} -> first
+      {first, last} -> "#{first} #{last}"
+    end
   end
 
   @doc """

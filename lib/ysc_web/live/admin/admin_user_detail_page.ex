@@ -1096,33 +1096,11 @@ defmodule YscWeb.AdminUserDetailsLive do
         <div :if={@live_action == :membership} class="max-w-lg py-8 px-2">
           <div class="space-y-6">
             <%!-- Board volunteer billing pause notice --%>
-            <div
+            <.board_pause_notice
               :if={@membership_paused_by_board != nil}
-              id="admin-board-pause-notice"
-              class="bg-blue-50 border border-blue-200 rounded-md p-4"
-            >
-              <div class="flex gap-3">
-                <.icon
-                  name="hero-shield-check"
-                  class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
-                />
-                <div class="text-sm text-blue-800 space-y-1">
-                  <p class="font-semibold">Billing paused — board volunteer</p>
-                  <p>
-                    {@membership_paused_by_board.first_name} {@membership_paused_by_board.last_name} serves as <span class="font-medium">
-                      {Ysc.Accounts.format_board_position(
-                        @membership_paused_by_board.board_position
-                      )}
-                    </span>.
-                    The household's membership billing is paused via Stripe
-                    <code class="text-xs bg-blue-100 px-1 py-0.5 rounded">
-                      pause_collection
-                    </code>
-                    for the duration of their board service.
-                  </p>
-                </div>
-              </div>
-            </div>
+              board_member={@membership_paused_by_board}
+              current_user={@current_user}
+            />
 
             <%!-- Sub-account: membership via primary user --%>
             <div
