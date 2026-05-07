@@ -3,10 +3,16 @@ defmodule YscWeb.ImpersonationControllerTest do
 
   import Ysc.AccountsFixtures
 
-  describe "GET /admin/impersonate/:user_id" do
+  describe "POST /admin/impersonate/:user_id" do
     test "redirects unauthenticated users to log in", %{conn: conn} do
       target = user_fixture()
-      conn = get(conn, ~p"/admin/impersonate/#{target.id}")
+      conn = get(conn, ~p"/")
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "sign in"
@@ -19,7 +25,14 @@ defmodule YscWeb.ImpersonationControllerTest do
       conn =
         conn
         |> log_in_user(member)
-        |> get(~p"/admin/impersonate/#{target.id}")
+        |> get(~p"/")
+
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/"
 
@@ -36,7 +49,12 @@ defmodule YscWeb.ImpersonationControllerTest do
       conn =
         conn
         |> log_in_user(admin)
-        |> get(~p"/admin/impersonate/#{fake_id}")
+        |> get(~p"/admin/users")
+
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{fake_id}", %{"_csrf_token" => token})
 
       assert redirected_to(conn) == ~p"/admin/users"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) == "User not found."
@@ -54,7 +72,14 @@ defmodule YscWeb.ImpersonationControllerTest do
       conn =
         conn
         |> log_in_user(admin)
-        |> get(~p"/admin/impersonate/#{target.id}")
+        |> get(~p"/admin/users")
+
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Impersonating"
@@ -71,7 +96,14 @@ defmodule YscWeb.ImpersonationControllerTest do
       conn =
         conn
         |> log_in_user(admin)
-        |> get(~p"/admin/impersonate/#{target.id}")
+        |> get(~p"/admin/users")
+
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
 
       assert redirected_to(conn) == ~p"/"
       conn = get(conn, ~p"/")
@@ -82,14 +114,19 @@ defmodule YscWeb.ImpersonationControllerTest do
     end
   end
 
-  describe "GET /admin/stop-impersonation" do
+  describe "POST /admin/stop-impersonation" do
     test "redirects to / when not impersonating", %{conn: conn} do
       admin = user_fixture(%{role: "admin"})
 
       conn =
         conn
         |> log_in_user(admin)
-        |> get(~p"/admin/stop-impersonation")
+        |> get(~p"/admin/users")
+
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => token})
 
       assert redirected_to(conn) == ~p"/"
       refute get_session(conn, :impersonated_user_id)
@@ -110,7 +147,12 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> put_session(:user_token, token)
         |> put_session(:impersonated_user_id, target.id)
         |> put_session(:original_admin_id, admin.id)
-        |> get(~p"/admin/stop-impersonation")
+        |> get(~p"/")
+
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => csrf})
 
       assert redirected_to(conn) == ~p"/admin/users/#{target.id}/details"
 
@@ -133,7 +175,12 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> init_test_session(%{})
         |> put_session(:user_token, token)
         |> put_session(:original_admin_id, admin.id)
-        |> get(~p"/admin/stop-impersonation")
+        |> get(~p"/")
+
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => csrf})
 
       assert redirected_to(conn) == ~p"/admin"
 
@@ -159,7 +206,12 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> put_session(:user_token, token)
         |> put_session(:impersonated_user_id, target.id)
         |> put_session(:original_admin_id, admin2.id)
-        |> get(~p"/admin/stop-impersonation")
+        |> get(~p"/")
+
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => csrf})
 
       assert redirected_to(conn) == ~p"/"
 
@@ -171,7 +223,12 @@ defmodule YscWeb.ImpersonationControllerTest do
     end
 
     test "unauthenticated user is redirected to log in", %{conn: conn} do
-      conn = get(conn, ~p"/admin/stop-impersonation")
+      conn = get(conn, ~p"/")
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => token})
+
       assert redirected_to(conn) == ~p"/users/log-in"
     end
   end

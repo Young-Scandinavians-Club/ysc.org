@@ -110,7 +110,17 @@ defmodule YscWeb.VolunteerRoleTest do
     test "cannot impersonate users", %{conn: conn} do
       other_user = user_fixture()
 
-      conn = get(conn, ~p"/admin/impersonate/#{other_user.id}")
+      conn =
+        conn
+        |> get(~p"/admin")
+
+      {conn, token} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{other_user.id}", %{
+          "_csrf_token" => token
+        })
+
       assert redirected_to(conn) == "/admin"
     end
   end

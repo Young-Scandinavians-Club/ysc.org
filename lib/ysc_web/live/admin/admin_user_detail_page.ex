@@ -39,12 +39,24 @@ defmodule YscWeb.AdminUserDetailsLive do
           <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
             {"#{Ysc.title_case(@first_name)} #{Ysc.title_case(@last_name)}"}
           </h1>
-          <.link
-            href={~p"/admin/impersonate/#{@user_id}"}
-            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+          <form
+            id="admin-impersonate-form"
+            action={~p"/admin/impersonate/#{@user_id}"}
+            method="post"
+            class="inline-block m-0"
           >
-            <.icon name="hero-user-circle" class="w-5 h-5" /> Sign in as User
-          </.link>
+            <input
+              type="hidden"
+              name="_csrf_token"
+              value={Phoenix.Controller.get_csrf_token()}
+            />
+            <button
+              type="submit"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
+            >
+              <.icon name="hero-user-circle" class="w-5 h-5" /> Sign in as User
+            </button>
+          </form>
         </div>
 
         <div class="w-full py-4">

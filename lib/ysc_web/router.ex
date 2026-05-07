@@ -382,8 +382,8 @@ defmodule YscWeb.Router do
       :full_admin_only
     ]
 
-    get "/impersonate/:user_id", ImpersonationController, :impersonate
-    get "/stop-impersonation", ImpersonationController, :stop_impersonation
+    post "/impersonate/:user_id", ImpersonationController, :impersonate
+    post "/stop-impersonation", ImpersonationController, :stop_impersonation
 
     live_dashboard "/dashboard", metrics: {YscWeb.Telemetry, :metrics}
   end
