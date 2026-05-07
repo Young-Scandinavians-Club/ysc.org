@@ -7,7 +7,7 @@ defmodule Ysc.Accounts.FamilyInvite do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Ysc.Accounts.User
+  alias Ysc.Accounts.{Email, User}
 
   @rand_size 32
   @invite_validity_in_days 30
@@ -49,6 +49,7 @@ defmodule Ysc.Accounts.FamilyInvite do
       :created_by_user_id,
       :relationship
     ])
+    |> normalize_email()
     |> validate_required([
       :email,
       :token,
@@ -61,6 +62,13 @@ defmodule Ysc.Accounts.FamilyInvite do
     |> validate_length(:email, max: 160)
     |> unique_constraint(:token)
     |> put_expires_at()
+  end
+
+  defp normalize_email(changeset) do
+    case get_change(changeset, :email) do
+      nil -> changeset
+      email -> put_change(changeset, :email, Email.normalize(email))
+    end
   end
 
   defp put_expires_at(changeset) do

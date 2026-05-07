@@ -7,7 +7,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
-  alias Ysc.Accounts.{User, FamilyInvite, UserEvent}
+  alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent}
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
@@ -300,16 +300,12 @@ defmodule Ysc.Accounts.FamilyInvites do
   can accept without needing the original email link.
   """
   def list_pending_invites_for_email(email) when is_binary(email) do
-    normalized_email =
-      email
-      |> String.downcase()
-      |> String.trim()
-
+    normalized_email = Email.normalize(email)
     now = DateTime.utc_now()
 
     from(i in FamilyInvite,
       where:
-        fragment("lower(trim(?))", i.email) == ^normalized_email and
+        i.email == ^normalized_email and
           is_nil(i.accepted_at) and
           i.expires_at > ^now,
       order_by: [desc: i.inserted_at],
@@ -506,7 +502,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   defp validate_email_not_registered(email, primary_user_id) do
-    normalized = String.downcase(String.trim(email))
+    normalized = Email.normalize(email)
 
     case Ysc.Accounts.get_user_by_email(normalized) do
       nil -> :ok
