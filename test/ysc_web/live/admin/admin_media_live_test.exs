@@ -3,6 +3,7 @@ defmodule YscWeb.AdminMediaLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.TestDataFactory
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -25,6 +26,29 @@ defmodule YscWeb.AdminMediaLiveTest do
       |> render_click()
 
       assert_patched(view, ~p"/admin/media/upload")
+    end
+
+    test "clearing search URL restores full gallery results", %{conn: conn} do
+      _other =
+        create_test_image(%{
+          title: "AdminMediaOtherImage998877"
+        })
+
+      matching =
+        create_test_image(%{
+          title: "AdminMediaUniqueSearchTitle554433"
+        })
+
+      {:ok, view, html} =
+        live(conn, ~p"/admin/media?search=#{matching.title}")
+
+      assert html =~ matching.title
+      refute html =~ "AdminMediaOtherImage998877"
+
+      html_after_clear = render_patch(view, ~p"/admin/media")
+
+      assert html_after_clear =~ matching.title
+      assert html_after_clear =~ "AdminMediaOtherImage998877"
     end
   end
 end
