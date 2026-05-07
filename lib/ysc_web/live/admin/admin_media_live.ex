@@ -350,6 +350,18 @@ defmodule YscWeb.AdminMediaLive do
         </div>
       </div>
 
+      <div :if={@media_count > 0} class="w-full pb-4">
+        <.admin_search_bar
+          id="media-search-form"
+          input_id="media-search-input"
+          name="search"
+          value={@search_query}
+          placeholder="Search by filename, title, or alt text..."
+          on_change="search"
+          clear_event="clear-search"
+        />
+      </div>
+
       <section class="py-6 relative">
         <div
           :if={@media_count > 0}
@@ -440,6 +452,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:timeline, timeline)
      |> assign(:available_years, available_years)
      |> assign(:selected_year, nil)
+     |> assign(:search_query, "")
      |> assign(:per_page, 30)
      |> assign(:end_of_timeline?, false)
      |> assign(:stream_initialized?, false)
@@ -487,17 +500,21 @@ defmodule YscWeb.AdminMediaLive do
           socket
       end
 
-    # Parse query parameters from URI to get year param
+    # Parse query parameters from URI to get year and search params
     query_params = parse_query_params_from_uri(params, uri)
     year_param = query_params["year"] || query_params[:year]
+    search_query = query_params["search"] || query_params[:search] || ""
 
     # Store current URL parameters in assigns for use when building return URLs
-    socket = assign(socket, :url_year_param, year_param)
+    socket = 
+      socket
+      |> assign(:url_year_param, year_param)
+      |> assign(:search_query, search_query)
 
-    Ysc.Logging.debug("Year param: #{inspect(year_param)}")
+    Ysc.Logging.debug("Year param: #{inspect(year_param)}, Search query: #{inspect(search_query)}")
 
-    # Load images based on year param, even when on edit route
-    # But only load if stream is empty or year has changed
+    # Load images based on year param and search query, even when on edit route
+    # But only load if stream is empty or year/search has changed
     socket =
       if year_param do
         year =
@@ -510,9 +527,10 @@ defmodule YscWeb.AdminMediaLive do
         )
 
         year_changed = year != socket.assigns.selected_year
+        search_changed = search_query != socket.assigns.search_query
         not_initialized = not socket.assigns.stream_initialized?
 
-        if year_changed || not_initialized do
+        if year_changed || search_changed || not_initialized do
           start_date =
             DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
 
@@ -527,6 +545,14 @@ defmodule YscWeb.AdminMediaLive do
                 order_by: [desc: i.inserted_at, desc: i.id],
                 limit: ^socket.assigns.per_page
             )
+
+          # Apply search filter if present
+          images =
+            if search_query != "" do
+              filter_images_by_search(images, search_query)
+            else
+              images
+            end
 
           Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
 
@@ -546,10 +572,11 @@ defmodule YscWeb.AdminMediaLive do
         end
       else
         has_year_filter = not is_nil(socket.assigns.selected_year)
+        search_changed = search_query != socket.assigns.search_query
         not_initialized = not socket.assigns.stream_initialized?
 
-        if has_year_filter || not_initialized do
-          images = Media.list_images_cursor(limit: socket.assigns.per_page)
+        if has_year_filter || search_changed || not_initialized do
+          images = Media.list_images_cursor(limit: socket.assigns.per_page, search: search_query)
           {years_set, years_list} = years_from_images(images)
           stream_items = Timeline.inject_date_headers(images)
 
@@ -790,6 +817,7 @@ defmodule YscWeb.AdminMediaLive do
     require Ysc.Logging
 
     last_image_date = socket.assigns.last_image_date
+    search_query = socket.assigns.search_query
 
     if not socket.assigns.end_of_timeline? and not is_nil(last_image_date) do
       new_images =
@@ -802,18 +830,27 @@ defmodule YscWeb.AdminMediaLive do
           end_date =
             DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
 
-          Repo.all(
-            from i in Media.Image,
-              where:
-                i.inserted_at >= ^start_date and i.inserted_at <= ^end_date and
-                  i.inserted_at < ^last_image_date,
-              order_by: [desc: i.inserted_at, desc: i.id],
-              limit: ^socket.assigns.per_page
-          )
+          images =
+            Repo.all(
+              from i in Media.Image,
+                where:
+                  i.inserted_at >= ^start_date and i.inserted_at <= ^end_date and
+                    i.inserted_at < ^last_image_date,
+                order_by: [desc: i.inserted_at, desc: i.id],
+                limit: ^socket.assigns.per_page
+            )
+
+          # Apply search filter if present
+          if search_query != "" do
+            filter_images_by_search(images, search_query)
+          else
+            images
+          end
         else
           Media.list_images_cursor(
             before_date: last_image_date,
-            limit: socket.assigns.per_page
+            limit: socket.assigns.per_page,
+            search: search_query
           )
         end
 
@@ -908,6 +945,38 @@ defmodule YscWeb.AdminMediaLive do
       |> push_event("scroll-to-year", %{year: year_int})
 
     {:noreply, socket}
+  end
+
+  def handle_event("search", %{"search" => search_query}, socket) do
+    search_query = String.trim(search_query)
+
+    new_params =
+      if search_query == "" do
+        %{}
+      else
+        %{"search" => search_query}
+      end
+
+    # Preserve year filter if present
+    new_params =
+      if socket.assigns.selected_year do
+        Map.put(new_params, "year", to_string(socket.assigns.selected_year))
+      else
+        new_params
+      end
+
+    {:noreply, push_patch(socket, to: ~p"/admin/media?#{new_params}")}
+  end
+
+  def handle_event("clear-search", %{"input-id" => _input_id}, socket) do
+    new_params =
+      if socket.assigns.selected_year do
+        %{"year" => to_string(socket.assigns.selected_year)}
+      else
+        %{}
+      end
+
+    {:noreply, push_patch(socket, to: ~p"/admin/media?#{new_params}")}
   end
 
   defp presign_upload(entry, socket) do
@@ -1023,10 +1092,17 @@ defmodule YscWeb.AdminMediaLive do
           nil
       end
 
+    search_query = assigns[:search_query] || ""
+
     query_params = []
 
     query_params =
       if year, do: [{"year", year} | query_params], else: query_params
+
+    query_params =
+      if search_query != "",
+        do: [{"search", search_query} | query_params],
+        else: query_params
 
     base_path = ~p"/admin/media"
 
@@ -1060,10 +1136,17 @@ defmodule YscWeb.AdminMediaLive do
           nil
       end
 
+    search_query = assigns[:search_query] || ""
+
     query_params = []
 
     query_params =
       if year, do: [{"year", year} | query_params], else: query_params
+
+    query_params =
+      if search_query != "",
+        do: [{"search", search_query} | query_params],
+        else: query_params
 
     base_path = ~p"/admin/media/upload/#{image_id}"
 
@@ -1084,6 +1167,22 @@ defmodule YscWeb.AdminMediaLive do
     years_list = years_set |> MapSet.to_list() |> Enum.sort(:desc)
     {years_set, years_list}
   end
+
+  defp filter_images_by_search(images, search_query) when is_binary(search_query) do
+    normalized_search = String.downcase(search_query)
+
+    Enum.filter(images, fn image ->
+      title = String.downcase(image.title || "")
+      alt_text = String.downcase(image.alt_text || "")
+      filename = String.downcase(Path.basename(image.raw_image_path || ""))
+
+      String.contains?(title, normalized_search) ||
+        String.contains?(alt_text, normalized_search) ||
+        String.contains?(filename, normalized_search)
+    end)
+  end
+
+  defp filter_images_by_search(images, _), do: images
 
   defp last_date(nil), do: nil
   defp last_date(%{inserted_at: inserted_at}), do: inserted_at
