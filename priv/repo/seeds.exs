@@ -2448,3 +2448,314 @@ if tahoe_room_policy do
 end
 
 IO.puts("✅ Refund policies seeding completed!")
+
+# --- Dev-only: sent newsletter editions with fake engagement stats (SES-style events)
+if Mix.env() == :dev do
+  alias Ysc.Newsletter
+  alias Ysc.Newsletter.Edition
+
+  seed_edition_titles = [
+    "[Dev seed] YSC Weekly — Midsummer roundup",
+    "[Dev seed] YSC Weekly — Cabin & events digest",
+    "[Dev seed] YSC Weekly — New member welcome"
+  ]
+
+  env = to_string(Ysc.Env.current())
+  base_url = String.trim_trailing(YscWeb.Endpoint.url(), "/")
+
+  click_links =
+    []
+    |> then(fn acc ->
+      case Repo.one(
+             from p in Ysc.Posts.Post,
+               where: p.state == "published",
+               order_by: [desc: p.inserted_at],
+               limit: 1,
+               select: p.url_name
+           ) do
+        nil -> acc
+        url_name -> ["#{base_url}/posts/#{url_name}" | acc]
+      end
+    end)
+    |> then(fn acc ->
+      case Repo.one(
+             from ev in Ysc.Events.Event,
+               where: ev.state == "published",
+               order_by: [desc: ev.inserted_at],
+               limit: 1,
+               select: ev.id
+           ) do
+        nil -> acc
+        id -> ["#{base_url}/events/#{id}" | acc]
+      end
+    end)
+    |> then(fn
+      [] -> ["#{base_url}/posts/dev-seed-placeholder"]
+      links -> Enum.reverse(links)
+    end)
+
+  editions_spec = [
+    %{
+      title: Enum.at(seed_edition_titles, 0),
+      subject: "Midsummer photos, thank-yous, and what's next",
+      intro:
+        "Hej! Dev-only sample edition with higher engagement stats for UI testing.",
+      days_ago: 21,
+      sent_count: 512,
+      opens: 198,
+      clicks: 52,
+      bounces: 3
+    },
+    %{
+      title: Enum.at(seed_edition_titles, 1),
+      subject: "Tahoe openings, volunteer call, and April events",
+      intro:
+        "Quick club updates — seeded data for local development (not a real send).",
+      days_ago: 10,
+      sent_count: 340,
+      opens: 121,
+      clicks: 28,
+      bounces: 2
+    },
+    %{
+      title: Enum.at(seed_edition_titles, 2),
+      subject: "Welcome new members + how to get involved",
+      intro:
+        "A shorter edition with lighter engagement numbers for comparison in the admin UI.",
+      days_ago: 3,
+      sent_count: 186,
+      opens: 47,
+      clicks: 9,
+      bounces: 6
+    }
+  ]
+
+  post_ids =
+    Repo.all(
+      from p in Ysc.Posts.Post,
+        where: p.state == "published",
+        order_by: [desc: p.inserted_at],
+        limit: 2,
+        select: p.id
+    )
+
+  event_ids =
+    Repo.all(
+      from ev in Ysc.Events.Event,
+        where: ev.state == "published",
+        order_by: [desc: ev.inserted_at],
+        limit: 2,
+        select: ev.id
+    )
+
+  sent_at_for = fn days_ago ->
+    DateTime.utc_now()
+    |> DateTime.add(-days_ago * 86_400, :second)
+    |> DateTime.truncate(:second)
+  end
+
+  {created, skipped} =
+    Enum.reduce(editions_spec, {0, 0}, fn spec, {created_acc, skipped_acc} ->
+      if Repo.get_by(Edition, title: spec.title) do
+        {created_acc, skipped_acc + 1}
+      else
+        sent_at = sent_at_for.(spec.days_ago)
+
+        edition_attrs = %{
+          "title" => spec.title,
+          "subject" => spec.subject,
+          "intro_text" => spec.intro,
+          "post_ids" => post_ids,
+          "event_ids" => event_ids,
+          "status" => :sent,
+          "sent_at" => sent_at,
+          "sent_count" => spec.sent_count
+        }
+
+        {:ok, edition} =
+          Newsletter.create_edition(edition_attrs, created_by_id: admin_user.id)
+
+        {:ok, _} =
+          Newsletter.store_archive_html(
+            edition,
+            "<p>#{Plug.HTML.html_escape(spec.intro)}</p>"
+          )
+
+        ts_base = sent_at
+
+        for i <- 1..spec.opens do
+          offset = rem(i * 7_311, 86_400)
+
+          {:ok, _} =
+            Newsletter.record_email_event(%{
+              event_type: "open",
+              email: "seed-open-#{edition.id}-#{i}@example.invalid",
+              environment: env,
+              edition_id: edition.id,
+              event_timestamp: DateTime.add(ts_base, offset, :second)
+            })
+        end
+
+        click_link_count = length(click_links)
+
+        for i <- 1..spec.clicks do
+          link = Enum.at(click_links, rem(i - 1, click_link_count))
+          offset = rem(i * 5_017, 86_400)
+
+          {:ok, _} =
+            Newsletter.record_email_event(%{
+              event_type: "click",
+              email: "seed-click-#{edition.id}-#{i}@example.invalid",
+              environment: env,
+              edition_id: edition.id,
+              link_url: link,
+              event_timestamp: DateTime.add(ts_base, offset, :second)
+            })
+        end
+
+        for i <- 1..spec.bounces do
+          offset = rem(i * 3_331, 86_400)
+
+          {:ok, _} =
+            Newsletter.record_email_event(%{
+              event_type: "bounce",
+              email: "seed-bounce-#{edition.id}-#{i}@example.invalid",
+              environment: env,
+              edition_id: edition.id,
+              bounce_type: "Transient",
+              bounce_sub_type: "General",
+              event_timestamp: DateTime.add(ts_base, offset, :second)
+            })
+        end
+
+        {created_acc + 1, skipped_acc}
+      end
+    end)
+
+  cond do
+    created > 0 ->
+      IO.puts(
+        "\n📧 Dev newsletter seed: created #{created} sent edition(s) with fake opens/clicks/bounces" <>
+          if(skipped > 0, do: " (#{skipped} already existed)", else: "")
+      )
+
+    skipped > 0 ->
+      IO.puts(
+        "\n📧 Dev newsletter seed: all #{skipped} edition(s) already present, skipping"
+      )
+
+    true ->
+      :ok
+  end
+end
+
+# --- Dev-only: sample comments on published news posts
+if Mix.env() == :dev do
+  alias Ysc.Posts
+  alias Ysc.Posts.Comment
+
+  seed_comment_prefix = "[Dev seed]"
+
+  post_ids_for_comments =
+    Repo.all(
+      from p in Ysc.Posts.Post,
+        where: p.state == :published,
+        order_by: [desc: p.inserted_at],
+        limit: 3,
+        select: p.id
+    )
+
+  comment_authors =
+    Repo.all(
+      from u in User,
+        where: u.state == :active,
+        order_by: [asc: u.inserted_at],
+        limit: 8
+    )
+
+  if post_ids_for_comments == [] or comment_authors == [] do
+    IO.puts(
+      "\n💬 Dev post comments: skipped (need published posts and at least one active user)"
+    )
+  else
+    n_authors = length(comment_authors)
+
+    {comments_added, posts_seeded, posts_skipped} =
+      Enum.reduce(
+        Enum.with_index(post_ids_for_comments),
+        {0, 0, 0},
+        fn {post_id, post_idx}, {comments_acc, seeded_acc, skipped_acc} ->
+          already_has_seed? =
+            Repo.exists?(
+              from c in Comment,
+                where: c.post_id == ^post_id,
+                where: ilike(c.text, ^"#{seed_comment_prefix}%")
+            )
+
+          if already_has_seed? do
+            {comments_acc, seeded_acc, skipped_acc + 1}
+          else
+            pick = fn i ->
+              Enum.at(comment_authors, rem(post_idx * 3 + i, n_authors))
+            end
+
+            a0 = pick.(0)
+            a1 = pick.(1)
+            a2 = pick.(2)
+
+            {:ok, root} =
+              Posts.add_comment_to_post(
+                %{
+                  "post_id" => post_id,
+                  "text" =>
+                    "#{seed_comment_prefix} Thanks for publishing this — really clear and welcoming for newcomers."
+                },
+                a0
+              )
+
+            {:ok, _} =
+              Posts.add_comment_to_post(
+                %{
+                  "post_id" => post_id,
+                  "comment_id" => root.id,
+                  "text" =>
+                    "#{seed_comment_prefix} Same here — we're hoping to bring friends to the next gathering."
+                },
+                a1
+              )
+
+            {:ok, _} =
+              Posts.add_comment_to_post(
+                %{
+                  "post_id" => post_id,
+                  "text" =>
+                    "#{seed_comment_prefix} Appreciate the detail in this post. Makes it easy to share with people who just joined the club."
+                },
+                a2
+              )
+
+            {comments_acc + 3, seeded_acc + 1, skipped_acc}
+          end
+        end
+      )
+
+    cond do
+      posts_seeded > 0 ->
+        IO.puts(
+          "\n💬 Dev post comments: added #{comments_added} comment(s) across #{posts_seeded} post(s)" <>
+            if(posts_skipped > 0,
+              do: " (#{posts_skipped} post(s) already had seed comments)",
+              else: ""
+            )
+        )
+
+      posts_skipped > 0 ->
+        IO.puts(
+          "\n💬 Dev post comments: all #{posts_skipped} candidate post(s) already had seed comments"
+        )
+
+      true ->
+        :ok
+    end
+  end
+end

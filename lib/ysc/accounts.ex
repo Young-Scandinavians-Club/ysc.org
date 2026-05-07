@@ -25,6 +25,7 @@ defmodule Ysc.Accounts do
   }
 
   alias Ysc.Newsletter
+  alias Ysc.Subscriptions.Subscription
 
   ## Database getters
 
@@ -3127,6 +3128,95 @@ defmodule Ysc.Accounts do
       family: Map.get(by_type, :family, 0),
       lifetime: Map.get(by_type, :lifetime, 0)
     }
+  end
+
+  @doc """
+  YTD comparison of **new membership joins** (not active headcount).
+
+  Counts distinct primary `User` accounts that either:
+
+  - had `lifetime_membership_awarded_at` fall in the half-open interval
+    `[range_start, range_end)`, or
+  - had their **first** `Subscription` (by `inserted_at`) fall in that interval.
+
+  Used on the admin dashboard to compare this year-to-date with the same
+  calendar-aligned span last year (Jan 1 through the same instant, shifted back one year).
+  """
+  def get_membership_joins_ytd_comparison do
+    %DateTime{} = now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    prior_period_end = Timex.shift(now, years: -1)
+    prior_year_start = Timex.shift(year_start, years: -1)
+
+    current_count = membership_joins_in_interval(year_start, now)
+
+    prior_count =
+      membership_joins_in_interval(prior_year_start, prior_period_end)
+
+    %DateTime{year: prior_year} =
+      DateTime.shift_zone!(prior_year_start, "America/Los_Angeles")
+
+    prior_year_label = Integer.to_string(prior_year)
+
+    change_percent =
+      if prior_count > 0 do
+        round((current_count - prior_count) / prior_count * 100)
+      else
+        nil
+      end
+
+    %{
+      current_ytd_joins: current_count,
+      prior_ytd_joins: prior_count,
+      prior_year_label: prior_year_label,
+      joins_ytd_change_percent: change_percent
+    }
+  end
+
+  defp membership_joins_in_interval(
+         %DateTime{} = start_dt,
+         %DateTime{} = end_dt
+       ) do
+    lifetime_ids =
+      from(u in User,
+        where: is_nil(u.primary_user_id),
+        where: u.state == :active,
+        where: not is_nil(u.lifetime_membership_awarded_at),
+        where:
+          u.lifetime_membership_awarded_at >= ^start_dt and
+            u.lifetime_membership_awarded_at < ^end_dt,
+        select: u.id
+      )
+      |> Repo.all()
+
+    first_sub_q =
+      from(s in Subscription,
+        join: u in User,
+        on: s.user_id == u.id,
+        where: is_nil(u.primary_user_id),
+        where: u.state == :active,
+        group_by: u.id,
+        select: %{user_id: u.id, first_at: min(s.inserted_at)}
+      )
+
+    sub_ids =
+      from(f in subquery(first_sub_q),
+        where: f.first_at >= ^start_dt and f.first_at < ^end_dt,
+        select: f.user_id
+      )
+      |> Repo.all()
+
+    (lifetime_ids ++ sub_ids) |> Enum.uniq() |> length()
   end
 
   defp get_membership_type_for_primary(user) do

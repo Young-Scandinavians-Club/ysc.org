@@ -2978,6 +2978,30 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Returns pending refund counts for the admin dashboard: total and per property.
+  """
+  def pending_refunds_dashboard_summary do
+    counts =
+      from(pr in PendingRefund,
+        join: b in assoc(pr, :booking),
+        where: pr.status == :pending,
+        group_by: b.property,
+        select: {b.property, count(pr.id)}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    tahoe = Map.get(counts, :tahoe, 0)
+    clear_lake = Map.get(counts, :clear_lake, 0)
+
+    %{
+      total: tahoe + clear_lake,
+      tahoe: tahoe,
+      clear_lake: clear_lake
+    }
+  end
+
+  @doc """
   Gets a pending refund by ID with all associations preloaded.
   """
   def get_pending_refund!(id) do
