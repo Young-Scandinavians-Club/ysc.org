@@ -1396,6 +1396,62 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @doc """
+  Like `update_user_with_address/3`, but also inserts a rejection-category user note
+  in the same database transaction. If the note insert fails, the user update is rolled back.
+  """
+  def update_user_with_address_and_rejection_override_note(
+        user,
+        params,
+        note_text,
+        %User{} = current_user
+      )
+      when is_binary(note_text) do
+    with :ok <- Policy.authorize(:user_update, current_user, user) do
+      result =
+        Repo.transaction(fn ->
+          user = maybe_update_board_position_history(user, params)
+
+          case user
+               |> User.update_user_with_address_changeset(params)
+               |> Repo.update() do
+            {:ok, updated_user} ->
+              note_attrs = %{
+                "note" => note_text,
+                "category" => "rejection",
+                "user_id" => updated_user.id,
+                "created_by_user_id" => current_user.id
+              }
+
+              case %UserNote{}
+                   |> UserNote.changeset(note_attrs)
+                   |> Repo.insert() do
+                {:ok, _note} -> updated_user
+                {:error, changeset} -> Repo.rollback(changeset)
+              end
+
+            {:error, changeset} ->
+              Repo.rollback(changeset)
+          end
+        end)
+
+      case result do
+        {:ok, updated_user} ->
+          Task.start(fn ->
+            Ysc.Customers.update_stripe_customer(updated_user)
+          end)
+
+          {:ok, updated_user}
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:error, changeset}
+
+        {:error, other} ->
+          {:error, other}
+      end
+    end
+  end
+
   defp maybe_update_board_position_history(user, params) do
     new_val =
       Map.get(params, "board_position") || Map.get(params, :board_position)

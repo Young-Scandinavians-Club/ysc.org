@@ -505,6 +505,296 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "rejection override - save intercepted" do
+    test "saving active state for a rejected user with a rejected application shows the override modal",
+         %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :rejected})
+
+      application =
+        signup_application_fixture(user, %{
+          review_outcome: "rejected",
+          reviewed_at: DateTime.utc_now(),
+          reviewed_by_user_id: admin.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "active",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      assert has_element?(view, "#rejection-override-modal")
+      assert has_element?(view, "#override-rejection-form")
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :rejected
+
+      _ = application
+    end
+
+    test "normal save still works for non-rejected users", %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "suspended",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :suspended
+      refute has_element?(view, "#rejection-override-modal")
+    end
+
+    test "normal save still works for rejected user without a rejected application",
+         %{conn: conn} do
+      user = user_fixture(%{state: :rejected})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "active",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :active
+      refute has_element?(view, "#rejection-override-modal")
+    end
+  end
+
+  describe "rejection override - confirm flow" do
+    setup %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :rejected})
+
+      application =
+        signup_application_fixture(user, %{
+          review_outcome: "rejected",
+          reviewed_at: DateTime.utc_now(),
+          reviewed_by_user_id: admin.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "active",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      %{view: view, user: user, admin: admin, application: application}
+    end
+
+    test "confirming with a valid note activates the user", %{
+      view: view,
+      user: user
+    } do
+      view
+      |> form("#override-rejection-form", %{
+        "override" => %{
+          "note" => "Spoke with the applicant and confirmed eligibility."
+        }
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :active
+    end
+
+    test "confirming with a valid note creates a rejection-category note", %{
+      view: view,
+      user: user,
+      admin: admin
+    } do
+      view
+      |> form("#override-rejection-form", %{
+        "override" => %{
+          "note" => "Spoke with the applicant and confirmed eligibility."
+        }
+      })
+      |> render_submit()
+
+      notes = Ysc.Accounts.list_user_notes_by_category(user.id, :rejection)
+      assert length(notes) == 1
+      [note] = notes
+      assert note.note == "Spoke with the applicant and confirmed eligibility."
+      assert note.created_by_user_id == admin.id
+    end
+
+    test "submitting with a blank note shows a validation error and does not save",
+         %{view: view, user: user} do
+      view
+      |> form("#override-rejection-form", %{
+        "override" => %{"note" => ""}
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :rejected
+      assert has_element?(view, "#override-rejection-form")
+    end
+
+    test "submitting with a too-short note shows a validation error and does not save",
+         %{view: view, user: user} do
+      view
+      |> form("#override-rejection-form", %{
+        "override" => %{"note" => "Short"}
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :rejected
+      assert has_element?(view, "#override-rejection-form")
+    end
+
+    test "cancelling the override dismisses the modal and does not save",
+         %{view: view, user: user} do
+      render_click(view, "cancel_activation_override")
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :rejected
+      refute has_element?(view, "#rejection-override-modal")
+    end
+
+    test "live validation in the override form updates errors",
+         %{view: view} do
+      view
+      |> form("#override-rejection-form", %{"override" => %{"note" => "Hi"}})
+      |> render_change()
+
+      assert has_element?(view, "#override-rejection-form .field-error")
+    end
+  end
+
+  describe "rejection override - application tab display" do
+    test "shows override banner on application tab when rejection was overridden",
+         %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :active})
+
+      application =
+        signup_application_fixture(user, %{
+          review_outcome: "rejected",
+          reviewed_at: DateTime.utc_now(),
+          reviewed_by_user_id: admin.id
+        })
+
+      {:ok, _note} =
+        Ysc.Accounts.create_user_note(
+          user,
+          %{
+            "note" => "Override reason: eligibility confirmed.",
+            "category" => "rejection"
+          },
+          admin
+        )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      assert has_element?(view, "#admin-application-rejection-override-banner")
+      assert has_element?(view, "[data-testid='rejection-note-text']")
+
+      _ = application
+    end
+
+    test "does not show override banner for a still-rejected user with rejection notes",
+         %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :rejected})
+
+      application =
+        signup_application_fixture(user, %{
+          review_outcome: "rejected",
+          reviewed_at: DateTime.utc_now(),
+          reviewed_by_user_id: admin.id
+        })
+
+      {:ok, _note} =
+        Ysc.Accounts.create_user_note(
+          user,
+          %{
+            "note" => "Application did not meet eligibility criteria.",
+            "category" => "rejection"
+          },
+          admin
+        )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      assert has_element?(view, "#admin-application-rejection-notes")
+      assert has_element?(view, "[data-testid='rejection-note-text']")
+      refute has_element?(view, "#admin-application-rejection-override-banner")
+
+      _ = application
+    end
+
+    test "does not show rejection notes section when there are no rejection notes",
+         %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :rejected})
+
+      application =
+        signup_application_fixture(user, %{
+          review_outcome: "rejected",
+          reviewed_at: DateTime.utc_now(),
+          reviewed_by_user_id: admin.id
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      refute has_element?(view, "section", "Rejection notes")
+
+      _ = application
+    end
+  end
+
   defp register_and_log_in_admin(%{conn: conn}) do
     user = user_fixture(%{role: :admin})
     %{conn: log_in_user(conn, user), user: user}
