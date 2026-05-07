@@ -328,7 +328,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
       html = render(view)
 
-      assert html =~ "authorise"
+      assert html =~ "authorize"
       assert html =~ "automatically renew"
     end
 

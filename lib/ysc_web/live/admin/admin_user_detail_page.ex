@@ -764,7 +764,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <tbody class="divide-y divide-zinc-100">
                   <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
                     <td class="px-4 py-3">
-                      <span class="font-medium text-zinc-800">{ent.status}</span>
+                      <span class="font-medium text-zinc-800">
+                        {format_entitlement_status(ent.status)}
+                      </span>
                     </td>
                     <td class="px-4 py-3 text-zinc-700">
                       {admin_entitlement_summary(ent)}
@@ -1093,6 +1095,13 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :membership} class="max-w-lg py-8 px-2">
           <div class="space-y-6">
+            <%!-- Board volunteer billing pause notice --%>
+            <.board_pause_notice
+              :if={@membership_paused_by_board != nil}
+              board_member={@membership_paused_by_board}
+              current_user={@current_user}
+            />
+
             <%!-- Sub-account: membership via primary user --%>
             <div
               :if={@primary_user != nil}
@@ -2252,6 +2261,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:subscription_payments, [])
       |> assign(:scheduled_downgrade_info, nil)
       |> assign(:has_lifetime_membership, false)
+      |> assign(:membership_paused_by_board, nil)
       |> assign(
         :membership_form,
         to_form(membership_changeset(%{period_end_date: nil}), as: "membership")
@@ -2310,14 +2320,17 @@ defmodule YscWeb.AdminUserDetailsLive do
 
     socket =
       if connected?(socket) do
-        [sub_result, has_lifetime, application] =
+        [sub_result, has_lifetime, application, board_member] =
           Task.await_many(
             [
               Task.async(fn -> fetch_subscription_data(selected_user) end),
               Task.async(fn ->
                 Accounts.has_lifetime_membership?(selected_user)
               end),
-              Task.async(fn -> fetch_application(id, current_user) end)
+              Task.async(fn -> fetch_application(id, current_user) end),
+              Task.async(fn ->
+                Accounts.household_board_member(selected_user)
+              end)
             ],
             :infinity
           )
@@ -2352,6 +2365,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           |> assign(:active_subscription, active_subscription)
           |> assign(:subscription_payments, subscription_payments)
           |> assign(:has_lifetime_membership, has_lifetime)
+          |> assign(:membership_paused_by_board, board_member)
           |> assign(:membership_form, to_form(membership_cs, as: "membership"))
           |> assign(
             :membership_type_form,
@@ -4200,6 +4214,12 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp entitlement_form_defaults do
     to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)
   end
+
+  defp format_entitlement_status(:active), do: "Active"
+  defp format_entitlement_status(:consumed), do: "Consumed"
+  defp format_entitlement_status(:revoked), do: "Revoked"
+  defp format_entitlement_status(:expired), do: "Expired"
+  defp format_entitlement_status(other), do: to_string(other)
 
   defp admin_entitlement_summary(ent) do
     case ent.benefit_kind do

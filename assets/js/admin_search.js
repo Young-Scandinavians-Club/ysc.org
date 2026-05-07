@@ -81,6 +81,13 @@ let AdminSearch = {
             }
         } else if (key === 'Escape') {
             // Close results on escape
+            if (!this.el.isConnected) return;
+            try {
+                const view = this.__view();
+                if (!view || !view.isConnected()) return;
+            } catch (_) {
+                return;
+            }
             this.pushEvent('close_results', {});
         }
     },

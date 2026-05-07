@@ -160,4 +160,174 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert ent.consumed_booking_id in [booking_a.id, booking_b.id]
     end
   end
+
+  describe "expire_passed_entitlements/1" do
+    test "sets active entitlements with past expires_at to expired", %{
+      user: user,
+      admin: admin
+    } do
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, ent} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
+
+      assert Repo.get!(Ysc.Bookings.BookingEntitlement, ent.id).status ==
+               :expired
+    end
+
+    test "skips active entitlements with nil expires_at", %{
+      user: user,
+      admin: admin
+    } do
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 10)
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, %{expired: 0, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
+    end
+
+    test "skips entitlements that are still before expires_at", %{
+      user: user,
+      admin: admin
+    } do
+      future =
+        DateTime.add(DateTime.utc_now(), 86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 10),
+                   expires_at: future
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, %{expired: 0, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
+    end
+
+    test "expire_passed_entitlements/1 respects :limit and oldest expires_at first",
+         %{
+           user: user,
+           admin: admin
+         } do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      oldest = DateTime.add(now, -10 * 86_400, :second)
+      middle = DateTime.add(now, -5 * 86_400, :second)
+      newest = DateTime.add(now, -1 * 86_400, :second)
+
+      for expires_at <- [newest, middle, oldest] do
+        assert {:ok, _} =
+                 Entitlements.create_entitlement(
+                   %{
+                     user_id: user.id,
+                     issued_by_user_id: admin.id,
+                     benefit_kind: :fixed_amount_off,
+                     amount_off: Money.new(:USD, 1),
+                     expires_at: expires_at
+                   },
+                   send_notification: false
+                 )
+      end
+
+      assert {:ok, %{expired: 2, failed: 0}} =
+               Entitlements.expire_passed_entitlements(limit: 2)
+
+      active_count =
+        from(e in Ysc.Bookings.BookingEntitlement,
+          where: e.user_id == ^user.id,
+          where: e.status == :active,
+          select: count(e.id)
+        )
+        |> Ysc.Repo.one()
+
+      assert active_count == 1
+
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements(limit: 2)
+
+      assert {:ok, %{expired: 0, failed: 0}} =
+               Entitlements.expire_passed_entitlements(limit: 2)
+    end
+
+    test "revoke_entitlement only succeeds for active rows", %{
+      user: user,
+      admin: admin
+    } do
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, ent} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 3),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
+
+      expired = Repo.get!(Ysc.Bookings.BookingEntitlement, ent.id)
+      assert {:error, :not_revocable} = Entitlements.revoke_entitlement(expired)
+    end
+  end
+
+  describe "BookingEntitlementExpiryWorker" do
+    test "perform/1 runs expiry", %{user: user, admin: admin} do
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, msg} =
+               Ysc.Bookings.BookingEntitlementExpiryWorker.perform(%Oban.Job{
+                 args: %{}
+               })
+
+      assert msg =~ "Expired 1"
+    end
+  end
 end

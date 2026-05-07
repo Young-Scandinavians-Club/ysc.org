@@ -1645,6 +1645,18 @@ defmodule Ysc.BookingsTest do
     end
 
     test "approve_pending_refund/4 completes when payment has Stripe intent" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+
+      Application.put_env(
+        :ysc,
+        :stripe_client,
+        Ysc.StripeRefundApproveTestClient
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
       user = user_fixture()
       admin = user_fixture(%{role: :admin})
       booking = booking_fixture(%{user_id: user.id})
@@ -1685,7 +1697,128 @@ defmodule Ysc.BookingsTest do
       assert updated.reviewed_by_id == admin.id
     end
 
+    test "approve_pending_refund/4 approves $0 policy refund without Stripe or ledger refund" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeRetrieveBlockedClient)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      user = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      booking = booking_fixture(%{user_id: user.id})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_approve_zero_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      zero_policy = Money.new!(:USD, "0")
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: zero_policy,
+          status: :pending
+        })
+        |> Ysc.Repo.insert()
+
+      assert {:ok, updated, nil} =
+               Bookings.approve_pending_refund(pr, nil, nil, admin)
+
+      assert updated.status == :approved
+      assert updated.reviewed_by_id == admin.id
+      assert Money.equal?(updated.admin_refund_amount, zero_policy)
+
+      ref_count =
+        Ysc.Repo.aggregate(
+          from(r in Ysc.Ledgers.Refund, where: r.payment_id == ^payment.id),
+          :count
+        )
+
+      assert ref_count == 0
+    end
+
+    test "approve_pending_refund/4 returns invalid_refund_amount for negative admin amount" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeRetrieveBlockedClient)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      user = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      booking = booking_fixture(%{user_id: user.id})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_approve_negative_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: Money.new(5000, :USD),
+          status: :pending
+        })
+        |> Ysc.Repo.insert()
+
+      bad = Money.new!(:USD, "-10.00")
+
+      assert {:error, :invalid_refund_amount} =
+               Bookings.approve_pending_refund(pr, bad, "notes", admin)
+
+      reloaded = Ysc.Repo.get!(PendingRefund, pr.id)
+      assert reloaded.status == :pending
+    end
+
     test "approve_pending_refund/4 uses custom admin_refund_amount and nil admin_notes" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+
+      Application.put_env(
+        :ysc,
+        :stripe_client,
+        Ysc.StripeRefundApproveTestClient
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
       user = user_fixture()
       admin = user_fixture(%{role: :admin})
       booking = booking_fixture(%{user_id: user.id})
@@ -2270,6 +2403,13 @@ defmodule Ysc.BookingsTest do
     end
 
     test "approve_pending_refund/4 returns error when payment has no Stripe payment intent" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeRetrieveBlockedClient)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
       user = user_fixture()
       admin = user_fixture(%{role: :admin})
       booking = booking_fixture(%{user_id: user.id})

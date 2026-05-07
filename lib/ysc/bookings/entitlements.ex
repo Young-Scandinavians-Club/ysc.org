@@ -19,7 +19,9 @@ defmodule Ysc.Bookings.Entitlements do
   def get_entitlement(id), do: Repo.get(BookingEntitlement, id)
 
   @doc """
-  Active entitlements for a user: status active, not expired.
+  Active entitlements for a user: `status` is `:active` and not past `expires_at`
+  (end-of-day semantics are unchanged; rows past end date should also be moved to
+  `:expired` by `expire_passed_entitlements/1` / the cron worker).
   """
   def list_active_for_user(user_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -453,10 +455,49 @@ defmodule Ysc.Bookings.Entitlements do
     end
   end
 
-  def revoke_entitlement(%BookingEntitlement{} = ent) do
+  def revoke_entitlement(%BookingEntitlement{status: :active} = ent) do
     ent
     |> BookingEntitlement.revoke_changeset()
     |> Repo.update()
+  end
+
+  def revoke_entitlement(%BookingEntitlement{}), do: {:error, :not_revocable}
+
+  @doc """
+  Retires active entitlements whose `expires_at` is set and not after now.
+
+  Sets `status` to `:expired` so they are excluded from checkout and admin
+  outstanding lists (same as `:active` filters).
+
+  Indefinite benefits (`expires_at` nil) are never changed here.
+
+  ## Options
+
+  - `:limit` — max rows to process in one run (default `500`).
+
+  Returns `{:ok, %{expired: integer, failed: integer}}`.
+  """
+  def expire_passed_entitlements(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    candidate_subq =
+      from(e in BookingEntitlement,
+        where: e.status == :active,
+        where: not is_nil(e.expires_at) and e.expires_at <= ^now,
+        order_by: [asc: e.expires_at],
+        limit: ^limit,
+        select: e.id
+      )
+
+    {expired_count, _} =
+      from(e in BookingEntitlement,
+        where: e.id in subquery(candidate_subq),
+        where: e.status == :active
+      )
+      |> Repo.update_all(set: [status: "expired", updated_at: now])
+
+    {:ok, %{expired: expired_count, failed: 0}}
   end
 
   @doc """

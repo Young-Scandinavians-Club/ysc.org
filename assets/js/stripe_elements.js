@@ -1,5 +1,6 @@
 // Stripe Elements Hook for Phoenix LiveView
 import { loadScript } from "./load_external_asset";
+import { pushEventIfConnected } from "./live_view_safe_push";
 
 let stripePromise = null;
 
@@ -40,6 +41,11 @@ const getStripe = () => {
     }
     return stripePromise;
 };
+
+function safePushEvent(hook, event, payload = {}) {
+    if (hook.isDestroyed) return;
+    pushEventIfConnected(hook, event, payload);
+}
 
 const StripeElements = {
     mounted() {
@@ -89,6 +95,8 @@ const StripeElements = {
 
             // Wait for the Stripe script to finish loading
             await this.loadPromise;
+
+            if (this.isDestroyed) return;
 
             if (!window.Stripe) {
                 console.error('Stripe not available');
@@ -328,10 +336,19 @@ const StripeElements = {
             // This prevents the order from being cancelled when the connection is lost
             // Send the event and wait a bit to ensure it's processed before redirect
             if (ticketOrderId || bookingId) {
-                this.pushEvent('payment-redirect-started', {});
+                safePushEvent(this, 'payment-redirect-started', {});
                 // Give LiveView a moment to process the event before redirect happens
                 // This is especially important for redirect-based payment methods (Amazon Pay, CashApp, etc.)
                 await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            if (this.isDestroyed || !this.el?.isConnected) {
+                this._paymentConfirmInFlight = false;
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = this.originalButtonText;
+                }
+                return;
             }
 
             const { error } = await this.stripe.confirmPayment({
@@ -351,7 +368,7 @@ const StripeElements = {
 
                 if (alreadySucceeded) {
                     this.showMessage('Payment successful! Processing your order...', true);
-                    this.pushEvent('payment-success', {
+                    safePushEvent(this, 'payment-success', {
                         payment_intent_id: pi.id || this.clientSecret.split('_secret_')[0]
                     });
                     return;
@@ -369,7 +386,7 @@ const StripeElements = {
                 this.showMessage('Payment successful! Processing your order...', true);
 
                 // Notify the LiveView that payment was successful
-                this.pushEvent('payment-success', {
+                safePushEvent(this, 'payment-success', {
                     payment_intent_id: this.clientSecret.split('_secret_')[0]
                 });
             }
@@ -399,6 +416,7 @@ const StripeElements = {
 
             // Hide message after 5 seconds
             setTimeout(() => {
+                if (!messageDiv.isConnected) return;
                 messageDiv.classList.add('hidden');
             }, 5000);
         }

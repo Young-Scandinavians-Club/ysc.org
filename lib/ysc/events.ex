@@ -1934,24 +1934,62 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Scopes a `TicketReservation` query to rows that still count as an active hold.
+
+  `status` must be `"active"` and, when `expires_at` is set, it must be strictly
+  after `DateTime.utc_now/0` (same rule as checkout, capacity, and fulfillment).
+  """
+  def where_ticket_reservation_hold_active(query) do
+    now = DateTime.utc_now()
+
+    where(
+      query,
+      [tr],
+      tr.status == "active" and (is_nil(tr.expires_at) or tr.expires_at > ^now)
+    )
+  end
+
+  @doc """
   List ticket reservations for a user for a specific event.
+
+  Only returns holds that are still valid for pricing (`expires_at` unset or in the future).
   """
   def list_ticket_reservations_for_user(user_id, event_id) do
     TicketReservation
     |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
     |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
-    |> where([tr], tr.status == "active")
+    |> where_ticket_reservation_hold_active()
     |> order_by([tr], desc: tr.inserted_at)
     |> Repo.all()
     |> Repo.preload([:ticket_tier, :user, :created_by, :ticket_order])
   end
 
   @doc """
-  List only active reservations for a ticket tier.
+  List reservations for a tier that still count toward holds and discounts.
+
+  Excludes `status: "active"` rows whose `expires_at` is in the past (those remain
+  in the database until fulfilled or cancelled; see `list_expired_active_reservations_for_tier/1`).
   """
   def list_active_reservations_for_tier(tier_id) do
     TicketReservation
+    |> where([tr], tr.ticket_tier_id == ^tier_id)
+    |> where_ticket_reservation_hold_active()
+    |> order_by([tr], desc: tr.inserted_at)
+    |> Repo.all()
+    |> Repo.preload([:ticket_tier, :user, :created_by])
+  end
+
+  @doc """
+  Active `status` reservations whose `expires_at` is set and not after now.
+
+  Used so admins can see lapsed holds that still occupy a row until cancelled or fulfilled.
+  """
+  def list_expired_active_reservations_for_tier(tier_id) do
+    now = DateTime.utc_now()
+
+    TicketReservation
     |> where([tr], tr.ticket_tier_id == ^tier_id and tr.status == "active")
+    |> where([tr], not is_nil(tr.expires_at) and tr.expires_at <= ^now)
     |> order_by([tr], desc: tr.inserted_at)
     |> Repo.all()
     |> Repo.preload([:ticket_tier, :user, :created_by])
@@ -2008,11 +2046,102 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Count total reserved tickets for a tier (active reservations only).
+  Cancels active ticket reservations whose `expires_at` has passed.
+
+  Only rows with `status: \"active\"`, a non-nil `expires_at`, and
+  `expires_at <= DateTime.utc_now/0` are processed (same rows as
+  `list_expired_active_reservations_for_tier/1`). Indefinite holds are skipped.
+
+  Atomically cancels each candidate row only if it is still `active` and past
+  `expires_at`. That avoids a race where checkout fulfills the hold after the
+  expiry job selected the id but before cancellation — `Repo.get/1` plus
+  `cancel_ticket_reservation/1` could otherwise overwrite `fulfilled` with
+  `cancelled`.
+
+  Successful cancellations broadcast `TicketReservationCancelled` like
+  `cancel_ticket_reservation/1`.
+
+  ## Options
+
+  - `:limit` — max reservations to process in one run (default `500`).
+
+  Returns `{:ok, %{cancelled: integer, failed: integer, total_pending: integer,
+  backlog_remaining: integer}}` where `total_pending` is the count of rows
+  matching the expiry criteria before this batch, and `backlog_remaining` is
+  `max(0, total_pending - cancelled)` (rows still to clear on later runs,
+  including failed attempts and any not yet processed due to `:limit`).
+  """
+  def expire_passed_ticket_reservations(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+    now = DateTime.utc_now()
+
+    pending_query =
+      from(tr in TicketReservation,
+        where: tr.status == "active",
+        where: not is_nil(tr.expires_at) and tr.expires_at <= ^now
+      )
+
+    total_pending =
+      pending_query
+      |> select([tr], count(tr.id))
+      |> Repo.one()
+
+    ids =
+      pending_query
+      |> order_by([tr], asc: tr.expires_at)
+      |> limit(^limit)
+      |> select([tr], tr.id)
+      |> Repo.all()
+
+    {cancelled, failed} =
+      Enum.reduce(ids, {0, 0}, fn id, {c_acc, f_acc} ->
+        case cancel_expired_ticket_reservation_atomically(id, now) do
+          {:ok, _} -> {c_acc + 1, f_acc}
+          :skipped -> {c_acc, f_acc}
+        end
+      end)
+
+    backlog_remaining = max(0, total_pending - cancelled)
+
+    {:ok,
+     %{
+       cancelled: cancelled,
+       failed: failed,
+       total_pending: total_pending,
+       backlog_remaining: backlog_remaining
+     }}
+  end
+
+  defp cancel_expired_ticket_reservation_atomically(reservation_id, now) do
+    case Repo.update_all(
+           from(tr in TicketReservation,
+             where: tr.id == ^reservation_id,
+             where: tr.status == "active",
+             where: not is_nil(tr.expires_at) and tr.expires_at <= ^now
+           ),
+           set: [status: "cancelled", cancelled_at: now]
+         ) do
+      {1, _} ->
+        reservation = Repo.get!(TicketReservation, reservation_id)
+
+        broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
+          ticket_reservation: reservation
+        })
+
+        {:ok, reservation}
+
+      {0, _} ->
+        :skipped
+    end
+  end
+
+  @doc """
+  Count total reserved tickets for a tier (active, non-expired reservations only).
   """
   def count_reserved_tickets_for_tier(tier_id) do
     TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.status == "active")
+    |> where([tr], tr.ticket_tier_id == ^tier_id)
+    |> where_ticket_reservation_hold_active()
     |> select([tr], sum(tr.quantity))
     |> Repo.one()
     |> case do
@@ -2022,15 +2151,12 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Get the quantity of tickets reserved for a specific user and tier.
+  Get the quantity of tickets reserved for a specific user and tier (hold still valid).
   """
   def get_user_reserved_quantity(tier_id, user_id) do
     TicketReservation
-    |> where(
-      [tr],
-      tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id and
-        tr.status == "active"
-    )
+    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id)
+    |> where_ticket_reservation_hold_active()
     |> select([tr], sum(tr.quantity))
     |> Repo.one()
     |> case do

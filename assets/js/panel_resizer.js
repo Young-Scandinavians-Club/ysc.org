@@ -200,6 +200,13 @@ const PanelResizer = {
         // Save the width to server
         const width = this.resizeTarget.style.width;
         if (width) {
+            if (!this.el.isConnected) return;
+            try {
+                const view = this.__view();
+                if (!view || !view.isConnected()) return;
+            } catch (_) {
+                return;
+            }
             this.pushEvent("resize_panel", { width: width });
         }
     },

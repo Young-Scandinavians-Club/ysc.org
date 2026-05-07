@@ -1,0 +1,46 @@
+defmodule Ysc.Tickets.TicketReservationExpiryWorker do
+  @moduledoc """
+  Periodically cancels event ticket reservations past their `expires_at`.
+
+  Work is delegated to `Ysc.Events.expire_passed_ticket_reservations/0`, which uses a
+  conditional `UPDATE` so a concurrent checkout cannot be overwritten from `fulfilled`
+  back to `cancelled`. Cancelled rows drop out of admin hold lists and checkout capacity
+  math the same as `Ysc.Events.cancel_ticket_reservation/1` would.
+  """
+
+  use Oban.Worker, queue: :default, max_attempts: 3
+
+  require Ysc.Logging
+
+  alias Ysc.Events
+
+  @impl Oban.Worker
+  def perform(%Oban.Job{}) do
+    {:ok,
+     %{
+       cancelled: cancelled,
+       failed: failed,
+       total_pending: total_pending,
+       backlog_remaining: backlog_remaining
+     }} =
+      Events.expire_passed_ticket_reservations()
+
+    if cancelled > 0 or failed > 0 or backlog_remaining > 0 do
+      meta = [
+        cancelled: cancelled,
+        failed: failed,
+        total_pending: total_pending,
+        backlog_remaining: backlog_remaining
+      ]
+
+      if failed > 0 do
+        Ysc.Logging.warning("Ticket reservation expiry batch finished", meta)
+      else
+        Ysc.Logging.info("Ticket reservation expiry batch finished", meta)
+      end
+    end
+
+    {:ok,
+     "Cancelled #{cancelled} expired ticket reservation(s) (#{failed} failed)"}
+  end
+end

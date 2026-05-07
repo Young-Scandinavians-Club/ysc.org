@@ -72,6 +72,7 @@ defmodule YscWeb.HomeLive do
       newsletter_error: nil,
       # Track async loading state
       async_data_loaded: false,
+      membership_paused_by_board: nil,
       # Membership QR modal
       show_membership_qr: false,
       membership_qr_token: nil,
@@ -160,6 +161,8 @@ defmodule YscWeb.HomeLive do
   defp load_logged_in_user_data(user_id) do
     tasks = [
       {:user_data, fn -> load_user_with_subscriptions(user_id) end},
+      {:board_member,
+       fn -> Accounts.household_board_member(Accounts.get_user!(user_id)) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
       {:bookings, fn -> get_future_active_bookings(user_id) end},
       {:events,
@@ -224,6 +227,7 @@ defmodule YscWeb.HomeLive do
     {is_sub_account, primary_user, other_family_members} =
       Map.get(results, :user_data, {false, nil, []})
 
+    board_member = Map.get(results, :board_member, nil)
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
     upcoming_events = Map.get(results, :events, [])
@@ -242,6 +246,7 @@ defmodule YscWeb.HomeLive do
         is_sub_account: is_sub_account,
         primary_user: primary_user,
         other_family_members: other_family_members,
+        membership_paused_by_board: board_member,
         upcoming_tickets: upcoming_tickets,
         future_bookings: future_bookings,
         upcoming_events: upcoming_events,
@@ -1168,7 +1173,7 @@ defmodule YscWeb.HomeLive do
                   Sign in faster with Passkeys
                 </p>
                 <p class="mt-1 text-sm text-blue-800/80 leading-snug max-w-xl">
-                  Use FaceID, TouchID, or your device passcode instead of a password.
+                  Use Face ID, Touch ID, or your device passcode instead of a password.
                 </p>
               </div>
             </div>
@@ -1733,6 +1738,12 @@ defmodule YscWeb.HomeLive do
                 <.icon name="hero-identification" class="w-40 h-40" />
               </div>
             </div>
+
+            <.board_pause_notice
+              :if={@active_membership? && @membership_paused_by_board != nil}
+              board_member={@membership_paused_by_board}
+              current_user={@current_user}
+            />
 
             <%!-- Detects platform to show the correct wallet button(s) --%>
             <div

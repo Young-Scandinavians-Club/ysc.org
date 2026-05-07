@@ -802,7 +802,7 @@ defmodule YscWeb.UserSettingsLive do
                   field={@profile_form[:phone_number]}
                 />
                 <p class="text-xs text-zinc-600 mt-1">
-                  <strong>Young Scandinavians Club (YSC)</strong>: By voluntarily providing your phone number and explicitly opting in to text messaging, you agree to receive account security codes and booking reminders from Young Scandinavians Club(YSC). Message frequency may vary. Message & data rates may apply. Reply HELP for support or STOP to unsubscribe. Your phone number will not be shared with third parties for marketing or promotional purposes. You can also opt out at any time in your notification settings. See our
+                  <strong>Young Scandinavians Club (YSC)</strong>: By voluntarily providing your phone number and explicitly opting in to text messaging, you agree to receive account security codes and booking reminders from Young Scandinavians Club (YSC). Message frequency may vary. Message and data rates may apply. Reply HELP for support or STOP to unsubscribe. Your phone number will not be shared with third parties for marketing or promotional purposes. You can also opt out at any time in your notification settings. See our
                   <.link
                     navigate={~p"/privacy-policy"}
                     class="text-blue-600 hover:underline"
@@ -999,6 +999,11 @@ defmodule YscWeb.UserSettingsLive do
                   Leave family membership
                 </.button>
               </div>
+              <.board_pause_notice
+                :if={@membership_paused_by_board != nil}
+                board_member={@membership_paused_by_board}
+                current_user={@current_user}
+              />
               <.membership_status
                 current_membership={@current_membership}
                 primary_user={@primary_user}
@@ -1422,6 +1427,11 @@ defmodule YscWeb.UserSettingsLive do
               <div class="rounded border border-zinc-100 p-6 space-y-4">
                 <h2 class="text-zinc-900 font-bold text-xl">Current Membership</h2>
 
+                <.board_pause_notice
+                  :if={@membership_paused_by_board != nil}
+                  board_member={@membership_paused_by_board}
+                  current_user={@current_user}
+                />
                 <.membership_status
                   current_membership={@current_membership}
                   primary_user={@primary_user}
@@ -1975,7 +1985,7 @@ defmodule YscWeb.UserSettingsLive do
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                 <p class="text-sm text-blue-900">
                   <strong>SMS Consent:</strong>
-                  By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club(YSC). Message and data rates may apply. You can opt out at any time by unchecking the SMS options below or sending a STOP message to the number you receive messages from. See our
+                  By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the SMS options below or sending a STOP message to the number you receive messages from. See our
                   <.link
                     navigate={~p"/privacy-policy"}
                     class="text-blue-700 hover:underline font-semibold"
@@ -2640,6 +2650,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:show_membership_qr, false)
       |> assign(:membership_qr_token, nil)
       |> assign(:membership_qr_details, nil)
+      |> assign(:membership_paused_by_board, nil)
       |> assign(
         :apple_wallet_membership_enabled?,
         Ysc.AppleWallet.configured?(:membership)
@@ -2756,11 +2767,14 @@ defmodule YscWeb.UserSettingsLive do
       live_action == :payment_method && all_payment_methods == [] &&
         not is_nil(payment_intent_secret)
 
+    board_member = Accounts.household_board_member(user)
+
     {:noreply,
      socket
      |> assign(:user, user)
      |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
      |> assign(:primary_user, primary_user)
+     |> assign(:membership_paused_by_board, board_member)
      |> assign(:payment_intent_secret, payment_intent_secret)
      |> assign(:default_payment_method, default_payment_method)
      |> assign(:all_payment_methods, all_payment_methods)
@@ -4454,12 +4468,15 @@ defmodule YscWeb.UserSettingsLive do
     pending_family_invites =
       FamilyInvites.list_pending_invites_for_email(user.email)
 
+    board_member = Accounts.household_board_member(user)
+
     socket
     |> assign(:user, user)
     |> assign(:current_membership, current_membership)
     |> assign(:active_plan_type, active_plan)
     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
     |> assign(:pending_family_invites, pending_family_invites)
+    |> assign(:membership_paused_by_board, board_member)
     |> assign(:change_membership_button, false)
     |> assign(:membership_change_info, nil)
     |> assign(

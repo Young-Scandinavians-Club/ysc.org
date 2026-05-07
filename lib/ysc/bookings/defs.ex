@@ -51,5 +51,5 @@ defmodule Ysc.Bookings.BookingEntitlementStatus do
   @moduledoc false
   use EctoEnum,
     type: :booking_entitlement_status,
-    enums: [:active, :consumed, :revoked]
+    enums: [:active, :consumed, :revoked, :expired]
 end

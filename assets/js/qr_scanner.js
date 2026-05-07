@@ -15,6 +15,17 @@ function getHtml5Qrcode() {
 }
 
 export default {
+  safePush(event, payload) {
+    if (this.isDestroyed || !this.el?.isConnected) return;
+    try {
+      const view = this.__view();
+      if (!view || !view.isConnected()) return;
+    } catch (_) {
+      return;
+    }
+    this.pushEvent(event, payload);
+  },
+
   mounted() {
     this.scanner = null;
     this.cooldown = false;
@@ -58,9 +69,8 @@ export default {
   },
 
   log(message, extra) {
-    const payload = { message, extra: extra || null };
     console.log("[QrScanner]", message, extra || "");
-    this.pushEvent("scanner_debug", payload);
+    this.safePush("scanner_debug", { message, extra: extra || null });
   },
 
   async startCamera() {
@@ -83,7 +93,7 @@ export default {
         "Camera requires a secure connection (HTTPS). " +
         "Current protocol: " + window.location.protocol;
       this.log("insecure context", { protocol: window.location.protocol });
-      this.pushEvent("camera_error", { reason });
+      this.safePush("camera_error", { reason });
       this.cameraStarting = false;
       return;
     }
@@ -92,7 +102,7 @@ export default {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       const reason = "Camera API (mediaDevices) not available in this browser.";
       this.log("mediaDevices unavailable");
-      this.pushEvent("camera_error", { reason });
+      this.safePush("camera_error", { reason });
       this.cameraStarting = false;
       return;
     }
@@ -113,7 +123,7 @@ export default {
         name: err.name,
         message: err.message,
       });
-      this.pushEvent("camera_error", { reason });
+      this.safePush("camera_error", { reason });
       this.cameraStarting = false;
       return;
     }
@@ -127,7 +137,7 @@ export default {
     if (!readerEl) {
       const reason = "QR reader DOM element not found.";
       this.log("reader element missing");
-      this.pushEvent("camera_error", { reason });
+      this.safePush("camera_error", { reason });
       this.cameraStarting = false;
       return;
     }
@@ -142,7 +152,7 @@ export default {
         Html5Qrcode: typeof window.Html5Qrcode,
         __Html5QrcodeLibrary__: typeof window.__Html5QrcodeLibrary__,
       });
-      this.pushEvent("camera_error", { reason });
+      this.safePush("camera_error", { reason });
       this.cameraStarting = false;
       return;
     }
@@ -159,7 +169,7 @@ export default {
           if (this.cooldown) return;
           this.cooldown = true;
           this.log("QR code decoded", { length: decodedText.length });
-          this.pushEvent("scan_result", { data: decodedText });
+          this.safePush("scan_result", { data: decodedText });
           setTimeout(() => {
             this.cooldown = false;
           }, SCAN_COOLDOWN_MS);
@@ -178,7 +188,7 @@ export default {
         }
         this.cameraActive = true;
         this.log("camera started successfully");
-        this.pushEvent("camera_started", {});
+        this.safePush("camera_started", {});
       })
       .catch((err) => {
         this.scanner = null;
@@ -187,7 +197,7 @@ export default {
           error: err.toString(),
           name: err.name,
         });
-        this.pushEvent("camera_error", { reason });
+        this.safePush("camera_error", { reason });
       })
       .finally(() => {
         this.cameraStarting = false;

@@ -5,40 +5,24 @@
  * Also handles device detection (iOS mobile) and passkey support detection.
  * Uses builtin browser functionality (parseRequestOptionsFromJSON) when available.
  */
+import { pushEventIfConnected, pushEventToIfConnected } from "./live_view_safe_push";
+
 const PasskeyAuth = {
     detectAndPushSupport() {
         const userAgent = navigator.userAgent;
         const isIOSMobile = /iPhone|iPad|iPod/.test(userAgent);
 
         if (isIOSMobile) {
-            this.pushEvent("device_detected", { device: "ios_mobile" });
+            pushEventIfConnected(this, "device_detected", { device: "ios_mobile" });
         }
 
         const isPasskeySupported = typeof window.PublicKeyCredential !== "undefined";
 
-        try {
-            this.pushEvent("passkey_support_detected", { supported: isPasskeySupported });
-        } catch (error) {
-            console.error("[PasskeyAuth] Error pushing passkey_support_detected event", error);
-            if (window.Sentry) {
-                window.Sentry.captureException(error, {
-                    tags: { component: "passkey_auth", event: "passkey_support_detected" },
-                    extra: { isPasskeySupported, userAgent }
-                });
-            }
-        }
+        pushEventIfConnected(this, "passkey_support_detected", {
+            supported: isPasskeySupported
+        });
 
-        try {
-            this.pushEvent("user_agent_received", { user_agent: userAgent });
-        } catch (error) {
-            console.error("[PasskeyAuth] Error pushing user_agent_received event", error);
-            if (window.Sentry) {
-                window.Sentry.captureException(error, {
-                    tags: { component: "passkey_auth", event: "user_agent_received" },
-                    extra: { userAgent }
-                });
-            }
-        }
+        pushEventIfConnected(this, "user_agent_received", { user_agent: userAgent });
     },
 
     mounted() {
@@ -284,7 +268,7 @@ const PasskeyAuth = {
                 }
                 
                 // Push error event to LiveView so it doesn't hang
-                this.pushEvent("passkey_registration_error", {
+                this.pushPasskeyEvent("passkey_registration_error", {
                     error: "ConfigurationError",
                     message: errorMsg
                 });
@@ -466,7 +450,7 @@ const PasskeyAuth = {
                     }
 
                     // Push the result back to the LiveView
-                    this.pushEvent("verify_registration", credentialJson);
+                    this.pushPasskeyEvent("verify_registration", credentialJson);
                 } else {
                     const errorMsg = "No credential returned from navigator.credentials.create";
                     console.error("[PasskeyAuth]", errorMsg);
@@ -509,7 +493,7 @@ const PasskeyAuth = {
                     }
                 }
 
-                this.pushEvent("passkey_registration_error", {
+                this.pushPasskeyEvent("passkey_registration_error", {
                     error: error.name || "UnknownError",
                     message: error.message || "Registration failed"
                 });
@@ -526,9 +510,9 @@ const PasskeyAuth = {
     pushPasskeyEvent(event, payload) {
         const target = this.el.dataset.pushTo;
         if (target) {
-            this.pushEventTo(`#${target}`, event, payload);
+            pushEventToIfConnected(this, `#${target}`, event, payload);
         } else {
-            this.pushEvent(event, payload);
+            pushEventIfConnected(this, event, payload);
         }
     },
 
