@@ -161,8 +161,6 @@ defmodule YscWeb.HomeLive do
   defp load_logged_in_user_data(user_id) do
     tasks = [
       {:user_data, fn -> load_user_with_subscriptions(user_id) end},
-      {:board_member,
-       fn -> Accounts.household_board_member(Accounts.get_user!(user_id)) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
       {:bookings, fn -> get_future_active_bookings(user_id) end},
       {:events,
@@ -206,6 +204,10 @@ defmodule YscWeb.HomeLive do
         []
       end
 
+    # Same household set as Accounts.household_board_member/1 (single DB path vs. extra async task)
+    membership_paused_by_board =
+      Enum.find(family_group, fn member -> member.board_position != nil end)
+
     # Get active plan type for showing "Your Family" section
     active_plan_type =
       Ysc.Accounts.MembershipCache.get_membership_plan_type(user_for_family)
@@ -218,16 +220,14 @@ defmodule YscWeb.HomeLive do
         []
       end
 
-    {is_sub_account, primary_user, other_family_members}
+    {is_sub_account, primary_user, other_family_members, membership_paused_by_board}
   end
 
   @impl true
   def handle_async(:load_home_data, {:ok, results}, socket) do
     # Handle logged-in user async results
-    {is_sub_account, primary_user, other_family_members} =
-      Map.get(results, :user_data, {false, nil, []})
-
-    board_member = Map.get(results, :board_member, nil)
+    {is_sub_account, primary_user, other_family_members, membership_paused_by_board} =
+      Map.get(results, :user_data, {false, nil, [], nil})
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
     upcoming_events = Map.get(results, :events, [])
@@ -246,7 +246,7 @@ defmodule YscWeb.HomeLive do
         is_sub_account: is_sub_account,
         primary_user: primary_user,
         other_family_members: other_family_members,
-        membership_paused_by_board: board_member,
+        membership_paused_by_board: membership_paused_by_board,
         upcoming_tickets: upcoming_tickets,
         future_bookings: future_bookings,
         upcoming_events: upcoming_events,
