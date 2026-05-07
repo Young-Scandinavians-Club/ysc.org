@@ -426,9 +426,9 @@ defmodule YscWeb.OrderConfirmationLive do
               <div class="px-6 pb-6">
                 <.link
                   navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
-                  class="inline-flex items-center justify-center gap-2 w-full rounded py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
+                  class="inline-flex items-center justify-center w-full rounded py-3 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
                 >
-                  <.icon name="hero-qr-code" class="w-4 h-4" /> Open Ticket QR Codes
+                  <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5 me-2" />Open Ticket QR Codes
                 </.link>
               </div>
             <% end %>
@@ -683,9 +683,9 @@ defmodule YscWeb.OrderConfirmationLive do
             <%= if @ticket_order.status != :cancelled do %>
               <.link
                 navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
-                class="inline-flex items-center justify-center gap-2 w-full rounded py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
+                class="inline-flex items-center justify-center w-full rounded py-3 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
               >
-                <.icon name="hero-qr-code" class="w-4 h-4" /> View Ticket QR Codes
+                <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5 me-2" />View Ticket QR Codes
               </.link>
             <% end %>
             <.button phx-click="view-tickets" class="w-full py-3">
