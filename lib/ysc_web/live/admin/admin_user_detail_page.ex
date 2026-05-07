@@ -295,7 +295,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   Suspended: "suspended",
                   Deleted: "deleted"
                 ]}
-                label="State"
+                label="Account Status"
               />
               <.input
                 type="select"
