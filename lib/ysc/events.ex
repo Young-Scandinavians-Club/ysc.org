@@ -85,8 +85,15 @@ defmodule Ysc.Events do
         |> maybe_filter_start_date_to(date_to)
       end
 
-    query
-    |> Flop.validate_and_run(params, for: Event)
+    case query
+         |> Flop.validate_and_run(params, for: Event) do
+      {:ok, {events, meta}} ->
+        events = Enum.map(events, &enrich_event_with_capacity/1)
+        {:ok, {events, meta}}
+
+      error ->
+        error
+    end
   end
 
   defp maybe_filter_tab(query, :upcoming) do
@@ -118,6 +125,71 @@ defmodule Ysc.Events do
     do: String.to_existing_atom(tab)
 
   defp normalize_tab(_), do: :all
+
+  @doc """
+  Enriches an event struct with capacity information (registrations and total capacity).
+  Adds a virtual `capacity_info` field with the format needed for display.
+  """
+  defp enrich_event_with_capacity(event) do
+    # Load ticket tiers if not already loaded
+    event = ensure_ticket_tiers_loaded(event)
+    
+    # Count confirmed tickets (excluding donation tiers)
+    registrations = count_tickets_sold_excluding_donations(event.id)
+    
+    # Calculate total capacity
+    capacity = calculate_event_capacity(event)
+    
+    # Add capacity info to the event struct
+    Map.put(event, :capacity_info, %{
+      registrations: registrations,
+      capacity: capacity
+    })
+  end
+
+  @doc """
+  Calculates the total capacity for an event considering both event-level
+  and tier-level limits. Returns :unlimited if there are no limits, or an integer
+  representing the actual capacity.
+  """
+  defp calculate_event_capacity(event) do
+    event_capacity = event.max_attendees
+    
+    # Get non-donation ticket tiers
+    non_donation_tiers = 
+      Enum.reject(event.ticket_tiers || [], fn tier -> 
+        tier.type == :donation or tier.type == "donation"
+      end)
+    
+    # Calculate sum of tier capacities
+    tier_capacity = calculate_tier_capacity_sum(non_donation_tiers)
+    
+    # Determine actual capacity
+    case {event_capacity, tier_capacity} do
+      {nil, :unlimited} -> :unlimited
+      {nil, tier_cap} -> tier_cap
+      {event_cap, :unlimited} -> event_cap
+      {event_cap, tier_cap} -> min(event_cap, tier_cap)
+    end
+  end
+
+  defp calculate_tier_capacity_sum([]), do: :unlimited
+  
+  defp calculate_tier_capacity_sum(tiers) do
+    # If any tier is unlimited (nil or 0 quantity), the event has unlimited capacity
+    # Otherwise, sum up all tier quantities
+    has_unlimited = Enum.any?(tiers, fn tier -> 
+      tier.quantity == nil or tier.quantity == 0
+    end)
+    
+    if has_unlimited do
+      :unlimited
+    else
+      Enum.reduce(tiers, 0, fn tier, acc -> 
+        acc + (tier.quantity || 0)
+      end)
+    end
+  end
 
   defp normalize_list_events_opts(search_term)
        when is_binary(search_term) or is_nil(search_term),
