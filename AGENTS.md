@@ -356,3 +356,30 @@ And **never** do this:
 ## Shell Scripts
 
 - Always use `#!/usr/bin/env bash` as shebang for scripts
+
+## Cursor Cloud specific instructions
+
+### System dependencies (pre-installed in environment)
+
+- **Erlang/OTP 27** (installed at system level via esl-erlang package)
+- **Elixir 1.19.5** (installed at `/usr/local/elixir/bin`, added to PATH via `~/.bashrc`)
+- **Docker** with `docker compose` (fuse-overlayfs storage driver, iptables-legacy)
+- **shellcheck** and **shfmt** (for shell script linting)
+- **inotify-tools** (for Phoenix live reload file watching)
+
+### Starting services
+
+1. **Docker daemon**: `sudo dockerd &>/tmp/dockerd.log &` (wait ~3s for startup)
+2. **PostgreSQL + MinIO**: `sudo docker compose -f etc/docker/docker-compose.yml up -d`
+3. **Dev server**: `set -a && source .env && set +a && mix phx.server` (runs on port 4000)
+
+### Key caveats
+
+- The `.env` file must exist with at least `STRIPE_SECRET`, `STRIPE_PUBLIC_KEY`, and `STRIPE_WEBHOOK_SECRET` keys (placeholder values work for basic dev/test but Stripe-dependent features won't function)
+- The `make dev` target calls `etc/scripts/check_dev_prerequisites.sh` which uses `tput` for coloring; if this fails in a non-TTY context, run `mix phx.server` directly with `.env` sourced
+- Test suite runs with `MIX_ENV=test mix test` (7256 tests); no external services needed beyond PostgreSQL
+- Docker containers must be started with `sudo docker compose` since the daemon runs as root in this environment
+- `.tool-versions` specifies `elixir 1.19.5-otp-28` but the environment uses OTP 27; Elixir 1.19.5 compiled for OTP 27 works correctly
+- Lint: `mix format --check-formatted && mix credo --all` plus `shellcheck` and `shfmt -d -i 2 -ci` on shell scripts (see Makefile `lint` target)
+- The seeded admin account is `admin@ysc.org` / `very_secure_password`
+- After login, the app may redirect to an onboarding page; navigate to `/admin` directly to access the admin dashboard
