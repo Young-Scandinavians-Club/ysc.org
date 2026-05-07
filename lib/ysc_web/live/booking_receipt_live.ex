@@ -1,6 +1,7 @@
 defmodule YscWeb.BookingReceiptLive do
   use YscWeb, :live_view
 
+  alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
@@ -1638,7 +1639,7 @@ defmodule YscWeb.BookingReceiptLive do
         payment_type =
           case payment_method.type do
             nil -> nil
-            type -> normalize_payment_type(type)
+            type -> PaymentMethodFormatter.normalize_payment_type(type)
           end
 
         case payment_type do
@@ -1646,7 +1647,9 @@ defmodule YscWeb.BookingReceiptLive do
             desc =
               if payment_method.last_four do
                 brand =
-                  payment_brand_label(payment_method.display_brand || "Card")
+                  PaymentMethodFormatter.payment_brand_label(
+                    payment_method.display_brand || "Card"
+                  )
 
                 "#{brand} ending in #{payment_method.last_four}"
               else
@@ -1668,7 +1671,7 @@ defmodule YscWeb.BookingReceiptLive do
 
           :link ->
             desc =
-              format_link_payment_method(
+              PaymentMethodFormatter.format_link_payment_method(
                 payment_method.last_four,
                 payment_method.display_brand
               )
@@ -1676,7 +1679,12 @@ defmodule YscWeb.BookingReceiptLive do
             %{description: desc, logo_path: local_logo}
 
           type when not is_nil(type) ->
-            desc = format_alternative_payment_method(type, payment_method)
+            desc =
+              PaymentMethodFormatter.format_alternative_payment_method(
+                type,
+                payment_method
+              )
+
             %{description: desc, logo_path: local_logo}
 
           _ ->
@@ -1709,7 +1717,8 @@ defmodule YscWeb.BookingReceiptLive do
 
     cond do
       is_map(payment_intent.payment_method) &&
-          Map.has_key?(payment_intent.payment_method, :type) ->
+          (Map.has_key?(payment_intent.payment_method, :type) ||
+             Map.has_key?(payment_intent.payment_method, "type")) ->
         summary_from_stripe_payment_method(payment_intent.payment_method)
 
       is_binary(payment_intent.payment_method) ->
@@ -1726,37 +1735,15 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp summary_from_stripe_payment_method(stripe_pm) do
-    type = normalize_payment_type(stripe_pm.type)
+    {payment_method_type, last_four, display_brand} =
+      PaymentMethodFormatter.extract_payment_method_details(stripe_pm)
 
     actual_type =
-      if type == :card && stripe_pm.card do
-        wallet = Map.get(stripe_pm.card, :wallet)
-
-        cond do
-          wallet &&
-              (Map.get(wallet, :type) || Map.get(wallet, "type")) == "link" ->
-            :link
-
-          wallet ->
-            :card
-
-          (Map.get(stripe_pm.card, :brand) || Map.get(stripe_pm.card, "brand")) ==
-              "link" ->
-            :link
-
-          true ->
-            :card
-        end
-      else
-        type
-      end
-
-    last_four = stripe_last_four_from_pm(stripe_pm)
-    display_brand = stripe_display_brand_from_pm(stripe_pm)
+      PaymentMethodFormatter.normalize_payment_type(payment_method_type)
 
     %{
       description:
-        format_payment_method_with_details(
+        PaymentMethodFormatter.format_payment_method_with_details(
           actual_type,
           last_four,
           display_brand
@@ -1765,226 +1752,6 @@ defmodule YscWeb.BookingReceiptLive do
         PaymentMethodLogo.path_for_stripe_summary(actual_type, display_brand)
     }
   end
-
-  defp stripe_last_four_from_pm(stripe_pm) do
-    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
-    wallet = card && (Map.get(card, :wallet) || Map.get(card, "wallet"))
-
-    bank =
-      Map.get(stripe_pm, :us_bank_account) ||
-        Map.get(stripe_pm, "us_bank_account")
-
-    cond do
-      wallet &&
-          (Map.get(wallet, :dynamic_last4) || Map.get(wallet, "dynamic_last4")) ->
-        Map.get(wallet, :dynamic_last4) || Map.get(wallet, "dynamic_last4")
-
-      card && (Map.get(card, :last4) || Map.get(card, "last4")) ->
-        Map.get(card, :last4) || Map.get(card, "last4")
-
-      bank && (Map.get(bank, :last4) || Map.get(bank, "last4")) ->
-        Map.get(bank, :last4) || Map.get(bank, "last4")
-
-      true ->
-        nil
-    end
-  end
-
-  defp stripe_display_brand_from_pm(stripe_pm) do
-    card = Map.get(stripe_pm, :card) || Map.get(stripe_pm, "card")
-    wallet = card && (Map.get(card, :wallet) || Map.get(card, "wallet"))
-
-    cond do
-      wallet ->
-        case Map.get(wallet, :type) || Map.get(wallet, "type") do
-          "link" -> card_display_brand(card)
-          "apple_pay" -> "Apple Pay"
-          "google_pay" -> "Google Pay"
-          _ -> card_display_brand(card)
-        end
-
-      card ->
-        card_display_brand(card)
-
-      true ->
-        nil
-    end
-  end
-
-  # Format payment method with available details
-  defp format_payment_method_with_details(type, last_four, display_brand) do
-    case type do
-      :card ->
-        if last_four do
-          brand = payment_brand_label(display_brand || "Card")
-          "#{brand} ending in #{last_four}"
-        else
-          "Credit Card"
-        end
-
-      :link ->
-        format_link_payment_method(last_four, display_brand)
-
-      :bank_account ->
-        if last_four do
-          bank_name = display_brand || "Bank"
-          "#{bank_name} Account ending in #{last_four}"
-        else
-          "Bank Account"
-        end
-
-      _ ->
-        format_alternative_payment_method(type, nil)
-    end
-  end
-
-  # Normalize payment type to atom
-  defp normalize_payment_type(type) when is_atom(type), do: type
-
-  defp normalize_payment_type(type) when is_binary(type) do
-    case type do
-      "card" -> :card
-      "us_bank_account" -> :bank_account
-      "sepa_debit" -> :sepa_debit
-      "link" -> :link
-      "paypal" -> :paypal
-      "affirm" -> :affirm
-      "klarna" -> :klarna
-      "cashapp" -> :cashapp
-      "apple_pay" -> :apple_pay
-      "google_pay" -> :google_pay
-      _ -> :other
-    end
-  end
-
-  defp normalize_payment_type(_), do: :other
-
-  # Format alternative payment method names for display
-  defp format_alternative_payment_method(type, payment_method) do
-    type = if is_binary(type), do: normalize_payment_type(type), else: type
-
-    case type do
-      :klarna ->
-        if payment_method && payment_method.last_four do
-          "Klarna ending in #{payment_method.last_four}"
-        else
-          "Klarna"
-        end
-
-      :amazon_pay ->
-        "Amazon Pay"
-
-      :cashapp ->
-        if payment_method && payment_method.last_four do
-          "Cash App ending in #{payment_method.last_four}"
-        else
-          "Cash App"
-        end
-
-      :paypal ->
-        "PayPal"
-
-      :apple_pay ->
-        "Apple Pay"
-
-      :google_pay ->
-        "Google Pay"
-
-      :link ->
-        last_four = payment_method && payment_method.last_four
-        display_brand = payment_method && payment_method.display_brand
-
-        format_link_payment_method(last_four, display_brand)
-
-      :us_bank_account ->
-        if payment_method && payment_method.last_four do
-          bank_name =
-            payment_method.bank_name || payment_method.display_brand ||
-              "Bank"
-
-          "#{bank_name} Account ending in #{payment_method.last_four}"
-        else
-          "Bank Account"
-        end
-
-      :bank_account ->
-        if payment_method && payment_method.last_four do
-          bank_name =
-            payment_method.bank_name || payment_method.display_brand ||
-              "Bank"
-
-          "#{bank_name} Account ending in #{payment_method.last_four}"
-        else
-          "Bank Account"
-        end
-
-      :sepa_debit ->
-        if payment_method && payment_method.last_four do
-          "SEPA Debit ending in #{payment_method.last_four}"
-        else
-          "SEPA Debit"
-        end
-
-      :card ->
-        if payment_method && payment_method.last_four do
-          brand = payment_brand_label(payment_method.display_brand || "Card")
-          "#{brand} ending in #{payment_method.last_four}"
-        else
-          "Credit Card"
-        end
-
-      _ ->
-        type
-        |> Atom.to_string()
-        |> String.replace("_", " ")
-        |> String.split()
-        |> Enum.map_join(" ", &String.capitalize/1)
-    end
-  end
-
-  defp format_link_payment_method(last_four, display_brand) do
-    card_brand =
-      display_brand
-      |> payment_brand_label()
-      |> non_link_brand()
-
-    cond do
-      last_four && card_brand ->
-        "Link · #{card_brand} ending in #{last_four}"
-
-      last_four ->
-        "Link ending in #{last_four}"
-
-      card_brand ->
-        "Link · #{card_brand}"
-
-      true ->
-        "Link"
-    end
-  end
-
-  defp card_display_brand(card) do
-    Map.get(card, :display_brand) ||
-      Map.get(card, "display_brand") ||
-      Map.get(card, :brand) ||
-      Map.get(card, "brand")
-  end
-
-  defp payment_brand_label(nil), do: nil
-
-  defp payment_brand_label(brand) when is_binary(brand) do
-    case String.downcase(brand) do
-      "amex" -> "Amex"
-      "american_express" -> "American Express"
-      "mastercard" -> "Mastercard"
-      "visa" -> "Visa"
-      "link" -> "Link"
-      _ -> brand |> String.replace("_", " ") |> String.capitalize()
-    end
-  end
-
-  defp non_link_brand("Link"), do: nil
-  defp non_link_brand(brand), do: brand
 
   defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
   defp format_property_name(:clear_lake), do: "Clear Lake Cabin"
