@@ -148,7 +148,8 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
       Events.TicketReservation.changeset(%Events.TicketReservation{}, %{
         ticket_tier_id: ticket_tier.id,
         created_by_id: current_user.id,
-        status: "active"
+        status: "active",
+        quantity: 1
       })
 
     {:ok,
@@ -171,7 +172,8 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
       Events.TicketReservation.changeset(%Events.TicketReservation{}, %{
         ticket_tier_id: ticket_tier_id,
         created_by_id: assigns.current_user.id,
-        status: "active"
+        status: "active",
+        quantity: 1
       })
 
     {:ok,
@@ -190,24 +192,34 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
         %{"ticket_reservation" => reservation_params},
         socket
       ) do
-    # Preserve user_id if a user has been selected
-    reservation_params =
-      if socket.assigns[:selected_user] do
-        Map.put(reservation_params, "user_id", socket.assigns.selected_user.id)
-      else
-        reservation_params
-      end
+    # Get existing values from the current changeset to preserve them
+    existing_changeset = socket.assigns.form.source
 
-    # Ensure required fields are present
-    reservation_params =
-      reservation_params
-      |> Map.put("ticket_tier_id", socket.assigns.ticket_tier_id)
-      |> Map.put("created_by_id", socket.assigns.current_user.id)
-      |> Map.put("status", "active")
+    existing_values = %{
+      "quantity" => Ecto.Changeset.get_field(existing_changeset, :quantity),
+      "discount_percentage" =>
+        Ecto.Changeset.get_field(existing_changeset, :discount_percentage),
+      "expires_at" => Ecto.Changeset.get_field(existing_changeset, :expires_at),
+      "notes" => Ecto.Changeset.get_field(existing_changeset, :notes),
+      "ticket_tier_id" => socket.assigns.ticket_tier_id,
+      "created_by_id" => socket.assigns.current_user.id,
+      "status" => "active"
+    }
+
+    # Merge existing values with new params (new params take precedence)
+    merged_params = Map.merge(existing_values, reservation_params)
+
+    # Preserve user_id if a user has been selected
+    merged_params =
+      if socket.assigns[:selected_user] do
+        Map.put(merged_params, "user_id", socket.assigns.selected_user.id)
+      else
+        merged_params
+      end
 
     changeset =
       %Events.TicketReservation{}
-      |> Events.TicketReservation.changeset(reservation_params)
+      |> Events.TicketReservation.changeset(merged_params)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, :form, to_form(changeset))}
@@ -232,17 +244,22 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
   def handle_event("select-user", %{"id" => id}, socket) do
     user = Accounts.get_user!(id)
 
-    # Build params from current changeset state
-    base_params = %{
+    # Get existing values from the current changeset to preserve them
+    existing_changeset = socket.assigns.form.source
+
+    params = %{
       "ticket_tier_id" => socket.assigns.ticket_tier_id,
       "created_by_id" => socket.assigns.current_user.id,
-      "status" => "active"
+      "status" => "active",
+      "user_id" => user.id,
+      "quantity" => Ecto.Changeset.get_field(existing_changeset, :quantity),
+      "discount_percentage" =>
+        Ecto.Changeset.get_field(existing_changeset, :discount_percentage),
+      "expires_at" => Ecto.Changeset.get_field(existing_changeset, :expires_at),
+      "notes" => Ecto.Changeset.get_field(existing_changeset, :notes)
     }
 
-    # Add user_id to params
-    params = Map.put(base_params, "user_id", user.id)
-
-    # Create a fresh changeset with the user_id
+    # Create a changeset with all preserved values plus the new user_id
     changeset =
       %Events.TicketReservation{}
       |> Events.TicketReservation.changeset(params)
@@ -258,9 +275,24 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
   @impl true
   def handle_event("clear-user", _params, socket) do
+    # Get existing values from the current changeset to preserve them
+    existing_changeset = socket.assigns.form.source
+
+    params = %{
+      "ticket_tier_id" => socket.assigns.ticket_tier_id,
+      "created_by_id" => socket.assigns.current_user.id,
+      "status" => "active",
+      "quantity" => Ecto.Changeset.get_field(existing_changeset, :quantity),
+      "discount_percentage" =>
+        Ecto.Changeset.get_field(existing_changeset, :discount_percentage),
+      "expires_at" => Ecto.Changeset.get_field(existing_changeset, :expires_at),
+      "notes" => Ecto.Changeset.get_field(existing_changeset, :notes)
+    }
+
+    # Create a changeset with all preserved values but without user_id
     changeset =
-      socket.assigns.form.source
-      |> Ecto.Changeset.delete_change(:user_id)
+      %Events.TicketReservation{}
+      |> Events.TicketReservation.changeset(params)
       |> Map.put(:action, :validate)
 
     {:noreply,
