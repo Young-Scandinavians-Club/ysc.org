@@ -381,12 +381,21 @@ defmodule YscWeb.AdminNewslettersLive do
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-zinc-200">
-                  <.link
-                    navigate={~p"/admin/newsletters/#{edition.id}/edit"}
-                    class="text-blue-600 font-semibold hover:underline text-sm"
-                  >
-                    Edit
-                  </.link>
+                  <%= if edition.status == :sent do %>
+                    <.link
+                      navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                      class="text-blue-600 font-semibold hover:underline text-sm"
+                    >
+                      View
+                    </.link>
+                  <% else %>
+                    <.link
+                      navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                      class="text-blue-600 font-semibold hover:underline text-sm"
+                    >
+                      Edit
+                    </.link>
+                  <% end %>
                   <%= if edition.status == :sending do %>
                     <span class="inline-flex items-center gap-1.5 text-sm text-blue-600 font-semibold">
                       <span class="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
@@ -528,13 +537,23 @@ defmodule YscWeb.AdminNewslettersLive do
               </:col>
               <:action :let={{_, edition}} label="Actions">
                 <div class="flex items-center gap-2">
-                  <.link
-                    navigate={~p"/admin/newsletters/#{edition.id}/edit"}
-                    class="p-1.5 rounded text-blue-600 hover:bg-blue-50"
-                    title="Edit"
-                  >
-                    <.icon name="hero-pencil-square" class="w-4 h-4" />
-                  </.link>
+                  <%= if edition.status == :sent do %>
+                    <.link
+                      navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                      class="p-1.5 rounded text-blue-600 hover:bg-blue-50"
+                      title="View"
+                    >
+                      <.icon name="hero-eye" class="w-4 h-4" />
+                    </.link>
+                  <% else %>
+                    <.link
+                      navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                      class="p-1.5 rounded text-blue-600 hover:bg-blue-50"
+                      title="Edit"
+                    >
+                      <.icon name="hero-pencil-square" class="w-4 h-4" />
+                    </.link>
+                  <% end %>
                   <%= if edition.status == :sending do %>
                     <span class="p-1.5" title="Sending…">
                       <span class="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin">
