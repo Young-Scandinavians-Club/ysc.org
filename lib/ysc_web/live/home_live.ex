@@ -220,14 +220,17 @@ defmodule YscWeb.HomeLive do
         []
       end
 
-    {is_sub_account, primary_user, other_family_members, membership_paused_by_board}
+    {is_sub_account, primary_user, other_family_members,
+     membership_paused_by_board}
   end
 
   @impl true
   def handle_async(:load_home_data, {:ok, results}, socket) do
     # Handle logged-in user async results
-    {is_sub_account, primary_user, other_family_members, membership_paused_by_board} =
+    {is_sub_account, primary_user, other_family_members,
+     membership_paused_by_board} =
       Map.get(results, :user_data, {false, nil, [], nil})
+
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
     upcoming_events = Map.get(results, :events, [])
