@@ -1226,65 +1226,67 @@ defmodule YscWeb.HomeLive do
 
       <%!-- Dashboard Content --%>
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6 -mt-8 pb-20">
-        <%!-- App Launcher Grid --%>
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0">
-          <.link
-            navigate={~p"/bookings/tahoe"}
-            class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
-          >
-            <div class="w-10 h-10 bg-blue-50 rounded-md flex items-center justify-center mb-4">
-              <.icon name="hero-home" class="w-5 h-5 text-blue-600" />
-            </div>
-            <p class="font-bold text-zinc-900">Lake Tahoe</p>
-            <p class="text-sm text-zinc-500">Reserve Cabin</p>
-          </.link>
-          <.link
-            navigate={~p"/bookings/clear-lake"}
-            class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
-          >
-            <div class="w-10 h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-4">
-              <.icon name="hero-home" class="w-5 h-5 text-emerald-600" />
-            </div>
-            <p class="font-bold text-zinc-900">Clear Lake</p>
-            <p class="text-sm text-zinc-500">Reserve Cabin</p>
-          </.link>
-          <.link
-            navigate={~p"/users/settings"}
-            class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
-          >
-            <div class="w-10 h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-4">
-              <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-zinc-600" />
-            </div>
-            <p class="font-bold text-zinc-900">Settings</p>
-            <p class="text-sm text-zinc-500">Preferences</p>
-          </.link>
-          <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
+        <%!-- Flex container for mobile reordering: dynamic content first on mobile, launcher grid first on desktop --%>
+        <div class="flex flex-col">
+          <%!-- App Launcher Grid - Order 2 on mobile, Order 1 on lg+ --%>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0 order-2 lg:order-1">
             <.link
-              navigate={~p"/expensereport"}
+              navigate={~p"/bookings/tahoe"}
               class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-orange-50 rounded-md flex items-center justify-center mb-4">
-                <.icon name="hero-receipt-refund" class="w-5 h-5 text-orange-600" />
+              <div class="w-10 h-10 bg-blue-50 rounded-md flex items-center justify-center mb-4">
+                <.icon name="hero-home" class="w-5 h-5 text-blue-600" />
               </div>
-              <p class="font-bold text-zinc-900">Expenses</p>
-              <p class="text-sm text-zinc-500">File Report</p>
+              <p class="font-bold text-zinc-900">Lake Tahoe</p>
+              <p class="text-sm text-zinc-500">Reserve Cabin</p>
             </.link>
-          <% else %>
             <.link
-              navigate={~p"/events"}
+              navigate={~p"/bookings/clear-lake"}
               class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-purple-50 rounded-md flex items-center justify-center mb-4">
-                <.icon name="hero-calendar-days" class="w-5 h-5 text-purple-600" />
+              <div class="w-10 h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-4">
+                <.icon name="hero-home" class="w-5 h-5 text-emerald-600" />
               </div>
-              <p class="font-bold text-zinc-900">Events</p>
-              <p class="text-sm text-zinc-500">Browse Events</p>
+              <p class="font-bold text-zinc-900">Clear Lake</p>
+              <p class="text-sm text-zinc-500">Reserve Cabin</p>
             </.link>
-          <% end %>
-        </div>
+            <.link
+              navigate={~p"/users/settings"}
+              class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+            >
+              <div class="w-10 h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-4">
+                <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-zinc-600" />
+              </div>
+              <p class="font-bold text-zinc-900">Settings</p>
+              <p class="text-sm text-zinc-500">Preferences</p>
+            </.link>
+            <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
+              <.link
+                navigate={~p"/expensereport"}
+                class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              >
+                <div class="w-10 h-10 bg-orange-50 rounded-md flex items-center justify-center mb-4">
+                  <.icon name="hero-receipt-refund" class="w-5 h-5 text-orange-600" />
+                </div>
+                <p class="font-bold text-zinc-900">Expenses</p>
+                <p class="text-sm text-zinc-500">File Report</p>
+              </.link>
+            <% else %>
+              <.link
+                navigate={~p"/events"}
+                class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              >
+                <div class="w-10 h-10 bg-purple-50 rounded-md flex items-center justify-center mb-4">
+                  <.icon name="hero-calendar-days" class="w-5 h-5 text-purple-600" />
+                </div>
+                <p class="font-bold text-zinc-900">Events</p>
+                <p class="text-sm text-zinc-500">Browse Events</p>
+              </.link>
+            <% end %>
+          </div>
 
-        <%!-- Main Content Grid --%>
-        <div class="grid lg:grid-cols-3 gap-12">
+          <%!-- Main Content Grid - Order 1 on mobile, Order 2 on lg+ --%>
+          <div class="grid lg:grid-cols-3 gap-12 order-1 lg:order-2">
           <div class="lg:col-span-2 space-y-12">
             <%!-- Your Itinerary Section --%>
             <section>
@@ -1926,6 +1928,7 @@ defmodule YscWeb.HomeLive do
               </div>
             </section>
           </aside>
+        </div>
         </div>
 
         <%!-- Community Events Section --%>
