@@ -2784,30 +2784,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
-  defp do_save_user(socket, assigned, user_params, current_user) do
-    case Accounts.update_user_with_address(assigned, user_params, current_user) do
-      {:ok, updated_user} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
-         |> push_patch(to: ~p"/admin/users/#{updated_user.id}/details")}
-
-      {:error, changeset} ->
-        # Log the actual error for debugging
-        Ysc.Logging.error(
-          "Failed to update user with address: #{inspect(changeset.errors)}"
-        )
-
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Failed to save: #{inspect(changeset.errors)}",
-           title: "Save failed"
-         )}
-    end
-  end
-
   def handle_event("validate", %{"user" => user_params}, socket) do
     assigned = socket.assigns[:selected_user]
 
@@ -3852,6 +3828,30 @@ defmodule YscWeb.AdminUserDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(:error, "Failed to remove user.",
            title: "Remove User"
+         )}
+    end
+  end
+
+  defp do_save_user(socket, assigned, user_params, current_user) do
+    case Accounts.update_user_with_address(assigned, user_params, current_user) do
+      {:ok, updated_user} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "User updated.", title: "Profile")
+         |> push_patch(to: ~p"/admin/users/#{updated_user.id}/details")}
+
+      {:error, changeset} ->
+        # Log the actual error for debugging
+        Ysc.Logging.error(
+          "Failed to update user with address: #{inspect(changeset.errors)}"
+        )
+
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to save: #{inspect(changeset.errors)}",
+           title: "Save failed"
          )}
     end
   end
