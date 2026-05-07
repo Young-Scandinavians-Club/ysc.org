@@ -363,7 +363,7 @@ defmodule Ysc.Payments do
       provider: :stripe,
       provider_id: stripe_payment_method.id,
       provider_customer_id: stripe_payment_method.customer,
-      type: map_stripe_type_to_payment_method_type(stripe_payment_method.type),
+      type: map_stripe_type_to_payment_method_type(stripe_payment_method),
       provider_type: stripe_payment_method.type,
       last_four: get_last_four(stripe_payment_method),
       display_brand: get_display_brand(stripe_payment_method),
@@ -426,7 +426,7 @@ defmodule Ysc.Payments do
       provider: :stripe,
       provider_id: stripe_payment_method.id,
       provider_customer_id: stripe_payment_method.customer,
-      type: map_stripe_type_to_payment_method_type(stripe_payment_method.type),
+      type: map_stripe_type_to_payment_method_type(stripe_payment_method),
       provider_type: stripe_payment_method.type,
       last_four: get_last_four(stripe_payment_method),
       display_brand: get_display_brand(stripe_payment_method),
@@ -495,30 +495,90 @@ defmodule Ysc.Payments do
 
   defp handle_duplicate_payment_method(result), do: result
 
-  defp map_stripe_type_to_payment_method_type("card"), do: :card
+  # Map Stripe payment method to our internal type, detecting wallet types like Link
+  defp map_stripe_type_to_payment_method_type(stripe_payment_method) do
+    case stripe_payment_method.type do
+      "card" ->
+        # Check if this is a wallet payment like Link
+        if stripe_payment_method.card && stripe_payment_method.card.wallet do
+          wallet_type = stripe_payment_method.card.wallet.type
 
-  defp map_stripe_type_to_payment_method_type("us_bank_account"),
-    do: :bank_account
+          case wallet_type do
+            "link" -> :link
+            _ -> :card
+          end
+        else
+          # Check if brand is link
+          if stripe_payment_method.card &&
+               stripe_payment_method.card.brand == "link" do
+            :link
+          else
+            :card
+          end
+        end
 
-  defp map_stripe_type_to_payment_method_type("sepa_debit"), do: :sepa_debit
-  defp map_stripe_type_to_payment_method_type("link"), do: :link
-  defp map_stripe_type_to_payment_method_type("paypal"), do: :paypal
-  defp map_stripe_type_to_payment_method_type("affirm"), do: :affirm
-  defp map_stripe_type_to_payment_method_type("klarna"), do: :klarna
-  defp map_stripe_type_to_payment_method_type("cashapp"), do: :cashapp
+      "us_bank_account" ->
+        :bank_account
 
-  # Return :other for unknown payment types to prevent atom exhaustion
-  defp map_stripe_type_to_payment_method_type(_unknown), do: :other
+      "sepa_debit" ->
+        :sepa_debit
+
+      "link" ->
+        :link
+
+      "paypal" ->
+        :paypal
+
+      "affirm" ->
+        :affirm
+
+      "klarna" ->
+        :klarna
+
+      "cashapp" ->
+        :cashapp
+
+      # Return :other for unknown payment types to prevent atom exhaustion
+      _unknown ->
+        :other
+    end
+  end
+
+  # Extract last four digits from various payment method types
+  defp get_last_four(%{card: %{wallet: %{dynamic_last4: dynamic_last4}}})
+       when not is_nil(dynamic_last4),
+       do: dynamic_last4
 
   defp get_last_four(%{card: %{last4: last4}}), do: last4
   defp get_last_four(%{us_bank_account: %{last4: last4}}), do: last4
+  defp get_last_four(%{link: %{last4: last4}}), do: last4
+  defp get_last_four(%{cashapp: %{last4: last4}}), do: last4
   defp get_last_four(_), do: nil
 
+  # Extract display brand from various payment method types
+  defp get_display_brand(%{card: %{wallet: %{type: wallet_type}}})
+       when not is_nil(wallet_type) do
+    case wallet_type do
+      "link" -> "Link"
+      "apple_pay" -> "Apple Pay"
+      "google_pay" -> "Google Pay"
+      "samsung_pay" -> "Samsung Pay"
+      _ -> nil
+    end
+  end
+
+  defp get_display_brand(%{card: %{brand: "link"}}), do: "Link"
+  defp get_display_brand(%{card: %{display_brand: brand}}), do: brand
   defp get_display_brand(%{card: %{brand: brand}}), do: brand
 
   defp get_display_brand(%{us_bank_account: %{bank_name: bank_name}}),
     do: bank_name
 
+  defp get_display_brand(%{link: _}), do: "Link"
+  defp get_display_brand(%{cashapp: _}), do: "Cash App"
+  defp get_display_brand(%{paypal: _}), do: "PayPal"
+  defp get_display_brand(%{klarna: _}), do: "Klarna"
+  defp get_display_brand(%{affirm: _}), do: "Affirm"
   defp get_display_brand(_), do: nil
 
   defp stripe_payment_method_to_map(stripe_payment_method) do

@@ -1605,10 +1605,19 @@ defmodule YscWeb.BookingReceiptLive do
   defp get_payment_method_description(payment) do
     case payment.payment_method do
       nil ->
-        "Credit Card (Stripe)"
+        # Payment method not synced - try to get it from Stripe payment intent
+        get_payment_method_from_stripe(payment)
 
       payment_method ->
-        case payment_method.type do
+        # Normalize type to atom (could be string from database)
+        payment_type =
+          case payment_method.type do
+            nil -> nil
+            type when is_atom(type) -> type
+            type when is_binary(type) -> String.to_existing_atom(type)
+          end
+
+        case payment_type do
           :card ->
             if payment_method.last_four do
               brand = payment_method.display_brand || "Card"
@@ -1626,11 +1635,317 @@ defmodule YscWeb.BookingReceiptLive do
               "Bank Account"
             end
 
+          :link ->
+            if payment_method.last_four do
+              "Link ending in #{payment_method.last_four}"
+            else
+              "Link"
+            end
+
+          type when not is_nil(type) ->
+            # Handle alternative payment methods (klarna, amazon_pay, cashapp, etc.)
+            format_alternative_payment_method(type, payment_method)
+
           _ ->
-            "Payment Method"
+            # Fallback: try to get from Stripe
+            get_payment_method_from_stripe(payment)
         end
+    rescue
+      ArgumentError ->
+        # If String.to_existing_atom fails, fallback
+        get_payment_method_from_stripe(payment)
     end
   end
+
+  # Get payment method type from Stripe payment intent when not synced to database
+  defp get_payment_method_from_stripe(payment) do
+    if payment.external_payment_id do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             Stripe.PaymentIntent.retrieve(payment.external_payment_id, %{
+               expand: ["payment_method"]
+             })
+           end) do
+        {:ok, payment_intent} ->
+          cond do
+            is_map(payment_intent.payment_method) &&
+                Map.has_key?(payment_intent.payment_method, :type) ->
+              stripe_pm = payment_intent.payment_method
+              type = normalize_payment_type(stripe_pm.type)
+
+              # Check for wallet payments
+              actual_type =
+                if type == :card && stripe_pm.card && stripe_pm.card.wallet do
+                  case stripe_pm.card.wallet.type do
+                    "link" -> :link
+                    _ -> :card
+                  end
+                else
+                  type
+                end
+
+              # Get last four digits if available
+              last_four =
+                cond do
+                  stripe_pm.card && stripe_pm.card.wallet &&
+                      stripe_pm.card.wallet.dynamic_last4 ->
+                    stripe_pm.card.wallet.dynamic_last4
+
+                  stripe_pm.card && stripe_pm.card.last4 ->
+                    stripe_pm.card.last4
+
+                  stripe_pm.us_bank_account &&
+                      stripe_pm.us_bank_account.last4 ->
+                    stripe_pm.us_bank_account.last4
+
+                  true ->
+                    nil
+                end
+
+              # Get display brand
+              display_brand =
+                cond do
+                  stripe_pm.card && stripe_pm.card.wallet ->
+                    case stripe_pm.card.wallet.type do
+                      "link" -> "Link"
+                      "apple_pay" -> "Apple Pay"
+                      "google_pay" -> "Google Pay"
+                      _ -> nil
+                    end
+
+                  stripe_pm.card && stripe_pm.card.display_brand ->
+                    stripe_pm.card.display_brand
+
+                  stripe_pm.card && stripe_pm.card.brand ->
+                    stripe_pm.card.brand
+
+                  true ->
+                    nil
+                end
+
+              format_payment_method_with_details(
+                actual_type,
+                last_four,
+                display_brand
+              )
+
+            is_binary(payment_intent.payment_method) ->
+              case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                     Stripe.PaymentMethod.retrieve(payment_intent.payment_method)
+                   end) do
+                {:ok, stripe_pm} ->
+                  type = normalize_payment_type(stripe_pm.type)
+
+                  actual_type =
+                    if type == :card && stripe_pm.card &&
+                         stripe_pm.card.wallet do
+                      case stripe_pm.card.wallet.type do
+                        "link" -> :link
+                        _ -> :card
+                      end
+                    else
+                      type
+                    end
+
+                  last_four =
+                    cond do
+                      stripe_pm.card && stripe_pm.card.wallet &&
+                          stripe_pm.card.wallet.dynamic_last4 ->
+                        stripe_pm.card.wallet.dynamic_last4
+
+                      stripe_pm.card && stripe_pm.card.last4 ->
+                        stripe_pm.card.last4
+
+                      stripe_pm.us_bank_account &&
+                          stripe_pm.us_bank_account.last4 ->
+                        stripe_pm.us_bank_account.last4
+
+                      true ->
+                        nil
+                    end
+
+                  display_brand =
+                    cond do
+                      stripe_pm.card && stripe_pm.card.wallet ->
+                        case stripe_pm.card.wallet.type do
+                          "link" -> "Link"
+                          "apple_pay" -> "Apple Pay"
+                          "google_pay" -> "Google Pay"
+                          _ -> nil
+                        end
+
+                      stripe_pm.card && stripe_pm.card.display_brand ->
+                        stripe_pm.card.display_brand
+
+                      stripe_pm.card && stripe_pm.card.brand ->
+                        stripe_pm.card.brand
+
+                      true ->
+                        nil
+                    end
+
+                  format_payment_method_with_details(
+                    actual_type,
+                    last_four,
+                    display_brand
+                  )
+
+                _ ->
+                  "Credit Card (Stripe)"
+              end
+
+            true ->
+              "Credit Card (Stripe)"
+          end
+
+        {:error, _} ->
+          "Credit Card (Stripe)"
+      end
+    else
+      "Credit Card (Stripe)"
+    end
+  end
+
+  # Format payment method with available details
+  defp format_payment_method_with_details(type, last_four, display_brand) do
+    case type do
+      :card ->
+        if last_four do
+          brand = display_brand || "Card"
+          "#{String.capitalize(brand)} ending in #{last_four}"
+        else
+          "Credit Card"
+        end
+
+      :link ->
+        if last_four do
+          "Link ending in #{last_four}"
+        else
+          "Link"
+        end
+
+      :bank_account ->
+        if last_four do
+          bank_name = display_brand || "Bank"
+          "#{bank_name} Account ending in #{last_four}"
+        else
+          "Bank Account"
+        end
+
+      _ ->
+        format_alternative_payment_method(type, nil)
+    end
+  end
+
+  # Normalize payment type to atom
+  defp normalize_payment_type(type) when is_atom(type), do: type
+
+  defp normalize_payment_type(type) when is_binary(type) do
+    case type do
+      "card" -> :card
+      "us_bank_account" -> :bank_account
+      "sepa_debit" -> :sepa_debit
+      "link" -> :link
+      "paypal" -> :paypal
+      "affirm" -> :affirm
+      "klarna" -> :klarna
+      "cashapp" -> :cashapp
+      "apple_pay" -> :apple_pay
+      "google_pay" -> :google_pay
+      _ -> :other
+    end
+  end
+
+  defp normalize_payment_type(_), do: :other
+
+  # Format alternative payment method names for display
+  defp format_alternative_payment_method(type, payment_method)
+       when is_atom(type) do
+    case type do
+      :klarna ->
+        if payment_method && payment_method.last_four do
+          "Klarna ending in #{payment_method.last_four}"
+        else
+          "Klarna"
+        end
+
+      :amazon_pay ->
+        "Amazon Pay"
+
+      :cashapp ->
+        if payment_method && payment_method.last_four do
+          "Cash App ending in #{payment_method.last_four}"
+        else
+          "Cash App"
+        end
+
+      :paypal ->
+        "PayPal"
+
+      :apple_pay ->
+        "Apple Pay"
+
+      :google_pay ->
+        "Google Pay"
+
+      :link ->
+        if payment_method && payment_method.last_four do
+          "Link ending in #{payment_method.last_four}"
+        else
+          "Link"
+        end
+
+      :us_bank_account ->
+        if payment_method && payment_method.last_four do
+          bank_name =
+            (payment_method.bank_name || payment_method.display_brand) ||
+              "Bank"
+
+          "#{bank_name} Account ending in #{payment_method.last_four}"
+        else
+          "Bank Account"
+        end
+
+      :bank_account ->
+        if payment_method && payment_method.last_four do
+          bank_name =
+            (payment_method.bank_name || payment_method.display_brand) ||
+              "Bank"
+
+          "#{bank_name} Account ending in #{payment_method.last_four}"
+        else
+          "Bank Account"
+        end
+
+      :sepa_debit ->
+        if payment_method && payment_method.last_four do
+          "SEPA Debit ending in #{payment_method.last_four}"
+        else
+          "SEPA Debit"
+        end
+
+      :card ->
+        if payment_method && payment_method.last_four do
+          brand = payment_method.display_brand || "Card"
+          "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
+        else
+          "Credit Card"
+        end
+
+      _ ->
+        type
+        |> Atom.to_string()
+        |> String.replace("_", " ")
+        |> String.split()
+        |> Enum.map_join(" ", &String.capitalize/1)
+    end
+  end
+
+  defp format_alternative_payment_method(type, payment_method)
+       when is_binary(type) do
+    format_alternative_payment_method(normalize_payment_type(type), payment_method)
+  end
+
+  defp format_alternative_payment_method(_, _), do: "Payment Method"
 
   defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
   defp format_property_name(:clear_lake), do: "Clear Lake Cabin"
