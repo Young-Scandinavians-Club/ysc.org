@@ -1,4 +1,5 @@
 import { loadScript, loadStylesheet } from "./load_external_asset";
+import { pushEventIfConnected } from "./live_view_safe_push";
 
 /** Radar Web SDK core bundle — https://docs.radar.com/maps/maps */
 const RADAR_VERSION = "5.1.0";
@@ -46,6 +47,8 @@ function radarGlyphTransformRequest(url) {
 
 export default RadarMap = {
     async mounted() {
+        this._radarActive = true;
+
         loadStylesheet(
             "radar-maps-css",
             `https://js.radar.com/maps/v${RADAR_MAPS_VERSION}/radar-maps.css`,
@@ -119,6 +122,8 @@ export default RadarMap = {
             container: elementID,
             transformRequest: radarGlyphTransformRequest,
         });
+
+        this._radarMap = map;
 
         // Radar styles sometimes reference sprite icons (e.g. "viewpoint") not present for every zoom/style combo.
         map.on("styleimagemissing", (e) => {
@@ -199,6 +204,7 @@ export default RadarMap = {
         });
 
         map.on("click", (e) => {
+            if (!this._radarActive) return;
             if (locked) return;
             if (typeof map.loaded === 'function' && !map.loaded()) return;
 
@@ -213,7 +219,7 @@ export default RadarMap = {
                     return;
                 }
 
-                this.pushEvent("map-new-marker", { lat: lat, long: lng });
+                pushEventIfConnected(this, "map-new-marker", { lat: lat, long: lng });
                 map.fitToMarkers({ maxZoom: 14, padding: 80 });
 
                 existingMarker.on("click", () => {
@@ -224,5 +230,17 @@ export default RadarMap = {
                 console.error("Error creating marker on click:", error);
             }
         });
+    },
+
+    destroyed() {
+        this._radarActive = false;
+        if (this._radarMap) {
+            try {
+                this._radarMap.remove();
+            } catch (_) {
+                /* ignore */
+            }
+            this._radarMap = null;
+        }
     },
 };
