@@ -409,7 +409,12 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       assert has_element?(
                view,
-               "a[href*='/admin/impersonate/#{target.id}']",
+               "form#admin-impersonate-form[action='/admin/impersonate/#{target.id}']"
+             )
+
+      assert has_element?(
+               view,
+               "#admin-impersonate-form button",
                "Sign in as User"
              )
     end

@@ -74,4 +74,28 @@ defmodule YscWeb.ConnCase do
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_token, token)
   end
+
+  @doc """
+  Reads the CSRF token from a rendered HTML page's `<meta name="csrf-token">` tag.
+
+  Expects `conn` to be the connection returned from a successful `get/2` that ran
+  through the browser pipeline (session + CSRF).
+  """
+  def fetch_conn_csrf_from_html(conn) do
+    html = Phoenix.ConnTest.html_response(conn, 200)
+
+    token =
+      case Regex.run(~r/<meta\s+name="csrf-token"\s+content="([^"]+)"/, html) do
+        [_, t] ->
+          t
+
+        nil ->
+          case Regex.run(~r/<meta\s+content="([^"]+)"\s+name="csrf-token"/, html) do
+            [_, t] -> t
+            nil -> raise ArgumentError, "no csrf-token meta tag in HTML response"
+          end
+      end
+
+    {conn, token}
+  end
 end

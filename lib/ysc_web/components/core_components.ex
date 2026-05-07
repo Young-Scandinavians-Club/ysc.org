@@ -18,6 +18,8 @@ defmodule YscWeb.CoreComponents do
   use Gettext, backend: YscWeb.Gettext
   use YscWeb, :verified_routes
 
+  import Phoenix.Controller, only: [get_csrf_token: 0]
+
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -1463,12 +1465,15 @@ defmodule YscWeb.CoreComponents do
             </p>
           </div>
         </div>
-        <.link
-          href="/admin/stop-impersonation"
-          class="bg-white text-red-600 px-4 py-2 rounded font-semibold hover:bg-red-50 transition-colors"
-        >
-          Stop Impersonating
-        </.link>
+        <form id="stop-impersonation-form" action={~p"/admin/stop-impersonation"} method="post" class="inline m-0">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <button
+            type="submit"
+            class="bg-white text-red-600 px-4 py-2 rounded font-semibold hover:bg-red-50 transition-colors"
+          >
+            Stop Impersonating
+          </button>
+        </form>
       </div>
     </div>
     """
