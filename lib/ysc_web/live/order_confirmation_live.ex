@@ -67,6 +67,10 @@ defmodule YscWeb.OrderConfirmationLive do
             )
             # Placeholder for async-loaded data
             |> assign(:refund_data, nil)
+            |> assign(
+              :payment_method_description,
+              payment_method_description_without_stripe(ticket_order.payment)
+            )
             |> assign(:async_data_loaded, false)
 
           if connected?(socket) do
@@ -638,7 +642,11 @@ defmodule YscWeb.OrderConfirmationLive do
                 </span>
                 <span>
                   {if @ticket_order.payment do
-                    get_payment_method_description(@ticket_order.payment)
+                    @payment_method_description ||
+                      if(@async_data_loaded,
+                        do: "Credit Card (Stripe)",
+                        else: "…"
+                      )
                   else
                     "Free"
                   end}
@@ -785,15 +793,15 @@ defmodule YscWeb.OrderConfirmationLive do
     end
   end
 
-  # Helper function to get payment method description
-  defp get_payment_method_description(payment) do
+  # Label from synced payment method only (no Stripe). Nil when async Stripe lookup is required.
+  defp payment_method_description_without_stripe(nil), do: nil
+
+  defp payment_method_description_without_stripe(payment) do
     case payment.payment_method do
       nil ->
-        # Payment method not synced - try to get it from Stripe payment intent
-        get_payment_method_from_stripe(payment)
+        nil
 
       payment_method ->
-        # Normalize type to atom (could be string from database)
         payment_type =
           case payment_method.type do
             nil -> nil
@@ -819,12 +827,10 @@ defmodule YscWeb.OrderConfirmationLive do
             end
 
           type when not is_nil(type) ->
-            # Handle alternative payment methods (klarna, amazon_pay, cashapp, etc.)
             format_alternative_payment_method(type, payment_method)
 
           _ ->
-            # Fallback: try to get from Stripe
-            get_payment_method_from_stripe(payment)
+            nil
         end
     end
   end
@@ -849,11 +855,9 @@ defmodule YscWeb.OrderConfirmationLive do
 
               # Payment method is a string ID - retrieve it
               is_binary(payment_intent.payment_method) ->
-                case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                       Stripe.PaymentMethod.retrieve(
-                         payment_intent.payment_method
-                       )
-                     end) do
+                case stripe_client.retrieve_payment_method(
+                       payment_intent.payment_method
+                     ) do
                   {:ok, pm} -> extract_payment_method_details(pm)
                   _ -> {nil, nil, nil}
                 end
@@ -873,9 +877,7 @@ defmodule YscWeb.OrderConfirmationLive do
                     extract_payment_method_details(pm_on_charge)
 
                   is_binary(pm_on_charge) ->
-                    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                           Stripe.PaymentMethod.retrieve(pm_on_charge)
-                         end) do
+                    case stripe_client.retrieve_payment_method(pm_on_charge) do
                       {:ok, pm} -> extract_payment_method_details(pm)
                       _ -> {nil, nil, nil}
                     end
@@ -1181,18 +1183,42 @@ defmodule YscWeb.OrderConfirmationLive do
   # Load order data asynchronously after WebSocket connection
   defp load_order_data_async(socket, ticket_order) do
     start_async(socket, :load_order_data, fn ->
-      # Only fetch refund data if order has a payment
-      # (free orders have no payment and no refunds)
-      get_refund_data_for_order(ticket_order)
+      refund_data = get_refund_data_for_order(ticket_order)
+
+      stripe_payment_method_description =
+        if ticket_order.payment &&
+             is_nil(ticket_order.payment.payment_method) do
+          get_payment_method_from_stripe(ticket_order.payment)
+        else
+          nil
+        end
+
+      %{
+        refund_data: refund_data,
+        stripe_payment_method_description: stripe_payment_method_description
+      }
     end)
   end
 
   @impl true
-  def handle_async(:load_order_data, {:ok, refund_data}, socket) do
-    {:noreply,
-     socket
-     |> assign(:refund_data, refund_data)
-     |> assign(:async_data_loaded, true)}
+  def handle_async(:load_order_data, {:ok, results}, socket) do
+    socket =
+      socket
+      |> assign(:refund_data, results.refund_data)
+      |> assign(:async_data_loaded, true)
+
+    socket =
+      if results.stripe_payment_method_description do
+        assign(
+          socket,
+          :payment_method_description,
+          results.stripe_payment_method_description
+        )
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_async(:load_order_data, {:exit, reason}, socket) do

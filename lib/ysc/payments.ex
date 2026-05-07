@@ -499,22 +499,29 @@ defmodule Ysc.Payments do
   defp map_stripe_type_to_payment_method_type(stripe_payment_method) do
     case stripe_payment_method.type do
       "card" ->
-        # Check if this is a wallet payment like Link
-        if stripe_payment_method.card && stripe_payment_method.card.wallet do
-          wallet_type = stripe_payment_method.card.wallet.type
+        card = stripe_payment_method.card
 
-          case wallet_type do
-            "link" -> :link
-            _ -> :card
-          end
-        else
-          # Check if brand is link
-          if stripe_payment_method.card &&
-               stripe_payment_method.card.brand == "link" do
+        wallet =
+          card &&
+            (Map.get(card, :wallet) || Map.get(card, "wallet"))
+
+        wtype =
+          wallet && (Map.get(wallet, :type) || Map.get(wallet, "type"))
+
+        cond do
+          wtype == "link" ->
             :link
-          else
+
+          not is_nil(wtype) ->
             :card
-          end
+
+          card &&
+              (Map.get(card, :brand) == "link" ||
+                 Map.get(card, "brand") == "link") ->
+            :link
+
+          true ->
+            :card
         end
 
       "us_bank_account" ->
@@ -556,14 +563,14 @@ defmodule Ysc.Payments do
   defp get_last_four(_), do: nil
 
   # Extract display brand from various payment method types
-  defp get_display_brand(%{card: %{wallet: %{type: wallet_type}}})
+  defp get_display_brand(%{card: %{wallet: %{type: wallet_type}} = card})
        when not is_nil(wallet_type) do
     case wallet_type do
       "link" -> "Link"
       "apple_pay" -> "Apple Pay"
       "google_pay" -> "Google Pay"
       "samsung_pay" -> "Samsung Pay"
-      _ -> nil
+      _ -> Map.get(card, :display_brand) || Map.get(card, :brand)
     end
   end
 
@@ -574,11 +581,20 @@ defmodule Ysc.Payments do
   defp get_display_brand(%{us_bank_account: %{bank_name: bank_name}}),
     do: bank_name
 
-  defp get_display_brand(%{link: _}), do: "Link"
-  defp get_display_brand(%{cashapp: _}), do: "Cash App"
-  defp get_display_brand(%{paypal: _}), do: "PayPal"
-  defp get_display_brand(%{klarna: _}), do: "Klarna"
-  defp get_display_brand(%{affirm: _}), do: "Affirm"
+  defp get_display_brand(%{link: link}) when not is_nil(link), do: "Link"
+
+  defp get_display_brand(%{cashapp: cashapp}) when not is_nil(cashapp),
+    do: "Cash App"
+
+  defp get_display_brand(%{paypal: paypal}) when not is_nil(paypal),
+    do: "PayPal"
+
+  defp get_display_brand(%{klarna: klarna}) when not is_nil(klarna),
+    do: "Klarna"
+
+  defp get_display_brand(%{affirm: affirm}) when not is_nil(affirm),
+    do: "Affirm"
+
   defp get_display_brand(_), do: nil
 
   defp stripe_payment_method_to_map(stripe_payment_method) do

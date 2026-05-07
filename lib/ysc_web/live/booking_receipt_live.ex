@@ -118,6 +118,7 @@ defmodule YscWeb.BookingReceiptLive do
             |> assign(:door_code, nil)
             |> assign(:show_door_code, false)
             |> assign(:refund_data, nil)
+            |> assign(:payment_method_description, nil)
             |> assign(:async_data_loaded, false)
 
           if connected?(socket) do
@@ -1012,7 +1013,7 @@ defmodule YscWeb.BookingReceiptLive do
                   }>
                     Method
                   </span>
-                  <span>{get_payment_method_description(@payment)}</span>
+                  <span>{@payment_method_description}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class={
@@ -1441,12 +1442,20 @@ defmodule YscWeb.BookingReceiptLive do
     # Get refund data for cancelled bookings
     refund_data = get_refund_data_for_booking(booking, payment)
 
+    payment_method_description =
+      if payment do
+        build_payment_method_description(payment)
+      else
+        nil
+      end
+
     %{
       payment: payment,
       refund_info: refund_info,
       door_code: door_code,
       show_door_code: show_door_code,
-      refund_data: refund_data
+      refund_data: refund_data,
+      payment_method_description: payment_method_description
     }
   end
 
@@ -1459,6 +1468,7 @@ defmodule YscWeb.BookingReceiptLive do
      |> assign(:door_code, results.door_code)
      |> assign(:show_door_code, results.show_door_code)
      |> assign(:refund_data, results.refund_data)
+     |> assign(:payment_method_description, results.payment_method_description)
      |> assign(:async_data_loaded, true)}
   end
 
@@ -1602,73 +1612,62 @@ defmodule YscWeb.BookingReceiptLive do
 
   defp parse_money_from_map(_), do: nil
 
-  defp get_payment_method_description(payment) do
-    try do
-      case payment.payment_method do
-        nil ->
-          # Payment method not synced - try to get it from Stripe payment intent
-          get_payment_method_from_stripe(payment)
+  defp build_payment_method_description(payment) do
+    case payment.payment_method do
+      nil ->
+        get_payment_method_from_stripe(payment)
 
-        payment_method ->
-          # Normalize type to atom (could be string from database)
-          payment_type =
-            case payment_method.type do
-              nil -> nil
-              type when is_atom(type) -> type
-              type when is_binary(type) -> String.to_existing_atom(type)
+      payment_method ->
+        payment_type =
+          case payment_method.type do
+            nil -> nil
+            type -> normalize_payment_type(type)
+          end
+
+        case payment_type do
+          :card ->
+            if payment_method.last_four do
+              brand = payment_method.display_brand || "Card"
+
+              "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
+            else
+              "Credit Card"
             end
 
-          case payment_type do
-            :card ->
-              if payment_method.last_four do
-                brand = payment_method.display_brand || "Card"
+          :bank_account ->
+            if payment_method.last_four do
+              bank_name = payment_method.bank_name || "Bank"
+              "#{bank_name} Account ending in #{payment_method.last_four}"
+            else
+              "Bank Account"
+            end
 
-                "#{String.capitalize(brand)} ending in #{payment_method.last_four}"
-              else
-                "Credit Card"
-              end
+          :link ->
+            if payment_method.last_four do
+              "Link ending in #{payment_method.last_four}"
+            else
+              "Link"
+            end
 
-            :bank_account ->
-              if payment_method.last_four do
-                bank_name = payment_method.bank_name || "Bank"
-                "#{bank_name} Account ending in #{payment_method.last_four}"
-              else
-                "Bank Account"
-              end
+          type when not is_nil(type) ->
+            format_alternative_payment_method(type, payment_method)
 
-            :link ->
-              if payment_method.last_four do
-                "Link ending in #{payment_method.last_four}"
-              else
-                "Link"
-              end
-
-            type when not is_nil(type) ->
-              # Handle alternative payment methods (klarna, amazon_pay, cashapp, etc.)
-              format_alternative_payment_method(type, payment_method)
-
-            _ ->
-              # Fallback: try to get from Stripe
-              get_payment_method_from_stripe(payment)
-          end
-      end
-    rescue
-      ArgumentError ->
-        # If String.to_existing_atom fails, fallback
-        get_payment_method_from_stripe(payment)
+          _ ->
+            get_payment_method_from_stripe(payment)
+        end
     end
   end
 
   # Get payment method type from Stripe payment intent when not synced to database
   defp get_payment_method_from_stripe(payment) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
     if payment.external_payment_id do
-      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.PaymentIntent.retrieve(payment.external_payment_id, %{
-               expand: ["payment_method"]
-             })
-           end) do
+      case stripe_client.retrieve_payment_intent(payment.external_payment_id, %{
+             expand: ["payment_method"]
+           }) do
         {:ok, payment_intent} ->
-          payment_method_description_from_intent(payment_intent)
+          payment_method_description_from_intent(payment_intent, stripe_client)
 
         {:error, _} ->
           "Credit Card (Stripe)"
@@ -1678,16 +1677,16 @@ defmodule YscWeb.BookingReceiptLive do
     end
   end
 
-  defp payment_method_description_from_intent(payment_intent) do
+  defp payment_method_description_from_intent(payment_intent, stripe_client) do
     cond do
       is_map(payment_intent.payment_method) &&
           Map.has_key?(payment_intent.payment_method, :type) ->
         format_from_stripe_payment_method(payment_intent.payment_method)
 
       is_binary(payment_intent.payment_method) ->
-        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.PaymentMethod.retrieve(payment_intent.payment_method)
-             end) do
+        case stripe_client.retrieve_payment_method(
+               payment_intent.payment_method
+             ) do
           {:ok, stripe_pm} -> format_from_stripe_payment_method(stripe_pm)
           _ -> "Credit Card (Stripe)"
         end
@@ -1740,7 +1739,7 @@ defmodule YscWeb.BookingReceiptLive do
           "link" -> "Link"
           "apple_pay" -> "Apple Pay"
           "google_pay" -> "Google Pay"
-          _ -> nil
+          _ -> stripe_pm.card.display_brand || stripe_pm.card.brand
         end
 
       stripe_pm.card && stripe_pm.card.display_brand ->
