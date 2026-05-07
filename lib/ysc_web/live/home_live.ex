@@ -1287,648 +1287,649 @@ defmodule YscWeb.HomeLive do
 
           <%!-- Main Content Grid - Order 1 on mobile, Order 2 on lg+ --%>
           <div class="grid lg:grid-cols-3 gap-12 order-1 lg:order-2">
-          <div class="lg:col-span-2 space-y-12">
-            <%!-- Your Itinerary Section --%>
-            <section>
-              <div class="flex items-center justify-between mb-6">
-                <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
-                  <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
-                </h2>
-                <.link
-                  navigate={~p"/users/payments"}
-                  class="text-xs font-bold text-blue-600 hover:underline"
-                >
-                  View All Trips
-                </.link>
-              </div>
+            <div class="lg:col-span-2 space-y-12">
+              <%!-- Your Itinerary Section --%>
+              <section>
+                <div class="flex items-center justify-between mb-6">
+                  <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                    <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
+                  </h2>
+                  <.link
+                    navigate={~p"/users/payments"}
+                    class="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    View All Trips
+                  </.link>
+                </div>
 
-              <%!-- Loading skeleton for bookings --%>
-              <div
-                :if={!@async_data_loaded}
-                class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 animate-pulse"
-              >
-                <div class="flex gap-4">
-                  <div class="w-24 h-20 bg-zinc-200 rounded"></div>
-                  <div class="flex-1 space-y-3">
-                    <div class="h-4 bg-zinc-200 rounded w-1/3"></div>
-                    <div class="h-3 bg-zinc-200 rounded w-1/2"></div>
-                    <div class="h-3 bg-zinc-200 rounded w-1/4"></div>
+                <%!-- Loading skeleton for bookings --%>
+                <div
+                  :if={!@async_data_loaded}
+                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 animate-pulse"
+                >
+                  <div class="flex gap-4">
+                    <div class="w-24 h-20 bg-zinc-200 rounded"></div>
+                    <div class="flex-1 space-y-3">
+                      <div class="h-4 bg-zinc-200 rounded w-1/3"></div>
+                      <div class="h-3 bg-zinc-200 rounded w-1/2"></div>
+                      <div class="h-3 bg-zinc-200 rounded w-1/4"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div
-                :if={@async_data_loaded && Enum.empty?(@future_bookings)}
-                class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
-              >
-                <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
+                <div
+                  :if={@async_data_loaded && Enum.empty?(@future_bookings)}
+                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
+                >
+                  <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
+                  </div>
+                  <h3 class="text-base font-bold text-zinc-900 mb-2">
+                    No upcoming bookings
+                  </h3>
+                  <p class="text-zinc-500 text-sm mb-6">
+                    Plan your next cabin getaway
+                  </p>
+                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <.link
+                      navigate={~p"/bookings/tahoe"}
+                      class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
+                    >
+                      Book Lake Tahoe
+                    </.link>
+                    <.link
+                      navigate={~p"/bookings/clear-lake"}
+                      class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
+                    >
+                      Book Clear Lake
+                    </.link>
+                  </div>
                 </div>
-                <h3 class="text-base font-bold text-zinc-900 mb-2">
-                  No upcoming bookings
-                </h3>
-                <p class="text-zinc-500 text-sm mb-6">
-                  Plan your next cabin getaway
-                </p>
-                <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                  <.link
-                    navigate={~p"/bookings/tahoe"}
-                    class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
-                  >
-                    Book Lake Tahoe
-                  </.link>
-                  <.link
-                    navigate={~p"/bookings/clear-lake"}
-                    class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
-                  >
-                    Book Clear Lake
-                  </.link>
-                </div>
-              </div>
 
-              <div
-                :if={@async_data_loaded && !Enum.empty?(@future_bookings)}
-                class="space-y-4"
-              >
-                <%= for booking <- @future_bookings do %>
-                  <% is_active =
-                    days_until_booking(booking) == :started ||
-                      days_until_booking(booking) == 0 %>
-                  <.link
-                    navigate={~p"/bookings/#{booking.id}/receipt"}
-                    class={[
-                      "relative bg-white rounded-xl overflow-hidden flex flex-col md:flex-row transition-colors duration-200 group border border-zinc-200 hover:border-zinc-300",
-                      if is_active do
-                        if booking.property == :tahoe do
-                          "ring-1 ring-blue-500/10"
+                <div
+                  :if={@async_data_loaded && !Enum.empty?(@future_bookings)}
+                  class="space-y-4"
+                >
+                  <%= for booking <- @future_bookings do %>
+                    <% is_active =
+                      days_until_booking(booking) == :started ||
+                        days_until_booking(booking) == 0 %>
+                    <.link
+                      navigate={~p"/bookings/#{booking.id}/receipt"}
+                      class={[
+                        "relative bg-white rounded-xl overflow-hidden flex flex-col md:flex-row transition-colors duration-200 group border border-zinc-200 hover:border-zinc-300",
+                        if is_active do
+                          if booking.property == :tahoe do
+                            "ring-1 ring-blue-500/10"
+                          else
+                            "ring-1 ring-emerald-500/10"
+                          end
                         else
-                          "ring-1 ring-emerald-500/10"
+                          ""
                         end
-                      else
-                        ""
-                      end
-                    ]}
-                  >
-                    <div class={[
-                      "md:w-1.5 flex-shrink-0",
-                      if booking.property == :tahoe do
-                        "bg-gradient-to-b from-blue-500 to-blue-700"
-                      else
-                        "bg-gradient-to-b from-emerald-500 to-emerald-700"
-                      end
-                    ]}>
-                    </div>
-                    <div class="p-8 flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-                      <div class="space-y-1 md:border-r border-zinc-100 pr-6">
-                        <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
-                          Destination
-                        </p>
-                        <p class="font-black text-2xl text-zinc-900 tracking-tight">
-                          {format_property_name(booking.property)}
-                        </p>
-                        <p class="text-xs font-mono text-zinc-400">
-                          {booking.reference_id}
-                        </p>
+                      ]}
+                    >
+                      <div class={[
+                        "md:w-1.5 flex-shrink-0",
+                        if booking.property == :tahoe do
+                          "bg-gradient-to-b from-blue-500 to-blue-700"
+                        else
+                          "bg-gradient-to-b from-emerald-500 to-emerald-700"
+                        end
+                      ]}>
                       </div>
-                      <div class="space-y-2">
-                        <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
-                          Dates
-                        </p>
-                        <p class="font-bold text-zinc-800">
-                          {format_booking_date(booking.checkin_date)} — {format_booking_date(
-                            booking.checkout_date
-                          )}
-                        </p>
+                      <div class="p-8 flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                        <div class="space-y-1 md:border-r border-zinc-100 pr-6">
+                          <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
+                            Destination
+                          </p>
+                          <p class="font-black text-2xl text-zinc-900 tracking-tight">
+                            {format_property_name(booking.property)}
+                          </p>
+                          <p class="text-xs font-mono text-zinc-400">
+                            {booking.reference_id}
+                          </p>
+                        </div>
+                        <div class="space-y-2">
+                          <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
+                            Dates
+                          </p>
+                          <p class="font-bold text-zinc-800">
+                            {format_booking_date(booking.checkin_date)} — {format_booking_date(
+                              booking.checkout_date
+                            )}
+                          </p>
+                          <span class={[
+                            "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded uppercase tracking-tighter",
+                            case days_until_booking(booking) do
+                              :started ->
+                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
+
+                              0 ->
+                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
+
+                              1 ->
+                                "bg-blue-50 text-blue-700 ring-1 ring-blue-200/50"
+
+                              days when days <= 7 ->
+                                "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/50"
+
+                              _ ->
+                                "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
+                            end
+                          ]}>
+                            {case days_until_booking(booking) do
+                              :started -> "Currently Staying"
+                              0 -> "Checking in today"
+                              1 -> "Tomorrow"
+                              days -> "In #{days} days"
+                            end}
+                          </span>
+                          <%= if booking.booking_mode == :buyout do %>
+                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
+                              Full Buyout
+                            </span>
+                          <% end %>
+                        </div>
+                        <div class="flex justify-end">
+                          <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded group-hover:bg-blue-600 transition-colors duration-150">
+                            View Details
+                          </span>
+                        </div>
+                      </div>
+                    </.link>
+                  <% end %>
+                </div>
+              </section>
+
+              <%!-- Event Tickets Section --%>
+              <section>
+                <div class="flex items-center justify-between mb-6">
+                  <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                    <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
+                    Event Tickets
+                  </h2>
+                  <.link
+                    navigate={~p"/events"}
+                    class="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Browse Events
+                  </.link>
+                </div>
+
+                <%!-- Loading skeleton for tickets --%>
+                <div
+                  :if={!@async_data_loaded}
+                  class="grid grid-cols-1 md:grid-cols-2 gap-6"
+                >
+                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8 animate-pulse">
+                    <div class="flex justify-between items-start mb-4">
+                      <div class="w-16 h-5 bg-zinc-200 rounded"></div>
+                      <div class="w-8 h-8 bg-zinc-200 rounded"></div>
+                    </div>
+                    <div class="h-5 bg-zinc-200 rounded w-3/4 mb-2"></div>
+                    <div class="h-3 bg-zinc-200 rounded w-1/2 mb-4"></div>
+                    <div class="h-3 bg-zinc-200 rounded w-2/3"></div>
+                  </div>
+                </div>
+
+                <div
+                  :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
+                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center"
+                >
+                  <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
+                  </div>
+                  <h3 class="text-base font-bold text-zinc-900 mb-2">
+                    No upcoming event tickets
+                  </h3>
+                  <p class="text-zinc-500 text-sm mb-6">
+                    Discover what's happening in our community
+                  </p>
+                  <.link
+                    navigate={~p"/events"}
+                    class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-zinc-900 hover:bg-zinc-800 text-white active:text-white/80 active:scale-[0.98] active:transition-none"
+                  >
+                    Browse Events
+                  </.link>
+                </div>
+
+                <div
+                  :if={@async_data_loaded && !Enum.empty?(@upcoming_tickets)}
+                  class="grid grid-cols-1 md:grid-cols-2 gap-6"
+                >
+                  <%= for {event, grouped_tiers} <- group_tickets_by_event_and_tier(@upcoming_tickets) do %>
+                    <% order_ids =
+                      grouped_tiers
+                      |> Enum.flat_map(fn {_tier_name, tickets} ->
+                        Enum.map(tickets, fn t ->
+                          t.ticket_order && t.ticket_order.id
+                        end)
+                      end)
+                      |> Enum.filter(& &1)
+                      |> Enum.uniq() %>
+                    <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
+                      <div class="flex justify-between items-start mb-4">
                         <span class={[
-                          "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded uppercase tracking-tighter",
-                          case days_until_booking(booking) do
-                            :started ->
-                              "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
-
-                            0 ->
-                              "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
-
-                            1 ->
-                              "bg-blue-50 text-blue-700 ring-1 ring-blue-200/50"
-
-                            days when days <= 7 ->
-                              "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/50"
-
-                            _ ->
-                              "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
+                          "px-2 py-1 text-xs font-bold rounded",
+                          case days_until_event(event) do
+                            0 -> "bg-amber-50 text-amber-700"
+                            1 -> "bg-blue-50 text-blue-700"
+                            days when days <= 7 -> "bg-emerald-50 text-emerald-700"
+                            _ -> "bg-purple-50 text-purple-700"
                           end
                         ]}>
-                          {case days_until_booking(booking) do
-                            :started -> "Currently Staying"
-                            0 -> "Checking in today"
+                          {case days_until_event(event) do
+                            0 -> "Today"
                             1 -> "Tomorrow"
                             days -> "In #{days} days"
                           end}
                         </span>
-                        <%= if booking.booking_mode == :buyout do %>
-                          <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
-                            Full Buyout
-                          </span>
-                        <% end %>
+                        <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                       </div>
-                      <div class="flex justify-end">
-                        <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded group-hover:bg-blue-600 transition-colors duration-150">
-                          View Details
-                        </span>
+                      <.link navigate={~p"/events/#{event.id}"} class="block group">
+                        <h3 class="font-black text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
+                          {event.title}
+                        </h3>
+                      </.link>
+                      <p class="text-xs text-zinc-500 flex items-center gap-1 mb-4">
+                        <.icon name="hero-calendar" class="w-3 h-3" />
+                        {format_event_date_long(event.start_date)}
+                      </p>
+                      <div
+                        :if={event.location_name}
+                        class="text-xs text-zinc-500 flex items-center gap-1 mb-4"
+                      >
+                        <.icon name="hero-map-pin" class="w-3 h-3" />
+                        <span class="truncate">{event.location_name}</span>
                       </div>
-                    </div>
-                  </.link>
-                <% end %>
-              </div>
-            </section>
-
-            <%!-- Event Tickets Section --%>
-            <section>
-              <div class="flex items-center justify-between mb-6">
-                <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
-                  <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
-                  Event Tickets
-                </h2>
-                <.link
-                  navigate={~p"/events"}
-                  class="text-xs font-bold text-blue-600 hover:underline"
-                >
-                  Browse Events
-                </.link>
-              </div>
-
-              <%!-- Loading skeleton for tickets --%>
-              <div
-                :if={!@async_data_loaded}
-                class="grid grid-cols-1 md:grid-cols-2 gap-6"
-              >
-                <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8 animate-pulse">
-                  <div class="flex justify-between items-start mb-4">
-                    <div class="w-16 h-5 bg-zinc-200 rounded"></div>
-                    <div class="w-8 h-8 bg-zinc-200 rounded"></div>
-                  </div>
-                  <div class="h-5 bg-zinc-200 rounded w-3/4 mb-2"></div>
-                  <div class="h-3 bg-zinc-200 rounded w-1/2 mb-4"></div>
-                  <div class="h-3 bg-zinc-200 rounded w-2/3"></div>
-                </div>
-              </div>
-
-              <div
-                :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
-                class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center"
-              >
-                <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
-                </div>
-                <h3 class="text-base font-bold text-zinc-900 mb-2">
-                  No upcoming event tickets
-                </h3>
-                <p class="text-zinc-500 text-sm mb-6">
-                  Discover what's happening in our community
-                </p>
-                <.link
-                  navigate={~p"/events"}
-                  class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-zinc-900 hover:bg-zinc-800 text-white active:text-white/80 active:scale-[0.98] active:transition-none"
-                >
-                  Browse Events
-                </.link>
-              </div>
-
-              <div
-                :if={@async_data_loaded && !Enum.empty?(@upcoming_tickets)}
-                class="grid grid-cols-1 md:grid-cols-2 gap-6"
-              >
-                <%= for {event, grouped_tiers} <- group_tickets_by_event_and_tier(@upcoming_tickets) do %>
-                  <% order_ids =
-                    grouped_tiers
-                    |> Enum.flat_map(fn {_tier_name, tickets} ->
-                      Enum.map(tickets, fn t ->
-                        t.ticket_order && t.ticket_order.id
-                      end)
-                    end)
-                    |> Enum.filter(& &1)
-                    |> Enum.uniq() %>
-                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
-                    <div class="flex justify-between items-start mb-4">
-                      <span class={[
-                        "px-2 py-1 text-xs font-bold rounded",
-                        case days_until_event(event) do
-                          0 -> "bg-amber-50 text-amber-700"
-                          1 -> "bg-blue-50 text-blue-700"
-                          days when days <= 7 -> "bg-emerald-50 text-emerald-700"
-                          _ -> "bg-purple-50 text-purple-700"
-                        end
-                      ]}>
-                        {case days_until_event(event) do
-                          0 -> "Today"
-                          1 -> "Tomorrow"
-                          days -> "In #{days} days"
-                        end}
-                      </span>
-                      <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
-                    </div>
-                    <.link navigate={~p"/events/#{event.id}"} class="block group">
-                      <h3 class="font-black text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
-                        {event.title}
-                      </h3>
-                    </.link>
-                    <p class="text-xs text-zinc-500 flex items-center gap-1 mb-4">
-                      <.icon name="hero-calendar" class="w-3 h-3" />
-                      {format_event_date_long(event.start_date)}
-                    </p>
-                    <div
-                      :if={event.location_name}
-                      class="text-xs text-zinc-500 flex items-center gap-1 mb-4"
-                    >
-                      <.icon name="hero-map-pin" class="w-3 h-3" />
-                      <span class="truncate">{event.location_name}</span>
-                    </div>
-                    <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 space-y-3">
-                      <div class="flex flex-wrap gap-1.5">
-                        <%= for {tier_name, tickets} <- grouped_tiers do %>
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-full">
-                            <span class="text-zinc-400">{length(tickets)}×</span>{tier_name}
-                          </span>
-                        <% end %>
-                      </div>
-                      <div class="flex flex-col gap-1.5">
-                        <%= if order_ids != [] do %>
-                          <div class="flex items-center gap-3">
-                            <.link
-                              navigate={
-                                ~p"/events/#{event.id}/tickets/qr?return_to=/"
-                              }
-                              class="inline-flex items-center gap-1.5 rounded py-1.5 px-3 text-sm font-semibold leading-6 text-zinc-100 bg-zinc-900 hover:bg-zinc-800 active:scale-[0.98] active:transition-none transition duration-150 ease-in-out whitespace-nowrap"
-                            >
-                              <.icon name="hero-qr-code" class="w-4 h-4" /> QR Codes
-                            </.link>
-                            <%= if length(order_ids) == 1 do %>
+                      <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 space-y-3">
+                        <div class="flex flex-wrap gap-1.5">
+                          <%= for {tier_name, tickets} <- grouped_tiers do %>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-full">
+                              <span class="text-zinc-400">{length(tickets)}×</span>{tier_name}
+                            </span>
+                          <% end %>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                          <%= if order_ids != [] do %>
+                            <div class="flex items-center gap-3">
                               <.link
                                 navigate={
-                                  ~p"/orders/#{List.first(order_ids)}/confirmation"
+                                  ~p"/events/#{event.id}/tickets/qr?return_to=/"
                                 }
-                                class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                                class="inline-flex items-center gap-1.5 rounded py-1.5 px-3 text-sm font-semibold leading-6 text-zinc-100 bg-zinc-900 hover:bg-zinc-800 active:scale-[0.98] active:transition-none transition duration-150 ease-in-out whitespace-nowrap"
                               >
-                                View Order
+                                <.icon name="hero-qr-code" class="w-4 h-4" />
+                                QR Codes
                               </.link>
-                            <% else %>
-                              <.link
-                                navigate={~p"/users/tickets"}
-                                class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
-                              >
-                                View Orders
-                              </.link>
-                            <% end %>
-                          </div>
+                              <%= if length(order_ids) == 1 do %>
+                                <.link
+                                  navigate={
+                                    ~p"/orders/#{List.first(order_ids)}/confirmation"
+                                  }
+                                  class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                                >
+                                  View Order
+                                </.link>
+                              <% else %>
+                                <.link
+                                  navigate={~p"/users/tickets"}
+                                  class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                                >
+                                  View Orders
+                                </.link>
+                              <% end %>
+                            </div>
+                          <% else %>
+                            <span class="text-xs font-bold text-zinc-400">
+                              No order
+                            </span>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </section>
+            </div>
+
+            <%!-- Sidebar --%>
+            <aside class="space-y-10">
+              <%!-- Membership Status Card --%>
+              <div class={[
+                "relative overflow-hidden rounded-xl p-8 text-white shadow-sm",
+                cond do
+                  @active_membership? ->
+                    "bg-zinc-900"
+
+                  @current_user.state == :pending_approval ->
+                    "bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950"
+
+                  true ->
+                    "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900"
+                end
+              ]}>
+                <div class="absolute inset-0 z-0 opacity-40">
+                  <%= cond do %>
+                    <% @active_membership? -> %>
+                      <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-blue-500 blur-[80px]">
+                      </div>
+                      <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
+                      </div>
+                      <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-800 blur-[80px]">
+                      </div>
+                    <% @current_user.state == :pending_approval -> %>
+                      <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
+                      </div>
+                      <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
+                      </div>
+                      <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-700 blur-[80px]">
+                      </div>
+                    <% true -> %>
+                      <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
+                      </div>
+                      <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
+                      </div>
+                      <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
+                      </div>
+                  <% end %>
+                </div>
+
+                <div class="relative z-10">
+                  <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md backdrop-blur-md bg-white/10">
+                    <.icon
+                      name={
+                        if @current_user.state == :pending_approval,
+                          do: "hero-clock",
+                          else: "hero-identification"
+                      }
+                      class={[
+                        "w-6 h-6",
+                        cond do
+                          @active_membership? -> "text-blue-400"
+                          @current_user.state == :pending_approval -> "text-sky-300"
+                          true -> "text-amber-300"
+                        end
+                      ]}
+                    />
+                  </div>
+
+                  <h2 class="text-2xl font-black tracking-tight mb-2">
+                    <%= cond do %>
+                      <% @current_user.state == :pending_approval -> %>
+                        Application Under Review
+                      <% true -> %>
+                        {YscWeb.UserAuth.get_membership_plan_display_name(
+                          @current_membership
+                        )}
+                    <% end %>
+                  </h2>
+                  <p class={[
+                    "text-base leading-relaxed mb-8",
+                    cond do
+                      @active_membership? -> "text-zinc-300"
+                      @current_user.state == :pending_approval -> "text-sky-100"
+                      true -> "text-amber-100 font-semibold"
+                    end
+                  ]}>
+                    <%= cond do %>
+                      <% @active_membership? -> %>
+                        {get_membership_description(
+                          @current_membership,
+                          @is_sub_account || false,
+                          @primary_user
+                        )}
+                      <% @current_user.state == :pending_approval -> %>
+                        <span class="block mb-2 font-bold text-white">
+                          Pending Approval
+                        </span>
+                        Your membership application has been submitted and is being reviewed by the board. You'll receive an email once a decision has been made.
+                      <% true -> %>
+                        <span class="block mb-2 font-bold text-white">
+                          Membership Required
+                        </span>
+                        <%= if @current_membership == nil do %>
+                          You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
                         <% else %>
-                          <span class="text-xs font-bold text-zinc-400">
-                            No order
+                          Your membership has expired. Renew now to continue enjoying all YSC benefits including cabin access and exclusive events.
+                        <% end %>
+                    <% end %>
+                  </p>
+
+                  <%= cond do %>
+                    <% @current_user.state == :pending_approval -> %>
+                      <div class="flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 bg-white/10 text-sky-100 border border-white/20 backdrop-blur-md">
+                        <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
+                        Awaiting board review
+                      </div>
+                    <% true -> %>
+                      <.link
+                        navigate={~p"/users/membership"}
+                        class={[
+                          "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
+                          if(@active_membership?,
+                            do: "bg-white text-zinc-900 hover:bg-blue-50",
+                            else:
+                              "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
+                          )
+                        ]}
+                      >
+                        <%= if @active_membership? do %>
+                          Manage Membership
+                        <% else %>
+                          <%= if @current_membership == nil do %>
+                            Get Membership Now
+                          <% else %>
+                            Renew Membership
+                          <% end %>
+                        <% end %>
+                      </.link>
+                  <% end %>
+
+                  <button
+                    :if={@active_membership?}
+                    phx-click="show_membership_qr"
+                    class="flex w-full items-center justify-center rounded mt-3 px-6 py-3 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/20"
+                  >
+                    <.icon name="hero-qr-code" class="w-5 h-5 mr-2" />
+                    My Membership QR
+                  </button>
+                </div>
+
+                <div class="absolute right-[-10%] bottom-[-10%] z-0 opacity-10 rotate-12">
+                  <.icon name="hero-identification" class="w-40 h-40" />
+                </div>
+              </div>
+
+              <.board_pause_notice
+                :if={@active_membership? && @membership_paused_by_board != nil}
+                board_member={@membership_paused_by_board}
+                current_user={@current_user}
+              />
+
+              <%!-- Detects platform to show the correct wallet button(s) --%>
+              <div
+                id="wallet-platform-detector"
+                phx-hook="WalletPlatform"
+                class="hidden"
+              >
+              </div>
+
+              <.modal
+                :if={@show_membership_qr}
+                id="membership-qr-modal"
+                show
+                on_cancel={JS.push("hide_membership_qr")}
+              >
+                <div class="text-center">
+                  <h3 class="text-xl font-bold text-zinc-900 mb-1">
+                    My Membership QR
+                  </h3>
+                  <p class="text-sm text-zinc-500 mb-5">
+                    Show this to an admin for membership verification
+                  </p>
+                  <.qr_code
+                    data={@membership_qr_token}
+                    size={250}
+                    class="mx-auto p-2 rounded-lg border border-1"
+                  />
+                  <%= if @apple_wallet_membership_enabled? &&
+                      @wallet_platform in [:apple_only, :both] do %>
+                    <div class="flex justify-center mt-4">
+                      <.add_to_wallet_button href={~p"/wallet/membership"} />
+                    </div>
+                  <% end %>
+                  <%= if @google_wallet_membership_enabled? &&
+                      @wallet_platform in [:google_only, :both] &&
+                      @google_wallet_membership_url do %>
+                    <div class="flex justify-center mt-2">
+                      <.add_to_google_wallet_button href={
+                        @google_wallet_membership_url
+                      } />
+                    </div>
+                  <% end %>
+                  <%= if @membership_qr_details do %>
+                    <div class="mt-5 rounded-xl bg-zinc-50 border border-zinc-200 divide-y divide-zinc-200 text-left">
+                      <div class="flex items-center justify-between px-4 py-3">
+                        <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                          Type
+                        </span>
+                        <span class="text-sm font-semibold text-zinc-900">
+                          {@membership_qr_details.type_label}
+                        </span>
+                      </div>
+                      <%= if @membership_qr_details.member_since do %>
+                        <div class="flex items-center justify-between px-4 py-3">
+                          <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                            Member Since
+                          </span>
+                          <span class="text-sm font-semibold text-zinc-900">
+                            {format_membership_date(
+                              @membership_qr_details.member_since
+                            )}
+                          </span>
+                        </div>
+                      <% end %>
+                      <div class="flex items-center justify-between px-4 py-3">
+                        <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                          Valid Until
+                        </span>
+                        <%= if @membership_qr_details.renewal_date do %>
+                          <span class="text-sm font-semibold text-zinc-900">
+                            {format_membership_date(
+                              @membership_qr_details.renewal_date
+                            )}
+                          </span>
+                        <% else %>
+                          <span class="text-sm font-semibold text-emerald-700">
+                            Forever ✦
                           </span>
                         <% end %>
                       </div>
+                      <%= if @membership_qr_details.is_sub_account && @membership_qr_details.primary_name do %>
+                        <div class="flex items-center justify-between px-4 py-3">
+                          <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+                            Through
+                          </span>
+                          <span class="text-sm font-semibold text-zinc-900">
+                            {@membership_qr_details.primary_name}
+                          </span>
+                        </div>
+                      <% end %>
                     </div>
-                  </div>
-                <% end %>
-              </div>
-            </section>
-          </div>
-
-          <%!-- Sidebar --%>
-          <aside class="space-y-10">
-            <%!-- Membership Status Card --%>
-            <div class={[
-              "relative overflow-hidden rounded-xl p-8 text-white shadow-sm",
-              cond do
-                @active_membership? ->
-                  "bg-zinc-900"
-
-                @current_user.state == :pending_approval ->
-                  "bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950"
-
-                true ->
-                  "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900"
-              end
-            ]}>
-              <div class="absolute inset-0 z-0 opacity-40">
-                <%= cond do %>
-                  <% @active_membership? -> %>
-                    <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-blue-500 blur-[80px]">
-                    </div>
-                    <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
-                    </div>
-                    <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-800 blur-[80px]">
-                    </div>
-                  <% @current_user.state == :pending_approval -> %>
-                    <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
-                    </div>
-                    <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
-                    </div>
-                    <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-700 blur-[80px]">
-                    </div>
-                  <% true -> %>
-                    <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
-                    </div>
-                    <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
-                    </div>
-                    <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
-                    </div>
-                <% end %>
-              </div>
-
-              <div class="relative z-10">
-                <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md backdrop-blur-md bg-white/10">
-                  <.icon
-                    name={
-                      if @current_user.state == :pending_approval,
-                        do: "hero-clock",
-                        else: "hero-identification"
-                    }
-                    class={[
-                      "w-6 h-6",
-                      cond do
-                        @active_membership? -> "text-blue-400"
-                        @current_user.state == :pending_approval -> "text-sky-300"
-                        true -> "text-amber-300"
-                      end
-                    ]}
-                  />
-                </div>
-
-                <h2 class="text-2xl font-black tracking-tight mb-2">
-                  <%= cond do %>
-                    <% @current_user.state == :pending_approval -> %>
-                      Application Under Review
-                    <% true -> %>
-                      {YscWeb.UserAuth.get_membership_plan_display_name(
-                        @current_membership
-                      )}
                   <% end %>
-                </h2>
-                <p class={[
-                  "text-base leading-relaxed mb-8",
-                  cond do
-                    @active_membership? -> "text-zinc-300"
-                    @current_user.state == :pending_approval -> "text-sky-100"
-                    true -> "text-amber-100 font-semibold"
-                  end
-                ]}>
-                  <%= cond do %>
-                    <% @active_membership? -> %>
-                      {get_membership_description(
-                        @current_membership,
-                        @is_sub_account || false,
-                        @primary_user
-                      )}
-                    <% @current_user.state == :pending_approval -> %>
-                      <span class="block mb-2 font-bold text-white">
-                        Pending Approval
-                      </span>
-                      Your membership application has been submitted and is being reviewed by the board. You'll receive an email once a decision has been made.
-                    <% true -> %>
-                      <span class="block mb-2 font-bold text-white">
-                        Membership Required
-                      </span>
-                      <%= if @current_membership == nil do %>
-                        You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
-                      <% else %>
-                        Your membership has expired. Renew now to continue enjoying all YSC benefits including cabin access and exclusive events.
-                      <% end %>
-                  <% end %>
-                </p>
-
-                <%= cond do %>
-                  <% @current_user.state == :pending_approval -> %>
-                    <div class="flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 bg-white/10 text-sky-100 border border-white/20 backdrop-blur-md">
-                      <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
-                      Awaiting board review
-                    </div>
-                  <% true -> %>
-                    <.link
-                      navigate={~p"/users/membership"}
-                      class={[
-                        "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
-                        if(@active_membership?,
-                          do: "bg-white text-zinc-900 hover:bg-blue-50",
-                          else:
-                            "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
-                        )
-                      ]}
-                    >
-                      <%= if @active_membership? do %>
-                        Manage Membership
-                      <% else %>
-                        <%= if @current_membership == nil do %>
-                          Get Membership Now
-                        <% else %>
-                          Renew Membership
-                        <% end %>
-                      <% end %>
-                    </.link>
-                <% end %>
-
-                <button
-                  :if={@active_membership?}
-                  phx-click="show_membership_qr"
-                  class="flex w-full items-center justify-center rounded mt-3 px-6 py-3 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/20"
-                >
-                  <.icon name="hero-qr-code" class="w-5 h-5 mr-2" />
-                  My Membership QR
-                </button>
-              </div>
-
-              <div class="absolute right-[-10%] bottom-[-10%] z-0 opacity-10 rotate-12">
-                <.icon name="hero-identification" class="w-40 h-40" />
-              </div>
-            </div>
-
-            <.board_pause_notice
-              :if={@active_membership? && @membership_paused_by_board != nil}
-              board_member={@membership_paused_by_board}
-              current_user={@current_user}
-            />
-
-            <%!-- Detects platform to show the correct wallet button(s) --%>
-            <div
-              id="wallet-platform-detector"
-              phx-hook="WalletPlatform"
-              class="hidden"
-            >
-            </div>
-
-            <.modal
-              :if={@show_membership_qr}
-              id="membership-qr-modal"
-              show
-              on_cancel={JS.push("hide_membership_qr")}
-            >
-              <div class="text-center">
-                <h3 class="text-xl font-bold text-zinc-900 mb-1">
-                  My Membership QR
-                </h3>
-                <p class="text-sm text-zinc-500 mb-5">
-                  Show this to an admin for membership verification
-                </p>
-                <.qr_code
-                  data={@membership_qr_token}
-                  size={250}
-                  class="mx-auto p-2 rounded-lg border border-1"
-                />
-                <%= if @apple_wallet_membership_enabled? &&
-                      @wallet_platform in [:apple_only, :both] do %>
-                  <div class="flex justify-center mt-4">
-                    <.add_to_wallet_button href={~p"/wallet/membership"} />
-                  </div>
-                <% end %>
-                <%= if @google_wallet_membership_enabled? &&
-                      @wallet_platform in [:google_only, :both] &&
-                      @google_wallet_membership_url do %>
-                  <div class="flex justify-center mt-2">
-                    <.add_to_google_wallet_button href={
-                      @google_wallet_membership_url
-                    } />
-                  </div>
-                <% end %>
-                <%= if @membership_qr_details do %>
-                  <div class="mt-5 rounded-xl bg-zinc-50 border border-zinc-200 divide-y divide-zinc-200 text-left">
-                    <div class="flex items-center justify-between px-4 py-3">
-                      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                        Type
-                      </span>
-                      <span class="text-sm font-semibold text-zinc-900">
-                        {@membership_qr_details.type_label}
-                      </span>
-                    </div>
-                    <%= if @membership_qr_details.member_since do %>
-                      <div class="flex items-center justify-between px-4 py-3">
-                        <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                          Member Since
-                        </span>
-                        <span class="text-sm font-semibold text-zinc-900">
-                          {format_membership_date(
-                            @membership_qr_details.member_since
-                          )}
-                        </span>
-                      </div>
-                    <% end %>
-                    <div class="flex items-center justify-between px-4 py-3">
-                      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                        Valid Until
-                      </span>
-                      <%= if @membership_qr_details.renewal_date do %>
-                        <span class="text-sm font-semibold text-zinc-900">
-                          {format_membership_date(
-                            @membership_qr_details.renewal_date
-                          )}
-                        </span>
-                      <% else %>
-                        <span class="text-sm font-semibold text-emerald-700">
-                          Forever ✦
-                        </span>
-                      <% end %>
-                    </div>
-                    <%= if @membership_qr_details.is_sub_account && @membership_qr_details.primary_name do %>
-                      <div class="flex items-center justify-between px-4 py-3">
-                        <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                          Through
-                        </span>
-                        <span class="text-sm font-semibold text-zinc-900">
-                          {@membership_qr_details.primary_name}
-                        </span>
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
-                <.button
-                  phx-click="hide_membership_qr"
-                  color="zinc"
-                  class="w-full mt-3"
-                >
-                  Close
-                </.button>
-              </div>
-            </.modal>
-
-            <%!-- Your Family Section (family/lifetime members with linked users) --%>
-            <section :if={@async_data_loaded && @other_family_members != []}>
-              <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
-                Your Family
-              </h2>
-              <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
-                <%= for member <- @other_family_members do %>
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="text-zinc-900 font-medium">
-                      {member.first_name} {member.last_name}
-                    </span>
-                    <span class="text-zinc-500 text-xs">
-                      {format_family_relationship(member.family_relationship)}
-                    </span>
-                  </div>
-                <% end %>
-                <.link
-                  navigate={~p"/users/settings/family"}
-                  class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
-                >
-                  Manage family
-                  <.icon name="hero-arrow-right" class="w-3.5 h-3.5" />
-                </.link>
-              </div>
-            </section>
-
-            <%!-- Latest Updates Section --%>
-            <section>
-              <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
-                Latest Updates
-              </h2>
-              <div class="space-y-6">
-                <%= for post <- Enum.take(@latest_news, 3) do %>
-                  <.link
-                    navigate={~p"/posts/#{post.url_name}"}
-                    class="flex gap-4 group"
+                  <.button
+                    phx-click="hide_membership_qr"
+                    color="zinc"
+                    class="w-full mt-3"
                   >
-                    <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden flex-shrink-0">
-                      <div class="relative w-full h-full">
-                        <canvas
-                          id={"blur-hash-sidebar-#{post.id}"}
-                          src={get_blur_hash(post.featured_image)}
-                          class="absolute inset-0 z-0 w-full h-full object-cover"
-                          phx-hook="BlurHashCanvas"
-                        >
-                        </canvas>
-                        <img
-                          src={thumbnail_image_url(post.featured_image)}
-                          id={"image-sidebar-#{post.id}"}
-                          loading="lazy"
-                          phx-hook="BlurHashImage"
-                          class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                          alt={
-                            if post.featured_image,
-                              do:
-                                post.featured_image.alt_text ||
-                                  post.featured_image.title ||
-                                  post.title ||
-                                  "News article image",
-                              else: "News article image"
-                          }
-                        />
-                      </div>
+                    Close
+                  </.button>
+                </div>
+              </.modal>
+
+              <%!-- Your Family Section (family/lifetime members with linked users) --%>
+              <section :if={@async_data_loaded && @other_family_members != []}>
+                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                  Your Family
+                </h2>
+                <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
+                  <%= for member <- @other_family_members do %>
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-zinc-900 font-medium">
+                        {member.first_name} {member.last_name}
+                      </span>
+                      <span class="text-zinc-500 text-xs">
+                        {format_family_relationship(member.family_relationship)}
+                      </span>
                     </div>
-                    <div>
-                      <p class="text-xs font-bold text-blue-600 mb-1">
-                        {format_post_date(post.published_on)}
-                      </p>
-                      <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
-                        {post.title}
-                      </h3>
-                      <p class="text-xs text-zinc-500 line-clamp-1">
-                        {preview_text_plain(post)}
-                      </p>
-                    </div>
+                  <% end %>
+                  <.link
+                    navigate={~p"/users/settings/family"}
+                    class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
+                  >
+                    Manage family
+                    <.icon name="hero-arrow-right" class="w-3.5 h-3.5" />
                   </.link>
-                <% end %>
-              </div>
-            </section>
-          </aside>
-        </div>
+                </div>
+              </section>
+
+              <%!-- Latest Updates Section --%>
+              <section>
+                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                  Latest Updates
+                </h2>
+                <div class="space-y-6">
+                  <%= for post <- Enum.take(@latest_news, 3) do %>
+                    <.link
+                      navigate={~p"/posts/#{post.url_name}"}
+                      class="flex gap-4 group"
+                    >
+                      <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden flex-shrink-0">
+                        <div class="relative w-full h-full">
+                          <canvas
+                            id={"blur-hash-sidebar-#{post.id}"}
+                            src={get_blur_hash(post.featured_image)}
+                            class="absolute inset-0 z-0 w-full h-full object-cover"
+                            phx-hook="BlurHashCanvas"
+                          >
+                          </canvas>
+                          <img
+                            src={thumbnail_image_url(post.featured_image)}
+                            id={"image-sidebar-#{post.id}"}
+                            loading="lazy"
+                            phx-hook="BlurHashImage"
+                            class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                            alt={
+                              if post.featured_image,
+                                do:
+                                  post.featured_image.alt_text ||
+                                    post.featured_image.title ||
+                                    post.title ||
+                                    "News article image",
+                                else: "News article image"
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <p class="text-xs font-bold text-blue-600 mb-1">
+                          {format_post_date(post.published_on)}
+                        </p>
+                        <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
+                          {post.title}
+                        </h3>
+                        <p class="text-xs text-zinc-500 line-clamp-1">
+                          {preview_text_plain(post)}
+                        </p>
+                      </div>
+                    </.link>
+                  <% end %>
+                </div>
+              </section>
+            </aside>
+          </div>
         </div>
 
         <%!-- Community Events Section --%>
