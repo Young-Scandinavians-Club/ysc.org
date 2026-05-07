@@ -88,7 +88,7 @@ defmodule Ysc.Events do
     case query
          |> Flop.validate_and_run(params, for: Event) do
       {:ok, {events, meta}} ->
-        events = Enum.map(events, &enrich_event_with_capacity/1)
+        events = enrich_events_with_capacity(events)
         {:ok, {events, meta}}
 
       error ->
@@ -126,21 +126,39 @@ defmodule Ysc.Events do
 
   defp normalize_tab(_), do: :all
 
-  defp enrich_event_with_capacity(event) do
-    # Load ticket tiers if not already loaded
-    event = ensure_ticket_tiers_loaded(event)
+  defp enrich_events_with_capacity([]), do: []
 
-    # Count confirmed tickets (excluding donation tiers)
-    registrations = count_tickets_sold_excluding_donations(event.id)
+  defp enrich_events_with_capacity(events) do
+    event_ids = Enum.map(events, & &1.id)
+    ticket_tiers_by_event = batch_load_ticket_tiers(event_ids)
 
-    # Calculate total capacity
-    capacity = calculate_event_capacity(event)
+    registrations_by_event =
+      batch_count_tickets_sold_excluding_donations(event_ids)
 
-    # Add capacity info to the event struct
-    Map.put(event, :capacity_info, %{
-      registrations: registrations,
-      capacity: capacity
-    })
+    Enum.map(events, fn event ->
+      enrich_single_event_capacity(
+        event,
+        ticket_tiers_by_event,
+        registrations_by_event
+      )
+    end)
+  end
+
+  defp enrich_single_event_capacity(
+         %Event{} = event,
+         ticket_tiers_by_event,
+         registrations_by_event
+       ) do
+    tiers = Map.get(ticket_tiers_by_event, event.id, [])
+    registrations = Map.get(registrations_by_event, event.id, 0)
+
+    event_for_capacity = %Event{event | ticket_tiers: tiers}
+    capacity = calculate_event_capacity(event_for_capacity)
+
+    %Event{
+      event
+      | capacity_info: %{registrations: registrations, capacity: capacity}
+    }
   end
 
   defp calculate_event_capacity(event) do
@@ -995,6 +1013,24 @@ defmodule Ysc.Events do
       |> Repo.all()
       |> Enum.into(%{}, fn {event_id, count} -> {event_id, count} end)
     end
+  end
+
+  # Batch count confirmed tickets excluding donation tiers (same rules as count_tickets_sold_excluding_donations/1).
+  defp batch_count_tickets_sold_excluding_donations([]), do: %{}
+
+  defp batch_count_tickets_sold_excluding_donations(event_ids)
+       when is_list(event_ids) do
+    from(t in Ticket,
+      join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id,
+      where: t.event_id in ^event_ids,
+      where: t.status == :confirmed,
+      where: tt.type != :donation,
+      group_by: t.event_id,
+      select: {t.event_id, count(t.id)}
+    )
+    |> Repo.all()
+    |> Enum.into(%{}, fn {event_id, count} -> {event_id, count} end)
   end
 
   # Calculate pricing display information for an event

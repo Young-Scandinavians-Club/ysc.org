@@ -516,7 +516,7 @@ defmodule YscWeb.AdminEventsLive do
 
   defp format_capacity(event) do
     capacity_info =
-      Map.get(event, :capacity_info, %{registrations: 0, capacity: :unlimited})
+      event.capacity_info || %{registrations: 0, capacity: :unlimited}
 
     registrations = capacity_info.registrations || 0
     capacity = capacity_info.capacity
