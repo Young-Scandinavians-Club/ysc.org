@@ -62,18 +62,31 @@ defmodule YscWeb.AdminDashboardLive do
       <div
         :if={@admin_role == :admin}
         id="admin-stats-row"
-        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+        class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
       >
         <.link
           navigate={applications_queue_url()}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class={[
+            "p-5 rounded border flex flex-col justify-between transition-all group",
+            if(@pending_reviews_count > 0,
+              do:
+                "bg-white border-amber-300 shadow-sm shadow-amber-50 hover:ring-2 hover:ring-amber-200",
+              else: "bg-white border-zinc-200 hover:ring-2 hover:ring-zinc-300"
+            )
+          ]}
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
               Applications
             </p>
             <div class="flex items-baseline gap-2">
-              <p class="text-3xl font-black text-zinc-900 group-hover:text-amber-600 transition-colors">
+              <p class={[
+                "text-3xl font-black font-mono transition-colors",
+                if(@pending_reviews_count > 0,
+                  do: "text-amber-600",
+                  else: "text-zinc-900 group-hover:text-amber-600"
+                )
+              ]}>
                 {@pending_reviews_count}
               </p>
               <.badge type="yellow">Pending</.badge>
@@ -82,7 +95,7 @@ defmodule YscWeb.AdminDashboardLive do
           <div class="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3">
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">This Month</p>
-              <p class="text-sm font-black text-zinc-700">
+              <p class="text-sm font-black font-mono text-zinc-700">
                 {@applications_this_month}
               </p>
               <p class="text-xs text-zinc-500 mt-0.5">
@@ -102,7 +115,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">YTD</p>
-              <p class="text-sm font-black text-zinc-700">
+              <p class="text-sm font-black font-mono text-zinc-700">
                 {@applications_this_year}
               </p>
               <p class="text-xs text-zinc-500 mt-0.5">
@@ -128,14 +141,14 @@ defmodule YscWeb.AdminDashboardLive do
         <.link
           id="dashboard-memberships-card"
           navigate={~p"/admin/memberships"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
               Active memberships
             </p>
             <div class="flex items-baseline gap-2">
-              <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
+              <p class="text-3xl font-black font-mono text-zinc-900 group-hover:text-blue-600 transition-colors">
                 {@membership_stats.total}
               </p>
               <span class="text-xs font-bold text-zinc-500">now</span>
@@ -147,7 +160,7 @@ defmodule YscWeb.AdminDashboardLive do
             </p>
             <div class="flex items-end justify-between gap-2">
               <div>
-                <p class="text-xl font-black text-zinc-900 tabular-nums leading-none">
+                <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
                   {@membership_joins_current_ytd}
                 </p>
                 <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
@@ -156,7 +169,7 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
               <%= if @membership_joins_ytd_change_percent != nil do %>
                 <span class={[
-                  "text-xs font-black shrink-0",
+                  "text-xs font-black font-mono shrink-0",
                   membership_joins_ytd_change_class(
                     @membership_joins_ytd_change_percent
                   )
@@ -171,19 +184,19 @@ defmodule YscWeb.AdminDashboardLive do
           <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-3 gap-2 text-center">
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
-              <p class="text-sm font-black text-zinc-700">
+              <p class="text-sm font-black font-mono text-zinc-700">
                 {@membership_stats.single}
               </p>
             </div>
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
-              <p class="text-sm font-black text-zinc-700">
+              <p class="text-sm font-black font-mono text-zinc-700">
                 {@membership_stats.family}
               </p>
             </div>
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
-              <p class="text-sm font-black text-zinc-700">
+              <p class="text-sm font-black font-mono text-zinc-700">
                 {@membership_stats.lifetime}
               </p>
             </div>
@@ -192,7 +205,7 @@ defmodule YscWeb.AdminDashboardLive do
             <span class="font-bold text-zinc-400 uppercase">
               Renewing in 30 days
             </span>
-            <span class="font-black text-zinc-700 tabular-nums">
+            <span class="font-black font-mono text-zinc-700 tabular-nums">
               {@memberships_renewing_30_days}
             </span>
           </div>
@@ -203,9 +216,9 @@ defmodule YscWeb.AdminDashboardLive do
         <div
           id="dashboard-pending-refunds"
           class={[
-            "p-5 rounded-lg border flex flex-col justify-between transition-all",
+            "p-5 rounded border flex flex-col justify-between transition-all",
             if(@pending_refunds_summary.total > 0,
-              do: "bg-rose-50 border-rose-200",
+              do: "bg-rose-50 border-rose-300 shadow-sm shadow-rose-100",
               else: "bg-white border-zinc-200"
             )
           ]}
@@ -215,7 +228,7 @@ defmodule YscWeb.AdminDashboardLive do
               <p class="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-2">
                 Refunds to review
               </p>
-              <p class="text-3xl font-black text-rose-900">
+              <p class="text-3xl font-black font-mono text-rose-900">
                 {@pending_refunds_summary.total}
               </p>
               <p class="text-xs text-rose-700 mt-2 space-x-2">
@@ -239,7 +252,7 @@ defmodule YscWeb.AdminDashboardLive do
                 Pending Refunds
               </p>
               <div class="flex items-baseline gap-2 mt-1">
-                <p class="text-3xl font-black text-emerald-600">0</p>
+                <p class="text-3xl font-black font-mono text-emerald-600">0</p>
                 <.badge type="green">All clear</.badge>
               </div>
               <p class="text-xs text-zinc-400 font-medium mt-2">
@@ -254,76 +267,86 @@ defmodule YscWeb.AdminDashboardLive do
             </.link>
           <% end %>
         </div>
-        <.link
-          navigate={~p"/admin/bookings"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
-        >
-          <div>
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
-              Today at the Cabins
-            </p>
-            <p class="text-3xl font-black text-zinc-900 group-hover:text-blue-600 transition-colors">
-              {@active_guests_count}
-            </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">
-              Guests staying now
-            </p>
-          </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-xs">
-            <div class="rounded-lg bg-emerald-50 border border-emerald-100 p-2">
-              <p class="font-bold text-emerald-700 uppercase text-[10px]">
-                Checking in
-              </p>
-              <p class="font-black text-emerald-800 text-lg tabular-nums">
-                {@checkins_today}
-              </p>
-            </div>
-            <div class="rounded-lg bg-amber-50 border border-amber-100 p-2">
-              <p class="font-bold text-amber-700 uppercase text-[10px]">
-                Checking out
-              </p>
-              <p class="font-black text-amber-800 text-lg tabular-nums">
-                {@checkouts_today}
-              </p>
-            </div>
-          </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            View all bookings →
-          </p>
-        </.link>
       </div>
 
-      <%!-- Admin-only: upcoming cabin occupancy (next 14 days) --%>
+      <%!-- Admin-only: Property Status Matrix --%>
       <div
         :if={@admin_role == :admin}
-        id="dashboard-cabin-occupancy"
+        id="property-matrix"
         class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8"
       >
         <.link
           navigate={~p"/admin/bookings?property=tahoe"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
-            <div class="flex items-start justify-between">
-              <p class="text-xs font-black text-sky-600 uppercase tracking-[0.2em] mb-2">
-                Tahoe · Next 14 days
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-black text-sky-600 uppercase tracking-[0.2em]">
+                Tahoe
               </p>
-              <.icon name="hero-home" class="w-4 h-4 text-sky-200 -mt-0.5 shrink-0" />
-            </div>
-            <div class="flex items-baseline gap-2">
-              <p class="text-3xl font-black text-zinc-900 group-hover:text-sky-600 transition-colors tabular-nums">
-                {@occupancy_tahoe_bookings}
-              </p>
-              <span class="text-xs font-bold text-zinc-400">
-                {if(@occupancy_tahoe_bookings == 1, do: "booking", else: "bookings")}
+              <span class="flex items-center gap-1.5">
+                <span class={[
+                  "w-1.5 h-1.5 rounded-full",
+                  if(@property_stats.tahoe.staying > 0,
+                    do: "bg-emerald-500",
+                    else: "bg-zinc-300"
+                  )
+                ]}>
+                </span>
+                <span class="text-[10px] font-bold text-zinc-400 uppercase">
+                  {if(@property_stats.tahoe.staying > 0,
+                    do: "Active",
+                    else: "Empty"
+                  )}
+                </span>
               </span>
             </div>
+            <div class="flex items-baseline gap-2">
+              <p class="text-3xl font-black font-mono text-zinc-900 group-hover:text-sky-600 transition-colors">
+                {@property_stats.tahoe.staying}
+              </p>
+              <span class="text-xs font-bold text-zinc-400">staying now</span>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div class="rounded bg-emerald-50 border border-emerald-100 p-2">
+                <p class="font-bold text-emerald-700 uppercase text-[10px]">
+                  Checking in
+                </p>
+                <p class="font-black font-mono text-emerald-800 text-lg">
+                  {@property_stats.tahoe.checkins_today}
+                </p>
+              </div>
+              <div class="rounded bg-amber-50 border border-amber-100 p-2">
+                <p class="font-bold text-amber-700 uppercase text-[10px]">
+                  Checking out
+                </p>
+                <p class="font-black font-mono text-amber-800 text-lg">
+                  {@property_stats.tahoe.checkouts_today}
+                </p>
+              </div>
+            </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
-            <span class="font-bold text-zinc-400 uppercase">Expected guests</span>
-            <span class="font-black text-zinc-700 tabular-nums">
-              {@occupancy_tahoe_guests}
-            </span>
+          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <p class="font-bold text-zinc-400 uppercase text-[10px]">
+                Next 14 days
+              </p>
+              <p class="font-black font-mono text-zinc-800 mt-0.5">
+                {@property_stats.tahoe.upcoming_bookings}
+                {if(@property_stats.tahoe.upcoming_bookings == 1,
+                  do: "booking",
+                  else: "bookings"
+                )}
+              </p>
+            </div>
+            <div>
+              <p class="font-bold text-zinc-400 uppercase text-[10px]">
+                Expected guests
+              </p>
+              <p class="font-black font-mono text-zinc-800 mt-0.5">
+                {@property_stats.tahoe.upcoming_guests}
+              </p>
+            </div>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             View Tahoe bookings →
@@ -331,35 +354,76 @@ defmodule YscWeb.AdminDashboardLive do
         </.link>
         <.link
           navigate={~p"/admin/bookings?property=clear_lake"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
-            <div class="flex items-start justify-between">
-              <p class="text-xs font-black text-teal-600 uppercase tracking-[0.2em] mb-2">
-                Clear Lake · Next 14 days
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
+                Clear Lake
               </p>
-              <.icon
-                name="hero-home"
-                class="w-4 h-4 text-teal-200 -mt-0.5 shrink-0"
-              />
+              <span class="flex items-center gap-1.5">
+                <span class={[
+                  "w-1.5 h-1.5 rounded-full",
+                  if(@property_stats.clear_lake.staying > 0,
+                    do: "bg-emerald-500",
+                    else: "bg-zinc-300"
+                  )
+                ]}>
+                </span>
+                <span class="text-[10px] font-bold text-zinc-400 uppercase">
+                  {if(@property_stats.clear_lake.staying > 0,
+                    do: "Active",
+                    else: "Empty"
+                  )}
+                </span>
+              </span>
             </div>
             <div class="flex items-baseline gap-2">
-              <p class="text-3xl font-black text-zinc-900 group-hover:text-teal-600 transition-colors tabular-nums">
-                {@occupancy_clear_lake_bookings}
+              <p class="text-3xl font-black font-mono text-zinc-900 group-hover:text-teal-600 transition-colors">
+                {@property_stats.clear_lake.staying}
               </p>
-              <span class="text-xs font-bold text-zinc-400">
-                {if(@occupancy_clear_lake_bookings == 1,
+              <span class="text-xs font-bold text-zinc-400">staying now</span>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div class="rounded bg-emerald-50 border border-emerald-100 p-2">
+                <p class="font-bold text-emerald-700 uppercase text-[10px]">
+                  Checking in
+                </p>
+                <p class="font-black font-mono text-emerald-800 text-lg">
+                  {@property_stats.clear_lake.checkins_today}
+                </p>
+              </div>
+              <div class="rounded bg-amber-50 border border-amber-100 p-2">
+                <p class="font-bold text-amber-700 uppercase text-[10px]">
+                  Checking out
+                </p>
+                <p class="font-black font-mono text-amber-800 text-lg">
+                  {@property_stats.clear_lake.checkouts_today}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <p class="font-bold text-zinc-400 uppercase text-[10px]">
+                Next 14 days
+              </p>
+              <p class="font-black font-mono text-zinc-800 mt-0.5">
+                {@property_stats.clear_lake.upcoming_bookings}
+                {if(@property_stats.clear_lake.upcoming_bookings == 1,
                   do: "booking",
                   else: "bookings"
                 )}
-              </span>
+              </p>
             </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
-            <span class="font-bold text-zinc-400 uppercase">Expected guests</span>
-            <span class="font-black text-zinc-700 tabular-nums">
-              {@occupancy_clear_lake_guests}
-            </span>
+            <div>
+              <p class="font-bold text-zinc-400 uppercase text-[10px]">
+                Expected guests
+              </p>
+              <p class="font-black font-mono text-zinc-800 mt-0.5">
+                {@property_stats.clear_lake.upcoming_guests}
+              </p>
+            </div>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             View Clear Lake bookings →
@@ -375,7 +439,7 @@ defmodule YscWeb.AdminDashboardLive do
       >
         <.link
           navigate={~p"/admin/events"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -401,7 +465,7 @@ defmodule YscWeb.AdminDashboardLive do
         </.link>
         <.link
           navigate={~p"/admin/posts"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -429,7 +493,7 @@ defmodule YscWeb.AdminDashboardLive do
         </.link>
         <.link
           navigate={~p"/admin/newsletters"}
-          class="bg-white p-5 rounded-lg border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -464,7 +528,7 @@ defmodule YscWeb.AdminDashboardLive do
         ]}>
           <div
             id="dashboard-events-timeline"
-            class="bg-white rounded-lg border border-zinc-200 p-5 sm:p-6 shadow-sm"
+            class="bg-white rounded border border-zinc-200 p-5 sm:p-6 shadow-sm"
           >
             <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
               <h2 class="text-lg font-black text-zinc-900 tracking-tight">
@@ -580,23 +644,48 @@ defmodule YscWeb.AdminDashboardLive do
         >
           <div
             id="dashboard-financials"
-            class="bg-white rounded-lg border border-zinc-200 p-5 shadow-sm space-y-5"
+            class="bg-white rounded border border-zinc-200 p-5 shadow-sm space-y-5"
           >
             <h2 class="text-sm font-black text-zinc-900 uppercase tracking-widest border-b border-zinc-100 pb-2">
               Financials
             </h2>
             <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">
-                Total revenue ({@current_period_label})
-              </p>
-              <p class="text-2xl font-black text-emerald-600 mt-1 tabular-nums">
-                {format_money(@current_month_revenue)}
-              </p>
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs font-bold text-zinc-400 uppercase">
+                    Total revenue ({@current_period_label})
+                  </p>
+                  <p class="text-2xl font-black font-mono text-emerald-600 mt-1 tabular-nums">
+                    {format_money(@current_month_revenue)}
+                  </p>
+                </div>
+                <svg
+                  viewBox="0 0 80 24"
+                  width="80"
+                  height="24"
+                  class="mt-2 overflow-visible shrink-0 opacity-80"
+                  aria-hidden="true"
+                >
+                  <polyline
+                    points={sparkline_fill_points(@revenue_sparkline)}
+                    fill="rgba(16,185,129,0.1)"
+                    stroke="none"
+                  />
+                  <polyline
+                    points={sparkline_line_points(@revenue_sparkline)}
+                    fill="none"
+                    stroke="#10b981"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
               <div class="flex items-baseline gap-2 mt-1.5 mb-1">
                 <p class="text-xs font-bold text-zinc-400 uppercase">
                   YTD {@ytd_revenue_label}
                 </p>
-                <p class="text-sm font-black text-zinc-700 tabular-nums">
+                <p class="text-sm font-black font-mono text-zinc-700 tabular-nums">
                   {format_money(@ytd_revenue)}
                 </p>
               </div>
@@ -621,17 +710,17 @@ defmodule YscWeb.AdminDashboardLive do
                 </span>
               </div>
               <div class="grid grid-cols-2 gap-3 mt-3 text-xs">
-                <div class="rounded-lg bg-zinc-50 p-2 border border-zinc-100">
+                <div class="rounded bg-zinc-50 p-2 border border-zinc-100">
                   <p class="font-bold text-zinc-400 uppercase">Prev. month</p>
-                  <p class="font-black text-zinc-800 mt-0.5">
+                  <p class="font-black font-mono text-zinc-800 mt-0.5">
                     {format_money(@last_month_revenue)}
                   </p>
                 </div>
-                <div class="rounded-lg bg-zinc-50 p-2 border border-zinc-100">
+                <div class="rounded bg-zinc-50 p-2 border border-zinc-100">
                   <p class="font-bold text-zinc-400 uppercase">
                     {@comparison_month_year_pretty}
                   </p>
-                  <p class="font-black text-zinc-800 mt-0.5">
+                  <p class="font-black font-mono text-zinc-800 mt-0.5">
                     {format_money(@last_year_month_revenue)}
                   </p>
                 </div>
@@ -771,7 +860,7 @@ defmodule YscWeb.AdminDashboardLive do
 
           <div
             id="dashboard-newsletters"
-            class="bg-white rounded-lg border border-zinc-200 p-5 shadow-sm"
+            class="bg-white rounded border border-zinc-200 p-5 shadow-sm"
           >
             <div class="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
               <div>
@@ -854,7 +943,7 @@ defmodule YscWeb.AdminDashboardLive do
       <div
         :if={@admin_role == :admin}
         id="review-applications-section"
-        class="bg-white rounded-lg border border-zinc-200 p-5 sm:p-6 shadow-sm mb-6"
+        class="bg-white rounded border border-zinc-200 p-5 sm:p-6 shadow-sm mb-6"
       >
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4 border-b border-zinc-100 pb-3">
           <div class="flex items-center gap-2">
@@ -942,7 +1031,7 @@ defmodule YscWeb.AdminDashboardLive do
 
       <div
         id="dashboard-recent-discussions"
-        class="bg-white rounded-lg border border-zinc-200 p-5 shadow-sm mb-8"
+        class="bg-white rounded border border-zinc-200 p-5 shadow-sm mb-8"
       >
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
@@ -955,16 +1044,12 @@ defmodule YscWeb.AdminDashboardLive do
             View all posts
           </.link>
         </div>
-        <div
+        <p
           :if={Enum.empty?(@latest_comments)}
-          class="text-center py-8 border-2 border-dashed border-zinc-100 rounded-lg"
+          class="text-xs text-zinc-400 italic py-1"
         >
-          <.icon
-            name="hero-chat-bubble-left-right"
-            class="w-7 h-7 text-zinc-200 mx-auto mb-2"
-          />
-          <p class="text-sm text-zinc-400">No new comments to moderate</p>
-        </div>
+          No new comments to moderate
+        </p>
         <ul :if={not Enum.empty?(@latest_comments)} class="space-y-3">
           <li
             :for={comment <- @latest_comments}
@@ -1052,10 +1137,23 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:revenue_yoy_change_direction, :neutral)
       |> assign(:pending_refunds_summary, %{total: 0, tahoe: 0, clear_lake: 0})
       |> assign(:recent_newsletters_with_stats, [])
-      |> assign(:active_guests_count, 0)
-      |> assign(:active_guests_sample, [])
-      |> assign(:checkins_today, 0)
-      |> assign(:checkouts_today, 0)
+      |> assign(:property_stats, %{
+        tahoe: %{
+          staying: 0,
+          checkins_today: 0,
+          checkouts_today: 0,
+          upcoming_bookings: 0,
+          upcoming_guests: 0
+        },
+        clear_lake: %{
+          staying: 0,
+          checkins_today: 0,
+          checkouts_today: 0,
+          upcoming_bookings: 0,
+          upcoming_guests: 0
+        }
+      })
+      |> assign(:revenue_sparkline, List.duplicate(Decimal.new(0), 7))
       |> assign(:membership_stats, %{
         total: 0,
         single: 0,
@@ -1071,10 +1169,6 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:ytd_revenue_label, "—")
       |> assign(:newsletter_subscriber_count, 0)
       |> assign(:newsletter_subscribers_this_month, 0)
-      |> assign(:occupancy_tahoe_bookings, 0)
-      |> assign(:occupancy_tahoe_guests, 0)
-      |> assign(:occupancy_clear_lake_bookings, 0)
-      |> assign(:occupancy_clear_lake_guests, 0)
       # Volunteer-only placeholders
       |> assign(:upcoming_events_count, 0)
       |> assign(:published_posts_count, 0)
@@ -1124,17 +1218,15 @@ defmodule YscWeb.AdminDashboardLive do
      applications_year_change} =
       get_application_statistics()
 
-    {active_guests_count, active_guests_sample} = get_active_guests()
-    {checkins_today, checkouts_today} = get_today_cabin_activity()
+    property_stats = get_property_stats()
     membership_stats = Accounts.get_membership_stats()
     joins_ytd = Accounts.get_membership_joins_ytd_comparison()
     memberships_renewing_30_days = get_renewals_in_30_days()
     {ytd_revenue, ytd_revenue_label} = calculate_ytd_revenue()
+    revenue_sparkline = get_last_7_days_revenue()
 
     {newsletter_subscriber_count, newsletter_subscribers_this_month} =
       get_newsletter_subscriber_stats()
-
-    occupancy = get_upcoming_occupancy()
 
     socket =
       socket
@@ -1149,10 +1241,8 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:applications_last_year, applications_last_year)
       |> assign(:applications_month_change, applications_month_change)
       |> assign(:applications_year_change, applications_year_change)
-      |> assign(:active_guests_count, active_guests_count)
-      |> assign(:active_guests_sample, active_guests_sample)
-      |> assign(:checkins_today, checkins_today)
-      |> assign(:checkouts_today, checkouts_today)
+      |> assign(:property_stats, property_stats)
+      |> assign(:revenue_sparkline, revenue_sparkline)
       |> assign(:membership_stats, membership_stats)
       |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
       |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
@@ -1169,10 +1259,6 @@ defmodule YscWeb.AdminDashboardLive do
         :newsletter_subscribers_this_month,
         newsletter_subscribers_this_month
       )
-      |> assign(:occupancy_tahoe_bookings, occupancy.tahoe_bookings)
-      |> assign(:occupancy_tahoe_guests, occupancy.tahoe_guests)
-      |> assign(:occupancy_clear_lake_bookings, occupancy.clear_lake_bookings)
-      |> assign(:occupancy_clear_lake_guests, occupancy.clear_lake_guests)
       |> assign(:recent_newsletters_with_stats, recent_newsletters)
       |> assign(:pending_refunds_summary, pending_refund_summary)
       |> then(fn s ->
@@ -1834,50 +1920,81 @@ defmodule YscWeb.AdminDashboardLive do
   defp format_newsletter_stat(count, _sent_count, label),
     do: "#{count} #{label}"
 
-  defp get_active_guests do
+  defp get_property_stats do
     alias Ysc.Repo
     import Ecto.Query
 
     today = pst_today()
     checkout_time = ~T[11:00:00]
+    now_pst = DateTime.now!("America/Los_Angeles")
+    checkout_cutoff = DateTime.new!(today, checkout_time, "America/Los_Angeles")
+    two_weeks_out = Date.add(today, 14)
 
-    # Get all active bookings: checked in on or before today, and not yet checked out
-    query =
-      from(b in Bookings.Booking,
-        where: b.status == :complete,
-        where: b.checkin_date <= ^today,
-        where: b.checkout_date >= ^today,
-        preload: [user: :current_avatar]
+    staying_bookings =
+      Repo.all(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where: b.checkin_date <= ^today,
+          where: b.checkout_date >= ^today,
+          select: %{property: b.property, checkout_date: b.checkout_date}
       )
-
-    bookings = Repo.all(query)
-
-    # Filter out bookings that are past checkout time today
-    active_bookings =
-      bookings
-      |> Enum.filter(fn booking ->
-        if Date.compare(booking.checkout_date, today) == :eq do
-          now_pst = DateTime.now!("America/Los_Angeles")
-
-          checkout_datetime =
-            DateTime.new!(today, checkout_time, "America/Los_Angeles")
-
-          DateTime.compare(now_pst, checkout_datetime) == :lt
+      |> Enum.filter(fn b ->
+        if Date.compare(b.checkout_date, today) == :eq do
+          DateTime.compare(now_pst, checkout_cutoff) == :lt
         else
           true
         end
       end)
 
-    # Count unique users
-    unique_users =
-      active_bookings
-      |> Enum.map(& &1.user)
-      |> Enum.uniq_by(& &1.id)
+    checkins_today =
+      Repo.all(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where: b.checkin_date == ^today,
+          select: %{property: b.property}
+      )
 
-    # Get sample of users for avatars (max 3)
-    sample_users = Enum.take(unique_users, 3)
+    checkouts_today =
+      Repo.all(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where: b.checkout_date == ^today,
+          select: %{property: b.property}
+      )
 
-    {length(unique_users), sample_users}
+    upcoming =
+      Repo.all(
+        from b in Bookings.Booking,
+          where: b.status == :complete,
+          where:
+            fragment(
+              "(? <= ? AND ? >= ?)",
+              b.checkin_date,
+              ^two_weeks_out,
+              b.checkout_date,
+              ^today
+            ),
+          select: %{property: b.property, guests_count: b.guests_count}
+      )
+
+    build_stats = fn property ->
+      prop_upcoming = Enum.filter(upcoming, &(&1.property == property))
+
+      %{
+        staying: Enum.count(staying_bookings, &(&1.property == property)),
+        checkins_today: Enum.count(checkins_today, &(&1.property == property)),
+        checkouts_today:
+          Enum.count(checkouts_today, &(&1.property == property)),
+        upcoming_bookings: length(prop_upcoming),
+        upcoming_guests:
+          Enum.sum(Enum.map(prop_upcoming, &(&1.guests_count || 0)))
+      }
+    end
+
+    %{
+      tahoe: build_stats.(:tahoe),
+      clear_lake: build_stats.(:clear_lake)
+    }
   end
 
   @impl true
@@ -1886,31 +2003,6 @@ defmodule YscWeb.AdminDashboardLive do
   end
 
   defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-
-  defp get_today_cabin_activity do
-    alias Ysc.Repo
-    import Ecto.Query
-
-    today = pst_today()
-
-    checkins =
-      Repo.one(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where: b.checkin_date == ^today,
-          select: count()
-      ) || 0
-
-    checkouts =
-      Repo.one(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where: b.checkout_date == ^today,
-          select: count()
-      ) || 0
-
-    {checkins, checkouts}
-  end
 
   defp get_renewals_in_30_days do
     alias Ysc.Repo
@@ -2031,39 +2123,6 @@ defmodule YscWeb.AdminDashboardLive do
     {total, new_this_month}
   end
 
-  defp get_upcoming_occupancy do
-    alias Ysc.Repo
-    import Ecto.Query
-
-    today = pst_today()
-    two_weeks_out = Date.add(today, 14)
-
-    bookings =
-      Repo.all(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where:
-            fragment(
-              "(? <= ? AND ? >= ?)",
-              b.checkin_date,
-              ^two_weeks_out,
-              b.checkout_date,
-              ^today
-            ),
-          select: %{property: b.property, guests_count: b.guests_count}
-      )
-
-    tahoe = Enum.filter(bookings, &(&1.property == :tahoe))
-    clear_lake = Enum.filter(bookings, &(&1.property == :clear_lake))
-
-    %{
-      tahoe_bookings: length(tahoe),
-      tahoe_guests: Enum.sum(Enum.map(tahoe, &(&1.guests_count || 0))),
-      clear_lake_bookings: length(clear_lake),
-      clear_lake_guests: Enum.sum(Enum.map(clear_lake, &(&1.guests_count || 0)))
-    }
-  end
-
   defp get_draft_posts_count do
     alias Ysc.Repo
     import Ecto.Query
@@ -2085,6 +2144,92 @@ defmodule YscWeb.AdminDashboardLive do
         select: count()
     ) || 0
   end
+
+  defp get_last_7_days_revenue do
+    alias Ysc.Repo
+    import Ecto.Query
+
+    today_utc = DateTime.utc_now() |> DateTime.to_date()
+    days = Enum.map(6..0//-1, &Date.add(today_utc, -&1))
+    oldest_day = List.first(days)
+    start_dt = DateTime.new!(oldest_day, ~T[00:00:00], "Etc/UTC")
+    end_dt = DateTime.utc_now()
+
+    revenue_account_names = [
+      "membership_revenue",
+      "event_revenue",
+      "tahoe_booking_revenue",
+      "clear_lake_booking_revenue",
+      "donation_revenue"
+    ]
+
+    account_ids =
+      from(a in Ysc.Ledgers.LedgerAccount,
+        where: a.name in ^revenue_account_names,
+        select: a.id
+      )
+      |> Repo.all()
+
+    entries =
+      Repo.all(
+        from e in Ysc.Ledgers.LedgerEntry,
+          where: e.account_id in ^account_ids,
+          where: e.inserted_at >= ^start_dt,
+          where: e.inserted_at < ^end_dt,
+          select: %{
+            amount: fragment("ABS((?.amount).amount)", e),
+            debit_credit: e.debit_credit,
+            inserted_at: e.inserted_at
+          }
+      )
+
+    by_date = Enum.group_by(entries, &DateTime.to_date(&1.inserted_at))
+
+    Enum.map(days, fn day ->
+      Enum.reduce(Map.get(by_date, day, []), Decimal.new(0), fn entry, acc ->
+        dc =
+          case entry.debit_credit do
+            atom when is_atom(atom) -> to_string(atom)
+            str when is_binary(str) -> str
+            _ -> "debit"
+          end
+
+        amount = entry.amount || Decimal.new(0)
+        signed = if dc == "credit", do: amount, else: Decimal.negate(amount)
+        Decimal.add(acc, signed)
+      end)
+    end)
+  end
+
+  defp sparkline_line_points(values) when is_list(values) and values != [] do
+    w = 80.0
+    h = 24.0
+
+    floats =
+      Enum.map(values, fn v ->
+        f = Decimal.to_float(v)
+        max(f, 0.0)
+      end)
+
+    max_v = max(Enum.max(floats, fn -> 0.0 end), 0.01)
+    count = length(floats)
+
+    floats
+    |> Enum.with_index()
+    |> Enum.map_join(" ", fn {v, i} ->
+      x = if count <= 1, do: 0.0, else: i * w / (count - 1)
+      y = (1.0 - v / max_v) * h
+      "#{Float.round(x, 1)},#{Float.round(y, 1)}"
+    end)
+  end
+
+  defp sparkline_line_points(_), do: "0,24 80,24"
+
+  defp sparkline_fill_points(values) when is_list(values) and values != [] do
+    "#{sparkline_line_points(values)} 80,24 0,24"
+  end
+
+  defp sparkline_fill_points(_), do: ""
 
   defp format_admin_datetime(%DateTime{} = dt) do
     dt
