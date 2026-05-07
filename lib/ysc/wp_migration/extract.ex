@@ -13,10 +13,13 @@ defmodule Ysc.WpMigration.Extract do
   into export_dir.
 
   Options:
-  - :db         - path to the DuckDB file (from mix ysc.wp_to_duckdb; required)
-  - :export_dir - output path (default: "wp_migration_export")
-  - :wp_files   - path to wp_backup/files (for resolving uploads; default: "wp_backup/files")
-  - :dry_run    - if true, only log what would be written
+  - :db          - path to the DuckDB file (from mix ysc.wp_to_duckdb; required)
+  - :export_dir  - output path (default: "wp_migration_export")
+  - :wp_files    - path to wp_backup/files (for resolving uploads; default: "wp_backup/files")
+  - :dry_run     - if true, only log what would be written
+  - :only_emails - a single email string or list of email strings; when provided,
+                   only the matching users (and their associated applications, stripe
+                   data, and bookings) are extracted. Useful for targeted test runs.
   """
   def run(opts \\ []) do
     db = opts[:db]
@@ -24,14 +27,26 @@ defmodule Ysc.WpMigration.Extract do
     wp_files = Path.expand(opts[:wp_files] || "wp_backup/files")
     dry_run = opts[:dry_run] || false
 
+    only_emails =
+      case opts[:only_emails] do
+        nil ->
+          nil
+
+        email when is_binary(email) ->
+          MapSet.new([String.downcase(email)])
+
+        emails when is_list(emails) ->
+          MapSet.new(Enum.map(emails, &String.downcase/1))
+      end
+
     if is_nil(db) or db == "" do
       {:error, "Missing :db (path to DuckDB file from mix ysc.wp_to_duckdb)"}
     else
-      do_run(db, export_dir, wp_files, dry_run)
+      do_run(db, export_dir, wp_files, dry_run, only_emails)
     end
   end
 
-  defp do_run(db, export_dir, wp_files, dry_run) do
+  defp do_run(db, export_dir, wp_files, dry_run, only_emails) do
     case WpRepo.open(db) do
       {:ok, repo} ->
         try do
@@ -40,11 +55,25 @@ defmodule Ysc.WpMigration.Extract do
             File.mkdir_p!(Path.join(export_dir, "media"))
           end
 
-          users = build_users(repo)
+          users =
+            repo |> build_users() |> filter_by_emails(only_emails, "email")
+
+          if only_emails,
+            do:
+              Ysc.Logging.info(
+                "[WP Extract] :only_emails filter active — #{length(users)} matching users"
+              )
+
           if dry_run, do: Ysc.Logging.info("Would write #{length(users)} users")
           write_json(export_dir, "users.json", users, dry_run)
 
-          applications = build_applications(repo)
+          only_wp_user_ids =
+            if only_emails, do: wp_user_id_set(users), else: nil
+
+          applications =
+            repo
+            |> build_applications()
+            |> filter_by_wp_user_ids(only_wp_user_ids, "wp_user_id")
 
           if dry_run,
             do:
@@ -58,7 +87,10 @@ defmodule Ysc.WpMigration.Extract do
           if dry_run, do: Ysc.Logging.info("Would write #{length(posts)} posts")
           write_json(export_dir, "posts.json", posts, dry_run)
 
-          stripe_lookup = build_stripe_customer_lookup(repo)
+          stripe_lookup =
+            repo
+            |> build_stripe_customer_lookup()
+            |> filter_by_wp_user_ids(only_wp_user_ids, "wp_user_id")
 
           write_json(
             export_dir,
@@ -67,7 +99,10 @@ defmodule Ysc.WpMigration.Extract do
             dry_run
           )
 
-          bookings = build_bookings(repo)
+          bookings =
+            repo
+            |> build_bookings()
+            |> filter_by_wp_user_ids(only_wp_user_ids, "wp_customer_user_id")
 
           if dry_run,
             do: Ysc.Logging.info("Would write #{length(bookings)} bookings")
@@ -85,6 +120,31 @@ defmodule Ysc.WpMigration.Extract do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # Returns a MapSet of wp_user_id values from a list of user rows.
+  # When only_emails is nil (no filter), returns nil so downstream filters are skipped.
+  defp wp_user_id_set(users) do
+    MapSet.new(users, & &1["wp_user_id"])
+  end
+
+  # Filters rows whose `email_field` (downcased) is in the given MapSet.
+  # Passes through unchanged when only_emails is nil.
+  defp filter_by_emails(rows, nil, _field), do: rows
+
+  defp filter_by_emails(rows, only_emails, field) do
+    Enum.filter(rows, fn row ->
+      email = row[field]
+      is_binary(email) and MapSet.member?(only_emails, String.downcase(email))
+    end)
+  end
+
+  # Filters rows whose `id_field` value is in the given MapSet of wp_user_ids.
+  # Passes through unchanged when only_wp_user_ids is nil (no filter active).
+  defp filter_by_wp_user_ids(rows, nil, _field), do: rows
+
+  defp filter_by_wp_user_ids(rows, only_wp_user_ids, field) do
+    Enum.filter(rows, fn row -> MapSet.member?(only_wp_user_ids, row[field]) end)
   end
 
   defp build_users(repo) do
