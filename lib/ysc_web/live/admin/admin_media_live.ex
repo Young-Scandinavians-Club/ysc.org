@@ -357,6 +357,7 @@ defmodule YscWeb.AdminMediaLive do
           name="search"
           value={@search_query}
           placeholder="Search by filename, title, or alt text..."
+          debounce="300"
           on_change="search"
           clear_event="clear-search"
         />
@@ -504,6 +505,7 @@ defmodule YscWeb.AdminMediaLive do
     query_params = parse_query_params_from_uri(params, uri)
     year_param = query_params["year"] || query_params[:year]
     search_query = query_params["search"] || query_params[:search] || ""
+    previous_search_query = socket.assigns.search_query
 
     # Store current URL parameters in assigns for use when building return URLs
     socket =
@@ -529,7 +531,7 @@ defmodule YscWeb.AdminMediaLive do
         )
 
         year_changed = year != socket.assigns.selected_year
-        search_changed = search_query != socket.assigns.search_query
+        search_changed = search_query != previous_search_query
         not_initialized = not socket.assigns.stream_initialized?
 
         if year_changed || search_changed || not_initialized do
@@ -574,7 +576,7 @@ defmodule YscWeb.AdminMediaLive do
         end
       else
         has_year_filter = not is_nil(socket.assigns.selected_year)
-        search_changed = search_query != socket.assigns.search_query
+        search_changed = search_query != previous_search_query
         not_initialized = not socket.assigns.stream_initialized?
 
         if has_year_filter || search_changed || not_initialized do
