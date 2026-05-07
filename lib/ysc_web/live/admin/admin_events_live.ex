@@ -515,10 +515,12 @@ defmodule YscWeb.AdminEventsLive do
   defp format_date(date), do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
 
   defp format_capacity(event) do
-    capacity_info = Map.get(event, :capacity_info, %{registrations: 0, capacity: :unlimited})
+    capacity_info =
+      Map.get(event, :capacity_info, %{registrations: 0, capacity: :unlimited})
+
     registrations = capacity_info.registrations || 0
     capacity = capacity_info.capacity
-    
+
     case capacity do
       :unlimited -> "#{registrations} / ∞"
       cap when is_integer(cap) -> "#{registrations} / #{cap}"
