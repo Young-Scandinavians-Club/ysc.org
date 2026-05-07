@@ -1008,6 +1008,7 @@ defmodule YscWeb.UserSettingsLive do
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
+                scheduled_downgrade_info={@scheduled_downgrade_info}
               />
               <.button
                 :if={@current_membership != nil}
@@ -1061,6 +1062,7 @@ defmodule YscWeb.UserSettingsLive do
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
+                scheduled_downgrade_info={@scheduled_downgrade_info}
               />
               <.button phx-click="show_membership_qr">
                 <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />

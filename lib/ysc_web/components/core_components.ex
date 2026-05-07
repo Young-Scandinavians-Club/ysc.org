@@ -2660,6 +2660,7 @@ defmodule YscWeb.CoreComponents do
   attr :current_membership, :any, required: true
   attr :primary_user, :any, default: nil
   attr :is_sub_account, :boolean, default: false
+  attr :scheduled_downgrade_info, :any, default: nil
   attr :class, :string, default: ""
 
   def membership_status(assigns) do
@@ -2773,7 +2774,8 @@ defmodule YscWeb.CoreComponents do
 
       <div :if={
         !membership_cancelled?(@current_membership) &&
-          membership_scheduled_for_cancellation?(@current_membership)
+          membership_scheduled_for_cancellation?(@current_membership) &&
+          @scheduled_downgrade_info == nil
       }>
         <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
           <p class="text-sm text-yellow-800 font-semibold">
@@ -2787,28 +2789,28 @@ defmodule YscWeb.CoreComponents do
                 <strong>
                   {@primary_user.first_name} {@primary_user.last_name}
                 </strong>
-                is scheduled for cancellation.
+                will not automatically renew.
               <% else %>
-                The primary account membership is scheduled for cancellation.
+                The primary account membership will not automatically renew.
               <% end %>
             <% else %>
               Your <strong>{get_membership_type(@current_membership)}</strong>
-              membership is scheduled for cancellation.
+              membership will not automatically renew.
             <% end %>
           </p>
 
           <p
-            :if={get_membership_ends_at(@current_membership) != nil}
+            :if={get_membership_renewal_date(@current_membership) != nil}
             class="text-sm text-yellow-900 mt-2"
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= Timex.format!(get_membership_ends_at(@current_membership), "{Mshort} {D}, {YYYY}") %>
-              </strong>. The membership will not automatically renew.
+              <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
+              </strong>. After that date, you will no longer have access to YSC membership features.
             <% else %>
               You are still an active member until <strong>
-              <%= Timex.format!(get_membership_ends_at(@current_membership), "{Mshort} {D}, {YYYY}") %>
-              </strong>. Your membership will not automatically renew.
+              <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
+              </strong>. After that date, you will no longer have access to YSC membership features.
             <% end %>
           </p>
         </div>

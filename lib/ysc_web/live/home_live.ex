@@ -2047,7 +2047,7 @@ defmodule YscWeb.HomeLive do
         else
           cond do
             scheduled_for_cancellation? && renewal_date ->
-              "Your #{membership_type} membership is scheduled for cancellation. You are still an active member until #{format_membership_date(renewal_date)}. Your membership will not automatically renew."
+              "Your #{membership_type} membership will not automatically renew. You are still an active member until #{format_membership_date(renewal_date)}."
 
             renewal_date ->
               "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date)} unless you turn it off beforehand."
