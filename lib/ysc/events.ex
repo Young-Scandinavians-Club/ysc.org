@@ -85,8 +85,15 @@ defmodule Ysc.Events do
         |> maybe_filter_start_date_to(date_to)
       end
 
-    query
-    |> Flop.validate_and_run(params, for: Event)
+    case query
+         |> Flop.validate_and_run(params, for: Event) do
+      {:ok, {events, meta}} ->
+        events = enrich_events_with_capacity(events)
+        {:ok, {events, meta}}
+
+      error ->
+        error
+    end
   end
 
   defp maybe_filter_tab(query, :upcoming) do
@@ -118,6 +125,81 @@ defmodule Ysc.Events do
     do: String.to_existing_atom(tab)
 
   defp normalize_tab(_), do: :all
+
+  defp enrich_events_with_capacity([]), do: []
+
+  defp enrich_events_with_capacity(events) do
+    event_ids = Enum.map(events, & &1.id)
+    ticket_tiers_by_event = batch_load_ticket_tiers(event_ids)
+
+    registrations_by_event =
+      batch_count_tickets_sold_excluding_donations(event_ids)
+
+    Enum.map(events, fn event ->
+      enrich_single_event_capacity(
+        event,
+        ticket_tiers_by_event,
+        registrations_by_event
+      )
+    end)
+  end
+
+  defp enrich_single_event_capacity(
+         %Event{} = event,
+         ticket_tiers_by_event,
+         registrations_by_event
+       ) do
+    tiers = Map.get(ticket_tiers_by_event, event.id, [])
+    registrations = Map.get(registrations_by_event, event.id, 0)
+
+    event_for_capacity = %Event{event | ticket_tiers: tiers}
+    capacity = calculate_event_capacity(event_for_capacity)
+
+    %Event{
+      event
+      | capacity_info: %{registrations: registrations, capacity: capacity}
+    }
+  end
+
+  defp calculate_event_capacity(event) do
+    event_capacity = event.max_attendees
+
+    # Get non-donation ticket tiers
+    non_donation_tiers =
+      Enum.reject(event.ticket_tiers || [], fn tier ->
+        tier.type == :donation or tier.type == "donation"
+      end)
+
+    # Calculate sum of tier capacities
+    tier_capacity = calculate_tier_capacity_sum(non_donation_tiers)
+
+    # Determine actual capacity
+    case {event_capacity, tier_capacity} do
+      {nil, :unlimited} -> :unlimited
+      {nil, tier_cap} -> tier_cap
+      {event_cap, :unlimited} -> event_cap
+      {event_cap, tier_cap} -> min(event_cap, tier_cap)
+    end
+  end
+
+  defp calculate_tier_capacity_sum([]), do: :unlimited
+
+  defp calculate_tier_capacity_sum(tiers) do
+    # If any tier is unlimited (nil or 0 quantity), the event has unlimited capacity
+    # Otherwise, sum up all tier quantities
+    has_unlimited =
+      Enum.any?(tiers, fn tier ->
+        tier.quantity == nil or tier.quantity == 0
+      end)
+
+    if has_unlimited do
+      :unlimited
+    else
+      Enum.reduce(tiers, 0, fn tier, acc ->
+        acc + (tier.quantity || 0)
+      end)
+    end
+  end
 
   defp normalize_list_events_opts(search_term)
        when is_binary(search_term) or is_nil(search_term),
@@ -931,6 +1013,24 @@ defmodule Ysc.Events do
       |> Repo.all()
       |> Enum.into(%{}, fn {event_id, count} -> {event_id, count} end)
     end
+  end
+
+  # Batch count confirmed tickets excluding donation tiers (same rules as count_tickets_sold_excluding_donations/1).
+  defp batch_count_tickets_sold_excluding_donations([]), do: %{}
+
+  defp batch_count_tickets_sold_excluding_donations(event_ids)
+       when is_list(event_ids) do
+    from(t in Ticket,
+      join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id,
+      where: t.event_id in ^event_ids,
+      where: t.status == :confirmed,
+      where: tt.type != :donation,
+      group_by: t.event_id,
+      select: {t.event_id, count(t.id)}
+    )
+    |> Repo.all()
+    |> Enum.into(%{}, fn {event_id, count} -> {event_id, count} end)
   end
 
   # Calculate pricing display information for an event

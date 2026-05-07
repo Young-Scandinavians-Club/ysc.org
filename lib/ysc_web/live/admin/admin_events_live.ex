@@ -164,6 +164,12 @@ defmodule YscWeb.AdminEventsLive do
                       </span>
                     </div>
                     <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Capacity:</span>
+                      <span class="text-sm font-medium text-zinc-900">
+                        {format_capacity(event)}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
                       <span class="text-sm text-zinc-600">Organizer:</span>
                       <span class="text-sm text-zinc-900">
                         {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
@@ -276,6 +282,10 @@ defmodule YscWeb.AdminEventsLive do
 
               <:col :let={{_, event}} label="Event Date" field={:start_date}>
                 {format_date(event.start_date)}
+              </:col>
+
+              <:col :let={{_, event}} label="Registrations / Capacity">
+                {format_capacity(event)}
               </:col>
 
               <:col :let={{_, event}} label="Author" field={:author_name}>
@@ -503,6 +513,20 @@ defmodule YscWeb.AdminEventsLive do
 
   defp format_date(nil), do: "n/a"
   defp format_date(date), do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
+
+  defp format_capacity(event) do
+    capacity_info =
+      event.capacity_info || %{registrations: 0, capacity: :unlimited}
+
+    registrations = capacity_info.registrations || 0
+    capacity = capacity_info.capacity
+
+    case capacity do
+      :unlimited -> "#{registrations} / ∞"
+      cap when is_integer(cap) -> "#{registrations} / #{cap}"
+      _ -> "#{registrations} / ∞"
+    end
+  end
 
   defp format_publish_at(%DateTime{} = publish_at) do
     publish_at

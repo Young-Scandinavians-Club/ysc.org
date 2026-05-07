@@ -75,6 +75,9 @@ defmodule Ysc.Events.Event do
     field :max_attendees, :integer
     # Virtual field for unlimited capacity checkbox
     field :unlimited_capacity, :boolean, virtual: true
+
+    # Set by admin/event listing when enriching with registration vs capacity data
+    field :capacity_info, :map, virtual: true
     # Optional: Age restriction for the event
     # if null or 0 then no age restriction
     field :age_restriction, :integer

@@ -780,6 +780,14 @@ defmodule Ysc.EventsTest do
       assert {:ok, {events, meta}} = result
       assert is_list(events)
       assert meta.current_page == 1
+
+      for event <- events do
+        assert %{registrations: registrations, capacity: capacity} =
+                 event.capacity_info
+
+        assert is_integer(registrations)
+        assert capacity == :unlimited or is_integer(capacity)
+      end
     end
 
     test "list_events_paginated/2 filters drafts tab" do
