@@ -1884,7 +1884,6 @@ defmodule YscWeb.AdminBookingsLive do
           >
             <button
               phx-click={JS.patch(~p"/admin/bookings?property=tahoe")}
-              phx-disable-with="Loading..."
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@selected_property == :tahoe,
@@ -1903,7 +1902,6 @@ defmodule YscWeb.AdminBookingsLive do
           >
             <button
               phx-click={JS.patch(~p"/admin/bookings?property=clear_lake")}
-              phx-disable-with="Loading..."
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@selected_property == :clear_lake,
@@ -1924,7 +1922,6 @@ defmodule YscWeb.AdminBookingsLive do
           <button
             phx-click="select-section"
             phx-value-section="calendar"
-            phx-disable-with="Loading..."
             class={[
               "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
               if(@current_section == :calendar,
@@ -1939,7 +1936,6 @@ defmodule YscWeb.AdminBookingsLive do
           <button
             phx-click="select-section"
             phx-value-section="reservations"
-            phx-disable-with="Loading..."
             class={[
               "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
               if(@current_section == :reservations,
@@ -1954,7 +1950,6 @@ defmodule YscWeb.AdminBookingsLive do
           <button
             phx-click="select-section"
             phx-value-section="config"
-            phx-disable-with="Loading..."
             class={[
               "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
               if(@current_section == :config,
@@ -1970,7 +1965,6 @@ defmodule YscWeb.AdminBookingsLive do
             <button
               phx-click="select-section"
               phx-value-section="pending_refunds"
-              phx-disable-with="Loading..."
               class={[
                 "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                 if(@current_section == :pending_refunds,
