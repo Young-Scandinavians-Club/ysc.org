@@ -2626,6 +2626,39 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Returns the first household member (primary or sub-account) who currently
+  holds a board position, or `nil` if nobody in the household does.
+
+  Used to determine whether the household's membership billing has been paused
+  due to board volunteer service.
+  """
+  def household_board_member(user) do
+    get_family_group(user)
+    |> Enum.find(&(&1.board_position != nil))
+  end
+
+  @doc """
+  Returns a human-readable title for a `BoardMemberPosition` enum value.
+
+  ## Examples
+
+      iex> Ysc.Accounts.format_board_position(:vice_president)
+      "Vice President"
+
+      iex> Ysc.Accounts.format_board_position(:member_outreach)
+      "Member Outreach & Events"
+
+  """
+  def format_board_position(:member_outreach), do: "Member Outreach & Events"
+
+  def format_board_position(position) when not is_nil(position) do
+    position
+    |> to_string()
+    |> String.split("_")
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  @doc """
   Gets all user IDs in a family group.
   Useful for querying bookings across the family.
   """
