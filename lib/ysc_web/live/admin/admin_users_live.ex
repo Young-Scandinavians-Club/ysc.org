@@ -62,7 +62,7 @@ defmodule YscWeb.AdminUsersLive do
               "suspended",
               "deleted"
             ]}
-            label="State"
+            label="Account Status"
           />
           <.input
             type="select"
@@ -520,7 +520,7 @@ defmodule YscWeb.AdminUsersLive do
                 <.filter_form
                   fields={[
                     state: [
-                      label: "State",
+                      label: "Account Status",
                       type: "checkgroup",
                       multiple: true,
                       op: :in,
@@ -598,7 +598,7 @@ defmodule YscWeb.AdminUsersLive do
                     </span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">State:</span>
+                    <span class="text-sm text-zinc-600">Account Status:</span>
                     <.badge type={user_state_to_badge_type(user.state)}>
                       {user_state_to_readable(user.state)}
                     </.badge>
@@ -725,7 +725,7 @@ defmodule YscWeb.AdminUsersLive do
               </:col>
               <:col
                 :let={{_, user}}
-                label="State"
+                label="Account Status"
                 field={:state}
                 thead_th_attrs={[class: "dance"]}
               >
