@@ -31,6 +31,9 @@ defmodule Ysc.WpMigration.Load do
   - :create_stripe_subscriptions - if true, create real Stripe customers and subscriptions
       in the connected Stripe account (useful for sandbox/dev testing). Each subscription
       uses trial_end set to the WP renewal date so no charge fires immediately.
+  - :only_emails - a single email string or list of email strings; when provided,
+                   only the matching users (and their associated applications, stripe
+                   data, and bookings) are loaded. Useful for targeted test runs.
   """
   def run(opts \\ []) do
     export_dir = opts[:export_dir]
@@ -38,11 +41,35 @@ defmodule Ysc.WpMigration.Load do
     upload_media = Keyword.get(opts, :upload_media, true)
     create_stripe_subscriptions = opts[:create_stripe_subscriptions] || false
 
+    only_emails =
+      case opts[:only_emails] do
+        nil ->
+          nil
+
+        email when is_binary(email) ->
+          MapSet.new([String.downcase(email)])
+
+        emails when is_list(emails) ->
+          valid =
+            emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
+
+          if valid == [], do: nil, else: MapSet.new(valid)
+
+        _ ->
+          nil
+      end
+
     if export_dir do
       export_dir = Path.expand(export_dir)
 
       if File.dir?(export_dir) do
-        do_run(export_dir, dry_run, upload_media, create_stripe_subscriptions)
+        do_run(
+          export_dir,
+          dry_run,
+          upload_media,
+          create_stripe_subscriptions,
+          only_emails
+        )
       else
         {:error, "Export directory not found: #{export_dir}"}
       end
@@ -51,7 +78,13 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp do_run(export_dir, dry_run, upload_media, create_stripe_subscriptions) do
+  defp do_run(
+         export_dir,
+         dry_run,
+         upload_media,
+         create_stripe_subscriptions,
+         only_emails
+       ) do
     users_json = Path.join(export_dir, "users.json")
     applications_json = Path.join(export_dir, "applications.json")
     posts_json = Path.join(export_dir, "posts.json")
@@ -59,11 +92,35 @@ defmodule Ysc.WpMigration.Load do
     bookings_json = Path.join(export_dir, "bookings.json")
     media_dir = Path.join(export_dir, "media")
 
-    users_data = read_json(users_json)
-    applications_data = read_json(applications_json)
+    users_data = read_json(users_json) |> filter_by_emails(only_emails)
+
+    only_wp_user_ids =
+      if only_emails do
+        users_data
+        |> Enum.map(& &1["wp_user_id"])
+        |> Enum.reject(&is_nil/1)
+        |> MapSet.new()
+      end
+
+    if only_emails do
+      Ysc.Logging.info(
+        "[WP Load] :only_emails filter active — #{length(users_data)} matching users"
+      )
+    end
+
+    applications_data =
+      read_json(applications_json)
+      |> filter_by_wp_user_ids(only_wp_user_ids, "wp_user_id")
+
     posts_data = read_json(posts_json)
-    stripe_data = read_json(stripe_json)
-    bookings_data = read_json(bookings_json)
+
+    stripe_data =
+      read_json(stripe_json)
+      |> filter_by_wp_user_ids(only_wp_user_ids, "wp_user_id")
+
+    bookings_data =
+      read_json(bookings_json)
+      |> filter_by_wp_user_ids(only_wp_user_ids, "wp_customer_user_id")
 
     if dry_run do
       Ysc.Logging.info(
@@ -156,6 +213,21 @@ defmodule Ysc.WpMigration.Load do
     else
       []
     end
+  end
+
+  defp filter_by_emails(rows, nil), do: rows
+
+  defp filter_by_emails(rows, only_emails) do
+    Enum.filter(rows, fn row ->
+      email = row["email"]
+      is_binary(email) and MapSet.member?(only_emails, String.downcase(email))
+    end)
+  end
+
+  defp filter_by_wp_user_ids(rows, nil, _field), do: rows
+
+  defp filter_by_wp_user_ids(rows, only_wp_user_ids, field) do
+    Enum.filter(rows, fn row -> MapSet.member?(only_wp_user_ids, row[field]) end)
   end
 
   defp get_migration_uploader do
