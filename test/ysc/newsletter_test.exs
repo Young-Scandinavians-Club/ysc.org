@@ -348,6 +348,78 @@ defmodule Ysc.NewsletterTest do
     end
   end
 
+  describe "list_recent_sent_editions_with_stats/1" do
+    test "returns open and click counts per sent edition (batched query)" do
+      user = user_fixture()
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, e1} =
+        Newsletter.create_edition(
+          %{"title" => "Batch A", "subject" => "S1"},
+          created_by_id: user.id
+        )
+
+      {:ok, e2} =
+        Newsletter.create_edition(
+          %{"title" => "Batch B", "subject" => "S2"},
+          created_by_id: user.id
+        )
+
+      sent_at1 = DateTime.add(now, -120, :second)
+      sent_at2 = DateTime.add(now, -60, :second)
+
+      assert {:ok, e1} =
+               Newsletter.update_edition(e1, %{
+                 status: :sent,
+                 sent_at: sent_at1,
+                 sent_count: 10
+               })
+
+      assert {:ok, e2} =
+               Newsletter.update_edition(e2, %{
+                 status: :sent,
+                 sent_at: sent_at2,
+                 sent_count: 5
+               })
+
+      for email <- ["a1@x.com", "a2@x.com"] do
+        {:ok, _} =
+          Newsletter.record_email_event(%{
+            event_type: "open",
+            email: email,
+            environment: "test",
+            edition_id: e1.id
+          })
+      end
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "click",
+          email: "c1@x.com",
+          environment: "test",
+          edition_id: e1.id
+        })
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "open",
+          email: "b1@x.com",
+          environment: "test",
+          edition_id: e2.id
+        })
+
+      rows = Newsletter.list_recent_sent_editions_with_stats(5)
+
+      row1 = Enum.find(rows, &(&1.edition.id == e1.id))
+      row2 = Enum.find(rows, &(&1.edition.id == e2.id))
+
+      assert row1.opens == 2
+      assert row1.clicks == 1
+      assert row2.opens == 1
+      assert row2.clicks == 0
+    end
+  end
+
   describe "list_paginated_editions/2" do
     test "accepts date_from and date_to filters" do
       user = user_fixture()
