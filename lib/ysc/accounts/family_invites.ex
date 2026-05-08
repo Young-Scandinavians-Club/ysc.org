@@ -275,8 +275,7 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   defp emails_match?(user_email, invite_email)
        when is_binary(user_email) and is_binary(invite_email) do
-    String.downcase(String.trim(user_email)) ==
-      String.downcase(String.trim(invite_email))
+    Email.normalize(user_email) == Email.normalize(invite_email)
   end
 
   defp emails_match?(_, _), do: false
@@ -512,9 +511,11 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   defp validate_no_pending_invite(email, primary_user_id) do
+    normalized = Email.normalize(email)
+
     pending_invite =
       from(i in FamilyInvite,
-        where: i.email == ^email,
+        where: i.email == ^normalized,
         where: i.primary_user_id == ^primary_user_id,
         where: is_nil(i.accepted_at),
         where: i.expires_at > ^DateTime.utc_now()
