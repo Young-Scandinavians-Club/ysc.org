@@ -288,11 +288,11 @@ defmodule YscWeb.AdminEventsLive do
                 </p>
               </:col>
 
-              <:col :let={{_, event}} label="Event Date" field={:start_date}>
+              <:col :let={{_, event}} label="Date" field={:start_date}>
                 {format_date(event.start_date)}
               </:col>
 
-              <:col :let={{_, event}} label="Registrations / Capacity">
+              <:col :let={{_, event}} label="Registrations" field={:capacity}>
                 {format_capacity(event)}
               </:col>
 
@@ -356,6 +356,87 @@ defmodule YscWeb.AdminEventsLive do
         </div>
       </div>
     </.side_menu>
+    """
+  end
+
+  attr :event, :map, required: true
+  attr :menu_id, :string, required: true
+
+  def event_actions_dropdown(assigns) do
+    ~H"""
+    <div class="flex justify-end" onclick="event.stopPropagation()">
+      <.dropdown
+        id={@menu_id}
+        right={true}
+        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+      >
+        <:button_block>
+          <span class="sr-only">Event actions</span>
+          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
+        </:button_block>
+
+        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
+          <ul class="py-1">
+            <li :if={@event.state in [:published, :scheduled]}>
+              <.link
+                id={"event-menu-view-live-#{@event.id}"}
+                href={~p"/events/#{@event.id}"}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-arrow-top-right-on-square"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>View live</span>
+              </.link>
+            </li>
+            <li>
+              <button
+                id={"event-menu-copy-#{@event.id}"}
+                type="button"
+                phx-click="copy-event"
+                phx-value-id={@event.id}
+                data-confirm="Copy this event?"
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-document-duplicate"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>Copy</span>
+              </button>
+            </li>
+            <li>
+              <button
+                id={"event-menu-edit-#{@event.id}"}
+                type="button"
+                phx-click={JS.navigate(~p"/admin/events/#{@event.id}/edit")}
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-pencil-square"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>Edit</span>
+              </button>
+            </li>
+            <li :if={@event.state in [:published, :scheduled]}>
+              <button
+                id={"event-menu-check-in-#{@event.id}"}
+                type="button"
+                phx-click={JS.navigate(~p"/admin/events/#{@event.id}/check-in")}
+                class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
+              >
+                <.icon name="hero-qr-code" class="h-5 w-5 shrink-0" />
+                <span>Check in</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </.dropdown>
+    </div>
     """
   end
 
