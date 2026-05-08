@@ -574,19 +574,17 @@ defmodule YscWeb.AdminUsersLive do
           <!-- Mobile Card View -->
           <div class="block md:hidden space-y-4">
             <%= for {_, user} <- @streams.users do %>
-              <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-                <.link
-                  navigate={
-                    if user.state == :pending_approval,
-                      do: ~p"/admin/users/#{user.id}/review?#{@params}",
-                      else: ~p"/admin/users/#{user.id}/details?#{@params}"
-                  }
-                  class="block"
-                >
-                  <div class="flex items-start gap-3 mb-3">
-                    <.user_card user={user} />
-                  </div>
-                </.link>
+              <div
+                class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                phx-click={
+                  if user.state == :pending_approval,
+                    do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
+                    else: JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                }
+              >
+                <div class="flex items-start gap-3 mb-3">
+                  <.user_card user={user} />
+                </div>
 
                 <div class="space-y-2 mb-3">
                   <div :if={user.phone_number} class="flex items-center gap-2">
@@ -626,7 +624,7 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                 </div>
 
-                <div class="flex justify-end pt-3 border-t border-zinc-200">
+                <div class="flex justify-end pt-3 border-t border-zinc-200" onclick="event.stopPropagation()">
                   <button
                     :if={user.state == :pending_approval}
                     phx-click={
@@ -706,18 +704,17 @@ defmodule YscWeb.AdminUsersLive do
               items={@streams.users}
               meta={@meta}
               path={~p"/admin/users?#{non_flop_params(@params)}"}
+              row_click={
+                fn {_, user} ->
+                  if user.state == :pending_approval,
+                    do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
+                    else: JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                end
+              }
+              opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
             >
               <:col :let={{_, user}} label="Name" field={:first_name}>
-                <.link
-                  navigate={
-                    if user.state == :pending_approval,
-                      do: ~p"/admin/users/#{user.id}/review?#{@params}",
-                      else: ~p"/admin/users/#{user.id}/details?#{@params}"
-                  }
-                  class="cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <.user_card user={user} />
-                </.link>
+                <.user_card user={user} />
               </:col>
               <:col :let={{_, user}} label="Phone" field={:phone_number}>
                 {Ysc.Extensions.PhoneNumber.format_for_display(user.phone_number) ||
@@ -751,22 +748,24 @@ defmodule YscWeb.AdminUsersLive do
                 <% end %>
               </:col>
               <:action :let={{_, user}} label="Action">
-                <button
-                  :if={user.state == :pending_approval}
-                  phx-click={
-                    JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
-                  }
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                >
-                  Review
-                </button>
-                <button
-                  :if={user.state != :pending_approval}
-                  phx-click={JS.navigate(~p"/admin/users/#{user.id}/details")}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                >
-                  Edit
-                </button>
+                <div onclick="event.stopPropagation()">
+                  <button
+                    :if={user.state == :pending_approval}
+                    phx-click={
+                      JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
+                    }
+                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Review
+                  </button>
+                  <button
+                    :if={user.state != :pending_approval}
+                    phx-click={JS.navigate(~p"/admin/users/#{user.id}/details")}
+                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
               </:action>
             </Flop.Phoenix.table>
 
