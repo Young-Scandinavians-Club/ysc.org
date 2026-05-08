@@ -738,7 +738,11 @@ defmodule Ysc.Newsletter do
     counts_by_edition = batch_open_click_counts_by_edition_ids(edition_ids)
 
     Enum.map(editions, fn edition ->
-      counts = Map.get(counts_by_edition, edition.id, %{opens: 0, clicks: 0})
+      counts =
+        Map.get(counts_by_edition, engagement_counts_key(edition.id), %{
+          opens: 0,
+          clicks: 0
+        })
 
       %{
         edition: edition,
@@ -755,27 +759,37 @@ defmodule Ysc.Newsletter do
       where: e.edition_id in ^edition_ids,
       where: e.event_type in ["open", "click"],
       group_by: [e.edition_id, e.event_type],
-      select: {
-        e.edition_id,
-        e.event_type,
-        fragment("COUNT(DISTINCT ?)", e.email)
+      select: %{
+        edition_id: e.edition_id,
+        event_type: e.event_type,
+        unique_recipients: fragment("COUNT(DISTINCT ?)", e.email)
       }
     )
     |> Repo.all()
-    |> Enum.reduce(%{}, fn {edition_id, event_type, count}, acc ->
-      Map.update(
-        acc,
-        edition_id,
-        %{opens: 0, clicks: 0},
-        fn prev ->
-          case event_type do
-            "open" -> %{prev | opens: count}
-            "click" -> %{prev | clicks: count}
-            _ -> prev
-          end
+    |> Enum.reduce(%{}, fn row, acc ->
+      key = engagement_counts_key(row.edition_id)
+      count = row.unique_recipients
+      prev = Map.get(acc, key, %{opens: 0, clicks: 0})
+
+      next =
+        case engagement_event_bucket(row.event_type) do
+          :open -> %{prev | opens: count}
+          :click -> %{prev | clicks: count}
+          :ignore -> prev
         end
-      )
+
+      Map.put(acc, key, next)
     end)
+  end
+
+  defp engagement_counts_key(id), do: to_string(id)
+
+  defp engagement_event_bucket(event_type) do
+    case event_type |> to_string() |> String.trim() do
+      "open" -> :open
+      "click" -> :click
+      _ -> :ignore
+    end
   end
 
   @doc """

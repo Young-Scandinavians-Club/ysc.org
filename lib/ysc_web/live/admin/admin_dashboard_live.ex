@@ -1192,7 +1192,8 @@ defmodule YscWeb.AdminDashboardLive do
     data =
       [
         {:latest_comments, fn -> Posts.get_latest_comments(5) end},
-        {:events_with_tickets, fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
+        {:events_with_tickets,
+         fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
         {:published_posts_count, fn -> get_published_posts_count() end},
         {:newsletter_editions_count, fn -> get_newsletter_editions_count() end},
         {:draft_posts_count, fn -> get_draft_posts_count() end},
@@ -1202,7 +1203,9 @@ defmodule YscWeb.AdminDashboardLive do
         timeout: :infinity,
         max_concurrency: 6
       )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc -> Map.put(acc, key, value) end)
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
+        Map.put(acc, key, value)
+      end)
 
     events_with_tickets = Map.fetch!(data, :events_with_tickets)
 
@@ -1213,9 +1216,15 @@ defmodule YscWeb.AdminDashboardLive do
      |> assign(:events_with_tickets, events_with_tickets)
      |> assign(:upcoming_events_count, length(events_with_tickets))
      |> assign(:published_posts_count, Map.fetch!(data, :published_posts_count))
-     |> assign(:newsletter_editions_count, Map.fetch!(data, :newsletter_editions_count))
+     |> assign(
+       :newsletter_editions_count,
+       Map.fetch!(data, :newsletter_editions_count)
+     )
      |> assign(:draft_posts_count, Map.fetch!(data, :draft_posts_count))
-     |> assign(:draft_newsletter_count, Map.fetch!(data, :draft_newsletter_count))}
+     |> assign(
+       :draft_newsletter_count,
+       Map.fetch!(data, :draft_newsletter_count)
+     )}
   end
 
   @impl true
@@ -1223,25 +1232,32 @@ defmodule YscWeb.AdminDashboardLive do
     data =
       [
         {:latest_comments, fn -> Posts.get_latest_comments(5) end},
-        {:events_with_tickets, fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
+        {:events_with_tickets,
+         fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
         {:pending_users, fn -> Accounts.get_pending_approval_users() end},
         {:revenue, fn -> calculate_all_revenue_stats() end},
-        {:pending_refunds_summary, fn -> Bookings.pending_refunds_dashboard_summary() end},
-        {:recent_newsletters, fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
+        {:pending_refunds_summary,
+         fn -> Bookings.pending_refunds_dashboard_summary() end},
+        {:recent_newsletters,
+         fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
         {:application_statistics, fn -> get_application_statistics() end},
         {:property_stats, fn -> get_property_stats() end},
         {:membership_stats, fn -> Accounts.get_membership_stats() end},
-        {:membership_joins_ytd, fn -> Accounts.get_membership_joins_ytd_comparison() end},
+        {:membership_joins_ytd,
+         fn -> Accounts.get_membership_joins_ytd_comparison() end},
         {:memberships_renewing_30_days, fn -> get_renewals_in_30_days() end},
         {:ytd_revenue_pair, fn -> calculate_ytd_revenue() end},
         {:revenue_sparkline, fn -> get_last_7_days_revenue() end},
-        {:newsletter_subscriber_stats, fn -> get_newsletter_subscriber_stats() end}
+        {:newsletter_subscriber_stats,
+         fn -> get_newsletter_subscriber_stats() end}
       ]
       |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
         timeout: :infinity,
         max_concurrency: 10
       )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc -> Map.put(acc, key, value) end)
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
+        Map.put(acc, key, value)
+      end)
 
     pending_users = Map.fetch!(data, :pending_users)
 
@@ -1292,8 +1308,14 @@ defmodule YscWeb.AdminDashboardLive do
         :newsletter_subscribers_this_month,
         newsletter_subscribers_this_month
       )
-      |> assign(:recent_newsletters_with_stats, Map.fetch!(data, :recent_newsletters))
-      |> assign(:pending_refunds_summary, Map.fetch!(data, :pending_refunds_summary))
+      |> assign(
+        :recent_newsletters_with_stats,
+        Map.fetch!(data, :recent_newsletters)
+      )
+      |> assign(
+        :pending_refunds_summary,
+        Map.fetch!(data, :pending_refunds_summary)
+      )
       |> then(fn s ->
         Enum.reduce(revenue, s, fn {k, v}, acc -> assign(acc, k, v) end)
       end)
