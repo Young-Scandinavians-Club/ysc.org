@@ -41,7 +41,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Event Details → </mj-button>
     <mj-spacer height="4px"></mj-spacer>
-    <mj-button href="<%= @tickets_qr_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#18181b" color="#ffffff" align="center" font-size="18px" border-radius="4px">🎫 View Ticket QR Codes</mj-button>
+    <mj-button href="<%= @tickets_qr_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#18181b" color="#ffffff" align="center" font-size="18px" border-radius="4px">🎫 View tickets for check-in</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Event Agenda -->
     <%= if @agenda && length(@agenda) > 0 do %>

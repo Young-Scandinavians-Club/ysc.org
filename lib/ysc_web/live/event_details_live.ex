@@ -190,7 +190,8 @@ defmodule YscWeb.EventDetailsLive do
                       }
                       class="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all"
                     >
-                      <.icon name="hero-qr-code" class="w-4 h-4" /> View QR Codes
+                      <.icon name="hero-qr-code" class="w-4 h-4" />
+                      View tickets for check-in
                     </.link>
                   <% end %>
                 </div>
