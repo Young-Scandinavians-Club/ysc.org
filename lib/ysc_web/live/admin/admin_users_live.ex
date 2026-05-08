@@ -579,7 +579,8 @@ defmodule YscWeb.AdminUsersLive do
                 phx-click={
                   if user.state == :pending_approval,
                     do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
-                    else: JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                    else:
+                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
                 }
               >
                 <div class="flex items-start gap-3 mb-3">
@@ -624,7 +625,10 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                 </div>
 
-                <div class="flex justify-end pt-3 border-t border-zinc-200" onclick="event.stopPropagation()">
+                <div
+                  class="flex justify-end pt-3 border-t border-zinc-200"
+                  onclick="event.stopPropagation()"
+                >
                   <button
                     :if={user.state == :pending_approval}
                     phx-click={
@@ -708,7 +712,8 @@ defmodule YscWeb.AdminUsersLive do
                 fn {_, user} ->
                   if user.state == :pending_approval,
                     do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
-                    else: JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                    else:
+                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
                 end
               }
               opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
