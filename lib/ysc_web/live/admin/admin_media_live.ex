@@ -130,17 +130,26 @@ defmodule YscWeb.AdminMediaLive do
               <div class="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  phx-click={copy_to_clipboard_js("image-path-text-#{@selected_image_version}", "copy-path-btn")}
+                  phx-click={
+                    copy_to_clipboard_js(
+                      "image-path-text-#{@selected_image_version}",
+                      "copy-path-btn"
+                    )
+                  }
                   id="copy-path-btn"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                   title="Copy URL to clipboard"
                 >
-                  <.icon name="hero-link" class="w-3.5 h-3.5" />
-                  Copy URL
+                  <.icon name="hero-link" class="w-3.5 h-3.5" /> Copy URL
                 </button>
                 <button
                   type="button"
-                  phx-click={copy_to_clipboard_js("image-markdown-#{@selected_image_version}", "copy-markdown-btn")}
+                  phx-click={
+                    copy_to_clipboard_js(
+                      "image-markdown-#{@selected_image_version}",
+                      "copy-markdown-btn"
+                    )
+                  }
                   id="copy-markdown-btn"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                   title="Copy as Markdown"
@@ -150,18 +159,24 @@ defmodule YscWeb.AdminMediaLive do
                 </button>
                 <button
                   type="button"
-                  phx-click={copy_to_clipboard_js("image-html-#{@selected_image_version}", "copy-html-btn")}
+                  phx-click={
+                    copy_to_clipboard_js(
+                      "image-html-#{@selected_image_version}",
+                      "copy-html-btn"
+                    )
+                  }
                   id="copy-html-btn"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                   title="Copy as HTML"
                 >
-                  <.icon name="hero-code-bracket" class="w-3.5 h-3.5" />
-                  Copy HTML
+                  <.icon name="hero-code-bracket" class="w-3.5 h-3.5" /> Copy HTML
                 </button>
                 <input
                   type="hidden"
                   id={"image-path-text-#{@selected_image_version}"}
-                  value={get_image_version_path(@active_image, @selected_image_version)}
+                  value={
+                    get_image_version_path(@active_image, @selected_image_version)
+                  }
                 />
                 <input
                   type="hidden"
@@ -190,7 +205,9 @@ defmodule YscWeb.AdminMediaLive do
                 <%= if @active_image.processing_state do %>
                   <p>
                     <strong>Status:</strong>
-                    {String.capitalize(Atom.to_string(@active_image.processing_state))}
+                    {String.capitalize(
+                      Atom.to_string(@active_image.processing_state)
+                    )}
                   </p>
                 <% end %>
                 <p class="break-all">
@@ -361,7 +378,11 @@ defmodule YscWeb.AdminMediaLive do
             :if={@media_count > 0}
             phx-click="toggle-layout"
             class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
-            title={if @layout_mode == :square, do: "Switch to masonry layout", else: "Switch to square grid"}
+            title={
+              if @layout_mode == :square,
+                do: "Switch to masonry layout",
+                else: "Switch to square grid"
+            }
           >
             <%= if @layout_mode == :square do %>
               <.icon name="hero-squares-2x2" class="w-4 h-4" />
@@ -402,7 +423,10 @@ defmodule YscWeb.AdminMediaLive do
         class="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center"
       >
         <div class="bg-white rounded-lg shadow-2xl p-8 border-4 border-dashed border-blue-500 max-w-md mx-4">
-          <.icon name="hero-cloud-arrow-up" class="w-16 h-16 text-blue-600 mx-auto mb-4" />
+          <.icon
+            name="hero-cloud-arrow-up"
+            class="w-16 h-16 text-blue-600 mx-auto mb-4"
+          />
           <p class="text-xl font-semibold text-zinc-800 text-center mb-2">
             Drop images to upload
           </p>
@@ -1307,8 +1331,7 @@ defmodule YscWeb.AdminMediaLive do
             phx-value-input-id="media-search-input"
             class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
           >
-            <.icon name="hero-x-mark" class="w-4 h-4" />
-            Clear search
+            <.icon name="hero-x-mark" class="w-4 h-4" /> Clear search
           </button>
         </div>
       </div>
@@ -1341,7 +1364,9 @@ defmodule YscWeb.AdminMediaLive do
           <%!-- RENDER IMAGE --%>
           <%= if match?(%Media.Image{}, item) do %>
             <button
-              phx-click={JS.patch(build_image_edit_url_with_state(assigns, item.id))}
+              phx-click={
+                JS.patch(build_image_edit_url_with_state(assigns, item.id))
+              }
               id={id}
               class={[
                 "mb-4 group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
@@ -1352,7 +1377,8 @@ defmodule YscWeb.AdminMediaLive do
               <%= if item.processing_state != :completed do %>
                 <div class="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
                   <div class="text-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2">
+                    </div>
                     <p class="text-xs font-medium text-white">Processing...</p>
                   </div>
                 </div>
