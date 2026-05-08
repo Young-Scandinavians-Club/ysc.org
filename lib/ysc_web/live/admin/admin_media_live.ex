@@ -412,7 +412,7 @@ defmodule YscWeb.AdminMediaLive do
         </div>
       </div>
 
-      <section class="py-6 relative" phx-hook="MediaDropZone">
+      <section id="media-section" class="py-6 relative" phx-hook="MediaDropZone">
         <div
           :if={@media_count > 0}
           id="media-gallery"
