@@ -25,6 +25,21 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # Matches config/test.exs ExAws (localhost:9000, minioadmin). Image upload
+      # tests (e.g. Trix uploads) call S3; without MinIO they fail with :econnrefused.
+      minio:
+        image: minio/minio:RELEASE.2025-03-12T18-04-18Z@sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -50,6 +65,23 @@ jobs:
 
       - name: Compile
         run: mix compile --warnings-as-errors
+
+      - name: Initialize MinIO buckets
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && break
+            sleep 1
+          done
+          docker run --rm --network host --entrypoint /bin/sh \
+            minio/mc:RELEASE.2025-03-12T17-29-24Z@sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123 \
+            -c "
+              mc alias set local http://127.0.0.1:9000 minioadmin minioadmin &&
+              mc mb local/media --ignore-existing &&
+              mc mb local/expense-reports --ignore-existing &&
+              mc mb local/avatars --ignore-existing &&
+              mc anonymous set public local/media &&
+              mc anonymous set public local/avatars
+            "
 
       - name: Run tests with coverage
         env:
