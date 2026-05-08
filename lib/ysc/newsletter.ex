@@ -725,13 +725,8 @@ defmodule Ysc.Newsletter do
   def list_recent_sent_editions_with_stats(limit \\ 5)
       when is_integer(limit) and limit > 0 do
     editions =
-      from(e in Edition,
-        where: e.status == :sent,
-        where: not is_nil(e.sent_at),
-        order_by: [desc: e.sent_at],
-        limit: ^limit,
-        select: struct(e, ^@edition_list_fields)
-      )
+      limit
+      |> recent_sent_editions_query()
       |> Repo.all()
 
     edition_ids = Enum.map(editions, & &1.id)
@@ -752,9 +747,30 @@ defmodule Ysc.Newsletter do
     end)
   end
 
-  defp batch_open_click_counts_by_edition_ids([]), do: %{}
+  @doc false
+  def recent_sent_editions_query(limit \\ 5)
+      when is_integer(limit) and limit > 0 do
+    from(e in Edition,
+      where: e.status == :sent,
+      where: not is_nil(e.sent_at),
+      order_by: [desc: e.sent_at],
+      limit: ^limit,
+      select: struct(e, ^@edition_list_fields)
+    )
+  end
 
-  defp batch_open_click_counts_by_edition_ids(edition_ids) do
+  @doc false
+  def recent_newsletter_open_click_counts_query(edition_ids \\ nil)
+
+  def recent_newsletter_open_click_counts_query(nil) do
+    recent_newsletter_open_click_counts_query([
+      Ecto.ULID.generate(),
+      Ecto.ULID.generate()
+    ])
+  end
+
+  def recent_newsletter_open_click_counts_query(edition_ids)
+      when is_list(edition_ids) do
     from(e in EmailEvent,
       where: e.edition_id in ^edition_ids,
       where: e.event_type in ["open", "click"],
@@ -765,6 +781,13 @@ defmodule Ysc.Newsletter do
         unique_recipients: fragment("COUNT(DISTINCT ?)", e.email)
       }
     )
+  end
+
+  defp batch_open_click_counts_by_edition_ids([]), do: %{}
+
+  defp batch_open_click_counts_by_edition_ids(edition_ids) do
+    edition_ids
+    |> recent_newsletter_open_click_counts_query()
     |> Repo.all()
     |> Enum.reduce(%{}, fn row, acc ->
       key = engagement_counts_key(row.edition_id)

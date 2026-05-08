@@ -194,7 +194,11 @@ ORDER BY idx_scan DESC;
 
 ## Pull request CI (SQL + EXPLAIN comments)
 
-On pull requests to `main`, GitHub Actions may post a sticky comment with rendered SQL and `EXPLAIN` (without `ANALYZE`) for targets listed in `priv/ci/query_explain_targets.exs`. The job runs only when the diff adds query-shaped lines under `lib/` (excluding `*_test.exs`). Each target’s `source_paths` must overlap changed files for that target to run.
+On pull requests to `main`, GitHub Actions may post a sticky comment with rendered SQL and `EXPLAIN` (without `ANALYZE`). The job runs only when the diff adds query-shaped lines under `lib/` (excluding `*_test.exs`).
+
+Changed modules are auto-scanned for public zero-arity functions ending in `_query`; any that return `%Ecto.Query{}` are explained automatically. Use `priv/ci/query_explain_targets.exs` for explicit targets that need arguments, live in helper modules, or should run when another source file changes.
+
+When adding or changing a query, prefer extracting the query shape into a public `*_query/0` or `*_query/1` function with a zero-arity default when possible. Keep execution (`Repo.all`, `Repo.one`, preloads, post-processing) in the calling function so CI can explain the SQL without running application side effects.
 
 - **Fork PRs:** `pull_request` workflows from forks often cannot post comments with the default `GITHUB_TOKEN` (read-only). Same-repo branches work as-is; for forks use a PAT or accept no comment.
 - **OpenRouter:** If the repository secret `OPENROUTER_API_KEY` is set, an optional LLM summary is appended. Without it, the comment still contains raw SQL and plans.
