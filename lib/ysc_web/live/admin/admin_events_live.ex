@@ -184,7 +184,7 @@ defmodule YscWeb.AdminEventsLive do
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between pt-3 border-t border-zinc-200">
+                <div class="flex items-center justify-between gap-2 pt-3 border-t border-zinc-200">
                   <div>
                     <%= if event.state == :scheduled && event.publish_at do %>
                       <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
@@ -199,39 +199,10 @@ defmodule YscWeb.AdminEventsLive do
                     <% end %>
                   </div>
 
-                  <div class="flex items-center gap-2">
-                    <a
-                      :if={event.state in [:published, :scheduled]}
-                      href={~p"/events/#{event.id}"}
-                      target="_blank"
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                    >
-                      View Live
-                    </a>
-                    <button
-                      phx-click="copy-event"
-                      phx-value-id={event.id}
-                      data-confirm="Copy this event?"
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                    >
-                      Copy
-                    </button>
-                    <button
-                      phx-click={JS.navigate(~p"/admin/events/#{event.id}/edit")}
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      :if={event.state in [:published, :scheduled]}
-                      phx-click={
-                        JS.navigate(~p"/admin/events/#{event.id}/check-in")
-                      }
-                      class="text-emerald-600 font-semibold hover:underline cursor-pointer text-sm"
-                    >
-                      Check In
-                    </button>
-                  </div>
+                  <.event_actions_dropdown
+                    event={event}
+                    menu_id={"event-actions-mob-#{event.id}"}
+                  />
                 </div>
               </div>
             <% end %>
@@ -318,38 +289,11 @@ defmodule YscWeb.AdminEventsLive do
                 {format_date(event.inserted_at)}
               </:col>
 
-              <:action :let={{_, event}} label="Action">
-                <div class="flex items-center gap-3">
-                  <a
-                    :if={event.state in [:published, :scheduled]}
-                    href={~p"/events/#{event.id}"}
-                    target="_blank"
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    View Live
-                  </a>
-                  <button
-                    phx-click="copy-event"
-                    phx-value-id={event.id}
-                    data-confirm="Copy this event?"
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Copy
-                  </button>
-                  <button
-                    phx-click={JS.navigate(~p"/admin/events/#{event.id}/edit")}
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    :if={event.state in [:published, :scheduled]}
-                    phx-click={JS.navigate(~p"/admin/events/#{event.id}/check-in")}
-                    class="text-emerald-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Check In
-                  </button>
-                </div>
+              <:action :let={{_, event}} label="Actions">
+                <.event_actions_dropdown
+                  event={event}
+                  menu_id={"event-actions-dt-#{event.id}"}
+                />
               </:action>
             </Flop.Phoenix.table>
           </div>
@@ -379,7 +323,7 @@ defmodule YscWeb.AdminEventsLive do
           <ul class="py-1">
             <li :if={@event.state in [:published, :scheduled]}>
               <.link
-                id={"event-menu-view-live-#{@event.id}"}
+                id={"#{@menu_id}-view-live"}
                 href={~p"/events/#{@event.id}"}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -394,7 +338,7 @@ defmodule YscWeb.AdminEventsLive do
             </li>
             <li>
               <button
-                id={"event-menu-copy-#{@event.id}"}
+                id={"#{@menu_id}-copy"}
                 type="button"
                 phx-click="copy-event"
                 phx-value-id={@event.id}
@@ -410,7 +354,7 @@ defmodule YscWeb.AdminEventsLive do
             </li>
             <li>
               <button
-                id={"event-menu-edit-#{@event.id}"}
+                id={"#{@menu_id}-edit"}
                 type="button"
                 phx-click={JS.navigate(~p"/admin/events/#{@event.id}/edit")}
                 class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
@@ -424,7 +368,7 @@ defmodule YscWeb.AdminEventsLive do
             </li>
             <li :if={@event.state in [:published, :scheduled]}>
               <button
-                id={"event-menu-check-in-#{@event.id}"}
+                id={"#{@menu_id}-check-in"}
                 type="button"
                 phx-click={JS.navigate(~p"/admin/events/#{@event.id}/check-in")}
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
