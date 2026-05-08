@@ -148,6 +148,32 @@ defmodule Ysc.AccountsTest do
       user_fixture(%{email: "john.doe@example.com"})
       refute Accounts.get_user_by_email("johndoe@example.com")
     end
+
+    test "finds Gmail user when database stores legacy dotted local part" do
+      %{id: id} = user = user_fixture(%{email: "legacydots@gmail.com"})
+
+      {1, _} =
+        Repo.update_all(from(u in User, where: u.id == ^user.id),
+          set: [email: "legacy.dots@gmail.com"]
+        )
+
+      assert %User{id: ^id} = Accounts.get_user_by_email("legacydots@gmail.com")
+      assert %User{id: ^id} = Accounts.get_user_by_email("legacy.dots@gmail.com")
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email("LegacY.Dots+tag@gmail.com")
+    end
+
+    test "Gmail equivalence matches googlemail.com and gmail.com interchangeably" do
+      %{id: id} = user = user_fixture(%{email: "crossmail@gmail.com"})
+
+      {1, _} =
+        Repo.update_all(from(u in User, where: u.id == ^user.id),
+          set: [email: "crossmail@googlemail.com"]
+        )
+
+      assert %User{id: ^id} = Accounts.get_user_by_email("crossmail@gmail.com")
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -588,6 +614,22 @@ defmodule Ysc.AccountsTest do
                Accounts.get_user_by_email_and_password(
                  user.email,
                  valid_user_password()
+               )
+    end
+
+    test "returns the user when login uses canonical Gmail but DB has legacy dotted local" do
+      password = valid_user_password()
+      %{id: id} = user = user_fixture(%{email: "pwdlegacy@gmail.com", password: password})
+
+      {1, _} =
+        Repo.update_all(from(u in User, where: u.id == ^user.id),
+          set: [email: "pwd.legacy@gmail.com"]
+        )
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 "pwdlegacy@gmail.com",
+                 password
                )
     end
   end

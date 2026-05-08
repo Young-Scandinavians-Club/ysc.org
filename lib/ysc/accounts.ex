@@ -46,8 +46,7 @@ defmodule Ysc.Accounts do
 
   """
   def get_user_by_email(email) when is_binary(email) do
-    normalized_email = Email.normalize(email)
-    Repo.get_by(User, email: normalized_email)
+    fetch_user_by_email_with_gmail_equivalence(email)
   end
 
   @doc """
@@ -156,8 +155,7 @@ defmodule Ysc.Accounts do
   """
   def get_user_by_email_and_password(email, password)
       when is_binary(email) and is_binary(password) do
-    normalized_email = Email.normalize(email)
-    user = Repo.get_by(User, email: normalized_email)
+    user = fetch_user_by_email_with_gmail_equivalence(email)
     if User.valid_password?(user, password), do: user
   end
 
@@ -246,11 +244,66 @@ defmodule Ysc.Accounts do
   (dots and plus-addressing).
   """
   def get_user_by_email_for_passkey(email) when is_binary(email) do
-    normalized_email = Email.normalize(email)
-
-    case Repo.get_by(User, email: normalized_email) do
+    case fetch_user_by_email_with_gmail_equivalence(email) do
       nil -> nil
       user -> Repo.preload(user, :passkeys)
+    end
+  end
+
+  # Looks up by canonical stored email first, then by Gmail-local equivalence so
+  # users created before Gmail normalization (dots/plus in `users.email`) still
+  # match logins and passkey flows that use the normalized address.
+  defp fetch_user_by_email_with_gmail_equivalence(email) when is_binary(email) do
+    normalized = Email.normalize(email)
+
+    case Repo.get_by(User, email: normalized) do
+      %User{} = user ->
+        user
+
+      nil ->
+        maybe_get_user_by_gmail_equivalent_stored_email(email)
+    end
+  end
+
+  defp maybe_get_user_by_gmail_equivalent_stored_email(email) do
+    trimmed = String.trim(email)
+
+    if Email.gmail?(trimmed) do
+      from(u in User,
+        where:
+          fragment(
+            "lower(split_part(trim(?), '@', 2)) IN ('gmail.com', 'googlemail.com')",
+            u.email
+          ) and
+            fragment(
+              "lower(split_part(trim(?), '@', 2)) IN ('gmail.com', 'googlemail.com')",
+              ^trimmed
+            ) and
+            fragment(
+              """
+              regexp_replace(
+                split_part(lower(trim(split_part(trim(?), '@', 1))), '+', 1),
+                '\\.',
+                '',
+                'g'
+              )
+              =
+              regexp_replace(
+                split_part(lower(trim(split_part(trim(?), '@', 1))), '+', 1),
+                '\\.',
+                '',
+                'g'
+              )
+              """,
+              u.email,
+              ^trimmed
+            ),
+        order_by: [asc: u.id],
+        limit: 1
+      )
+      |> Repo.one()
+    else
+      nil
     end
   end
 
