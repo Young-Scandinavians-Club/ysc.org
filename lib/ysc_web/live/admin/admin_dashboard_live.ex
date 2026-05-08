@@ -2,6 +2,7 @@ defmodule YscWeb.AdminDashboardLive do
   use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
+  import YscWeb.Live.AsyncHelpers
 
   use Phoenix.VerifiedRoutes,
     endpoint: YscWeb.Endpoint,
@@ -1188,51 +1189,80 @@ defmodule YscWeb.AdminDashboardLive do
         :load_dashboard_data,
         %{assigns: %{admin_role: :volunteer}} = socket
       ) do
-    latest_comments = Posts.get_latest_comments(5)
-    events_with_tickets = Events.get_upcoming_events_with_ticket_tier_counts()
+    data =
+      [
+        {:latest_comments, fn -> Posts.get_latest_comments(5) end},
+        {:events_with_tickets, fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
+        {:published_posts_count, fn -> get_published_posts_count() end},
+        {:newsletter_editions_count, fn -> get_newsletter_editions_count() end},
+        {:draft_posts_count, fn -> get_draft_posts_count() end},
+        {:draft_newsletter_count, fn -> get_draft_newsletter_count() end}
+      ]
+      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+        timeout: :infinity,
+        max_concurrency: 6
+      )
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc -> Map.put(acc, key, value) end)
+
+    events_with_tickets = Map.fetch!(data, :events_with_tickets)
 
     {:noreply,
      socket
      |> assign(:loading_dashboard, false)
-     |> assign(:latest_comments, latest_comments)
+     |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
      |> assign(:events_with_tickets, events_with_tickets)
      |> assign(:upcoming_events_count, length(events_with_tickets))
-     |> assign(:published_posts_count, get_published_posts_count())
-     |> assign(:newsletter_editions_count, get_newsletter_editions_count())
-     |> assign(:draft_posts_count, get_draft_posts_count())
-     |> assign(:draft_newsletter_count, get_draft_newsletter_count())}
+     |> assign(:published_posts_count, Map.fetch!(data, :published_posts_count))
+     |> assign(:newsletter_editions_count, Map.fetch!(data, :newsletter_editions_count))
+     |> assign(:draft_posts_count, Map.fetch!(data, :draft_posts_count))
+     |> assign(:draft_newsletter_count, Map.fetch!(data, :draft_newsletter_count))}
   end
 
   @impl true
   def handle_info(:load_dashboard_data, socket) do
-    latest_comments = Posts.get_latest_comments(5)
-    events_with_tickets = Events.get_upcoming_events_with_ticket_tier_counts()
-    pending_users = Accounts.get_pending_approval_users()
+    data =
+      [
+        {:latest_comments, fn -> Posts.get_latest_comments(5) end},
+        {:events_with_tickets, fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
+        {:pending_users, fn -> Accounts.get_pending_approval_users() end},
+        {:revenue, fn -> calculate_all_revenue_stats() end},
+        {:pending_refunds_summary, fn -> Bookings.pending_refunds_dashboard_summary() end},
+        {:recent_newsletters, fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
+        {:application_statistics, fn -> get_application_statistics() end},
+        {:property_stats, fn -> get_property_stats() end},
+        {:membership_stats, fn -> Accounts.get_membership_stats() end},
+        {:membership_joins_ytd, fn -> Accounts.get_membership_joins_ytd_comparison() end},
+        {:memberships_renewing_30_days, fn -> get_renewals_in_30_days() end},
+        {:ytd_revenue_pair, fn -> calculate_ytd_revenue() end},
+        {:revenue_sparkline, fn -> get_last_7_days_revenue() end},
+        {:newsletter_subscriber_stats, fn -> get_newsletter_subscriber_stats() end}
+      ]
+      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+        timeout: :infinity,
+        max_concurrency: 10
+      )
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc -> Map.put(acc, key, value) end)
 
-    revenue = calculate_all_revenue_stats()
-    pending_refund_summary = Bookings.pending_refunds_dashboard_summary()
-    recent_newsletters = Newsletter.list_recent_sent_editions_with_stats(5)
+    pending_users = Map.fetch!(data, :pending_users)
 
     {applications_this_month, applications_this_year, applications_last_month,
      applications_last_year, applications_month_change,
-     applications_year_change} =
-      get_application_statistics()
+     applications_year_change} = Map.fetch!(data, :application_statistics)
 
-    property_stats = get_property_stats()
-    membership_stats = Accounts.get_membership_stats()
-    joins_ytd = Accounts.get_membership_joins_ytd_comparison()
-    memberships_renewing_30_days = get_renewals_in_30_days()
-    {ytd_revenue, ytd_revenue_label} = calculate_ytd_revenue()
-    revenue_sparkline = get_last_7_days_revenue()
+    joins_ytd = Map.fetch!(data, :membership_joins_ytd)
+
+    {ytd_revenue, ytd_revenue_label} = Map.fetch!(data, :ytd_revenue_pair)
 
     {newsletter_subscriber_count, newsletter_subscribers_this_month} =
-      get_newsletter_subscriber_stats()
+      Map.fetch!(data, :newsletter_subscriber_stats)
+
+    revenue = Map.fetch!(data, :revenue)
 
     socket =
       socket
       |> assign(:loading_dashboard, false)
-      |> assign(:latest_comments, latest_comments)
-      |> assign(:events_with_tickets, events_with_tickets)
+      |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
+      |> assign(:events_with_tickets, Map.fetch!(data, :events_with_tickets))
       |> assign(:pending_users, pending_users)
       |> assign(:pending_reviews_count, length(pending_users))
       |> assign(:applications_this_month, applications_this_month)
@@ -1241,9 +1271,9 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:applications_last_year, applications_last_year)
       |> assign(:applications_month_change, applications_month_change)
       |> assign(:applications_year_change, applications_year_change)
-      |> assign(:property_stats, property_stats)
-      |> assign(:revenue_sparkline, revenue_sparkline)
-      |> assign(:membership_stats, membership_stats)
+      |> assign(:property_stats, Map.fetch!(data, :property_stats))
+      |> assign(:revenue_sparkline, Map.fetch!(data, :revenue_sparkline))
+      |> assign(:membership_stats, Map.fetch!(data, :membership_stats))
       |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
       |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
       |> assign(:membership_joins_prior_year_label, joins_ytd.prior_year_label)
@@ -1251,7 +1281,10 @@ defmodule YscWeb.AdminDashboardLive do
         :membership_joins_ytd_change_percent,
         joins_ytd.joins_ytd_change_percent
       )
-      |> assign(:memberships_renewing_30_days, memberships_renewing_30_days)
+      |> assign(
+        :memberships_renewing_30_days,
+        Map.fetch!(data, :memberships_renewing_30_days)
+      )
       |> assign(:ytd_revenue, ytd_revenue)
       |> assign(:ytd_revenue_label, ytd_revenue_label)
       |> assign(:newsletter_subscriber_count, newsletter_subscriber_count)
@@ -1259,8 +1292,8 @@ defmodule YscWeb.AdminDashboardLive do
         :newsletter_subscribers_this_month,
         newsletter_subscribers_this_month
       )
-      |> assign(:recent_newsletters_with_stats, recent_newsletters)
-      |> assign(:pending_refunds_summary, pending_refund_summary)
+      |> assign(:recent_newsletters_with_stats, Map.fetch!(data, :recent_newsletters))
+      |> assign(:pending_refunds_summary, Map.fetch!(data, :pending_refunds_summary))
       |> then(fn s ->
         Enum.reduce(revenue, s, fn {k, v}, acc -> assign(acc, k, v) end)
       end)
