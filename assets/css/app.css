@@ -37,18 +37,24 @@
 
 /* Collapse date row with motion (display:none cannot transition). */
 #event-header-bar .event-header-date {
-    max-height: 4rem;
+    max-height: 10rem;
     opacity: 1;
-    overflow: hidden;
+    overflow: visible;
     transition:
         max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
         opacity 0.22s ease,
         margin 0.22s ease;
 }
 
+#event-header-bar:not(.is-sticky) .event-header-date {
+    max-height: none;
+    overflow: visible;
+}
+
 #event-header-bar.is-sticky .event-header-date {
     max-height: 0;
     opacity: 0;
+    overflow: hidden;
     margin-top: 0;
     margin-bottom: 0;
     pointer-events: none;
@@ -78,6 +84,17 @@
 #event-header-bar.is-sticky .event-header-tabs a {
     padding: 0.375rem 0.75rem;
     font-size: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #event-header-bar,
+    #event-header-bar .event-header-date,
+    #event-header-bar .event-header-title,
+    #event-header-bar .event-header-tabs,
+    #event-header-bar .event-header-tabs a {
+        transition: none !important;
+        animation: none !important;
+    }
 }
 
 

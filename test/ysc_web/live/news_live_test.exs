@@ -10,10 +10,9 @@ defmodule YscWeb.NewsLiveTest do
 
   defp image_fixture(user_id) do
     {:ok, image} =
-      %Image{}
+      %Image{user_id: user_id}
       |> Image.add_image_changeset(%{
-        raw_image_path: "/test/raw/hero-#{System.unique_integer()}.jpg",
-        user_id: user_id
+        raw_image_path: "/test/raw/hero-#{System.unique_integer()}.jpg"
       })
       |> Repo.insert()
 

@@ -76,6 +76,7 @@ defmodule YscWeb.Workers.ImageProcessor do
                     "Duplicate image detected for #{image.id}, reusing processed output from #{existing.id}"
                   )
 
+                  strip_and_replace_raw_on_s3(image, tmp_output_file)
                   Media.reuse_existing_processed_image(image, existing)
 
                 _ ->

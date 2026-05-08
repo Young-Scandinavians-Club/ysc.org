@@ -271,20 +271,27 @@ defmodule YscWeb.TrixUploadsControllerTest do
       assert Media.count_images() == image_count_before
     end
 
-    test "creates a new image when no existing image has the same hash" do
-      # Write a tiny PNG so the MIME validator passes, but with random padding
-      # so its hash won't match any pre-seeded record.
-      unique_content =
-        File.read!(@tiny_png_path) <> :crypto.strong_rand_bytes(16)
-
-      path = write_tmp(unique_content, "unique.png")
-
-      # No pre-seeded image with this content — the dedup path is not taken.
+    test "creates a new image when no existing image has the same hash",
+         %{conn: conn} do
+      tiny_content = File.read!(@tiny_png_path)
+      path = write_tmp(tiny_content, "new_image.png")
       hash = Media.compute_file_hash(path)
+
       assert Media.find_image_by_content_hash(hash) == nil
+
+      count_before = Media.count_images()
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "new_image.png")
+        })
+
+      assert json_response(conn, 201)
+      assert Media.count_images() == count_before + 1
+      assert %Image{} = Media.find_image_by_content_hash(hash)
     end
 
-    test "returns the raw_image_path when the duplicate has no optimized path",
+    test "returns the raw_image_path when the completed duplicate has no optimized path",
          %{conn: conn, user: user} do
       tiny_content = File.read!(@tiny_png_path)
       path = write_tmp(tiny_content, "photo.png")
@@ -296,7 +303,7 @@ defmodule YscWeb.TrixUploadsControllerTest do
           user_id: user.id,
           raw_image_path: "https://cdn.example.com/raw_only.png",
           optimized_image_path: nil,
-          processing_state: :unprocessed,
+          processing_state: :completed,
           content_hash: hash
         }
         |> Ysc.Repo.insert()

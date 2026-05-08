@@ -249,7 +249,6 @@ defmodule Ysc.MediaTest do
       assert {:ok, image} =
                Media.add_new_image(
                  %{
-                   user_id: admin.id,
                    raw_image_path: "https://example.com/new.jpg",
                    title: "Original title"
                  },
@@ -269,7 +268,6 @@ defmodule Ysc.MediaTest do
       assert {:error, _} =
                Media.add_new_image(
                  %{
-                   user_id: user.id,
                    raw_image_path: "https://example.com/denied.jpg"
                  },
                  user
@@ -449,18 +447,16 @@ defmodule Ysc.MediaTest do
   describe "content_hash uniqueness constraint" do
     test "rejects two images with the same content_hash", %{user: user} do
       {:ok, _} =
-        %Media.Image{}
+        %Media.Image{user_id: user.id}
         |> Media.Image.add_image_changeset(%{
-          user_id: user.id,
           raw_image_path: "https://example.com/a.jpg",
           content_hash: "uniquehash_xyz"
         })
         |> Repo.insert()
 
       assert {:error, changeset} =
-               %Media.Image{}
+               %Media.Image{user_id: user.id}
                |> Media.Image.add_image_changeset(%{
-                 user_id: user.id,
                  raw_image_path: "https://example.com/b.jpg",
                  content_hash: "uniquehash_xyz"
                })

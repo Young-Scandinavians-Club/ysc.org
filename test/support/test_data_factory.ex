@@ -383,14 +383,13 @@ defmodule Ysc.TestDataFactory do
       raw_image_path: "/uploads/test_image.jpg",
       optimized_image_path: "/uploads/test_image_optimized.jpg",
       thumbnail_path: "/uploads/test_image_thumb.jpg",
-      blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
-      user_id: user_id
+      blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
     }
 
     attrs = Map.merge(default_attrs, Map.delete(attrs, :user_id))
 
     {:ok, image} =
-      %Media.Image{}
+      %Media.Image{user_id: user_id}
       |> Media.Image.add_image_changeset(attrs)
       |> Repo.insert()
 

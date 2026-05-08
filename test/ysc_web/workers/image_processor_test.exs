@@ -170,7 +170,7 @@ defmodule YscWeb.Workers.ImageProcessorTest do
       source =
         create_test_image(%{
           optimized_image_path: "https://cdn.example.com/dedup_opt.webp",
-          thumbnail_path: "https://cdn.example.com/dedup_thumb.webb",
+          thumbnail_path: "https://cdn.example.com/dedup_thumb.webp",
           blur_hash: "L6Pj0^jE.AyXtest",
           width: 1,
           height: 1,
@@ -244,16 +244,26 @@ defmodule YscWeb.Workers.ImageProcessorTest do
         attempt: 1
       }
 
-      # The guard prevents self-reuse; normal processing runs. The image ends
-      # up with freshly generated S3 paths — not the `create_test_image`
-      # defaults ("/uploads/test_image_optimized.jpg").
-      assert {:ok, _} = ImageProcessor.perform(job)
-
+      # The guard prevents self-reuse; normal processing runs instead.
+      # If the dedup path had been taken (incorrectly), `reuse_existing_processed_image`
+      # would mark the image :completed with the fixture's default optimized path.
+      # We verify the guard works regardless of whether S3 is available.
+      result = ImageProcessor.perform(job)
       reloaded = Media.fetch_image(self_image.id)
-      assert reloaded.processing_state == :completed
 
-      refute reloaded.optimized_image_path ==
-               "/uploads/test_image_optimized.jpg"
+      case result do
+        {:ok, _} ->
+          # S3 available: full processing completed with a real S3 path.
+          assert reloaded.processing_state == :completed
+
+          refute reloaded.optimized_image_path ==
+                   "/uploads/test_image_optimized.jpg"
+
+        {:error, _} ->
+          # S3 unavailable: normal processing attempted but failed — the image
+          # is :failed, not :completed via the dedup reuse path.
+          assert reloaded.processing_state == :failed
+      end
     end
   end
 

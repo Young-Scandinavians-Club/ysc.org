@@ -156,10 +156,10 @@ defmodule YscWeb.Uploads do
     hash = Media.compute_file_hash(path)
 
     case Media.find_image_by_content_hash(hash) do
-      %Media.Image{} = existing ->
+      %Media.Image{processing_state: :completed} = existing ->
         {:ok, existing.id}
 
-      nil ->
+      _ ->
         base = Path.basename(path)
         _dest = Path.join(uploads_dir(), base)
 
@@ -169,7 +169,6 @@ defmodule YscWeb.Uploads do
           Media.add_new_image(
             %{
               raw_image_path: upload_result[:body][:location],
-              user_id: current_user.id,
               content_hash: hash
             },
             current_user

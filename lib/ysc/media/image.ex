@@ -64,7 +64,6 @@ defmodule Ysc.Media.Image do
       :width,
       :height,
       :processing_state,
-      :user_id,
       :upload_data,
       :content_hash
     ])

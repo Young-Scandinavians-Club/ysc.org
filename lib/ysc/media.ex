@@ -252,7 +252,7 @@ defmodule Ysc.Media do
 
   def add_new_image(attrs, %User{} = current_user) do
     with :ok <- Policy.authorize(:media_image_create, current_user) do
-      %Media.Image{}
+      %Media.Image{user_id: current_user.id}
       |> Media.Image.add_image_changeset(attrs)
       |> Repo.insert()
     end

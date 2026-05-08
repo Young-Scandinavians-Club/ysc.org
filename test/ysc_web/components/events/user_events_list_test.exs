@@ -13,14 +13,13 @@ defmodule YscWeb.UserEventsListLiveTest do
     uploader = user_fixture()
 
     {:ok, image} =
-      %Media.Image{}
+      %Media.Image{user_id: uploader.id}
       |> Media.Image.add_image_changeset(%{
         title: "User event list image",
         raw_image_path: "/uploads/uel_raw.jpg",
         optimized_image_path: "/uploads/uel_opt.jpg",
         thumbnail_path: "/uploads/uel_thumb.jpg",
-        blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
-        user_id: uploader.id
+        blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
       })
       |> Repo.insert()
 
