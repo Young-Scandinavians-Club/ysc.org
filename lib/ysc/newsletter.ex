@@ -734,14 +734,47 @@ defmodule Ysc.Newsletter do
       )
       |> Repo.all()
 
+    edition_ids = Enum.map(editions, & &1.id)
+    counts_by_edition = batch_open_click_counts_by_edition_ids(edition_ids)
+
     Enum.map(editions, fn edition ->
-      counts = count_email_events_by_type(edition.id)
+      counts = Map.get(counts_by_edition, edition.id, %{opens: 0, clicks: 0})
 
       %{
         edition: edition,
-        opens: Map.get(counts, "open", 0),
-        clicks: Map.get(counts, "click", 0)
+        opens: counts.opens,
+        clicks: counts.clicks
       }
+    end)
+  end
+
+  defp batch_open_click_counts_by_edition_ids([]), do: %{}
+
+  defp batch_open_click_counts_by_edition_ids(edition_ids) do
+    from(e in EmailEvent,
+      where: e.edition_id in ^edition_ids,
+      where: e.event_type in ["open", "click"],
+      group_by: [e.edition_id, e.event_type],
+      select: {
+        e.edition_id,
+        e.event_type,
+        fragment("COUNT(DISTINCT ?)", e.email)
+      }
+    )
+    |> Repo.all()
+    |> Enum.reduce(%{}, fn {edition_id, event_type, count}, acc ->
+      Map.update(
+        acc,
+        edition_id,
+        %{opens: 0, clicks: 0},
+        fn prev ->
+          case event_type do
+            "open" -> %{prev | opens: count}
+            "click" -> %{prev | clicks: count}
+            _ -> prev
+          end
+        end
+      )
     end)
   end
 
