@@ -274,7 +274,8 @@ defmodule YscWeb.OrderConfirmationLive do
                   navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
                   class="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded transition-colors shrink-0"
                 >
-                  <.icon name="hero-qr-code" class="w-4 h-4" /> View tickets for check-in
+                  <.icon name="hero-qr-code" class="w-4 h-4" />
+                  View tickets for check-in
                 </.link>
               <% end %>
             </div>

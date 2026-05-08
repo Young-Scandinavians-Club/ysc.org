@@ -189,7 +189,8 @@ defmodule YscWeb.UserTicketsLive do
                         }
                         class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-zinc-100 bg-zinc-900 hover:bg-zinc-800 rounded transition-colors"
                       >
-                        <.icon name="hero-qr-code" class="w-4 h-4" /> Tickets for check-in
+                        <.icon name="hero-qr-code" class="w-4 h-4" />
+                        Tickets for check-in
                       </.link>
                       <.link
                         navigate={~p"/orders/#{ticket_order.id}/confirmation"}
