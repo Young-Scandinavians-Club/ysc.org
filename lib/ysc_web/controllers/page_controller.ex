@@ -171,7 +171,14 @@ defmodule YscWeb.PageController do
   end
 
   def choir(conn, _params) do
+    choir_leader =
+      case Ysc.Accounts.get_user_by_email("chrtev@gmail.com") do
+        nil -> nil
+        user -> Ysc.Repo.preload(user, :current_avatar)
+      end
+
     conn
+    |> assign(:choir_leader, choir_leader)
     |> assign(:page_title, "YSC Choir")
     |> assign(
       :meta_description,
