@@ -750,7 +750,7 @@ defmodule YscWeb.AdminUsersLive do
                     </div>
                 <% end %>
               </:col>
-              <:action :let={{_, user}} label="Action">
+              <:action :let={{_, user}}>
                 <button
                   :if={user.state == :pending_approval}
                   phx-click={

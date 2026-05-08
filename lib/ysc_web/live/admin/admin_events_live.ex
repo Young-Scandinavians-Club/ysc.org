@@ -289,7 +289,7 @@ defmodule YscWeb.AdminEventsLive do
                 {format_date(event.inserted_at)}
               </:col>
 
-              <:action :let={{_, event}} label="Actions">
+              <:action :let={{_, event}}>
                 <.event_actions_dropdown
                   event={event}
                   menu_id={"event-actions-dt-#{event.id}"}
