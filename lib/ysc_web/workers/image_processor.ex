@@ -66,16 +66,34 @@ defmodule YscWeb.Workers.ImageProcessor do
                 raise "File validation failed: #{reason}"
             end
 
-            result =
-              Media.process_image_upload(
-                image,
-                tmp_output_file,
-                thumbnail_output_path,
-                optimized_output_path
-              )
+            hash = Media.compute_file_hash(tmp_output_file)
 
-            # Strip EXIF/metadata from raw and overwrite on S3 so the raw URL also serves clean bytes
-            strip_and_replace_raw_on_s3(image, tmp_output_file)
+            result =
+              case Media.find_image_by_content_hash(hash) do
+                %Media.Image{processing_state: :completed} = existing
+                when existing.id != image.id ->
+                  Ysc.Logging.info(
+                    "Duplicate image detected for #{image.id}, reusing processed output from #{existing.id}"
+                  )
+
+                  Media.reuse_existing_processed_image(image, existing)
+
+                _ ->
+                  processed =
+                    Media.process_image_upload(
+                      image,
+                      tmp_output_file,
+                      thumbnail_output_path,
+                      optimized_output_path
+                    )
+
+                  Media.set_content_hash(processed, hash)
+
+                  # Strip EXIF/metadata from raw and overwrite on S3 so the raw URL also serves clean bytes
+                  strip_and_replace_raw_on_s3(image, tmp_output_file)
+
+                  processed
+              end
 
             Ysc.Logging.info(
               "Image processing completed successfully for: #{image.id}"

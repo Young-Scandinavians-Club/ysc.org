@@ -81,40 +81,49 @@ defmodule YscWeb.TrixUploadsController do
            ".webp"
          ]) do
       {:ok, _mime_type} ->
-        upload_result = Media.upload_file_to_s3(path)
+        hash = Media.compute_file_hash(path)
 
-        {:ok, new_image} =
-          Media.add_new_image(
-            %{
-              raw_image_path: upload_result[:body][:location],
-              user_id: current_user.id
-            },
-            current_user
-          )
+        case Media.find_image_by_content_hash(hash) do
+          %Media.Image{} = existing ->
+            {:ok, existing}
 
-        File.mkdir_p!(@temp_dir)
-        tmp_output_file = "#{@temp_dir}/#{new_image.id}"
-        optimized_output_path = "#{tmp_output_file}_optimized"
-        thumbnail_output_path = "#{tmp_output_file}_thumb"
+          nil ->
+            upload_result = Media.upload_file_to_s3(path)
 
-        updated_image =
-          Media.process_image_upload(
-            new_image,
-            path,
-            thumbnail_output_path,
-            optimized_output_path
-          )
+            {:ok, new_image} =
+              Media.add_new_image(
+                %{
+                  raw_image_path: upload_result[:body][:location],
+                  user_id: current_user.id,
+                  content_hash: hash
+                },
+                current_user
+              )
 
-        ["_optimized", "_thumb"]
-        |> Enum.each(fn suffix ->
-          [".jpg", ".jpeg", ".png", ".webp"]
-          |> Enum.each(fn ext ->
-            file_path = "#{tmp_output_file}#{suffix}#{ext}"
-            if File.exists?(file_path), do: File.rm(file_path)
-          end)
-        end)
+            File.mkdir_p!(@temp_dir)
+            tmp_output_file = "#{@temp_dir}/#{new_image.id}"
+            optimized_output_path = "#{tmp_output_file}_optimized"
+            thumbnail_output_path = "#{tmp_output_file}_thumb"
 
-        {:ok, updated_image}
+            updated_image =
+              Media.process_image_upload(
+                new_image,
+                path,
+                thumbnail_output_path,
+                optimized_output_path
+              )
+
+            ["_optimized", "_thumb"]
+            |> Enum.each(fn suffix ->
+              [".jpg", ".jpeg", ".png", ".webp"]
+              |> Enum.each(fn ext ->
+                file_path = "#{tmp_output_file}#{suffix}#{ext}"
+                if File.exists?(file_path), do: File.rm(file_path)
+              end)
+            end)
+
+            {:ok, updated_image}
+        end
 
       {:error, reason} ->
         {:error, reason}

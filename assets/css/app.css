@@ -8,7 +8,11 @@
 /* Admin event editor — sticky action bar */
 
 #event-header-bar {
-    transition: background-color 0.15s ease, box-shadow 0.15s ease, padding 0.15s ease;
+    transition:
+        background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+        margin 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #event-header-bar.is-sticky {
@@ -31,8 +35,27 @@
     }
 }
 
+/* Collapse date row with motion (display:none cannot transition). */
+#event-header-bar .event-header-date {
+    max-height: 4rem;
+    opacity: 1;
+    overflow: hidden;
+    transition:
+        max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.22s ease,
+        margin 0.22s ease;
+}
+
 #event-header-bar.is-sticky .event-header-date {
-    display: none;
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    pointer-events: none;
+}
+
+#event-header-bar .event-header-title {
+    transition: font-size 0.24s cubic-bezier(0.4, 0, 0.2, 1), line-height 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #event-header-bar.is-sticky .event-header-title {
@@ -40,8 +63,16 @@
     line-height: 1.5rem;
 }
 
+#event-header-bar .event-header-tabs {
+    transition: padding-top 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 #event-header-bar.is-sticky .event-header-tabs {
     padding-top: 0;
+}
+
+#event-header-bar .event-header-tabs a {
+    transition: padding 0.22s cubic-bezier(0.4, 0, 0.2, 1), font-size 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #event-header-bar.is-sticky .event-header-tabs a {

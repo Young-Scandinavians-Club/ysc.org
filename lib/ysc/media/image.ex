@@ -41,6 +41,8 @@ defmodule Ysc.Media.Image do
 
     field :processing_state, ImageProcessingState
 
+    field :content_hash, :string
+
     belongs_to :uploader, Ysc.Accounts.User,
       foreign_key: :user_id,
       references: :id
@@ -63,12 +65,14 @@ defmodule Ysc.Media.Image do
       :height,
       :processing_state,
       :user_id,
-      :upload_data
+      :upload_data,
+      :content_hash
     ])
     |> validate_length(:title, max: 255)
     |> validate_length(:alt_text, max: 512)
     |> validate_length(:raw_image_path, max: 2048)
     |> validate_required([:raw_image_path, :user_id])
+    |> unique_constraint(:content_hash, name: :images_content_hash_index)
   end
 
   def processed_image_changeset(image, attrs) do
@@ -79,7 +83,8 @@ defmodule Ysc.Media.Image do
       :blur_hash,
       :width,
       :height,
-      :processing_state
+      :processing_state,
+      :content_hash
     ])
   end
 
