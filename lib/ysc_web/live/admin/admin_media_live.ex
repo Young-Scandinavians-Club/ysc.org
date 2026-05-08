@@ -688,7 +688,6 @@ defmodule YscWeb.AdminMediaLive do
           Media.add_new_image(
             %{
               raw_image_path: URI.encode(raw_path),
-              user_id: uploader.id,
               upload_data: details
             },
             uploader

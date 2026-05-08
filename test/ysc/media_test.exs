@@ -249,7 +249,6 @@ defmodule Ysc.MediaTest do
       assert {:ok, image} =
                Media.add_new_image(
                  %{
-                   user_id: admin.id,
                    raw_image_path: "https://example.com/new.jpg",
                    title: "Original title"
                  },
@@ -269,11 +268,220 @@ defmodule Ysc.MediaTest do
       assert {:error, _} =
                Media.add_new_image(
                  %{
-                   user_id: user.id,
                    raw_image_path: "https://example.com/denied.jpg"
                  },
                  user
                )
+    end
+  end
+
+  describe "compute_file_hash/1" do
+    defp tmp_path(content) do
+      path = "/tmp/media_hash_test_#{System.unique_integer([:positive])}"
+      File.write!(path, content)
+      on_exit(fn -> File.rm(path) end)
+      path
+    end
+
+    test "returns a 64-character lowercase hex string" do
+      hash = Media.compute_file_hash(tmp_path("hello"))
+      assert String.length(hash) == 64
+      assert hash =~ ~r/^[0-9a-f]{64}$/
+    end
+
+    test "same file content produces the same hash" do
+      assert Media.compute_file_hash(tmp_path("deterministic")) ==
+               Media.compute_file_hash(tmp_path("deterministic"))
+    end
+
+    test "different file content produces different hashes" do
+      refute Media.compute_file_hash(tmp_path("content_a")) ==
+               Media.compute_file_hash(tmp_path("content_b"))
+    end
+
+    test "matches the expected SHA-256 of the file content" do
+      content = "known content for hashing"
+      expected = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
+      assert Media.compute_file_hash(tmp_path(content)) == expected
+    end
+
+    test "works correctly on binary file content" do
+      content = :crypto.strong_rand_bytes(4096)
+      expected = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
+      assert Media.compute_file_hash(tmp_path(content)) == expected
+    end
+  end
+
+  describe "find_image_by_content_hash/1" do
+    test "returns nil when no image has the given hash" do
+      assert Media.find_image_by_content_hash("hashnotinthisdatabase") == nil
+    end
+
+    test "returns the image matching the given hash", %{user: user} do
+      {:ok, image} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/img.jpg",
+          processing_state: :unprocessed,
+          content_hash: "deadbeef01234567890a"
+        }
+        |> Repo.insert()
+
+      found = Media.find_image_by_content_hash("deadbeef01234567890a")
+      assert found.id == image.id
+    end
+
+    test "does not return an image with a different hash", %{user: user} do
+      {:ok, _image} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/other.jpg",
+          processing_state: :unprocessed,
+          content_hash: "aaaaaaaabbbbbbbb"
+        }
+        |> Repo.insert()
+
+      assert Media.find_image_by_content_hash("ccccccccdddddddd") == nil
+    end
+  end
+
+  describe "set_content_hash/2" do
+    test "persists the content hash on the image record", %{user: user} do
+      {:ok, image} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/img.jpg",
+          processing_state: :unprocessed
+        }
+        |> Repo.insert()
+
+      assert {:ok, updated} = Media.set_content_hash(image, "myhash123")
+      assert updated.content_hash == "myhash123"
+      assert Media.fetch_image(image.id).content_hash == "myhash123"
+    end
+
+    test "overwrites an existing hash", %{user: user} do
+      {:ok, image} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/img.jpg",
+          processing_state: :unprocessed,
+          content_hash: "oldhash"
+        }
+        |> Repo.insert()
+
+      assert {:ok, _} = Media.set_content_hash(image, "newhash")
+      assert Media.fetch_image(image.id).content_hash == "newhash"
+    end
+  end
+
+  describe "reuse_existing_processed_image/2" do
+    test "copies all processed fields from source to target", %{user: user} do
+      {:ok, source} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/source.jpg",
+          optimized_image_path: "https://cdn.example.com/source_opt.webp",
+          thumbnail_path: "https://cdn.example.com/source_thumb.webp",
+          blur_hash: "L6Pj0^jE.AyX_3t7",
+          width: 1920,
+          height: 1080,
+          processing_state: :completed,
+          content_hash: "sourcehash999"
+        }
+        |> Repo.insert()
+
+      {:ok, target} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/duplicate.jpg",
+          processing_state: :unprocessed
+        }
+        |> Repo.insert()
+
+      result = Media.reuse_existing_processed_image(target, source)
+
+      assert result.processing_state == :completed
+      assert result.optimized_image_path == source.optimized_image_path
+      assert result.thumbnail_path == source.thumbnail_path
+      assert result.blur_hash == source.blur_hash
+      assert result.width == source.width
+      assert result.height == source.height
+      # content_hash is NOT copied — only one record can own a given hash
+      assert result.content_hash == nil
+    end
+
+    test "persisted record reflects the reused values", %{user: user} do
+      {:ok, source} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/source.jpg",
+          optimized_image_path: "https://cdn.example.com/opt.webp",
+          thumbnail_path: "https://cdn.example.com/thumb.webp",
+          blur_hash: "L6Pj0^jE",
+          width: 800,
+          height: 600,
+          processing_state: :completed,
+          content_hash: "persistedhash"
+        }
+        |> Repo.insert()
+
+      {:ok, target} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/dup.jpg",
+          processing_state: :unprocessed
+        }
+        |> Repo.insert()
+
+      Media.reuse_existing_processed_image(target, source)
+
+      reloaded = Media.fetch_image(target.id)
+      assert reloaded.processing_state == :completed
+      assert reloaded.optimized_image_path == source.optimized_image_path
+      assert reloaded.thumbnail_path == source.thumbnail_path
+      assert reloaded.content_hash == nil
+    end
+  end
+
+  describe "content_hash uniqueness constraint" do
+    test "rejects two images with the same content_hash", %{user: user} do
+      {:ok, _} =
+        %Media.Image{user_id: user.id}
+        |> Media.Image.add_image_changeset(%{
+          raw_image_path: "https://example.com/a.jpg",
+          content_hash: "uniquehash_xyz"
+        })
+        |> Repo.insert()
+
+      assert {:error, changeset} =
+               %Media.Image{user_id: user.id}
+               |> Media.Image.add_image_changeset(%{
+                 raw_image_path: "https://example.com/b.jpg",
+                 content_hash: "uniquehash_xyz"
+               })
+               |> Repo.insert()
+
+      assert {:content_hash, _} =
+               List.keyfind(changeset.errors, :content_hash, 0)
+    end
+
+    test "allows two images with nil content_hash", %{user: user} do
+      {:ok, _} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/a.jpg",
+          processing_state: :unprocessed
+        }
+        |> Repo.insert()
+
+      assert {:ok, _} =
+               %Media.Image{
+                 user_id: user.id,
+                 raw_image_path: "https://example.com/b.jpg",
+                 processing_state: :unprocessed
+               }
+               |> Repo.insert()
     end
   end
 

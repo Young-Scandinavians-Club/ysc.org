@@ -174,22 +174,10 @@ defmodule YscWeb.AdminPostsLive do
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    class="ml-2 flex-shrink-0 rounded p-1.5 hover:bg-zinc-100"
-                    phx-click="toggle-featured"
-                    phx-value-id={post.id}
-                  >
-                    <.icon
-                      name={
-                        if post.featured_post,
-                          do: "hero-star-solid",
-                          else: "hero-star"
-                      }
-                      class={"w-5 h-5 #{if post.featured_post, do: "text-yellow-500", else: "text-zinc-600"}"}
-                    />
-                    <span class="sr-only">Toggle featured</span>
-                  </button>
+                  <.post_actions_dropdown
+                    post={post}
+                    menu_id={"post-actions-mob-#{post.id}"}
+                  />
                 </div>
 
                 <div class="flex items-center justify-between">
@@ -221,22 +209,11 @@ defmodule YscWeb.AdminPostsLive do
                     </span>
                   </div>
 
-                  <div class="flex items-center gap-2">
-                    <a
-                      :if={post.state == :published}
-                      href={~p"/posts/#{post.id}"}
-                      target="_blank"
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                    >
-                      View Live
-                    </a>
-                    <button
-                      phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                    >
-                      Edit
-                    </button>
-                  </div>
+                  <.icon
+                    :if={post.featured_post}
+                    name="hero-star-solid"
+                    class="w-5 h-5 text-yellow-500"
+                  />
                 </div>
               </div>
             <% end %>
@@ -331,48 +308,96 @@ defmodule YscWeb.AdminPostsLive do
                 {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
               </:col>
 
-              <:action :let={{_, post}} label="Pinned">
-                <button
-                  type="button"
-                  class="rounded px-2 py-1 text-sm flex items-center gap-1 hover:bg-zinc-100"
-                  phx-click="toggle-featured"
-                  phx-value-id={post.id}
-                >
-                  <.icon
-                    name={
-                      if post.featured_post,
-                        do: "hero-star-solid",
-                        else: "hero-star"
-                    }
-                    class={"w-4 h-4 #{if post.featured_post, do: "text-yellow-500", else: "text-zinc-600"}"}
-                  />
-                  <span class="sr-only">Toggle featured</span>
-                </button>
-              </:action>
-
               <:action :let={{_, post}}>
-                <div class="flex items-center gap-3">
-                  <a
-                    :if={post.state == :published}
-                    href={~p"/posts/#{post.id}"}
-                    target="_blank"
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    View Live
-                  </a>
-                  <button
-                    phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                </div>
+                <.post_actions_dropdown
+                  post={post}
+                  menu_id={"post-actions-dt-#{post.id}"}
+                />
               </:action>
             </Flop.Phoenix.table>
           </div>
         </div>
       </div>
     </.side_menu>
+    """
+  end
+
+  attr :post, :map, required: true
+  attr :menu_id, :string, required: true
+
+  def post_actions_dropdown(assigns) do
+    ~H"""
+    <div class="flex justify-end" onclick="event.stopPropagation()">
+      <.dropdown
+        id={@menu_id}
+        right={true}
+        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+      >
+        <:button_block>
+          <span class="sr-only">Post actions</span>
+          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
+        </:button_block>
+
+        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
+          <ul class="py-1">
+            <li :if={@post.state == :published}>
+              <.link
+                id={"#{@menu_id}-view-live"}
+                href={~p"/posts/#{@post.id}"}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-arrow-top-right-on-square"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>View live</span>
+              </.link>
+            </li>
+            <li>
+              <button
+                id={"#{@menu_id}-edit"}
+                type="button"
+                phx-click={JS.navigate(~p"/admin/posts/#{@post.id}")}
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-pencil-square"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>Edit</span>
+              </button>
+            </li>
+            <li>
+              <button
+                id={"#{@menu_id}-toggle-featured"}
+                type="button"
+                phx-click="toggle-featured"
+                phx-value-id={@post.id}
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name={
+                    if @post.featured_post, do: "hero-star-solid", else: "hero-star"
+                  }
+                  class={[
+                    "h-5 w-5 shrink-0",
+                    if(@post.featured_post,
+                      do: "text-yellow-500",
+                      else: "text-zinc-500"
+                    )
+                  ]}
+                />
+                <span>
+                  {if @post.featured_post, do: "Unpin post", else: "Pin post"}
+                </span>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </.dropdown>
+    </div>
     """
   end
 

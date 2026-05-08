@@ -40,15 +40,14 @@ defmodule YscWeb.PostLiveTest do
     uploader = user_fixture()
 
     {:ok, image} =
-      %Media.Image{}
+      %Media.Image{user_id: uploader.id}
       |> Media.Image.add_image_changeset(%{
         title: "Post hero",
         raw_image_path: "/uploads/post_raw.jpg",
         optimized_image_path: "/uploads/post_opt.jpg",
         thumbnail_path: "/uploads/post_thumb.jpg",
         blur_hash: nil,
-        alt_text: "Alt for post",
-        user_id: uploader.id
+        alt_text: "Alt for post"
       })
       |> Repo.insert()
 

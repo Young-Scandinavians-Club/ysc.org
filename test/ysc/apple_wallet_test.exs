@@ -447,14 +447,13 @@ defmodule Ysc.AppleWalletTest do
       url = "http://127.0.0.1:#{port}/cover.png"
 
       {:ok, image} =
-        %Ysc.Media.Image{}
+        %Ysc.Media.Image{user_id: user.id}
         |> Ysc.Media.Image.add_image_changeset(%{
           title: "Event Cover",
           raw_image_path: url,
           optimized_image_path: url,
           thumbnail_path: url,
-          processing_state: "completed",
-          user_id: user.id
+          processing_state: "completed"
         })
         |> Repo.insert()
 
@@ -477,14 +476,13 @@ defmodule Ysc.AppleWalletTest do
            event: event
          } do
       {:ok, image} =
-        %Ysc.Media.Image{}
+        %Ysc.Media.Image{user_id: user.id}
         |> Ysc.Media.Image.add_image_changeset(%{
           title: "Unprocessed Cover",
           raw_image_path: "/uploads/raw.jpg",
           optimized_image_path: nil,
           thumbnail_path: nil,
-          processing_state: "unprocessed",
-          user_id: user.id
+          processing_state: "unprocessed"
         })
         |> Repo.insert()
 
