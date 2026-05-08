@@ -725,34 +725,22 @@ defmodule YscWeb.AccountSetupLive do
       # Re-fetch user to get latest data for access control (important after email verification)
       fresh_user = Accounts.get_user!(user.id)
 
-      # Check authentication for steps that require it
+      # Steps after email verification require a real session whose user matches the
+      # account in the URL. Never derive current_user from the path alone — that would
+      # let an unauthenticated visitor impersonate the account for LiveView events.
       can_access_step =
         cond do
           requested_step == 0 ->
             # Email verification step: always accessible
             true
 
-          requested_step > 0 and is_nil(fresh_user.email_verified_at) ->
-            # Trying to access steps after email verification but email not verified
+          is_nil(fresh_user.email_verified_at) ->
             false
 
-          requested_step > 0 and not is_nil(current_user) and
-              current_user.id != fresh_user.id ->
-            # Trying to access authenticated steps but not the owner
-            false
-
-          requested_step > 0 and is_nil(current_user) and
-              not is_nil(fresh_user.email_verified_at) ->
-            # User has verified email but session not set yet - allow access
-            # This handles the case where user just verified email and is being redirected
-            true
-
-          requested_step > 0 and is_nil(current_user) ->
-            # Trying to access authenticated steps but not logged in
+          is_nil(current_user) or current_user.id != fresh_user.id ->
             false
 
           true ->
-            # Authenticated owner accessing their own setup
             true
         end
 
@@ -761,15 +749,6 @@ defmodule YscWeb.AccountSetupLive do
 
         # Update socket assigns with fresh user data
         socket = assign(socket, user: fresh_user)
-
-        # If current_user is not set but user has verified email, set current_user
-        # This handles the case where session is not fully loaded yet
-        socket =
-          if is_nil(current_user) and not is_nil(fresh_user.email_verified_at) do
-            assign(socket, current_user: fresh_user)
-          else
-            socket
-          end
 
         # Calculate allowed step based on what user needs and their authentication
         # New order: 0=email, 1=payment, 2=password, 3=phone setup, 4=phone verify
@@ -1210,14 +1189,17 @@ defmodule YscWeb.AccountSetupLive do
 
     # Check if step is accessible based on authentication and user needs
     # New order: 0=email, 1=payment, 2=password, 3=phone setup, 4=phone verify
+    owner? =
+      not is_nil(current_user) and current_user.id == socket.assigns.user.id
+
     can_access_step =
       cond do
         # Step 0: Always allow if user needs email verification
         requested_step == 0 and user_needs.email_verification ->
           true
 
-        # Steps 1+: Require authentication
-        requested_step >= 1 and is_nil(current_user) ->
+        # Steps 1+: Must be logged in as the user in the URL (same as handle_params)
+        not owner? ->
           false
 
         # Step 1: Allow if user needs payment method setup
