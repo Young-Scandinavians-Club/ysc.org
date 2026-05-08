@@ -15,6 +15,37 @@ defmodule YscWeb.PageControllerTest do
     end
   end
 
+  describe "GET /choir" do
+    test "renders choir leader by name when no matching user exists", %{
+      conn: conn
+    } do
+      conn = get(conn, ~p"/choir")
+
+      html = html_response(conn, 200)
+      assert html =~ "The choir is led by our board member"
+      assert html =~ "Christoffer Tevrén"
+      assert conn.assigns.choir_leader == nil
+    end
+
+    test "renders choir leader user card when matching user exists", %{
+      conn: conn
+    } do
+      user_fixture(%{
+        email: "chrtev@gmail.com",
+        first_name: "Christoffer",
+        last_name: "Tevrén"
+      })
+
+      conn = get(conn, ~p"/choir")
+
+      html = html_response(conn, 200)
+      assert html =~ "Choir Leader"
+      assert html =~ "Christoffer Tevrén"
+      assert html =~ ~s(alt="User avatar")
+      assert conn.assigns.choir_leader.email == "chrtev@gmail.com"
+    end
+  end
+
   describe "GET /pending-review" do
     setup %{conn: conn} do
       user = user_fixture(%{country: "SE", state: :pending_approval})
