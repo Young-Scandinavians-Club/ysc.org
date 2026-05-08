@@ -350,7 +350,7 @@ defmodule YscWeb.AdminPostsLive do
                 </button>
               </:action>
 
-              <:action :let={{_, post}} label="Action">
+              <:action :let={{_, post}}>
                 <div class="flex items-center gap-3">
                   <a
                     :if={post.state == :published}

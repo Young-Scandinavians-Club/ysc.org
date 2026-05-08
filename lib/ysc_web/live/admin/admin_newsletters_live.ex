@@ -535,7 +535,7 @@ defmodule YscWeb.AdminNewslettersLive do
                   <span class="text-zinc-400">—</span>
                 <% end %>
               </:col>
-              <:action :let={{_, edition}} label="Actions">
+              <:action :let={{_, edition}}>
                 <div class="flex items-center gap-2">
                   <%= if edition.status == :sent do %>
                     <.link
@@ -879,7 +879,7 @@ defmodule YscWeb.AdminNewslettersLive do
                       else: "—"}
                   </span>
                 </:col>
-                <:action :let={{_, sub}} label="Actions">
+                <:action :let={{_, sub}}>
                   <button
                     :if={sub.subscribed}
                     type="button"

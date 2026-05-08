@@ -2549,7 +2549,7 @@ defmodule YscWeb.AdminBookingsLive do
                     end}
                   </span>
                 </:col>
-                <:action :let={{_, booking}} label="Actions">
+                <:action :let={{_, booking}}>
                   <div class="flex gap-3 items-center">
                     <button
                       phx-click="view-booking"

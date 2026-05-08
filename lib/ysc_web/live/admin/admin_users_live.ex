@@ -752,25 +752,23 @@ defmodule YscWeb.AdminUsersLive do
                     </div>
                 <% end %>
               </:col>
-              <:action :let={{_, user}} label="Action">
-                <div onclick="event.stopPropagation()">
-                  <button
-                    :if={user.state == :pending_approval}
-                    phx-click={
-                      JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
-                    }
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Review
-                  </button>
-                  <button
-                    :if={user.state != :pending_approval}
-                    phx-click={JS.navigate(~p"/admin/users/#{user.id}/details")}
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                </div>
+              <:action :let={{_, user}}>
+                <button
+                  :if={user.state == :pending_approval}
+                  phx-click={
+                    JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
+                  }
+                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                >
+                  Review
+                </button>
+                <button
+                  :if={user.state != :pending_approval}
+                  phx-click={JS.navigate(~p"/admin/users/#{user.id}/details")}
+                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
+                >
+                  Edit
+                </button>
               </:action>
             </Flop.Phoenix.table>
 
