@@ -814,3 +814,31 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     animation: scanner-result-slide-up 0.25s cubic-bezier(0.34, 1.2, 0.64, 1) both;
 }
 
+/*
+=== MASONRY LAYOUT FOR MEDIA GALLERY ===
+*/
+
+.masonry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-auto-rows: 10px;
+    gap: 1rem;
+}
+
+.masonry-grid > button {
+    grid-row-end: span 30;
+}
+
+@media (min-width: 768px) {
+    .masonry-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .masonry-grid {
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    }
+}
+
+

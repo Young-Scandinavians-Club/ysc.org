@@ -20,6 +20,7 @@ import QrScanner from "./qr_scanner";
 import StickyEventHeader from "./sticky_event_header";
 import MembershipCheckInKeyboard from "./membership_checkin_keyboard";
 import EventCheckInKeyboard from "./event_checkin_keyboard";
+import MediaDropZone from "./media_drop_zone";
 import { applyPlatformKeyLabels } from "./platform_keys";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
@@ -56,6 +57,7 @@ window.__adminHooks = {
     StickyEventHeader,
     MembershipCheckInKeyboard,
     EventCheckInKeyboard,
+    MediaDropZone,
 };
 
 // Apply platform-aware key labels on initial load and after every LiveView patch.

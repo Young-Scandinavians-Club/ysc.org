@@ -30,206 +30,221 @@ defmodule YscWeb.AdminMediaLive do
         on_cancel={JS.patch(build_media_url_with_state(assigns))}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
+        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
           Edit Image
         </h2>
-        <!-- Image Version Tabs -->
-        <div class="border-b border-zinc-200 mb-4">
-          <nav class="-mb-px flex space-x-4" aria-label="Image Versions">
-            <button
-              phx-click="select-image-version"
-              phx-value-version="optimized"
-              class={[
-                "whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_image_version == :optimized,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Optimized
-              <%= if @active_image.optimized_image_path do %>
-                <span class="ml-1 text-xs text-zinc-400">✓</span>
-              <% else %>
-                <span class="ml-1 text-xs text-zinc-400">—</span>
-              <% end %>
-            </button>
-            <button
-              phx-click="select-image-version"
-              phx-value-version="thumbnail"
-              class={[
-                "whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_image_version == :thumbnail,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Thumbnail
-              <%= if @active_image.thumbnail_path do %>
-                <span class="ml-1 text-xs text-zinc-400">✓</span>
-              <% else %>
-                <span class="ml-1 text-xs text-zinc-400">—</span>
-              <% end %>
-            </button>
-            <button
-              phx-click="select-image-version"
-              phx-value-version="raw"
-              class={[
-                "whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_image_version == :raw,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Raw
-              <%= if @active_image.raw_image_path do %>
-                <span class="ml-1 text-xs text-zinc-400">✓</span>
-              <% else %>
-                <span class="ml-1 text-xs text-zinc-400">—</span>
-              <% end %>
-            </button>
-          </nav>
-        </div>
-        <!-- Image Display -->
-        <div class="mb-4">
-          <%= if get_image_version_path(@active_image, @selected_image_version) do %>
-            <img
-              src={get_image_version_path(@active_image, @selected_image_version)}
-              class="w-full object-cover rounded max-h-96"
-              alt={@active_image.alt_text || @active_image.title || "Image"}
-            />
-            <div class="mt-2 text-xs text-zinc-500 space-y-1">
-              <p>
-                <strong>Version:</strong> {String.capitalize(
-                  Atom.to_string(@selected_image_version)
-                )}
-              </p>
-              <%= if @selected_image_version == :optimized && @active_image.width && @active_image.height do %>
-                <p>
-                  <strong>Dimensions:</strong> {@active_image.width} × {@active_image.height} px
-                </p>
-              <% end %>
-              <%= if @active_image.processing_state do %>
-                <p>
-                  <strong>Processing State:</strong> {String.capitalize(
-                    Atom.to_string(@active_image.processing_state)
-                  )}
-                </p>
-              <% end %>
-              <div class="flex items-center gap-2">
-                <strong class="flex-shrink-0">Path:</strong>
-                <div class="flex-1 min-w-0 flex items-center gap-2">
-                  <span class="font-mono text-xs truncate overflow-hidden flex-1">
-                    {get_image_version_path(
-                      @active_image,
-                      @selected_image_version
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    phx-click={
-                      JS.dispatch("phx:copy",
-                        to: "#image-path-text-#{@selected_image_version}"
-                      )
-                      |> JS.add_class("text-green-600 border-green-600",
-                        to: "#copy-icon-#{@selected_image_version}"
-                      )
-                      |> JS.remove_class("text-zinc-600 border-zinc-300",
-                        to: "#copy-icon-#{@selected_image_version}"
-                      )
-                      |> JS.transition("opacity-0",
-                        to: "#copy-feedback-#{@selected_image_version}",
-                        time: 0
-                      )
-                      |> JS.show(to: "#copy-feedback-#{@selected_image_version}")
-                      |> JS.transition("opacity-100",
-                        to: "#copy-feedback-#{@selected_image_version}",
-                        time: 200
-                      )
-                      |> JS.hide(
-                        to: "#copy-feedback-#{@selected_image_version}",
-                        time: 200,
-                        transition: "opacity-0"
-                      )
-                      |> JS.add_class("text-zinc-600 border-zinc-300",
-                        to: "#copy-icon-#{@selected_image_version}",
-                        time: 2000
-                      )
-                      |> JS.remove_class("text-green-600 border-green-600",
-                        to: "#copy-icon-#{@selected_image_version}",
-                        time: 2000
-                      )
-                    }
-                    class="flex-shrink-0 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 p-1.5 rounded transition-colors relative"
-                    title="Copy path to clipboard"
-                  >
-                    <.icon
-                      name="hero-clipboard"
-                      id={"copy-icon-#{@selected_image_version}"}
-                      class="w-4 h-4 text-zinc-600 transition-colors border-zinc-300"
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <%!-- Left Column: Image Preview --%>
+          <div>
+            <%!-- Image Version Tabs with Thumbnails --%>
+            <div class="border-b border-zinc-200 mb-4">
+              <nav class="-mb-px flex space-x-2" aria-label="Image Versions">
+                <button
+                  phx-click="select-image-version"
+                  phx-value-version="optimized"
+                  class={[
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    if(@selected_image_version == :optimized,
+                      do: "border-blue-500 text-blue-600 bg-blue-50",
+                      else:
+                        "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                    )
+                  ]}
+                >
+                  <%= if @active_image.optimized_image_path do %>
+                    <img
+                      src={@active_image.optimized_image_path}
+                      class="w-12 h-12 object-cover rounded mb-1 border border-zinc-200"
+                      alt="Optimized preview"
                     />
-                    <span
-                      id={"copy-feedback-#{@selected_image_version}"}
-                      class="hidden absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none"
-                    >
-                      Copied!
-                    </span>
-                  </button>
-                  <input
-                    type="hidden"
-                    id={"image-path-text-#{@selected_image_version}"}
-                    value={
-                      get_image_version_path(@active_image, @selected_image_version)
-                    }
+                  <% else %>
+                    <div class="w-12 h-12 bg-zinc-100 rounded mb-1 flex items-center justify-center border border-zinc-200">
+                      <.icon name="hero-photo" class="w-6 h-6 text-zinc-400" />
+                    </div>
+                  <% end %>
+                  <span>Optimized</span>
+                </button>
+                <button
+                  phx-click="select-image-version"
+                  phx-value-version="thumbnail"
+                  class={[
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    if(@selected_image_version == :thumbnail,
+                      do: "border-blue-500 text-blue-600 bg-blue-50",
+                      else:
+                        "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                    )
+                  ]}
+                >
+                  <%= if @active_image.thumbnail_path do %>
+                    <img
+                      src={@active_image.thumbnail_path}
+                      class="w-12 h-12 object-cover rounded mb-1 border border-zinc-200"
+                      alt="Thumbnail preview"
+                    />
+                  <% else %>
+                    <div class="w-12 h-12 bg-zinc-100 rounded mb-1 flex items-center justify-center border border-zinc-200">
+                      <.icon name="hero-photo" class="w-6 h-6 text-zinc-400" />
+                    </div>
+                  <% end %>
+                  <span>Thumbnail</span>
+                </button>
+                <button
+                  phx-click="select-image-version"
+                  phx-value-version="raw"
+                  class={[
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    if(@selected_image_version == :raw,
+                      do: "border-blue-500 text-blue-600 bg-blue-50",
+                      else:
+                        "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                    )
+                  ]}
+                >
+                  <%= if @active_image.raw_image_path do %>
+                    <img
+                      src={@active_image.raw_image_path}
+                      class="w-12 h-12 object-cover rounded mb-1 border border-zinc-200"
+                      alt="Raw preview"
+                    />
+                  <% else %>
+                    <div class="w-12 h-12 bg-zinc-100 rounded mb-1 flex items-center justify-center border border-zinc-200">
+                      <.icon name="hero-photo" class="w-6 h-6 text-zinc-400" />
+                    </div>
+                  <% end %>
+                  <span>Raw</span>
+                </button>
+              </nav>
+            </div>
+
+            <%!-- Image Display --%>
+            <%= if get_image_version_path(@active_image, @selected_image_version) do %>
+              <img
+                src={get_image_version_path(@active_image, @selected_image_version)}
+                class="w-full object-contain rounded max-h-96 border border-zinc-200"
+                alt={@active_image.alt_text || @active_image.title || "Image"}
+              />
+
+              <%!-- Quick Copy Actions --%>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  phx-click={copy_to_clipboard_js("image-path-text-#{@selected_image_version}", "copy-path-btn")}
+                  id="copy-path-btn"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  title="Copy URL to clipboard"
+                >
+                  <.icon name="hero-link" class="w-3.5 h-3.5" />
+                  Copy URL
+                </button>
+                <button
+                  type="button"
+                  phx-click={copy_to_clipboard_js("image-markdown-#{@selected_image_version}", "copy-markdown-btn")}
+                  id="copy-markdown-btn"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  title="Copy as Markdown"
+                >
+                  <.icon name="hero-document-text" class="w-3.5 h-3.5" />
+                  Copy Markdown
+                </button>
+                <button
+                  type="button"
+                  phx-click={copy_to_clipboard_js("image-html-#{@selected_image_version}", "copy-html-btn")}
+                  id="copy-html-btn"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  title="Copy as HTML"
+                >
+                  <.icon name="hero-code-bracket" class="w-3.5 h-3.5" />
+                  Copy HTML
+                </button>
+                <input
+                  type="hidden"
+                  id={"image-path-text-#{@selected_image_version}"}
+                  value={get_image_version_path(@active_image, @selected_image_version)}
+                />
+                <input
+                  type="hidden"
+                  id={"image-markdown-#{@selected_image_version}"}
+                  value={"![#{@active_image.alt_text || @active_image.title || "Image"}](#{get_image_version_path(@active_image, @selected_image_version)})"}
+                />
+                <input
+                  type="hidden"
+                  id={"image-html-#{@selected_image_version}"}
+                  value={"<img src=\"#{get_image_version_path(@active_image, @selected_image_version)}\" alt=\"#{@active_image.alt_text || @active_image.title || "Image"}\" />"}
+                />
+              </div>
+
+              <%!-- Image Metadata --%>
+              <div class="mt-4 text-xs text-zinc-500 space-y-1 bg-zinc-50 p-3 rounded">
+                <p>
+                  <strong>Version:</strong>
+                  {String.capitalize(Atom.to_string(@selected_image_version))}
+                </p>
+                <%= if @selected_image_version == :optimized && @active_image.width && @active_image.height do %>
+                  <p>
+                    <strong>Dimensions:</strong>
+                    {@active_image.width} × {@active_image.height} px
+                  </p>
+                <% end %>
+                <%= if @active_image.processing_state do %>
+                  <p>
+                    <strong>Status:</strong>
+                    {String.capitalize(Atom.to_string(@active_image.processing_state))}
+                  </p>
+                <% end %>
+                <p class="break-all">
+                  <strong>Path:</strong>
+                  <span class="font-mono">
+                    {get_image_version_path(@active_image, @selected_image_version)}
+                  </span>
+                </p>
+              </div>
+
+              <p class="text-xs text-zinc-500 mt-3">
+                Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} on #{Timex.format!(@image_uploader.inserted_at, "%b %d, %Y", :strftime)}"}
+              </p>
+            <% else %>
+              <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
+                <div class="text-center">
+                  <.icon
+                    name="hero-photo"
+                    class="w-12 h-12 text-zinc-400 mx-auto mb-2"
                   />
+                  <p class="text-sm text-zinc-500">
+                    {String.capitalize(Atom.to_string(@selected_image_version))} version not available
+                  </p>
                 </div>
               </div>
-            </div>
-          <% else %>
-            <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
-              <div class="text-center">
-                <.icon
-                  name="hero-photo"
-                  class="w-12 h-12 text-zinc-400 mx-auto mb-2"
-                />
-                <p class="text-sm text-zinc-500">
-                  {String.capitalize(Atom.to_string(@selected_image_version))} version not available
-                </p>
-              </div>
-            </div>
-          <% end %>
-        </div>
-
-        <p class="leading-6 text-sm text-zinc-600 mt-2">
-          Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} (#{@image_uploader.email}) on #{Timex.format!(@image_uploader.inserted_at, "%Y-%m-%d", :strftime)}"}
-        </p>
-
-        <.simple_form
-          for={@form}
-          id="edit_image_form"
-          phx-submit="save-image"
-          phx-change="validate-edit"
-        >
-          <.input field={@form[:title]} label="Title" />
-          <.input field={@form[:alt_text]} label="Alt Text" />
-
-          <div class="flex justify-end">
-            <button
-              class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80 mr-2"
-              phx-click={JS.patch(build_media_url_with_state(assigns))}
-            >
-              Cancel
-            </button>
-            <.button type="submit" phx-disable-with="Updating...">
-              Update Image
-            </.button>
+            <% end %>
           </div>
-        </.simple_form>
+
+          <%!-- Right Column: Edit Form --%>
+          <div>
+            <.simple_form
+              for={@form}
+              id="edit_image_form"
+              phx-submit="save-image"
+              phx-change="validate-edit"
+            >
+              <.input field={@form[:title]} label="Title" />
+              <.input field={@form[:alt_text]} label="Alt Text" />
+
+              <div class="flex justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
+                  phx-click={JS.patch(build_media_url_with_state(assigns))}
+                >
+                  Cancel
+                </button>
+                <.button type="submit" phx-disable-with="Updating...">
+                  Update Image
+                </.button>
+              </div>
+            </.simple_form>
+          </div>
+        </div>
       </.modal>
 
       <.modal
@@ -340,7 +355,23 @@ defmodule YscWeb.AdminMediaLive do
           </p>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
+          <%!-- Layout Toggle --%>
+          <button
+            :if={@media_count > 0}
+            phx-click="toggle-layout"
+            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
+            title={if @layout_mode == :square, do: "Switch to masonry layout", else: "Switch to square grid"}
+          >
+            <%= if @layout_mode == :square do %>
+              <.icon name="hero-squares-2x2" class="w-4 h-4" />
+              <span>Square</span>
+            <% else %>
+              <.icon name="hero-view-columns" class="w-4 h-4" />
+              <span>Masonry</span>
+            <% end %>
+          </button>
+
           <.button phx-click={JS.patch(~p"/admin/media/upload")}>
             <.icon name="hero-photo" class="w-5 h-5 -mt-1" />
             <span class="ms-1">
@@ -363,7 +394,25 @@ defmodule YscWeb.AdminMediaLive do
         />
       </div>
 
-      <section class="py-6 relative">
+      <%!-- Drag and Drop Overlay --%>
+      <div
+        :if={@show_drop_zone && @live_action != :upload}
+        id="media-drop-zone"
+        phx-drop-target={@uploads.media_uploads.ref}
+        class="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center"
+      >
+        <div class="bg-white rounded-lg shadow-2xl p-8 border-4 border-dashed border-blue-500 max-w-md mx-4">
+          <.icon name="hero-cloud-arrow-up" class="w-16 h-16 text-blue-600 mx-auto mb-4" />
+          <p class="text-xl font-semibold text-zinc-800 text-center mb-2">
+            Drop images to upload
+          </p>
+          <p class="text-sm text-zinc-600 text-center">
+            Release to add to media library
+          </p>
+        </div>
+      </div>
+
+      <section class="py-6 relative" phx-hook="MediaDropZone">
         <div
           :if={@media_count > 0}
           id="media-gallery"
@@ -464,6 +513,8 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:active_image, nil)
      |> assign(:image_uploader, nil)
      |> assign(:selected_image_version, :optimized)
+     |> assign(:layout_mode, :square)
+     |> assign(:show_drop_zone, false)
      |> assign(form: nil)
      |> stream(:images, [], dom_id: &get_dom_id/1)
      |> allow_upload(:media_uploads,
@@ -988,6 +1039,24 @@ defmodule YscWeb.AdminMediaLive do
     {:noreply, push_patch(socket, to: ~p"/admin/media?#{new_params}")}
   end
 
+  def handle_event("toggle-layout", _params, socket) do
+    new_layout =
+      case socket.assigns.layout_mode do
+        :square -> :masonry
+        :masonry -> :square
+      end
+
+    {:noreply, assign(socket, :layout_mode, new_layout)}
+  end
+
+  def handle_event("show-drop-zone", _params, socket) do
+    {:noreply, assign(socket, :show_drop_zone, true)}
+  end
+
+  def handle_event("hide-drop-zone", _params, socket) do
+    {:noreply, assign(socket, :show_drop_zone, false)}
+  end
+
   defp presign_upload(entry, socket) do
     uploads = socket.assigns.uploads
     key = "public/#{entry.client_name}"
@@ -1197,73 +1266,149 @@ defmodule YscWeb.AdminMediaLive do
   defp last_date(nil), do: nil
   defp last_date(%{inserted_at: inserted_at}), do: inserted_at
 
+  defp copy_to_clipboard_js(hidden_input_id, button_id) do
+    JS.dispatch("phx:copy", to: "##{hidden_input_id}")
+    |> JS.add_class("bg-green-50 border-green-500 text-green-700",
+      to: "##{button_id}",
+      time: 100
+    )
+    |> JS.remove_class("border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50",
+      to: "##{button_id}",
+      time: 100
+    )
+    |> JS.transition(
+      {"transition-all duration-100", "opacity-100", "opacity-0"},
+      to: "##{button_id}",
+      time: 2000
+    )
+    |> JS.add_class("border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50",
+      to: "##{button_id}",
+      time: 2100
+    )
+    |> JS.remove_class("bg-green-50 border-green-500 text-green-700",
+      to: "##{button_id}",
+      time: 2100
+    )
+  end
+
   defp render_images_by_year(assigns) do
     ~H"""
-    <div
-      id="images-grid"
-      phx-update="stream"
-      phx-viewport-bottom={!@end_of_timeline? && "load-more"}
-      class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9 gap-3 md:gap-4"
-    >
-      <%= for {id, item} <- @streams.images do %>
-        <%!-- RENDER HEADER --%>
-        <%= if match?(%Timeline.Header{}, item) do %>
-          <div
-            id={id}
-            data-year-section={item.date.year}
-            class="col-span-full sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200"
-          >
-            {item.formatted_date}
-          </div>
-        <% end %>
-
-        <%!-- RENDER IMAGE --%>
-        <%= if match?(%Media.Image{}, item) do %>
+    <%!-- Empty Search State --%>
+    <%= if @search_query != "" && Enum.empty?(@streams.images) do %>
+      <div class="mx-auto py-20 text-center">
+        <div class="flex flex-col items-center">
+          <.icon name="hero-magnifying-glass" class="w-16 h-16 text-zinc-300 mb-4" />
+          <p class="text-lg font-medium text-zinc-700 mb-2">No results found</p>
+          <p class="text-sm text-zinc-500 mb-6">
+            No images match "{@search_query}"
+          </p>
           <button
-            phx-click={JS.patch(build_image_edit_url_with_state(assigns, item.id))}
-            id={id}
-            class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden"
+            phx-click="clear-search"
+            phx-value-input-id="media-search-input"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
           >
-            <canvas
-              id={"blur-hash-image-#{item.id}"}
-              src={get_blur_hash(item)}
-              class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
-              phx-hook="BlurHashCanvas"
-            >
-            </canvas>
-
-            <img
-              class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"
-              id={"img-#{item.id}"}
-              src={get_image_path(item)}
-              loading="lazy"
-              phx-hook="BlurHashImage"
-              alt={item.alt_text || item.title || "Image"}
-            />
-
-            <div
-              :if={item.title != nil or item.alt_text != nil}
-              class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
-            >
-              <p
-                :if={item.title != nil}
-                class="text-xs font-medium text-white truncate"
-                title={item.title}
-              >
-                {item.title}
-              </p>
-              <p
-                :if={item.title == nil and item.alt_text != nil}
-                class="text-xs font-medium text-white/90 truncate"
-                title={item.alt_text}
-              >
-                {item.alt_text}
-              </p>
-            </div>
+            <.icon name="hero-x-mark" class="w-4 h-4" />
+            Clear search
           </button>
+        </div>
+      </div>
+    <% else %>
+      <div
+        id="images-grid"
+        phx-update="stream"
+        phx-viewport-bottom={!@end_of_timeline? && "load-more"}
+        class={[
+          "grid gap-3 md:gap-4",
+          if(@layout_mode == :square,
+            do:
+              "grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9",
+            else: "masonry-grid"
+          )
+        ]}
+      >
+        <%= for {id, item} <- @streams.images do %>
+          <%!-- RENDER HEADER --%>
+          <%= if match?(%Timeline.Header{}, item) do %>
+            <div
+              id={id}
+              data-year-section={item.date.year}
+              class="col-span-full sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200"
+            >
+              {item.formatted_date}
+            </div>
+          <% end %>
+
+          <%!-- RENDER IMAGE --%>
+          <%= if match?(%Media.Image{}, item) do %>
+            <button
+              phx-click={JS.patch(build_image_edit_url_with_state(assigns, item.id))}
+              id={id}
+              class={[
+                "mb-4 group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
+                if(@layout_mode == :square, do: "aspect-square", else: "")
+              ]}
+            >
+              <%!-- Processing Overlay --%>
+              <%= if item.processing_state != :completed do %>
+                <div class="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
+                  <div class="text-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                    <p class="text-xs font-medium text-white">Processing...</p>
+                  </div>
+                </div>
+              <% end %>
+
+              <%!-- Missing Alt Text Warning --%>
+              <%= if is_nil(item.alt_text) || item.alt_text == "" do %>
+                <div
+                  class="absolute top-2 right-2 z-[3] bg-yellow-500 text-white rounded-full p-1.5 shadow-lg"
+                  title="Missing alt text"
+                >
+                  <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
+                </div>
+              <% end %>
+
+              <canvas
+                id={"blur-hash-image-#{item.id}"}
+                src={get_blur_hash(item)}
+                class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
+                phx-hook="BlurHashCanvas"
+              >
+              </canvas>
+
+              <img
+                class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"
+                id={"img-#{item.id}"}
+                src={get_image_path(item)}
+                loading="lazy"
+                phx-hook="BlurHashImage"
+                alt={item.alt_text || item.title || "Image"}
+              />
+
+              <div
+                :if={item.title != nil or item.alt_text != nil}
+                class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
+              >
+                <p
+                  :if={item.title != nil}
+                  class="text-xs font-medium text-white truncate"
+                  title={item.title}
+                >
+                  {item.title}
+                </p>
+                <p
+                  :if={item.title == nil and item.alt_text != nil}
+                  class="text-xs font-medium text-white/90 truncate"
+                  title={item.alt_text}
+                >
+                  {item.alt_text}
+                </p>
+              </div>
+            </button>
+          <% end %>
         <% end %>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
     """
   end
 end
