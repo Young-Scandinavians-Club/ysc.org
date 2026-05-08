@@ -1564,7 +1564,7 @@ defmodule YscWeb.HomeLive do
                                 class="inline-flex items-center gap-1.5 rounded py-1.5 px-3 text-sm font-semibold leading-6 text-zinc-100 bg-zinc-900 hover:bg-zinc-800 active:scale-[0.98] active:transition-none transition duration-150 ease-in-out whitespace-nowrap"
                               >
                                 <.icon name="hero-qr-code" class="w-4 h-4" />
-                                QR Codes
+                                Tickets for check-in
                               </.link>
                               <%= if length(order_ids) == 1 do %>
                                 <.link
