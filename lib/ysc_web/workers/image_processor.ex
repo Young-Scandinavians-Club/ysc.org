@@ -10,6 +10,7 @@ defmodule YscWeb.Workers.ImageProcessor do
 
   alias Ysc.Http.UrlFetchGuard
   alias Ysc.Media
+  alias Ysc.S3Config
   alias YscWeb.Validators.FileValidator
 
   @temp_dir "/tmp/image_processor"
@@ -140,6 +141,43 @@ defmodule YscWeb.Workers.ImageProcessor do
   end
 
   defp download_raw_to_temp(%Media.Image{} = image, dest_path) do
+    case upload_key_from_image(image) do
+      key when is_binary(key) ->
+        download_s3_object_to_temp(image, key, dest_path)
+
+      nil ->
+        download_raw_url_to_temp(image, dest_path)
+    end
+  end
+
+  defp download_s3_object_to_temp(%Media.Image{} = image, key, dest_path) do
+    case S3Config.bucket_name()
+         |> ExAws.S3.download_file(key, dest_path)
+         |> ExAws.request() do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "ImageProcessor: raw image S3 download failed",
+          error: RuntimeError.exception("raw_image S3 download failed"),
+          extra: %{
+            image_id: image.id,
+            key: key,
+            reason: inspect(reason)
+          },
+          tags: %{
+            worker: "YscWeb.Workers.ImageProcessor",
+            stage: "s3_download"
+          }
+        )
+
+        Media.set_image_processing_state(image, :failed)
+        {:error, {:s3_download_failed, reason}}
+    end
+  end
+
+  defp download_raw_url_to_temp(%Media.Image{} = image, dest_path) do
     url = image.raw_image_path
 
     case UrlFetchGuard.validate_url_for_server_fetch(url) do
@@ -245,8 +283,10 @@ defmodule YscWeb.Workers.ImageProcessor do
          ext when ext != "" <- Path.extname(raw_path),
          stripped_path <- raw_path <> ".stripped" <> ext,
          {:ok, parsed} <- Image.open(raw_path),
-         # Remove EXIF, IPTC, XMP only; keep color profile (ICC)
-         {:ok, stripped} <- Image.remove_metadata(parsed, [:exif, :iptc, :xmp]),
+         {:ok, oriented} <- autorotate_image(parsed),
+         # Remove EXIF, IPTC, XMP only after orientation has been baked in.
+         {:ok, stripped} <-
+           Image.remove_metadata(oriented, [:exif, :iptc, :xmp]),
          {:ok, _} <- write_stripped_image(stripped, stripped_path, ext),
          _ <- Media.upload_file_to_s3(stripped_path, raw_key) do
       Ysc.Logging.info(
@@ -280,11 +320,26 @@ defmodule YscWeb.Workers.ImageProcessor do
     Image.write(stripped, path, opts)
   end
 
+  defp autorotate_image(image) do
+    case Image.autorotate(image) do
+      {:ok, {%Vix.Vips.Image{} = oriented, _orientation}} -> {:ok, oriented}
+      {:error, _} = error -> error
+    end
+  end
+
   defp raw_key_from_image(image) do
     case image.upload_data do
       %{key: k} when is_binary(k) -> k
       %{"key" => k} when is_binary(k) -> k
       _ -> key_from_object_url(image.raw_image_path)
+    end
+  end
+
+  defp upload_key_from_image(image) do
+    case image.upload_data do
+      %{key: k} when is_binary(k) and k != "" -> k
+      %{"key" => k} when is_binary(k) and k != "" -> k
+      _ -> nil
     end
   end
 

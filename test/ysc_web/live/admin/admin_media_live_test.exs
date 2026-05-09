@@ -38,7 +38,7 @@ defmodule YscWeb.AdminMediaLiveTest do
 
       assert has_element?(
                view,
-               "#media-drop-upload-form[phx-submit='save'][phx-change='validate'] input[type='file']"
+               "#media-drop-upload-form[phx-change='validate'] input[type='file']"
              )
     end
 
@@ -81,12 +81,17 @@ defmodule YscWeb.AdminMediaLiveTest do
 
       assert has_element?(
                view,
-               "button[phx-value-layout='square'][aria-pressed='false']"
+               "#media-layout-preference[phx-hook='MediaLayoutPreference']"
              )
 
       assert has_element?(
                view,
-               "button[phx-value-layout='masonry'][aria-pressed='true']"
+               "button[data-media-layout='square'][phx-value-layout='square'][aria-pressed='false']"
+             )
+
+      assert has_element?(
+               view,
+               "button[data-media-layout='masonry'][phx-value-layout='masonry'][aria-pressed='true']"
              )
 
       assert has_element?(view, "#images-grid.media-masonry-grid")
@@ -128,6 +133,57 @@ defmodule YscWeb.AdminMediaLiveTest do
                view,
                "#image-#{image.id} [aria-label='Missing alt text'].h-7.w-7.rounded-full"
              )
+    end
+
+    test "renders blurhash placeholder wired to the gallery image hook", %{
+      conn: conn
+    } do
+      image =
+        create_test_image(%{
+          blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+          processing_state: "completed"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      assert has_element?(
+               view,
+               "#image-#{image.id} canvas#blur-hash-img-#{image.id}[phx-hook='BlurHashCanvas']"
+             )
+
+      assert has_element?(
+               view,
+               "#image-#{image.id} img#img-#{image.id}[phx-hook='BlurHashImage']"
+             )
+    end
+
+    test "refreshes a processing image when the processor broadcasts an update",
+         %{
+           conn: conn
+         } do
+      image =
+        create_test_image(%{
+          optimized_image_path: nil,
+          thumbnail_path: nil,
+          processing_state: "processing"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      assert has_element?(view, "#image-#{image.id}", "Processing...")
+
+      Ysc.Media.update_processed_image(image, %{
+        optimized_image_path: "/uploads/processed_optimized.webp",
+        thumbnail_path: "/uploads/processed_thumb.webp",
+        blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+        width: 800,
+        height: 600,
+        processing_state: "completed"
+      })
+
+      send(view.pid, {Ysc.Media, {:image_updated, image.id}})
+
+      refute has_element?(view, "#image-#{image.id}", "Processing...")
     end
   end
 end

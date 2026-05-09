@@ -372,17 +372,16 @@ defmodule YscWeb.AdminMediaLive do
       <form
         :if={@live_action != :upload}
         id="media-drop-upload-form"
-        phx-submit="save"
         phx-change="validate"
         class="hidden"
       >
-        <.live_file_input upload={@uploads.media_uploads} />
+        <.live_file_input upload={@uploads.media_drop_uploads} />
       </form>
 
       <div
         id="media-page-drop-target"
         phx-hook="MediaDropZone"
-        phx-drop-target={@uploads.media_uploads.ref}
+        phx-drop-target={@uploads.media_drop_uploads.ref}
       >
         <div class="flex justify-between items-center py-6">
           <div>
@@ -399,6 +398,8 @@ defmodule YscWeb.AdminMediaLive do
           <div class="flex items-center gap-3">
             <div
               :if={@media_count > 0}
+              id="media-layout-preference"
+              phx-hook="MediaLayoutPreference"
               class="inline-flex rounded-lg border border-zinc-300 bg-zinc-100 p-1"
               role="group"
               aria-label="Media layout"
@@ -407,6 +408,7 @@ defmodule YscWeb.AdminMediaLive do
                 type="button"
                 phx-click="set-layout"
                 phx-value-layout="square"
+                data-media-layout="square"
                 aria-pressed={
                   if(@layout_mode == :square, do: "true", else: "false")
                 }
@@ -426,6 +428,7 @@ defmodule YscWeb.AdminMediaLive do
                 type="button"
                 phx-click="set-layout"
                 phx-value-layout="masonry"
+                data-media-layout="masonry"
                 aria-pressed={
                   if(@layout_mode == :masonry, do: "true", else: "false")
                 }
@@ -467,22 +470,45 @@ defmodule YscWeb.AdminMediaLive do
 
         <%!-- Drag and Drop Overlay --%>
         <div
-          :if={@show_drop_zone && @live_action != :upload}
+          :if={
+            (@show_drop_zone || @pending_upload_submit?) && @live_action != :upload
+          }
           id="media-drop-zone"
-          phx-drop-target={@uploads.media_uploads.ref}
-          class="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center"
+          phx-drop-target={@uploads.media_drop_uploads.ref}
+          class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/20 backdrop-blur-[2px]"
         >
-          <div class="bg-white rounded-lg shadow-2xl p-8 border-4 border-dashed border-blue-500 max-w-md mx-4">
-            <.icon
-              name="hero-cloud-arrow-up"
-              class="w-16 h-16 text-blue-600 mx-auto mb-4"
-            />
-            <p class="text-xl font-semibold text-zinc-800 text-center mb-2">
-              Drop images to upload
+          <div class="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 bg-white/95 p-6 text-center shadow-xl ring-1 ring-zinc-950/5">
+            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+              <.icon name="hero-cloud-arrow-up" class="h-7 w-7" />
+            </div>
+            <p class="text-base font-semibold text-zinc-900">
+              {if @pending_upload_submit?,
+                do: "Uploading images",
+                else: "Drop images to upload"}
             </p>
-            <p class="text-sm text-zinc-600 text-center">
-              Release to add to media library
+            <p class="mt-1 text-sm text-zinc-600">
+              {if @pending_upload_submit?,
+                do: "Keep this page open while the upload finishes.",
+                else:
+                  "Release anywhere on this page to add them to the media library."}
             </p>
+            <div
+              :if={@pending_upload_submit?}
+              class="mt-5 overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200"
+            >
+              <div
+                class="h-2 rounded-full bg-blue-600 transition-all duration-300"
+                style={"width: #{upload_progress(@uploads.media_drop_uploads.entries)}%"}
+              >
+              </div>
+            </div>
+            <div class="mt-3 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500">
+              <%= if @pending_upload_submit? do %>
+                {upload_progress(@uploads.media_drop_uploads.entries)}% uploaded
+              <% else %>
+                JPG, PNG, GIF, or WebP
+              <% end %>
+            </div>
           </div>
         </div>
 
@@ -565,6 +591,8 @@ defmodule YscWeb.AdminMediaLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Media.subscribe_images()
+
     media_count = Media.count_images()
     timeline = Media.get_timeline_indices()
     available_years = Enum.map(timeline, & &1.year)
@@ -591,12 +619,21 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_image_version, :optimized)
      |> assign(:layout_mode, :masonry)
      |> assign(:show_drop_zone, false)
+     |> assign(:pending_upload_submit?, false)
      |> assign(form: nil)
      |> stream(:images, [], dom_id: &get_dom_id/1)
      |> allow_upload(:media_uploads,
        accept: ~w(.jpg .jpeg .png .gif .webp),
        max_entries: 10,
-       external: &presign_upload/2
+       external: &presign_upload/2,
+       progress: &handle_media_upload_progress/3
+     )
+     |> allow_upload(:media_drop_uploads,
+       accept: ~w(.jpg .jpeg .png .gif .webp),
+       max_entries: 10,
+       auto_upload: true,
+       external: &presign_upload/2,
+       progress: &handle_media_upload_progress/3
      ), temporary_assigns: [form: nil]}
   end
 
@@ -807,50 +844,18 @@ defmodule YscWeb.AdminMediaLive do
   end
 
   def handle_event("save", _params, socket) do
-    uploader = socket.assigns[:current_user]
+    if upload_entries_in_progress?(socket, :media_uploads) do
+      {:noreply, assign(socket, :pending_upload_submit?, true)}
+    else
+      {:noreply, save_uploaded_media(socket, :media_uploads)}
+    end
+  end
 
-    uploaded_files =
-      consume_uploaded_entries(socket, :media_uploads, fn details, _entry ->
-        raw_path = S3Config.object_url(details[:key])
-
-        {:ok, new_image} =
-          Media.add_new_image(
-            %{
-              raw_image_path: URI.encode(raw_path),
-              user_id: uploader.id,
-              upload_data: details
-            },
-            uploader
-          )
-
-        %{id: new_image.id}
-        |> YscWeb.Workers.ImageProcessor.new()
-        |> Oban.insert()
-
-        {:ok, new_image}
-      end)
-
-    media_count = Media.count_images()
-    timeline = Media.get_timeline_indices()
-    available_years = Enum.map(timeline, & &1.year)
-    images = Media.list_images_cursor(limit: socket.assigns.per_page)
-    {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_date_headers(images)
-
+  def handle_event("drop-upload-started", _params, socket) do
     {:noreply,
      socket
-     |> update(:uploaded_files, &(&1 ++ uploaded_files))
-     |> assign(:media_count, media_count)
-     |> assign(:timeline, timeline)
-     |> assign(:available_years, available_years)
-     |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-     |> assign(:stream_initialized?, true)
-     |> assign(:last_image_date, images |> List.last() |> last_date())
-     |> assign(:images_empty?, images == [])
-     |> assign(:years_set, years_set)
-     |> assign(:years_list, years_list)
-     |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-     |> push_patch(to: ~p"/admin/media")}
+     |> assign(:show_drop_zone, false)
+     |> assign(:pending_upload_submit?, true)}
   end
 
   def handle_event("validate-edit", %{"image" => image_params}, socket) do
@@ -1141,6 +1146,90 @@ defmodule YscWeb.AdminMediaLive do
     {:noreply, assign(socket, :show_drop_zone, false)}
   end
 
+  @impl true
+  def handle_info({Media, {:image_updated, image_id}}, socket) do
+    case Media.fetch_image(image_id) do
+      nil ->
+        {:noreply, socket}
+
+      image ->
+        socket =
+          if socket.assigns.active_image &&
+               socket.assigns.active_image.id == image.id do
+            assign(socket, :active_image, image)
+          else
+            socket
+          end
+
+        {:noreply, stream_insert(socket, :images, image)}
+    end
+  end
+
+  defp handle_media_upload_progress(:media_uploads, _entry, socket) do
+    if socket.assigns.pending_upload_submit? and
+         upload_entries_done?(socket, :media_uploads) do
+      {:noreply, save_uploaded_media(socket, :media_uploads)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp handle_media_upload_progress(:media_drop_uploads, _entry, socket) do
+    if upload_entries_done?(socket, :media_drop_uploads) do
+      {:noreply, save_uploaded_media(socket, :media_drop_uploads)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp save_uploaded_media(socket, upload_name) do
+    uploader = socket.assigns[:current_user]
+
+    uploaded_files =
+      consume_uploaded_entries(socket, upload_name, fn details, _entry ->
+        raw_path = S3Config.object_url(details[:key])
+
+        {:ok, new_image} =
+          Media.add_new_image(
+            %{
+              raw_image_path: URI.encode(raw_path),
+              user_id: uploader.id,
+              upload_data: details
+            },
+            uploader
+          )
+
+        %{id: new_image.id}
+        |> YscWeb.Workers.ImageProcessor.new()
+        |> Oban.insert()
+
+        {:ok, new_image}
+      end)
+
+    media_count = Media.count_images()
+    timeline = Media.get_timeline_indices()
+    available_years = Enum.map(timeline, & &1.year)
+    images = Media.list_images_cursor(limit: socket.assigns.per_page)
+    {years_set, years_list} = years_from_images(images)
+    stream_items = Timeline.inject_date_headers(images)
+
+    socket
+    |> update(:uploaded_files, &(&1 ++ uploaded_files))
+    |> assign(:media_count, media_count)
+    |> assign(:timeline, timeline)
+    |> assign(:available_years, available_years)
+    |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+    |> assign(:stream_initialized?, true)
+    |> assign(:last_image_date, images |> List.last() |> last_date())
+    |> assign(:images_empty?, images == [])
+    |> assign(:years_set, years_set)
+    |> assign(:years_list, years_list)
+    |> assign(:show_drop_zone, false)
+    |> assign(:pending_upload_submit?, false)
+    |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+    |> push_patch(to: ~p"/admin/media")
+  end
+
   defp presign_upload(entry, socket) do
     uploads = socket.assigns.uploads
     key = "public/#{entry.client_name}"
@@ -1187,6 +1276,25 @@ defmodule YscWeb.AdminMediaLive do
   end
 
   defp error_to_string(_), do: "An error occurred"
+
+  defp upload_entries_in_progress?(socket, upload_name) do
+    socket.assigns.uploads[upload_name].entries
+    |> Enum.any?(&(not &1.done?))
+  end
+
+  defp upload_entries_done?(socket, upload_name) do
+    entries = socket.assigns.uploads[upload_name].entries
+    entries != [] and Enum.all?(entries, & &1.done?)
+  end
+
+  defp upload_progress([]), do: 0
+
+  defp upload_progress(entries) do
+    entries
+    |> Enum.map(& &1.progress)
+    |> Enum.sum()
+    |> div(length(entries))
+  end
 
   # Helper function to get a specific image version path
   defp get_image_version_path(%Media.Image{} = image, :thumbnail) do
@@ -1444,7 +1552,7 @@ defmodule YscWeb.AdminMediaLive do
               <% end %>
 
               <canvas
-                id={"blur-hash-image-#{item.id}"}
+                id={"blur-hash-img-#{item.id}"}
                 src={get_blur_hash(item)}
                 class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
                 phx-hook="BlurHashCanvas"

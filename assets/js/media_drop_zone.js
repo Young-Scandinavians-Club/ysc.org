@@ -2,7 +2,6 @@ let MediaDropZone = {
     mounted() {
         this.container = this.el;
         this.dragCounter = 0;
-        this.dropUploadForm = document.getElementById("media-drop-upload-form");
 
         // Bind event handlers
         this.handleDragEnter = this.handleDragEnter.bind(this);
@@ -23,10 +22,6 @@ let MediaDropZone = {
         document.removeEventListener("dragleave", this.handleDragLeave);
         document.removeEventListener("dragover", this.handleDragOver);
         document.removeEventListener("drop", this.handleDrop);
-    },
-
-    updated() {
-        this.dropUploadForm = document.getElementById("media-drop-upload-form");
     },
 
     handleDragEnter(e) {
@@ -70,13 +65,12 @@ let MediaDropZone = {
         e.preventDefault();
         this.dragCounter = 0;
 
-        // Hide drop zone overlay
-        this.pushEvent("hide-drop-zone", {});
-
-        // Phoenix handles the drop via phx-drop-target. Submit on the next tick
-        // so the dropped files are registered before the server consumes them.
-        if (this.dropUploadForm) {
-            setTimeout(() => this.submitDropUploadForm(), 0);
+        const files = Array.from(e.dataTransfer.files || []);
+        if (files.length > 0) {
+            // Let LiveView's phx-drop-target handler track the files first.
+            setTimeout(() => this.pushEvent("drop-upload-started", {}), 0);
+        } else {
+            this.pushEvent("hide-drop-zone", {});
         }
     },
 
@@ -84,19 +78,6 @@ let MediaDropZone = {
         // Check if the drag contains files
         if (!e.dataTransfer || !e.dataTransfer.types) return false;
         return Array.from(e.dataTransfer.types).includes("Files");
-    },
-
-    submitDropUploadForm() {
-        const form = document.getElementById("media-drop-upload-form");
-        if (!form) return;
-
-        if (typeof form.requestSubmit === "function") {
-            form.requestSubmit();
-        } else {
-            form.dispatchEvent(
-                new Event("submit", { bubbles: true, cancelable: true })
-            );
-        }
     },
 };
 

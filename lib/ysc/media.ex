@@ -18,6 +18,19 @@ defmodule Ysc.Media do
   @max_optimized_width 1920
   @max_optimized_height 1920
   @optimized_quality 85
+  @topic "media"
+
+  def subscribe_images do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @topic)
+  end
+
+  def broadcast_image_updated(%Media.Image{} = image) do
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      @topic,
+      {__MODULE__, {:image_updated, image.id}}
+    )
+  end
 
   def list_images() do
     {:ok, Media.Image |> order_by(desc: :id) |> Repo.all()}
@@ -220,12 +233,24 @@ defmodule Ysc.Media do
   end
 
   def set_image_processing_state(%Media.Image{} = image, state) do
-    Repo.update(Media.Image.image_processing_state_changeset(image, state))
+    image
+    |> Media.Image.image_processing_state_changeset(state)
+    |> Repo.update()
+    |> case do
+      {:ok, image} = result ->
+        broadcast_image_updated(image)
+        result
+
+      error ->
+        error
+    end
   end
 
   def update_processed_image(%Media.Image{} = image, attrs) do
     changeset = Media.Image.processed_image_changeset(image, attrs)
-    Repo.update!(changeset)
+    image = Repo.update!(changeset)
+    broadcast_image_updated(image)
+    image
   end
 
   def process_image_upload(
@@ -235,14 +260,16 @@ defmodule Ysc.Media do
         optimized_output_path
       ) do
     {:ok, parsed_image} = Image.open(path)
+    {:ok, oriented_image} = autorotate_image(parsed_image)
 
-    # Remove EXIF, IPTC, XMP only; keep color profile (ICC) for correct rendering
+    # Bake EXIF orientation into pixels before stripping metadata so WebP outputs
+    # render the same way as the original camera image.
     {:ok, meta_free_image} =
-      Image.remove_metadata(parsed_image, [:exif, :iptc, :xmp])
+      Image.remove_metadata(oriented_image, [:exif, :iptc, :xmp])
 
-    # Get original dimensions
-    original_width = Image.width(parsed_image)
-    original_height = Image.height(parsed_image)
+    # Store display dimensions after orientation has been normalized.
+    original_width = Image.width(meta_free_image)
+    original_height = Image.height(meta_free_image)
 
     # Detect original format from file extension
     original_format = detect_image_format(path)
@@ -336,6 +363,13 @@ defmodule Ysc.Media do
 
   # Always convert to WebP for optimal compression and modern browser support
   defp determine_output_format(_original_format), do: :webp
+
+  defp autorotate_image(image) do
+    case Image.autorotate(image) do
+      {:ok, {%Vix.Vips.Image{} = oriented, _orientation}} -> {:ok, oriented}
+      {:error, _} = error -> error
+    end
+  end
 
   # Ensure file path has correct extension for the format
   defp ensure_format_extension(path, format) do

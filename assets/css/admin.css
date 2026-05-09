@@ -830,6 +830,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     width: 100%;
 }
 
+.media-square-grid > [data-year-section] {
+    grid-column: 1 / -1;
+}
+
 .media-masonry-grid {
     column-count: 2;
     column-gap: 0.75rem;
