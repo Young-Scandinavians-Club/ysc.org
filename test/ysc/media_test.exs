@@ -171,6 +171,37 @@ defmodule Ysc.MediaTest do
       assert results != []
     end
 
+    test "filters by search on basename of raw_image_path when title and alt omit the term",
+         %{user: user} do
+      token = "PathOnlySearchToken#{System.unique_integer([:positive])}"
+
+      {:ok, matching} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://cdn.example.com/2024/#{token}_photo.webp",
+          processing_state: :unprocessed,
+          title: "Holiday snap",
+          alt_text: "Friends"
+        }
+        |> Repo.insert()
+
+      {:ok, other} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://cdn.example.com/2024/ordinary_name.jpg",
+          processing_state: :unprocessed,
+          title: "Different subject",
+          alt_text: "Nature"
+        }
+        |> Repo.insert()
+
+      results = Media.list_images_cursor(search: token, limit: 50)
+      ids = Enum.map(results, & &1.id)
+
+      assert matching.id in ids
+      refute other.id in ids
+    end
+
     test "search returns empty list for non-matching term" do
       results =
         Media.list_images_cursor(search: "zzz_nonexistent_xyz", limit: 50)
