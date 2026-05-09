@@ -28,6 +28,18 @@ defmodule Ysc.MediaTest do
     end
   end
 
+  describe "total_image_count_from_timeline/1" do
+    test "sums per-year counts" do
+      timeline = [
+        %{year: 2026, count: 3},
+        %{year: 2025, count: 7}
+      ]
+
+      assert Media.total_image_count_from_timeline(timeline) == 10
+      assert Media.total_image_count_from_timeline([]) == 0
+    end
+  end
+
   describe "fetch_image/1" do
     test "returns image when found" do
       # Create an image

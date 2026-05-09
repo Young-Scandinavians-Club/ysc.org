@@ -516,7 +516,21 @@ defmodule YscWeb.AdminMediaLive do
             phx-hook="ScrollPreserver"
             class="pr-12"
           >
-            {render_images_by_year(assigns)}
+            <%= if @stream_initialized? do %>
+              {render_images_by_year(assigns)}
+            <% else %>
+              <div
+                id="media-gallery-loading"
+                class="flex justify-center py-16"
+                role="status"
+                aria-live="polite"
+              >
+                <div class="flex flex-col items-center gap-3 text-zinc-500">
+                  <.icon name="hero-arrow-path" class="w-10 h-10 animate-spin" />
+                  <p class="text-sm font-medium">Loading images…</p>
+                </div>
+              </div>
+            <% end %>
           </div>
           <%!-- Year Scrubber --%>
           <div
@@ -590,8 +604,8 @@ defmodule YscWeb.AdminMediaLive do
   def mount(_params, _session, socket) do
     if connected?(socket), do: Media.subscribe_images()
 
-    media_count = Media.count_images()
     timeline = Media.get_timeline_indices()
+    media_count = Media.total_image_count_from_timeline(timeline)
     available_years = Enum.map(timeline, & &1.year)
 
     {:ok,
@@ -678,87 +692,107 @@ defmodule YscWeb.AdminMediaLive do
       "Year param: #{inspect(year_param)}, Search query: #{inspect(search_query)}"
     )
 
-    # Load images based on year param and search query, even when on edit route
-    # But only load if stream is empty or year/search has changed
+    # Load images after the WebSocket connects so the first HTML response avoids the
+    # gallery query; timeline + totals still load in mount (single grouped query).
     socket =
-      if year_param do
-        year =
-          if is_binary(year_param),
-            do: String.to_integer(year_param),
-            else: year_param
-
-        Ysc.Logging.debug(
-          "Processing year: #{year}, current: #{socket.assigns.selected_year}"
+      if connected?(socket) do
+        load_media_gallery_for_params(
+          socket,
+          year_param,
+          search_query,
+          previous_search_query
         )
-
-        year_changed = year != socket.assigns.selected_year
-        search_changed = search_query != previous_search_query
-        not_initialized = not socket.assigns.stream_initialized?
-
-        if year_changed || search_changed || not_initialized do
-          start_date =
-            DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-
-          end_date =
-            DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
-
-          images =
-            Repo.all(
-              year_images_query(
-                start_date,
-                end_date,
-                search_query,
-                socket.assigns.per_page
-              )
-            )
-
-          Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
-
-          {years_set, years_list} = years_from_images(images)
-          stream_items = Timeline.inject_date_headers(images)
-
-          socket
-          |> assign(:selected_year, year)
-          |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-          |> assign(:stream_initialized?, true)
-          |> assign(:last_image_date, images |> List.last() |> last_date())
-          |> assign(:images_empty?, images == [])
-          |> assign(:years_set, years_set)
-          |> assign(:years_list, years_list)
-          |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-        else
-          socket
-        end
       else
-        has_year_filter = not is_nil(socket.assigns.selected_year)
-        search_changed = search_query != previous_search_query
-        not_initialized = not socket.assigns.stream_initialized?
-
-        if has_year_filter || search_changed || not_initialized do
-          images =
-            Media.list_images_cursor(
-              limit: socket.assigns.per_page,
-              search: search_query
-            )
-
-          {years_set, years_list} = years_from_images(images)
-          stream_items = Timeline.inject_date_headers(images)
-
-          socket
-          |> assign(:selected_year, nil)
-          |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-          |> assign(:stream_initialized?, true)
-          |> assign(:last_image_date, images |> List.last() |> last_date())
-          |> assign(:images_empty?, images == [])
-          |> assign(:years_set, years_set)
-          |> assign(:years_list, years_list)
-          |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-        else
-          socket
-        end
+        socket
       end
 
     {:noreply, socket}
+  end
+
+  defp load_media_gallery_for_params(
+         socket,
+         year_param,
+         search_query,
+         previous_search_query
+       ) do
+    require Ysc.Logging
+
+    if year_param do
+      year =
+        if is_binary(year_param),
+          do: String.to_integer(year_param),
+          else: year_param
+
+      Ysc.Logging.debug(
+        "Processing year: #{year}, current: #{socket.assigns.selected_year}"
+      )
+
+      year_changed = year != socket.assigns.selected_year
+      search_changed = search_query != previous_search_query
+      not_initialized = not socket.assigns.stream_initialized?
+
+      if year_changed || search_changed || not_initialized do
+        start_date =
+          DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
+
+        end_date =
+          DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
+
+        images =
+          Repo.all(
+            year_images_query(
+              start_date,
+              end_date,
+              search_query,
+              socket.assigns.per_page
+            )
+          )
+
+        Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
+
+        {years_set, years_list} = years_from_images(images)
+        stream_items = Timeline.inject_date_headers(images)
+
+        socket
+        |> assign(:selected_year, year)
+        |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+        |> assign(:stream_initialized?, true)
+        |> assign(:last_image_date, images |> List.last() |> last_date())
+        |> assign(:images_empty?, images == [])
+        |> assign(:years_set, years_set)
+        |> assign(:years_list, years_list)
+        |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+      else
+        socket
+      end
+    else
+      has_year_filter = not is_nil(socket.assigns.selected_year)
+      search_changed = search_query != previous_search_query
+      not_initialized = not socket.assigns.stream_initialized?
+
+      if has_year_filter || search_changed || not_initialized do
+        images =
+          Media.list_images_cursor(
+            limit: socket.assigns.per_page,
+            search: search_query
+          )
+
+        {years_set, years_list} = years_from_images(images)
+        stream_items = Timeline.inject_date_headers(images)
+
+        socket
+        |> assign(:selected_year, nil)
+        |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+        |> assign(:stream_initialized?, true)
+        |> assign(:last_image_date, images |> List.last() |> last_date())
+        |> assign(:images_empty?, images == [])
+        |> assign(:years_set, years_set)
+        |> assign(:years_list, years_list)
+        |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+      else
+        socket
+      end
+    end
   end
 
   defp parse_query_params_from_uri(params, uri) do
@@ -1189,8 +1223,8 @@ defmodule YscWeb.AdminMediaLive do
         {:ok, new_image}
       end)
 
-    media_count = Media.count_images()
     timeline = Media.get_timeline_indices()
+    media_count = Media.total_image_count_from_timeline(timeline)
     available_years = Enum.map(timeline, & &1.year)
     images = Media.list_images_cursor(limit: socket.assigns.per_page)
     {years_set, years_list} = years_from_images(images)
