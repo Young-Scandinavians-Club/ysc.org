@@ -73,13 +73,19 @@ defmodule Ysc.Newsletter do
   - :source - Source of subscription (e.g. "public_signup", "user_registration")
   - :metadata - Map of extra data
 
-  Returns `{:ok, subscriber}` or `{:error, changeset}`.
+  Returns `{:ok, subscriber}` or `{:error, changeset}` or `{:error, atom}`.
+
+  Error atoms:
+  - `:invalid_email` - malformed email address
+  - `:no_mx_records` - domain cannot receive email
+  - `:disposable_email` - throwaway/temporary email domain blocked
   """
   def subscribe(email, opts \\ []) do
-    if valid_email?(email) do
-      do_subscribe(String.trim(email), opts)
-    else
-      {:error, :invalid_email}
+    trimmed_email = String.trim(email)
+
+    case Ysc.Newsletter.EmailValidator.validate_email(trimmed_email) do
+      :ok -> do_subscribe(trimmed_email, opts)
+      {:error, reason} -> {:error, reason}
     end
   end
 

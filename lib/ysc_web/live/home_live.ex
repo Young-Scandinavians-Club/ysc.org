@@ -2522,6 +2522,24 @@ defmodule YscWeb.HomeLive do
            newsletter_error: "Please enter a valid email address."
          )}
 
+      {:error, :no_mx_records} ->
+        {:noreply,
+         socket
+         |> assign(
+           newsletter_email: email,
+           newsletter_error:
+             "This email domain appears to be invalid. Please check your email address."
+         )}
+
+      {:error, :disposable_email} ->
+        {:noreply,
+         socket
+         |> assign(
+           newsletter_email: email,
+           newsletter_error:
+             "Temporary email addresses are not allowed. Please use a permanent email address."
+         )}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         error_message =
           case changeset.errors do

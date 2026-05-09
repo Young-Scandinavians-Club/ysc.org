@@ -789,6 +789,33 @@ defmodule YscWeb.HomeLiveTest do
       assert render(view) =~ "Please enter a valid email address."
     end
 
+    test "subscribe_newsletter shows error for disposable email domain", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_submit(view, "subscribe_newsletter", %{
+        "email" => "test@mailinator.com"
+      })
+
+      assert has_element?(view, "#newsletter-error")
+      assert render(view) =~ "Temporary email addresses are not allowed"
+    end
+
+    test "subscribe_newsletter shows error for domain with no MX records", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      domain =
+        "nonexistent-domain-#{System.unique_integer([:positive])}-test.com"
+
+      render_submit(view, "subscribe_newsletter", %{"email" => "user@#{domain}"})
+
+      assert has_element?(view, "#newsletter-error")
+      assert render(view) =~ "email domain appears to be invalid"
+    end
+
     test "subscribe_newsletter shows success state for valid email", %{
       conn: conn
     } do
