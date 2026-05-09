@@ -3177,8 +3177,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </li>
                       <li>
                         <strong>Step 2:</strong>
-                        Select your check-in and check-out dates, number of adults and children using the
-                        <strong>booking form above</strong>.
+                        Select your check-in and check-out dates, number of adults and children using the <strong>booking form above</strong>.
                       </li>
                       <li>
                         <strong>Step 3:</strong>
@@ -3186,8 +3185,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </li>
                       <li>
                         <strong>Step 4:</strong>
-                        Review your reservation summary, then complete your booking and payment
-                        <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
+                        Review your reservation summary, then complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
                       </li>
                       <li>
                         After booking, you can view and manage your reservation, including cancellation options, from your booking details page (accessible via the link in your confirmation email).
