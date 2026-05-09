@@ -173,6 +173,8 @@ defmodule Ysc.Newsletter.EmailValidator do
     :ok
   end
 
+  # path is constructed from Application.app_dir/2 with a fixed internal filename, not user input
+  # sobelow_skip ["Traversal.FileModule"]
   defp load_disposable_domains do
     path = Application.app_dir(:ysc, "priv/disposable_domains.txt")
 

@@ -80,7 +80,9 @@ defmodule Ysc.Newsletter do
   - `:no_mx_records` - domain cannot receive email
   - `:disposable_email` - throwaway/temporary email domain blocked
   """
-  def subscribe(email, opts \\ []) do
+  def subscribe(email, opts \\ [])
+
+  def subscribe(email, opts) when is_binary(email) do
     trimmed_email = String.trim(email)
 
     case Ysc.Newsletter.EmailValidator.validate_email(trimmed_email) do
@@ -88,6 +90,8 @@ defmodule Ysc.Newsletter do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  def subscribe(_email, _opts), do: {:error, :invalid_email}
 
   defp do_subscribe(email, opts) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)

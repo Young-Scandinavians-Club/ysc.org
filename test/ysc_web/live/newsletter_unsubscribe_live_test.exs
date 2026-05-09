@@ -73,8 +73,9 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
     end
 
     test "displays email correctly with special characters", %{conn: conn} do
-      # Test email with plus addressing and dots
-      test_email = "user.name+tag@example.co.uk"
+      # Test email with plus addressing and dots; example.com has a null MX
+      # record so it passes validation while keeping focus on the local-part.
+      test_email = "user.name+tag@example.com"
 
       {:ok, sub} =
         Newsletter.subscribe(test_email, source: "public_signup")

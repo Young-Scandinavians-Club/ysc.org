@@ -57,9 +57,9 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
                EmailValidator.validate_email("test@10minutemail.com")
     end
 
-    test "rejects tempmail disposable domain" do
+    test "rejects tempmail-style disposable domain" do
       assert {:error, :disposable_email} =
-               EmailValidator.validate_email("test@tempmail.com")
+               EmailValidator.validate_email("test@etempmail.com")
     end
 
     test "rejects domain with no MX records" do
