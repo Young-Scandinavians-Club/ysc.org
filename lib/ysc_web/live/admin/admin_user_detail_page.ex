@@ -6,11 +6,6 @@ defmodule YscWeb.AdminUserDetailsLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias Ysc.Accounts
   alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Bookings

@@ -11,11 +11,6 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
   alias Ysc.Accounts
   alias Ysc.Bookings.Entitlements
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,

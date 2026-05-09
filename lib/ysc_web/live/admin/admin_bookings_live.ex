@@ -8,11 +8,6 @@ defmodule YscWeb.AdminBookingsLive do
   import YscWeb.Components.Autocomplete
   alias Phoenix.LiveView.JS
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias Ysc.Bookings
   alias Ysc.MoneyHelper
   alias Ysc.Accounts

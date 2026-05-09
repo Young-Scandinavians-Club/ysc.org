@@ -4,11 +4,6 @@ defmodule YscWeb.AdminPostEditorLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Posts.Post
