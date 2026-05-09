@@ -158,7 +158,7 @@ defmodule YscWeb.TrixUploadsController do
           [".jpg", ".jpeg", ".png", ".webp"]
           |> Enum.each(fn ext ->
             file_path = "#{tmp_output_file}#{suffix}#{ext}"
-            if File.exists?(file_path), do: File.rm(file_path)
+            rm_temp_image_output_if_present(file_path)
           end)
         end)
 
@@ -176,6 +176,12 @@ defmodule YscWeb.TrixUploadsController do
             {:error, "Could not save image."}
         end
     end
+  end
+
+  # sobelow_skip ["Traversal.FileModule"]
+  # Paths are always under @temp_dir, using only fixed suffixes/extensions and a DB id.
+  defp rm_temp_image_output_if_present(file_path) when is_binary(file_path) do
+    if File.exists?(file_path), do: File.rm(file_path)
   end
 
   defp check_file_size(path) do
