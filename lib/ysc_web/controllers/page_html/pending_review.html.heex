@@ -43,15 +43,21 @@
           If your application is approved, your membership will activate automatically — no further action needed.
         </div>
       <% else %>
-        <div class="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm">
-          You haven't added a payment method yet.
-          <.link
-            href={~p"/account/setup/#{@current_user.id}?step=1"}
-            class="underline font-medium"
-          >
-            Add a card or bank account now
-          </.link>
-          if you would like your membership to start automatically once you're approved. If you prefer to wait, we will email you a secure link to pay your dues after approval.
+        <div class="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm space-y-2">
+          <p>
+            You have not added a payment method yet. If you add one before you are approved, we can charge your dues automatically as soon as the board approves you.
+          </p>
+          <p>
+            <.link
+              href={~p"/account/setup/#{@current_user.id}?step=1"}
+              class="underline font-medium"
+            >
+              Add a card or bank account
+            </.link>
+          </p>
+          <p>
+            If you prefer to wait, we will email you a secure link to pay your dues after approval.
+          </p>
         </div>
       <% end %>
 

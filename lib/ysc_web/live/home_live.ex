@@ -1687,7 +1687,7 @@ defmodule YscWeb.HomeLive do
                         <span class="block mb-2 font-bold text-white">
                           Pending Approval
                         </span>
-                        Your membership application has been submitted and is being reviewed by the board. You'll receive an email once a decision has been made.
+                        Your membership application has been submitted and is being reviewed by the board. We will email you when there is a decision. Paying membership dues may still be required before cabin bookings and member-only tickets are available.
                       <% true -> %>
                         <span class="block mb-2 font-bold text-white">
                           Membership Required
