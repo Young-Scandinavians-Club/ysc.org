@@ -121,13 +121,9 @@ defmodule YscWeb.SecurityAuditTest do
   describe "AccountSetupLive mount does not spam email verification" do
     test "unauthenticated mount does not create an email verification code when email is already verified",
          %{conn: conn} do
-      user =
-        user_fixture(%{
-          state: :pending_approval,
-          email_verified_at:
-            DateTime.utc_now() |> DateTime.truncate(:microsecond),
-          password_set_at: nil
-        })
+      # registration_changeset does not cast email_verified_at; set it via the context API.
+      user = user_fixture(%{state: :pending_approval})
+      {:ok, user} = Accounts.mark_email_verified(user)
 
       assert {:ok, _view, _html} = live(conn, ~p"/account/setup/#{user.id}")
 
