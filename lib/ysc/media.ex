@@ -76,6 +76,28 @@ defmodule Ysc.Media do
   end
 
   @doc """
+  Total image count implied by `get_timeline_indices/0` rows (sum of per-year counts).
+
+  Matches `count_images/0` when every row has a non-null `inserted_at`, which is true for
+  normal `%Media.Image{}` records. Avoids a separate `COUNT(*)` round-trip when both the
+  scrubber and the total are needed.
+  """
+  def total_image_count_from_timeline(timeline) when is_list(timeline) do
+    Enum.reduce(timeline, 0, fn %{count: count}, acc ->
+      acc + timeline_count_as_integer(count)
+    end)
+  end
+
+  defp timeline_count_as_integer(n) when is_integer(n), do: n
+
+  defp timeline_count_as_integer(%Decimal{} = d), do: Decimal.to_integer(d)
+
+  defp timeline_count_as_integer(n) when is_binary(n) do
+    {int, ""} = Integer.parse(n)
+    int
+  end
+
+  @doc """
   Lists images with cursor-based pagination.
   Uses inserted_at and id as cursor for efficient pagination.
 
