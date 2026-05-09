@@ -1084,6 +1084,14 @@ defmodule YscWeb.AdminUserDetailsLive do
                     {@selected_user_application.spoken_languages}
                   </div>
                 </div>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    How did you hear about the club?
+                  </p>
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                    {@selected_user_application.hear_about_the_club}
+                  </div>
+                </div>
               </div>
             </section>
 
