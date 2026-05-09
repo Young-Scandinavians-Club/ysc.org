@@ -32,8 +32,7 @@ let MediaDropZone = {
         this.dragCounter++;
 
         if (this.dragCounter === 1) {
-            // Show drop zone overlay
-            this.pushEvent("show-drop-zone", {});
+            this.showOverlay();
         }
     },
 
@@ -43,10 +42,10 @@ let MediaDropZone = {
 
         e.preventDefault();
         this.dragCounter--;
+        this.dragCounter = Math.max(0, this.dragCounter);
 
         if (this.dragCounter === 0) {
-            // Hide drop zone overlay
-            this.pushEvent("hide-drop-zone", {});
+            this.hideOverlay();
         }
     },
 
@@ -64,14 +63,23 @@ let MediaDropZone = {
 
         e.preventDefault();
         this.dragCounter = 0;
+        this.hideOverlay();
 
         const files = Array.from(e.dataTransfer.files || []);
         if (files.length > 0) {
             // Let LiveView's phx-drop-target handler track the files first.
             setTimeout(() => this.pushEvent("drop-upload-started", {}), 0);
-        } else {
-            this.pushEvent("hide-drop-zone", {});
         }
+    },
+
+    showOverlay() {
+        const overlay = document.querySelector("[data-drop-zone-overlay]");
+        if (overlay) overlay.classList.remove("hidden");
+    },
+
+    hideOverlay() {
+        const overlay = document.querySelector("[data-drop-zone-overlay]");
+        if (overlay) overlay.classList.add("hidden");
     },
 
     hasFiles(e) {

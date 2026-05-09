@@ -8,6 +8,7 @@ defmodule Ysc.Media do
 
   alias Ysc.Repo
   alias Ysc.Media
+  alias Ysc.Media.ImageOps
   alias Ysc.S3Config
   alias YscWeb.Authorization.Policy
   alias Ysc.Accounts.User
@@ -365,10 +366,7 @@ defmodule Ysc.Media do
   defp determine_output_format(_original_format), do: :webp
 
   defp autorotate_image(image) do
-    case Image.autorotate(image) do
-      {:ok, {%Vix.Vips.Image{} = oriented, _orientation}} -> {:ok, oriented}
-      {:error, _} = error -> error
-    end
+    ImageOps.autorotate(image)
   end
 
   # Ensure file path has correct extension for the format

@@ -10,6 +10,7 @@ defmodule YscWeb.Workers.ImageProcessor do
 
   alias Ysc.Http.UrlFetchGuard
   alias Ysc.Media
+  alias Ysc.Media.ImageOps
   alias Ysc.S3Config
   alias YscWeb.Validators.FileValidator
 
@@ -321,27 +322,27 @@ defmodule YscWeb.Workers.ImageProcessor do
   end
 
   defp autorotate_image(image) do
-    case Image.autorotate(image) do
-      {:ok, {%Vix.Vips.Image{} = oriented, _orientation}} -> {:ok, oriented}
-      {:error, _} = error -> error
-    end
+    ImageOps.autorotate(image)
   end
 
   defp raw_key_from_image(image) do
-    case image.upload_data do
-      %{key: k} when is_binary(k) -> k
-      %{"key" => k} when is_binary(k) -> k
-      _ -> key_from_object_url(image.raw_image_path)
-    end
+    get_upload_key(image, true) || key_from_object_url(image.raw_image_path)
   end
 
   defp upload_key_from_image(image) do
+    get_upload_key(image, false)
+  end
+
+  defp get_upload_key(image, allow_empty) do
     case image.upload_data do
-      %{key: k} when is_binary(k) and k != "" -> k
-      %{"key" => k} when is_binary(k) and k != "" -> k
+      %{key: k} when is_binary(k) -> filter_upload_key(k, allow_empty)
+      %{"key" => k} when is_binary(k) -> filter_upload_key(k, allow_empty)
       _ -> nil
     end
   end
+
+  defp filter_upload_key("", false), do: nil
+  defp filter_upload_key(key, _allow_empty), do: key
 
   defp key_from_object_url(url) when is_binary(url) do
     path = URI.parse(url).path || ""

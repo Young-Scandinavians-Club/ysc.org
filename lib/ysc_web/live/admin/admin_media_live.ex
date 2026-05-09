@@ -190,12 +190,12 @@ defmodule YscWeb.AdminMediaLive do
                 <input
                   type="hidden"
                   id={"image-markdown-#{@selected_image_version}"}
-                  value={"![#{@active_image.alt_text || @active_image.title || "Image"}](#{get_image_version_path(@active_image, @selected_image_version)})"}
+                  value={"![#{markdown_alt_text(@active_image)}](#{get_image_version_path(@active_image, @selected_image_version)})"}
                 />
                 <input
                   type="hidden"
                   id={"image-html-#{@selected_image_version}"}
-                  value={"<img src=\"#{get_image_version_path(@active_image, @selected_image_version)}\" alt=\"#{@active_image.alt_text || @active_image.title || "Image"}\" />"}
+                  value={"<img src=\"#{get_image_version_path(@active_image, @selected_image_version)}\" alt=\"#{html_alt_text(@active_image)}\" />"}
                 />
               </div>
 
@@ -228,7 +228,7 @@ defmodule YscWeb.AdminMediaLive do
               </div>
 
               <p class="text-xs text-zinc-500 mt-3">
-                Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} on #{Timex.format!(@image_uploader.inserted_at, "%b %d, %Y", :strftime)}"}
+                Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} on #{Timex.format!(@active_image.inserted_at, "%b %d, %Y", :strftime)}"}
               </p>
             <% else %>
               <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
@@ -470,12 +470,14 @@ defmodule YscWeb.AdminMediaLive do
 
         <%!-- Drag and Drop Overlay --%>
         <div
-          :if={
-            (@show_drop_zone || @pending_upload_submit?) && @live_action != :upload
-          }
+          :if={@live_action != :upload}
           id="media-drop-zone"
+          data-drop-zone-overlay
           phx-drop-target={@uploads.media_drop_uploads.ref}
-          class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/20 backdrop-blur-[2px]"
+          class={[
+            "fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/20 backdrop-blur-[2px]",
+            !@pending_upload_submit? && "hidden"
+          ]}
         >
           <div class="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 bg-white/95 p-6 text-center shadow-xl ring-1 ring-zinc-950/5">
             <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100">
@@ -707,20 +709,13 @@ defmodule YscWeb.AdminMediaLive do
 
           images =
             Repo.all(
-              from i in Media.Image,
-                where:
-                  i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
-                order_by: [desc: i.inserted_at, desc: i.id],
-                limit: ^socket.assigns.per_page
+              year_images_query(
+                start_date,
+                end_date,
+                search_query,
+                socket.assigns.per_page
+              )
             )
-
-          # Apply search filter if present
-          images =
-            if search_query != "" do
-              filter_images_by_search(images, search_query)
-            else
-              images
-            end
 
           Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
 
@@ -977,22 +972,15 @@ defmodule YscWeb.AdminMediaLive do
           end_date =
             DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
 
-          images =
-            Repo.all(
-              from i in Media.Image,
-                where:
-                  i.inserted_at >= ^start_date and i.inserted_at <= ^end_date and
-                    i.inserted_at < ^last_image_date,
-                order_by: [desc: i.inserted_at, desc: i.id],
-                limit: ^socket.assigns.per_page
+          Repo.all(
+            year_images_query(
+              start_date,
+              end_date,
+              search_query,
+              socket.assigns.per_page,
+              last_image_date
             )
-
-          # Apply search filter if present
-          if search_query != "" do
-            filter_images_by_search(images, search_query)
-          else
-            images
-          end
+          )
         else
           Media.list_images_cursor(
             before_date: last_image_date,
@@ -1438,22 +1426,68 @@ defmodule YscWeb.AdminMediaLive do
     {years_set, years_list}
   end
 
-  defp filter_images_by_search(images, search_query)
-       when is_binary(search_query) do
-    normalized_search = String.downcase(search_query)
+  defp year_images_query(
+         start_date,
+         end_date,
+         search_query,
+         limit,
+         before_date \\ nil
+       ) do
+    query =
+      from i in Media.Image,
+        where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
+        order_by: [desc: i.inserted_at, desc: i.id],
+        limit: ^limit
 
-    Enum.filter(images, fn image ->
-      title = String.downcase(image.title || "")
-      alt_text = String.downcase(image.alt_text || "")
-      filename = String.downcase(Path.basename(image.raw_image_path || ""))
+    query =
+      if before_date do
+        from i in query, where: i.inserted_at < ^before_date
+      else
+        query
+      end
 
-      String.contains?(title, normalized_search) ||
-        String.contains?(alt_text, normalized_search) ||
-        String.contains?(filename, normalized_search)
-    end)
+    apply_image_search(query, search_query)
   end
 
-  defp filter_images_by_search(images, _), do: images
+  defp apply_image_search(query, search_query)
+       when is_binary(search_query) and search_query != "" do
+    search_pattern = "%#{search_query}%"
+
+    from i in query,
+      where:
+        ilike(i.title, ^search_pattern) or
+          ilike(i.alt_text, ^search_pattern) or
+          ilike(
+            fragment(
+              "regexp_replace(?, '.*/([^/]+)$', '\\1')",
+              i.raw_image_path
+            ),
+            ^search_pattern
+          )
+  end
+
+  defp apply_image_search(query, _search_query), do: query
+
+  defp copy_alt_text(%Media.Image{} = image) do
+    image.alt_text || image.title || "Image"
+  end
+
+  defp html_alt_text(%Media.Image{} = image) do
+    image
+    |> copy_alt_text()
+    |> Phoenix.HTML.html_escape()
+    |> Phoenix.HTML.safe_to_string()
+  end
+
+  defp markdown_alt_text(%Media.Image{} = image) do
+    image
+    |> copy_alt_text()
+    |> String.replace("\\", "\\\\")
+    |> String.replace("[", "\\[")
+    |> String.replace("]", "\\]")
+    |> String.replace("(", "\\(")
+    |> String.replace(")", "\\)")
+  end
 
   defp last_date(nil), do: nil
   defp last_date(%{inserted_at: inserted_at}), do: inserted_at

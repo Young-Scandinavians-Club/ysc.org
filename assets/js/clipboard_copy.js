@@ -81,6 +81,16 @@ export default {
 
     showFailure() {
         this.showFeedback("Copy failed");
+        this.el.classList.remove(
+            "border-zinc-300",
+            "hover:border-zinc-400",
+            "hover:bg-zinc-50",
+            "bg-green-50",
+            "border-green-500",
+            "text-green-700",
+            "hover:bg-green-50",
+            "hover:border-green-600"
+        );
         this.el.classList.add("bg-red-50", "border-red-500", "text-red-700");
 
         window.clearTimeout(this.resetTimeout);
