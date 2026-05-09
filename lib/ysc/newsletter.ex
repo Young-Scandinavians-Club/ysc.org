@@ -328,10 +328,6 @@ defmodule Ysc.Newsletter do
     end
   end
 
-  defp valid_email?(email) do
-    is_binary(email) && String.trim(email) != "" && String.contains?(email, "@")
-  end
-
   # ---------------------------------------------------------------------------
   # Newsletter editions (curated content: cover, intro, posts, events)
   # ---------------------------------------------------------------------------

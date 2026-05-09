@@ -24,7 +24,8 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
     end
 
     test "rejects email without @" do
-      assert {:error, :invalid_email} = EmailValidator.validate_email("notanemail")
+      assert {:error, :invalid_email} =
+               EmailValidator.validate_email("notanemail")
     end
 
     test "rejects empty string" do
@@ -63,7 +64,8 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
 
     test "rejects domain with no MX records" do
       # Using a non-existent domain that definitely has no MX records
-      domain = "this-domain-definitely-does-not-exist-#{System.unique_integer([:positive])}.com"
+      domain =
+        "this-domain-definitely-does-not-exist-#{System.unique_integer([:positive])}.com"
 
       assert {:error, :no_mx_records} =
                EmailValidator.validate_email("user@#{domain}")

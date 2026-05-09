@@ -40,9 +40,8 @@ defmodule Ysc.Newsletter.EmailValidator do
 
     with :ok <- validate_format(email),
          domain <- extract_domain(email),
-         :ok <- check_disposable_domain(domain),
-         :ok <- check_mx_records(domain) do
-      :ok
+         :ok <- check_disposable_domain(domain) do
+      check_mx_records(domain)
     end
   end
 
@@ -133,7 +132,7 @@ defmodule Ysc.Newsletter.EmailValidator do
 
         {:error, :no_mx_records}
 
-      mx_records when is_list(mx_records) and length(mx_records) > 0 ->
+      [_ | _] = _mx_records ->
         :ok
 
       _ ->
