@@ -384,7 +384,9 @@ defmodule YscWeb.UserRegistrationLive do
               </.inputs_for>
             </div>
 
-            <Turnstile.widget appearance="interaction-only" theme="light" />
+            <%!-- Hidden Turnstile verification for bot protection --%>
+            <%!-- Uses interaction-only mode: runs invisibly in background, only shows challenge if suspicious activity detected --%>
+            <Turnstile.widget appearance="interaction-only" />
 
             <div
               id="registration-actions"
