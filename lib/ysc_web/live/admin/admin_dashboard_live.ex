@@ -4,11 +4,6 @@ defmodule YscWeb.AdminDashboardLive do
   import YscWeb.CoreComponents
   import YscWeb.Live.AsyncHelpers
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias Ysc.{Posts, Events, Accounts, Bookings, BuildVersion, Newsletter}
 
   @impl true

@@ -3,11 +3,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   import YscWeb.CoreComponents
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias Ysc.Newsletter
   alias Ysc.Newsletter.Edition
   alias Ysc.Posts

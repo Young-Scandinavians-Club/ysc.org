@@ -10,7 +10,10 @@ import Ecto.Query
 admin_user =
   case Repo.get_by(User, email: "admin@ysc.org") do
     nil ->
-      IO.puts("⚠️  Admin user not found. Please run seeds.exs first or create a user.")
+      IO.puts(
+        "⚠️  Admin user not found. Please run seeds.exs first or create a user."
+      )
+
       # Try to get any user
       case Repo.all(from u in User, limit: 1) do
         [user] -> user
@@ -26,7 +29,8 @@ IO.puts("   Using user: #{admin_user.email}")
 
 # Generate images across years 2010-2025
 years = 2010..2025
-images_per_year = 5..15  # Random number of images per year
+# Random number of images per year
+images_per_year = 5..15
 
 total_created =
   Enum.reduce(years, 0, fn year, acc ->
@@ -36,13 +40,18 @@ total_created =
       Enum.reduce(1..num_images, 0, fn i, count ->
         # Random date within the year
         month = Enum.random(1..12)
-        day = Enum.random(1..28)  # Use 28 to avoid month-end issues
+        # Use 28 to avoid month-end issues
+        day = Enum.random(1..28)
         hour = Enum.random(0..23)
         minute = Enum.random(0..59)
         second = Enum.random(0..59)
 
         inserted_at =
-          DateTime.new!(Date.new!(year, month, day), Time.new!(hour, minute, second, 0), "Etc/UTC")
+          DateTime.new!(
+            Date.new!(year, month, day),
+            Time.new!(hour, minute, second, 0),
+            "Etc/UTC"
+          )
 
         # Generate fake but realistic image paths
         image_id = Ecto.ULID.generate()
@@ -66,17 +75,22 @@ total_created =
           "Group Photo #{year}",
           "Activity #{year}",
           "Memories #{year}",
-          nil,  # Some images without titles
+          # Some images without titles
+          nil,
           nil
         ]
 
+        title = Enum.random(titles)
+
         attrs = %{
-          title: Enum.random(titles),
-          alt_text: "Image from #{year}",
+          title: title,
+          alt_text: title || "Image from #{year}",
           raw_image_path: raw_path,
-          optimized_image_path: "uploads/images/#{year}/#{image_id}_optimized.jpg",
+          optimized_image_path:
+            "uploads/images/#{year}/#{image_id}_optimized.jpg",
           thumbnail_path: "uploads/images/#{year}/#{image_id}_thumb.jpg",
-          blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",  # Default blurhash
+          # Default blurhash
+          blur_hash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
           width: width,
           height: height,
           processing_state: "completed",
@@ -96,10 +110,14 @@ total_created =
               from(i in Image, where: i.id == ^image.id),
               set: [inserted_at: inserted_at, updated_at: inserted_at]
             )
+
             count + 1
 
           {:error, changeset} ->
-            IO.puts("  ❌ Failed to create image for #{year}: #{inspect(changeset.errors)}")
+            IO.puts(
+              "  ❌ Failed to create image for #{year}: #{inspect(changeset.errors)}"
+            )
+
             count
         end
       end)
@@ -108,5 +126,8 @@ total_created =
     acc + created_count
   end)
 
-IO.puts("\n🎉 Done! Created #{total_created} fake images across #{Enum.count(years)} years.")
+IO.puts(
+  "\n🎉 Done! Created #{total_created} fake images across #{Enum.count(years)} years."
+)
+
 IO.puts("   Years: #{Enum.join(Enum.to_list(years), ", ")}")

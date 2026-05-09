@@ -4,11 +4,6 @@ defmodule YscWeb.AdminMediaLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   import Ecto.Query, only: [from: 2]
   alias Ysc.Repo
   alias Ysc.Media
@@ -30,206 +25,247 @@ defmodule YscWeb.AdminMediaLive do
         on_cancel={JS.patch(build_media_url_with_state(assigns))}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
+        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
           Edit Image
         </h2>
-        <!-- Image Version Tabs -->
-        <div class="border-b border-zinc-200 mb-4">
-          <nav class="-mb-px flex space-x-4" aria-label="Image Versions">
-            <button
-              phx-click="select-image-version"
-              phx-value-version="optimized"
-              class={[
-                "whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_image_version == :optimized,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Optimized
-              <%= if @active_image.optimized_image_path do %>
-                <span class="ml-1 text-xs text-zinc-400">✓</span>
-              <% else %>
-                <span class="ml-1 text-xs text-zinc-400">—</span>
-              <% end %>
-            </button>
-            <button
-              phx-click="select-image-version"
-              phx-value-version="thumbnail"
-              class={[
-                "whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_image_version == :thumbnail,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Thumbnail
-              <%= if @active_image.thumbnail_path do %>
-                <span class="ml-1 text-xs text-zinc-400">✓</span>
-              <% else %>
-                <span class="ml-1 text-xs text-zinc-400">—</span>
-              <% end %>
-            </button>
-            <button
-              phx-click="select-image-version"
-              phx-value-version="raw"
-              class={[
-                "whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_image_version == :raw,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Raw
-              <%= if @active_image.raw_image_path do %>
-                <span class="ml-1 text-xs text-zinc-400">✓</span>
-              <% else %>
-                <span class="ml-1 text-xs text-zinc-400">—</span>
-              <% end %>
-            </button>
-          </nav>
-        </div>
-        <!-- Image Display -->
-        <div class="mb-4">
-          <%= if get_image_version_path(@active_image, @selected_image_version) do %>
-            <img
-              src={get_image_version_path(@active_image, @selected_image_version)}
-              class="w-full object-cover rounded max-h-96"
-              alt={@active_image.alt_text || @active_image.title || "Image"}
-            />
-            <div class="mt-2 text-xs text-zinc-500 space-y-1">
-              <p>
-                <strong>Version:</strong> {String.capitalize(
-                  Atom.to_string(@selected_image_version)
-                )}
-              </p>
-              <%= if @selected_image_version == :optimized && @active_image.width && @active_image.height do %>
-                <p>
-                  <strong>Dimensions:</strong> {@active_image.width} × {@active_image.height} px
-                </p>
-              <% end %>
-              <%= if @active_image.processing_state do %>
-                <p>
-                  <strong>Processing State:</strong> {String.capitalize(
-                    Atom.to_string(@active_image.processing_state)
-                  )}
-                </p>
-              <% end %>
-              <div class="flex items-center gap-2">
-                <strong class="flex-shrink-0">Path:</strong>
-                <div class="flex-1 min-w-0 flex items-center gap-2">
-                  <span class="font-mono text-xs truncate overflow-hidden flex-1">
-                    {get_image_version_path(
-                      @active_image,
-                      @selected_image_version
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    phx-click={
-                      JS.dispatch("phx:copy",
-                        to: "#image-path-text-#{@selected_image_version}"
-                      )
-                      |> JS.add_class("text-green-600 border-green-600",
-                        to: "#copy-icon-#{@selected_image_version}"
-                      )
-                      |> JS.remove_class("text-zinc-600 border-zinc-300",
-                        to: "#copy-icon-#{@selected_image_version}"
-                      )
-                      |> JS.transition("opacity-0",
-                        to: "#copy-feedback-#{@selected_image_version}",
-                        time: 0
-                      )
-                      |> JS.show(to: "#copy-feedback-#{@selected_image_version}")
-                      |> JS.transition("opacity-100",
-                        to: "#copy-feedback-#{@selected_image_version}",
-                        time: 200
-                      )
-                      |> JS.hide(
-                        to: "#copy-feedback-#{@selected_image_version}",
-                        time: 200,
-                        transition: "opacity-0"
-                      )
-                      |> JS.add_class("text-zinc-600 border-zinc-300",
-                        to: "#copy-icon-#{@selected_image_version}",
-                        time: 2000
-                      )
-                      |> JS.remove_class("text-green-600 border-green-600",
-                        to: "#copy-icon-#{@selected_image_version}",
-                        time: 2000
-                      )
-                    }
-                    class="flex-shrink-0 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 p-1.5 rounded transition-colors relative"
-                    title="Copy path to clipboard"
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <%!-- Left Column: Image Preview --%>
+          <div>
+            <%!-- Image Version Tabs --%>
+            <div class="border-b border-zinc-200 mb-4">
+              <nav class="-mb-px flex space-x-2" aria-label="Image Versions">
+                <button
+                  phx-click="select-image-version"
+                  phx-value-version="optimized"
+                  class={[
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    if(@selected_image_version == :optimized,
+                      do: "border-blue-500 text-blue-600 bg-blue-50",
+                      else:
+                        "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                    )
+                  ]}
+                >
+                  <div class={[
+                    "mb-1 flex h-10 w-10 items-center justify-center rounded-full border",
+                    if(@active_image.optimized_image_path,
+                      do: "border-blue-200 bg-blue-50 text-blue-600",
+                      else: "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    )
+                  ]}>
+                    <.icon name="hero-sparkles" class="h-5 w-5" />
+                  </div>
+                  <span>Optimized</span>
+                </button>
+                <button
+                  phx-click="select-image-version"
+                  phx-value-version="thumbnail"
+                  class={[
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    if(@selected_image_version == :thumbnail,
+                      do: "border-blue-500 text-blue-600 bg-blue-50",
+                      else:
+                        "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                    )
+                  ]}
+                >
+                  <div class={[
+                    "mb-1 flex h-10 w-10 items-center justify-center rounded-full border",
+                    if(@active_image.thumbnail_path,
+                      do: "border-emerald-200 bg-emerald-50 text-emerald-600",
+                      else: "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    )
+                  ]}>
+                    <.icon name="hero-squares-2x2" class="h-5 w-5" />
+                  </div>
+                  <span>Thumbnail</span>
+                </button>
+                <button
+                  phx-click="select-image-version"
+                  phx-value-version="raw"
+                  class={[
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    if(@selected_image_version == :raw,
+                      do: "border-blue-500 text-blue-600 bg-blue-50",
+                      else:
+                        "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                    )
+                  ]}
+                >
+                  <div class={[
+                    "mb-1 flex h-10 w-10 items-center justify-center rounded-full border",
+                    if(@active_image.raw_image_path,
+                      do: "border-zinc-300 bg-zinc-50 text-zinc-700",
+                      else: "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    )
+                  ]}>
+                    <.icon name="hero-photo" class="h-5 w-5" />
+                  </div>
+                  <span>Raw</span>
+                </button>
+              </nav>
+            </div>
+
+            <%!-- Image Display --%>
+            <%= if get_image_version_path(@active_image, @selected_image_version) do %>
+              <img
+                src={get_image_version_path(@active_image, @selected_image_version)}
+                class="w-full object-contain rounded max-h-96 border border-zinc-200"
+                alt={@active_image.alt_text || @active_image.title || "Image"}
+              />
+
+              <%!-- Quick Copy Actions --%>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  id="copy-path-btn"
+                  phx-hook="ClipboardCopy"
+                  data-copy-target={"image-path-text-#{@selected_image_version}"}
+                  data-copy-feedback="copy-path-btn-feedback"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  title="Copy URL to clipboard"
+                >
+                  <.icon name="hero-link" class="w-3.5 h-3.5" /> Copy URL
+                  <span
+                    id="copy-path-btn-feedback"
+                    class="hidden items-center gap-1 text-green-700"
+                    aria-live="polite"
                   >
-                    <.icon
-                      name="hero-clipboard"
-                      id={"copy-icon-#{@selected_image_version}"}
-                      class="w-4 h-4 text-zinc-600 transition-colors border-zinc-300"
-                    />
-                    <span
-                      id={"copy-feedback-#{@selected_image_version}"}
-                      class="hidden absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none"
-                    >
-                      Copied!
-                    </span>
-                  </button>
-                  <input
-                    type="hidden"
-                    id={"image-path-text-#{@selected_image_version}"}
-                    value={
-                      get_image_version_path(@active_image, @selected_image_version)
-                    }
+                    <.icon name="hero-check" class="h-3.5 w-3.5" />
+                    <span data-copy-feedback-label>Copied</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  id="copy-markdown-btn"
+                  phx-hook="ClipboardCopy"
+                  data-copy-target={"image-markdown-#{@selected_image_version}"}
+                  data-copy-feedback="copy-markdown-btn-feedback"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  title="Copy as Markdown"
+                >
+                  <.icon name="hero-document-text" class="w-3.5 h-3.5" />
+                  Copy Markdown
+                  <span
+                    id="copy-markdown-btn-feedback"
+                    class="hidden items-center gap-1 text-green-700"
+                    aria-live="polite"
+                  >
+                    <.icon name="hero-check" class="h-3.5 w-3.5" />
+                    <span data-copy-feedback-label>Copied</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  id="copy-html-btn"
+                  phx-hook="ClipboardCopy"
+                  data-copy-target={"image-html-#{@selected_image_version}"}
+                  data-copy-feedback="copy-html-btn-feedback"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  title="Copy as HTML"
+                >
+                  <.icon name="hero-code-bracket" class="w-3.5 h-3.5" /> Copy HTML
+                  <span
+                    id="copy-html-btn-feedback"
+                    class="hidden items-center gap-1 text-green-700"
+                    aria-live="polite"
+                  >
+                    <.icon name="hero-check" class="h-3.5 w-3.5" />
+                    <span data-copy-feedback-label>Copied</span>
+                  </span>
+                </button>
+                <input
+                  type="hidden"
+                  id={"image-path-text-#{@selected_image_version}"}
+                  value={
+                    get_image_version_path(@active_image, @selected_image_version)
+                  }
+                />
+                <input
+                  type="hidden"
+                  id={"image-markdown-#{@selected_image_version}"}
+                  value={"![#{markdown_alt_text(@active_image)}](#{get_image_version_path(@active_image, @selected_image_version)})"}
+                />
+                <input
+                  type="hidden"
+                  id={"image-html-#{@selected_image_version}"}
+                  value={"<img src=\"#{get_image_version_path(@active_image, @selected_image_version)}\" alt=\"#{html_alt_text(@active_image)}\" />"}
+                />
+              </div>
+
+              <%!-- Image Metadata --%>
+              <div class="mt-4 text-xs text-zinc-500 space-y-1 bg-zinc-50 p-3 rounded">
+                <p>
+                  <strong>Version:</strong>
+                  {String.capitalize(Atom.to_string(@selected_image_version))}
+                </p>
+                <%= if @selected_image_version == :optimized && @active_image.width && @active_image.height do %>
+                  <p>
+                    <strong>Dimensions:</strong>
+                    {@active_image.width} × {@active_image.height} px
+                  </p>
+                <% end %>
+                <%= if @active_image.processing_state do %>
+                  <p>
+                    <strong>Status:</strong>
+                    {String.capitalize(
+                      Atom.to_string(@active_image.processing_state)
+                    )}
+                  </p>
+                <% end %>
+                <p class="break-all">
+                  <strong>Path:</strong>
+                  <span class="font-mono">
+                    {get_image_version_path(@active_image, @selected_image_version)}
+                  </span>
+                </p>
+              </div>
+
+              <p class="text-xs text-zinc-500 mt-3">
+                Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} on #{Timex.format!(@active_image.inserted_at, "%b %d, %Y", :strftime)}"}
+              </p>
+            <% else %>
+              <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
+                <div class="text-center">
+                  <.icon
+                    name="hero-photo"
+                    class="w-12 h-12 text-zinc-400 mx-auto mb-2"
                   />
+                  <p class="text-sm text-zinc-500">
+                    {String.capitalize(Atom.to_string(@selected_image_version))} version not available
+                  </p>
                 </div>
               </div>
-            </div>
-          <% else %>
-            <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
-              <div class="text-center">
-                <.icon
-                  name="hero-photo"
-                  class="w-12 h-12 text-zinc-400 mx-auto mb-2"
-                />
-                <p class="text-sm text-zinc-500">
-                  {String.capitalize(Atom.to_string(@selected_image_version))} version not available
-                </p>
-              </div>
-            </div>
-          <% end %>
-        </div>
-
-        <p class="leading-6 text-sm text-zinc-600 mt-2">
-          Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} (#{@image_uploader.email}) on #{Timex.format!(@image_uploader.inserted_at, "%Y-%m-%d", :strftime)}"}
-        </p>
-
-        <.simple_form
-          for={@form}
-          id="edit_image_form"
-          phx-submit="save-image"
-          phx-change="validate-edit"
-        >
-          <.input field={@form[:title]} label="Title" />
-          <.input field={@form[:alt_text]} label="Alt Text" />
-
-          <div class="flex justify-end">
-            <button
-              class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80 mr-2"
-              phx-click={JS.patch(build_media_url_with_state(assigns))}
-            >
-              Cancel
-            </button>
-            <.button type="submit" phx-disable-with="Updating...">
-              Update Image
-            </.button>
+            <% end %>
           </div>
-        </.simple_form>
+
+          <%!-- Right Column: Edit Form --%>
+          <div>
+            <.simple_form
+              for={@form}
+              id="edit_image_form"
+              phx-submit="save-image"
+              phx-change="validate-edit"
+            >
+              <.input field={@form[:title]} label="Title" />
+              <.input field={@form[:alt_text]} label="Alt Text" />
+
+              <div class="flex justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
+                  phx-click={JS.patch(build_media_url_with_state(assigns))}
+                >
+                  Cancel
+                </button>
+                <.button type="submit" phx-disable-with="Updating...">
+                  Update Image
+                </.button>
+              </div>
+            </.simple_form>
+          </div>
+        </div>
       </.modal>
 
       <.modal
@@ -328,119 +364,232 @@ defmodule YscWeb.AdminMediaLive do
         </div>
       </.modal>
 
-      <div class="flex justify-between items-center py-6">
-        <div>
-          <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-            Media Library
-          </h1>
-          <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
-            {@media_count} {if @media_count == 1,
-              do: "image",
-              else: "images"}
-          </p>
-        </div>
+      <form
+        :if={@live_action != :upload}
+        id="media-drop-upload-form"
+        phx-change="validate"
+        class="hidden"
+      >
+        <.live_file_input upload={@uploads.media_drop_uploads} />
+      </form>
 
-        <div class="flex items-center gap-4">
-          <.button phx-click={JS.patch(~p"/admin/media/upload")}>
-            <.icon name="hero-photo" class="w-5 h-5 -mt-1" />
-            <span class="ms-1">
-              New Image
-            </span>
-          </.button>
-        </div>
-      </div>
-
-      <div :if={@media_count > 0} class="w-full pb-4">
-        <.admin_search_bar
-          id="media-search-form"
-          input_id="media-search-input"
-          name="search"
-          value={@search_query}
-          placeholder="Search by filename, title, or alt text..."
-          debounce="300"
-          on_change="search"
-          clear_event="clear-search"
-        />
-      </div>
-
-      <section class="py-6 relative">
-        <div
-          :if={@media_count > 0}
-          id="media-gallery"
-          phx-hook="ScrollPreserver"
-          class="pr-12"
-        >
-          {render_images_by_year(assigns)}
-        </div>
-        <%!-- Year Scrubber --%>
-        <div
-          :if={@media_count > 0 and length(@timeline) > 1}
-          id="year-scrubber"
-          phx-hook="YearScrubber"
-          class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
-        >
-          <%!-- All / reset button --%>
-          <button
-            phx-click="show-all-years"
-            class={[
-              "w-9 h-9 flex items-center justify-center rounded transition-all duration-150 relative group",
-              if(is_nil(@selected_year),
-                do: "bg-zinc-800 text-white opacity-100",
-                else:
-                  "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 opacity-60 hover:opacity-100"
-              )
-            ]}
-            title="Show all years"
-          >
-            <.icon name="hero-squares-2x2" class="w-4 h-4" />
-            <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-              All years
-            </span>
-          </button>
-          <div class="w-5 h-px bg-zinc-200 my-0.5"></div>
-          <%= for item <- @timeline do %>
-            <button
-              data-year-item={item.year}
-              phx-click="jump-to-year"
-              phx-value-year={item.year}
-              class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
-              title={"#{item.year} (#{item.count} images)"}
-            >
-              <span class="group-hover:hidden flex items-center justify-center w-full h-full">
-                {String.slice(to_string(item.year), -2, 2)}
-              </span>
-              <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
-                {item.year}
-              </span>
-              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-                {item.count} photos
-              </span>
-            </button>
-          <% end %>
-        </div>
-
-        <div :if={@media_count == 0} class="mx-auto py-20 text-center">
-          <div class="flex flex-col items-center">
-            <.icon name="hero-photo" class="w-16 h-16 text-zinc-300 mb-4" />
-            <p class="text-lg font-medium text-zinc-700 mb-2">No images yet</p>
-            <p class="text-sm text-zinc-500 mb-6">
-              Upload your first image to get started
+      <div
+        id="media-page-drop-target"
+        phx-hook="MediaDropZone"
+        phx-drop-target={@uploads.media_drop_uploads.ref}
+      >
+        <div class="flex justify-between items-center py-6">
+          <div>
+            <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+              Media Library
+            </h1>
+            <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
+              {@media_count} {if @media_count == 1,
+                do: "image",
+                else: "images"}
             </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div
+              :if={@media_count > 0}
+              id="media-layout-preference"
+              phx-hook="MediaLayoutPreference"
+              class="inline-flex rounded-lg border border-zinc-300 bg-zinc-100 p-1"
+              role="group"
+              aria-label="Media layout"
+            >
+              <button
+                type="button"
+                phx-click="set-layout"
+                phx-value-layout="square"
+                data-media-layout="square"
+                aria-pressed={
+                  if(@layout_mode == :square, do: "true", else: "false")
+                }
+                class={[
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  if(@layout_mode == :square,
+                    do: "bg-white text-blue-700 shadow-sm ring-1 ring-zinc-200",
+                    else: "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
+                  )
+                ]}
+                title="Show square cropped thumbnails"
+              >
+                <.icon name="hero-squares-2x2" class="w-4 h-4" />
+                <span>Square</span>
+              </button>
+              <button
+                type="button"
+                phx-click="set-layout"
+                phx-value-layout="masonry"
+                data-media-layout="masonry"
+                aria-pressed={
+                  if(@layout_mode == :masonry, do: "true", else: "false")
+                }
+                class={[
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  if(@layout_mode == :masonry,
+                    do: "bg-white text-blue-700 shadow-sm ring-1 ring-zinc-200",
+                    else: "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
+                  )
+                ]}
+                title="Show images in natural proportions"
+              >
+                <.icon name="hero-view-columns" class="w-4 h-4" />
+                <span>Masonry</span>
+              </button>
+            </div>
+
             <.button phx-click={JS.patch(~p"/admin/media/upload")}>
-              <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-photo" class="w-5 h-5 -mt-1" />
               <span class="ms-1">
-                Upload Image
+                New Image
               </span>
             </.button>
           </div>
         </div>
-      </section>
+
+        <div :if={@media_count > 0} class="w-full pb-4">
+          <.admin_search_bar
+            id="media-search-form"
+            input_id="media-search-input"
+            name="search"
+            value={@search_query}
+            placeholder="Search by filename, title, or alt text..."
+            debounce="300"
+            on_change="search"
+            clear_event="clear-search"
+          />
+        </div>
+
+        <%!-- Drag and Drop Overlay --%>
+        <div
+          :if={@live_action != :upload}
+          id="media-drop-zone"
+          data-drop-zone-overlay
+          phx-drop-target={@uploads.media_drop_uploads.ref}
+          class={[
+            "fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/20 backdrop-blur-[2px]",
+            !@pending_upload_submit? && "hidden"
+          ]}
+        >
+          <div class="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 bg-white/95 p-6 text-center shadow-xl ring-1 ring-zinc-950/5">
+            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+              <.icon name="hero-cloud-arrow-up" class="h-7 w-7" />
+            </div>
+            <p class="text-base font-semibold text-zinc-900">
+              {if @pending_upload_submit?,
+                do: "Uploading images",
+                else: "Drop images to upload"}
+            </p>
+            <p class="mt-1 text-sm text-zinc-600">
+              {if @pending_upload_submit?,
+                do: "Keep this page open while the upload finishes.",
+                else:
+                  "Release anywhere on this page to add them to the media library."}
+            </p>
+            <div
+              :if={@pending_upload_submit?}
+              class="mt-5 overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200"
+            >
+              <div
+                class="h-2 rounded-full bg-blue-600 transition-all duration-300"
+                style={"width: #{upload_progress(@uploads.media_drop_uploads.entries)}%"}
+              >
+              </div>
+            </div>
+            <div class="mt-3 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500">
+              <%= if @pending_upload_submit? do %>
+                {upload_progress(@uploads.media_drop_uploads.entries)}% uploaded
+              <% else %>
+                JPG, PNG, GIF, or WebP
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <section id="media-section" class="py-6 relative">
+          <div
+            :if={@media_count > 0}
+            id="media-gallery"
+            phx-hook="ScrollPreserver"
+            class="pr-12"
+          >
+            {render_images_by_year(assigns)}
+          </div>
+          <%!-- Year Scrubber --%>
+          <div
+            :if={@media_count > 0 and length(@timeline) > 1}
+            id="year-scrubber"
+            phx-hook="YearScrubber"
+            class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
+          >
+            <%!-- All / reset button --%>
+            <button
+              phx-click="show-all-years"
+              class={[
+                "w-9 h-9 flex items-center justify-center rounded transition-all duration-150 relative group",
+                if(is_nil(@selected_year),
+                  do: "bg-zinc-800 text-white opacity-100",
+                  else:
+                    "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 opacity-60 hover:opacity-100"
+                )
+              ]}
+              title="Show all years"
+            >
+              <.icon name="hero-squares-2x2" class="w-4 h-4" />
+              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                All years
+              </span>
+            </button>
+            <div class="w-5 h-px bg-zinc-200 my-0.5"></div>
+            <%= for item <- @timeline do %>
+              <button
+                data-year-item={item.year}
+                phx-click="jump-to-year"
+                phx-value-year={item.year}
+                class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
+                title={"#{item.year} (#{item.count} images)"}
+              >
+                <span class="group-hover:hidden flex items-center justify-center w-full h-full">
+                  {String.slice(to_string(item.year), -2, 2)}
+                </span>
+                <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
+                  {item.year}
+                </span>
+                <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                  {item.count} photos
+                </span>
+              </button>
+            <% end %>
+          </div>
+
+          <div :if={@media_count == 0} class="mx-auto py-20 text-center">
+            <div class="flex flex-col items-center">
+              <.icon name="hero-photo" class="w-16 h-16 text-zinc-300 mb-4" />
+              <p class="text-lg font-medium text-zinc-700 mb-2">No images yet</p>
+              <p class="text-sm text-zinc-500 mb-6">
+                Upload your first image to get started
+              </p>
+              <.button phx-click={JS.patch(~p"/admin/media/upload")}>
+                <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-1" />
+                <span class="ms-1">
+                  Upload Image
+                </span>
+              </.button>
+            </div>
+          </div>
+        </section>
+      </div>
     </.side_menu>
     """
   end
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Media.subscribe_images()
+
     media_count = Media.count_images()
     timeline = Media.get_timeline_indices()
     available_years = Enum.map(timeline, & &1.year)
@@ -458,18 +607,30 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:end_of_timeline?, false)
      |> assign(:stream_initialized?, false)
      |> assign(:last_image_date, nil)
+     |> assign(:images_empty?, media_count == 0)
      |> assign(:years_set, MapSet.new())
      |> assign(:years_list, [])
      |> assign(:uploaded_files, [])
      |> assign(:active_image, nil)
      |> assign(:image_uploader, nil)
      |> assign(:selected_image_version, :optimized)
+     |> assign(:layout_mode, :masonry)
+     |> assign(:show_drop_zone, false)
+     |> assign(:pending_upload_submit?, false)
      |> assign(form: nil)
      |> stream(:images, [], dom_id: &get_dom_id/1)
      |> allow_upload(:media_uploads,
        accept: ~w(.jpg .jpeg .png .gif .webp),
        max_entries: 10,
-       external: &presign_upload/2
+       external: &presign_upload/2,
+       progress: &handle_media_upload_progress/3
+     )
+     |> allow_upload(:media_drop_uploads,
+       accept: ~w(.jpg .jpeg .png .gif .webp),
+       max_entries: 10,
+       auto_upload: true,
+       external: &presign_upload/2,
+       progress: &handle_media_upload_progress/3
      ), temporary_assigns: [form: nil]}
   end
 
@@ -543,20 +704,13 @@ defmodule YscWeb.AdminMediaLive do
 
           images =
             Repo.all(
-              from i in Media.Image,
-                where:
-                  i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
-                order_by: [desc: i.inserted_at, desc: i.id],
-                limit: ^socket.assigns.per_page
+              year_images_query(
+                start_date,
+                end_date,
+                search_query,
+                socket.assigns.per_page
+              )
             )
-
-          # Apply search filter if present
-          images =
-            if search_query != "" do
-              filter_images_by_search(images, search_query)
-            else
-              images
-            end
 
           Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
 
@@ -568,6 +722,7 @@ defmodule YscWeb.AdminMediaLive do
           |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
           |> assign(:stream_initialized?, true)
           |> assign(:last_image_date, images |> List.last() |> last_date())
+          |> assign(:images_empty?, images == [])
           |> assign(:years_set, years_set)
           |> assign(:years_list, years_list)
           |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -594,6 +749,7 @@ defmodule YscWeb.AdminMediaLive do
           |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
           |> assign(:stream_initialized?, true)
           |> assign(:last_image_date, images |> List.last() |> last_date())
+          |> assign(:images_empty?, images == [])
           |> assign(:years_set, years_set)
           |> assign(:years_list, years_list)
           |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -678,48 +834,18 @@ defmodule YscWeb.AdminMediaLive do
   end
 
   def handle_event("save", _params, socket) do
-    uploader = socket.assigns[:current_user]
+    if upload_entries_in_progress?(socket, :media_uploads) do
+      {:noreply, assign(socket, :pending_upload_submit?, true)}
+    else
+      {:noreply, save_uploaded_media(socket, :media_uploads)}
+    end
+  end
 
-    uploaded_files =
-      consume_uploaded_entries(socket, :media_uploads, fn details, _entry ->
-        raw_path = S3Config.object_url(details[:key])
-
-        {:ok, new_image} =
-          Media.add_new_image(
-            %{
-              raw_image_path: URI.encode(raw_path),
-              upload_data: details
-            },
-            uploader
-          )
-
-        %{id: new_image.id}
-        |> YscWeb.Workers.ImageProcessor.new()
-        |> Oban.insert()
-
-        {:ok, new_image}
-      end)
-
-    media_count = Media.count_images()
-    timeline = Media.get_timeline_indices()
-    available_years = Enum.map(timeline, & &1.year)
-    images = Media.list_images_cursor(limit: socket.assigns.per_page)
-    {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_date_headers(images)
-
+  def handle_event("drop-upload-started", _params, socket) do
     {:noreply,
      socket
-     |> update(:uploaded_files, &(&1 ++ uploaded_files))
-     |> assign(:media_count, media_count)
-     |> assign(:timeline, timeline)
-     |> assign(:available_years, available_years)
-     |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-     |> assign(:stream_initialized?, true)
-     |> assign(:last_image_date, images |> List.last() |> last_date())
-     |> assign(:years_set, years_set)
-     |> assign(:years_list, years_list)
-     |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-     |> push_patch(to: ~p"/admin/media")}
+     |> assign(:show_drop_zone, false)
+     |> assign(:pending_upload_submit?, true)}
   end
 
   def handle_event("validate-edit", %{"image" => image_params}, socket) do
@@ -755,6 +881,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:stream_initialized?, true)
      |> assign(:last_image_date, images |> List.last() |> last_date())
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, years_set)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -786,6 +913,7 @@ defmodule YscWeb.AdminMediaLive do
      socket
      |> assign(:selected_year, nil)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)}
@@ -815,6 +943,7 @@ defmodule YscWeb.AdminMediaLive do
      socket
      |> assign(:selected_year, year)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)}
@@ -838,22 +967,15 @@ defmodule YscWeb.AdminMediaLive do
           end_date =
             DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
 
-          images =
-            Repo.all(
-              from i in Media.Image,
-                where:
-                  i.inserted_at >= ^start_date and i.inserted_at <= ^end_date and
-                    i.inserted_at < ^last_image_date,
-                order_by: [desc: i.inserted_at, desc: i.id],
-                limit: ^socket.assigns.per_page
+          Repo.all(
+            year_images_query(
+              start_date,
+              end_date,
+              search_query,
+              socket.assigns.per_page,
+              last_image_date
             )
-
-          # Apply search filter if present
-          if search_query != "" do
-            filter_images_by_search(images, search_query)
-          else
-            images
-          end
+          )
         else
           Media.list_images_cursor(
             before_date: last_image_date,
@@ -914,6 +1036,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
       |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> assign(:images_empty?, images == [])
       |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
       |> push_patch(to: ~p"/admin/media")
 
@@ -942,6 +1065,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
       |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> assign(:images_empty?, images == [])
       |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
 
     # Build URL with year parameter
@@ -985,6 +1109,108 @@ defmodule YscWeb.AdminMediaLive do
       end
 
     {:noreply, push_patch(socket, to: ~p"/admin/media?#{new_params}")}
+  end
+
+  def handle_event("set-layout", %{"layout" => layout}, socket) do
+    layout_mode =
+      case layout do
+        "masonry" -> :masonry
+        _ -> :square
+      end
+
+    {:noreply, assign(socket, :layout_mode, layout_mode)}
+  end
+
+  def handle_event("show-drop-zone", _params, socket) do
+    {:noreply, assign(socket, :show_drop_zone, true)}
+  end
+
+  def handle_event("hide-drop-zone", _params, socket) do
+    {:noreply, assign(socket, :show_drop_zone, false)}
+  end
+
+  @impl true
+  def handle_info({Media, {:image_updated, image_id}}, socket) do
+    case Media.fetch_image(image_id) do
+      nil ->
+        {:noreply, socket}
+
+      image ->
+        socket =
+          if socket.assigns.active_image &&
+               socket.assigns.active_image.id == image.id do
+            assign(socket, :active_image, image)
+          else
+            socket
+          end
+
+        {:noreply, stream_insert(socket, :images, image)}
+    end
+  end
+
+  defp handle_media_upload_progress(:media_uploads, _entry, socket) do
+    if socket.assigns.pending_upload_submit? and
+         upload_entries_done?(socket, :media_uploads) do
+      {:noreply, save_uploaded_media(socket, :media_uploads)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp handle_media_upload_progress(:media_drop_uploads, _entry, socket) do
+    if upload_entries_done?(socket, :media_drop_uploads) do
+      {:noreply, save_uploaded_media(socket, :media_drop_uploads)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp save_uploaded_media(socket, upload_name) do
+    uploader = socket.assigns[:current_user]
+
+    uploaded_files =
+      consume_uploaded_entries(socket, upload_name, fn details, _entry ->
+        raw_path = S3Config.object_url(details[:key])
+
+        {:ok, new_image} =
+          Media.add_new_image(
+            %{
+              raw_image_path: URI.encode(raw_path),
+              user_id: uploader.id,
+              upload_data: details
+            },
+            uploader
+          )
+
+        %{id: new_image.id}
+        |> YscWeb.Workers.ImageProcessor.new()
+        |> Oban.insert()
+
+        {:ok, new_image}
+      end)
+
+    media_count = Media.count_images()
+    timeline = Media.get_timeline_indices()
+    available_years = Enum.map(timeline, & &1.year)
+    images = Media.list_images_cursor(limit: socket.assigns.per_page)
+    {years_set, years_list} = years_from_images(images)
+    stream_items = Timeline.inject_date_headers(images)
+
+    socket
+    |> update(:uploaded_files, &(&1 ++ uploaded_files))
+    |> assign(:media_count, media_count)
+    |> assign(:timeline, timeline)
+    |> assign(:available_years, available_years)
+    |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+    |> assign(:stream_initialized?, true)
+    |> assign(:last_image_date, images |> List.last() |> last_date())
+    |> assign(:images_empty?, images == [])
+    |> assign(:years_set, years_set)
+    |> assign(:years_list, years_list)
+    |> assign(:show_drop_zone, false)
+    |> assign(:pending_upload_submit?, false)
+    |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+    |> push_patch(to: ~p"/admin/media")
   end
 
   defp presign_upload(entry, socket) do
@@ -1033,6 +1259,25 @@ defmodule YscWeb.AdminMediaLive do
   end
 
   defp error_to_string(_), do: "An error occurred"
+
+  defp upload_entries_in_progress?(socket, upload_name) do
+    socket.assigns.uploads[upload_name].entries
+    |> Enum.any?(&(not &1.done?))
+  end
+
+  defp upload_entries_done?(socket, upload_name) do
+    entries = socket.assigns.uploads[upload_name].entries
+    entries != [] and Enum.all?(entries, & &1.done?)
+  end
+
+  defp upload_progress([]), do: 0
+
+  defp upload_progress(entries) do
+    entries
+    |> Enum.map(& &1.progress)
+    |> Enum.sum()
+    |> div(length(entries))
+  end
 
   # Helper function to get a specific image version path
   defp get_image_version_path(%Media.Image{} = image, :thumbnail) do
@@ -1176,93 +1421,214 @@ defmodule YscWeb.AdminMediaLive do
     {years_set, years_list}
   end
 
-  defp filter_images_by_search(images, search_query)
-       when is_binary(search_query) do
-    normalized_search = String.downcase(search_query)
+  defp year_images_query(
+         start_date,
+         end_date,
+         search_query,
+         limit,
+         before_date \\ nil
+       ) do
+    query =
+      from i in Media.Image,
+        where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
+        order_by: [desc: i.inserted_at, desc: i.id],
+        limit: ^limit
 
-    Enum.filter(images, fn image ->
-      title = String.downcase(image.title || "")
-      alt_text = String.downcase(image.alt_text || "")
-      filename = String.downcase(Path.basename(image.raw_image_path || ""))
+    query =
+      if before_date do
+        from i in query, where: i.inserted_at < ^before_date
+      else
+        query
+      end
 
-      String.contains?(title, normalized_search) ||
-        String.contains?(alt_text, normalized_search) ||
-        String.contains?(filename, normalized_search)
-    end)
+    apply_image_search(query, search_query)
   end
 
-  defp filter_images_by_search(images, _), do: images
+  defp apply_image_search(query, search_query)
+       when is_binary(search_query) and search_query != "" do
+    search_pattern = "%#{search_query}%"
+
+    from i in query,
+      where:
+        ilike(i.title, ^search_pattern) or
+          ilike(i.alt_text, ^search_pattern) or
+          ilike(
+            fragment(
+              "regexp_replace(?, '.*/([^/]+)$', '\\1')",
+              i.raw_image_path
+            ),
+            ^search_pattern
+          )
+  end
+
+  defp apply_image_search(query, _search_query), do: query
+
+  defp copy_alt_text(%Media.Image{} = image) do
+    image.alt_text || image.title || "Image"
+  end
+
+  defp html_alt_text(%Media.Image{} = image) do
+    image
+    |> copy_alt_text()
+    |> Phoenix.HTML.html_escape()
+    |> Phoenix.HTML.safe_to_string()
+  end
+
+  defp markdown_alt_text(%Media.Image{} = image) do
+    image
+    |> copy_alt_text()
+    |> String.replace("\\", "\\\\")
+    |> String.replace("[", "\\[")
+    |> String.replace("]", "\\]")
+    |> String.replace("(", "\\(")
+    |> String.replace(")", "\\)")
+  end
 
   defp last_date(nil), do: nil
   defp last_date(%{inserted_at: inserted_at}), do: inserted_at
 
+  defp positive_image_dimension(value) when is_integer(value) and value > 0,
+    do: value
+
+  defp positive_image_dimension(_), do: nil
+
   defp render_images_by_year(assigns) do
     ~H"""
-    <div
-      id="images-grid"
-      phx-update="stream"
-      phx-viewport-bottom={!@end_of_timeline? && "load-more"}
-      class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9 gap-3 md:gap-4"
-    >
-      <%= for {id, item} <- @streams.images do %>
-        <%!-- RENDER HEADER --%>
-        <%= if match?(%Timeline.Header{}, item) do %>
-          <div
-            id={id}
-            data-year-section={item.date.year}
-            class="col-span-full sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200"
-          >
-            {item.formatted_date}
-          </div>
-        <% end %>
-
-        <%!-- RENDER IMAGE --%>
-        <%= if match?(%Media.Image{}, item) do %>
+    <%!-- Empty Search State --%>
+    <%= if @search_query != "" && @images_empty? do %>
+      <div class="mx-auto py-20 text-center">
+        <div class="flex flex-col items-center">
+          <.icon name="hero-magnifying-glass" class="w-16 h-16 text-zinc-300 mb-4" />
+          <p class="text-lg font-medium text-zinc-700 mb-2">No results found</p>
+          <p class="text-sm text-zinc-500 mb-6">
+            No images match "{@search_query}"
+          </p>
           <button
-            phx-click={JS.patch(build_image_edit_url_with_state(assigns, item.id))}
-            id={id}
-            class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden"
+            phx-click="clear-search"
+            phx-value-input-id="media-search-input"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
           >
-            <canvas
-              id={"blur-hash-image-#{item.id}"}
-              src={get_blur_hash(item)}
-              class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
-              phx-hook="BlurHashCanvas"
-            >
-            </canvas>
-
-            <img
-              class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"
-              id={"img-#{item.id}"}
-              src={get_image_path(item)}
-              loading="lazy"
-              phx-hook="BlurHashImage"
-              alt={item.alt_text || item.title || "Image"}
-            />
-
-            <div
-              :if={item.title != nil or item.alt_text != nil}
-              class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
-            >
-              <p
-                :if={item.title != nil}
-                class="text-xs font-medium text-white truncate"
-                title={item.title}
-              >
-                {item.title}
-              </p>
-              <p
-                :if={item.title == nil and item.alt_text != nil}
-                class="text-xs font-medium text-white/90 truncate"
-                title={item.alt_text}
-              >
-                {item.alt_text}
-              </p>
-            </div>
+            <.icon name="hero-x-mark" class="w-4 h-4" /> Clear search
           </button>
+        </div>
+      </div>
+    <% else %>
+      <div
+        id="images-grid"
+        phx-update="stream"
+        phx-viewport-bottom={!@end_of_timeline? && "load-more"}
+        class={[
+          if(@layout_mode == :square,
+            do:
+              "media-square-grid grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9",
+            else: "media-masonry-grid"
+          )
+        ]}
+      >
+        <%= for {id, item} <- @streams.images do %>
+          <%!-- RENDER HEADER --%>
+          <%= if match?(%Timeline.Header{}, item) do %>
+            <div
+              id={id}
+              data-year-section={item.date.year}
+              class={[
+                "sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200",
+                if(@layout_mode == :square,
+                  do: "col-span-full",
+                  else: "media-masonry-header"
+                )
+              ]}
+            >
+              {item.formatted_date}
+            </div>
+          <% end %>
+
+          <%!-- RENDER IMAGE --%>
+          <%= if match?(%Media.Image{}, item) do %>
+            <button
+              phx-click={
+                JS.patch(build_image_edit_url_with_state(assigns, item.id))
+              }
+              id={id}
+              class={[
+                "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
+                if(@layout_mode == :square,
+                  do: "aspect-square",
+                  else: "media-masonry-card bg-zinc-100"
+                )
+              ]}
+            >
+              <%!-- Processing Overlay --%>
+              <%= if item.processing_state != :completed do %>
+                <div class="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
+                  <div class="text-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2">
+                    </div>
+                    <p class="text-xs font-medium text-white">Processing...</p>
+                  </div>
+                </div>
+              <% end %>
+
+              <%!-- Missing Alt Text Warning --%>
+              <%= if is_nil(item.alt_text) || item.alt_text == "" do %>
+                <div
+                  class="absolute top-2 right-2 z-[3] flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500 text-white shadow-lg"
+                  title="Missing alt text"
+                  aria-label="Missing alt text"
+                >
+                  <.icon name="hero-exclamation-triangle" class="h-4 w-4 flex-none" />
+                </div>
+              <% end %>
+
+              <canvas
+                id={"blur-hash-img-#{item.id}"}
+                src={get_blur_hash(item)}
+                class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
+                phx-hook="BlurHashCanvas"
+              >
+              </canvas>
+
+              <img
+                class={[
+                  "z-[1] rounded-lg opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100",
+                  if(@layout_mode == :square,
+                    do: "absolute inset-0 h-full w-full object-cover",
+                    else: "relative block h-auto w-full object-contain"
+                  )
+                ]}
+                id={"img-#{item.id}"}
+                src={get_image_path(item)}
+                width={positive_image_dimension(item.width)}
+                height={positive_image_dimension(item.height)}
+                loading="lazy"
+                phx-hook="BlurHashImage"
+                alt={item.alt_text || item.title || "Image"}
+              />
+
+              <div
+                :if={item.title != nil or item.alt_text != nil}
+                class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
+              >
+                <p
+                  :if={item.title != nil}
+                  class="text-xs font-medium text-white truncate"
+                  title={item.title}
+                >
+                  {item.title}
+                </p>
+                <p
+                  :if={item.title == nil and item.alt_text != nil}
+                  class="text-xs font-medium text-white/90 truncate"
+                  title={item.alt_text}
+                >
+                  {item.alt_text}
+                </p>
+              </div>
+            </button>
+          <% end %>
         <% end %>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
     """
   end
 end

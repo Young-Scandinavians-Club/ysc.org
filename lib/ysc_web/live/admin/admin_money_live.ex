@@ -5,11 +5,6 @@ defmodule YscWeb.AdminMoneyLive do
 
   import YscWeb.CoreComponents
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias Ysc.Ledgers
   alias Ysc.Accounts
   alias Ysc.Webhooks

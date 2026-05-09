@@ -10,11 +10,6 @@ defmodule YscWeb.AdminSettingsLive do
 
   import YscWeb.CoreComponents
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   import Ecto.Query
 
   @impl true

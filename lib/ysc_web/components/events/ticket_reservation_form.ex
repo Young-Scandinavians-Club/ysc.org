@@ -1,11 +1,6 @@
 defmodule YscWeb.AdminEventsLive.TicketReservationForm do
   use YscWeb, :live_component
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   alias Ysc.Events
   alias Ysc.Accounts
 

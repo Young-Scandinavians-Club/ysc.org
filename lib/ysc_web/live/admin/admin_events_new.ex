@@ -3,11 +3,6 @@ defmodule YscWeb.AdminEventsNewLive do
 
   import YscWeb.CoreComponents
 
-  use Phoenix.VerifiedRoutes,
-    endpoint: YscWeb.Endpoint,
-    router: YscWeb.Router,
-    statics: YscWeb.static_paths()
-
   require Ysc.Logging
 
   alias Phoenix.LiveView.JS

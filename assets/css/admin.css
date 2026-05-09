@@ -814,3 +814,86 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     animation: scanner-result-slide-up 0.25s cubic-bezier(0.34, 1.2, 0.64, 1) both;
 }
 
+/*
+=== MASONRY LAYOUT FOR MEDIA GALLERY ===
+*/
+
+.media-square-grid > button {
+    aspect-ratio: 1 / 1;
+}
+
+.media-square-grid > button > img {
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
+}
+
+.media-square-grid > [data-year-section] {
+    grid-column: 1 / -1;
+}
+
+.media-masonry-grid {
+    column-count: 2;
+    column-gap: 0.75rem;
+}
+
+.media-masonry-grid > * {
+    break-inside: avoid;
+}
+
+.media-masonry-grid > button,
+.media-masonry-card {
+    aspect-ratio: auto;
+    background-color: rgb(244 244 245);
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.media-masonry-grid > button > img {
+    height: auto;
+    object-fit: contain;
+    position: relative;
+    width: 100%;
+}
+
+.media-masonry-grid > [data-year-section],
+.media-masonry-header {
+    column-span: all;
+    margin-bottom: 0.75rem;
+}
+
+@media (min-width: 768px) {
+    .media-masonry-grid {
+        column-count: 3;
+        column-gap: 1rem;
+    }
+
+    .media-masonry-grid > button,
+    .media-masonry-grid > [data-year-section],
+    .media-masonry-card,
+    .media-masonry-header {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (min-width: 1280px) {
+    .media-masonry-grid {
+        column-count: 4;
+    }
+}
+
+@media (min-width: 1536px) {
+    .media-masonry-grid {
+        column-count: 5;
+    }
+}
+
+@media (min-width: 1920px) {
+    .media-masonry-grid {
+        column-count: 7;
+    }
+}
+
+
