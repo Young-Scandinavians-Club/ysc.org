@@ -653,16 +653,19 @@ defmodule YscWeb.AccountSetupLive do
       current_step = starting_step
       password_changeset = Accounts.change_user_password(user)
 
-      # Generate and send initial verification code only if one doesn't already exist
-      case Ysc.VerificationCache.get_code(user.id, :email_verification) do
-        {:ok, _existing_code} ->
-          # Code already exists, don't generate a new one
-          :ok
+      # Only send email verification when this user still needs it. Otherwise an
+      # unauthenticated visitor with a guessed or leaked user_id could trigger
+      # verification emails (and, after expiry, repeat) for unrelated flows such
+      # as payment setup.
+      if user_needs.email_verification do
+        case Ysc.VerificationCache.get_code(user.id, :email_verification) do
+          {:ok, _existing_code} ->
+            :ok
 
-        {:error, _} ->
-          # No existing code, generate and send new one
-          code = Accounts.generate_and_store_email_verification_code(user)
-          _job = Accounts.send_email_verification_code(user, code, "initial")
+          {:error, _} ->
+            code = Accounts.generate_and_store_email_verification_code(user)
+            _job = Accounts.send_email_verification_code(user, code, "initial")
+        end
       end
 
       email_changeset = %{"verification_code" => ""} |> to_form()
