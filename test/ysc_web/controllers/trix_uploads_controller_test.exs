@@ -1,5 +1,64 @@
+defmodule YscWeb.TrixUploadsControllerTest.MockS3Plug do
+  @moduledoc false
+  import Plug.Conn
+
+  def init(opts), do: opts
+
+  def call(conn, _opts) do
+    conn = fetch_query_params(conn)
+    dispatch(conn)
+  end
+
+  # Initiate multipart upload: POST /{bucket}/{key}?uploads
+  defp dispatch(%{method: "POST", query_params: %{"uploads" => _}} = conn) do
+    {:ok, _body, conn} = read_body(conn)
+
+    conn
+    |> put_resp_content_type("application/xml")
+    |> send_resp(200, """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Bucket>media</Bucket>
+      <Key>key</Key>
+      <UploadId>mock-upload-id-12345</UploadId>
+    </InitiateMultipartUploadResult>
+    """)
+  end
+
+  # Upload part: PUT /{bucket}/{key}?partNumber=N&uploadId=xxx
+  defp dispatch(%{method: "PUT", query_params: %{"partNumber" => _}} = conn) do
+    {:ok, _body, conn} = read_body(conn)
+
+    conn
+    |> put_resp_header("etag", ~s("mock-etag-abc123"))
+    |> send_resp(200, "")
+  end
+
+  # Complete multipart upload: POST /{bucket}/{key}?uploadId=xxx
+  defp dispatch(%{method: "POST", query_params: %{"uploadId" => _}} = conn) do
+    {:ok, _body, conn} = read_body(conn)
+    path = conn.request_path |> String.trim_leading("/")
+
+    conn
+    |> put_resp_content_type("application/xml")
+    |> send_resp(200, """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Location>http://localhost/#{path}</Location>
+      <Bucket>media</Bucket>
+      <Key>key</Key>
+      <ETag>"mock-etag-final"</ETag>
+    </CompleteMultipartUploadResult>
+    """)
+  end
+
+  defp dispatch(conn), do: send_resp(conn, 200, "")
+end
+
 defmodule YscWeb.TrixUploadsControllerTest do
-  use YscWeb.ConnCase, async: true
+  # async: false required because the image deduplication tests override
+  # Application.put_env(:ex_aws, :s3, ...) which is global process state.
+  use YscWeb.ConnCase, async: false
 
   import Ysc.AccountsFixtures
 
@@ -236,8 +295,51 @@ defmodule YscWeb.TrixUploadsControllerTest do
     end
   end
 
+  defp start_mock_s3_server do
+    {:ok, socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+
+    ref = :"trix_uploads_s3_#{port}_#{System.unique_integer([:positive])}"
+
+    {:ok, _} =
+      Plug.Cowboy.http(YscWeb.TrixUploadsControllerTest.MockS3Plug, [],
+        port: port,
+        ref: ref
+      )
+
+    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
+    port
+  end
+
+  defp override_exaws_s3_port(port) do
+    original = Application.get_env(:ex_aws, :s3)
+
+    Application.put_env(:ex_aws, :s3,
+      scheme: "http://",
+      host: "localhost",
+      port: port
+    )
+
+    on_exit(fn ->
+      if original do
+        Application.put_env(:ex_aws, :s3, original)
+      else
+        Application.delete_env(:ex_aws, :s3)
+      end
+    end)
+  end
+
   describe "create/2 — image deduplication" do
     @tiny_png_path "test/support/fixtures/tiny.png"
+
+    setup do
+      port = start_mock_s3_server()
+      override_exaws_s3_port(port)
+      :ok
+    end
 
     test "returns the existing image URL when the same file is uploaded again",
          %{conn: conn, user: user} do
