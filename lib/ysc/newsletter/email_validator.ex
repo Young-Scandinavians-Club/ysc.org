@@ -134,15 +134,6 @@ defmodule Ysc.Newsletter.EmailValidator do
 
       [_ | _] = _mx_records ->
         :ok
-
-      _ ->
-        # On error, fail open - don't block the user
-        Ysc.Logging.warning("MX lookup error, failing open",
-          domain: domain,
-          context: "newsletter_signup"
-        )
-
-        :ok
     end
   rescue
     e ->
