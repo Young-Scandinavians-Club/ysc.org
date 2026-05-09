@@ -207,13 +207,66 @@ defmodule Ysc.Media do
     Repo.get(Media.Image, id)
   end
 
+  @doc """
+  Computes a SHA-256 content hash for the file at the given path.
+
+  Reads the file in chunks to avoid loading large images into RAM. Returns a
+  lowercase hex-encoded string, e.g. `"a3f2..."`.
+  """
+  # sobelow_skip ["Traversal.FileModule"]
+  def compute_file_hash(path) do
+    path
+    |> File.stream!(2048)
+    |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
+  end
+
+  @doc """
+  Looks up an image by its content hash. Returns the `%Media.Image{}` struct if
+  found, or `nil` if no image with that hash exists.
+  """
+  def find_image_by_content_hash(hash) when is_binary(hash) do
+    Repo.get_by(Media.Image, content_hash: hash)
+  end
+
+  @doc """
+  Copies all processed output fields from `source` onto `target` and marks the
+  target as `"completed"`. Used to skip re-processing when the same raw image
+  has already been processed before.
+  """
+  def reuse_existing_processed_image(
+        %Media.Image{} = target,
+        %Media.Image{} = source
+      ) do
+    attrs = %{
+      optimized_image_path: source.optimized_image_path,
+      thumbnail_path: source.thumbnail_path,
+      blur_hash: source.blur_hash,
+      width: source.width,
+      height: source.height,
+      processing_state: "completed"
+    }
+
+    update_processed_image(target, attrs)
+  end
+
+  @doc """
+  Persists the content hash onto an existing image record.
+  """
+  def set_content_hash(%Media.Image{} = image, hash) when is_binary(hash) do
+    image
+    |> Media.Image.add_image_changeset(%{content_hash: hash})
+    |> Repo.update()
+  end
+
   def get_image!(id) do
     Repo.get!(Media.Image, id)
   end
 
   def add_new_image(attrs, %User{} = current_user) do
     with :ok <- Policy.authorize(:media_image_create, current_user) do
-      %Media.Image{}
+      %Media.Image{user_id: current_user.id}
       |> Media.Image.add_image_changeset(attrs)
       |> Repo.insert()
     end

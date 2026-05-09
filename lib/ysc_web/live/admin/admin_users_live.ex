@@ -625,28 +625,12 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                 </div>
 
-                <div
-                  class="flex justify-end pt-3 border-t border-zinc-200"
-                  onclick="event.stopPropagation()"
-                >
-                  <button
-                    :if={user.state == :pending_approval}
-                    phx-click={
-                      JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
-                    }
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                  >
-                    Review
-                  </button>
-                  <button
-                    :if={user.state != :pending_approval}
-                    phx-click={
-                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
-                    }
-                    class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
-                  >
-                    Edit
-                  </button>
+                <div class="flex justify-end pt-3 border-t border-zinc-200">
+                  <.user_actions_dropdown
+                    user={user}
+                    params={@params}
+                    menu_id={"user-actions-mob-#{user.id}"}
+                  />
                 </div>
               </div>
             <% end %>
@@ -753,22 +737,11 @@ defmodule YscWeb.AdminUsersLive do
                 <% end %>
               </:col>
               <:action :let={{_, user}}>
-                <button
-                  :if={user.state == :pending_approval}
-                  phx-click={
-                    JS.patch(~p"/admin/users/#{user.id}/review?#{@params}")
-                  }
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                >
-                  Review
-                </button>
-                <button
-                  :if={user.state != :pending_approval}
-                  phx-click={JS.navigate(~p"/admin/users/#{user.id}/details")}
-                  class="text-blue-600 font-semibold hover:underline cursor-pointer"
-                >
-                  Edit
-                </button>
+                <.user_actions_dropdown
+                  user={user}
+                  params={@params}
+                  menu_id={"user-actions-dt-#{user.id}"}
+                />
               </:action>
             </Flop.Phoenix.table>
 
@@ -823,6 +796,62 @@ defmodule YscWeb.AdminUsersLive do
         </div>
       </div>
     </.side_menu>
+    """
+  end
+
+  attr :user, :map, required: true
+  attr :params, :map, required: true
+  attr :menu_id, :string, required: true
+
+  def user_actions_dropdown(assigns) do
+    ~H"""
+    <div class="flex justify-end" onclick="event.stopPropagation()">
+      <.dropdown
+        id={@menu_id}
+        right={true}
+        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+      >
+        <:button_block>
+          <span class="sr-only">User actions</span>
+          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
+        </:button_block>
+
+        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
+          <ul class="py-1">
+            <li :if={@user.state == :pending_approval}>
+              <button
+                id={"#{@menu_id}-review"}
+                type="button"
+                phx-click={JS.patch(~p"/admin/users/#{@user.id}/review?#{@params}")}
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-clipboard-document-check"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>Review</span>
+              </button>
+            </li>
+            <li :if={@user.state != :pending_approval}>
+              <button
+                id={"#{@menu_id}-edit"}
+                type="button"
+                phx-click={
+                  JS.navigate(~p"/admin/users/#{@user.id}/details?#{@params}")
+                }
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+              >
+                <.icon
+                  name="hero-pencil-square"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                />
+                <span>Edit</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </.dropdown>
+    </div>
     """
   end
 

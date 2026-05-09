@@ -153,34 +153,42 @@ defmodule YscWeb.Uploads do
         raise "File validation failed: #{reason}"
     end
 
-    base = Path.basename(path)
-    _dest = Path.join(uploads_dir(), base)
+    hash = Media.compute_file_hash(path)
 
-    upload_result = Media.upload_file_to_s3(path)
+    case Media.find_image_by_content_hash(hash) do
+      %Media.Image{processing_state: :completed} = existing ->
+        {:ok, existing.id}
 
-    {:ok, new_image} =
-      Media.add_new_image(
-        %{
-          raw_image_path: upload_result[:body][:location],
-          user_id: current_user.id
-        },
-        current_user
-      )
+      _ ->
+        base = Path.basename(path)
+        _dest = Path.join(uploads_dir(), base)
 
-    make_temp_dir(@temp_dir)
-    tmp_output_file = "#{@temp_dir}/#{new_image.id}"
-    optimized_output_path = "#{tmp_output_file}_optimized.png"
-    thumbnail_output_path = "#{tmp_output_file}_thumb.png"
+        upload_result = Media.upload_file_to_s3(path)
 
-    updated_image =
-      Media.process_image_upload(
-        new_image,
-        path,
-        thumbnail_output_path,
-        optimized_output_path
-      )
+        {:ok, new_image} =
+          Media.add_new_image(
+            %{
+              raw_image_path: upload_result[:body][:location],
+              content_hash: hash
+            },
+            current_user
+          )
 
-    {:ok, updated_image.id}
+        make_temp_dir(@temp_dir)
+        tmp_output_file = "#{@temp_dir}/#{new_image.id}"
+        optimized_output_path = "#{tmp_output_file}_optimized.png"
+        thumbnail_output_path = "#{tmp_output_file}_thumb.png"
+
+        updated_image =
+          Media.process_image_upload(
+            new_image,
+            path,
+            thumbnail_output_path,
+            optimized_output_path
+          )
+
+        {:ok, updated_image.id}
+    end
   end
 
   def consume_entry(%{uploader: _} = meta, _entry, _current_user) do

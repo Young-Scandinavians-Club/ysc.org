@@ -797,6 +797,20 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       assert_redirect(view)
     end
+
+    test "set-step cannot skip to password step without an authenticated session",
+         %{
+           conn: conn
+         } do
+      user = unverified_pending_user()
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      assert has_element?(view, "#email_form")
+
+      render_click(view, "set-step", %{"step" => "2"})
+
+      assert_redirect(view)
+    end
   end
 
   # ---------------------------------------------------------------------------

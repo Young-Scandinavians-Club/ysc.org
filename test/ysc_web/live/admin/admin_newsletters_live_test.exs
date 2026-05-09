@@ -181,11 +181,9 @@ defmodule YscWeb.AdminNewslettersLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
 
-      # Two send-now buttons exist (mobile card + desktop table); target desktop via title attr
+      # Two send-now buttons exist (mobile card + desktop table); target the desktop dropdown action.
       view
-      |> element(
-        "[phx-click='send-now'][phx-value-id='#{edition.id}'][title='Send now']"
-      )
+      |> element("#newsletter-actions-dt-#{edition.id}-send-now")
       |> render_click()
 
       # In inline Oban mode the sender fires synchronously; edition is :sent

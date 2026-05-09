@@ -3,6 +3,9 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
   import Ysc.AccountsFixtures
 
+  alias Ysc.Media
+  alias Ysc.Media.Image
+
   setup %{conn: conn} do
     user = user_fixture(%{role: :admin})
     conn = log_in_user(conn, user)
@@ -230,6 +233,87 @@ defmodule YscWeb.TrixUploadsControllerTest do
       path = write_tmp("random binary \x00\x01\x02 data", "data.bin")
       assert {:ok, mime} = FileValidator.validate_attachment(path, "data.bin")
       assert mime == "application/octet-stream"
+    end
+  end
+
+  describe "create/2 — image deduplication" do
+    @tiny_png_path "test/support/fixtures/tiny.png"
+
+    test "returns the existing image URL when the same file is uploaded again",
+         %{conn: conn, user: user} do
+      tiny_content = File.read!(@tiny_png_path)
+      path = write_tmp(tiny_content, "photo.png")
+
+      hash = Media.compute_file_hash(path)
+
+      {:ok, existing} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://s3.example.com/original_raw.png",
+          optimized_image_path: "https://cdn.example.com/existing_opt.webp",
+          thumbnail_path: "https://cdn.example.com/existing_thumb.webp",
+          blur_hash: "L6Pj0^jE",
+          width: 1,
+          height: 1,
+          processing_state: :completed,
+          content_hash: hash
+        }
+        |> Ysc.Repo.insert()
+
+      image_count_before = Media.count_images()
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "photo.png")
+        })
+
+      assert json_response(conn, 201)["url"] == existing.optimized_image_path
+      assert Media.count_images() == image_count_before
+    end
+
+    test "creates a new image when no existing image has the same hash",
+         %{conn: conn} do
+      tiny_content = File.read!(@tiny_png_path)
+      path = write_tmp(tiny_content, "new_image.png")
+      hash = Media.compute_file_hash(path)
+
+      assert Media.find_image_by_content_hash(hash) == nil
+
+      count_before = Media.count_images()
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "new_image.png")
+        })
+
+      assert json_response(conn, 201)
+      assert Media.count_images() == count_before + 1
+      assert %Image{} = Media.find_image_by_content_hash(hash)
+    end
+
+    test "returns the raw_image_path when the completed duplicate has no optimized path",
+         %{conn: conn, user: user} do
+      tiny_content = File.read!(@tiny_png_path)
+      path = write_tmp(tiny_content, "photo.png")
+
+      hash = Media.compute_file_hash(path)
+
+      {:ok, existing} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://cdn.example.com/raw_only.png",
+          optimized_image_path: nil,
+          processing_state: :completed,
+          content_hash: hash
+        }
+        |> Ysc.Repo.insert()
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "photo.png")
+        })
+
+      assert json_response(conn, 201)["url"] == existing.raw_image_path
     end
   end
 end

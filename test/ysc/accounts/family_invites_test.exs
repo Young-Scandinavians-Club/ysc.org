@@ -156,6 +156,22 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                FamilyInvites.create_invite(primary_user, email)
     end
 
+    test "returns error when pending invite exists for Gmail alias of same address" do
+      primary_user = create_user_with_lifetime_membership()
+
+      assert {:ok, _invite} =
+               FamilyInvites.create_invite(
+                 primary_user,
+                 "dup.pending@gmail.com"
+               )
+
+      assert {:error, :pending_invite_exists} =
+               FamilyInvites.create_invite(
+                 primary_user,
+                 "d.u.p.pending+news@gmail.com"
+               )
+    end
+
     test "allows creating invite after previous invite expired" do
       primary_user = create_user_with_lifetime_membership()
       email = unique_user_email()
@@ -691,6 +707,25 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert hd(found).primary_user.id == primary_user.id
     end
 
+    test "finds pending invite when query uses Gmail alias of stored address" do
+      primary_user = create_user_with_lifetime_membership()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(
+          primary_user,
+          "family.pending.alias@gmail.com"
+        )
+
+      # Same canonical local part: dots removed on insert; plus-tag removed on lookup
+      found =
+        FamilyInvites.list_pending_invites_for_email(
+          "familypendingalias+inbox@gmail.com"
+        )
+
+      assert length(found) == 1
+      assert hd(found).id == invite.id
+    end
+
     test "returns empty list when no pending invites match" do
       assert FamilyInvites.list_pending_invites_for_email(unique_user_email()) ==
                []
@@ -709,6 +744,29 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           email: email,
           first_name: "Invitee",
           last_name: "User"
+        })
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert linked.primary_user_id == primary_user.id
+      assert Repo.get!(FamilyInvite, invite.id).accepted_at != nil
+    end
+
+    test "links existing account when Gmail address is a plus/dot alias of invite target" do
+      primary_user = create_user_with_lifetime_membership()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(
+          primary_user,
+          "family.link.member@gmail.com"
+        )
+
+      invitee =
+        user_fixture(%{
+          email: "family.link.member+inbox@gmail.com",
+          first_name: "Invitee",
+          last_name: "Alias"
         })
 
       assert {:ok, linked} =

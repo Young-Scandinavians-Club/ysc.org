@@ -51,6 +51,33 @@ jobs:
       - name: Compile
         run: mix compile --warnings-as-errors
 
+      # GHA service containers do not pass `server /data` to the MinIO image, so the
+      # container exits immediately (help text only) and the health check never passes.
+      # Start MinIO explicitly on the runner (same image as etc/docker/docker-compose).
+      - name: Start MinIO and create buckets
+        run: |
+          docker rm -f minio_ci 2>/dev/null || true
+          docker run -d --name minio_ci -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:RELEASE.2025-03-12T18-04-18Z@sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f \
+            server /data --console-address ":9001"
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:9000/minio/health/live
+          docker run --rm --network host --entrypoint /bin/sh \
+            minio/mc:RELEASE.2025-03-12T17-29-24Z@sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123 \
+            -c "
+              mc alias set local http://127.0.0.1:9000 minioadmin minioadmin &&
+              mc mb local/media --ignore-existing &&
+              mc mb local/expense-reports --ignore-existing &&
+              mc mb local/avatars --ignore-existing &&
+              mc anonymous set public local/media &&
+              mc anonymous set public local/avatars
+            "
+
       - name: Run tests with coverage
         env:
           MIX_ENV: test
