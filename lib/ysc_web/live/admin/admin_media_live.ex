@@ -37,7 +37,7 @@ defmodule YscWeb.AdminMediaLive do
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <%!-- Left Column: Image Preview --%>
           <div>
-            <%!-- Image Version Tabs with Thumbnails --%>
+            <%!-- Image Version Tabs --%>
             <div class="border-b border-zinc-200 mb-4">
               <nav class="-mb-px flex space-x-2" aria-label="Image Versions">
                 <button
@@ -52,17 +52,15 @@ defmodule YscWeb.AdminMediaLive do
                     )
                   ]}
                 >
-                  <%= if @active_image.optimized_image_path do %>
-                    <img
-                      src={@active_image.optimized_image_path}
-                      class="w-12 h-12 object-cover rounded mb-1 border border-zinc-200"
-                      alt="Optimized preview"
-                    />
-                  <% else %>
-                    <div class="w-12 h-12 bg-zinc-100 rounded mb-1 flex items-center justify-center border border-zinc-200">
-                      <.icon name="hero-photo" class="w-6 h-6 text-zinc-400" />
-                    </div>
-                  <% end %>
+                  <div class={[
+                    "mb-1 flex h-10 w-10 items-center justify-center rounded-full border",
+                    if(@active_image.optimized_image_path,
+                      do: "border-blue-200 bg-blue-50 text-blue-600",
+                      else: "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    )
+                  ]}>
+                    <.icon name="hero-sparkles" class="h-5 w-5" />
+                  </div>
                   <span>Optimized</span>
                 </button>
                 <button
@@ -77,17 +75,15 @@ defmodule YscWeb.AdminMediaLive do
                     )
                   ]}
                 >
-                  <%= if @active_image.thumbnail_path do %>
-                    <img
-                      src={@active_image.thumbnail_path}
-                      class="w-12 h-12 object-cover rounded mb-1 border border-zinc-200"
-                      alt="Thumbnail preview"
-                    />
-                  <% else %>
-                    <div class="w-12 h-12 bg-zinc-100 rounded mb-1 flex items-center justify-center border border-zinc-200">
-                      <.icon name="hero-photo" class="w-6 h-6 text-zinc-400" />
-                    </div>
-                  <% end %>
+                  <div class={[
+                    "mb-1 flex h-10 w-10 items-center justify-center rounded-full border",
+                    if(@active_image.thumbnail_path,
+                      do: "border-emerald-200 bg-emerald-50 text-emerald-600",
+                      else: "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    )
+                  ]}>
+                    <.icon name="hero-squares-2x2" class="h-5 w-5" />
+                  </div>
                   <span>Thumbnail</span>
                 </button>
                 <button
@@ -102,17 +98,15 @@ defmodule YscWeb.AdminMediaLive do
                     )
                   ]}
                 >
-                  <%= if @active_image.raw_image_path do %>
-                    <img
-                      src={@active_image.raw_image_path}
-                      class="w-12 h-12 object-cover rounded mb-1 border border-zinc-200"
-                      alt="Raw preview"
-                    />
-                  <% else %>
-                    <div class="w-12 h-12 bg-zinc-100 rounded mb-1 flex items-center justify-center border border-zinc-200">
-                      <.icon name="hero-photo" class="w-6 h-6 text-zinc-400" />
-                    </div>
-                  <% end %>
+                  <div class={[
+                    "mb-1 flex h-10 w-10 items-center justify-center rounded-full border",
+                    if(@active_image.raw_image_path,
+                      do: "border-zinc-300 bg-zinc-50 text-zinc-700",
+                      else: "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    )
+                  ]}>
+                    <.icon name="hero-photo" class="h-5 w-5" />
+                  </div>
                   <span>Raw</span>
                 </button>
               </nav>
@@ -130,46 +124,61 @@ defmodule YscWeb.AdminMediaLive do
               <div class="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  phx-click={
-                    copy_to_clipboard_js(
-                      "image-path-text-#{@selected_image_version}",
-                      "copy-path-btn"
-                    )
-                  }
                   id="copy-path-btn"
+                  phx-hook="ClipboardCopy"
+                  data-copy-target={"image-path-text-#{@selected_image_version}"}
+                  data-copy-feedback="copy-path-btn-feedback"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                   title="Copy URL to clipboard"
                 >
                   <.icon name="hero-link" class="w-3.5 h-3.5" /> Copy URL
+                  <span
+                    id="copy-path-btn-feedback"
+                    class="hidden items-center gap-1 text-green-700"
+                    aria-live="polite"
+                  >
+                    <.icon name="hero-check" class="h-3.5 w-3.5" />
+                    <span data-copy-feedback-label>Copied</span>
+                  </span>
                 </button>
                 <button
                   type="button"
-                  phx-click={
-                    copy_to_clipboard_js(
-                      "image-markdown-#{@selected_image_version}",
-                      "copy-markdown-btn"
-                    )
-                  }
                   id="copy-markdown-btn"
+                  phx-hook="ClipboardCopy"
+                  data-copy-target={"image-markdown-#{@selected_image_version}"}
+                  data-copy-feedback="copy-markdown-btn-feedback"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                   title="Copy as Markdown"
                 >
                   <.icon name="hero-document-text" class="w-3.5 h-3.5" />
                   Copy Markdown
+                  <span
+                    id="copy-markdown-btn-feedback"
+                    class="hidden items-center gap-1 text-green-700"
+                    aria-live="polite"
+                  >
+                    <.icon name="hero-check" class="h-3.5 w-3.5" />
+                    <span data-copy-feedback-label>Copied</span>
+                  </span>
                 </button>
                 <button
                   type="button"
-                  phx-click={
-                    copy_to_clipboard_js(
-                      "image-html-#{@selected_image_version}",
-                      "copy-html-btn"
-                    )
-                  }
                   id="copy-html-btn"
+                  phx-hook="ClipboardCopy"
+                  data-copy-target={"image-html-#{@selected_image_version}"}
+                  data-copy-feedback="copy-html-btn-feedback"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                   title="Copy as HTML"
                 >
                   <.icon name="hero-code-bracket" class="w-3.5 h-3.5" /> Copy HTML
+                  <span
+                    id="copy-html-btn-feedback"
+                    class="hidden items-center gap-1 text-green-700"
+                    aria-live="polite"
+                  >
+                    <.icon name="hero-check" class="h-3.5 w-3.5" />
+                    <span data-copy-feedback-label>Copied</span>
+                  </span>
                 </button>
                 <input
                   type="hidden"
@@ -360,154 +369,196 @@ defmodule YscWeb.AdminMediaLive do
         </div>
       </.modal>
 
-      <div class="flex justify-between items-center py-6">
-        <div>
-          <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-            Media Library
-          </h1>
-          <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
-            {@media_count} {if @media_count == 1,
-              do: "image",
-              else: "images"}
-          </p>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <%!-- Layout Toggle --%>
-          <button
-            :if={@media_count > 0}
-            phx-click="toggle-layout"
-            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
-            title={
-              if @layout_mode == :square,
-                do: "Switch to masonry layout",
-                else: "Switch to square grid"
-            }
-          >
-            <%= if @layout_mode == :square do %>
-              <.icon name="hero-squares-2x2" class="w-4 h-4" />
-              <span>Square</span>
-            <% else %>
-              <.icon name="hero-view-columns" class="w-4 h-4" />
-              <span>Masonry</span>
-            <% end %>
-          </button>
-
-          <.button phx-click={JS.patch(~p"/admin/media/upload")}>
-            <.icon name="hero-photo" class="w-5 h-5 -mt-1" />
-            <span class="ms-1">
-              New Image
-            </span>
-          </.button>
-        </div>
-      </div>
-
-      <div :if={@media_count > 0} class="w-full pb-4">
-        <.admin_search_bar
-          id="media-search-form"
-          input_id="media-search-input"
-          name="search"
-          value={@search_query}
-          placeholder="Search by filename, title, or alt text..."
-          debounce="300"
-          on_change="search"
-          clear_event="clear-search"
-        />
-      </div>
-
-      <%!-- Drag and Drop Overlay --%>
-      <div
-        :if={@show_drop_zone && @live_action != :upload}
-        id="media-drop-zone"
-        phx-drop-target={@uploads.media_uploads.ref}
-        class="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center"
+      <form
+        :if={@live_action != :upload}
+        id="media-drop-upload-form"
+        phx-submit="save"
+        phx-change="validate"
+        class="hidden"
       >
-        <div class="bg-white rounded-lg shadow-2xl p-8 border-4 border-dashed border-blue-500 max-w-md mx-4">
-          <.icon
-            name="hero-cloud-arrow-up"
-            class="w-16 h-16 text-blue-600 mx-auto mb-4"
-          />
-          <p class="text-xl font-semibold text-zinc-800 text-center mb-2">
-            Drop images to upload
-          </p>
-          <p class="text-sm text-zinc-600 text-center">
-            Release to add to media library
-          </p>
-        </div>
-      </div>
+        <.live_file_input upload={@uploads.media_uploads} />
+      </form>
 
-      <section id="media-section" class="py-6 relative" phx-hook="MediaDropZone">
-        <div
-          :if={@media_count > 0}
-          id="media-gallery"
-          phx-hook="ScrollPreserver"
-          class="pr-12"
-        >
-          {render_images_by_year(assigns)}
-        </div>
-        <%!-- Year Scrubber --%>
-        <div
-          :if={@media_count > 0 and length(@timeline) > 1}
-          id="year-scrubber"
-          phx-hook="YearScrubber"
-          class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
-        >
-          <%!-- All / reset button --%>
-          <button
-            phx-click="show-all-years"
-            class={[
-              "w-9 h-9 flex items-center justify-center rounded transition-all duration-150 relative group",
-              if(is_nil(@selected_year),
-                do: "bg-zinc-800 text-white opacity-100",
-                else:
-                  "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 opacity-60 hover:opacity-100"
-              )
-            ]}
-            title="Show all years"
-          >
-            <.icon name="hero-squares-2x2" class="w-4 h-4" />
-            <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-              All years
-            </span>
-          </button>
-          <div class="w-5 h-px bg-zinc-200 my-0.5"></div>
-          <%= for item <- @timeline do %>
-            <button
-              data-year-item={item.year}
-              phx-click="jump-to-year"
-              phx-value-year={item.year}
-              class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
-              title={"#{item.year} (#{item.count} images)"}
-            >
-              <span class="group-hover:hidden flex items-center justify-center w-full h-full">
-                {String.slice(to_string(item.year), -2, 2)}
-              </span>
-              <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
-                {item.year}
-              </span>
-              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-                {item.count} photos
-              </span>
-            </button>
-          <% end %>
-        </div>
-
-        <div :if={@media_count == 0} class="mx-auto py-20 text-center">
-          <div class="flex flex-col items-center">
-            <.icon name="hero-photo" class="w-16 h-16 text-zinc-300 mb-4" />
-            <p class="text-lg font-medium text-zinc-700 mb-2">No images yet</p>
-            <p class="text-sm text-zinc-500 mb-6">
-              Upload your first image to get started
+      <div
+        id="media-page-drop-target"
+        phx-hook="MediaDropZone"
+        phx-drop-target={@uploads.media_uploads.ref}
+      >
+        <div class="flex justify-between items-center py-6">
+          <div>
+            <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+              Media Library
+            </h1>
+            <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
+              {@media_count} {if @media_count == 1,
+                do: "image",
+                else: "images"}
             </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div
+              :if={@media_count > 0}
+              class="inline-flex rounded-lg border border-zinc-300 bg-zinc-100 p-1"
+              role="group"
+              aria-label="Media layout"
+            >
+              <button
+                type="button"
+                phx-click="set-layout"
+                phx-value-layout="square"
+                aria-pressed={
+                  if(@layout_mode == :square, do: "true", else: "false")
+                }
+                class={[
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  if(@layout_mode == :square,
+                    do: "bg-white text-blue-700 shadow-sm ring-1 ring-zinc-200",
+                    else: "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
+                  )
+                ]}
+                title="Show square cropped thumbnails"
+              >
+                <.icon name="hero-squares-2x2" class="w-4 h-4" />
+                <span>Square</span>
+              </button>
+              <button
+                type="button"
+                phx-click="set-layout"
+                phx-value-layout="masonry"
+                aria-pressed={
+                  if(@layout_mode == :masonry, do: "true", else: "false")
+                }
+                class={[
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  if(@layout_mode == :masonry,
+                    do: "bg-white text-blue-700 shadow-sm ring-1 ring-zinc-200",
+                    else: "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
+                  )
+                ]}
+                title="Show images in natural proportions"
+              >
+                <.icon name="hero-view-columns" class="w-4 h-4" />
+                <span>Masonry</span>
+              </button>
+            </div>
+
             <.button phx-click={JS.patch(~p"/admin/media/upload")}>
-              <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-photo" class="w-5 h-5 -mt-1" />
               <span class="ms-1">
-                Upload Image
+                New Image
               </span>
             </.button>
           </div>
         </div>
-      </section>
+
+        <div :if={@media_count > 0} class="w-full pb-4">
+          <.admin_search_bar
+            id="media-search-form"
+            input_id="media-search-input"
+            name="search"
+            value={@search_query}
+            placeholder="Search by filename, title, or alt text..."
+            debounce="300"
+            on_change="search"
+            clear_event="clear-search"
+          />
+        </div>
+
+        <%!-- Drag and Drop Overlay --%>
+        <div
+          :if={@show_drop_zone && @live_action != :upload}
+          id="media-drop-zone"
+          phx-drop-target={@uploads.media_uploads.ref}
+          class="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center"
+        >
+          <div class="bg-white rounded-lg shadow-2xl p-8 border-4 border-dashed border-blue-500 max-w-md mx-4">
+            <.icon
+              name="hero-cloud-arrow-up"
+              class="w-16 h-16 text-blue-600 mx-auto mb-4"
+            />
+            <p class="text-xl font-semibold text-zinc-800 text-center mb-2">
+              Drop images to upload
+            </p>
+            <p class="text-sm text-zinc-600 text-center">
+              Release to add to media library
+            </p>
+          </div>
+        </div>
+
+        <section id="media-section" class="py-6 relative">
+          <div
+            :if={@media_count > 0}
+            id="media-gallery"
+            phx-hook="ScrollPreserver"
+            class="pr-12"
+          >
+            {render_images_by_year(assigns)}
+          </div>
+          <%!-- Year Scrubber --%>
+          <div
+            :if={@media_count > 0 and length(@timeline) > 1}
+            id="year-scrubber"
+            phx-hook="YearScrubber"
+            class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
+          >
+            <%!-- All / reset button --%>
+            <button
+              phx-click="show-all-years"
+              class={[
+                "w-9 h-9 flex items-center justify-center rounded transition-all duration-150 relative group",
+                if(is_nil(@selected_year),
+                  do: "bg-zinc-800 text-white opacity-100",
+                  else:
+                    "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 opacity-60 hover:opacity-100"
+                )
+              ]}
+              title="Show all years"
+            >
+              <.icon name="hero-squares-2x2" class="w-4 h-4" />
+              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                All years
+              </span>
+            </button>
+            <div class="w-5 h-px bg-zinc-200 my-0.5"></div>
+            <%= for item <- @timeline do %>
+              <button
+                data-year-item={item.year}
+                phx-click="jump-to-year"
+                phx-value-year={item.year}
+                class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
+                title={"#{item.year} (#{item.count} images)"}
+              >
+                <span class="group-hover:hidden flex items-center justify-center w-full h-full">
+                  {String.slice(to_string(item.year), -2, 2)}
+                </span>
+                <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
+                  {item.year}
+                </span>
+                <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                  {item.count} photos
+                </span>
+              </button>
+            <% end %>
+          </div>
+
+          <div :if={@media_count == 0} class="mx-auto py-20 text-center">
+            <div class="flex flex-col items-center">
+              <.icon name="hero-photo" class="w-16 h-16 text-zinc-300 mb-4" />
+              <p class="text-lg font-medium text-zinc-700 mb-2">No images yet</p>
+              <p class="text-sm text-zinc-500 mb-6">
+                Upload your first image to get started
+              </p>
+              <.button phx-click={JS.patch(~p"/admin/media/upload")}>
+                <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-1" />
+                <span class="ms-1">
+                  Upload Image
+                </span>
+              </.button>
+            </div>
+          </div>
+        </section>
+      </div>
     </.side_menu>
     """
   end
@@ -531,13 +582,14 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:end_of_timeline?, false)
      |> assign(:stream_initialized?, false)
      |> assign(:last_image_date, nil)
+     |> assign(:images_empty?, media_count == 0)
      |> assign(:years_set, MapSet.new())
      |> assign(:years_list, [])
      |> assign(:uploaded_files, [])
      |> assign(:active_image, nil)
      |> assign(:image_uploader, nil)
      |> assign(:selected_image_version, :optimized)
-     |> assign(:layout_mode, :square)
+     |> assign(:layout_mode, :masonry)
      |> assign(:show_drop_zone, false)
      |> assign(form: nil)
      |> stream(:images, [], dom_id: &get_dom_id/1)
@@ -643,6 +695,7 @@ defmodule YscWeb.AdminMediaLive do
           |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
           |> assign(:stream_initialized?, true)
           |> assign(:last_image_date, images |> List.last() |> last_date())
+          |> assign(:images_empty?, images == [])
           |> assign(:years_set, years_set)
           |> assign(:years_list, years_list)
           |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -669,6 +722,7 @@ defmodule YscWeb.AdminMediaLive do
           |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
           |> assign(:stream_initialized?, true)
           |> assign(:last_image_date, images |> List.last() |> last_date())
+          |> assign(:images_empty?, images == [])
           |> assign(:years_set, years_set)
           |> assign(:years_list, years_list)
           |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -792,6 +846,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:stream_initialized?, true)
      |> assign(:last_image_date, images |> List.last() |> last_date())
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, years_set)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -831,6 +886,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:stream_initialized?, true)
      |> assign(:last_image_date, images |> List.last() |> last_date())
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, years_set)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
@@ -862,6 +918,7 @@ defmodule YscWeb.AdminMediaLive do
      socket
      |> assign(:selected_year, nil)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)}
@@ -891,6 +948,7 @@ defmodule YscWeb.AdminMediaLive do
      socket
      |> assign(:selected_year, year)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
+     |> assign(:images_empty?, images == [])
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)}
@@ -990,6 +1048,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
       |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> assign(:images_empty?, images == [])
       |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
       |> push_patch(to: ~p"/admin/media")
 
@@ -1018,6 +1077,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
       |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> assign(:images_empty?, images == [])
       |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
 
     # Build URL with year parameter
@@ -1063,14 +1123,14 @@ defmodule YscWeb.AdminMediaLive do
     {:noreply, push_patch(socket, to: ~p"/admin/media?#{new_params}")}
   end
 
-  def handle_event("toggle-layout", _params, socket) do
-    new_layout =
-      case socket.assigns.layout_mode do
-        :square -> :masonry
-        :masonry -> :square
+  def handle_event("set-layout", %{"layout" => layout}, socket) do
+    layout_mode =
+      case layout do
+        "masonry" -> :masonry
+        _ -> :square
       end
 
-    {:noreply, assign(socket, :layout_mode, new_layout)}
+    {:noreply, assign(socket, :layout_mode, layout_mode)}
   end
 
   def handle_event("show-drop-zone", _params, socket) do
@@ -1290,35 +1350,15 @@ defmodule YscWeb.AdminMediaLive do
   defp last_date(nil), do: nil
   defp last_date(%{inserted_at: inserted_at}), do: inserted_at
 
-  defp copy_to_clipboard_js(hidden_input_id, button_id) do
-    JS.dispatch("phx:copy", to: "##{hidden_input_id}")
-    |> JS.add_class("bg-green-50 border-green-500 text-green-700",
-      to: "##{button_id}",
-      time: 100
-    )
-    |> JS.remove_class("border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50",
-      to: "##{button_id}",
-      time: 100
-    )
-    |> JS.transition(
-      {"transition-all duration-100", "opacity-100", "opacity-0"},
-      to: "##{button_id}",
-      time: 2000
-    )
-    |> JS.add_class("border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50",
-      to: "##{button_id}",
-      time: 2100
-    )
-    |> JS.remove_class("bg-green-50 border-green-500 text-green-700",
-      to: "##{button_id}",
-      time: 2100
-    )
-  end
+  defp positive_image_dimension(value) when is_integer(value) and value > 0,
+    do: value
+
+  defp positive_image_dimension(_), do: nil
 
   defp render_images_by_year(assigns) do
     ~H"""
     <%!-- Empty Search State --%>
-    <%= if @search_query != "" && Enum.empty?(@streams.images) do %>
+    <%= if @search_query != "" && @images_empty? do %>
       <div class="mx-auto py-20 text-center">
         <div class="flex flex-col items-center">
           <.icon name="hero-magnifying-glass" class="w-16 h-16 text-zinc-300 mb-4" />
@@ -1341,11 +1381,10 @@ defmodule YscWeb.AdminMediaLive do
         phx-update="stream"
         phx-viewport-bottom={!@end_of_timeline? && "load-more"}
         class={[
-          "grid gap-3 md:gap-4",
           if(@layout_mode == :square,
             do:
-              "grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9",
-            else: "masonry-grid"
+              "media-square-grid grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9",
+            else: "media-masonry-grid"
           )
         ]}
       >
@@ -1355,7 +1394,13 @@ defmodule YscWeb.AdminMediaLive do
             <div
               id={id}
               data-year-section={item.date.year}
-              class="col-span-full sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200"
+              class={[
+                "sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200",
+                if(@layout_mode == :square,
+                  do: "col-span-full",
+                  else: "media-masonry-header"
+                )
+              ]}
             >
               {item.formatted_date}
             </div>
@@ -1369,8 +1414,11 @@ defmodule YscWeb.AdminMediaLive do
               }
               id={id}
               class={[
-                "mb-4 group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
-                if(@layout_mode == :square, do: "aspect-square", else: "")
+                "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
+                if(@layout_mode == :square,
+                  do: "aspect-square",
+                  else: "media-masonry-card bg-zinc-100"
+                )
               ]}
             >
               <%!-- Processing Overlay --%>
@@ -1387,25 +1435,34 @@ defmodule YscWeb.AdminMediaLive do
               <%!-- Missing Alt Text Warning --%>
               <%= if is_nil(item.alt_text) || item.alt_text == "" do %>
                 <div
-                  class="absolute top-2 right-2 z-[3] bg-yellow-500 text-white rounded-full p-1.5 shadow-lg"
+                  class="absolute top-2 right-2 z-[3] flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500 text-white shadow-lg"
                   title="Missing alt text"
+                  aria-label="Missing alt text"
                 >
-                  <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
+                  <.icon name="hero-exclamation-triangle" class="h-4 w-4 flex-none" />
                 </div>
               <% end %>
 
               <canvas
                 id={"blur-hash-image-#{item.id}"}
                 src={get_blur_hash(item)}
-                class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
+                class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
                 phx-hook="BlurHashCanvas"
               >
               </canvas>
 
               <img
-                class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"
+                class={[
+                  "z-[1] rounded-lg opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100",
+                  if(@layout_mode == :square,
+                    do: "absolute inset-0 h-full w-full object-cover",
+                    else: "relative block h-auto w-full object-contain"
+                  )
+                ]}
                 id={"img-#{item.id}"}
                 src={get_image_path(item)}
+                width={positive_image_dimension(item.width)}
+                height={positive_image_dimension(item.height)}
                 loading="lazy"
                 phx-hook="BlurHashImage"
                 alt={item.alt_text || item.title || "Image"}

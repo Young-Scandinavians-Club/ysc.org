@@ -770,6 +770,8 @@ if length(active_users) > 0 do
           String.replace(filename, ~r/[_-]/, " ")
           |> String.replace(~r/\.[^.]*$/, "")
 
+        image_alt_text = image_title
+
         # Check if image already exists by title
         existing_image =
           Repo.one(
@@ -780,7 +782,19 @@ if length(active_users) > 0 do
 
         if existing_image do
           IO.puts("Image already exists, skipping: #{filename}")
-          existing_image
+
+          if is_nil(existing_image.alt_text) or existing_image.alt_text == "" do
+            {:ok, updated_image} =
+              Media.update_image(
+                existing_image,
+                %{alt_text: image_alt_text},
+                admin_user
+              )
+
+            updated_image
+          else
+            existing_image
+          end
         else
           # Upload raw file to S3
           upload_result =
@@ -805,7 +819,20 @@ if length(active_users) > 0 do
 
             if existing_by_path do
               IO.puts("Image with path already exists, skipping: #{filename}")
-              existing_by_path
+
+              if is_nil(existing_by_path.alt_text) or
+                   existing_by_path.alt_text == "" do
+                {:ok, updated_image} =
+                  Media.update_image(
+                    existing_by_path,
+                    %{alt_text: image_alt_text},
+                    admin_user
+                  )
+
+                updated_image
+              else
+                existing_by_path
+              end
             else
               # Create image record (must use admin_user for authorization)
               case Media.add_new_image(
@@ -813,6 +840,7 @@ if length(active_users) > 0 do
                        raw_image_path: URI.encode(raw_s3_path),
                        user_id: admin_user.id,
                        title: image_title,
+                       alt_text: image_alt_text,
                        processing_state: "unprocessed"
                      },
                      admin_user
