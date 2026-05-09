@@ -291,6 +291,32 @@ defmodule YscWeb.TrixUploadsControllerTest do
       assert %Image{} = Media.find_image_by_content_hash(hash)
     end
 
+    test "returns 201 using the in-flight image when the same bytes exist (processing)",
+         %{conn: conn, user: user} do
+      tiny_content = File.read!(@tiny_png_path)
+      path = write_tmp(tiny_content, "photo.png")
+      hash = Media.compute_file_hash(path)
+
+      {:ok, in_flight} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://s3.example.com/inflight.png",
+          processing_state: :processing,
+          content_hash: hash
+        }
+        |> Ysc.Repo.insert()
+
+      count_before = Media.count_images()
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "photo.png")
+        })
+
+      assert json_response(conn, 201)["url"] == in_flight.raw_image_path
+      assert Media.count_images() == count_before
+    end
+
     test "returns the raw_image_path when the completed duplicate has no optimized path",
          %{conn: conn, user: user} do
       tiny_content = File.read!(@tiny_png_path)

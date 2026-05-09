@@ -84,44 +84,14 @@ defmodule YscWeb.TrixUploadsController do
         hash = Media.compute_file_hash(path)
 
         case Media.find_image_by_content_hash(hash) do
-          %Media.Image{processing_state: :completed} = existing ->
+          %Media.Image{processing_state: :failed} ->
+            trix_insert_new_image_after_hash(path, hash, current_user)
+
+          %Media.Image{} = existing ->
             {:ok, existing}
 
-          _ ->
-            upload_result = Media.upload_file_to_s3(path)
-
-            {:ok, new_image} =
-              Media.add_new_image(
-                %{
-                  raw_image_path: upload_result[:body][:location],
-                  content_hash: hash
-                },
-                current_user
-              )
-
-            File.mkdir_p!(@temp_dir)
-            tmp_output_file = "#{@temp_dir}/#{new_image.id}"
-            optimized_output_path = "#{tmp_output_file}_optimized"
-            thumbnail_output_path = "#{tmp_output_file}_thumb"
-
-            updated_image =
-              Media.process_image_upload(
-                new_image,
-                path,
-                thumbnail_output_path,
-                optimized_output_path
-              )
-
-            ["_optimized", "_thumb"]
-            |> Enum.each(fn suffix ->
-              [".jpg", ".jpeg", ".png", ".webp"]
-              |> Enum.each(fn ext ->
-                file_path = "#{tmp_output_file}#{suffix}#{ext}"
-                if File.exists?(file_path), do: File.rm(file_path)
-              end)
-            end)
-
-            {:ok, updated_image}
+          nil ->
+            trix_insert_new_image_after_hash(path, hash, current_user)
         end
 
       {:error, reason} ->
@@ -158,6 +128,55 @@ defmodule YscWeb.TrixUploadsController do
   end
 
   # --- Shared helpers ---
+
+  defp trix_insert_new_image_after_hash(path, hash, current_user) do
+    upload_result = Media.upload_file_to_s3(path)
+
+    case Media.add_new_image(
+           %{
+             raw_image_path: upload_result[:body][:location],
+             content_hash: hash
+           },
+           current_user
+         ) do
+      {:ok, new_image} ->
+        File.mkdir_p!(@temp_dir)
+        tmp_output_file = "#{@temp_dir}/#{new_image.id}"
+        optimized_output_path = "#{tmp_output_file}_optimized"
+        thumbnail_output_path = "#{tmp_output_file}_thumb"
+
+        updated_image =
+          Media.process_image_upload(
+            new_image,
+            path,
+            thumbnail_output_path,
+            optimized_output_path
+          )
+
+        ["_optimized", "_thumb"]
+        |> Enum.each(fn suffix ->
+          [".jpg", ".jpeg", ".png", ".webp"]
+          |> Enum.each(fn ext ->
+            file_path = "#{tmp_output_file}#{suffix}#{ext}"
+            if File.exists?(file_path), do: File.rm(file_path)
+          end)
+        end)
+
+        {:ok, updated_image}
+
+      {:error, _changeset} ->
+        case Media.find_image_by_content_hash(hash) do
+          %Media.Image{processing_state: :failed} ->
+            {:error, "Could not save image."}
+
+          %Media.Image{} = existing ->
+            {:ok, existing}
+
+          nil ->
+            {:error, "Could not save image."}
+        end
+    end
+  end
 
   defp check_file_size(path) do
     case File.stat(path) do

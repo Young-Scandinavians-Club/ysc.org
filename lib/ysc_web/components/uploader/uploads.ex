@@ -156,24 +156,33 @@ defmodule YscWeb.Uploads do
     hash = Media.compute_file_hash(path)
 
     case Media.find_image_by_content_hash(hash) do
-      %Media.Image{processing_state: :completed} = existing ->
+      %Media.Image{processing_state: :failed} ->
+        consume_insert_new_image_after_hash(path, hash, current_user)
+
+      %Media.Image{} = existing ->
         {:ok, existing.id}
 
-      _ ->
-        base = Path.basename(path)
-        _dest = Path.join(uploads_dir(), base)
+      nil ->
+        consume_insert_new_image_after_hash(path, hash, current_user)
+    end
+  end
 
-        upload_result = Media.upload_file_to_s3(path)
+  def consume_entry(%{uploader: _} = meta, _entry, _current_user) do
+    # External upload
+    {:ok, meta}
+  end
 
-        {:ok, new_image} =
-          Media.add_new_image(
-            %{
-              raw_image_path: upload_result[:body][:location],
-              content_hash: hash
-            },
-            current_user
-          )
+  defp consume_insert_new_image_after_hash(path, hash, current_user) do
+    upload_result = Media.upload_file_to_s3(path)
 
+    case Media.add_new_image(
+           %{
+             raw_image_path: upload_result[:body][:location],
+             content_hash: hash
+           },
+           current_user
+         ) do
+      {:ok, new_image} ->
         make_temp_dir(@temp_dir)
         tmp_output_file = "#{@temp_dir}/#{new_image.id}"
         optimized_output_path = "#{tmp_output_file}_optimized.png"
@@ -188,12 +197,19 @@ defmodule YscWeb.Uploads do
           )
 
         {:ok, updated_image.id}
-    end
-  end
 
-  def consume_entry(%{uploader: _} = meta, _entry, _current_user) do
-    # External upload
-    {:ok, meta}
+      {:error, _changeset} ->
+        case Media.find_image_by_content_hash(hash) do
+          %Media.Image{processing_state: :failed} ->
+            raise "Could not save image."
+
+          %Media.Image{} = existing ->
+            {:ok, existing.id}
+
+          nil ->
+            raise "Could not save image."
+        end
+    end
   end
 
   @doc """
