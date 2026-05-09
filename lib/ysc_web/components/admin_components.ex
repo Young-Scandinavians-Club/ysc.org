@@ -659,6 +659,75 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_flop_pagination
+  # ---------------------------------------------------------------------------
+
+  attr :meta, :any,
+    required: true,
+    doc: "Flop.Meta from the query; when nil, nothing is rendered"
+
+  attr :path, :any,
+    required: true,
+    doc: "Path or verified route passed to Flop.Phoenix"
+
+  attr :density, :atom,
+    values: [:compact, :comfortable],
+    default: :comfortable,
+    doc:
+      ":compact is for mobile toolbars (py-4, fewer page links); :comfortable matches desktop tables"
+
+  def admin_flop_pagination(assigns) do
+    assigns =
+      case assigns.density do
+        :compact ->
+          assign(assigns,
+            pagination_class: "flex items-center justify-center py-4 text-base",
+            page_links_count: 3
+          )
+
+        :comfortable ->
+          assign(assigns,
+            pagination_class:
+              "flex items-center justify-center py-10 text-base",
+            page_links_count: 5
+          )
+      end
+
+    ~H"""
+    <Flop.Phoenix.pagination
+      :if={@meta}
+      meta={@meta}
+      path={@path}
+      class={@pagination_class}
+      page_list_attrs={[class: "flex gap-1 order-2 justify-center items-center"]}
+      page_list_item_attrs={[class: "list-none"]}
+      page_link_attrs={[
+        class:
+          "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+      ]}
+      current_page_link_attrs={[
+        class:
+          "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded pointer-events-none"
+      ]}
+      page_links={@page_links_count}
+    >
+      <:previous attrs={[
+        class:
+          "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
+      ]}>
+        <.icon name="hero-chevron-left" class="w-4 h-4" />
+      </:previous>
+      <:next attrs={[
+        class:
+          "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
+      ]}>
+        <.icon name="hero-chevron-right" class="w-4 h-4" />
+      </:next>
+    </Flop.Phoenix.pagination>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_search_bar
   # ---------------------------------------------------------------------------
 
