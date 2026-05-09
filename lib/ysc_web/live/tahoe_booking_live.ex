@@ -3172,14 +3172,20 @@ defmodule YscWeb.TahoeBookingLive do
                     </h3>
                     <ul class="space-y-2 text-zinc-700">
                       <li>
-                        Use the <strong>booking form above</strong>
-                        to check availability and select your dates.
+                        <strong>Step 1:</strong>
+                        Choose your booking mode (individual rooms or full cabin buyout).
                       </li>
                       <li>
-                        Browse available rooms and select the ones that best fit your group size.
+                        <strong>Step 2:</strong>
+                        Select your check-in and check-out dates, number of adults and children using the <strong>booking form above</strong>.
                       </li>
                       <li>
-                        Complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
+                        <strong>Step 3:</strong>
+                        After selecting your dates, available rooms will appear. Browse and select the rooms that best fit your group size and needs.
+                      </li>
+                      <li>
+                        <strong>Step 4:</strong>
+                        Review your reservation summary, then complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
                       </li>
                       <li>
                         After booking, you can view and manage your reservation, including cancellation options, from your booking details page (accessible via the link in your confirmation email).
