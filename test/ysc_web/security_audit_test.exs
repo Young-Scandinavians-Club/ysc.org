@@ -115,6 +115,30 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Account setup: no unsolicited email verification for already-verified emails
+  # ---------------------------------------------------------------------------
+
+  describe "AccountSetupLive mount does not spam email verification" do
+    test "unauthenticated mount does not create an email verification code when email is already verified",
+         %{conn: conn} do
+      user =
+        user_fixture(%{
+          state: :pending_approval,
+          email_verified_at:
+            DateTime.utc_now() |> DateTime.truncate(:microsecond),
+          password_set_at: nil
+        })
+
+      assert {:ok, _view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      assert match?(
+               {:error, _},
+               Ysc.VerificationCache.get_code(user.id, :email_verification)
+             )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 7 (HIGH): Passkey sign_count replay protection
   # ---------------------------------------------------------------------------
 
