@@ -37,6 +37,26 @@ defmodule Ysc.NewsletterTest do
       assert {:error, :invalid_email} = Newsletter.subscribe(nil)
     end
 
+    test "returns error for disposable email domains" do
+      assert {:error, :disposable_email} =
+               Newsletter.subscribe("test@mailinator.com")
+
+      assert {:error, :disposable_email} =
+               Newsletter.subscribe("test@guerrillamail.com")
+
+      assert {:error, :disposable_email} =
+               Newsletter.subscribe("test@10minutemail.com")
+    end
+
+    test "returns error for domains with no MX records" do
+      # Using a non-existent domain
+      domain =
+        "nonexistent-domain-#{System.unique_integer([:positive])}-test.com"
+
+      assert {:error, :no_mx_records} =
+               Newsletter.subscribe("user@#{domain}")
+    end
+
     test "updates existing subscriber when subscribing again (re-activates)" do
       {:ok, first} =
         Newsletter.subscribe("again@example.com", source: "public_signup")

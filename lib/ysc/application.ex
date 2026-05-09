@@ -88,6 +88,9 @@ defmodule Ysc.Application do
     opts = [strategy: :one_for_one, name: Ysc.Supervisor]
     {:ok, supervisor} = Supervisor.start_link(children, opts)
 
+    # Initialize email validator ETS table and load disposable domains
+    Ysc.Newsletter.EmailValidator.init_ets_table()
+
     # Start the outage scraper scheduler
     Ysc.PropertyOutages.Scheduler.start_scheduler()
 
