@@ -14,6 +14,9 @@ defmodule Ysc.Newsletter.EmailValidator do
   @ets_table :disposable_email_domains
   @mx_cache_ttl :timer.minutes(10)
 
+  # Practical newsletter signup shape: local@domain.tld (no whitespace; at least one dot in host).
+  @email_format_regex ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
   @doc """
   Validates an email address for newsletter signup.
 
@@ -73,7 +76,7 @@ defmodule Ysc.Newsletter.EmailValidator do
   # Private functions
 
   defp validate_format(email) do
-    if String.contains?(email, "@") && String.length(email) > 3 do
+    if Regex.match?(@email_format_regex, email) do
       :ok
     else
       {:error, :invalid_email}
@@ -120,6 +123,16 @@ defmodule Ysc.Newsletter.EmailValidator do
   end
 
   defp perform_mx_lookup(domain) do
+    case Application.get_env(:ysc, __MODULE__, [])[:mx_resolver] do
+      fun when is_function(fun, 1) ->
+        fun.(domain)
+
+      _ ->
+        perform_inet_mx_lookup(domain)
+    end
+  end
+
+  defp perform_inet_mx_lookup(domain) do
     charlist_domain = String.to_charlist(domain)
 
     # Set a reasonable timeout for DNS lookups (5 seconds)

@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Newsletter.UpdateDisposableDomains do
   @shortdoc "Updates the disposable email domains list from GitHub"
 
   @github_url "https://raw.githubusercontent.com/disposable/disposable-email-domains/master/domains.txt"
-  @output_path "priv/disposable_domains.txt"
+  @output_filename "disposable_domains.txt"
 
   @impl Mix.Task
   def run(_args) do
@@ -58,7 +58,9 @@ defmodule Mix.Tasks.Newsletter.UpdateDisposableDomains do
   end
 
   defp save_domains(content) do
-    output_file = Path.join(File.cwd!(), @output_path)
+    output_file =
+      Application.app_dir(:ysc, "priv") |> Path.join(@output_filename)
+
     File.write!(output_file, content)
 
     # Count domains for reporting

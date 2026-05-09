@@ -10,7 +10,9 @@ import Config
 # Default environment - can be overridden by APP_ENV env var in runtime.exs
 config :ysc,
   ecto_repos: [Ysc.Repo],
-  environment: "dev"
+  environment: "dev",
+  # Minimum disposable-domain rows expected after loading priv/disposable_domains.txt (tests use this as a floor).
+  disposable_domains_threshold: 10_000
 
 # Configure Elixir's Calendar to use Timex timezone database
 config :elixir, :time_zone_database, Timex.Timezone.Database
