@@ -90,12 +90,30 @@ defmodule YscWeb.Workers.ImageProcessor do
                       optimized_output_path
                     )
 
-                  Media.set_content_hash(processed, hash)
+                  processed_after_hash =
+                    case Media.set_content_hash(processed, hash) do
+                      {:ok, _} ->
+                        processed
+
+                      {:error, _} ->
+                        case Media.find_image_by_content_hash(hash) do
+                          %Media.Image{id: wid} = winner
+                          when wid != image.id ->
+                            Ysc.Logging.info(
+                              "Content-hash race for #{image.id}; reusing processed output from #{winner.id}"
+                            )
+
+                            Media.reuse_existing_processed_image(image, winner)
+
+                          _ ->
+                            raise "failed to persist content hash for image #{image.id} and no duplicate winner row"
+                        end
+                    end
 
                   # Strip EXIF/metadata from raw and overwrite on S3 so the raw URL also serves clean bytes
                   strip_and_replace_raw_on_s3(image, tmp_output_file)
 
-                  processed
+                  processed_after_hash
               end
 
             Ysc.Logging.info(
