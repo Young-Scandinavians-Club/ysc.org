@@ -6,6 +6,10 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
 
   alias Ysc.{Newsletter, Repo}
 
+  defp clear_newsletter_rate_limit do
+    :ets.delete_all_objects(Ysc.NewsletterRateLimit)
+  end
+
   defp insert_sent_edition(creator, attrs) do
     base = %{
       "title" => "Weekly",
@@ -89,6 +93,8 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
     end
 
     test "guest subscribe shows error for invalid email", %{conn: conn} do
+      clear_newsletter_rate_limit()
+
       {:ok, view, _html} = live(conn, ~p"/newsletters")
       render_async(view)
 
@@ -97,7 +103,51 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
         |> form("#newsletter-subscribe-form", %{"email" => "not-valid"})
         |> render_submit()
 
+      assert has_element?(view, "#newsletter-error")
       assert html =~ "valid email"
+    end
+
+    test "subscribe_newsletter shows error for disposable email domain", %{
+      conn: conn
+    } do
+      clear_newsletter_rate_limit()
+
+      {:ok, view, _html} = live(conn, ~p"/newsletters")
+      render_async(view)
+
+      html =
+        view
+        |> form("#newsletter-subscribe-form", %{
+          "email" => "test@mailinator.com"
+        })
+        |> render_submit()
+
+      assert has_element?(view, "#newsletter-error")
+
+      assert html =~
+               "Temporary email addresses are not allowed. Please use a permanent email address."
+    end
+
+    test "subscribe_newsletter shows error for domain with no MX records", %{
+      conn: conn
+    } do
+      clear_newsletter_rate_limit()
+
+      {:ok, view, _html} = live(conn, ~p"/newsletters")
+      render_async(view)
+
+      domain =
+        "nonexistent-domain-#{System.unique_integer([:positive])}-test.com"
+
+      html =
+        view
+        |> form("#newsletter-subscribe-form", %{"email" => "user@#{domain}"})
+        |> render_submit()
+
+      assert has_element?(view, "#newsletter-error")
+
+      assert html =~
+               "This email domain appears to be invalid. Please check your email address."
     end
 
     test "shows subscription widget for logged-in users", %{conn: conn} do
