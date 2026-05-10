@@ -112,9 +112,9 @@ defmodule YscWeb.AdminPostEditorLive do
         on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
       >
         <div class="flex flex-col">
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
+          <.admin_page_title level={2} class="mb-4">
             Post Settings
-          </h2>
+          </.admin_page_title>
 
           <div class="rounded border border-1 border-zinc-100 px-3 py-4">
             <p class="text-lg font-semibold mb-3">Featured Image</p>

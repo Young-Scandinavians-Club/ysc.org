@@ -31,9 +31,9 @@ defmodule YscWeb.AdminUserDetailsLive do
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
 
         <div class="flex flex-row items-center justify-between pt-4">
-          <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+          <.admin_page_title>
             {"#{Ysc.title_case(@first_name)} #{Ysc.title_case(@last_name)}"}
-          </h1>
+          </.admin_page_title>
           <form
             id="admin-impersonate-form"
             action={~p"/admin/impersonate/#{@user_id}"}
@@ -778,7 +778,9 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div :if={@selected_user_application != nil} class="space-y-6">
             <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
               <div class="min-w-0">
-                <h2 class="text-2xl font-bold text-zinc-900">Application</h2>
+                <.admin_page_title level={2} variant={:emphasis}>
+                  Application
+                </.admin_page_title>
                 <p class="text-sm text-zinc-500 mt-0.5">
                   <%= if @selected_user.state == :pending_approval do %>
                     Submitted {if @selected_user_application.completed,
@@ -1499,9 +1501,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           class="max-w-full py-8 px-2"
         >
           <div class="space-y-6">
-            <h2 class="text-2xl font-semibold leading-8 text-zinc-800">
-              Bank Accounts
-            </h2>
+            <.admin_page_title level={2}>Bank Accounts</.admin_page_title>
             <p class="text-sm text-zinc-600">
               View bank accounts for expense report reimbursements. Click "Unseal" to view encrypted account and routing numbers.
             </p>

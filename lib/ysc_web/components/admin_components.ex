@@ -59,6 +59,45 @@ defmodule YscWeb.AdminComponents do
   defp format_form_error({msg, _type}), do: msg
 
   # ---------------------------------------------------------------------------
+  # admin_page_title
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders a consistent primary heading for admin pages and modals.
+
+  Use `variant={:emphasis}` for bold modal or panel titles (e.g. review flows).
+  Pass extra Tailwind utilities via `class` (e.g. `mb-4`).
+  """
+  attr :level, :integer, default: 1, values: [1, 2]
+  attr :variant, :atom, default: :default, values: [:default, :emphasis]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged with the default title styles"
+
+  slot :inner_block, required: true
+
+  def admin_page_title(assigns) do
+    ~H"""
+    <%= case @level do %>
+      <% 1 -> %>
+        <h1 class={[title_base_classes(@variant), @class]}>
+          {render_slot(@inner_block)}
+        </h1>
+      <% 2 -> %>
+        <h2 class={[title_base_classes(@variant), @class]}>
+          {render_slot(@inner_block)}
+        </h2>
+    <% end %>
+    """
+  end
+
+  defp title_base_classes(:emphasis), do: "text-2xl font-bold text-zinc-900"
+
+  defp title_base_classes(:default),
+    do: "text-2xl font-semibold leading-8 text-zinc-800"
+
+  # ---------------------------------------------------------------------------
   # side_menu
   # ---------------------------------------------------------------------------
 

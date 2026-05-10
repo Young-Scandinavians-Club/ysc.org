@@ -52,9 +52,7 @@ defmodule YscWeb.AdminPostsLive do
       </.modal>
 
       <div class="flex justify-between py-6">
-        <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-          Posts
-        </h1>
+        <.admin_page_title>Posts</.admin_page_title>
 
         <.button phx-click={JS.patch(~p"/admin/posts/new")}>
           <.icon name="hero-document-plus" class="w-5 h-5 -mt-1" />

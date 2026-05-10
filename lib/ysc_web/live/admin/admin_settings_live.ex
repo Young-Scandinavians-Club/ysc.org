@@ -21,9 +21,7 @@ defmodule YscWeb.AdminSettingsLive do
       role={@admin_role}
     >
       <div class="flex justify-between py-6">
-        <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-          Settings
-        </h1>
+        <.admin_page_title>Settings</.admin_page_title>
       </div>
 
       <div class="w-full">

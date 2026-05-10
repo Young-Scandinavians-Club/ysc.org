@@ -26,9 +26,9 @@ defmodule YscWeb.AdminUsersLive do
         on_cancel={JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
+        <.admin_page_title level={2} class="mb-4">
           Edit User
-        </h2>
+        </.admin_page_title>
 
         <div>
           <.user_avatar_image
@@ -92,7 +92,9 @@ defmodule YscWeb.AdminUsersLive do
         <div class="max-w-2xl mx-auto">
           <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
             <div class="min-w-0">
-              <h2 class="text-2xl font-bold text-zinc-900">Review Application</h2>
+              <.admin_page_title level={2} variant={:emphasis}>
+                Review Application
+              </.admin_page_title>
               <p class="text-sm text-zinc-500 mt-0.5">
                 {if @selected_user.state == :pending_approval do
                   "Submitted " <>
@@ -376,9 +378,7 @@ defmodule YscWeb.AdminUsersLive do
       </.modal>
 
       <div class="flex justify-between py-6">
-        <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-          Users
-        </h1>
+        <.admin_page_title>Users</.admin_page_title>
 
         <.dropdown
           id="export-users-button"

@@ -25,9 +25,9 @@ defmodule YscWeb.AdminMediaLive do
         on_cancel={JS.patch(build_media_url_with_state(assigns))}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+        <.admin_page_title level={2} class="mb-6">
           Edit Image
-        </h2>
+        </.admin_page_title>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <%!-- Left Column: Image Preview --%>
@@ -274,9 +274,9 @@ defmodule YscWeb.AdminMediaLive do
         on_cancel={JS.patch(build_media_url_with_state(assigns))}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-4">
+        <.admin_page_title level={2} class="mb-4">
           Upload new images
-        </h2>
+        </.admin_page_title>
         <div class="w-full">
           <form id="upload-form" phx-submit="save" phx-change="validate">
             <label
@@ -380,9 +380,7 @@ defmodule YscWeb.AdminMediaLive do
       >
         <div class="flex justify-between items-center py-6">
           <div>
-            <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-              Media Library
-            </h1>
+            <.admin_page_title>Media Library</.admin_page_title>
             <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
               {@media_count} {if @media_count == 1,
                 do: "image",
