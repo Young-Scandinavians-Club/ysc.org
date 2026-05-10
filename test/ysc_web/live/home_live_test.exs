@@ -414,7 +414,7 @@ defmodule YscWeb.HomeLiveTest do
 
       assert {:error, {:live_redirect, %{to: "/users/settings/passkeys/new"}}} =
                view
-               |> element("#passkey-prompt-banner button", "Setup")
+               |> element("#passkey-prompt-banner button", "Set up passkey")
                |> render_click()
     end
 
