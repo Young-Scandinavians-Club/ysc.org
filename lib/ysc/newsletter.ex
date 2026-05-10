@@ -300,6 +300,19 @@ defmodule Ysc.Newsletter do
     |> Repo.all()
   end
 
+  @doc """
+  Counts subscribers matching the same filters as `list_subscribers/1`.
+
+  Uses a single aggregate query instead of loading every matching row.
+  """
+  def count_subscribers(opts \\ []) do
+    Subscriber
+    |> maybe_filter_subscribed(opts)
+    |> maybe_filter_source(opts)
+    |> select([s], count(s.id))
+    |> Repo.one()
+  end
+
   defp maybe_filter_subscribed(query, opts) do
     case Keyword.get(opts, :subscribed) do
       true -> where(query, [s], s.subscribed == true)

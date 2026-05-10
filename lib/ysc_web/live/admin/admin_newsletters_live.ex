@@ -10,14 +10,16 @@ defmodule YscWeb.AdminNewslettersLive do
   def mount(_params, _session, socket) do
     if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
 
-    subscriber_count =
-      Newsletter.list_subscribers(subscribed: true) |> length()
+    subscriber_count = Newsletter.count_subscribers(subscribed: true)
+
+    creator_filter = Newsletter.get_all_creators()
 
     {:ok,
      socket
      |> assign(:page_title, "Newsletters")
      |> assign(:active_page, :newsletters)
      |> assign(:subscriber_count, subscriber_count)
+     |> assign(:creator_filter, creator_filter)
      |> assign(:empty, false)
      |> assign(:meta, nil)
      |> assign(:params, %{})
@@ -34,8 +36,7 @@ defmodule YscWeb.AdminNewslettersLive do
      )
      |> assign(:show_add_subscriber_modal, false)
      |> stream_configure(:editions, dom_id: &"edition-#{&1.id}")
-     |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}"),
-     temporary_assigns: [creator_filter: []]}
+     |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}")}
   end
 
   @impl true
@@ -69,7 +70,6 @@ defmodule YscWeb.AdminNewslettersLive do
                date_to: date_to
              ) do
           {:ok, {editions, meta}} ->
-            creator_filter = Newsletter.get_all_creators()
             title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
             search_query = if title_filter, do: title_filter.value, else: ""
 
@@ -77,7 +77,6 @@ defmodule YscWeb.AdminNewslettersLive do
             |> assign(:meta, meta)
             |> assign(:empty, editions == [])
             |> assign(:params, params)
-            |> assign(:creator_filter, creator_filter)
             |> assign(:search_query, search_query)
             |> assign(:date_from, date_from)
             |> assign(:date_to, date_to)
@@ -116,6 +115,7 @@ defmodule YscWeb.AdminNewslettersLive do
   def handle_info({:edition_sent, edition}, socket) do
     {:noreply,
      socket
+     |> assign(:creator_filter, Newsletter.get_all_creators())
      |> stream_insert(:editions, edition)
      |> YscWeb.Flash.put_toast(:info, "\"#{edition.title}\" has been sent.",
        title: "Newsletter sent"
