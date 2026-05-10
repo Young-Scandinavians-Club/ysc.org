@@ -99,6 +99,19 @@ defmodule YscWeb.TrixUploadsControllerTest do
     %Plug.Upload{path: path, filename: filename, content_type: "text/plain"}
   end
 
+  defp build_logged_in_admin_conn(user) do
+    secret_key_base =
+      Application.get_env(:ysc, YscWeb.Endpoint)[:secret_key_base] ||
+        String.duplicate("test", 16)
+
+    token = Ysc.Accounts.generate_user_session_token(user)
+
+    build_conn()
+    |> Map.put(:secret_key_base, secret_key_base)
+    |> Plug.Test.init_test_session(%{})
+    |> Plug.Conn.put_session(:user_token, token)
+  end
+
   describe "create/2 — no file" do
     test "returns 400 when no file param is provided", %{conn: conn} do
       conn = post(conn, ~p"/admin/trix-uploads", %{})
@@ -442,6 +455,52 @@ defmodule YscWeb.TrixUploadsControllerTest do
         })
 
       assert json_response(conn, 201)["url"] == existing.raw_image_path
+    end
+
+    test "concurrent identical uploads create one image and return the same URL",
+         %{user: user} do
+      tiny_content = File.read!(@tiny_png_path)
+      path = write_tmp(tiny_content, "concurrent.png")
+      hash = Media.compute_file_hash(path)
+
+      assert Media.find_image_by_content_hash(hash) == nil
+
+      count_before = Media.count_images()
+      parent = self()
+
+      responses =
+        1..2
+        |> Task.async_stream(
+          fn _ ->
+            Ysc.DataCase.allow_sandbox(self(), parent)
+
+            conn =
+              user
+              |> build_logged_in_admin_conn()
+              |> post(~p"/admin/trix-uploads", %{
+                "file" => plain_text_upload(path, "concurrent.png")
+              })
+
+            conn
+          end,
+          max_concurrency: 2,
+          timeout: 120_000
+        )
+        |> Enum.map(fn {:ok, conn} -> conn end)
+
+      for conn <- responses do
+        assert %{"url" => url} = json_response(conn, 201)
+        assert is_binary(url)
+      end
+
+      urls =
+        responses
+        |> Enum.map(&json_response(&1, 201)["url"])
+        |> Enum.uniq()
+
+      assert length(urls) == 1
+      assert Media.count_images() == count_before + 1
+      assert %Image{} = Media.find_image_by_content_hash(hash)
     end
   end
 end
