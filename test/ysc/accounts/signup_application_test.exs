@@ -13,9 +13,13 @@ defmodule Ysc.Accounts.SignupApplicationTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Accounts.SignupApplication
+  alias Ysc.Newsletter.EmailValidator
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
+
+  # Must match `Ysc.Newsletter.EmailValidator` process override (see perform_mx_lookup/1).
+  @email_validator_mx_override_key {EmailValidator, :process_mx_override}
 
   describe "application_changeset/2" do
     test "creates valid changeset with all required fields" do
@@ -869,20 +873,21 @@ defmodule Ysc.Accounts.SignupApplicationTest do
           user_id: user.id
         })
 
-      # Mock the MX resolver to return success
-      Application.put_env(:ysc, Ysc.Newsletter.EmailValidator,
-        mx_resolver: fn _domain -> :ok end
-      )
+      # Clear per-process MX cache so signup validation exercises the stub.
+      Process.delete({:mx_cache, "example.com"})
 
-      on_exit(fn ->
-        Application.delete_env(:ysc, Ysc.Newsletter.EmailValidator)
-      end)
+      # Process-local MX stub so async tests do not race on Application env.
+      Process.put(@email_validator_mx_override_key, fn _domain -> :ok end)
 
-      changeset =
-        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+      try do
+        changeset =
+          SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
-      # Should be valid with good email
-      assert changeset.valid?
+        # Should be valid with good email
+        assert changeset.valid?
+      after
+        Process.delete(@email_validator_mx_override_key)
+      end
     end
 
     test "blocks disposable email in production environment" do
@@ -1017,20 +1022,22 @@ defmodule Ysc.Accounts.SignupApplicationTest do
           user_id: user.id
         })
 
-      # Mock the MX resolver to raise an exception
-      Application.put_env(:ysc, Ysc.Newsletter.EmailValidator,
-        mx_resolver: fn _domain -> raise "Simulated error" end
-      )
+      # Clear per-process MX cache so signup validation does not skip the stub lookup.
+      Process.delete({:mx_cache, "example.com"})
 
-      on_exit(fn ->
-        Application.delete_env(:ysc, Ysc.Newsletter.EmailValidator)
+      Process.put(@email_validator_mx_override_key, fn _domain ->
+        raise "Simulated error"
       end)
 
-      changeset =
-        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+      try do
+        changeset =
+          SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
-      # Should be valid (fail open) even when validation raises
-      assert changeset.valid?
+        # Should be valid (fail open) even when validation raises
+        assert changeset.valid?
+      after
+        Process.delete(@email_validator_mx_override_key)
+      end
     end
   end
 
