@@ -16,9 +16,9 @@ defmodule YscWeb.AdminDashboardLive do
     >
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-6 mb-8">
         <div>
-          <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+          <.admin_page_title>
             Welcome back, {Ysc.title_case(@current_user.first_name)}
-          </h1>
+          </.admin_page_title>
           <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
             <span class="relative inline-flex w-2 h-2">
               <span class={[

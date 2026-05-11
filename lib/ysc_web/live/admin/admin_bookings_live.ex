@@ -1853,9 +1853,9 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
 
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-6 gap-3">
-        <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
+        <.admin_page_title>
           {atom_to_readable(@selected_property)} Bookings
-        </h1>
+        </.admin_page_title>
         <.link
           navigate={~p"/admin/bookings/entitlements"}
           class={[

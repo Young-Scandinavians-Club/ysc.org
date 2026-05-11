@@ -14,9 +14,7 @@ defmodule YscWeb.AdminEventsLive do
       role={@admin_role}
     >
       <div class="flex justify-between py-6">
-        <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-          Events
-        </h1>
+        <.admin_page_title>Events</.admin_page_title>
 
         <div class="flex items-center gap-3">
           <.button phx-click={JS.navigate(~p"/admin/scanner")}>

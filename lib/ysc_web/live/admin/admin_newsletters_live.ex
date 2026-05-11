@@ -174,9 +174,7 @@ defmodule YscWeb.AdminNewslettersLive do
       role={@admin_role}
     >
       <div class="py-6">
-        <h1 class="text-2xl font-semibold leading-8 text-zinc-800">
-          Newsletters
-        </h1>
+        <.admin_page_title>Newsletters</.admin_page_title>
         <p class="mt-0.5 text-sm text-zinc-500">
           {@subscriber_count} subscriber{if @subscriber_count == 1,
             do: "",
