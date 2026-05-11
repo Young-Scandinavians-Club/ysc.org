@@ -98,7 +98,7 @@ defmodule Ysc.Accounts.SignupApplication do
               optional(atom() | binary()) => any()
             }
         ) :: Ecto.Changeset.t()
-  def application_changeset(application, attrs, _opts \\ []) do
+  def application_changeset(application, attrs, opts \\ []) do
     application
     |> cast(attrs, [
       :user_id,
@@ -141,6 +141,7 @@ defmodule Ysc.Accounts.SignupApplication do
     |> validate_birth_date()
     |> validate_agreed_to_bylaws()
     |> validate_membership_eligibility()
+    |> validate_user_email(opts)
   end
 
   @doc """
@@ -230,6 +231,81 @@ defmodule Ysc.Accounts.SignupApplication do
       @valid_eligibility_option
     )
     |> validate_length(:membership_eligibility, min: 1)
+  end
+
+  defp validate_user_email(changeset, opts) do
+    # Only validate emails in production environment to prevent blocking legitimate
+    # signups due to email validation errors in dev/sandbox environments.
+    if should_validate_email?(opts) do
+      case get_field(changeset, :user_id) do
+        nil ->
+          # No user_id means we can't validate the email
+          changeset
+
+        user_id ->
+          # Fetch the user's email and validate it
+          validate_email_for_user(changeset, user_id)
+      end
+    else
+      changeset
+    end
+  end
+
+  defp should_validate_email?(opts) do
+    # Allow override via opts (useful for testing)
+    case Keyword.get(opts, :validate_email) do
+      true ->
+        true
+
+      false ->
+        false
+
+      nil ->
+        # Default: only validate in production environment
+        environment = Application.get_env(:ysc, :environment, "dev")
+        environment == "production"
+    end
+  end
+
+  defp validate_email_for_user(changeset, user_id) do
+    # Defensive: If we can't fetch the user or email, fail open (don't block signup)
+    try do
+      case Ysc.Repo.get(Ysc.Accounts.User, user_id) do
+        nil ->
+          changeset
+
+        user ->
+          case Ysc.Newsletter.EmailValidator.validate_email(user.email) do
+            :ok ->
+              changeset
+
+            {:error, :disposable_email} ->
+              add_error(
+                changeset,
+                :user_id,
+                "Email address appears to be a temporary or disposable email. Please use a permanent email address."
+              )
+
+            {:error, :no_mx_records} ->
+              add_error(
+                changeset,
+                :user_id,
+                "Email domain cannot receive mail. Please check your email address."
+              )
+
+            {:error, :invalid_email} ->
+              add_error(changeset, :user_id, "Email address is invalid")
+
+            _ ->
+              # Unknown error - fail open
+              changeset
+          end
+      end
+    rescue
+      _ ->
+        # Any exception during validation - fail open (don't block signup)
+        changeset
+    end
   end
 
   @spec eligibility_options() :: [{<<_::64, _::_*8>>, <<_::64, _::_*8>>}, ...]
