@@ -102,6 +102,36 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
     end
   end
 
+  describe "validate_email/1 (injected MX resolver returns error)" do
+    setup do
+      prev_mx = Application.get_env(:ysc, EmailValidator)
+
+      Application.put_env(
+        :ysc,
+        EmailValidator,
+        Keyword.put(prev_mx || [], :mx_resolver, fn _domain ->
+          {:error, :no_mx_records}
+        end)
+      )
+
+      on_exit(fn ->
+        case prev_mx do
+          nil -> Application.delete_env(:ysc, EmailValidator)
+          env -> Application.put_env(:ysc, EmailValidator, env)
+        end
+      end)
+
+      :ok
+    end
+
+    test "returns MX resolver errors from injected resolver" do
+      domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
+
+      assert {:error, :no_mx_records} =
+               EmailValidator.validate_email("any@#{domain}")
+    end
+  end
+
   describe "validate_email/1 (real DNS for MX)" do
     test "rejects domain with no MX records" do
       domain =
