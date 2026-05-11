@@ -332,7 +332,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             value="family"
             checked={@form[:membership_plan].value == "family"}
             label="Family Membership"
-            subtitle="Covers you, your spouse, and children under 18. Includes family member invitations."
+            subtitle="Covers you, your spouse or partner, and children under 18. Includes family member invitations."
             icon="user-group"
           />
         </div>
@@ -620,7 +620,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Add Family Members
         <:subtitle>
-          Your Family membership covers your spouse and children under 18. Add them below and we'll send each an invite to create their account.
+          Your Family membership covers your spouse or partner and children under 18. Add them below and we'll send each an invite to create their account.
         </:subtitle>
       </.header>
 
@@ -1329,7 +1329,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:error, :max_spouses_reached} ->
             %{
               ok: false,
-              message: "You can only have one spouse on the family membership."
+              message:
+                "You can only have one spouse or partner on the family membership."
             }
 
           {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
@@ -1413,7 +1414,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                   %{
                     ok: false,
                     message:
-                      "You can only have one spouse on the family membership."
+                      "You can only have one spouse or partner on the family membership."
                   }
 
                 {:error, :invalid_membership_type} ->

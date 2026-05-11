@@ -1186,7 +1186,7 @@ defmodule YscWeb.HomeLive do
                 phx-click="setup_passkey"
                 class="!py-1.5 !px-4 whitespace-nowrap shadow-sm"
               >
-                Setup
+                Set up passkey
               </.button>
 
               <button
@@ -1301,7 +1301,7 @@ defmodule YscWeb.HomeLive do
                     navigate={~p"/users/payments"}
                     class="text-xs font-bold text-blue-600 hover:underline"
                   >
-                    View All Trips
+                    View all payments
                   </.link>
                 </div>
 
