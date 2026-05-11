@@ -158,11 +158,19 @@
     <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Parking</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="red-alert-box">
+        <strong class="strong-block">⚠️ WINTER PARKING RESTRICTION - NOV 1 – MAY 1</strong>
+        <strong class="strong-block">NO STREET PARKING ALLOWED</strong>
+        Towing is strictly enforced for snow removal and carries massive financial penalties. You WILL be towed if parked on the street during winter months.
+      </div>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
       <div class="blue-alert-box-large">
+        <strong>General Parking Rules:</strong><br/><br/>
         <ul class="email-list">
           <li class="email-list-item">Do not park in front of neighbors' driveways.</li>
-          <li class="email-list-item">Park within the white stripe to leave room for others.</li>
-          <li class="email-list-item-last"><strong>Nov 1st - May 1st:</strong> No parking on the street. You will get a ticket and cause complaints.</li>
+          <li class="email-list-item-last">Park within the white stripe to leave room for others.</li>
         </ul>
       </div>
     </mj-text>
