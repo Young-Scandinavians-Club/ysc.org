@@ -14,7 +14,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
   Buyout pricing is ensured via `ensure_buyout_base_pricing!/0` so totals are deterministic
   even when the DB has no seasonal buyout rules yet.
   """
-  use YscWeb.ConnCase, async: false
+  use YscWeb.ConnCase, async: false, mox_global_first: true
 
   import Ecto.Changeset
   import Phoenix.LiveViewTest
@@ -28,8 +28,6 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
   alias Ysc.Ledgers
   alias Ysc.Repo
   alias Ysc.StripeMock
-
-  setup :set_mox_global
 
   setup %{conn: conn} do
     Ledgers.ensure_basic_accounts()

@@ -1,26 +1,45 @@
 defmodule YscWeb.ConnCase do
   @moduledoc """
-  This module defines the test case to be used by
-  tests that require setting up a connection.
+  This module defines the test case to be used for tests that require setting up a connection.
 
-  Such tests rely on `Phoenix.ConnTest` and also
-  import other functionality to make it easier
-  to build common data structures and query the data layer.
+  Such tests rely on `Phoenix.ConnTest` and also import other functionality to make it easier
+  to build common data structures and query the application.
 
-  Finally, if the test case interacts with the database,
+  Finally, if your test case interacts with the database,
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
   by setting `use YscWeb.ConnCase, async: true`, although
   this option is not recommended for other databases.
+
+  ## Options
+
+    * `:mox_global_first` — when `true`, enables Mox global mode **before** default
+      HTTP/Stripe stubs run so LiveViews and spawned tasks can call mocks. Only the
+      process that enables global mode may define stubs in shared mode. Resets to
+      private mode when the test exits.
+
+      Pass together with `async: false`, per Mox requirements.
+
+      Example:
+
+          use YscWeb.ConnCase, async: false, mox_global_first: true
+
   """
 
   use ExUnit.CaseTemplate
 
-  using do
+  using(opts) do
+    exunit_opts = Keyword.take(opts, [:async])
+    mox_global_first_flag = Keyword.get(opts, :mox_global_first, false)
+
     quote do
+      @conn_case_opts unquote(Macro.escape(opts))
+
       # The default endpoint for testing
       @endpoint YscWeb.Endpoint
+
+      use ExUnit.Case, unquote(Macro.escape(exunit_opts))
 
       use YscWeb, :verified_routes
 
@@ -29,24 +48,29 @@ defmodule YscWeb.ConnCase do
       import Phoenix.ConnTest
       import YscWeb.ConnCase
       import Mox
+
+      setup tags do
+        if unquote(mox_global_first_flag) do
+          Mox.set_mox_global()
+          on_exit(fn -> Mox.set_mox_private() end)
+        end
+
+        Ysc.DataCase.setup_sandbox(tags)
+        # Ensure basic site settings exist
+        Ysc.Settings.ensure_settings_exist()
+        Ysc.DataCase.stub_default_external_mocks()
+
+        secret_key_base =
+          Application.get_env(:ysc, YscWeb.Endpoint)[:secret_key_base] ||
+            String.duplicate("test", 16)
+
+        conn =
+          Phoenix.ConnTest.build_conn()
+          |> Map.put(:secret_key_base, secret_key_base)
+
+        {:ok, conn: conn}
+      end
     end
-  end
-
-  setup tags do
-    Ysc.DataCase.setup_sandbox(tags)
-    # Ensure basic site settings exist
-    Ysc.Settings.ensure_settings_exist()
-    Ysc.DataCase.stub_default_external_mocks()
-
-    secret_key_base =
-      Application.get_env(:ysc, YscWeb.Endpoint)[:secret_key_base] ||
-        String.duplicate("test", 16)
-
-    conn =
-      Phoenix.ConnTest.build_conn()
-      |> Map.put(:secret_key_base, secret_key_base)
-
-    {:ok, conn: conn}
   end
 
   @doc """
