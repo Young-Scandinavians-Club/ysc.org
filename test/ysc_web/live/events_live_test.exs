@@ -636,6 +636,62 @@ defmodule YscWeb.EventsLiveTest do
     end
   end
 
+  describe "PubSub-driven upcoming list refresh" do
+    test "handles TicketTierAdded for a real tier without error", %{conn: conn} do
+      tier = ticket_tier_fixture(%{})
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.TicketTierAdded{ticket_tier: tier}}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketTierUpdated for a real tier without error", %{
+      conn: conn
+    } do
+      tier = ticket_tier_fixture(%{})
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %MessagePassingEvents.TicketTierUpdated{ticket_tier: tier}}
+      )
+
+      assert render(view) =~ "Events"
+    end
+
+    test "handles TicketReservationCreated when tier exists", %{conn: conn} do
+      tier = ticket_tier_fixture(%{})
+
+      reservation = %Ysc.Events.TicketReservation{
+        ticket_tier_id: tier.id
+      }
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_async(view)
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events,
+         %MessagePassingEvents.TicketReservationCreated{
+           ticket_reservation: reservation
+         }}
+      )
+
+      assert render(view) =~ "Events"
+    end
+  end
+
   describe "TicketReservationFulfilled without tier" do
     test "handles TicketReservationFulfilled when ticket tier was deleted", %{
       conn: conn
