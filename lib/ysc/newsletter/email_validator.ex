@@ -234,7 +234,12 @@ defmodule Ysc.Newsletter.EmailValidator do
   defp ensure_ets_table do
     unless ets_table_exists?() do
       try do
-        :ets.new(@ets_table, [:set, :public, :named_table, read_concurrency: true])
+        :ets.new(@ets_table, [
+          :set,
+          :public,
+          :named_table,
+          read_concurrency: true
+        ])
       rescue
         e in ArgumentError ->
           if ets_table_exists?() do
