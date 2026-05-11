@@ -100,6 +100,26 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
       assert :ok = EmailValidator.validate_email(email1)
       assert :ok = EmailValidator.validate_email(email2)
     end
+
+    test "validate_email recreates disposable-domain ETS if it was deleted" do
+      table = :disposable_email_domains
+
+      try do
+        :ets.delete(table)
+
+        assert :ok =
+                 EmailValidator.validate_email(
+                   "user@newsletter-fixture.example.com"
+                 )
+
+        assert {:error, :disposable_email} =
+                 EmailValidator.validate_email("test@mailinator.com")
+
+        assert :ets.whereis(table) != :undefined
+      after
+        EmailValidator.init_ets_table()
+      end
+    end
   end
 
   describe "validate_email/1 (injected MX resolver returns error)" do

@@ -83,13 +83,17 @@ defmodule Ysc.Application do
           []
         end
 
+    # Newsletter disposable-domain checks use a named public ETS table. Load it
+    # before accepting HTTP traffic: the supervision tree includes Endpoint, so
+    # starting the supervisor first would allow requests that hit
+    # `EmailValidator.validate_email/1` to crash with ArgumentError from
+    # `:ets.lookup/2` while the table is still missing.
+    Ysc.Newsletter.EmailValidator.init_ets_table()
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Ysc.Supervisor]
     {:ok, supervisor} = Supervisor.start_link(children, opts)
-
-    # Initialize email validator ETS table and load disposable domains
-    Ysc.Newsletter.EmailValidator.init_ets_table()
 
     # Start the outage scraper scheduler
     Ysc.PropertyOutages.Scheduler.start_scheduler()

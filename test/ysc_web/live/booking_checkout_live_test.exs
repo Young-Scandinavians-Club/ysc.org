@@ -1,5 +1,5 @@
 defmodule YscWeb.BookingCheckoutLiveTest do
-  use YscWeb.ConnCase, async: false
+  use YscWeb.ConnCase, async: false, mox_global_first: true
 
   import Ecto.Changeset
   import Phoenix.LiveViewTest
@@ -13,8 +13,6 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   alias Ysc.Ledgers
   alias Ysc.Repo
   alias Ysc.StripeMock
-
-  setup :set_mox_global
 
   setup %{conn: conn} do
     Ledgers.ensure_basic_accounts()
