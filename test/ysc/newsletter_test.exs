@@ -227,6 +227,27 @@ defmodule Ysc.NewsletterTest do
     end
   end
 
+  describe "count_subscribers/1" do
+    test "matches list_subscribers/1 length for the same filters" do
+      assert Newsletter.count_subscribers() ==
+               length(Newsletter.list_subscribers())
+
+      assert Newsletter.count_subscribers(subscribed: true) ==
+               length(Newsletter.list_subscribers(subscribed: true))
+
+      assert Newsletter.count_subscribers(subscribed: false) ==
+               length(Newsletter.list_subscribers(subscribed: false))
+    end
+
+    test "filters by source like list_subscribers" do
+      Newsletter.subscribe("count-source@example.com", source: "public_signup")
+
+      count = Newsletter.count_subscribers(source: "public_signup")
+      list = Newsletter.list_subscribers(source: "public_signup")
+      assert count == length(list)
+    end
+  end
+
   describe "list_paginated_subscribers/1" do
     test "returns paginated rows" do
       Newsletter.subscribe("paged@example.com", source: "public_signup")
