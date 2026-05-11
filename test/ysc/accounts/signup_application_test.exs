@@ -874,14 +874,15 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         mx_resolver: fn _domain -> :ok end
       )
 
+      on_exit(fn ->
+        Application.delete_env(:ysc, Ysc.Newsletter.EmailValidator)
+      end)
+
       changeset =
         SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
       # Should be valid with good email
       assert changeset.valid?
-
-      # Clean up mock
-      Application.delete_env(:ysc, Ysc.Newsletter.EmailValidator)
     end
 
     test "blocks disposable email in production environment" do
@@ -903,7 +904,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
 
       assert "Email address appears to be a temporary or disposable email. Please use a permanent email address." in errors_on(
                changeset
-             ).user_id
+             ).base
     end
 
     test "blocks email with no MX records in production environment" do
@@ -925,7 +926,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
 
       assert "Email domain cannot receive mail. Please check your email address." in errors_on(
                changeset
-             ).user_id
+             ).base
     end
 
     test "respects validate_email option override to force validation" do
@@ -949,7 +950,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
 
       assert "Email address appears to be a temporary or disposable email. Please use a permanent email address." in errors_on(
                changeset
-             ).user_id
+             ).base
     end
 
     test "respects validate_email option override to skip validation" do
@@ -1021,14 +1022,15 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         mx_resolver: fn _domain -> raise "Simulated error" end
       )
 
+      on_exit(fn ->
+        Application.delete_env(:ysc, Ysc.Newsletter.EmailValidator)
+      end)
+
       changeset =
         SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
       # Should be valid (fail open) even when validation raises
       assert changeset.valid?
-
-      # Clean up mock
-      Application.delete_env(:ysc, Ysc.Newsletter.EmailValidator)
     end
   end
 
