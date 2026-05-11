@@ -342,7 +342,7 @@ defmodule YscWeb.TicketQrLive do
     socket =
       socket
       |> assign(:return_to, return_to)
-      |> assign(:page_title, "Tickets for check-in")
+      |> assign(:page_title, "Your event tickets")
       |> assign(:loading, true)
       |> assign(:load_error, false)
       |> assign(:event, nil)
@@ -374,7 +374,7 @@ defmodule YscWeb.TicketQrLive do
     socket =
       socket
       |> assign(:return_to, return_to)
-      |> assign(:page_title, "Tickets for check-in")
+      |> assign(:page_title, "Your event tickets")
       |> assign(:loading, true)
       |> assign(:load_error, false)
       |> assign(:event, nil)
@@ -438,7 +438,7 @@ defmodule YscWeb.TicketQrLive do
     {:noreply,
      socket
      |> assign(:loading, false)
-     |> assign(:page_title, "#{data.event.title} · Tickets for check-in")
+     |> assign(:page_title, "#{data.event.title} · Your tickets")
      |> assign(:event, data.event)
      |> assign(:tickets, data.tickets)
      |> assign(:ticket_count, data.ticket_count)
