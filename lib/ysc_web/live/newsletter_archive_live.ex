@@ -253,7 +253,12 @@ defmodule YscWeb.NewsletterArchiveLive do
           <Turnstile.widget appearance="interaction-only" theme="light" />
         </div>
 
-        <p :if={@newsletter_error} class="mt-3 text-sm text-red-600" role="alert">
+        <p
+          :if={@newsletter_error}
+          id="newsletter-error"
+          class="mt-3 text-sm text-red-600"
+          role="alert"
+        >
           {@newsletter_error}
         </p>
 
