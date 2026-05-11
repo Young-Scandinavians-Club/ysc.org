@@ -8,6 +8,8 @@ defmodule YscWeb.AdminPageTitleTest do
 
   describe "admin_page_title/1" do
     test "default variant renders h1 with semibold admin title classes" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_page_title>Dashboard</.admin_page_title>
@@ -20,6 +22,8 @@ defmodule YscWeb.AdminPageTitleTest do
     end
 
     test "level 2 renders h2" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_page_title level={2}>Section</.admin_page_title>
@@ -32,6 +36,8 @@ defmodule YscWeb.AdminPageTitleTest do
     end
 
     test "emphasis variant uses bold zinc-900 styling" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_page_title level={2} variant={:emphasis}>Review</.admin_page_title>
@@ -42,6 +48,8 @@ defmodule YscWeb.AdminPageTitleTest do
     end
 
     test "merges extra classes onto the title" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_page_title level={2} class="mb-4">Modal title</.admin_page_title>
