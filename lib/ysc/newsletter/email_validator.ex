@@ -56,11 +56,7 @@ defmodule Ysc.Newsletter.EmailValidator do
   Called by the application supervisor at startup.
   """
   def init_ets_table do
-    # Create ETS table if it doesn't exist
-    unless ets_table_exists?() do
-      :ets.new(@ets_table, [:set, :public, :named_table, read_concurrency: true])
-    end
-
+    ensure_ets_table()
     load_disposable_domains()
   end
 
@@ -104,6 +100,8 @@ defmodule Ysc.Newsletter.EmailValidator do
   end
 
   defp disposable_domain?(domain) do
+    ensure_ets_table()
+
     case :ets.lookup(@ets_table, domain) do
       [{^domain, true}] -> true
       _ -> false
@@ -231,5 +229,22 @@ defmodule Ysc.Newsletter.EmailValidator do
       :undefined -> false
       _ -> true
     end
+  end
+
+  defp ensure_ets_table do
+    unless ets_table_exists?() do
+      try do
+        :ets.new(@ets_table, [:set, :public, :named_table, read_concurrency: true])
+      rescue
+        e in ArgumentError ->
+          if ets_table_exists?() do
+            :ok
+          else
+            reraise e, __STACKTRACE__
+          end
+      end
+    end
+
+    :ok
   end
 end

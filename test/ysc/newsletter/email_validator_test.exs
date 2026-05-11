@@ -101,15 +101,18 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
       assert :ok = EmailValidator.validate_email(email2)
     end
 
-    test "validate_email raises if disposable-domain ETS was deleted (until init runs again)" do
+    test "validate_email recreates disposable-domain ETS if it was deleted" do
       table = :disposable_email_domains
 
       try do
         :ets.delete(table)
 
-        assert_raise ArgumentError, fn ->
-          EmailValidator.validate_email("user@newsletter-fixture.example.com")
-        end
+        assert :ok =
+                 EmailValidator.validate_email(
+                   "user@newsletter-fixture.example.com"
+                 )
+
+        assert :ets.whereis(table) != :undefined
       after
         EmailValidator.init_ets_table()
       end
