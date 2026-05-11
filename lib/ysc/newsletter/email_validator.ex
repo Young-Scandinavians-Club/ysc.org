@@ -100,7 +100,7 @@ defmodule Ysc.Newsletter.EmailValidator do
   end
 
   defp disposable_domain?(domain) do
-    ensure_ets_table()
+    ensure_disposable_domains_loaded()
 
     case :ets.lookup(@ets_table, domain) do
       [{^domain, true}] -> true
@@ -248,6 +248,24 @@ defmodule Ysc.Newsletter.EmailValidator do
             reraise e, __STACKTRACE__
           end
       end
+    end
+
+    :ok
+  end
+
+  # Recreate missing tables *and* ensure domains are loaded. Creating only the
+  # named table leaves lookups against an empty set, which would incorrectly
+  # allow disposable domains until `init_ets_table/0` runs again.
+  defp ensure_disposable_domains_loaded do
+    cond do
+      not ets_table_exists?() ->
+        init_ets_table()
+
+      :ets.info(@ets_table, :size) == 0 ->
+        load_disposable_domains()
+
+      true ->
+        :ok
     end
 
     :ok
