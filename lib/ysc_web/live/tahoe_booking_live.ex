@@ -3491,7 +3491,10 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li class="bg-red-50 border-l-4 border-red-600 p-3 -ml-5 pl-5 list-none">
                           <span class="inline-flex items-center gap-2 text-red-900 font-bold">
-                            <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-600" />
+                            <.icon
+                              name="hero-exclamation-triangle"
+                              class="w-5 h-5 text-red-600"
+                            />
                             <span>No street parking Nov 1 – May 1</span>
                           </span>
                           <span class="block text-red-800 font-semibold mt-1">
