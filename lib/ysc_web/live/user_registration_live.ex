@@ -139,6 +139,17 @@ defmodule YscWeb.UserRegistrationLive do
                 autocomplete="email"
                 required
               />
+              <% reg_base_msgs = registration_form_base_messages(@form) %>
+              <div
+                :if={reg_base_msgs != []}
+                id="registration-form-base-errors"
+                role="alert"
+                class="space-y-1"
+              >
+                <%= for msg <- reg_base_msgs do %>
+                  <.error>{msg}</.error>
+                <% end %>
+              </div>
               <.header class="text-left pt-6">Personal Information</.header>
               <.input
                 field={@form[:first_name]}
@@ -722,6 +733,22 @@ defmodule YscWeb.UserRegistrationLive do
      |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
   end
 
+  defp registration_form_base_messages(%Phoenix.HTML.Form{
+         source: %Ecto.Changeset{} = user_cs
+       }) do
+    case Ecto.Changeset.get_change(user_cs, :registration_form) do
+      %Ecto.Changeset{} = reg_cs ->
+        reg_cs.errors
+        |> Keyword.get_values(:base)
+        |> Enum.map(&translate_error/1)
+
+      _ ->
+        []
+    end
+  end
+
+  defp registration_form_base_messages(_), do: []
+
   # Which step (0, 1, or 2) has the first validation error; used to jump to that step on save failure
   defp step_with_first_error(changeset) do
     reg_form_errors =
@@ -746,7 +773,7 @@ defmodule YscWeb.UserRegistrationLive do
         k in [:email, :password, :first_name, :last_name]
       end) or
         Enum.any?(reg_keys, fn k ->
-          k in [:birth_date, :address, :city, :country, :postal_code]
+          k in [:birth_date, :address, :city, :country, :postal_code, :base]
         end)
 
     step_2_error? =
@@ -842,7 +869,7 @@ defmodule YscWeb.UserRegistrationLive do
         k in [:email, :password, :first_name, :last_name]
       end) ||
         Enum.any?(Keyword.keys(reg_form_errors), fn k ->
-          k in [:birth_date, :address, :city, :country, :postal_code]
+          k in [:birth_date, :address, :city, :country, :postal_code, :base]
         end)
 
     step_2_invalid =

@@ -13,9 +13,13 @@ defmodule Ysc.Accounts.SignupApplicationTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Accounts.SignupApplication
+  alias Ysc.Newsletter.EmailValidator
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
+
+  # Must match `Ysc.Newsletter.EmailValidator` process override (see perform_mx_lookup/1).
+  @email_validator_mx_override_key {EmailValidator, :process_mx_override}
 
   describe "application_changeset/2" do
     test "creates valid changeset with all required fields" do
@@ -806,6 +810,234 @@ defmodule Ysc.Accounts.SignupApplicationTest do
 
       refute changeset.valid?
       assert "cannot be in the future" in errors_on(changeset).birth_date
+    end
+  end
+
+  describe "email validation in production" do
+    setup do
+      # Save original environment
+      original_env = Application.get_env(:ysc, :environment, "dev")
+
+      on_exit(fn ->
+        # Restore original environment
+        Application.put_env(:ysc, :environment, original_env)
+      end)
+
+      {:ok, original_env: original_env}
+    end
+
+    test "does not validate email in dev environment" do
+      Application.put_env(:ysc, :environment, "dev")
+
+      # Create a user with a disposable email
+      user = user_fixture(%{email: "test@mailinator.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+      # Should be valid even though email is disposable
+      assert changeset.valid?
+    end
+
+    test "does not validate email in sandbox environment" do
+      Application.put_env(:ysc, :environment, "sandbox")
+
+      # Create a user with a disposable email
+      user = user_fixture(%{email: "test@mailinator.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+      # Should be valid even though email is disposable
+      assert changeset.valid?
+    end
+
+    test "validates email in production environment with valid email" do
+      Application.put_env(:ysc, :environment, "production")
+
+      # Create a user with a valid email
+      user = user_fixture(%{email: "test@example.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      # Clear per-process MX cache so signup validation exercises the stub.
+      Process.delete({:mx_cache, "example.com"})
+
+      # Process-local MX stub so async tests do not race on Application env.
+      Process.put(@email_validator_mx_override_key, fn _domain -> :ok end)
+
+      try do
+        changeset =
+          SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+        # Should be valid with good email
+        assert changeset.valid?
+      after
+        Process.delete(@email_validator_mx_override_key)
+      end
+    end
+
+    test "blocks disposable email in production environment" do
+      Application.put_env(:ysc, :environment, "production")
+
+      # Create a user with a disposable email (mailinator.com is in the disposable list)
+      user = user_fixture(%{email: "test@mailinator.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+      # Should be invalid with disposable email
+      refute changeset.valid?
+
+      assert "Email address appears to be a temporary or disposable email. Please use a permanent email address." in errors_on(
+               changeset
+             ).base
+    end
+
+    test "blocks email with no MX records in production environment" do
+      Application.put_env(:ysc, :environment, "production")
+
+      # Create a user with a domain that has no MX records
+      user = user_fixture(%{email: "test@nonexistentdomain123456789.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+      # Should be invalid with no MX records
+      refute changeset.valid?
+
+      assert "Email domain cannot receive mail. Please check your email address." in errors_on(
+               changeset
+             ).base
+    end
+
+    test "respects validate_email option override to force validation" do
+      Application.put_env(:ysc, :environment, "dev")
+
+      # Create a user with a disposable email
+      user = user_fixture(%{email: "test@mailinator.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs,
+          validate_email: true
+        )
+
+      # Should be invalid even in dev when forced
+      refute changeset.valid?
+
+      assert "Email address appears to be a temporary or disposable email. Please use a permanent email address." in errors_on(
+               changeset
+             ).base
+    end
+
+    test "respects validate_email option override to skip validation" do
+      Application.put_env(:ysc, :environment, "production")
+
+      # Create a user with a disposable email
+      user = user_fixture(%{email: "test@mailinator.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs,
+          validate_email: false
+        )
+
+      # Should be valid even in production when skipped
+      assert changeset.valid?
+    end
+
+    test "fails open when user_id is nil" do
+      Application.put_env(:ysc, :environment, "production")
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: nil
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+      # Should be valid even in production with no user_id
+      assert changeset.valid?
+    end
+
+    test "fails open when user does not exist" do
+      Application.put_env(:ysc, :environment, "production")
+
+      # Use a non-existent user ID
+      non_existent_id = Ecto.ULID.generate()
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: non_existent_id
+        })
+
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+      # Should be valid (fail open) even in production when user doesn't exist
+      assert changeset.valid?
+    end
+
+    test "fails open on validation exceptions" do
+      Application.put_env(:ysc, :environment, "production")
+
+      # Create a user with a valid email
+      user = user_fixture(%{email: "test@example.com"})
+
+      attrs =
+        valid_application_attrs(%{
+          user_id: user.id
+        })
+
+      # Clear per-process MX cache so signup validation does not skip the stub lookup.
+      Process.delete({:mx_cache, "example.com"})
+
+      Process.put(@email_validator_mx_override_key, fn _domain ->
+        raise "Simulated error"
+      end)
+
+      try do
+        changeset =
+          SignupApplication.application_changeset(%SignupApplication{}, attrs)
+
+        # Should be valid (fail open) even when validation raises
+        assert changeset.valid?
+      after
+        Process.delete(@email_validator_mx_override_key)
+      end
     end
   end
 

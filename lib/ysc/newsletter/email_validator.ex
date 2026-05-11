@@ -14,6 +14,9 @@ defmodule Ysc.Newsletter.EmailValidator do
   @ets_table :disposable_email_domains
   @mx_cache_ttl :timer.minutes(10)
 
+  # Process-local MX resolver override for tests (avoids Application env races under async: true).
+  @process_mx_override_key {__MODULE__, :process_mx_override}
+
   # Practical newsletter signup shape: local@domain.tld (no whitespace; at least one dot in host).
   @email_format_regex ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -121,12 +124,18 @@ defmodule Ysc.Newsletter.EmailValidator do
   end
 
   defp perform_mx_lookup(domain) do
-    case Application.get_env(:ysc, __MODULE__, [])[:mx_resolver] do
+    case Process.get(@process_mx_override_key, :absent) do
       fun when is_function(fun, 1) ->
         fun.(domain)
 
-      _ ->
-        perform_inet_mx_lookup(domain)
+      :absent ->
+        case Application.get_env(:ysc, __MODULE__, [])[:mx_resolver] do
+          fun when is_function(fun, 1) ->
+            fun.(domain)
+
+          _ ->
+            perform_inet_mx_lookup(domain)
+        end
     end
   end
 

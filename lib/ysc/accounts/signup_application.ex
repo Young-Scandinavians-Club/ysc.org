@@ -9,6 +9,8 @@ defmodule Ysc.Accounts.SignupApplication do
   import Ecto.Changeset
   import Ysc.ChangesetHelpers
 
+  require Ysc.Logging
+
   @eligibility_options [
     {
       "I am a citizen of a Scandinavian country (Denmark, Finland, Iceland, Norway & Sweden)",
@@ -96,9 +98,10 @@ defmodule Ysc.Accounts.SignupApplication do
           | %{
               optional(:__struct__) => none(),
               optional(atom() | binary()) => any()
-            }
+            },
+          opts :: Keyword.t()
         ) :: Ecto.Changeset.t()
-  def application_changeset(application, attrs, _opts \\ []) do
+  def application_changeset(application, attrs, opts \\ []) do
     application
     |> cast(attrs, [
       :user_id,
@@ -141,12 +144,13 @@ defmodule Ysc.Accounts.SignupApplication do
     |> validate_birth_date()
     |> validate_agreed_to_bylaws()
     |> validate_membership_eligibility()
+    |> validate_user_email(opts)
   end
 
   @doc """
   Changeset for migrating existing WP application data.
 
-  Uses the same field list as `application_changeset/2` but skips validations
+  Uses the same field list as `application_changeset/3` (default `opts \\ []`) but skips validations
   that are only meaningful for new signups: required fields (old members often
   have incomplete records), `agreed_to_bylaws` (they agreed under a previous
   system), and `validate_membership_eligibility` (eligibility strings may not
@@ -230,6 +234,159 @@ defmodule Ysc.Accounts.SignupApplication do
       @valid_eligibility_option
     )
     |> validate_length(:membership_eligibility, min: 1)
+  end
+
+  defp validate_user_email(changeset, opts) do
+    # Only validate emails in production environment to prevent blocking legitimate
+    # signups due to email validation errors in dev/sandbox environments.
+    if should_validate_email?(opts) do
+      case get_field(changeset, :user_id) do
+        nil ->
+          # No user_id means we can't validate the email
+          changeset
+
+        user_id ->
+          # Fetch the user's email and validate it
+          validate_email_for_user(changeset, user_id)
+      end
+    else
+      changeset
+    end
+  end
+
+  defp should_validate_email?(opts) do
+    # Allow override via opts (useful for testing)
+    case Keyword.get(opts, :validate_email) do
+      true ->
+        true
+
+      false ->
+        false
+
+      nil ->
+        # Default: only validate in production environment
+        environment = Application.get_env(:ysc, :environment, "dev")
+        environment == "production"
+    end
+  end
+
+  defp validate_email_for_user(changeset, user_id) do
+    # Defensive: If we can't fetch the user or email, fail open (don't block signup)
+    try do
+      {micros, user} =
+        :timer.tc(fn -> Ysc.Repo.get(Ysc.Accounts.User, user_id) end)
+
+      duration_ms = div(micros + 500, 1000)
+
+      :telemetry.execute(
+        [:ysc, :accounts, :signup_application, :validate_email_user_lookup],
+        %{duration: duration_ms, count: 1},
+        %{user_id: user_id, result: if(user, do: :ok, else: :not_found)}
+      )
+
+      case user do
+        nil ->
+          Ysc.Logging.error(
+            "Signup application email validation skipped: user not found (fail open)",
+            error: :user_not_found,
+            extra: %{user_id: user_id},
+            tags: %{feature: "signup_application_email_validation"}
+          )
+
+          changeset
+
+        user ->
+          case Ysc.Newsletter.EmailValidator.validate_email(user.email) do
+            :ok ->
+              changeset
+
+            {:error, :disposable_email} = err ->
+              Ysc.Logging.error(
+                "Signup application email validation failed",
+                error: err,
+                extra: %{
+                  user_id: user_id,
+                  email: user.email,
+                  reason: :disposable_email
+                },
+                tags: %{feature: "signup_application_email_validation"}
+              )
+
+              add_error(
+                changeset,
+                :base,
+                "Email address appears to be a temporary or disposable email. Please use a permanent email address."
+              )
+
+            {:error, :no_mx_records} = err ->
+              Ysc.Logging.error(
+                "Signup application email validation failed",
+                error: err,
+                extra: %{
+                  user_id: user_id,
+                  email: user.email,
+                  reason: :no_mx_records
+                },
+                tags: %{feature: "signup_application_email_validation"}
+              )
+
+              add_error(
+                changeset,
+                :base,
+                "Email domain cannot receive mail. Please check your email address."
+              )
+
+            {:error, :invalid_email} = err ->
+              Ysc.Logging.error(
+                "Signup application email validation failed",
+                error: err,
+                extra: %{
+                  user_id: user_id,
+                  email: user.email,
+                  reason: :invalid_email
+                },
+                tags: %{feature: "signup_application_email_validation"}
+              )
+
+              add_error(changeset, :base, "Email address is invalid")
+
+            other ->
+              Ysc.Logging.error(
+                "Signup application email validation unknown result (fail open)",
+                error: {:unknown_validator_result, other},
+                extra: %{
+                  user_id: user_id,
+                  email: user.email,
+                  validator_result: inspect(other)
+                },
+                tags: %{feature: "signup_application_email_validation"}
+              )
+
+              changeset
+          end
+      end
+    rescue
+      error ->
+        email_extra =
+          try do
+            case Ysc.Repo.get(Ysc.Accounts.User, user_id) do
+              %{email: email} -> email
+              _ -> nil
+            end
+          rescue
+            _ -> nil
+          end
+
+        Ysc.Logging.error(
+          "Signup application email validation raised (fail open)",
+          error: error,
+          stacktrace: __STACKTRACE__,
+          extra: %{user_id: user_id, email: email_extra},
+          tags: %{feature: "signup_application_email_validation"}
+        )
+
+        changeset
+    end
   end
 
   @spec eligibility_options() :: [{<<_::64, _::_*8>>, <<_::64, _::_*8>>}, ...]
