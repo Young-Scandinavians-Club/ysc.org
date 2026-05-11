@@ -416,6 +416,34 @@ defmodule Ysc.MediaTest do
       assert {:ok, _} = Media.set_content_hash(image, "newhash")
       assert Media.fetch_image(image.id).content_hash == "newhash"
     end
+
+    test "returns error when another image already owns the content hash", %{
+      user: user
+    } do
+      hash = "duphash#{System.unique_integer([:positive])}"
+
+      {:ok, _winner} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/winner.jpg",
+          processing_state: :unprocessed,
+          content_hash: hash
+        }
+        |> Repo.insert()
+
+      {:ok, loser} =
+        %Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/loser.jpg",
+          processing_state: :unprocessed
+        }
+        |> Repo.insert()
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Media.set_content_hash(loser, hash)
+
+      assert %{content_hash: _} = errors_on(changeset)
+    end
   end
 
   describe "reuse_existing_processed_image/2" do
