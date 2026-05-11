@@ -817,6 +817,41 @@ defmodule Ysc.Subscriptions do
     |> Enum.find(&active?/1)
   end
 
+  # Used by create_stripe_subscription/2. Broader than active?/1: Stripe still has an open
+  # subscription for past_due, unpaid, incomplete, paused, etc.; creating another would risk
+  # double billing. Migration placeholders (stripe_id migrated_*) are excluded so a real Stripe
+  # subscription can replace imported rows.
+  defp duplicate_create_blocked_by_existing_subscription?(
+         %Ysc.Accounts.User{} = user
+       ) do
+    user
+    |> list_subscriptions()
+    |> Enum.any?(&subscription_blocks_new_stripe_duplicate?/1)
+  end
+
+  defp subscription_blocks_new_stripe_duplicate?(%Subscription{} = sub) do
+    cond do
+      is_binary(sub.stripe_id) and
+          String.starts_with?(sub.stripe_id, "migrated_") ->
+        false
+
+      sub.stripe_status in ["canceled", "incomplete_expired"] ->
+        false
+
+      sub.stripe_status in ["past_due", "unpaid", "incomplete"] ->
+        true
+
+      sub.stripe_status == "paused" ->
+        true
+
+      active?(sub) ->
+        true
+
+      true ->
+        false
+    end
+  end
+
   @doc """
   Change membership plan with correct billing behavior:
   - Upgrades: charge proration delta immediately.
@@ -1181,8 +1216,9 @@ defmodule Ysc.Subscriptions do
   Creates a subscription in Stripe.
 
   Returns `{:error, :user_already_has_active_subscription}` if the user already has
-  an active subscription (including paused subscriptions which remain active in Stripe).
-  This prevents double subscriptions that would lead to double billing.
+  a subscription in Stripe that must not be duplicated—active, trialing, past due,
+  unpaid, incomplete checkout, paused, etc. WP migration placeholders (`migrated_*`)
+  do not block. This prevents double subscriptions that would lead to double billing.
 
   ## Examples
 
@@ -1195,9 +1231,7 @@ defmodule Ysc.Subscriptions do
   """
   @dialyzer {:nowarn_function, create_stripe_subscription: 2}
   def create_stripe_subscription(user, params) do
-    # Check if user already has an active subscription (including paused ones)
-    # to prevent double subscriptions that would lead to double billing
-    if get_active_subscription(user) != nil do
+    if duplicate_create_blocked_by_existing_subscription?(user) do
       {:error, :user_already_has_active_subscription}
     else
       # Handle both keyword lists and maps

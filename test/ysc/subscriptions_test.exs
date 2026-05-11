@@ -705,11 +705,53 @@ defmodule Ysc.SubscriptionsTest do
                {:error, :user_already_has_active_subscription}
     end
 
-    test "returns {:error, :user_already_has_active_subscription} for paused subscription (board volunteer)" do
+    test "returns {:error, :user_already_has_active_subscription} when user has past_due subscription" do
       user =
         user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
 
-      # Paused subscriptions remain "active" in Stripe with pause_collection behavior
+      {:ok, _past_due_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_past_due_#{System.unique_integer()}",
+          stripe_status: "past_due",
+          name: "Past Due Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 15, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      assert Subscriptions.create_stripe_subscription(user, params) ==
+               {:error, :user_already_has_active_subscription}
+    end
+
+    test "returns {:error, :user_already_has_active_subscription} when user has incomplete subscription (checkout in progress)" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      {:ok, _incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_incomplete_#{System.unique_integer()}",
+          stripe_status: "incomplete",
+          name: "Incomplete Checkout Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      assert Subscriptions.create_stripe_subscription(user, params) ==
+               {:error, :user_already_has_active_subscription}
+    end
+
+    test "returns {:error, :user_already_has_active_subscription} for subscription still active with pause_collection (board volunteer)" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      # pause_collection keeps Stripe subscription status as active
       {:ok, _paused_sub} =
         Subscriptions.create_subscription(%{
           user_id: user.id,
@@ -725,6 +767,49 @@ defmodule Ysc.SubscriptionsTest do
 
       assert Subscriptions.create_stripe_subscription(user, params) ==
                {:error, :user_already_has_active_subscription}
+    end
+
+    test "returns {:error, :user_already_has_active_subscription} when Stripe subscription status is paused" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      {:ok, _paused_status_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_status_paused_#{System.unique_integer()}",
+          stripe_status: "paused",
+          name: "Paused Status Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      assert Subscriptions.create_stripe_subscription(user, params) ==
+               {:error, :user_already_has_active_subscription}
+    end
+
+    test "allows creating subscription when user only has WP migration placeholder subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      {:ok, _migrated_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Migrated Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}]
+      }
+
+      result = Subscriptions.create_stripe_subscription(user, params)
+
+      refute result == {:error, :user_already_has_active_subscription}
     end
 
     test "allows creating subscription when user has no active subscription" do
