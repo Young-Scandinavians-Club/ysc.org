@@ -16,15 +16,15 @@
 // collapsed, so --event-header-height was too large and the Trix toolbar sat
 // far below the header. ResizeObserver keeps the variable in sync with the
 // real layout height until transitions settle.
+//
+// LiveView morphing removes DOM nodes that are not in the server-rendered tree.
+// The sentinel is client-only, so it can disappear after a patch; the observer
+// then never fires again and the header stays collapsed. `updated()` re-attaches
+// the sentinel when it is missing or no longer the direct predecessor of the
+// hook root.
 const StickyEventHeader = {
     mounted() {
         this.sticky = false;
-
-        this.sentinel = document.createElement("div");
-        this.sentinel.setAttribute("aria-hidden", "true");
-        this.sentinel.style.cssText =
-            "height:2px;margin-top:-2px;pointer-events:none;flex-shrink:0";
-        this.el.parentElement.insertBefore(this.sentinel, this.el);
 
         this.resizeObserver = new ResizeObserver(() => {
             this.syncEventHeaderHeightVar();
@@ -44,24 +44,87 @@ const StickyEventHeader = {
             this.updateHeightVar();
         };
 
-        this.observer = new IntersectionObserver(
-            ([entry]) => {
-                // isIntersecting === any overlap with the viewport (threshold 0).
-                // Sticky when the sentinel is completely out of view (scrolled up).
-                this.applySticky(!entry.isIntersecting);
-            },
-            { threshold: 0, rootMargin: "0px" }
-        );
+        this.intersectCallback = (entries) => {
+            const entry = entries[entries.length - 1];
+            if (!entry) return;
+            // isIntersecting === any overlap with the viewport (threshold 0).
+            // Sticky when the sentinel is completely out of view (scrolled up).
+            this.applySticky(!entry.isIntersecting);
+        };
 
+        this.attachSentinelAndObserver();
+    },
+
+    attachSentinelAndObserver() {
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+        if (this.sentinel?.parentElement) {
+            this.sentinel.parentElement.removeChild(this.sentinel);
+        }
+
+        const parent = this.el.parentElement;
+        if (!parent) return;
+
+        this.sentinel = document.createElement("div");
+        this.sentinel.setAttribute("aria-hidden", "true");
+        this.sentinel.style.cssText =
+            "height:2px;margin-top:-2px;pointer-events:none;flex-shrink:0";
+        parent.insertBefore(this.sentinel, this.el);
+
+        this.observer = new IntersectionObserver(this.intersectCallback, {
+            threshold: 0,
+            rootMargin: "0px",
+        });
         this.observer.observe(this.sentinel);
+    },
+
+    sentinelOk() {
+        return (
+            this.sentinel &&
+            this.sentinel.isConnected &&
+            this.el.previousElementSibling === this.sentinel
+        );
+    },
+
+    /** If the sentinel was stripped by a LiveView patch, re-create it and sync. */
+    repairSentinelIfNeeded() {
+        if (this.sentinelOk()) return;
+
+        this.attachSentinelAndObserver();
+
+        queueMicrotask(() => {
+            if (!this.sentinelOk()) return;
+            const pending = this.observer.takeRecords();
+            if (pending.length > 0) {
+                this.intersectCallback(pending);
+            } else {
+                this.syncStickyFromSentinelRect();
+            }
+        });
+    },
+
+    syncStickyFromSentinelRect() {
+        if (!this.sentinel) return;
+        const rect = this.sentinel.getBoundingClientRect();
+        const vw = window.innerWidth || document.documentElement.clientWidth;
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        const intersects =
+            rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw;
+        this.applySticky(!intersects);
     },
 
     // LiveView patches wipe client-added classes; restore `is-sticky` if needed.
     updated() {
+        this.repairSentinelIfNeeded();
+
         if (this.sticky && !this.el.classList.contains("is-sticky")) {
             this.el.classList.add("is-sticky");
         }
-        // Re-measure in case the header height changed due to a content update.
+        if (!this.sticky && this.el.classList.contains("is-sticky")) {
+            this.el.classList.remove("is-sticky");
+        }
         this.updateHeightVar();
     },
 
@@ -71,7 +134,7 @@ const StickyEventHeader = {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
-        if (this.sentinel && this.sentinel.parentElement) {
+        if (this.sentinel?.parentElement) {
             this.sentinel.parentElement.removeChild(this.sentinel);
         }
         document.documentElement.style.removeProperty("--event-header-height");
