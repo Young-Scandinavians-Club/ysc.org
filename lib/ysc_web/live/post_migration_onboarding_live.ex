@@ -741,7 +741,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         navigate={~p"/"}
         class="inline-flex items-center gap-2 phx-submit-loading:opacity-75 rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition duration-150 ease-in-out"
       >
-        <.icon name="hero-home" class="w-4 h-4" /> Go to Dashboard
+        <.icon name="hero-home" class="w-4 h-4" /> Go to Home
       </.link>
     </div>
     """
@@ -1133,7 +1133,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
                   YscWeb.Flash.send_toast(
                     :error,
-                    "Payment method saved but could not set as default.",
+                    "Your payment method was saved, but we could not set it as your default for renewals. Please try again or contact info@ysc.org.",
                     title: "Payment"
                   )
 
