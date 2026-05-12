@@ -49,27 +49,23 @@ defmodule YscWeb.UserSettingsLive do
             phx-change="validate_phone_code"
             phx-hook="ResendTimer"
           >
-            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p class="text-sm text-blue-800">
-                <.icon
-                  name="hero-information-circle"
-                  class="w-5 h-5 inline-block -mt-0.5 me-1"
-                />
-                <strong>Keep this window open</strong>
-                while you check your text messages for the verification code.
-              </p>
-            </div>
+            <.form_notice kind={:info} id="phone-verification-keep-open-notice">
+              <strong>Keep this window open</strong>
+              while you check your text messages for the verification code.
+            </.form_notice>
 
             <p class="text-base text-zinc-600 mb-4">
               We sent a verification code via text message to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@pending_phone_number) || @pending_phone_number %></strong>.
               Please enter it below to confirm your phone number.
             </p>
 
-            <%= if @phone_verification_error do %>
-              <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p class="text-sm text-red-800">{@phone_verification_error}</p>
-              </div>
-            <% end %>
+            <.form_notice
+              :if={@phone_verification_error}
+              kind={:error}
+              id="phone-verification-error-notice"
+            >
+              {@phone_verification_error}
+            </.form_notice>
 
             <p
               :if={dev_or_sandbox?()}
@@ -142,27 +138,23 @@ defmodule YscWeb.UserSettingsLive do
             phx-change="validate_email_code"
             phx-hook="ResendTimer"
           >
-            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p class="text-sm text-blue-800">
-                <.icon
-                  name="hero-information-circle"
-                  class="w-5 h-5 inline-block -mt-0.5 me-1"
-                />
-                <strong>Keep this window open</strong>
-                while you check your email for the verification code.
-              </p>
-            </div>
+            <.form_notice kind={:info} id="email-verification-keep-open-notice">
+              <strong>Keep this window open</strong>
+              while you check your email for the verification code.
+            </.form_notice>
 
             <p class="text-base text-zinc-600 mb-4">
               We sent a verification code to <strong><%= @pending_email %></strong>.
               Please enter it below to confirm your new email address.
             </p>
 
-            <%= if @email_verification_error do %>
-              <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p class="text-sm text-red-800">{@email_verification_error}</p>
-              </div>
-            <% end %>
+            <.form_notice
+              :if={@email_verification_error}
+              kind={:error}
+              id="email-verification-error-notice"
+            >
+              {@email_verification_error}
+            </.form_notice>
             <.input
               field={@email_verification_form[:verification_code]}
               type="otp"
