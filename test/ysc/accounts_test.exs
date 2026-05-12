@@ -246,6 +246,24 @@ defmodule Ysc.AccountsTest do
       assert Accounts.get_user_passkeys(user) == []
     end
 
+    test "get_user_passkeys uses preloaded passkeys when association is loaded",
+         %{} do
+      user = user_fixture(%{phone_number: "+14159098274"})
+
+      {:ok, passkey} =
+        Accounts.create_user_passkey(user, %{
+          external_id: "cred-preload-path",
+          public_key: <<1>>
+        })
+
+      loaded = Accounts.get_user!(user.id, [:passkeys])
+      assert Ecto.assoc_loaded?(loaded.passkeys)
+
+      keys = Accounts.get_user_passkeys(loaded)
+      assert length(keys) == 1
+      assert hd(keys).id == passkey.id
+    end
+
     test "should_show_passkey_prompt? is true when user has no passkeys and never dismissed",
          %{} do
       user = user_fixture(%{phone_number: "+14159098271"})

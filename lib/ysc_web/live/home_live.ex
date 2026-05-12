@@ -19,20 +19,15 @@ defmodule YscWeb.HomeLive do
       # Logged-in user: use async loading for performance
       socket = mount_minimal_assigns(socket)
 
-      # Check if user just logged in (from session) and should show passkey prompt
       just_logged_in =
         Map.get(session, "just_logged_in", false) ||
           Map.get(session, :just_logged_in, false)
 
-      user_with_passkeys = Accounts.get_user!(user.id, [:passkeys])
-
-      show_passkey_prompt =
-        just_logged_in &&
-          Accounts.should_show_passkey_prompt?(user_with_passkeys)
-
+      # Passkey prompt is resolved in `handle_async/3` with the same user load
+      # as the rest of the dashboard (no extra mount-time query). Static HTML
+      # stays free of passkey round-trips for typical visits.
       socket =
         assign(socket,
-          show_passkey_prompt: show_passkey_prompt,
           just_logged_in: just_logged_in
         )
 
@@ -81,7 +76,8 @@ defmodule YscWeb.HomeLive do
         Ysc.AppleWallet.configured?(:membership),
       google_wallet_membership_enabled?: GoogleWallet.configured?(:membership),
       google_wallet_membership_url: nil,
-      wallet_platform: wallet_platform_from_params(socket)
+      wallet_platform: wallet_platform_from_params(socket),
+      show_passkey_prompt: false
     )
   end
 
@@ -151,16 +147,18 @@ defmodule YscWeb.HomeLive do
   # Load all home page data asynchronously (logged-in users only)
   defp load_home_data_async(socket) do
     user = socket.assigns.current_user
+    just_logged_in = socket.assigns.just_logged_in
 
     start_async(socket, :load_home_data, fn ->
-      load_logged_in_user_data(user.id)
+      load_logged_in_user_data(user.id, just_logged_in)
     end)
   end
 
   # Background task to load logged-in user's home page data in parallel
-  defp load_logged_in_user_data(user_id) do
+  defp load_logged_in_user_data(user_id, just_logged_in) do
     tasks = [
-      {:user_data, fn -> load_user_with_subscriptions(user_id) end},
+      {:user_data,
+       fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
       {:bookings, fn -> get_future_active_bookings(user_id) end},
       {:events,
@@ -180,11 +178,19 @@ defmodule YscWeb.HomeLive do
     end)
   end
 
-  # Load user with subscriptions and virtual fields
-  defp load_user_with_subscriptions(user_id) do
+  # Load user with subscriptions and virtual fields. When `just_logged_in`,
+  # preloads passkeys once so `should_show_passkey_prompt?/1` does not query again.
+  defp load_user_with_subscriptions(user_id, just_logged_in) do
+    preloads =
+      if just_logged_in do
+        [:passkeys, subscriptions: :subscription_items]
+      else
+        [subscriptions: :subscription_items]
+      end
+
     user_with_subs =
       Accounts.get_user!(user_id)
-      |> Ysc.Repo.preload(subscriptions: :subscription_items)
+      |> Ysc.Repo.preload(preloads)
       |> Accounts.User.populate_virtual_fields()
 
     is_sub_account = Accounts.sub_account?(user_with_subs)
@@ -220,29 +226,24 @@ defmodule YscWeb.HomeLive do
         []
       end
 
+    show_passkey_prompt =
+      just_logged_in && Accounts.should_show_passkey_prompt?(user_with_subs)
+
     {is_sub_account, primary_user, other_family_members,
-     membership_paused_by_board}
+     membership_paused_by_board, show_passkey_prompt}
   end
 
   @impl true
   def handle_async(:load_home_data, {:ok, results}, socket) do
     # Handle logged-in user async results
     {is_sub_account, primary_user, other_family_members,
-     membership_paused_by_board} =
-      Map.get(results, :user_data, {false, nil, [], nil})
+     membership_paused_by_board, show_passkey_prompt} =
+      Map.get(results, :user_data, {false, nil, [], nil, false})
 
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
     upcoming_events = Map.get(results, :events, [])
     latest_news = Map.get(results, :news, [])
-
-    # Re-check passkey prompt status after data loads (in case user added a passkey)
-    user = socket.assigns.current_user
-    user_with_passkeys = Accounts.get_user!(user.id, [:passkeys])
-
-    show_passkey_prompt =
-      socket.assigns[:just_logged_in] &&
-        Accounts.should_show_passkey_prompt?(user_with_passkeys)
 
     socket =
       assign(socket,

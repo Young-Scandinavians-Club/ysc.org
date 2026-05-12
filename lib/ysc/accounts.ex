@@ -223,13 +223,37 @@ defmodule Ysc.Accounts do
 
   @doc """
   Gets all passkeys for a user.
+
+  When `:passkeys` is already preloaded on `user`, returns the in-memory list
+  sorted like the database query (`last_used_at` descending) instead of
+  issuing a second round-trip.
   """
   def get_user_passkeys(user) do
-    from(p in UserPasskey,
-      where: p.user_id == ^user.id,
-      order_by: [desc: p.last_used_at]
+    if Ecto.assoc_loaded?(user.passkeys) do
+      sort_passkeys_by_last_used_desc(user.passkeys)
+    else
+      from(p in UserPasskey,
+        where: p.user_id == ^user.id,
+        order_by: [desc: p.last_used_at]
+      )
+      |> Repo.all()
+    end
+  end
+
+  defp sort_passkeys_by_last_used_desc(passkeys) do
+    Enum.sort_by(
+      passkeys,
+      fn p ->
+        ts =
+          case p.last_used_at do
+            %DateTime{} = dt -> DateTime.to_unix(dt, :microsecond)
+            _ -> 0
+          end
+
+        {ts, p.id}
+      end,
+      :desc
     )
-    |> Repo.all()
   end
 
   @doc """
