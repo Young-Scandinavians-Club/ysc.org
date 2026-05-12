@@ -27,6 +27,17 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   describe "hosts - edit page UI" do
     setup [:create_admin]
 
+    test "add agenda inserts an agenda card", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#agendas .drag-handle")
+
+      assert view |> element("#add-agenda-button") |> render_click()
+
+      assert has_element?(view, "#agendas .drag-handle")
+    end
+
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")

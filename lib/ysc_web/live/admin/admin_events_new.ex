@@ -580,14 +580,13 @@ defmodule YscWeb.AdminEventsNewLive do
               </div>
 
               <.button
+                id="add-agenda-button"
                 type="button"
                 phx-click="add-agenda"
                 phx-disable-with="Adding..."
               >
                 <.icon name="hero-plus" class="-mt-0.5" /> Add Agenda
               </.button>
-
-              <%!-- Add Agenda button also appears at the bottom; defined again after the list --%>
 
               <ul
                 id="agendas"
@@ -658,14 +657,6 @@ defmodule YscWeb.AdminEventsNewLive do
                   </div>
                 </li>
               </ul>
-
-              <.button
-                type="button"
-                phx-click="add-agenda"
-                phx-disable-with="Adding..."
-              >
-                <.icon name="hero-plus" class="-mt-0.5" /> Add Agenda
-              </.button>
             </div>
           </div>
         </div>
@@ -855,8 +846,12 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def mount(%{"id" => id} = params, _session, socket) do
+    # Subscribe outside `connected?/1`: static mount runs first (disconnected) and
+    # handle_params skips `load_event/2` when the URL id matches the mounted event,
+    # so agenda PubSub updates would otherwise never be received.
+    Agendas.subscribe(id)
+
     if connected?(socket) do
-      Agendas.subscribe(id)
       Events.subscribe()
     end
 
@@ -1155,12 +1150,19 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("add-agenda", _, socket) do
-    Agendas.create_agenda(socket.assigns[:event], %{
-      title: "Agenda",
-      event_id: socket.assigns[:event].id
-    })
+    event = socket.assigns.event
 
-    {:noreply, socket}
+    case Agendas.create_agenda(event, %{title: "Agenda", event_id: event.id}) do
+      {:ok, agenda} ->
+        {:noreply, stream_insert(socket, :agendas, agenda)}
+
+      {:error, _changeset} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Could not add agenda.",
+           title: "Agenda"
+         )}
+    end
   end
 
   def handle_event("delete-agenda", %{"id" => id}, socket) do
