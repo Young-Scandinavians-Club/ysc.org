@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.EventNotification do
     mjml_template: "templates/event_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   alias Ysc.Repo
   alias Ysc.Events.Event
   alias HtmlSanitizeEx
@@ -60,11 +62,11 @@ defmodule YscWeb.Emails.EventNotification do
   end
 
   def event_url(event_id) do
-    YscWeb.Endpoint.url() <> "/events/#{event_id}"
+    absolute_url("/events/#{event_id}")
   end
 
   def notification_settings_url do
-    YscWeb.Endpoint.url() <> "/users/notifications"
+    absolute_url("/users/notifications")
   end
 
   @doc """
@@ -134,7 +136,7 @@ defmodule YscWeb.Emails.EventNotification do
     }
 
     %{
-      first_name: user.first_name || "Valued Member",
+      first_name: member_greeting_name(user),
       event: event_map,
       event_date_time: event_date_time,
       event_url: event_url(event.id),

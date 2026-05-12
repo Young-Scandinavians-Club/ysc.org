@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.BookingRefundPending do
     mjml_template: "templates/booking_refund_pending.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   def get_template_name() do
     "booking_refund_pending"
   end
@@ -17,7 +19,7 @@ defmodule YscWeb.Emails.BookingRefundPending do
   end
 
   def booking_url(booking_id) do
-    YscWeb.Endpoint.url() <> "/bookings/#{booking_id}/receipt"
+    absolute_url("/bookings/#{booking_id}/receipt")
   end
 
   @doc """
@@ -90,7 +92,7 @@ defmodule YscWeb.Emails.BookingRefundPending do
       end
 
     %{
-      first_name: booking.user.first_name || "Valued Member",
+      first_name: member_greeting_name(booking.user),
       booking: %{
         reference_id: booking.reference_id,
         property: property_name,

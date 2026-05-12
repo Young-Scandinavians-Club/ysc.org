@@ -9,6 +9,8 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
     mjml_template: "templates/membership_renewal_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   def get_template_name() do
     "membership_renewal_reminder"
   end
@@ -18,7 +20,7 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
   end
 
   def membership_url() do
-    YscWeb.Endpoint.url() <> "/users/membership"
+    absolute_url("/users/membership")
   end
 
   def prepare_email_data(user, subscription) do
@@ -30,12 +32,7 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
       raise ArgumentError, "Subscription cannot be nil"
     end
 
-    first_name =
-      case user.first_name do
-        nil -> "Valued Member"
-        "" -> "Valued Member"
-        name -> name
-      end
+    first_name = member_greeting_name(user)
 
     renewal_date =
       subscription.current_period_end

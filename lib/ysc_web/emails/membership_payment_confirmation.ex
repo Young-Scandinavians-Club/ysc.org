@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
     mjml_template: "templates/membership_payment_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1]
+
   def get_template_name() do
     "membership_payment_confirmation"
   end
@@ -28,7 +30,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
     end
 
     paid_elsewhere = Keyword.get(opts, :paid_elsewhere, false)
-    first_name = user.first_name || "Valued Member"
+    first_name = member_greeting_name(user)
     membership_type_name = get_membership_type_name(membership_type)
     amount_str = format_money(amount)
     payment_date_str = format_date(payment_date)

@@ -6,6 +6,8 @@ defmodule YscWeb.Emails.FooterBlock do
   """
   use MjmlEEx.Component, mode: :runtime
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, origin: 0]
+
   alias Ysc.Settings
 
   @impl MjmlEEx.Component
@@ -18,7 +20,7 @@ defmodule YscWeb.Emails.FooterBlock do
       <mj-column padding="0">
         <mj-text align="center" font-size="16px" font-weight="400" color="#71717b">Young Scandinavians Club</mj-text>
         <mj-text align="center" font-size="12px" color="#71717b">
-          <a href="#{YscWeb.Endpoint.url()}" class="link-nostyle">YSC.org</a>
+          <a href="#{origin()}" class="link-nostyle">YSC.org</a>
         </mj-text>
       </mj-column>
     </mj-section>
@@ -62,10 +64,10 @@ defmodule YscWeb.Emails.FooterBlock do
   end
 
   def social_icon_instagram() do
-    "#{YscWeb.Endpoint.url()}/images/social_icon_instagram.png"
+    absolute_url("/images/social_icon_instagram.png")
   end
 
   def social_icon_facebook() do
-    "#{YscWeb.Endpoint.url()}/images/social_icon_facebook.png"
+    absolute_url("/images/social_icon_facebook.png")
   end
 end

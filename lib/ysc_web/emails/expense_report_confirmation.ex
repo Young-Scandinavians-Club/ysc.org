@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
     mjml_template: "templates/expense_report_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   alias Ysc.Repo
   alias Ysc.ExpenseReports.ExpenseReport
 
@@ -49,7 +51,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
     bank_account_info = build_bank_account_info(expense_report.bank_account)
 
     %{
-      first_name: expense_report.user.first_name || "Valued Member",
+      first_name: member_greeting_name(expense_report.user),
       expense_report: %{
         id: expense_report.id,
         purpose: expense_report.purpose || "N/A",
@@ -189,7 +191,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
   end
 
   defp expense_report_url(expense_report_id) do
-    YscWeb.Endpoint.url() <> "/expensereport/#{expense_report_id}/success"
+    absolute_url("/expensereport/#{expense_report_id}/success")
   end
 
   defp format_reimbursement_method("bank_transfer"), do: "Bank Transfer"

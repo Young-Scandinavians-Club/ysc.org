@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
     mjml_template: "templates/booking_cancellation_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   alias Ysc.Repo
   alias Ysc.Bookings.Booking
 
@@ -20,7 +22,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
   end
 
   def booking_url(booking_id) do
-    YscWeb.Endpoint.url() <> "/bookings/#{booking_id}/receipt"
+    absolute_url("/bookings/#{booking_id}/receipt")
   end
 
   @doc """
@@ -117,7 +119,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
          reason
        ) do
     %{
-      first_name: booking.user.first_name || "Valued Member",
+      first_name: member_greeting_name(booking.user),
       booking: %{
         reference_id: booking.reference_id,
         property: property_name,

@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     mjml_template: "templates/membership_renewal_success.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1]
+
   def get_template_name() do
     "membership_renewal_success"
   end
@@ -44,7 +46,7 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     end
 
     # Ensure user has required fields
-    first_name = user.first_name || "Valued Member"
+    first_name = member_greeting_name(user)
     membership_type_name = get_membership_type_name(membership_type)
 
     # Format amount

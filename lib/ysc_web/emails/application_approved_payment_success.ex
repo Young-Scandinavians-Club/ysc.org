@@ -9,6 +9,8 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
     mjml_template: "templates/application_approved_payment_success.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   def get_template_name() do
     "application_approved_payment_success"
   end
@@ -18,10 +20,10 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
   end
 
   def dashboard_url() do
-    YscWeb.Endpoint.url() <> "/"
+    absolute_url("/")
   end
 
   def upcoming_events_url() do
-    YscWeb.Endpoint.url() <> "/events"
+    absolute_url("/events")
   end
 end

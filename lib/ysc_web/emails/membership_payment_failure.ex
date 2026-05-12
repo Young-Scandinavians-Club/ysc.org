@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
     mjml_template: "templates/membership_payment_failure.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   def get_template_name() do
     "membership_payment_failure"
   end
@@ -17,13 +19,14 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
   end
 
   def pay_membership_url() do
-    YscWeb.Endpoint.url() <> "/users/membership"
+    absolute_url("/users/membership")
   end
 
   def retry_payment_url(invoice_id) when is_binary(invoice_id) do
-    YscWeb.Endpoint.url() <>
+    absolute_url(
       "/users/membership?" <>
-      URI.encode_query(%{retry_invoice: invoice_id})
+        URI.encode_query(%{retry_invoice: invoice_id})
+    )
   end
 
   def retry_payment_url(_), do: nil
@@ -40,7 +43,7 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
     end
 
     # Ensure user has required fields
-    first_name = user.first_name || "Valued Member"
+    first_name = member_greeting_name(user)
     membership_type_name = get_membership_type_name(membership_type)
 
     retry_url =

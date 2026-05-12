@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.ConductViolationConfirmation do
     mjml_template: "templates/conduct_violation_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   def get_template_name() do
     "conduct_violation_confirmation"
   end
@@ -17,10 +19,10 @@ defmodule YscWeb.Emails.ConductViolationConfirmation do
   end
 
   def code_of_conduct_url() do
-    YscWeb.Endpoint.url() <> "/code-of-conduct"
+    absolute_url("/code-of-conduct")
   end
 
   def contact_url() do
-    YscWeb.Endpoint.url() <> "/contact"
+    absolute_url("/contact")
   end
 end

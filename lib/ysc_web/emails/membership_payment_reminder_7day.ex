@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.MembershipPaymentReminder7Day do
     mjml_template: "templates/membership_payment_reminder_7day.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   def get_template_name() do
     "membership_payment_reminder_7day"
   end
@@ -17,11 +19,11 @@ defmodule YscWeb.Emails.MembershipPaymentReminder7Day do
   end
 
   def pay_membership_url() do
-    YscWeb.Endpoint.url() <> "/users/membership"
+    absolute_url("/users/membership")
   end
 
   def upcoming_events_url() do
-    YscWeb.Endpoint.url() <> "/events"
+    absolute_url("/events")
   end
 
   def prepare_email_data(user) do
@@ -31,7 +33,7 @@ defmodule YscWeb.Emails.MembershipPaymentReminder7Day do
     end
 
     # Ensure user has required fields
-    first_name = user.first_name || "Valued Member"
+    first_name = member_greeting_name(user)
 
     %{
       first_name: first_name,

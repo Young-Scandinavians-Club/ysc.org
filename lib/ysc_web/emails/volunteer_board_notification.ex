@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.VolunteerBoardNotification do
     mjml_template: "templates/volunteer_board_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   def get_template_name() do
     "volunteer_board_notification"
   end
@@ -17,6 +19,6 @@ defmodule YscWeb.Emails.VolunteerBoardNotification do
   end
 
   def admin_dashboard_url() do
-    YscWeb.Endpoint.url() <> "/admin"
+    absolute_url("/admin")
   end
 end
