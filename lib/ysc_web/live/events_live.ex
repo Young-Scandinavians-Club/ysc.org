@@ -30,7 +30,7 @@ defmodule YscWeb.EventsLive do
           <%!-- Events Grid --%>
           <div class="lg:col-span-9 min-h-[50vh] lg:min-h-[70vh] flex flex-col">
             <.live_component
-              id="upcoming_events"
+              id={upcoming_events_list_id()}
               module={YscWeb.EventsListLive}
               show_hero={true}
               upcoming={true}
@@ -304,33 +304,15 @@ defmodule YscWeb.EventsLive do
 
   @impl true
   def handle_info({Ysc.Events, %_event{event: _} = base_event}, socket) do
-    # Pass event to component - component handles hero logic internally
-    send_update(YscWeb.EventsListLive, id: "upcoming_events", event: base_event)
-
-    {:noreply, socket}
+    notify_events_list_update(socket, base_event)
   end
 
-  # Handle ticket tier events - refresh the associated event in the list
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketTierAdded{ticket_tier: ticket_tier}},
         socket
       ) do
-    # Get the event and send an update to refresh it in the list
-    case Events.get_event(ticket_tier.event_id) do
-      nil ->
-        {:noreply, socket}
-
-      event ->
-        event_updated = %Ysc.MessagePassingEvents.EventUpdated{event: event}
-
-        send_update(YscWeb.EventsListLive,
-          id: "upcoming_events",
-          event: event_updated
-        )
-
-        {:noreply, socket}
-    end
+    refresh_events_list_for_event_id(socket, ticket_tier.event_id)
   end
 
   def handle_info(
@@ -338,21 +320,7 @@ defmodule YscWeb.EventsLive do
          %Ysc.MessagePassingEvents.TicketTierUpdated{ticket_tier: ticket_tier}},
         socket
       ) do
-    # Get the event and send an update to refresh it in the list
-    case Events.get_event(ticket_tier.event_id) do
-      nil ->
-        {:noreply, socket}
-
-      event ->
-        event_updated = %Ysc.MessagePassingEvents.EventUpdated{event: event}
-
-        send_update(YscWeb.EventsListLive,
-          id: "upcoming_events",
-          event: event_updated
-        )
-
-        {:noreply, socket}
-    end
+    refresh_events_list_for_event_id(socket, ticket_tier.event_id)
   end
 
   def handle_info(
@@ -360,24 +328,9 @@ defmodule YscWeb.EventsLive do
          %Ysc.MessagePassingEvents.TicketTierDeleted{ticket_tier: ticket_tier}},
         socket
       ) do
-    # Get the event and send an update to refresh it in the list
-    case Events.get_event(ticket_tier.event_id) do
-      nil ->
-        {:noreply, socket}
-
-      event ->
-        event_updated = %Ysc.MessagePassingEvents.EventUpdated{event: event}
-
-        send_update(YscWeb.EventsListLive,
-          id: "upcoming_events",
-          event: event_updated
-        )
-
-        {:noreply, socket}
-    end
+    refresh_events_list_for_event_id(socket, ticket_tier.event_id)
   end
 
-  @impl true
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCreated{
@@ -385,30 +338,9 @@ defmodule YscWeb.EventsLive do
          }},
         socket
       ) do
-    # Reservations affect availability, refresh the event
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier do
-      case Events.get_event(ticket_tier.event_id) do
-        nil ->
-          {:noreply, socket}
-
-        event ->
-          event_updated = %Ysc.MessagePassingEvents.EventUpdated{event: event}
-
-          send_update(YscWeb.EventsListLive,
-            id: "upcoming_events",
-            event: event_updated
-          )
-
-          {:noreply, socket}
-      end
-    else
-      {:noreply, socket}
-    end
+    refresh_events_list_for_reservation(socket, reservation)
   end
 
-  @impl true
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationFulfilled{
@@ -416,30 +348,9 @@ defmodule YscWeb.EventsLive do
          }},
         socket
       ) do
-    # Reservations affect availability, refresh the event
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier do
-      case Events.get_event(ticket_tier.event_id) do
-        nil ->
-          {:noreply, socket}
-
-        event ->
-          event_updated = %Ysc.MessagePassingEvents.EventUpdated{event: event}
-
-          send_update(YscWeb.EventsListLive,
-            id: "upcoming_events",
-            event: event_updated
-          )
-
-          {:noreply, socket}
-      end
-    else
-      {:noreply, socket}
-    end
+    refresh_events_list_for_reservation(socket, reservation)
   end
 
-  @impl true
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCancelled{
@@ -447,26 +358,40 @@ defmodule YscWeb.EventsLive do
          }},
         socket
       ) do
-    # Reservations affect availability, refresh the event
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
+    refresh_events_list_for_reservation(socket, reservation)
+  end
 
-    if ticket_tier do
-      case Events.get_event(ticket_tier.event_id) do
-        nil ->
-          {:noreply, socket}
+  defp upcoming_events_list_id, do: "upcoming_events"
 
-        event ->
-          event_updated = %Ysc.MessagePassingEvents.EventUpdated{event: event}
+  defp notify_events_list_update(socket, event_message) do
+    send_update(YscWeb.EventsListLive,
+      id: upcoming_events_list_id(),
+      event: event_message
+    )
 
-          send_update(YscWeb.EventsListLive,
-            id: "upcoming_events",
-            event: event_updated
-          )
+    {:noreply, socket}
+  end
 
-          {:noreply, socket}
-      end
-    else
-      {:noreply, socket}
+  defp refresh_events_list_for_event_id(socket, event_id) do
+    case Events.get_event(event_id) do
+      nil ->
+        {:noreply, socket}
+
+      event ->
+        notify_events_list_update(
+          socket,
+          %Ysc.MessagePassingEvents.EventUpdated{event: event}
+        )
+    end
+  end
+
+  defp refresh_events_list_for_reservation(socket, reservation) do
+    case Events.get_ticket_tier(reservation.ticket_tier_id) do
+      nil ->
+        {:noreply, socket}
+
+      ticket_tier ->
+        refresh_events_list_for_event_id(socket, ticket_tier.event_id)
     end
   end
 
