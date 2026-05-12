@@ -5,7 +5,9 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
+  alias Ysc.Agendas
   alias Ysc.Events
+  alias Ysc.MessagePassingEvents
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -36,6 +38,33 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert view |> element("#add-agenda-button") |> render_click()
 
       assert has_element?(view, "#agendas .drag-handle")
+    end
+
+    test "does not apply agenda updates from a previous event after live-patching to another event",
+         %{conn: conn, admin: admin} do
+      event_a = event_fixture(%{organizer_id: admin.id})
+      event_b = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, agenda_a} =
+        Agendas.create_agenda(event_a, %{
+          title: "Agenda on event A only",
+          event_id: event_a.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      assert {:ok, view} =
+               live_patch(view, ~p"/admin/events/#{event_b.id}/edit")
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "agendas:#{event_a.id}",
+        {Ysc.Agendas, %MessagePassingEvents.AgendaAdded{agenda: agenda_a}}
+      )
+
+      _html = render(view)
+
+      refute has_element?(view, "#agendas [data-id='#{agenda_a.id}']")
     end
 
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do

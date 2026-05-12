@@ -14,6 +14,17 @@ defmodule Ysc.Agendas do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic(event_id))
   end
 
+  @doc """
+  Unsubscribes the current process from agenda updates for the given event.
+
+  Call this when leaving an event edit context (for example before subscribing to
+  another event) so stale topic subscriptions cannot deliver messages for the
+  wrong page.
+  """
+  def unsubscribe(event_id) do
+    Phoenix.PubSub.unsubscribe(Ysc.PubSub, topic(event_id))
+  end
+
   def get_agenda_item!(id) do
     Repo.get!(AgendaItem, id) |> Repo.preload(:agenda)
   end
