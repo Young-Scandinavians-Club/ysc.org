@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.BookingConfirmation do
     mjml_template: "templates/booking_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   alias Ysc.Repo
 
   def get_template_name() do
@@ -19,7 +21,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
   end
 
   def booking_url(booking_id) do
-    YscWeb.Endpoint.url() <> "/bookings/#{booking_id}/receipt"
+    absolute_url("/bookings/#{booking_id}/receipt")
   end
 
   @doc """
@@ -95,7 +97,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
         booking_mode_description == "Property Buyout"
 
     %{
-      first_name: booking.user.first_name || "Valued Member",
+      first_name: member_greeting_name(booking.user),
       booking: %{
         reference_id: booking.reference_id,
         property: property_name,

@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.ExpenseReportTreasurerNotification do
     mjml_template: "templates/expense_report_treasurer_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   alias Ysc.Repo
   alias Ysc.ExpenseReports.ExpenseReport
 
@@ -214,11 +216,11 @@ defmodule YscWeb.Emails.ExpenseReportTreasurerNotification do
   end
 
   defp expense_report_url(expense_report_id) do
-    YscWeb.Endpoint.url() <> "/expensereport/#{expense_report_id}/success"
+    absolute_url("/expensereport/#{expense_report_id}/success")
   end
 
   defp admin_expense_report_url(expense_report_id) do
-    YscWeb.Endpoint.url() <> "/admin/expense_reports/#{expense_report_id}"
+    absolute_url("/admin/expense_reports/#{expense_report_id}")
   end
 
   defp format_reimbursement_method("bank_transfer"), do: "Bank Transfer"

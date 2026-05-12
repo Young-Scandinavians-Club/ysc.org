@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     mjml_template: "templates/booking_checkout_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   alias Ysc.Repo
   alias YscWeb.Emails.OutageNotification
 
@@ -20,7 +22,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
   end
 
   def booking_url(booking_id) do
-    YscWeb.Endpoint.url() <> "/bookings/#{booking_id}/receipt"
+    absolute_url("/bookings/#{booking_id}/receipt")
   end
 
   @doc """
@@ -102,7 +104,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
       end
 
     %{
-      first_name: booking.user.first_name || "Valued Member",
+      first_name: member_greeting_name(booking.user),
       property: property_string,
       property_name: property_name,
       property_address: property_address,

@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.VolunteerConfirmation do
     mjml_template: "templates/volunteer_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   def get_template_name() do
     "volunteer_confirmation"
   end
@@ -17,6 +19,6 @@ defmodule YscWeb.Emails.VolunteerConfirmation do
   end
 
   def contact_url() do
-    YscWeb.Endpoint.url() <> "/contact"
+    absolute_url("/contact")
   end
 end

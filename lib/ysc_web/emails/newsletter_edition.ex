@@ -9,6 +9,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
     mjml_template: "templates/newsletter_edition.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   @doc """
   Transforms Trix editor HTML into email-safe HTML for use inside MJML mj-text blocks.
 
@@ -193,8 +195,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
     unsubscribe_url =
       (subscriber.subscription_token &&
-         YscWeb.Endpoint.url() <>
-           "/newsletter/unsubscribe/" <> subscriber.subscription_token) || "#"
+         absolute_url(
+           "/newsletter/unsubscribe/" <> subscriber.subscription_token
+         )) || "#"
 
     intro_html = email_safe_html(edition.intro_text)
 
@@ -263,7 +266,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
       title: post.title,
       preview_text:
         clean_preview_text(post.preview_text || post.raw_body || ""),
-      url: YscWeb.Endpoint.url() <> "/posts/#{post.url_name}",
+      url: absolute_url("/posts/#{post.url_name}"),
       image_url: post_image_url(post.featured_image)
     }
   end
@@ -295,7 +298,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
       pricing_str: Events.event_pricing_display_string(event),
       tickets_on_sale_str: format_tickets_on_sale(event),
       location_name: event.location_name,
-      url: YscWeb.Endpoint.url() <> "/events/#{event.id}",
+      url: absolute_url("/events/#{event.id}"),
       image_url: event_image_url(event)
     }
   end

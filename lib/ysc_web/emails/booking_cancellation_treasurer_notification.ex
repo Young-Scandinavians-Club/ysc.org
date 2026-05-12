@@ -9,6 +9,8 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
       "templates/booking_cancellation_treasurer_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   alias Ysc.Repo
   alias Ysc.Bookings.Booking
 
@@ -32,8 +34,9 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
         _ -> to_string(property)
       end
 
-    YscWeb.Endpoint.url() <>
+    absolute_url(
       "/admin/bookings?section=pending_refunds&property=#{property_param}"
+    )
   end
 
   @doc """
@@ -153,7 +156,7 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
   end
 
   defp booking_url(booking_id) do
-    YscWeb.Endpoint.url() <> "/admin/bookings/#{booking_id}"
+    absolute_url("/admin/bookings/#{booking_id}")
   end
 
   defp get_property_name(:clear_lake), do: "Clear Lake"

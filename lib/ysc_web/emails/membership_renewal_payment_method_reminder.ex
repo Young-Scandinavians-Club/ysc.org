@@ -11,6 +11,8 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
       "templates/membership_renewal_payment_method_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   def get_template_name() do
     "membership_renewal_payment_method_reminder"
   end
@@ -20,11 +22,11 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
   end
 
   def payment_methods_url() do
-    YscWeb.Endpoint.url() <> "/users/payment-methods"
+    absolute_url("/users/payment-methods")
   end
 
   def membership_url() do
-    YscWeb.Endpoint.url() <> "/users/membership"
+    absolute_url("/users/membership")
   end
 
   def prepare_email_data(user, subscription) do
@@ -39,12 +41,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
 
     # Ensure user has required fields
     # Handle both nil and empty string cases
-    first_name =
-      case user.first_name do
-        nil -> "Valued Member"
-        "" -> "Valued Member"
-        name -> name
-      end
+    first_name = member_greeting_name(user)
 
     # Format renewal date
     renewal_date =

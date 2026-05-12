@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     mjml_template: "templates/ticket_purchase_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+
   alias Ysc.Tickets
 
   def get_template_name() do
@@ -19,11 +21,11 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
   end
 
   def event_url(event_id) do
-    YscWeb.Endpoint.url() <> "/events/#{event_id}"
+    absolute_url("/events/#{event_id}")
   end
 
   def tickets_qr_url(order_id) do
-    YscWeb.Endpoint.url() <> "/tickets/#{order_id}/qr"
+    absolute_url("/tickets/#{order_id}/qr")
   end
 
   @doc """
@@ -114,7 +116,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     agenda_data = prepare_agenda_data(agendas)
 
     %{
-      first_name: ticket_order.user.first_name || "Valued Member",
+      first_name: member_greeting_name(ticket_order.user),
       event: %{
         title: ticket_order.event.title,
         description: ticket_order.event.description,

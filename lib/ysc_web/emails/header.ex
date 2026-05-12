@@ -6,6 +6,8 @@ defmodule YscWeb.Emails.HeaderBlock do
   """
   use MjmlEEx.Component, mode: :runtime
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   @impl MjmlEEx.Component
   def render(_assigns) do
     """
@@ -19,6 +21,6 @@ defmodule YscWeb.Emails.HeaderBlock do
 
   @doc "PNG (not WebP) for broad HTML email client support."
   def logo_path() do
-    "#{YscWeb.Endpoint.url()}/images/ysc_logo.png"
+    absolute_url("/images/ysc_logo.png")
   end
 end

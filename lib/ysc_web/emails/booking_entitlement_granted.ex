@@ -6,6 +6,8 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     mjml_template: "templates/booking_entitlement_granted.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   alias Ysc.MoneyHelper
 
   def get_template_name, do: "booking_entitlement_granted"
@@ -14,21 +16,21 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
 
   def prepare_email_data(ent, user) do
     first_name = user.first_name || "there"
-    base = YscWeb.Endpoint.url()
 
     {show_tahoe, show_clear, tahoe_url, clear_url} =
       case ent.property do
         nil ->
-          {true, true, "#{base}/bookings/tahoe", "#{base}/bookings/clear-lake"}
+          {true, true, absolute_url("/bookings/tahoe"),
+           absolute_url("/bookings/clear-lake")}
 
         :tahoe ->
-          {true, false, "#{base}/bookings/tahoe", nil}
+          {true, false, absolute_url("/bookings/tahoe"), nil}
 
         :clear_lake ->
-          {false, true, nil, "#{base}/bookings/clear-lake"}
+          {false, true, nil, absolute_url("/bookings/clear-lake")}
       end
 
-    {header_image_url, header_image_alt} = header_image(ent.property, base)
+    {header_image_url, header_image_alt} = header_image(ent.property)
 
     %{
       first_name: first_name,
@@ -68,16 +70,17 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     |> String.trim()
   end
 
-  defp header_image(:tahoe, base) do
-    {base <> "/images/tahoe-cabin-feature.jpg", "Lake Tahoe cabin"}
+  defp header_image(:tahoe) do
+    {absolute_url("/images/tahoe-cabin-feature.jpg"), "Lake Tahoe cabin"}
   end
 
-  defp header_image(:clear_lake, base) do
-    {base <> "/images/clear_lake/clear_lake_cabin.webp", "Clear Lake cabin"}
+  defp header_image(:clear_lake) do
+    {absolute_url("/images/clear_lake/clear_lake_cabin.webp"),
+     "Clear Lake cabin"}
   end
 
-  defp header_image(nil, base) do
-    {base <> "/images/clear_lake/clear_lake_main.webp",
+  defp header_image(nil) do
+    {absolute_url("/images/clear_lake/clear_lake_main.webp"),
      "YSC cabin getaway — book Lake Tahoe or Clear Lake"}
   end
 

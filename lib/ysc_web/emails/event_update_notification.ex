@@ -6,6 +6,8 @@ defmodule YscWeb.Emails.EventUpdateNotification do
     mjml_template: "templates/event_update_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+
   alias Ysc.Repo
   alias Ysc.Events.Event
 
@@ -26,11 +28,11 @@ defmodule YscWeb.Emails.EventUpdateNotification do
   end
 
   def event_url(event_id) do
-    YscWeb.Endpoint.url() <> "/events/#{event_id}"
+    absolute_url("/events/#{event_id}")
   end
 
   def notification_settings_url do
-    YscWeb.Endpoint.url() <> "/users/notifications"
+    absolute_url("/users/notifications")
   end
 
   @doc """
