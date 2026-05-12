@@ -948,6 +948,14 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp load_event(socket, id) do
+    case socket.assigns[:event] do
+      %{id: old_id} when old_id != id ->
+        Agendas.unsubscribe(old_id)
+
+      _ ->
+        :ok
+    end
+
     Agendas.subscribe(id)
 
     event = Events.get_event!(id)
