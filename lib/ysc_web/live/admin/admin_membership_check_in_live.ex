@@ -137,30 +137,17 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           />
           <p class="mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none">
             <span class="flex items-center gap-0.5">
-              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
-                ↑
-              </kbd>
-              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
-                ↓
-              </kbd>
+              <.admin_kbd size={:compact}>↑</.admin_kbd>
+              <.admin_kbd size={:compact}>↓</.admin_kbd>
             </span>
             <span>navigate</span>
             <span class="text-zinc-300">·</span>
-            <kbd class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
-              ↵ enter
-            </kbd>
+            <.admin_kbd size={:inline}>↵ enter</.admin_kbd>
             <span>check in</span>
             <span class="text-zinc-300">·</span>
             <span class="flex items-center gap-0.5">
-              <kbd
-                data-key="alt"
-                class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]"
-              >
-                alt
-              </kbd>
-              <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
-                1–3
-              </kbd>
+              <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
+              <.admin_kbd size={:compact}>1–3</.admin_kbd>
             </span>
             <span>quick check in</span>
           </p>
@@ -318,15 +305,10 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             class="inline-flex items-center gap-0.5 select-none"
             title={"Alt+#{@result_index + 1} to check in"}
           >
-            <kbd
-              data-key="alt"
-              class="inline-flex justify-center items-center min-h-[1.375rem] px-1.5 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]"
-            >
-              alt
-            </kbd>
-            <kbd class="inline-flex justify-center items-center min-h-[1.375rem] min-w-[1.375rem] px-1 py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded shadow-[0_2px_0_0_theme(colors.zinc.300)]">
+            <.admin_kbd size={:inline} tone={:muted} data-key="alt">alt</.admin_kbd>
+            <.admin_kbd size={:compact} tone={:muted}>
               {@result_index + 1}
-            </kbd>
+            </.admin_kbd>
           </span>
         <% end %>
       </div>
