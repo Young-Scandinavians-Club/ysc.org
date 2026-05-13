@@ -1989,10 +1989,105 @@ defmodule Ysc.Events do
           ticket_reservation: reservation
         })
 
+        schedule_ticket_reservation_created_notification(reservation)
+
         {:ok, reservation}
 
       {:error, changeset} ->
         {:error, changeset}
+    end
+  end
+
+  @doc """
+  Schedules the member-facing email for a newly created ticket reservation (admin hold).
+
+  Best-effort: failures are logged and do not affect the reservation insert.
+  """
+  def schedule_ticket_reservation_created_notification(
+        %TicketReservation{} = reservation
+      ) do
+    require Ysc.Logging
+
+    reservation =
+      Repo.preload(reservation, [:user, :created_by, ticket_tier: :event])
+
+    cond do
+      is_nil(reservation.user) ->
+        Ysc.Logging.debug("Skipping ticket reservation email: missing user",
+          ticket_reservation_id: reservation.id
+        )
+
+        :skipped
+
+      reservation.user.email in [nil, ""] ->
+        Ysc.Logging.debug(
+          "Skipping ticket reservation email: user has no email",
+          ticket_reservation_id: reservation.id,
+          user_id: reservation.user_id
+        )
+
+        :skipped
+
+      true ->
+        try do
+          email_mod = YscWeb.Emails.TicketReservationCreated
+          email_data = email_mod.prepare_email_data(reservation)
+          subject = email_mod.get_subject(email_data)
+          idempotency_key = "ticket_reservation_created_#{reservation.id}"
+
+          case YscWeb.Emails.Notifier.schedule_email(
+                 reservation.user.email,
+                 idempotency_key,
+                 subject,
+                 email_mod.get_template_name(),
+                 email_data,
+                 "",
+                 reservation.user_id
+               ) do
+            %Oban.Job{} = job ->
+              Ysc.Logging.info(
+                "Ticket reservation notification email scheduled",
+                ticket_reservation_id: reservation.id,
+                user_id: reservation.user_id,
+                oban_job_id: job.id
+              )
+
+              {:ok, job}
+
+            {:error, reason} = error ->
+              Ysc.Logging.error(
+                "Failed to schedule ticket reservation notification email",
+                error: inspect(reason),
+                extra: %{
+                  ticket_reservation_id: reservation.id,
+                  user_id: reservation.user_id
+                },
+                tags: %{
+                  "operation" =>
+                    "schedule_ticket_reservation_created_notification"
+                }
+              )
+
+              error
+          end
+        rescue
+          error ->
+            Ysc.Logging.error(
+              "Failed to prepare ticket reservation notification email",
+              error: error,
+              stacktrace: __STACKTRACE__,
+              extra: %{
+                ticket_reservation_id: reservation.id,
+                user_id: reservation.user_id
+              },
+              tags: %{
+                "operation" =>
+                  "schedule_ticket_reservation_created_notification"
+              }
+            )
+
+            {:error, :email_prepare_failed}
+        end
     end
   end
 

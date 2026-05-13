@@ -1,0 +1,79 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding="48px 48px 24px 48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#1447e6" font-size="14px" font-weight="bold" letter-spacing="1px" padding="0px 0px 12px 0px">
+      TICKET RESERVATION
+    </mj-text>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Tickets reserved for you</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding="20px 48px 48px 48px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The YSC team has set aside tickets for you for the event below. When you check out for this event, your reservation will be applied automatically (including any member pricing shown here), subject to availability and the hold window.
+    </mj-text>
+    <mj-spacer height="28px"></mj-spacer>
+    <mj-text align="left" font-size="22px" line-height="1.4" padding="0px" font-weight="bold" color="#1447e6">
+      <%= @event.title %>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <%= if @event.description do %>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#444444">
+      <%= @event.description %>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <% end %>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px">
+      <%= if @event_date_time do %>
+      <strong>Date &amp; Time:</strong> <%= @event_date_time %><br />
+      <% end %>
+      <%= if @event.location_name do %>
+      <strong>Location:</strong> <%= @event.location_name %><br />
+      <% end %>
+      <%= if @event.address do %>
+      <span style="color: #6B7280; font-size: 14px;"><%= @event.address %></span><br />
+      <% end %>
+      <%= if @event.age_restriction && @event.age_restriction > 0 do %>
+      <strong>Age Restriction:</strong> <%= @event.age_restriction %>+ years old
+      <% end %>
+    </mj-text>
+    <mj-spacer height="28px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold">
+      Reservation details
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px">
+      <strong>Ticket type:</strong> <%= @ticket_tier_name %><br />
+      <strong>Quantity:</strong> <%= @quantity %><br />
+      <%= if @has_discount do %>
+      <strong>Member pricing:</strong> <%= @discount_display %><br />
+      <% end %>
+      <strong>Hold:</strong> <%= @hold_expires_display %><br />
+      <strong>Arranged by:</strong> <%= @reserved_by_display %>
+    </mj-text>
+    <%= if @has_notes do %>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#374151">
+      <strong>Note from the team:</strong><br />
+      <%= @notes_text %>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="16px 32px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" font-weight="bold" border-radius="6px">
+      View event &amp; complete tickets →
+    </mj-button>
+    <mj-spacer height="28px"></mj-spacer>
+    <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" color="#6B7280">
+      Manage notification preferences:
+      <a href="<%= @notification_settings_url %>" style="color: #1447e6;"><%= @notification_settings_url %></a>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
+      Vi ses!
+    </mj-text>
+  </mj-column>
+</mj-section>
