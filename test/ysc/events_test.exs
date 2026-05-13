@@ -6,6 +6,7 @@ defmodule Ysc.EventsTest do
   alias Ysc.Events.{Event, FaqQuestion, Ticket, TicketTier}
   alias Ysc.Repo
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
 
   setup do
     user = user_fixture()
@@ -2865,6 +2866,39 @@ defmodule Ysc.EventsTest do
 
       assert {:ok, _} = Events.delete_registration(updated)
       assert Events.get_ticket_detail_for_ticket(ticket.id) == nil
+    end
+  end
+
+  describe "create_ticket_reservation/1 notification email" do
+    test "enqueues EmailNotifier job for the member", %{user: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      member = user_fixture()
+
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, reservation} =
+                 Events.create_ticket_reservation(%{
+                   ticket_tier_id: tier.id,
+                   user_id: member.id,
+                   created_by_id: admin.id,
+                   quantity: 2,
+                   expires_at: expires_at,
+                   discount_percentage: Decimal.new("10")
+                 })
+
+        assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.args["template"] == "ticket_reservation_created"
+        assert job.args["recipient"] == member.email
+        assert job.args["user_id"] == member.id
+
+        assert job.args["idempotency_key"] ==
+                 "ticket_reservation_created_#{reservation.id}"
+      end)
     end
   end
 end

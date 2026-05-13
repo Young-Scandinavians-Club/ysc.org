@@ -27,6 +27,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ConductViolationConfirmation,
     ConductViolationBoardNotification,
     TicketPurchaseConfirmation,
+    TicketReservationCreated,
     TicketOrderRefund,
     BookingConfirmation,
     BookingRefundProcessed,
@@ -279,6 +280,46 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
       assert TicketPurchaseConfirmation.get_template_name() ==
                "ticket_purchase_confirmation"
+    end
+
+    test "TicketReservationCreated renders", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        event_title: "Nordic Night",
+        event: %{
+          title: "Nordic Night",
+          description: "An evening event",
+          location_name: "YSC Hall",
+          address: "123 Fjord Ave",
+          age_restriction: 18
+        },
+        event_date_time: "Dec 1, 2024 at 7:00 PM PST",
+        event_url: "https://example.com/events/evt-1",
+        ticket_tier_name: "Member GA",
+        quantity: 2,
+        discount_display: "10.00% member pricing",
+        has_discount: true,
+        hold_expires_display:
+          "Complete checkout before December 2, 2024 at 06:00 PM PST",
+        has_notes: true,
+        notes_text: "Please bring ID.",
+        reserved_by_display: "Admin Person",
+        notification_settings_url: "https://example.com/users/notifications"
+      }
+
+      html = TicketReservationCreated.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      assert html =~ "Member GA"
+      assert html =~ "Tickets reserved for you"
+
+      assert TicketReservationCreated.get_template_name() ==
+               "ticket_reservation_created"
+
+      assert TicketReservationCreated.get_subject(%{
+               event_title: "Nordic Night"
+             }) =~
+               "Nordic Night"
     end
 
     test "TicketOrderRefund renders", %{user: user} do
@@ -951,6 +992,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "conduct_violation_board_notification" =>
           ConductViolationBoardNotification,
         "ticket_purchase_confirmation" => TicketPurchaseConfirmation,
+        "ticket_reservation_created" => TicketReservationCreated,
         "ticket_order_refund" => TicketOrderRefund,
         "booking_confirmation" => BookingConfirmation,
         "booking_refund_processed" => BookingRefundProcessed,
