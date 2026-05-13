@@ -5850,7 +5850,7 @@ defmodule YscWeb.UserSettingsLive do
       ]}
       phx-click={@row_navigate}
       tabindex={@row_navigate && "0"}
-      role={@row_navigate && "button"}
+      role={@row_navigate && "link"}
       aria-label={@row_navigate_label}
       phx-keydown={@row_navigate}
       phx-key={@row_navigate && "enter"}
@@ -6616,7 +6616,11 @@ defmodule YscWeb.UserSettingsLive do
 
   defp member_entitlement_coupon_expiry_phrase(ent) do
     if ent.expires_at do
-      d = DateTime.to_date(ent.expires_at)
+      d =
+        ent.expires_at
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> DateTime.to_date()
+
       "Use by #{Calendar.strftime(d, "%b %-d, %Y")}"
     else
       "No expiry — book anytime"

@@ -113,6 +113,9 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
       user = user_fixture()
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+      # Registration may already subscribe this email; start from a clean row for this assertion.
+      Repo.delete_all(from s in Subscriber, where: s.email == ^user.email)
+
       # Insert directly so the test does not depend on MX validation for @example.com
       assert {:ok, _} =
                %Subscriber{}

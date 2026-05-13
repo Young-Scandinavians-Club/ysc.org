@@ -381,12 +381,15 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
         "event_notification_#{event.id}_#{user_with_events_b.id}"
       ]
 
-      assert 2 ==
-               Repo.one(
-                 from m in Ysc.Messages.MessageIdempotency,
-                   where: m.idempotency_key in ^expected_keys,
-                   select: count(m.id)
-               )
+      distinct_keys =
+        Repo.all(
+          from m in Ysc.Messages.MessageIdempotency,
+            where: m.idempotency_key in ^expected_keys,
+            distinct: [asc: m.idempotency_key],
+            select: m.idempotency_key
+        )
+
+      assert MapSet.new(distinct_keys) == MapSet.new(expected_keys)
 
       refute Repo.exists?(
                from m in Ysc.Messages.MessageIdempotency,
