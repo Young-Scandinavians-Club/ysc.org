@@ -1,0 +1,95 @@
+defmodule YscWeb.PostMigrationOnboardingLiveTest do
+  use YscWeb.ConnCase, async: true
+
+  import Phoenix.LiveViewTest
+  import Ysc.AccountsFixtures
+
+  alias Ysc.Repo
+
+  # WP-style user inserted without going through register_user/1 (which marks
+  # post-migration onboarding complete). Mirrors Accounts post-migration tests.
+  defp user_needing_post_migration_onboarding(attrs \\ %{}) do
+    user =
+      oauth_user_fixture(Map.merge(%{phone_number: unique_user_phone()}, attrs))
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {:ok, user} =
+      user
+      |> Ecto.Changeset.change(%{
+        post_migration_onboarding_completed_at: nil,
+        email_verified_at: now
+      })
+      |> Repo.update()
+
+    user
+  end
+
+  describe "mount" do
+    test "redirects to home when the user has already completed onboarding", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: path}}} = live(conn, ~p"/onboarding")
+      assert path == ~p"/"
+    end
+
+    test "redirects when the user is not eligible for post-migration onboarding",
+         %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{state: :pending_approval})
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: path}}} = live(conn, ~p"/onboarding")
+      assert path == ~p"/"
+    end
+
+    test "shows the profile step when post-migration onboarding is required", %{
+      conn: conn
+    } do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+
+      assert has_element?(view, "#onboarding-profile-form")
+      assert render(view) =~ "Welcome Back!"
+      assert render(view) =~ "confirm your details"
+    end
+  end
+
+  describe "profile step" do
+    test "validate_profile updates the profile form assign without persisting",
+         %{
+           conn: conn
+         } do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      new_first = "OnboardingFirst#{System.unique_integer([:positive])}"
+
+      html =
+        render_change(view, "validate_profile", %{
+          "user" => %{
+            "first_name" => new_first,
+            "last_name" => user.last_name,
+            "phone_number" => user.phone_number || "",
+            "date_of_birth" => "",
+            "most_connected_country" => user.most_connected_country || ""
+          }
+        })
+
+      assert html =~ new_first
+    end
+  end
+end
