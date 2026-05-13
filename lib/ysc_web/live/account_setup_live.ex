@@ -75,7 +75,7 @@ defmodule YscWeb.AccountSetupLive do
                   phx-click="resend_code"
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  click here to resend
+                  resend the code
                 </.link>
               <% else %>
                 <% email_countdown =
@@ -335,7 +335,7 @@ defmodule YscWeb.AccountSetupLive do
                   phx-click="resend_phone_code"
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  click here to resend
+                  resend the code
                 </.link>
               <% else %>
                 <% sms_countdown = sms_resend_seconds_remaining(assigns) |> max(0) %>
