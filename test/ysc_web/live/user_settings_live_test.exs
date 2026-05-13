@@ -717,6 +717,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert render(view) =~ "Verify Your Phone Number"
       assert has_element?(view, "#phone_verification_form")
+      assert has_element?(view, "#phone-verification-keep-open-notice")
 
       render_submit(view, "verify_phone_code", %{
         "verification_code" => "000000"
@@ -1704,6 +1705,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       submit_reauth_password(view, valid_user_password())
 
       assert render(view) =~ "Verify Your New Email Address"
+      assert has_element?(view, "#email-verification-keep-open-notice")
 
       render_submit(view, "verify_email_code", %{
         "verification_code" => "000000"
@@ -1748,6 +1750,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       |> render_submit(%{"password" => "definitely_wrong_password"})
 
       assert render(view) =~ "Invalid password"
+      assert has_element?(view, "#reauth-password-error-notice")
     end
 
     test "reauth_with_passkey pushes authentication challenge", %{conn: conn} do
@@ -1786,6 +1789,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       submit_reauth_password(view, Ysc.AccountsFixtures.valid_user_password())
 
       assert render(view) =~ "Verify Your New Email Address"
+      assert has_element?(view, "#email-verification-keep-open-notice")
 
       render_submit(view, "verify_email_code", %{
         "verification_code" => "000000"
@@ -1857,6 +1861,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       })
 
       assert render(view) =~ "Verify Your New Email Address"
+      assert has_element?(view, "#email-verification-keep-open-notice")
     end
 
     test "resend_email_code sends toast when on email verification route", %{

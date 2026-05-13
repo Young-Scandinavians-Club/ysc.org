@@ -266,11 +266,14 @@ defmodule YscWeb.ReauthComponent do
                 required
                 autocomplete="current-password"
               />
-              <%= if @reauth_error do %>
-                <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                  <p class="text-sm text-red-800">{@reauth_error}</p>
-                </div>
-              <% end %>
+              <.form_notice
+                :if={@reauth_error}
+                kind={:error}
+                id="reauth-password-error-notice"
+                margin_bottom={false}
+              >
+                {@reauth_error}
+              </.form_notice>
               <:actions>
                 <.button phx-disable-with="Verifying..." class="w-full">
                   Continue
@@ -310,11 +313,14 @@ defmodule YscWeb.ReauthComponent do
             </.button>
 
             <%!-- Show error for passkey-only users (no password section to host it) --%>
-            <%= if @reauth_error && !@user_has_password do %>
-              <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                <p class="text-sm text-red-800">{@reauth_error}</p>
-              </div>
-            <% end %>
+            <.form_notice
+              :if={@reauth_error && !@user_has_password}
+              kind={:error}
+              id="reauth-passkey-only-error-notice"
+              margin_bottom={false}
+            >
+              {@reauth_error}
+            </.form_notice>
           </div>
         </div>
 

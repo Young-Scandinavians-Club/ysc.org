@@ -2278,6 +2278,73 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Compact bordered notice for forms (info or error), used in modals and inline forms.
+
+  For `:info`, a default information icon is shown unless `:icon` is set to another
+  hero icon name or `icon={false}` is passed to omit the icon. For `:error`, no icon
+  is shown unless `:icon` is set explicitly.
+
+  ## Examples
+
+      <.form_notice kind={:info} id="verify-hint">
+        <strong>Keep this window open</strong> while you check your messages.
+      </.form_notice>
+
+      <.form_notice :if={@error} kind={:error} id="verify-error">
+        {@error}
+      </.form_notice>
+
+      <.form_notice kind={:error} margin_bottom={false} id="inline-error">
+        Invalid password.
+      </.form_notice>
+  """
+  attr :kind, :atom, values: [:info, :error], required: true
+  attr :id, :string, default: nil
+
+  attr :icon, :any,
+    default: :default,
+    doc: "hero icon name, false to hide, or :default for kind-based default"
+
+  attr :margin_bottom, :boolean, default: true
+
+  slot :inner_block, required: true
+
+  def form_notice(assigns) do
+    icon_name = form_notice_icon(assigns.kind, assigns.icon)
+    assigns = assign(assigns, :icon_name, icon_name)
+
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "p-3 border rounded-md",
+        @kind == :info && "bg-blue-50 border-blue-200",
+        @kind == :error && "bg-red-50 border-red-200",
+        @margin_bottom && "mb-4"
+      ]}
+    >
+      <p class={[
+        "text-sm",
+        @kind == :info && "text-blue-800",
+        @kind == :error && "text-red-800"
+      ]}>
+        <.icon
+          :if={@icon_name}
+          name={@icon_name}
+          class="w-5 h-5 inline-block -mt-0.5 me-1"
+        />
+        {render_slot(@inner_block)}
+      </p>
+    </div>
+    """
+  end
+
+  defp form_notice_icon(:info, :default), do: "hero-information-circle"
+  defp form_notice_icon(:error, :default), do: nil
+  defp form_notice_icon(_kind, false), do: nil
+  defp form_notice_icon(_kind, icon) when is_binary(icon), do: icon
+
   attr :id, :string, required: true
   attr :text, :string, required: true
   attr :author, :string, required: true

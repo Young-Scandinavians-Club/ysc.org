@@ -163,6 +163,9 @@ defmodule Ysc.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      # GHSA-rhv4-8758-jx7v: Decimal < 3.0.0 (DoS via unbounded exponent). Override pulls 3.1.x onto
+      # transitive ~> 2.x (e.g. retry_on).
+      {:decimal, "~> 3.1", override: true},
       {:argon2_elixir, "~> 4.1"},
       {:atomex, "~> 0.5"},
       {:blurhash, "~> 0.1", hex: :rinpatch_blurhash},
