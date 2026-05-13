@@ -74,7 +74,14 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
         </p>
 
         <p :if={!@subscriber} class="mt-4 text-zinc-600">
-          This unsubscribe link is invalid or has already been used. If you continue to receive emails, please contact us.
+          This unsubscribe link is invalid or has already been used. If you still receive our newsletter,
+          <.link
+            href="mailto:info@ysc.org"
+            class="text-blue-600 hover:underline font-semibold"
+          >
+            contact us at info@ysc.org
+          </.link>
+          and we will help.
         </p>
 
         <.button

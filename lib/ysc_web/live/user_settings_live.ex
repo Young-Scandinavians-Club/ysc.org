@@ -89,7 +89,7 @@ defmodule YscWeb.UserSettingsLive do
                   phx-disable-with="Sending..."
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  click here to resend
+                  resend the code
                 </.link>
               <% else %>
                 <% sms_countdown = sms_resend_seconds_remaining(assigns) %>
@@ -169,7 +169,7 @@ defmodule YscWeb.UserSettingsLive do
                   phx-disable-with="Sending..."
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  click here to resend
+                  resend the code
                 </.link>
               <% else %>
                 <% email_countdown = email_resend_seconds_remaining(assigns) %>

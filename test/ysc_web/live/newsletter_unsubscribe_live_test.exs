@@ -18,7 +18,8 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
         live(conn, ~p"/newsletter/unsubscribe/invalid-token-xyz")
 
       assert html =~ "Invalid or expired link"
-      assert html =~ "please contact us"
+      assert html =~ "mailto:info@ysc.org"
+      assert html =~ "contact us at info@ysc.org"
     end
 
     test "shows invalid link for token that is only whitespace", %{conn: conn} do
