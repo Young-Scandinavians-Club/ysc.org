@@ -133,17 +133,21 @@ defmodule YscWeb.SesWebhookControllerTest do
       ses_event =
         build_ses_event("Open",
           email: "timestamp-open@example.com",
-          env: "test"
+          env: "test",
+          mail_timestamp: "2026-03-19T15:30:00.000Z"
         )
-        |> put_in(["mail", "timestamp"], "2026-03-19T15:30:00.000Z")
 
-      post_notification(conn, ses_event)
+      conn = post_notification(conn, ses_event)
+      assert conn.status == 200
 
       event =
         Repo.get_by(EmailEvent,
           email: "timestamp-open@example.com",
           event_type: "open"
         )
+
+      assert event,
+             "expected EmailEvent row (check env tag matches Ysc.Env.current/0 and SNS body is valid JSON)"
 
       assert event.event_timestamp == ~U[2026-03-19 15:30:00Z]
     end
@@ -612,9 +616,9 @@ defmodule YscWeb.SesWebhookControllerTest do
       ses_event =
         build_ses_event("Open",
           email: "bad-ts@example.com",
-          env: "test"
+          env: "test",
+          mail_timestamp: "not-a-valid-timestamp"
         )
-        |> put_in(["mail", "timestamp"], "not-a-valid-timestamp")
 
       post_notification(conn, ses_event)
 
@@ -1038,6 +1042,10 @@ defmodule YscWeb.SesWebhookControllerTest do
   defp build_ses_event(event_type, opts) do
     email = Keyword.get(opts, :email, "test@example.com")
     env = Keyword.get(opts, :env, "test")
+
+    mail_timestamp =
+      Keyword.get(opts, :mail_timestamp, "2026-03-19T12:00:00.000Z")
+
     edition_id = Keyword.get(opts, :edition_id)
     subscriber_id = Keyword.get(opts, :subscriber_id)
     bounce_type = Keyword.get(opts, :bounce_type)
@@ -1053,7 +1061,7 @@ defmodule YscWeb.SesWebhookControllerTest do
       "eventType" => event_type,
       "mail" => %{
         "destination" => [email],
-        "timestamp" => "2026-03-19T12:00:00.000Z",
+        "timestamp" => mail_timestamp,
         "tags" => tags
       }
     }

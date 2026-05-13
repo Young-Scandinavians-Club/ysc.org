@@ -73,6 +73,27 @@ defmodule Ysc.Bookings.Entitlements do
     Repo.all(q)
   end
 
+  @doc """
+  Usable cabin entitlements for a member: `status` is `:active`, not consumed,
+  and not past `expires_at`.
+
+  These are the rows that apply at checkout and are shown on the member payments page.
+  """
+  def list_usable_for_user(user_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    from(e in BookingEntitlement,
+      where: e.user_id == ^user_id,
+      where: e.status == :active,
+      where: is_nil(e.consumed_at),
+      where: is_nil(e.consumed_booking_id),
+      where: is_nil(e.expires_at) or e.expires_at > ^now,
+      order_by: [asc: e.expires_at, asc: e.inserted_at],
+      preload: [:issued_by_user]
+    )
+    |> Repo.all()
+  end
+
   def list_all_for_user(user_id) do
     from(e in BookingEntitlement,
       where: e.user_id == ^user_id,

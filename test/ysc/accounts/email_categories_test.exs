@@ -8,6 +8,8 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
 
   alias Ysc.Accounts.EmailCategories
   alias Ysc.Newsletter
+  alias Ysc.Newsletter.Subscriber
+  alias Ysc.Repo
 
   describe "get_category/1" do
     test "returns correct category for known templates" do
@@ -109,12 +111,27 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
 
     test "newsletter_edition follows newsletter_subscribers when subscriber exists" do
       user = user_fixture()
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+      # Registration may already subscribe this email; start from a clean row for this assertion.
+      Repo.delete_all(from s in Subscriber, where: s.email == ^user.email)
+
+      # Insert directly so the test does not depend on MX validation for @example.com
       assert {:ok, _} =
-               Newsletter.subscribe(user.email,
+               %Subscriber{}
+               |> Subscriber.create_changeset(%{
+                 email: user.email,
                  user_id: user.id,
-                 source: "test"
-               )
+                 first_name: user.first_name,
+                 last_name: user.last_name,
+                 subscribed: true,
+                 subscription_token: Subscriber.generate_subscription_token(),
+                 source: "test",
+                 metadata: %{},
+                 subscribed_at: now,
+                 unsubscribed_at: nil
+               })
+               |> Repo.insert()
 
       assert EmailCategories.should_send_email?(user, "newsletter_edition")
 

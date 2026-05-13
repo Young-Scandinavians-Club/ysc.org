@@ -693,13 +693,24 @@ defmodule Ysc.Accounts do
       {:error, :invalid_email} ->
         :ok
 
-      {:error, changeset} ->
+      {:error, %Ecto.Changeset{} = changeset} ->
         require Ysc.Logging
 
         Ysc.Logging.warning("Failed to subscribe user to newsletter",
           user_id: user.id,
           email: user.email,
           errors: inspect(changeset.errors)
+        )
+
+        :ok
+
+      {:error, reason} ->
+        require Ysc.Logging
+
+        Ysc.Logging.warning("Failed to subscribe user to newsletter",
+          user_id: user.id,
+          email: user.email,
+          reason: inspect(reason)
         )
 
         :ok

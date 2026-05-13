@@ -2233,179 +2233,185 @@ defmodule YscWeb.UserSettingsLive do
           <div :if={@live_action == :payments} class="space-y-6">
             <div :if={!assigns[:loading_payments]} class="space-y-6">
               <div
+                :if={@booking_entitlements_count > 0}
                 id="member-booking-entitlements-section"
-                class="rounded border border-zinc-100 py-4 px-4"
+                class="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/90 p-5 sm:p-6 shadow-sm ring-1 ring-amber-100/60"
               >
-                <h3 class="text-lg font-semibold text-zinc-900">
-                  Cabin booking benefits
-                </h3>
-                <p class="text-sm text-zinc-600 mt-1 mb-4">
-                  Discounts and free nights granted to your account for cabin stays.
-                </p>
-                <div
-                  :if={@booking_entitlements_count > 0}
-                  class="overflow-x-auto rounded-lg border border-zinc-200"
-                >
-                  <table class="min-w-full text-sm">
-                    <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      <tr>
-                        <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3">Benefit</th>
-                        <th class="px-4 py-3">Property</th>
-                        <th class="px-4 py-3">Granted</th>
-                        <th class="px-4 py-3">Expires</th>
-                        <th class="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody
-                      id="member-booking-entitlements"
-                      phx-update="stream"
-                      class="divide-y divide-zinc-100"
-                    >
-                      <tr
-                        :for={{id, ent} <- @streams.booking_entitlements}
-                        id={id}
-                        class="hover:bg-zinc-50"
-                      >
-                        <td class="px-4 py-3 font-medium text-zinc-800">
-                          {member_entitlement_status_label(ent.status)}
-                        </td>
-                        <td class="px-4 py-3 text-zinc-700">
-                          {member_entitlement_benefit_summary(ent)}
-                        </td>
-                        <td class="px-4 py-3 text-zinc-600">
-                          {member_entitlement_property_label(ent.property)}
-                        </td>
-                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
-                          {Calendar.strftime(ent.inserted_at, "%Y-%m-%d")}
-                        </td>
-                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
-                          <%= if ent.expires_at do %>
-                            {Date.to_iso8601(DateTime.to_date(ent.expires_at))}
-                          <% else %>
-                            —
-                          <% end %>
-                        </td>
-                        <td class="px-4 py-3 text-right">
-                          <.link
-                            :if={ent.consumed_booking_id}
-                            navigate={~p"/bookings/#{ent.consumed_booking_id}"}
-                            class="text-blue-600 hover:underline text-xs font-semibold"
-                          >
-                            View booking
-                          </.link>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-amber-800/90">
+                      Cabin savings
+                    </p>
+                    <h2 class="text-zinc-900 font-extrabold text-2xl mt-1 tracking-tight">
+                      Your stay perks
+                    </h2>
+                    <p class="text-sm text-zinc-600 mt-1 max-w-xl">
+                      Apply these automatically when you book a qualifying cabin stay — like a coupon on file for members.
+                    </p>
+                  </div>
+                  <div class="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-2 ring-amber-200/80">
+                    <.icon name="hero-home-modern" class="w-7 h-7" />
+                  </div>
                 </div>
-                <p
-                  :if={@booking_entitlements_count == 0}
-                  id="member-entitlements-empty"
-                  class="text-sm text-zinc-500 py-2"
+                <div
+                  id="member-booking-entitlements"
+                  phx-update="stream"
+                  class="grid gap-4 sm:grid-cols-2"
                 >
-                  You do not have any cabin booking benefits on file.
-                </p>
+                  <div
+                    :for={{id, ent} <- @streams.booking_entitlements}
+                    id={id}
+                    class={[
+                      "relative overflow-hidden rounded-2xl border-2 border-dashed bg-white/90 backdrop-blur-sm shadow-md transition hover:shadow-lg hover:-translate-y-0.5",
+                      member_entitlement_coupon_frame_class(ent.property)
+                    ]}
+                  >
+                    <div class={[
+                      "absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-25 blur-2xl",
+                      member_entitlement_coupon_blob_class(ent.property)
+                    ]}>
+                    </div>
+                    <div class={[
+                      "absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r opacity-95",
+                      member_entitlement_coupon_ribbon_class(ent.property)
+                    ]}>
+                    </div>
+                    <div class="relative p-5 sm:p-6 flex flex-col gap-4">
+                      <div class="flex items-start justify-between gap-3">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-zinc-900/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-50 shadow-sm">
+                          <.icon name="hero-sparkles" class="w-3.5 h-3.5" />
+                          Member perk
+                        </span>
+                        <span class="text-xs font-semibold text-zinc-500 tabular-nums">
+                          Since {Calendar.strftime(ent.inserted_at, "%b %Y")}
+                        </span>
+                      </div>
+                      <div>
+                        <p class="text-2xl sm:text-3xl font-black text-zinc-900 leading-tight tracking-tight">
+                          {member_entitlement_coupon_headline(ent)}
+                        </p>
+                        <p class="mt-2 text-sm text-zinc-600 leading-relaxed">
+                          {member_entitlement_benefit_summary(ent)}
+                        </p>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-2 text-sm">
+                        <span class="inline-flex items-center rounded-lg bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800">
+                          <.icon
+                            name="hero-map-pin"
+                            class="w-4 h-4 me-1 text-zinc-500"
+                          />
+                          {member_entitlement_property_label(ent.property)}
+                        </span>
+                        <span class="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 font-medium text-emerald-900 ring-1 ring-emerald-200/80">
+                          <.icon
+                            name="hero-clock"
+                            class="w-4 h-4 me-1 text-emerald-600"
+                          />
+                          {member_entitlement_coupon_expiry_phrase(ent)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div
+                :if={@ticket_reservations_count > 0}
                 id="member-ticket-reservations-section"
-                class="rounded border border-zinc-100 py-4 px-4"
+                class="rounded-2xl border border-fuchsia-200/80 bg-gradient-to-br from-fuchsia-50 via-white to-violet-50/90 p-5 sm:p-6 shadow-sm ring-1 ring-fuchsia-100/60"
               >
-                <h3 class="text-lg font-semibold text-zinc-900">
-                  Event ticket reservations
-                </h3>
-                <p class="text-sm text-zinc-600 mt-1 mb-4">
-                  Holds and reservations created for you on club events (including completed purchases).
-                </p>
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-fuchsia-800/90">
+                      Event tickets
+                    </p>
+                    <h2 class="text-zinc-900 font-extrabold text-2xl mt-1 tracking-tight">
+                      Your price holds
+                    </h2>
+                    <p class="text-sm text-zinc-600 mt-1 max-w-xl">
+                      Active reservations lock in member-friendly pricing while you finish checkout — treat them like reserved coupons for the event.
+                    </p>
+                  </div>
+                  <div class="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 ring-2 ring-fuchsia-200/80">
+                    <.icon name="hero-ticket" class="w-7 h-7" />
+                  </div>
+                </div>
                 <div
-                  :if={@ticket_reservations_count > 0}
-                  class="overflow-x-auto rounded-lg border border-zinc-200"
+                  id="member-ticket-reservations"
+                  phx-update="stream"
+                  class="grid gap-4 sm:grid-cols-2"
                 >
-                  <table class="min-w-full text-sm">
-                    <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      <tr>
-                        <th class="px-4 py-3">Event</th>
-                        <th class="px-4 py-3">Ticket type</th>
-                        <th class="px-4 py-3">Qty</th>
-                        <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3">Hold expires</th>
-                        <th class="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody
-                      id="member-ticket-reservations"
-                      phx-update="stream"
-                      class="divide-y divide-zinc-100"
-                    >
-                      <tr
-                        :for={{id, res} <- @streams.ticket_reservations}
-                        id={id}
-                        class="hover:bg-zinc-50"
-                      >
-                        <td class="px-4 py-3 text-zinc-800 font-medium">
+                  <div
+                    :for={{id, res} <- @streams.ticket_reservations}
+                    id={id}
+                    class="relative overflow-hidden rounded-2xl border-2 border-dashed border-fuchsia-300/90 bg-white/90 backdrop-blur-sm shadow-md transition hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                    <div class="absolute -left-10 bottom-0 h-28 w-28 rounded-full bg-gradient-to-tr from-fuchsia-400/20 to-violet-400/20 blur-2xl">
+                    </div>
+                    <div class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-fuchsia-500 via-violet-500 to-purple-500 opacity-90">
+                    </div>
+                    <div class="relative p-5 sm:p-6 flex flex-col gap-4">
+                      <div class="flex items-start justify-between gap-3">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-900/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-fuchsia-50 shadow-sm">
+                          <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Active hold
+                        </span>
+                        <span class="text-xs font-semibold text-zinc-500 tabular-nums">
+                          Qty {res.quantity}
+                        </span>
+                      </div>
+                      <div>
+                        <p class="text-xl sm:text-2xl font-black text-zinc-900 leading-snug">
                           <%= if res.ticket_tier && res.ticket_tier.event do %>
                             {res.ticket_tier.event.title}
                           <% else %>
-                            —
+                            Ticket hold
                           <% end %>
-                        </td>
-                        <td class="px-4 py-3 text-zinc-700">
-                          <%= if res.ticket_tier do %>
-                            {res.ticket_tier.name}
-                          <% else %>
-                            —
-                          <% end %>
-                        </td>
-                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
-                          {res.quantity}
-                        </td>
-                        <td class="px-4 py-3">
-                          <span class="font-medium text-zinc-800">
-                            {member_ticket_reservation_status_main(res)}
-                          </span>
-                          <span
-                            :if={member_ticket_reservation_hold_lapsed?(res)}
-                            class="block text-xs text-amber-700 mt-0.5"
-                          >
-                            This hold is no longer active; complete checkout again if tickets are still available.
-                          </span>
-                        </td>
-                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
-                          <%= if res.status == "active" && res.expires_at do %>
-                            {Calendar.strftime(
+                        </p>
+                        <p
+                          :if={res.ticket_tier}
+                          class="mt-1 text-sm font-semibold text-fuchsia-900/90"
+                        >
+                          {res.ticket_tier.name}
+                        </p>
+                        <p
+                          :if={ticket_reservation_discount_phrase(res)}
+                          class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-950 ring-1 ring-amber-300/70"
+                        >
+                          <.icon name="hero-receipt-percent" class="w-4 h-4" />
+                          {ticket_reservation_discount_phrase(res)}
+                        </p>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-2 text-sm">
+                        <span class="inline-flex items-center rounded-lg bg-violet-50 px-2.5 py-1 font-medium text-violet-900 ring-1 ring-violet-200/80">
+                          <.icon
+                            name="hero-clock"
+                            class="w-4 h-4 me-1 text-violet-600"
+                          />
+                          <%= if res.expires_at do %>
+                            Hold until {Calendar.strftime(
                               DateTime.shift_zone!(
                                 res.expires_at,
                                 "America/Los_Angeles"
                               ),
-                              "%Y-%m-%d %H:%M PT"
+                              "%b %-d, %Y %H:%M PT"
                             )}
                           <% else %>
-                            —
+                            No timer — finish checkout when you are ready
                           <% end %>
-                        </td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                          <.link
-                            :if={res.ticket_tier && res.ticket_tier.event}
-                            navigate={
-                              ~p"/events/#{res.ticket_tier.event.id}/tickets"
-                            }
-                            class="text-blue-600 hover:underline text-xs font-semibold"
-                          >
-                            Event tickets
-                          </.link>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        </span>
+                      </div>
+                      <%= if res.ticket_tier && res.ticket_tier.event do %>
+                        <.link
+                          navigate={~p"/events/#{res.ticket_tier.event.id}/tickets"}
+                          class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:from-fuchsia-500 hover:to-violet-500 transition"
+                        >
+                          Use this hold
+                          <.icon name="hero-arrow-right" class="w-4 h-4" />
+                        </.link>
+                      <% end %>
+                    </div>
+                  </div>
                 </div>
-                <p
-                  :if={@ticket_reservations_count == 0}
-                  id="member-ticket-reservations-empty"
-                  class="text-sm text-zinc-500 py-2"
-                >
-                  You do not have any event ticket reservations on file.
-                </p>
               </div>
             </div>
 
@@ -2601,12 +2607,6 @@ defmodule YscWeb.UserSettingsLive do
                           class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
                         >
                           Status
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
-                        >
-                          Actions
                         </th>
                       </tr>
                     </thead>
@@ -3072,8 +3072,8 @@ defmodule YscWeb.UserSettingsLive do
     yearly_stats_year = pst_today().year
     yearly_stats = calculate_yearly_stats(all_payments)
 
-    booking_entitlements = Entitlements.list_all_for_user(user.id)
-    ticket_reservations = Events.list_all_ticket_reservations_for_user(user.id)
+    booking_entitlements = Entitlements.list_usable_for_user(user.id)
+    ticket_reservations = Events.list_active_ticket_holds_for_user(user.id)
 
     {:noreply,
      socket
@@ -5685,127 +5685,176 @@ defmodule YscWeb.UserSettingsLive do
 
   # Render payment card for mobile view
   defp render_payment_card(payment_info) do
-    assigns = %{payment_info: payment_info}
+    row_navigate = payment_row_navigate_js(payment_info)
+
+    assigns = %{
+      payment_info: payment_info,
+      row_navigate: row_navigate,
+      row_navigate_label:
+        payment_row_navigate_aria_label(payment_info, row_navigate)
+    }
 
     ~H"""
-    <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
-      <div class="flex items-center gap-4 mb-4">
-        <div class={[
-          "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
-          get_payment_icon_bg(@payment_info)
-        ]}>
-          <.icon
-            name={get_payment_icon(@payment_info)}
-            class={[
-              "w-6 h-6",
-              get_payment_icon_color(@payment_info)
-            ]}
-          />
-        </div>
-        <div class="flex-1">
-          <div class="flex items-center gap-2">
-            <h3 class="font-bold text-zinc-900 text-lg leading-tight">
-              {get_payment_title(@payment_info)}
-            </h3>
-            <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
-              <.badge type="red">Cancelled</.badge>
-            <% end %>
-            <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
-              <.badge type="red">Cancelled</.badge>
-            <% end %>
-          </div>
-          <p class="text-xs font-mono text-zinc-400 mt-1">
-            {get_payment_reference(@payment_info)}
-          </p>
-        </div>
+    <%= if @row_navigate do %>
+      <button
+        type="button"
+        phx-click={@row_navigate}
+        aria-label={@row_navigate_label}
+        class={[
+          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white cursor-pointer w-full text-left font-normal",
+          "appearance-none m-0"
+        ]}
+      >
+        {render_payment_card_body(assigns)}
+      </button>
+    <% else %>
+      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
+        {render_payment_card_body(assigns)}
       </div>
+    <% end %>
+    """
+  end
 
-      <div class="space-y-2 mb-4">
-        {render_payment_details(assigns)}
+  defp render_payment_card_body(assigns) do
+    ~H"""
+    <div class="flex items-center gap-4 mb-4">
+      <div class={[
+        "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
+        get_payment_icon_bg(@payment_info)
+      ]}>
+        <.icon
+          name={get_payment_icon(@payment_info)}
+          class={[
+            "w-6 h-6",
+            get_payment_icon_color(@payment_info)
+          ]}
+        />
       </div>
-
-      <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
-        <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-          <strong>Booking Cancelled:</strong>
-          This booking has been cancelled. {if @payment_info.payment do
-            refund_data = get_refund_data_for_payment(@payment_info.payment)
-
-            if refund_data && refund_data.total_refunded do
-              " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
-            else
-              " Refund information is available in the booking details."
-            end
-          end}
-        </div>
-      <% end %>
-
-      <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
-        <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-          <strong>Order Cancelled:</strong>
-          This ticket order has been cancelled. {if @payment_info.payment do
-            refund_data = get_refund_data_for_payment(@payment_info.payment)
-
-            if refund_data && refund_data.total_refunded do
-              " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
-            else
-              " Refund information is available in the order details."
-            end
-          end}
-        </div>
-      <% end %>
-
-      <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
-        <div class="text-right">
-          <p class="text-lg font-black text-zinc-900">
-            {if @payment_info.payment do
-              Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
-            else
-              "Free"
-            end}
-          </p>
-          <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
-            Paid on {if @payment_info.payment do
-              if @payment_info.payment.payment_date do
-                format_payment_date(@payment_info.payment.payment_date)
-              else
-                format_payment_date(@payment_info.payment.inserted_at)
-              end
-            else
-              format_payment_date(@payment_info.ticket_order.inserted_at)
-            end}
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          {render_payment_status_badge(@payment_info)}
-          <%= if @payment_info.type == :booking && @payment_info.booking do %>
-            <.link
-              navigate={~p"/bookings/#{@payment_info.booking.id}/receipt"}
-              class="p-2 rounded-lg bg-zinc-100 text-zinc-500 hover:bg-blue-600 hover:text-white transition-all"
-            >
-              <.icon name="hero-document-text" class="w-5 h-5" />
-            </.link>
+      <div class="flex-1">
+        <div class="flex items-center gap-2">
+          <h3 class="font-bold text-zinc-900 text-lg leading-tight">
+            {get_payment_title(@payment_info)}
+          </h3>
+          <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
+            <.badge type="red">Cancelled</.badge>
           <% end %>
-          <%= if @payment_info.type == :ticket && @payment_info.ticket_order do %>
-            <.link
-              navigate={~p"/orders/#{@payment_info.ticket_order.id}/confirmation"}
-              class="p-2 rounded-lg bg-zinc-100 text-zinc-500 hover:bg-blue-600 hover:text-white transition-all"
-            >
-              <.icon name="hero-document-text" class="w-5 h-5" />
-            </.link>
+          <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
+            <.badge type="red">Cancelled</.badge>
           <% end %>
         </div>
+        <p class="text-xs font-mono text-zinc-400 mt-1">
+          {get_payment_reference(@payment_info)}
+        </p>
+      </div>
+    </div>
+
+    <div class="space-y-2 mb-4">
+      {render_payment_details(assigns)}
+    </div>
+
+    <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
+      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+        <strong>Booking Cancelled:</strong>
+        This booking has been cancelled. {if @payment_info.payment do
+          refund_data = get_refund_data_for_payment(@payment_info.payment)
+
+          if refund_data && refund_data.total_refunded do
+            " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+          else
+            " Refund information is available in the booking details."
+          end
+        end}
+      </div>
+    <% end %>
+
+    <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
+      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+        <strong>Order Cancelled:</strong>
+        This ticket order has been cancelled. {if @payment_info.payment do
+          refund_data = get_refund_data_for_payment(@payment_info.payment)
+
+          if refund_data && refund_data.total_refunded do
+            " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+          else
+            " Refund information is available in the order details."
+          end
+        end}
+      </div>
+    <% end %>
+
+    <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
+      <div class="text-right">
+        <p class="text-lg font-black text-zinc-900">
+          {if @payment_info.payment do
+            Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
+          else
+            "Free"
+          end}
+        </p>
+        <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
+          Paid on {if @payment_info.payment do
+            if @payment_info.payment.payment_date do
+              format_payment_date(@payment_info.payment.payment_date)
+            else
+              format_payment_date(@payment_info.payment.inserted_at)
+            end
+          else
+            format_payment_date(@payment_info.ticket_order.inserted_at)
+          end}
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        {render_payment_status_badge(@payment_info)}
       </div>
     </div>
     """
   end
 
+  defp payment_row_navigate_js(%{type: :booking, booking: %{id: id}}) do
+    JS.navigate(~p"/bookings/#{id}/receipt")
+  end
+
+  defp payment_row_navigate_js(%{type: :ticket, ticket_order: %{id: id}}) do
+    JS.navigate(~p"/orders/#{id}/confirmation")
+  end
+
+  defp payment_row_navigate_js(_), do: nil
+
+  defp payment_row_navigate_aria_label(%{type: :booking}, %JS{}),
+    do: "View booking receipt"
+
+  defp payment_row_navigate_aria_label(%{type: :ticket}, %JS{}),
+    do: "View ticket order confirmation"
+
+  defp payment_row_navigate_aria_label(_, _), do: nil
+
   # Render payment table row for desktop view
   defp render_payment_table_row(payment_info, opts) do
     id = Keyword.get(opts, :id)
-    assigns = %{payment_info: payment_info, id: id}
+    row_navigate = payment_row_navigate_js(payment_info)
+
+    assigns = %{
+      payment_info: payment_info,
+      id: id,
+      row_navigate: row_navigate,
+      row_navigate_label:
+        payment_row_navigate_aria_label(payment_info, row_navigate)
+    }
 
     ~H"""
-    <tr id={@id} class="hover:bg-zinc-50 transition-colors">
+    <tr
+      id={@id}
+      class={[
+        "group hover:bg-zinc-50 transition-colors",
+        @row_navigate && "cursor-pointer"
+      ]}
+      phx-click={@row_navigate}
+      tabindex={@row_navigate && "0"}
+      role={@row_navigate && "link"}
+      aria-label={@row_navigate_label}
+      phx-keydown={@row_navigate}
+      phx-key={@row_navigate && "enter"}
+    >
       <td class="px-6 py-4 whitespace-nowrap">
         <div class="flex items-center gap-4">
           <div class={[
@@ -5865,24 +5914,6 @@ defmodule YscWeb.UserSettingsLive do
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-center">
         {render_payment_status_badge(@payment_info)}
-      </td>
-      <td class="px-6 py-4 whitespace-nowrap text-center">
-        <%= if @payment_info.type == :booking && @payment_info.booking do %>
-          <.link
-            navigate={~p"/bookings/#{@payment_info.booking.id}/receipt"}
-            class="p-2 rounded-lg bg-zinc-100 text-zinc-500 hover:bg-blue-600 hover:text-white transition-all inline-block"
-          >
-            <.icon name="hero-document-text" class="w-5 h-5" />
-          </.link>
-        <% end %>
-        <%= if @payment_info.type == :ticket && @payment_info.ticket_order do %>
-          <.link
-            navigate={~p"/orders/#{@payment_info.ticket_order.id}/confirmation"}
-            class="p-2 rounded-lg bg-zinc-100 text-zinc-500 hover:bg-blue-600 hover:text-white transition-all inline-block"
-          >
-            <.icon name="hero-document-text" class="w-5 h-5" />
-          </.link>
-        <% end %>
       </td>
     </tr>
     """
@@ -6538,11 +6569,73 @@ defmodule YscWeb.UserSettingsLive do
 
   defp format_payment_date(_), do: ""
 
-  defp member_entitlement_status_label(:active), do: "Active"
-  defp member_entitlement_status_label(:consumed), do: "Used"
-  defp member_entitlement_status_label(:revoked), do: "Revoked"
-  defp member_entitlement_status_label(:expired), do: "Expired"
-  defp member_entitlement_status_label(other), do: to_string(other)
+  defp member_entitlement_coupon_frame_class(:tahoe),
+    do: "border-sky-400/80 shadow-sky-100/80"
+
+  defp member_entitlement_coupon_frame_class(:clear_lake),
+    do: "border-emerald-400/80 shadow-emerald-100/80"
+
+  defp member_entitlement_coupon_frame_class(_),
+    do: "border-violet-400/80 shadow-violet-100/80"
+
+  defp member_entitlement_coupon_blob_class(:tahoe), do: "bg-sky-400"
+  defp member_entitlement_coupon_blob_class(:clear_lake), do: "bg-emerald-400"
+  defp member_entitlement_coupon_blob_class(_), do: "bg-violet-400"
+
+  defp member_entitlement_coupon_ribbon_class(:tahoe),
+    do: "from-sky-500 via-sky-300 to-blue-600"
+
+  defp member_entitlement_coupon_ribbon_class(:clear_lake),
+    do: "from-emerald-500 via-teal-400 to-cyan-600"
+
+  defp member_entitlement_coupon_ribbon_class(_),
+    do: "from-violet-500 via-fuchsia-400 to-purple-600"
+
+  defp member_entitlement_coupon_headline(ent) do
+    case ent.benefit_kind do
+      :percent_off ->
+        pct = ent.percent_off || Decimal.new(0)
+        "#{Decimal.round(pct, 0)}% off"
+
+      :free_nights ->
+        n = ent.free_nights || 0
+
+        if n == 1 do
+          "1 free night"
+        else
+          "#{n} free nights"
+        end
+
+      :fixed_amount_off ->
+        "#{format_member_money(ent.amount_off)} off"
+
+      _ ->
+        "Member savings"
+    end
+  end
+
+  defp member_entitlement_coupon_expiry_phrase(ent) do
+    if ent.expires_at do
+      d =
+        ent.expires_at
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+      "Use by #{Calendar.strftime(d, "%b %-d, %Y")}"
+    else
+      "No expiry — book anytime"
+    end
+  end
+
+  defp ticket_reservation_discount_phrase(%{discount_percentage: p})
+       when not is_nil(p) do
+    case Decimal.compare(p, Decimal.new(0)) do
+      :gt -> "#{Decimal.round(p, 0)}% off member tickets"
+      _ -> nil
+    end
+  end
+
+  defp ticket_reservation_discount_phrase(_), do: nil
 
   defp member_entitlement_property_label(nil), do: "Any cabin"
   defp member_entitlement_property_label(:tahoe), do: "Tahoe"
@@ -6572,33 +6665,5 @@ defmodule YscWeb.UserSettingsLive do
 
   defp format_member_money(%Money{} = m) do
     Ysc.MoneyHelper.format_money!(m)
-  end
-
-  defp member_ticket_reservation_hold_lapsed?(%{
-         status: "active",
-         expires_at: %DateTime{} = exp
-       }) do
-    DateTime.compare(exp, DateTime.utc_now()) != :gt
-  end
-
-  defp member_ticket_reservation_hold_lapsed?(_), do: false
-
-  defp member_ticket_reservation_status_main(res) do
-    cond do
-      res.status == "fulfilled" ->
-        "Purchased"
-
-      res.status == "cancelled" ->
-        "Cancelled"
-
-      res.status == "active" && member_ticket_reservation_hold_lapsed?(res) ->
-        "Hold ended"
-
-      res.status == "active" ->
-        "On hold"
-
-      true ->
-        res.status
-    end
   end
 end
