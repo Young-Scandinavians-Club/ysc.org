@@ -5695,103 +5695,116 @@ defmodule YscWeb.UserSettingsLive do
     }
 
     ~H"""
-    <div
-      class={[
-        "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white",
-        @row_navigate && "cursor-pointer"
-      ]}
-      phx-click={@row_navigate}
-      aria-label={@row_navigate_label}
-    >
-      <div class="flex items-center gap-4 mb-4">
-        <div class={[
-          "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
-          get_payment_icon_bg(@payment_info)
-        ]}>
-          <.icon
-            name={get_payment_icon(@payment_info)}
-            class={[
-              "w-6 h-6",
-              get_payment_icon_color(@payment_info)
-            ]}
-          />
-        </div>
-        <div class="flex-1">
-          <div class="flex items-center gap-2">
-            <h3 class="font-bold text-zinc-900 text-lg leading-tight">
-              {get_payment_title(@payment_info)}
-            </h3>
-            <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
-              <.badge type="red">Cancelled</.badge>
-            <% end %>
-            <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
-              <.badge type="red">Cancelled</.badge>
-            <% end %>
-          </div>
-          <p class="text-xs font-mono text-zinc-400 mt-1">
-            {get_payment_reference(@payment_info)}
-          </p>
-        </div>
+    <%= if @row_navigate do %>
+      <button
+        type="button"
+        phx-click={@row_navigate}
+        aria-label={@row_navigate_label}
+        class={[
+          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white cursor-pointer w-full text-left font-normal",
+          "appearance-none m-0"
+        ]}
+      >
+        {render_payment_card_body(assigns)}
+      </button>
+    <% else %>
+      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
+        {render_payment_card_body(assigns)}
       </div>
+    <% end %>
+    """
+  end
 
-      <div class="space-y-2 mb-4">
-        {render_payment_details(assigns)}
+  defp render_payment_card_body(assigns) do
+    ~H"""
+    <div class="flex items-center gap-4 mb-4">
+      <div class={[
+        "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
+        get_payment_icon_bg(@payment_info)
+      ]}>
+        <.icon
+          name={get_payment_icon(@payment_info)}
+          class={[
+            "w-6 h-6",
+            get_payment_icon_color(@payment_info)
+          ]}
+        />
       </div>
+      <div class="flex-1">
+        <div class="flex items-center gap-2">
+          <h3 class="font-bold text-zinc-900 text-lg leading-tight">
+            {get_payment_title(@payment_info)}
+          </h3>
+          <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
+            <.badge type="red">Cancelled</.badge>
+          <% end %>
+          <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
+            <.badge type="red">Cancelled</.badge>
+          <% end %>
+        </div>
+        <p class="text-xs font-mono text-zinc-400 mt-1">
+          {get_payment_reference(@payment_info)}
+        </p>
+      </div>
+    </div>
 
-      <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
-        <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-          <strong>Booking Cancelled:</strong>
-          This booking has been cancelled. {if @payment_info.payment do
-            refund_data = get_refund_data_for_payment(@payment_info.payment)
+    <div class="space-y-2 mb-4">
+      {render_payment_details(assigns)}
+    </div>
 
-            if refund_data && refund_data.total_refunded do
-              " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
-            else
-              " Refund information is available in the booking details."
-            end
+    <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
+      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+        <strong>Booking Cancelled:</strong>
+        This booking has been cancelled. {if @payment_info.payment do
+          refund_data = get_refund_data_for_payment(@payment_info.payment)
+
+          if refund_data && refund_data.total_refunded do
+            " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+          else
+            " Refund information is available in the booking details."
+          end
+        end}
+      </div>
+    <% end %>
+
+    <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
+      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+        <strong>Order Cancelled:</strong>
+        This ticket order has been cancelled. {if @payment_info.payment do
+          refund_data = get_refund_data_for_payment(@payment_info.payment)
+
+          if refund_data && refund_data.total_refunded do
+            " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+          else
+            " Refund information is available in the order details."
+          end
+        end}
+      </div>
+    <% end %>
+
+    <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
+      <div class="text-right">
+        <p class="text-lg font-black text-zinc-900">
+          {if @payment_info.payment do
+            Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
+          else
+            "Free"
           end}
-        </div>
-      <% end %>
-
-      <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
-        <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-          <strong>Order Cancelled:</strong>
-          This ticket order has been cancelled. {if @payment_info.payment do
-            refund_data = get_refund_data_for_payment(@payment_info.payment)
-
-            if refund_data && refund_data.total_refunded do
-              " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+        </p>
+        <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
+          Paid on {if @payment_info.payment do
+            if @payment_info.payment.payment_date do
+              format_payment_date(@payment_info.payment.payment_date)
             else
-              " Refund information is available in the order details."
+              format_payment_date(@payment_info.payment.inserted_at)
             end
+          else
+            format_payment_date(@payment_info.ticket_order.inserted_at)
           end}
-        </div>
-      <% end %>
-
-      <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
-        <div class="text-right">
-          <p class="text-lg font-black text-zinc-900">
-            {if @payment_info.payment do
-              Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
-            else
-              "Free"
-            end}
-          </p>
-          <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
-            Paid on {if @payment_info.payment do
-              if @payment_info.payment.payment_date do
-                format_payment_date(@payment_info.payment.payment_date)
-              else
-                format_payment_date(@payment_info.payment.inserted_at)
-              end
-            else
-              format_payment_date(@payment_info.ticket_order.inserted_at)
-            end}
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          {render_payment_status_badge(@payment_info)}
-        </div>
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        {render_payment_status_badge(@payment_info)}
       </div>
     </div>
     """
@@ -5836,7 +5849,11 @@ defmodule YscWeb.UserSettingsLive do
         @row_navigate && "cursor-pointer"
       ]}
       phx-click={@row_navigate}
+      tabindex={@row_navigate && "0"}
+      role={@row_navigate && "button"}
       aria-label={@row_navigate_label}
+      phx-keydown={@row_navigate}
+      phx-key={@row_navigate && "enter"}
     >
       <td class="px-6 py-4 whitespace-nowrap">
         <div class="flex items-center gap-4">
