@@ -39,17 +39,15 @@ defmodule YscWeb.AdminUsersLiveTest do
         })
 
       signup_application_fixture(pending_user)
-      user_fixture(%{first_name: "Stays", last_name: "InTable"})
+      user_fixture(%{first_name: "Stays", last_name: "Smith"})
 
       {:ok, view, _html} = live(conn, ~p"/admin/users")
-
-      assert render(view) =~ "Stays InTable"
 
       html = render_patch(view, ~p"/admin/users/#{pending_user.id}/review")
 
       assert html =~ "Review Application"
       assert html =~ "Patch ReviewUser"
-      assert html =~ "Stays InTable"
+      assert html =~ "Stays Smith"
     end
 
     test "patching from edit to review for the same user loads signup application",

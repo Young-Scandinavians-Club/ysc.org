@@ -38,19 +38,19 @@ defmodule YscWeb.AdminUsersLive do
           />
         </div>
 
-        <.simple_form for={@form} phx-change="validate" phx-submit="save">
-          <.input field={@form[:email]} label="Email" />
-          <.input field={@form[:first_name]} label="First Name" />
-          <.input field={@form[:last_name]} label="Last Name" />
+        <.simple_form for={@user_edit_form} phx-change="validate" phx-submit="save">
+          <.input field={@user_edit_form[:email]} label="Email" />
+          <.input field={@user_edit_form[:first_name]} label="First Name" />
+          <.input field={@user_edit_form[:last_name]} label="Last Name" />
           <.input
-            field={@form[:most_connected_country]}
+            field={@user_edit_form[:most_connected_country]}
             label="Most connected Nordic country:"
             type="select"
             options={["Sweden", "Norway", "Finland", "Denmark", "Iceland"]}
           />
           <.input
             type="select"
-            field={@form[:state]}
+            field={@user_edit_form[:state]}
             options={[
               "active",
               "pending_approval",
@@ -62,7 +62,7 @@ defmodule YscWeb.AdminUsersLive do
           />
           <.input
             type="select"
-            field={@form[:role]}
+            field={@user_edit_form[:role]}
             options={["member", "admin", "volunteer"]}
             label="Role"
           />
@@ -828,8 +828,8 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:export_progress, 0)
      |> assign(:file_export_path, "")
      |> assign(:export_error, "Something went wrong")
-     |> assign(form: to_form(%{}, as: "csv_export"))
-     |> assign(form: to_form(user_changeset, as: "user"))
+     |> assign(:form, to_form(%{}, as: "csv_export"))
+     |> assign(:user_edit_form, to_form(user_changeset, as: "user"))
      |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
      |> assign(:show_reject_form, false)}
   end
@@ -847,7 +847,8 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:export_progress, 0)
      |> assign(:file_export_path, "")
      |> assign(:export_error, "Something went wrong")
-     |> assign(form: to_form(%{}, as: "csv_export"))}
+     |> assign(:form, to_form(%{}, as: "csv_export"))
+     |> assign(:user_edit_form, nil)}
   end
 
   @spec handle_params(
@@ -872,7 +873,10 @@ defmodule YscWeb.AdminUsersLive do
          match?(%Flop.Meta{}, socket.assigns[:meta]) do
       {:noreply,
        socket
-       |> assign(:params, params)
+       |> assign(
+         :params,
+         merge_admin_users_route_params(socket.assigns[:params], params)
+       )
        |> assign(:focus_search_input, nil)}
     else
       search = params["search"]
@@ -1203,9 +1207,9 @@ defmodule YscWeb.AdminUsersLive do
     form = to_form(changeset, as: "user")
 
     if changeset.valid? do
-      assign(socket, form: form, check_errors: false)
+      assign(socket, user_edit_form: form, check_errors: false)
     else
-      assign(socket, form: form)
+      assign(socket, user_edit_form: form)
     end
   end
 
@@ -1256,6 +1260,12 @@ defmodule YscWeb.AdminUsersLive do
   defp no_results?([]), do: true
   defp no_results?(_), do: false
 
+  defp merge_admin_users_route_params(prev, new)
+       when is_map(prev) and is_map(new),
+       do: Map.merge(prev, new)
+
+  defp merge_admin_users_route_params(_prev, new) when is_map(new), do: new
+
   defp assign_user_modal_from_route(socket, params) do
     case socket.assigns.live_action do
       action when action in [:edit, :review] ->
@@ -1267,8 +1277,16 @@ defmodule YscWeb.AdminUsersLive do
 
             skip_assign? =
               match?(%User{}, current) and to_string(current.id) == id and
-                (socket.assigns.live_action != :review or
-                   match?(%Accounts.SignupApplication{}, application))
+                case socket.assigns.live_action do
+                  :edit ->
+                    match?(
+                      %Phoenix.HTML.Form{},
+                      socket.assigns[:user_edit_form]
+                    )
+
+                  :review ->
+                    match?(%Accounts.SignupApplication{}, application)
+                end
 
             if skip_assign? do
               socket
@@ -1306,7 +1324,15 @@ defmodule YscWeb.AdminUsersLive do
     |> assign(:selected_user_application, application)
     |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
     |> assign(:show_reject_form, false)
-    |> assign(form: to_form(user_changeset, as: "user"))
+    |> assign_user_edit_form_for_action(user_changeset)
+  end
+
+  defp assign_user_edit_form_for_action(socket, user_changeset) do
+    if socket.assigns.live_action == :edit do
+      assign(socket, :user_edit_form, to_form(user_changeset, as: "user"))
+    else
+      assign(socket, :user_edit_form, nil)
+    end
   end
 
   defp export_field_to_label(:id), do: "User ID"
