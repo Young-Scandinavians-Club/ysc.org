@@ -672,7 +672,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert render(view) =~ "Payment History"
     end
 
-    test "payments tab shows benefits and reservations panels with empty states",
+    test "payments tab omits benefits and reservations panels when none are usable",
          %{conn: conn} do
       user = user_fixture(%{state: :active})
       conn = log_in_user(conn, user)
@@ -680,10 +680,9 @@ defmodule YscWeb.UserSettingsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/payments")
       render(view)
 
-      assert has_element?(view, "#member-booking-entitlements-section")
-      assert has_element?(view, "#member-ticket-reservations-section")
-      assert has_element?(view, "#member-entitlements-empty")
-      assert has_element?(view, "#member-ticket-reservations-empty")
+      refute has_element?(view, "#member-booking-entitlements-section")
+      refute has_element?(view, "#member-ticket-reservations-section")
+      assert has_element?(view, "#payments-list")
     end
 
     test "payments tab lists booking entitlements and ticket reservations for the member",
@@ -713,7 +712,10 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       tier = ticket_tier_fixture(%{event_id: event.id, name: "VIP Row"})
 
-      fulfilled_at = DateTime.utc_now() |> DateTime.truncate(:second)
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.add(3 * 24 * 60 * 60, :second)
+        |> DateTime.truncate(:second)
 
       assert {:ok, reservation} =
                %TicketReservation{}
@@ -722,8 +724,9 @@ defmodule YscWeb.UserSettingsLiveTest do
                  user_id: member.id,
                  quantity: 2,
                  created_by_id: organizer.id,
-                 status: "fulfilled",
-                 fulfilled_at: fulfilled_at
+                 status: "active",
+                 expires_at: expires_at,
+                 discount_percentage: Decimal.new("15")
                })
                |> Repo.insert()
 
@@ -734,6 +737,9 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "#member-ticket-reservation-#{reservation.id}")
       assert html =~ "Payments Tab Event XYZ"
       assert html =~ "VIP Row"
+      assert html =~ "Your stay perks"
+      assert html =~ "Your price holds"
+      assert html =~ "15% off member tickets"
     end
 
     test "payment pagination prev on first page is a no-op", %{conn: conn} do

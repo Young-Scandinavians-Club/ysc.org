@@ -2065,10 +2065,25 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Active ticket holds for a member: `status` is `\"active\"` and the hold window
+  is still open (`expires_at` unset or in the future). These apply at checkout.
+
+  Fulfilled, cancelled, or lapsed holds are excluded.
+  """
+  def list_active_ticket_holds_for_user(user_id) do
+    TicketReservation
+    |> where([tr], tr.user_id == ^user_id)
+    |> where_ticket_reservation_hold_active()
+    |> order_by([tr], desc: tr.inserted_at)
+    |> preload(ticket_tier: :event)
+    |> Repo.all()
+  end
+
+  @doc """
   Lists every ticket reservation for the member (`user_id`), in any status,
   newest first.
 
-  Preloads `ticket_tier` and nested `event` for account settings and similar UIs.
+  Preloads `ticket_tier` (with `event`) for account settings and similar UIs.
   """
   def list_all_ticket_reservations_for_user(user_id) do
     TicketReservation

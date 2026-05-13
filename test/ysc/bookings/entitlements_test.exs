@@ -304,6 +304,48 @@ defmodule Ysc.Bookings.EntitlementsTest do
     end
   end
 
+  describe "list_usable_for_user/1" do
+    test "excludes expired-by-date entitlements while returning usable ones", %{
+      user: user,
+      admin: admin
+    } do
+      assert {:ok, good} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 10)
+                 },
+                 send_notification: false
+               )
+
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, bad} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 2),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      ids =
+        user.id
+        |> Entitlements.list_usable_for_user()
+        |> Enum.map(& &1.id)
+
+      assert good.id in ids
+      refute bad.id in ids
+    end
+  end
+
   describe "BookingEntitlementExpiryWorker" do
     test "perform/1 runs expiry", %{user: user, admin: admin} do
       past =
