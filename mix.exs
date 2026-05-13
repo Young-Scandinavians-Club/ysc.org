@@ -164,9 +164,8 @@ defmodule Ysc.MixProject do
   defp deps do
     [
       # GHSA-rhv4-8758-jx7v: Decimal < 3.0.0 (DoS via unbounded exponent). Override pulls 3.1.x onto
-      # transitive ~> 2.x (e.g. retry_on). Source from GitHub so resolution does not depend on Erlang TLS to repo.hex.pm.
-      {:decimal, "~> 3.1",
-       github: "ericmj/decimal", tag: "v3.1.0", override: true},
+      # transitive ~> 2.x (e.g. retry_on).
+      {:decimal, "~> 3.1", override: true},
       {:argon2_elixir, "~> 4.1"},
       {:atomex, "~> 0.5"},
       {:blurhash, "~> 0.1", hex: :rinpatch_blurhash},
