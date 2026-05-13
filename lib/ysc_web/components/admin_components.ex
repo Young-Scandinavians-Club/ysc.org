@@ -98,6 +98,78 @@ defmodule YscWeb.AdminComponents do
     do: "text-2xl font-semibold leading-8 text-zinc-800"
 
   # ---------------------------------------------------------------------------
+  # admin_kbd
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders a small keyboard-key pill for admin shortcut hints (check-in flows, etc.).
+
+  - `size={:compact}` — square keys (arrows, single digits); uses `min-w` matching check-in UIs.
+  - `size={:inline}` — wider keys (`↵ enter`, `alt`); horizontal padding only.
+  - `tone={:muted}` — slightly softer text (`text-zinc-400`) for secondary hints.
+
+  Pass `data-key`, `title`, or other safe global attributes via `rest`.
+
+  ## Examples
+
+      <.admin_kbd size={:compact}>↑</.admin_kbd>
+      <.admin_kbd size={:inline}>↵ enter</.admin_kbd>
+      <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
+      <.admin_kbd size={:compact} tone={:muted}>{@index + 1}</.admin_kbd>
+  """
+  attr :size, :atom,
+    default: :compact,
+    values: [:compact, :inline],
+    doc: ":compact for single-character keys; :inline for wider labels"
+
+  attr :tone, :atom,
+    default: :default,
+    values: [:default, :muted],
+    doc: ":muted for de-emphasized shortcut badges"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the key"
+
+  attr :rest, :global, include: ~w(data-key id title aria-label)
+
+  slot :inner_block, required: true
+
+  def admin_kbd(assigns) do
+    ~H"""
+    <kbd class={kbd_class_list(@size, @tone, @class)} {@rest}>
+      {render_slot(@inner_block)}
+    </kbd>
+    """
+  end
+
+  defp kbd_class_list(:compact, :default, extra),
+    do: kbd_base(:default) ++ ["min-w-[1.375rem] px-1 py-0.5", extra]
+
+  defp kbd_class_list(:inline, :default, extra),
+    do: kbd_base(:default) ++ ["px-1.5 py-0.5", extra]
+
+  defp kbd_class_list(:compact, :muted, extra),
+    do: kbd_base(:muted) ++ ["min-w-[1.375rem] px-1 py-0.5", extra]
+
+  defp kbd_class_list(:inline, :muted, extra),
+    do: kbd_base(:muted) ++ ["px-1.5 py-0.5", extra]
+
+  defp kbd_base(:default),
+    do: [
+      "inline-flex justify-center items-center min-h-[1.375rem]",
+      "bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded",
+      "shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+    ]
+
+  defp kbd_base(:muted),
+    do: [
+      "inline-flex justify-center items-center min-h-[1.375rem]",
+      "bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded",
+      "shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+    ]
+
+  # ---------------------------------------------------------------------------
   # side_menu
   # ---------------------------------------------------------------------------
 
