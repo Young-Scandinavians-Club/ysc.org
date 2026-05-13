@@ -9,6 +9,7 @@ defmodule YscWeb.AdminUsersLive do
   require Ysc.Logging
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.User
   alias Ysc.Customers
   alias Ysc.Payments
   alias Ysc.Subscriptions
@@ -577,7 +578,7 @@ defmodule YscWeb.AdminUsersLive do
                 class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
                 phx-click={
                   if user.state == :pending_approval,
-                    do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
+                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
                     else:
                       JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
                 }
@@ -668,7 +669,7 @@ defmodule YscWeb.AdminUsersLive do
               row_click={
                 fn {_, user} ->
                   if user.state == :pending_approval,
-                    do: JS.navigate(~p"/admin/users/#{user.id}/review?#{@params}"),
+                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
                     else:
                       JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
                 end
@@ -862,25 +863,38 @@ defmodule YscWeb.AdminUsersLive do
             }
         ) :: {:noreply, any()}
   def handle_params(params, _, socket) do
-    search = params["search"]
+    socket = assign_user_modal_from_route(socket, params)
 
-    search_term =
-      case search do
-        %{"query" => query} when is_binary(query) -> query
-        _ -> nil
+    # Opening edit/review from the users table only changes `live_action` and the
+    # route id; the list query + subscription preload are unchanged. Skipping the
+    # refetch avoids an extra heavy DB round-trip on every modal open.
+    if socket.assigns.live_action in [:edit, :review] &&
+         match?(%Flop.Meta{}, socket.assigns[:meta]) do
+      {:noreply,
+       socket
+       |> assign(:params, params)
+       |> assign(:focus_search_input, nil)}
+    else
+      search = params["search"]
+
+      search_term =
+        case search do
+          %{"query" => query} when is_binary(query) -> query
+          _ -> nil
+        end
+
+      case Accounts.list_paginated_users(params, search_term) do
+        {:ok, {users, meta}} ->
+          {:noreply,
+           assign(socket, meta: meta)
+           |> assign(:empty, no_results?(users))
+           |> assign(:params, params)
+           |> assign(:focus_search_input, nil)
+           |> stream(:users, users, reset: true)}
+
+        {:error, _meta} ->
+          {:noreply, push_patch(socket, to: ~p"/admin/users")}
       end
-
-    case Accounts.list_paginated_users(params, search_term) do
-      {:ok, {users, meta}} ->
-        {:noreply,
-         assign(socket, meta: meta)
-         |> assign(:empty, no_results?(users))
-         |> assign(:params, params)
-         |> assign(:focus_search_input, nil)
-         |> stream(:users, users, reset: true)}
-
-      {:error, _meta} ->
-        {:noreply, push_patch(socket, to: ~p"/admin/users")}
     end
   end
 
@@ -1241,6 +1255,59 @@ defmodule YscWeb.AdminUsersLive do
 
   defp no_results?([]), do: true
   defp no_results?(_), do: false
+
+  defp assign_user_modal_from_route(socket, params) do
+    case socket.assigns.live_action do
+      action when action in [:edit, :review] ->
+        case params["id"] do
+          id when is_binary(id) ->
+            current = socket.assigns[:selected_user]
+
+            application = socket.assigns[:selected_user_application]
+
+            skip_assign? =
+              match?(%User{}, current) and to_string(current.id) == id and
+                (socket.assigns.live_action != :review or
+                   match?(%Accounts.SignupApplication{}, application))
+
+            if skip_assign? do
+              socket
+            else
+              assign_user_modal_data(socket, id)
+            end
+
+          _ ->
+            socket
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp assign_user_modal_data(socket, id) do
+    current_user = socket.assigns.current_user
+
+    selected_user = Accounts.get_user!(id, [:family_members, :current_avatar])
+
+    application =
+      if socket.assigns.live_action == :review do
+        Accounts.get_signup_application_from_user_id!(id, current_user, [
+          :reviewed_by
+        ])
+      else
+        nil
+      end
+
+    user_changeset = User.update_user_changeset(selected_user, %{})
+
+    socket
+    |> assign(:selected_user, selected_user)
+    |> assign(:selected_user_application, application)
+    |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
+    |> assign(:show_reject_form, false)
+    |> assign(form: to_form(user_changeset, as: "user"))
+  end
 
   defp export_field_to_label(:id), do: "User ID"
   defp export_field_to_label(:email), do: "Email"

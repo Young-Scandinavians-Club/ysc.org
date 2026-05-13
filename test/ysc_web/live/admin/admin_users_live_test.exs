@@ -29,6 +29,49 @@ defmodule YscWeb.AdminUsersLiveTest do
       assert html =~ "Member One"
     end
 
+    test "patching to review from users list keeps list rows without reloading the table query",
+         %{conn: conn} do
+      pending_user =
+        user_fixture(%{
+          state: "pending_approval",
+          first_name: "Patch",
+          last_name: "ReviewUser"
+        })
+
+      signup_application_fixture(pending_user)
+      user_fixture(%{first_name: "Stays", last_name: "InTable"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+
+      assert render(view) =~ "Stays InTable"
+
+      html = render_patch(view, ~p"/admin/users/#{pending_user.id}/review")
+
+      assert html =~ "Review Application"
+      assert html =~ "Patch ReviewUser"
+      assert html =~ "Stays InTable"
+    end
+
+    test "patching from edit to review for the same user loads signup application",
+         %{conn: conn} do
+      pending_user =
+        user_fixture(%{
+          state: "pending_approval",
+          first_name: "EditThen",
+          last_name: "Review"
+        })
+
+      signup_application_fixture(pending_user)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+
+      render_patch(view, ~p"/admin/users/#{pending_user.id}")
+      html = render_patch(view, ~p"/admin/users/#{pending_user.id}/review")
+
+      assert html =~ "Review Application"
+      assert html =~ "EditThen Review"
+    end
+
     test "searches users", %{conn: conn} do
       user_fixture(%{first_name: "Searchable", last_name: "User"})
       user_fixture(%{first_name: "Other", last_name: "User"})
