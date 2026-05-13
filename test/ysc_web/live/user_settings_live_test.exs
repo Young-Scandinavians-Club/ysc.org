@@ -5,10 +5,14 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
 
+  alias Money
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.MembershipCache
+  alias Ysc.Bookings.Entitlements
+  alias Ysc.Events.TicketReservation
   alias Ysc.LedgersFixtures
   alias Ysc.MessagePassingEvents
   alias Ysc.Payments
@@ -666,6 +670,70 @@ defmodule YscWeb.UserSettingsLiveTest do
       |> render_click()
 
       assert render(view) =~ "Payment History"
+    end
+
+    test "payments tab shows benefits and reservations panels with empty states",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/payments")
+      render(view)
+
+      assert has_element?(view, "#member-booking-entitlements-section")
+      assert has_element?(view, "#member-ticket-reservations-section")
+      assert has_element?(view, "#member-entitlements-empty")
+      assert has_element?(view, "#member-ticket-reservations-empty")
+    end
+
+    test "payments tab lists booking entitlements and ticket reservations for the member",
+         %{conn: conn} do
+      organizer = user_fixture(%{state: :active})
+      member = user_fixture(%{state: :active})
+      conn = log_in_user(conn, member)
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: member.id,
+                   issued_by_user_id: organizer.id,
+                   benefit_kind: :percent_off,
+                   property: :tahoe,
+                   percent_off: Decimal.new("30"),
+                   buyout_max_discount: Money.new(:USD, 200)
+                 },
+                 send_notification: false
+               )
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          title: "Payments Tab Event XYZ"
+        })
+
+      tier = ticket_tier_fixture(%{event_id: event.id, name: "VIP Row"})
+
+      fulfilled_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, reservation} =
+               %TicketReservation{}
+               |> TicketReservation.changeset(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 quantity: 2,
+                 created_by_id: organizer.id,
+                 status: "fulfilled",
+                 fulfilled_at: fulfilled_at
+               })
+               |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/users/payments")
+      html = render(view)
+
+      assert has_element?(view, "#member-entitlement-#{entitlement.id}")
+      assert has_element?(view, "#member-ticket-reservation-#{reservation.id}")
+      assert html =~ "Payments Tab Event XYZ"
+      assert html =~ "VIP Row"
     end
 
     test "payment pagination prev on first page is a no-op", %{conn: conn} do

@@ -12,7 +12,9 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Accounts.{FamilyInvites, MembershipCache}
   alias Ysc.Accounts.UserNotifier
   alias Ysc.Avatars
+  alias Ysc.Bookings.Entitlements
   alias Ysc.Customers
+  alias Ysc.Events
   alias Ysc.GoogleWallet
   alias Ysc.Ledgers
   alias Ysc.Newsletter
@@ -2229,6 +2231,176 @@ defmodule YscWeb.UserSettingsLive do
           </div>
 
           <div :if={@live_action == :payments} class="space-y-6">
+            <div :if={!assigns[:loading_payments]} class="space-y-6">
+              <div
+                id="member-booking-entitlements-section"
+                class="rounded border border-zinc-100 py-4 px-4"
+              >
+                <h3 class="text-lg font-semibold text-zinc-900">
+                  Cabin booking benefits
+                </h3>
+                <p class="text-sm text-zinc-600 mt-1 mb-4">
+                  Discounts and free nights granted to your account for cabin stays.
+                </p>
+                <div
+                  :if={@booking_entitlements != []}
+                  class="overflow-x-auto rounded-lg border border-zinc-200"
+                >
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+                      <tr>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Benefit</th>
+                        <th class="px-4 py-3">Property</th>
+                        <th class="px-4 py-3">Granted</th>
+                        <th class="px-4 py-3">Expires</th>
+                        <th class="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100">
+                      <tr
+                        :for={ent <- @booking_entitlements}
+                        id={"member-entitlement-#{ent.id}"}
+                        class="hover:bg-zinc-50"
+                      >
+                        <td class="px-4 py-3 font-medium text-zinc-800">
+                          {member_entitlement_status_label(ent.status)}
+                        </td>
+                        <td class="px-4 py-3 text-zinc-700">
+                          {member_entitlement_benefit_summary(ent)}
+                        </td>
+                        <td class="px-4 py-3 text-zinc-600">
+                          {member_entitlement_property_label(ent.property)}
+                        </td>
+                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                          {Calendar.strftime(ent.inserted_at, "%Y-%m-%d")}
+                        </td>
+                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                          <%= if ent.expires_at do %>
+                            {Date.to_iso8601(DateTime.to_date(ent.expires_at))}
+                          <% else %>
+                            —
+                          <% end %>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                          <.link
+                            :if={ent.consumed_booking_id && ent.consumed_booking}
+                            navigate={~p"/bookings/#{ent.consumed_booking_id}"}
+                            class="text-blue-600 hover:underline text-xs font-semibold"
+                          >
+                            View booking
+                          </.link>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p
+                  :if={@booking_entitlements == []}
+                  id="member-entitlements-empty"
+                  class="text-sm text-zinc-500 py-2"
+                >
+                  You do not have any cabin booking benefits on file.
+                </p>
+              </div>
+
+              <div
+                id="member-ticket-reservations-section"
+                class="rounded border border-zinc-100 py-4 px-4"
+              >
+                <h3 class="text-lg font-semibold text-zinc-900">
+                  Event ticket reservations
+                </h3>
+                <p class="text-sm text-zinc-600 mt-1 mb-4">
+                  Holds and reservations created for you on club events (including completed purchases).
+                </p>
+                <div
+                  :if={@ticket_reservations != []}
+                  class="overflow-x-auto rounded-lg border border-zinc-200"
+                >
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+                      <tr>
+                        <th class="px-4 py-3">Event</th>
+                        <th class="px-4 py-3">Ticket type</th>
+                        <th class="px-4 py-3">Qty</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Hold expires</th>
+                        <th class="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100">
+                      <tr
+                        :for={res <- @ticket_reservations}
+                        id={"member-ticket-reservation-#{res.id}"}
+                        class="hover:bg-zinc-50"
+                      >
+                        <td class="px-4 py-3 text-zinc-800 font-medium">
+                          <%= if res.ticket_tier && res.ticket_tier.event do %>
+                            {res.ticket_tier.event.title}
+                          <% else %>
+                            —
+                          <% end %>
+                        </td>
+                        <td class="px-4 py-3 text-zinc-700">
+                          <%= if res.ticket_tier do %>
+                            {res.ticket_tier.name}
+                          <% else %>
+                            —
+                          <% end %>
+                        </td>
+                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                          {res.quantity}
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class="font-medium text-zinc-800">
+                            {member_ticket_reservation_status_main(res)}
+                          </span>
+                          <span
+                            :if={member_ticket_reservation_hold_lapsed?(res)}
+                            class="block text-xs text-amber-700 mt-0.5"
+                          >
+                            This hold is no longer active; complete checkout again if tickets are still available.
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                          <%= if res.status == "active" && res.expires_at do %>
+                            {Calendar.strftime(
+                              DateTime.shift_zone!(
+                                res.expires_at,
+                                "America/Los_Angeles"
+                              ),
+                              "%Y-%m-%d %H:%M PT"
+                            )}
+                          <% else %>
+                            —
+                          <% end %>
+                        </td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                          <.link
+                            :if={res.ticket_tier && res.ticket_tier.event}
+                            navigate={
+                              ~p"/events/#{res.ticket_tier.event.id}/tickets"
+                            }
+                            class="text-blue-600 hover:underline text-xs font-semibold"
+                          >
+                            Event tickets
+                          </.link>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p
+                  :if={@ticket_reservations == []}
+                  id="member-ticket-reservations-empty"
+                  class="text-sm text-zinc-500 py-2"
+                >
+                  You do not have any event ticket reservations on file.
+                </p>
+              </div>
+            </div>
+
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-6">
               <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <h2 class="text-zinc-900 font-bold text-xl">Payment History</h2>
@@ -2770,6 +2942,8 @@ defmodule YscWeb.UserSettingsLive do
         |> assign(:yearly_stats, nil)
         |> assign(:yearly_stats_year, nil)
         |> assign(:loading_payments, true)
+        |> assign(:booking_entitlements, [])
+        |> assign(:ticket_reservations, [])
       else
         socket
       end
@@ -2884,6 +3058,9 @@ defmodule YscWeb.UserSettingsLive do
     yearly_stats_year = pst_today().year
     yearly_stats = calculate_yearly_stats(all_payments)
 
+    booking_entitlements = Entitlements.list_all_for_user(user.id)
+    ticket_reservations = Events.list_all_ticket_reservations_for_user(user.id)
+
     {:noreply,
      socket
      |> assign(:payments_total, total_count)
@@ -2894,6 +3071,8 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(:filtered_payments_list, all_payments)
      |> assign(:yearly_stats, yearly_stats)
      |> assign(:yearly_stats_year, yearly_stats_year)
+     |> assign(:booking_entitlements, booking_entitlements)
+     |> assign(:ticket_reservations, ticket_reservations)
      |> assign(:loading_payments, false)}
   end
 
@@ -6332,4 +6511,68 @@ defmodule YscWeb.UserSettingsLive do
     do: Calendar.strftime(date, "%b %-d")
 
   defp format_payment_date(_), do: ""
+
+  defp member_entitlement_status_label(:active), do: "Active"
+  defp member_entitlement_status_label(:consumed), do: "Used"
+  defp member_entitlement_status_label(:revoked), do: "Revoked"
+  defp member_entitlement_status_label(:expired), do: "Expired"
+  defp member_entitlement_status_label(other), do: to_string(other)
+
+  defp member_entitlement_property_label(nil), do: "Any cabin"
+  defp member_entitlement_property_label(:tahoe), do: "Tahoe"
+  defp member_entitlement_property_label(:clear_lake), do: "Clear Lake"
+  defp member_entitlement_property_label(other), do: to_string(other)
+
+  defp member_entitlement_benefit_summary(ent) do
+    case ent.benefit_kind do
+      :free_nights ->
+        n = ent.free_nights || 0
+        cap = format_member_money(ent.buyout_max_discount)
+
+        "#{n} free night#{if n == 1, do: "", else: "s"} (up to #{cap} off buyout nights)"
+
+      :percent_off ->
+        pct = ent.percent_off || Decimal.new(0)
+        cap = format_member_money(ent.buyout_max_discount)
+
+        "#{Decimal.round(pct, 2)}% off your stay (up to #{cap} toward buyout pricing)"
+
+      :fixed_amount_off ->
+        "#{format_member_money(ent.amount_off)} off your stay"
+    end
+  end
+
+  defp format_member_money(nil), do: "—"
+
+  defp format_member_money(%Money{} = m) do
+    Ysc.MoneyHelper.format_money!(m)
+  end
+
+  defp member_ticket_reservation_hold_lapsed?(%{
+         status: "active",
+         expires_at: %DateTime{} = exp
+       }) do
+    DateTime.compare(exp, DateTime.utc_now()) != :gt
+  end
+
+  defp member_ticket_reservation_hold_lapsed?(_), do: false
+
+  defp member_ticket_reservation_status_main(res) do
+    cond do
+      res.status == "fulfilled" ->
+        "Purchased"
+
+      res.status == "cancelled" ->
+        "Cancelled"
+
+      res.status == "active" && member_ticket_reservation_hold_lapsed?(res) ->
+        "Hold ended"
+
+      res.status == "active" ->
+        "On hold"
+
+      true ->
+        res.status
+    end
+  end
 end

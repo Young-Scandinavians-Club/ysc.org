@@ -2065,6 +2065,20 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Lists every ticket reservation for the member (`user_id`), in any status,
+  newest first.
+
+  Preloads `ticket_tier` and nested `event` for account settings and similar UIs.
+  """
+  def list_all_ticket_reservations_for_user(user_id) do
+    TicketReservation
+    |> where([tr], tr.user_id == ^user_id)
+    |> order_by([tr], desc: tr.inserted_at)
+    |> preload(ticket_tier: :event)
+    |> Repo.all()
+  end
+
+  @doc """
   List reservations for a tier that still count toward holds and discounts.
 
   Excludes `status: "active"` rows whose `expires_at` is in the past (those remain
