@@ -343,20 +343,26 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
           account_notifications: true
         })
 
+      user_with_events_a = user_fixture()
+
       {:ok, _} =
-        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+        Ysc.Accounts.update_notification_preferences(user_with_events_a, %{
           event_notifications: true,
           account_notifications: true
         })
 
+      user_with_events_b = user_fixture()
+
       {:ok, _} =
-        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+        Ysc.Accounts.update_notification_preferences(user_with_events_b, %{
           event_notifications: true,
           account_notifications: true
         })
 
+      user_without_events = user_fixture()
+
       {:ok, _} =
-        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+        Ysc.Accounts.update_notification_preferences(user_without_events, %{
           event_notifications: false,
           account_notifications: true
         })
@@ -370,12 +376,24 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       import Ecto.Query
 
+      expected_keys = [
+        "event_notification_#{event.id}_#{user_with_events_a.id}",
+        "event_notification_#{event.id}_#{user_with_events_b.id}"
+      ]
+
       assert 2 ==
                Repo.one(
                  from m in Ysc.Messages.MessageIdempotency,
-                   where: ilike(m.idempotency_key, "event_notification_%"),
-                   select: count()
+                   where: m.idempotency_key in ^expected_keys,
+                   select: count(m.id)
                )
+
+      refute Repo.exists?(
+               from m in Ysc.Messages.MessageIdempotency,
+                 where:
+                   m.idempotency_key ==
+                     ^"event_notification_#{event.id}_#{user_without_events.id}"
+             )
     end
   end
 
