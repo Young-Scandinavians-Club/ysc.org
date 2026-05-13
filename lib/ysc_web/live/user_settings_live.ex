@@ -2243,7 +2243,7 @@ defmodule YscWeb.UserSettingsLive do
                   Discounts and free nights granted to your account for cabin stays.
                 </p>
                 <div
-                  :if={@booking_entitlements != []}
+                  :if={@booking_entitlements_count > 0}
                   class="overflow-x-auto rounded-lg border border-zinc-200"
                 >
                   <table class="min-w-full text-sm">
@@ -2257,10 +2257,14 @@ defmodule YscWeb.UserSettingsLive do
                         <th class="px-4 py-3"></th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody
+                      id="member-booking-entitlements"
+                      phx-update="stream"
+                      class="divide-y divide-zinc-100"
+                    >
                       <tr
-                        :for={ent <- @booking_entitlements}
-                        id={"member-entitlement-#{ent.id}"}
+                        :for={{id, ent} <- @streams.booking_entitlements}
+                        id={id}
                         class="hover:bg-zinc-50"
                       >
                         <td class="px-4 py-3 font-medium text-zinc-800">
@@ -2284,7 +2288,7 @@ defmodule YscWeb.UserSettingsLive do
                         </td>
                         <td class="px-4 py-3 text-right">
                           <.link
-                            :if={ent.consumed_booking_id && ent.consumed_booking}
+                            :if={ent.consumed_booking_id}
                             navigate={~p"/bookings/#{ent.consumed_booking_id}"}
                             class="text-blue-600 hover:underline text-xs font-semibold"
                           >
@@ -2296,7 +2300,7 @@ defmodule YscWeb.UserSettingsLive do
                   </table>
                 </div>
                 <p
-                  :if={@booking_entitlements == []}
+                  :if={@booking_entitlements_count == 0}
                   id="member-entitlements-empty"
                   class="text-sm text-zinc-500 py-2"
                 >
@@ -2315,7 +2319,7 @@ defmodule YscWeb.UserSettingsLive do
                   Holds and reservations created for you on club events (including completed purchases).
                 </p>
                 <div
-                  :if={@ticket_reservations != []}
+                  :if={@ticket_reservations_count > 0}
                   class="overflow-x-auto rounded-lg border border-zinc-200"
                 >
                   <table class="min-w-full text-sm">
@@ -2329,10 +2333,14 @@ defmodule YscWeb.UserSettingsLive do
                         <th class="px-4 py-3"></th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody
+                      id="member-ticket-reservations"
+                      phx-update="stream"
+                      class="divide-y divide-zinc-100"
+                    >
                       <tr
-                        :for={res <- @ticket_reservations}
-                        id={"member-ticket-reservation-#{res.id}"}
+                        :for={{id, res} <- @streams.ticket_reservations}
+                        id={id}
                         class="hover:bg-zinc-50"
                       >
                         <td class="px-4 py-3 text-zinc-800 font-medium">
@@ -2392,7 +2400,7 @@ defmodule YscWeb.UserSettingsLive do
                   </table>
                 </div>
                 <p
-                  :if={@ticket_reservations == []}
+                  :if={@ticket_reservations_count == 0}
                   id="member-ticket-reservations-empty"
                   class="text-sm text-zinc-500 py-2"
                 >
@@ -2942,8 +2950,14 @@ defmodule YscWeb.UserSettingsLive do
         |> assign(:yearly_stats, nil)
         |> assign(:yearly_stats_year, nil)
         |> assign(:loading_payments, true)
-        |> assign(:booking_entitlements, [])
-        |> assign(:ticket_reservations, [])
+        |> assign(:booking_entitlements_count, 0)
+        |> assign(:ticket_reservations_count, 0)
+        |> stream(:booking_entitlements, [],
+          dom_id: &booking_entitlement_dom_id/1
+        )
+        |> stream(:ticket_reservations, [],
+          dom_id: &ticket_reservation_dom_id/1
+        )
       else
         socket
       end
@@ -3071,8 +3085,16 @@ defmodule YscWeb.UserSettingsLive do
      |> assign(:filtered_payments_list, all_payments)
      |> assign(:yearly_stats, yearly_stats)
      |> assign(:yearly_stats_year, yearly_stats_year)
-     |> assign(:booking_entitlements, booking_entitlements)
-     |> assign(:ticket_reservations, ticket_reservations)
+     |> assign(:booking_entitlements_count, length(booking_entitlements))
+     |> assign(:ticket_reservations_count, length(ticket_reservations))
+     |> stream(:booking_entitlements, booking_entitlements,
+       reset: true,
+       dom_id: &booking_entitlement_dom_id/1
+     )
+     |> stream(:ticket_reservations, ticket_reservations,
+       reset: true,
+       dom_id: &ticket_reservation_dom_id/1
+     )
      |> assign(:loading_payments, false)}
   end
 
@@ -6364,6 +6386,10 @@ defmodule YscWeb.UserSettingsLive do
       item.stripe_price_id == price_id
     end)
   end
+
+  defp booking_entitlement_dom_id(ent), do: "member-entitlement-#{ent.id}"
+
+  defp ticket_reservation_dom_id(res), do: "member-ticket-reservation-#{res.id}"
 
   # Generate unique DOM ID for payment stream items
   defp payment_dom_id(%{type: :booking, booking: booking})
