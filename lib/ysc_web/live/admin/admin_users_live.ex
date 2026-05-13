@@ -354,6 +354,8 @@ defmodule YscWeb.AdminUsersLive do
                     />
                     <button
                       type="submit"
+                      id="confirm-reject-application-button"
+                      phx-disable-with="Rejecting..."
                       data-confirm="You are about to reject this application. Are you sure?"
                       class="phx-submit-loading:opacity-75 rounded bg-red-600 hover:bg-red-700 py-2 px-3 text-sm font-semibold text-white transition-colors"
                     >
@@ -364,8 +366,10 @@ defmodule YscWeb.AdminUsersLive do
                 </div>
               </div>
               <.button
+                id="approve-membership-application-button"
                 color="green"
                 phx-click="approve-application"
+                phx-disable-with="Approving..."
                 phx-value-user-id={@selected_user.id}
                 phx-value-application-id={@selected_user_application.id}
                 class="shrink-0"
