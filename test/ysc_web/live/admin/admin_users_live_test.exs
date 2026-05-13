@@ -59,9 +59,10 @@ defmodule YscWeb.AdminUsersLiveTest do
 
       assert render(view) =~ "Review Application"
       assert render(view) =~ "Approve Me"
+      assert render(view) =~ ~s(phx-disable-with="Approving...")
 
       view
-      |> element("button", "Approve")
+      |> element("#approve-membership-application-button")
       |> render_click()
 
       assert_patched(view, "/admin/users?id=#{pending_user.id}")
@@ -87,6 +88,8 @@ defmodule YscWeb.AdminUsersLiveTest do
       view
       |> element("button", "Reject Application...")
       |> render_click()
+
+      assert render(view) =~ ~s(phx-disable-with="Rejecting...")
 
       view
       |> element("#reject-application-form")
