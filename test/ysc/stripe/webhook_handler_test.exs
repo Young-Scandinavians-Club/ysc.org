@@ -2191,6 +2191,37 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
                WebhookHandler.handle_webhook_event("payout.paid", payout_map)
     end
 
+    test "payout.paid skips ledger when STRIPE_PROCESS_PAYOUT_WEBHOOKS disables processing" do
+      previous = Application.get_env(:ysc, :process_stripe_payout_webhooks)
+      Application.put_env(:ysc, :process_stripe_payout_webhooks, false)
+
+      on_exit(fn ->
+        if previous != nil do
+          Application.put_env(:ysc, :process_stripe_payout_webhooks, previous)
+        else
+          Application.delete_env(:ysc, :process_stripe_payout_webhooks)
+        end
+      end)
+
+      payout_id = "po_skip_#{System.unique_integer()}"
+      arrival = System.os_time(:second)
+
+      payout_map = %{
+        "id" => payout_id,
+        "amount" => 50_000,
+        "currency" => "usd",
+        "status" => "paid",
+        "arrival_date" => arrival,
+        "description" => "Skipped payout",
+        "metadata" => %{}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      assert Ledgers.get_payout_by_stripe_id(payout_id) == nil
+    end
+
     test "payout.paid with Stripe.Payout struct uses struct clause via handle_webhook_event" do
       payout_id = "po_struct_#{System.unique_integer()}"
 

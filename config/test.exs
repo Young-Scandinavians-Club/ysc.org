@@ -28,7 +28,10 @@ config :ysc,
   stripe_customer_module: Stripe.CustomerMock,
   stripe_invoice_module: Stripe.InvoiceMock,
   customers_module: Ysc.CustomersMock,
-  payments_module: Ysc.PaymentsMock
+  payments_module: Ysc.PaymentsMock,
+  # runtime.exs does not read STRIPE_PROCESS_PAYOUT_WEBHOOKS in :test; keep explicit so
+  # payout webhook tests stay green regardless of shell/.env.
+  process_stripe_payout_webhooks: true
 
 # Minimum Argon2 parameters for tests — fast but still exercises the real hash path.
 # t_cost: 1  — single iteration (minimum)

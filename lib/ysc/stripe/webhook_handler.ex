@@ -36,6 +36,14 @@ defmodule Ysc.Stripe.WebhookHandler do
   - Data validation errors: Webhook marked as failed, logged to Sentry
   - Duplicate events: Idempotent handling based on external IDs
 
+  ## Stripe payout webhooks (`payout.paid`)
+
+  When application config `:process_stripe_payout_webhooks` is `false` (set at
+  runtime via `STRIPE_PROCESS_PAYOUT_WEBHOOKS` in `config/runtime.exs` outside `:test`),
+  payout webhooks are acknowledged without creating ledger payouts or QuickBooks jobs.
+  In `:test`, that env var is ignored and `config/test.exs` keeps processing enabled unless
+  a test temporarily overrides `Application.get_env/3`.
+
   ## Important Notes
 
   - Never return success (:ok) unless the webhook event is stored in the database
@@ -1465,27 +1473,36 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     payout_id = payout[:id] || payout["id"]
 
-    Ysc.Logging.info("Processing Stripe payout",
-      payout_id: payout_id,
-      amount: payout[:amount] || payout["amount"],
-      currency: payout[:currency] || payout["currency"],
-      status: payout[:status] || payout["status"]
-    )
+    if Application.get_env(:ysc, :process_stripe_payout_webhooks, true) do
+      Ysc.Logging.info("Processing Stripe payout",
+        payout_id: payout_id,
+        amount: payout[:amount] || payout["amount"],
+        currency: payout[:currency] || payout["currency"],
+        status: payout[:status] || payout["status"]
+      )
 
-    # Check if payout already exists (idempotency)
-    case Ledgers.get_payout_by_stripe_id(payout_id) do
-      nil ->
-        # Payout doesn't exist, process it
-        process_new_payout(payout)
+      # Check if payout already exists (idempotency)
+      case Ledgers.get_payout_by_stripe_id(payout_id) do
+        nil ->
+          # Payout doesn't exist, process it
+          process_new_payout(payout)
 
-      existing_payout ->
-        # Payout already exists, skip processing
-        Ysc.Logging.info("Payout already processed, skipping (idempotency)",
-          payout_id: payout_id,
-          existing_payout_id: existing_payout.id
-        )
+        existing_payout ->
+          # Payout already exists, skip processing
+          Ysc.Logging.info("Payout already processed, skipping (idempotency)",
+            payout_id: payout_id,
+            existing_payout_id: existing_payout.id
+          )
 
-        :ok
+          :ok
+      end
+    else
+      Ysc.Logging.info(
+        "Stripe payout webhook processing disabled (STRIPE_PROCESS_PAYOUT_WEBHOOKS), acknowledging only",
+        payout_id: payout_id
+      )
+
+      :ok
     end
   end
 
