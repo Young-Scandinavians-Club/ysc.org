@@ -36,6 +36,11 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
       assert EmailCategories.get_category("newsletter_stats_snapshot") ==
                :account
     end
+
+    test "maps ticket_reservation_created to account notifications" do
+      assert EmailCategories.get_category("ticket_reservation_created") ==
+               :account
+    end
   end
 
   describe "get_reply_to/1" do
@@ -99,6 +104,15 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
       refute EmailCategories.should_send_email?(
                user_disabled,
                "event_notification"
+             )
+    end
+
+    test "still sends ticket_reservation_created when event notifications are disabled" do
+      user_disabled = %{event_notifications: false}
+
+      assert EmailCategories.should_send_email?(
+               user_disabled,
+               "ticket_reservation_created"
              )
     end
 
