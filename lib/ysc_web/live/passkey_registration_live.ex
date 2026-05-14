@@ -267,7 +267,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
             {:noreply,
              assign(socket,
                error:
-                 "Passkey registration failed: #{inspect(reason)}. Please try again.",
+                 "Passkey registration did not complete. Please try again, or use another way to sign in.",
                loading: false,
                passkey_challenge: nil
              )}

@@ -5191,11 +5191,18 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp handle_membership_change_error(socket, reason) do
+    require Ysc.Logging
+
+    Ysc.Logging.error(
+      "Membership plan change failed",
+      reason: inspect(reason)
+    )
+
     {:noreply,
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "Failed to change membership: #{inspect(reason)}",
+       "We couldn't update your membership plan. Please try again in a few minutes, or contact info@ysc.org if this continues.",
        title: "Membership"
      )}
   end

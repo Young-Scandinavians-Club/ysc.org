@@ -1339,10 +1339,30 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 msg
               end)
 
-            %{ok: false, message: "Could not send invite: #{inspect(errors)}"}
+            Ysc.Logging.warning(
+              "Family invite failed during onboarding (validation)",
+              user_id: user.id,
+              errors: inspect(errors)
+            )
+
+            %{
+              ok: false,
+              message:
+                "Could not send invite. Please check the information and try again."
+            }
 
           {:error, reason} ->
-            %{ok: false, message: "Could not send invite: #{inspect(reason)}"}
+            Ysc.Logging.warning(
+              "Family invite failed during onboarding",
+              user_id: user.id,
+              reason: inspect(reason)
+            )
+
+            %{
+              ok: false,
+              message:
+                "Could not send invite. Please try again, or contact info@ysc.org for help."
+            }
         end
       end
 
