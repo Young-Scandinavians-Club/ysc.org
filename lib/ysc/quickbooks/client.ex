@@ -1669,12 +1669,16 @@ defmodule Ysc.Quickbooks.Client do
   # https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
   # DepositToAccountRef (bank account) is required by QuickBooks - normalize and validate.
   defp build_deposit_body(params) do
-    # TotalAmt must match the sum of line Amounts as sent to QuickBooks (same float
-    # conversion as normalize_deposit_line_item/1); mismatch can cause validation errors.
+    # TotalAmt must match the sum of line amounts; sum in Decimal then round once to
+    # avoid float accumulation drift vs. repeated `acc + amt` on normalized floats.
     lines = Enum.map(params.line, &normalize_deposit_line_item/1)
 
     total_amt_from_lines =
-      Enum.reduce(lines, 0.0, fn %{"Amount" => amt}, acc -> acc + amt end)
+      Enum.reduce(params.line, Decimal.new(0), fn item, acc ->
+        Decimal.add(acc, deposit_line_amount_to_decimal(item.amount))
+      end)
+      |> Decimal.round(2)
+      |> Decimal.to_float()
 
     # Normalize so QuickBooks receives {"value": "..."} (string keys, string value).
     deposit_to_account_ref =
@@ -1937,6 +1941,25 @@ defmodule Ysc.Quickbooks.Client do
       Map.put(result, "Description", item.description)
     else
       result
+    end
+  end
+
+  defp deposit_line_amount_to_decimal(amount) do
+    case amount do
+      %Decimal{} = amt ->
+        amt
+
+      amt when is_integer(amt) ->
+        Decimal.new(amt)
+
+      amt when is_float(amt) ->
+        case Decimal.cast(amt) do
+          {:ok, d} -> d
+          :error -> Decimal.new(0)
+        end
+
+      _ ->
+        Decimal.new(0)
     end
   end
 
@@ -2837,7 +2860,15 @@ defmodule Ysc.Quickbooks.Client do
         first_error["detail"] ||
         "Unknown error"
 
-    code = first_error["code"] || "UNKNOWN"
+    code_raw = first_error["code"] || first_error["Code"] || "UNKNOWN"
+
+    code =
+      cond do
+        is_binary(code_raw) -> code_raw
+        is_integer(code_raw) -> Integer.to_string(code_raw)
+        true -> to_string(code_raw)
+      end
+
     "#{code}: #{message}"
   end
 

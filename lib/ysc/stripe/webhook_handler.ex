@@ -39,8 +39,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   ## Stripe payout webhooks (`payout.paid`)
 
   When application config `:process_stripe_payout_webhooks` is `false` (set at
-  runtime via `STRIPE_PROCESS_PAYOUT_WEBHOOKS` in `config/runtime.exs`), payout
-  webhooks are acknowledged without creating ledger payouts or QuickBooks jobs.
+  runtime via `STRIPE_PROCESS_PAYOUT_WEBHOOKS` in `config/runtime.exs` outside `:test`),
+  payout webhooks are acknowledged without creating ledger payouts or QuickBooks jobs.
+  In `:test`, that env var is ignored and `config/test.exs` keeps processing enabled unless
+  a test temporarily overrides `Application.get_env/3`.
 
   ## Important Notes
 

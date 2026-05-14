@@ -18,14 +18,17 @@ end
 # Stripe — `payout.paid` webhooks create ledger payouts unless disabled here.
 # Set STRIPE_PROCESS_PAYOUT_WEBHOOKS to false, 0, no, or off (case-insensitive) while another
 # system handles the same Stripe account (e.g. legacy site); unset means enabled.
-process_stripe_payout_webhooks =
-  case System.get_env("STRIPE_PROCESS_PAYOUT_WEBHOOKS") do
-    nil -> true
-    "" -> true
-    v -> String.downcase(String.trim(v)) not in ["false", "0", "no", "off"]
-  end
+# Not applied in :test so `mix test` stays stable when the shell or .env disables payouts.
+unless config_env() == :test do
+  process_stripe_payout_webhooks =
+    case System.get_env("STRIPE_PROCESS_PAYOUT_WEBHOOKS") do
+      nil -> true
+      "" -> true
+      v -> String.downcase(String.trim(v)) not in ["false", "0", "no", "off"]
+    end
 
-config :ysc, process_stripe_payout_webhooks: process_stripe_payout_webhooks
+  config :ysc, process_stripe_payout_webhooks: process_stripe_payout_webhooks
+end
 
 # ## FlowRoute SMS Configuration
 #

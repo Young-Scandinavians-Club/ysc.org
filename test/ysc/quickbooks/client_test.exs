@@ -392,6 +392,24 @@ defmodule Ysc.Quickbooks.ClientTest do
 
       assert result == "UNKNOWN: Something went wrong"
     end
+
+    test "parse_error_response reads capitalized Code like fault_to_error_details" do
+      response_body = """
+      {
+        "Fault": {
+          "Error": [
+            {
+              "Code": "6000",
+              "Message": "Application error"
+            }
+          ]
+        }
+      }
+      """
+
+      assert Client.test_parse_error_response(response_body) ==
+               "6000: Application error"
+    end
   end
 
   describe "rate limit handling" do
