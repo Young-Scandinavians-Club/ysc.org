@@ -1,6 +1,8 @@
 defmodule YscWeb.UserSettingsLive do
   use YscWeb, :live_view
 
+  import YscWeb.Live.AsyncHelpers
+
   @phone_verification_token_salt "phone_verification"
   @phone_verification_token_max_age 3600
 
@@ -3063,17 +3065,31 @@ defmodule YscWeb.UserSettingsLive do
     user = socket.assigns.user
     per_page = socket.assigns.payments_per_page
 
-    {all_payments, total_count} =
-      Ledgers.list_user_payments_paginated(user.id, 1, per_page)
+    parallel =
+      [
+        {:payments,
+         fn -> Ledgers.list_user_payments_paginated(user.id, 1, per_page) end},
+        {:entitlements, fn -> Entitlements.list_usable_for_user(user.id) end},
+        {:reservations,
+         fn -> Events.list_active_ticket_holds_for_user(user.id) end}
+      ]
+      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+        max_concurrency: 3,
+        timeout: :infinity
+      )
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
+        Map.put(acc, key, value)
+      end)
+
+    {all_payments, total_count} = Map.fetch!(parallel, :payments)
+    booking_entitlements = Map.fetch!(parallel, :entitlements)
+    ticket_reservations = Map.fetch!(parallel, :reservations)
 
     total_pages = div(total_count + per_page - 1, per_page)
 
     # Calculate yearly impact stats
     yearly_stats_year = pst_today().year
     yearly_stats = calculate_yearly_stats(all_payments)
-
-    booking_entitlements = Entitlements.list_usable_for_user(user.id)
-    ticket_reservations = Events.list_active_ticket_holds_for_user(user.id)
 
     {:noreply,
      socket
