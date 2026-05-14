@@ -55,9 +55,6 @@ defmodule YscWeb.AdminComponents do
     """
   end
 
-  defp format_form_error({_key, {msg, _type}}), do: msg
-  defp format_form_error({msg, _type}), do: msg
-
   # ---------------------------------------------------------------------------
   # admin_page_title
   # ---------------------------------------------------------------------------

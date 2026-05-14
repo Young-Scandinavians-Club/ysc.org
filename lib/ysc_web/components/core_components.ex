@@ -1073,8 +1073,9 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  defp format_form_error({_key, {msg, _type}}), do: msg
-  defp format_form_error({msg, _type}), do: msg
+  @doc false
+  def format_form_error({_key, {msg, _type}}), do: msg
+  def format_form_error({msg, _type}), do: msg
 
   attr :class, :string, default: nil
 
