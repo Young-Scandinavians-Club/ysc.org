@@ -1161,8 +1161,10 @@ defmodule YscWeb.AdminEventsNewLive do
     event = socket.assigns.event
 
     case Agendas.create_agenda(event, %{title: "Agenda", event_id: event.id}) do
-      {:ok, agenda} ->
-        {:noreply, stream_insert(socket, :agendas, agenda)}
+      {:ok, _agenda} ->
+        # `create_agenda/2` broadcasts `AgendaAdded`; `handle_info/2` performs
+        # `stream_insert`. Do not insert here or the same row appears twice.
+        {:noreply, socket}
 
       {:error, _changeset} ->
         {:noreply,

@@ -38,6 +38,13 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert view |> element("#add-agenda-button") |> render_click()
 
       assert has_element?(view, "#agendas .drag-handle")
+
+      html = render(view)
+      {:ok, doc} = Floki.parse_fragment(html)
+      agenda_cards = Floki.find(doc, "#agendas > li")
+
+      assert length(agenda_cards) == 1,
+             "expected a single agenda stream item (no duplicate PubSub + handler insert)"
     end
 
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do
