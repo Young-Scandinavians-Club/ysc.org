@@ -307,7 +307,9 @@ config :ysc,
   payment_success_total_timeout_ms: 10_000,
   # Stripe customer database sync delays
   stripe_customer_db_sync_delay_ms: 50,
-  stripe_customer_db_sync_retry_delay_ms: 100
+  stripe_customer_db_sync_retry_delay_ms: 100,
+  # Overridden in runtime.exs from STRIPE_PROCESS_PAYOUT_WEBHOOKS (default: process webhooks).
+  process_stripe_payout_webhooks: true
 
 config :phoenix_template, :format_encoders, []
 

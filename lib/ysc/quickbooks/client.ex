@@ -1669,12 +1669,12 @@ defmodule Ysc.Quickbooks.Client do
   # https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/deposit
   # DepositToAccountRef (bank account) is required by QuickBooks - normalize and validate.
   defp build_deposit_body(params) do
-    total_amt_value =
-      case params.total_amt do
-        %Decimal{} = amt -> Decimal.to_float(amt)
-        amt when is_number(amt) -> amt
-        _ -> 0
-      end
+    # TotalAmt must match the sum of line Amounts as sent to QuickBooks (same float
+    # conversion as normalize_deposit_line_item/1); mismatch can cause validation errors.
+    lines = Enum.map(params.line, &normalize_deposit_line_item/1)
+
+    total_amt_from_lines =
+      Enum.reduce(lines, 0.0, fn %{"Amount" => amt}, acc -> acc + amt end)
 
     # Normalize so QuickBooks receives {"value": "..."} (string keys, string value).
     deposit_to_account_ref =
@@ -1683,8 +1683,8 @@ defmodule Ysc.Quickbooks.Client do
 
     %{
       "DepositToAccountRef" => deposit_to_account_ref,
-      "Line" => Enum.map(params.line, &normalize_deposit_line_item/1),
-      "TotalAmt" => total_amt_value
+      "Line" => lines,
+      "TotalAmt" => total_amt_from_lines
     }
     |> maybe_put("TxnDate", params[:txn_date])
     |> maybe_put("PrivateNote", params[:private_note])
@@ -1949,10 +1949,11 @@ defmodule Ysc.Quickbooks.Client do
         _ -> 0
       end
 
-    base = %{
-      "Amount" => amount_value,
-      "DetailType" => item.detail_type
-    }
+    # Do not put DetailType on base yet: lines that include LinkedTxn must omit
+    # top-level DetailType — QuickBooks otherwise returns validation errors (often
+    # reported as 6000 / "invalid bank account") when DetailType is forced to
+    # DepositLineDetail alongside LinkedTxn. See Intuit/community deposit examples.
+    base = %{"Amount" => amount_value}
 
     case item.detail_type do
       "DepositLineDetail" ->
@@ -2018,27 +2019,41 @@ defmodule Ysc.Quickbooks.Client do
 
         # Add LinkedTxn at the line level (not inside DepositLineDetail)
         # This is the correct way to link deposits to SalesReceipts/RefundReceipts
-        result =
+        {result, has_linked?} =
           case item[:linked_txn] do
             [_ | _] = linked_txns ->
               linked_txn_list =
                 Enum.map(linked_txns, fn txn ->
+                  txn_line_id =
+                    case txn[:txn_line_id] do
+                      nil -> "0"
+                      id -> to_string(id)
+                    end
+
                   %{
-                    "TxnId" => txn.txn_id,
-                    "TxnType" => txn.txn_type
+                    "TxnId" => to_string(txn[:txn_id]),
+                    "TxnType" => to_string(txn[:txn_type]),
+                    "TxnLineId" => txn_line_id
                   }
                 end)
 
-              Map.put(result, "LinkedTxn", linked_txn_list)
+              {Map.put(result, "LinkedTxn", linked_txn_list), true}
 
             _ ->
-              result
+              {result, false}
+          end
+
+        result =
+          if has_linked? do
+            result
+          else
+            Map.put(result, "DetailType", "DepositLineDetail")
           end
 
         maybe_put(result, "Description", item[:description])
 
       _ ->
-        base
+        Map.put(base, "DetailType", item.detail_type)
     end
   end
 
@@ -2442,28 +2457,55 @@ defmodule Ysc.Quickbooks.Client do
       case result do
         {:ok, %Finch.Response{status: status, body: response_body}}
         when status in 200..299 ->
-          case Jason.decode(response_body) do
-            {:ok, %{"QueryResponse" => %{"Account" => accounts}}}
-            when is_list(accounts) ->
-              {:ok, accounts}
+          decode_query_all_accounts_body(response_body)
 
-            {:ok, %{"QueryResponse" => %{"Account" => account}}}
-            when is_map(account) ->
-              {:ok, [account]}
+        {:error, {:rate_limited, _resp}} ->
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "query_all_accounts",
+            max_retries: max_429_retries()
+          )
 
-            {:ok, %{"QueryResponse" => _}} ->
-              {:ok, []}
+          {:error, :rate_limited}
 
-            {:ok, data} ->
-              Ysc.Logging.error(
-                "[QB Client] query_all_accounts: Unexpected response",
-                data: inspect(data, limit: 500)
-              )
+        {:ok, %Finch.Response{status: 401, body: _response_body}} ->
+          Ysc.Logging.warning(
+            "[QB Client] query_all_accounts: Authentication failed, attempting token refresh"
+          )
 
-              {:error, :invalid_response}
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:get, url, headers)
 
-            {:error, _} ->
-              {:error, :invalid_response}
+              retry_result =
+                request_with_429_retry(fn ->
+                  Finch.request(request, Ysc.Finch)
+                end)
+
+              case retry_result do
+                {:ok, %Finch.Response{status: status, body: response_body}}
+                when status in 200..299 ->
+                  decode_query_all_accounts_body(response_body)
+
+                {:ok, %Finch.Response{body: body}} ->
+                  {:error, parse_error_response(body)}
+
+                {:error, {:rate_limited, _resp}} ->
+                  Ysc.Logging.warning(
+                    "QuickBooks rate limit exceeded after retries",
+                    endpoint: "query_all_accounts",
+                    max_retries: max_429_retries()
+                  )
+
+                  {:error, :rate_limited}
+
+                {:error, error} ->
+                  {:error, error}
+              end
+
+            error ->
+              error
           end
 
         {:ok, %Finch.Response{body: body}} ->
@@ -2472,6 +2514,32 @@ defmodule Ysc.Quickbooks.Client do
         {:error, error} ->
           {:error, error}
       end
+    end
+  end
+
+  defp decode_query_all_accounts_body(response_body) do
+    case Jason.decode(response_body) do
+      {:ok, %{"QueryResponse" => %{"Account" => accounts}}}
+      when is_list(accounts) ->
+        {:ok, accounts}
+
+      {:ok, %{"QueryResponse" => %{"Account" => account}}}
+      when is_map(account) ->
+        {:ok, [account]}
+
+      {:ok, %{"QueryResponse" => _}} ->
+        {:ok, []}
+
+      {:ok, data} ->
+        Ysc.Logging.error(
+          "[QB Client] query_all_accounts: Unexpected response",
+          data: inspect(data, limit: 500)
+        )
+
+        {:error, :invalid_response}
+
+      {:error, _} ->
+        {:error, :invalid_response}
     end
   end
 
@@ -2745,14 +2813,10 @@ defmodule Ysc.Quickbooks.Client do
   defp parse_error_response(response_body) do
     case Jason.decode(response_body) do
       {:ok, %{"Fault" => fault}} ->
-        error = fault["Error"] || []
-        first_error = List.first(error) || %{}
+        format_fault_message(fault)
 
-        message =
-          first_error["Message"] || first_error["Detail"] || "Unknown error"
-
-        code = first_error["code"] || "UNKNOWN"
-        "#{code}: #{message}"
+      {:ok, %{"fault" => fault}} ->
+        format_fault_message(fault)
 
       {:ok, data} ->
         inspect(data)
@@ -2762,28 +2826,30 @@ defmodule Ysc.Quickbooks.Client do
     end
   end
 
+  defp format_fault_message(fault) when is_map(fault) do
+    errors = fault["Error"] || fault["error"] || []
+    first_error = List.first(errors) || %{}
+
+    message =
+      first_error["Message"] ||
+        first_error["message"] ||
+        first_error["Detail"] ||
+        first_error["detail"] ||
+        "Unknown error"
+
+    code = first_error["code"] || "UNKNOWN"
+    "#{code}: #{message}"
+  end
+
   # Enhanced error response parser that extracts full error details for logging
   # Returns a map with all available error information from QuickBooks
   defp parse_error_details(response_body) do
     case Jason.decode(response_body) do
       {:ok, %{"Fault" => fault}} ->
-        errors = fault["Error"] || []
+        fault_to_error_details(fault, response_body)
 
-        %{
-          fault_type: fault["type"],
-          errors:
-            Enum.map(errors, fn error ->
-              %{
-                code: error["code"],
-                message: error["Message"],
-                detail: error["Detail"],
-                element: error["element"]
-              }
-              |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-              |> Map.new()
-            end),
-          raw_response: response_body
-        }
+      {:ok, %{"fault" => fault}} ->
+        fault_to_error_details(fault, response_body)
 
       {:ok, data} ->
         %{
@@ -2798,6 +2864,26 @@ defmodule Ysc.Quickbooks.Client do
           raw_response: String.slice(response_body, 0, 500)
         }
     end
+  end
+
+  defp fault_to_error_details(fault, response_body) when is_map(fault) do
+    errors = fault["Error"] || fault["error"] || []
+
+    %{
+      fault_type: fault["type"] || fault["Type"],
+      errors:
+        Enum.map(errors, fn error ->
+          %{
+            code: error["code"] || error["Code"],
+            message: error["Message"] || error["message"],
+            detail: error["Detail"] || error["detail"],
+            element: error["element"] || error["Element"]
+          }
+          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+          |> Map.new()
+        end),
+      raw_response: response_body
+    }
   end
 
   # Extract the primary error code from error details
