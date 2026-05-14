@@ -1254,7 +1254,8 @@ defmodule YscWeb.UserSettingsLiveTest do
 
         render_click(view, "change-membership", %{"membership_type" => "family"})
 
-        assert render(view) =~ "Failed to change membership"
+        assert render(view) =~ "info@ysc.org"
+        assert render(view) =~ "try again in a few minutes"
       after
         Application.delete_env(:ysc, :change_membership_plan_stripe_callback)
       end

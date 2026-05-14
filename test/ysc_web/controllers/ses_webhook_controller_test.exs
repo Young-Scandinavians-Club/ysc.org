@@ -4,8 +4,12 @@ defmodule YscWeb.SesWebhookControllerTest do
 
   Tests SNS message type handling, environment filtering, event recording,
   hard bounce unsubscription, and signature bypass in test mode.
+
+  Runs synchronously: the controller reads `Ysc.Env.current()` / Application
+  env for SES tag filtering, which must not race async tests that temporarily
+  set `:ysc, :environment` to non-test values.
   """
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   import Ysc.AccountsFixtures
 
