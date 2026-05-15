@@ -5320,5 +5320,10 @@ defmodule Ysc.Quickbooks.Client do
     def test_parse_error_details(response_body) do
       parse_error_details(response_body)
     end
+
+    @doc false
+    def test_build_deposit_body(params) do
+      build_deposit_body(params)
+    end
   end
 end
