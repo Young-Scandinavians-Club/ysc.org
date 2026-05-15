@@ -4,7 +4,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
 
   Prompts them to either:
   - log out and log in with the invited email (when an account already exists), or
-  - log out and create a new linked account via the membership application flow.
+  - log out and continue to the family invite acceptance page to create a linked family member account.
   """
   use YscWeb, :live_view
 
@@ -43,7 +43,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
       true ->
         # If the invite email already has an account, we want the user to
         # log out and then log in with that email. Otherwise, we send them
-        # to the registration flow with the invite token preserved.
+        # to the invite acceptance page with the invite token preserved.
         existing_user = Accounts.get_user_by_email(invite.email)
 
         redirect_to =
@@ -85,10 +85,10 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
             page to review and accept the pending family invitation.
           </p>
           <p :if={!@existing_user} class="text-zinc-600 mb-6">
-            To accept this invitation for <strong>{@invite.email}</strong>, you need to log out and
-            create a new account with that email. Your membership application will be linked to this
-            invitation and sent for review. Once approved, you'll be immediately added to the family
-            membership.
+            To accept this invitation for <strong>{@invite.email}</strong>, log out of this account first.
+            After you log out, we will take you to the invitation page where you can create your family
+            member account with that email. This is a short sign-up for the invited family member. It is
+            not a new membership application and does not go to the board for approval.
           </p>
           <form action={@logout_redirect_url} method="post">
             <input
