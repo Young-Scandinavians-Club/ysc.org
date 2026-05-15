@@ -27,10 +27,7 @@ defmodule YscWeb.AuthController do
   end
 
   def request(conn, %{"redirect_to" => redirect_to}) do
-    conn =
-      conn
-      |> delete_session(:reauth_mode)
-      |> delete_session(:reauth_return_to)
+    conn = UserAuth.clear_reauth_session(conn)
 
     if YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
       put_session(conn, :oauth_redirect_to, redirect_to)
@@ -40,9 +37,7 @@ defmodule YscWeb.AuthController do
   end
 
   def request(conn, _params) do
-    conn
-    |> delete_session(:reauth_mode)
-    |> delete_session(:reauth_return_to)
+    UserAuth.clear_reauth_session(conn)
   end
 
   @doc """
@@ -51,8 +46,7 @@ defmodule YscWeb.AuthController do
   def callback(%{assigns: %{ueberauth_failure: _fails}} = conn, _params) do
     # User cancelled or OAuth provider returned an error — clear any stale reauth flags
     conn
-    |> delete_session(:reauth_mode)
-    |> delete_session(:reauth_return_to)
+    |> UserAuth.clear_reauth_session()
     |> YscWeb.Flash.put_toast(
       :error,
       "Authentication was cancelled or failed. Please try again.",
@@ -73,8 +67,7 @@ defmodule YscWeb.AuthController do
       end
     else
       conn
-      |> delete_session(:reauth_mode)
-      |> delete_session(:reauth_return_to)
+      |> UserAuth.clear_reauth_session()
       |> YscWeb.Flash.put_toast(
         :error,
         "Unable to retrieve email from your account. Please contact support.",
@@ -87,8 +80,7 @@ defmodule YscWeb.AuthController do
   def callback(conn, _params) do
     # Unexpected state - no auth and no failure — clear any stale reauth flags
     conn
-    |> delete_session(:reauth_mode)
-    |> delete_session(:reauth_return_to)
+    |> UserAuth.clear_reauth_session()
     |> YscWeb.Flash.put_toast(
       :error,
       "Authentication error occurred. Please try again.",
@@ -110,8 +102,7 @@ defmodule YscWeb.AuthController do
     cond do
       is_nil(current_user) ->
         conn
-        |> delete_session(:reauth_mode)
-        |> delete_session(:reauth_return_to)
+        |> UserAuth.clear_reauth_session()
         |> YscWeb.Flash.put_toast(
           :error,
           "Session expired. Please sign in again.",
@@ -121,8 +112,7 @@ defmodule YscWeb.AuthController do
 
       String.downcase(oauth_email) == String.downcase(current_user.email) ->
         conn
-        |> delete_session(:reauth_mode)
-        |> delete_session(:reauth_return_to)
+        |> UserAuth.clear_reauth_session()
         |> put_session(
           :reauth_verified_at,
           DateTime.utc_now() |> DateTime.to_unix()
@@ -134,8 +124,7 @@ defmodule YscWeb.AuthController do
 
       true ->
         conn
-        |> delete_session(:reauth_mode)
-        |> delete_session(:reauth_return_to)
+        |> UserAuth.clear_reauth_session()
         |> YscWeb.Flash.put_toast(
           :error,
           "The social account email doesn't match your account. Please use the social account associated with your registered email.",
