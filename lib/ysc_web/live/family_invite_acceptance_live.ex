@@ -211,8 +211,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
 
         <p>
           You've been invited by <strong>{@invite.primary_user.first_name}</strong>
-          to join
-          their YSC family membership!
+          to join their family membership with the Young Scandinavians Club.
         </p>
 
         <p>

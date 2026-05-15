@@ -107,7 +107,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       assert html =~ "Accept Family Invitation"
       assert html =~ "You&#39;ve been invited by"
       assert html =~ invite.primary_user.first_name
-      assert html =~ "YSC family membership"
+      assert html =~ "Young Scandinavians Club"
 
       # Verify form is present
       assert has_element?(view, "form#accept-invite-form")
