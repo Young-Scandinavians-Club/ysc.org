@@ -412,6 +412,89 @@ defmodule Ysc.Quickbooks.ClientTest do
     end
   end
 
+  describe "build_deposit_body (Stripe payout / LinkedTxn regression)" do
+    @bank_ref %{value: "qb_bank_1"}
+
+    test "includes top-level DetailType when line has no LinkedTxn" do
+      body =
+        Client.test_build_deposit_body(%{
+          deposit_to_account_ref: @bank_ref,
+          line: [
+            %{
+              amount: 100,
+              detail_type: "DepositLineDetail",
+              deposit_line_detail: %{account_ref: %{value: "uf_1"}}
+            }
+          ],
+          total_amt: 100
+        })
+
+      [line] = body["Line"]
+      assert line["DetailType"] == "DepositLineDetail"
+      refute Map.has_key?(line, "LinkedTxn")
+      assert body["TotalAmt"] == 100.0
+    end
+
+    test "omits top-level DetailType when line has LinkedTxn (QuickBooks validation)" do
+      body =
+        Client.test_build_deposit_body(%{
+          deposit_to_account_ref: @bank_ref,
+          line: [
+            %{
+              amount: 50.0,
+              detail_type: "DepositLineDetail",
+              deposit_line_detail: %{account_ref: %{value: "uf_1"}},
+              linked_txn: [
+                %{txn_id: 12_345, txn_type: "Payment", txn_line_id: nil},
+                %{txn_id: "678", txn_type: :SalesReceipt, txn_line_id: 2}
+              ]
+            }
+          ],
+          total_amt: 50
+        })
+
+      [line] = body["Line"]
+      refute Map.has_key?(line, "DetailType")
+
+      assert [
+               %{"TxnId" => "12345", "TxnType" => "Payment", "TxnLineId" => "0"}
+               | _
+             ] =
+               line["LinkedTxn"]
+
+      assert Enum.at(line["LinkedTxn"], 1) == %{
+               "TxnId" => "678",
+               "TxnType" => "SalesReceipt",
+               "TxnLineId" => "2"
+             }
+
+      assert body["TotalAmt"] == 50.0
+    end
+
+    test "TotalAmt is sum of line amounts rounded in Decimal (avoids float drift)" do
+      body =
+        Client.test_build_deposit_body(%{
+          deposit_to_account_ref: @bank_ref,
+          line:
+            for(
+              _ <- 1..3,
+              do: %{
+                amount: Decimal.new("0.1"),
+                detail_type: "DepositLineDetail",
+                deposit_line_detail: %{account_ref: %{value: "uf_1"}}
+              }
+            ),
+          total_amt: 999
+        })
+
+      assert body["TotalAmt"] == 0.3
+
+      assert_in_delta Enum.sum(Enum.map(body["Line"], & &1["Amount"])),
+                      0.3,
+                      0.0001
+    end
+  end
+
   describe "rate limit handling" do
     test "rate_limited error atom is recognized" do
       # Verify that :rate_limited is used as an error type
