@@ -2233,17 +2233,18 @@ defmodule Ysc.Ledgers do
         _ -> user_id
       end
 
-    sql = """
-    SELECT
-      (SELECT COUNT(*)::bigint FROM payments WHERE user_id = $1)
-      +
-      (SELECT COUNT(*)::bigint FROM ticket_orders
-       WHERE user_id = $1
-         AND status = 'completed'
-         AND payment_id IS NULL)
-    """
-
-    case Repo.query!(sql, [user_id_binary]) do
+    case Repo.query!(
+           """
+           SELECT
+             (SELECT COUNT(*)::bigint FROM payments WHERE user_id = $1)
+             +
+             (SELECT COUNT(*)::bigint FROM ticket_orders
+              WHERE user_id = $1
+                AND status = 'completed'
+                AND payment_id IS NULL)
+           """,
+           [user_id_binary]
+         ) do
       %{rows: [[total]]} when not is_nil(total) -> total
       %{rows: [[nil]]} -> 0
       %{rows: []} -> 0
