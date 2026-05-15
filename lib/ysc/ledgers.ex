@@ -2162,21 +2162,8 @@ defmodule Ysc.Ledgers do
   def list_user_payments_paginated(user_id, page \\ 1, per_page \\ 20) do
     alias Ysc.Tickets.TicketOrder
 
-    # Get total count for payments and free ticket orders separately
-    payment_count =
-      from(p in Payment, where: p.user_id == ^user_id, select: count())
-      |> Repo.one()
-
-    free_ticket_order_count =
-      from(to in TicketOrder,
-        where: to.user_id == ^user_id,
-        where: to.status == :completed,
-        where: is_nil(to.payment_id),
-        select: count()
-      )
-      |> Repo.one()
-
-    total_count = payment_count + free_ticket_order_count
+    # Single round-trip for both counts (payments + completed free ticket orders)
+    total_count = count_user_payments_tab_total(user_id)
 
     # Calculate offset
     offset = (page - 1) * per_page
@@ -2236,6 +2223,32 @@ defmodule Ysc.Ledgers do
     paginated_items = Enum.slice(all_items, offset, per_page)
 
     {paginated_items, total_count}
+  end
+
+  # One DB round-trip instead of two separate count queries (member payments tab).
+  defp count_user_payments_tab_total(user_id) do
+    user_id_binary =
+      case Ecto.ULID.dump(user_id) do
+        {:ok, binary} -> binary
+        _ -> user_id
+      end
+
+    case Repo.query!(
+           """
+           SELECT
+             (SELECT COUNT(*)::bigint FROM payments WHERE user_id = $1)
+             +
+             (SELECT COUNT(*)::bigint FROM ticket_orders
+              WHERE user_id = $1
+                AND status = 'completed'
+                AND payment_id IS NULL)
+           """,
+           [user_id_binary]
+         ) do
+      %{rows: [[total]]} when not is_nil(total) -> total
+      %{rows: [[nil]]} -> 0
+      %{rows: []} -> 0
+    end
   end
 
   # Batch enrich payments to avoid N+1 queries
