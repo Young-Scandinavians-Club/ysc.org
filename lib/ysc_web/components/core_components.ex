@@ -278,10 +278,11 @@ defmodule YscWeb.CoreComponents do
   When `navigate`, `patch`, or `href` is set, renders `<.link>`; otherwise renders `<button>`.
 
   For LiveView interactions, pass `phx-disable-with` (or `loading_text`) with a short label
-  (for example, `"Saving..."`). The attribute is **not** forwarded to the DOM; instead the
-  component renders a spinner plus that label whenever LiveView applies `phx-*-loading`
-  classes, avoiding `phx-disable-with`'s `textContent` swap (which would strip structured
-  markup).
+  (for example, `"Saving..."`). When structured loading applies, that attribute is **not**
+  forwarded to the DOM; instead the component renders a spinner plus that label whenever
+  LiveView applies `phx-*-loading` classes, avoiding `phx-disable-with`'s `textContent` swap
+  (which would break the loading markup). When structured loading does not apply, the
+  attribute is left unchanged for LiveView's default behavior.
 
   ## Examples
 
