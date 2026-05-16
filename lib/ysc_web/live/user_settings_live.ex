@@ -226,16 +226,12 @@ defmodule YscWeb.UserSettingsLive do
             Payment Method
           </h2>
           <%!-- Loading state --%>
-          <div
+          <.async_section_loader
             :if={assigns[:loading_payment_methods]}
-            class="flex items-center justify-center py-12"
-          >
-            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
-            </div>
-            <span class="ml-3 text-zinc-600 text-sm">
-              Loading payment methods...
-            </span>
-          </div>
+            id="user-settings-payment-methods-loading"
+            label="Loading payment methods..."
+            class="py-12"
+          />
           <%!-- Loaded content --%>
           <div :if={!assigns[:loading_payment_methods]}>
             <%!-- Section 1: Existing payment methods --%>

@@ -2279,6 +2279,38 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Centered loading row (spinner + label) for async-loaded sections and modals.
+
+  Uses the standard hero refresh icon with `animate-spin`. Override vertical padding
+  via `class` when the default `py-8` is too tight (e.g. modal bodies often use `py-12`).
+
+  ## Examples
+
+      <.async_section_loader :if={@passkeys_loading} id="passkeys-loading" label="Loading passkeys..." />
+
+      <.async_section_loader label="Loading payment methods..." class="py-12" />
+  """
+  attr :id, :string, default: nil
+  attr :label, :string, required: true
+
+  attr :class, :any,
+    default: "py-8",
+    doc:
+      "Tailwind utilities merged with the flex row (default vertical padding is py-8)"
+
+  def async_section_loader(assigns) do
+    ~H"""
+    <div id={@id} class={["flex items-center justify-center", @class]}>
+      <.icon
+        name="hero-arrow-path"
+        class="w-6 h-6 shrink-0 text-blue-600 animate-spin"
+      />
+      <span class="ml-3 text-zinc-600 text-sm">{@label}</span>
+    </div>
+    """
+  end
+
+  @doc """
   Compact bordered notice for forms (info or error), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another
