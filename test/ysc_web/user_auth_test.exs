@@ -20,6 +20,24 @@ defmodule YscWeb.UserAuthTest do
     %{user: user_fixture(), conn: conn}
   end
 
+  describe "clear_reauth_session/1" do
+    test "removes reauth_mode and reauth_return_to while leaving other session keys",
+         %{
+           conn: conn
+         } do
+      conn =
+        conn
+        |> put_session(:reauth_mode, true)
+        |> put_session(:reauth_return_to, "/users/settings/security")
+        |> put_session(:oauth_redirect_to, "/events")
+        |> UserAuth.clear_reauth_session()
+
+      assert get_session(conn, :reauth_mode) == nil
+      assert get_session(conn, :reauth_return_to) == nil
+      assert get_session(conn, :oauth_redirect_to) == "/events"
+    end
+  end
+
   describe "log_in_user/3" do
     test "stores the user token in the session", %{conn: conn, user: user} do
       # Mark email as verified so user can log in without being redirected to account setup

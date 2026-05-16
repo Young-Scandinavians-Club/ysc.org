@@ -672,6 +672,19 @@ defmodule YscWeb.UserAuth do
 
   def valid_internal_redirect?(_), do: false
 
+  @doc """
+  Clears OAuth re-authentication flags from the plug session.
+
+  Removes keys set during sensitive flows when the user starts a normal OAuth
+  sign-in or when a re-authentication attempt finishes or fails, so stale
+  flags cannot affect later requests.
+  """
+  def clear_reauth_session(conn) do
+    conn
+    |> delete_session(:reauth_mode)
+    |> delete_session(:reauth_return_to)
+  end
+
   # Decode percent-encoding repeatedly so "%252f" (encoded "%2f") cannot hide protocol-relative URLs.
   defp repeatedly_percent_decode_redirect_target(path, iterations \\ 0)
 
