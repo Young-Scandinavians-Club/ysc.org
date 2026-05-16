@@ -877,7 +877,7 @@ defmodule Ysc.Subscriptions do
 
       if sub_accounts != [] do
         {:error,
-         "Cannot downgrade membership while you have sub-accounts. Please remove all sub-accounts first."}
+         "Cannot switch to a single-person membership while family members are still linked to your account. On the Family page, remove each linked family member, then try again."}
       else
         do_change_membership_plan(subscription, new_price_id, direction)
       end
