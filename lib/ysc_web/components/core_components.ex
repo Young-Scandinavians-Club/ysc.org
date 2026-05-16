@@ -306,8 +306,8 @@ defmodule YscWeb.CoreComponents do
   def button(assigns) do
     variant = assigns[:variant] || "solid"
     color = assigns[:color] || "blue"
-    rest = assigns[:rest]
-    {rest, disable_with} = pop_phx_disable_with(rest)
+    rest_raw = normalize_rest(assigns[:rest])
+    disable_with = read_phx_disable_with(rest_raw)
 
     loading_text =
       case assigns[:loading_text] do
@@ -324,9 +324,16 @@ defmodule YscWeb.CoreComponents do
       use_button_loading_ui?(
         loading_text,
         is_link,
-        rest,
+        rest_raw,
         assigns[:type]
       )
+
+    rest =
+      if use_loading_ui? do
+        delete_phx_disable_with(rest_raw)
+      else
+        rest_raw
+      end
 
     base_classes =
       [
@@ -423,21 +430,26 @@ defmodule YscWeb.CoreComponents do
   defp loading_text_to_string(nil), do: nil
   defp loading_text_to_string(text), do: to_string(text)
 
-  defp pop_phx_disable_with(rest) do
+  defp read_phx_disable_with(rest) do
     rest = normalize_rest(rest)
     key_a = :"phx-disable-with"
     key_b = "phx-disable-with"
 
     cond do
-      Map.has_key?(rest, key_a) ->
-        {Map.delete(rest, key_a), Map.get(rest, key_a)}
-
-      Map.has_key?(rest, key_b) ->
-        {Map.delete(rest, key_b), Map.get(rest, key_b)}
-
-      true ->
-        {rest, nil}
+      Map.has_key?(rest, key_a) -> Map.get(rest, key_a)
+      Map.has_key?(rest, key_b) -> Map.get(rest, key_b)
+      true -> nil
     end
+  end
+
+  defp delete_phx_disable_with(rest) do
+    rest = normalize_rest(rest)
+    key_a = :"phx-disable-with"
+    key_b = "phx-disable-with"
+
+    rest
+    |> Map.delete(key_a)
+    |> Map.delete(key_b)
   end
 
   defp use_button_loading_ui?(loading_text, is_link, rest, type) do

@@ -57,5 +57,17 @@ defmodule YscWeb.CoreComponents.ButtonTest do
       assert html =~ "Working..."
       assert html =~ "hero-arrow-path"
     end
+
+    test "keeps phx-disable-with on the wire when structured loading is not used" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.button type="button" phx-disable-with="Nope...">Idle</.button>
+        """)
+
+      assert html =~ "phx-disable-with"
+      refute html =~ "hero-arrow-path"
+    end
   end
 end
