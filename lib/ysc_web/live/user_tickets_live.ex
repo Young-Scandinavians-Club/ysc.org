@@ -1,8 +1,9 @@
 defmodule YscWeb.UserTicketsLive do
   use YscWeb, :live_view
 
+  import YscWeb.Live.AsyncHelpers
+
   alias Ysc.Tickets
-  import Ecto.Query
 
   @impl true
   def render(assigns) do
@@ -27,6 +28,17 @@ defmodule YscWeb.UserTicketsLive do
         </div>
 
         <div
+          :if={@loading_user_tickets}
+          id="user-tickets-loading"
+          class="grid grid-cols-1 lg:grid-cols-2 gap-8"
+        >
+          <div class="lg:col-span-2 text-center py-16">
+            <p class="text-zinc-600 text-sm font-medium">Loading your tickets…</p>
+          </div>
+        </div>
+
+        <div
+          :if={not @loading_user_tickets}
           class="grid grid-cols-1 lg:grid-cols-2 gap-8"
           id="ticket-orders-list"
           phx-update="stream"
@@ -265,23 +277,8 @@ defmodule YscWeb.UserTicketsLive do
     if connected?(socket) do
       # Subscribe to ticket order updates
       # Phoenix.PubSub.subscribe(Ysc.PubSub, "ticket_orders:#{socket.assigns.current_user.id}")
+      send(self(), :load_user_tickets_data)
     end
-
-    now = DateTime.utc_now()
-
-    # Get all ticket orders and filter for upcoming events only (excluding cancelled orders)
-    all_ticket_orders =
-      Tickets.list_user_ticket_orders(socket.assigns.current_user.id)
-
-    upcoming_ticket_orders =
-      all_ticket_orders
-      |> Enum.filter(fn ticket_order ->
-        ticket_order.status != :cancelled &&
-          ticket_order.event &&
-          DateTime.compare(ticket_order.event.start_date, now) == :gt
-      end)
-
-    past_items = get_past_items(socket.assigns.current_user.id)
 
     {:ok,
      socket
@@ -290,8 +287,37 @@ defmodule YscWeb.UserTicketsLive do
        :meta_description,
        "View and manage your event tickets with Young Scandinavians Club."
      )
+     |> assign(:past_items, [])
+     |> assign(:loading_user_tickets, true)
+     |> stream(:ticket_orders, [], limit: -50)}
+  end
+
+  @impl true
+  def handle_info(:load_user_tickets_data, socket) do
+    user_id = socket.assigns.current_user.id
+
+    parallel =
+      [
+        {:upcoming,
+         fn -> Tickets.list_user_upcoming_ticket_orders(user_id) end},
+        {:past, fn -> memory_gallery_items(user_id) end}
+      ]
+      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+        max_concurrency: 2,
+        timeout: :infinity
+      )
+      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
+        Map.put(acc, key, value)
+      end)
+
+    upcoming = Map.fetch!(parallel, :upcoming)
+    past_items = Map.fetch!(parallel, :past)
+
+    {:noreply,
+     socket
+     |> assign(:loading_user_tickets, false)
      |> assign(:past_items, past_items)
-     |> stream(:ticket_orders, upcoming_ticket_orders, limit: -50)}
+     |> stream(:ticket_orders, upcoming, reset: true, limit: -50)}
   end
 
   @impl true
@@ -308,19 +334,10 @@ defmodule YscWeb.UserTicketsLive do
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
           {:ok, _cancelled_order} ->
-            # Refresh the ticket orders list (excluding cancelled orders)
-            now = DateTime.utc_now()
-
-            all_ticket_orders =
-              Tickets.list_user_ticket_orders(socket.assigns.current_user.id)
-
             ticket_orders =
-              all_ticket_orders
-              |> Enum.filter(fn to ->
-                to.status != :cancelled &&
-                  to.event &&
-                  DateTime.compare(to.event.start_date, now) == :gt
-              end)
+              Tickets.list_user_upcoming_ticket_orders(
+                socket.assigns.current_user.id
+              )
 
             {:noreply,
              socket
@@ -487,21 +504,9 @@ defmodule YscWeb.UserTicketsLive do
     end
   end
 
-  defp get_past_items(user_id) do
-    now = DateTime.utc_now()
-
-    # Get past ticket orders (completed orders where event.start_date < now)
-    from(to in Ysc.Tickets.TicketOrder,
-      where: to.user_id == ^user_id,
-      where: to.status == :completed,
-      join: e in Ysc.Events.Event,
-      on: to.event_id == e.id,
-      where: e.start_date < ^now,
-      order_by: [desc: e.start_date],
-      limit: 12,
-      preload: [:event]
-    )
-    |> Ysc.Repo.all()
+  defp memory_gallery_items(user_id) do
+    user_id
+    |> Tickets.list_user_past_memory_gallery_ticket_orders()
     |> Enum.map(fn ticket_order ->
       %{
         title: ticket_order.event.title,
