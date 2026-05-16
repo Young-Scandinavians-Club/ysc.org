@@ -273,28 +273,70 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Renders a button.
+  Renders a `<button>` or a LiveView `<.link>` styled as a button.
+
+  When `navigate`, `patch`, or `href` is set, renders `<.link>`; otherwise renders `<button>`.
+
+  For LiveView interactions, pass `phx-disable-with` (or `loading_text`) with a short label
+  (for example, `"Saving..."`). The attribute is **not** forwarded to the DOM; instead the
+  component renders a spinner plus that label whenever LiveView applies `phx-*-loading`
+  classes, avoiding `phx-disable-with`'s `textContent` swap (which would strip structured
+  markup).
 
   ## Examples
 
       <.button>Send!</.button>
       <.button phx-click="go" class="ml-2">Send!</.button>
+      <.button type="submit" phx-disable-with="Saving...">Save</.button>
       <.button variant="outline" color="zinc">Outlined Button</.button>
+      <.button patch={~p"/posts"} loading_text="Loading...">Back</.button>
   """
   attr :type, :string, default: nil
   attr :class, :string, default: nil
   attr :color, :string, default: "blue"
   attr :variant, :string, default: "solid"
-  attr :rest, :global, include: ~w(disabled form name value)
+  attr :navigate, :string, default: nil
+  attr :patch, :string, default: nil
+  attr :href, :string, default: nil
+  attr :loading_text, :string, default: nil
+  attr :rest, :global, include: ~w(disabled form name value method rel replace)
 
   slot :inner_block, required: true
 
   def button(assigns) do
     variant = assigns[:variant] || "solid"
     color = assigns[:color] || "blue"
+    rest = assigns[:rest]
+    {rest, disable_with} = pop_phx_disable_with(rest)
+
+    loading_text =
+      case assigns[:loading_text] do
+        nil -> loading_text_to_string(disable_with)
+        "" -> loading_text_to_string(disable_with)
+        other -> loading_text_to_string(other)
+      end
+
+    is_link =
+      [assigns[:navigate], assigns[:patch], assigns[:href]]
+      |> Enum.any?(&(&1 not in [nil, ""]))
+
+    use_loading_ui? =
+      use_button_loading_ui?(
+        loading_text,
+        is_link,
+        rest,
+        assigns[:type]
+      )
 
     base_classes =
-      "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-150 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+      [
+        "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap",
+        "rounded py-2 px-3 min-h-[44px] transition duration-150 ease-in-out",
+        "text-sm font-semibold leading-6",
+        "disabled:cursor-not-allowed disabled:opacity-80",
+        "phx-click-loading:pointer-events-none phx-submit-loading:pointer-events-none phx-change-loading:pointer-events-none",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+      ]
 
     variant_classes =
       case variant do
@@ -309,12 +351,19 @@ defmodule YscWeb.CoreComponents do
 
     assigns =
       assigns
+      |> assign(:rest, rest)
+      |> assign(:loading_text, loading_text)
+      |> assign(:is_link, is_link)
+      |> assign(:use_loading_ui?, use_loading_ui?)
       |> assign(:base_classes, base_classes)
       |> assign(:variant_classes, variant_classes)
 
     ~H"""
-    <button
-      type={@type}
+    <.link
+      :if={@is_link}
+      navigate={@navigate}
+      patch={@patch}
+      href={@href}
       class={[
         @base_classes,
         @variant_classes,
@@ -322,41 +371,96 @@ defmodule YscWeb.CoreComponents do
       ]}
       {@rest}
     >
-      {render_slot(@inner_block)}
+      <%= if @use_loading_ui? do %>
+        <span class="inline-flex items-center justify-center gap-2 group-[.phx-click-loading]:hidden group-[.phx-submit-loading]:hidden group-[.phx-change-loading]:hidden">
+          {render_slot(@inner_block)}
+        </span>
+        <span
+          class="hidden items-center justify-center gap-2 group-[.phx-click-loading]:inline-flex group-[.phx-submit-loading]:inline-flex group-[.phx-change-loading]:inline-flex"
+          role="status"
+        >
+          <.icon
+            name="hero-arrow-path"
+            class="h-4 w-4 shrink-0 animate-spin text-blue-600"
+          />
+          <span class="text-current">{@loading_text}</span>
+        </span>
+      <% else %>
+        {render_slot(@inner_block)}
+      <% end %>
+    </.link>
+    <button
+      :if={!@is_link}
+      type={@type}
+      class={[@base_classes, @variant_classes, @class]}
+      {@rest}
+    >
+      <%= if @use_loading_ui? do %>
+        <span class="inline-flex items-center justify-center gap-2 group-[.phx-click-loading]:hidden group-[.phx-submit-loading]:hidden group-[.phx-change-loading]:hidden">
+          {render_slot(@inner_block)}
+        </span>
+        <span
+          class="hidden items-center justify-center gap-2 group-[.phx-click-loading]:inline-flex group-[.phx-submit-loading]:inline-flex group-[.phx-change-loading]:inline-flex"
+          role="status"
+        >
+          <.icon
+            name="hero-arrow-path"
+            class="h-4 w-4 shrink-0 animate-spin text-blue-600"
+          />
+          <span class="text-current">{@loading_text}</span>
+        </span>
+      <% else %>
+        {render_slot(@inner_block)}
+      <% end %>
     </button>
     """
   end
 
-  attr :type, :string, default: nil
-  attr :class, :string, default: nil
-  attr :color, :string, default: "blue"
-  attr :rest, :global, include: ~w(disabled form name value)
+  defp normalize_rest(nil), do: %{}
+  defp normalize_rest(rest) when is_map(rest), do: rest
+  defp normalize_rest(rest) when is_list(rest), do: Map.new(rest)
 
-  slot :inner_block, required: true
+  defp loading_text_to_string(nil), do: nil
+  defp loading_text_to_string(text), do: to_string(text)
 
-  def button_link(assigns) do
-    color = assigns[:color] || "blue"
+  defp pop_phx_disable_with(rest) do
+    rest = normalize_rest(rest)
+    key_a = :"phx-disable-with"
+    key_b = "phx-disable-with"
 
-    color_classes =
-      Map.get(button_solid_color_classes(), color) ||
-        Map.get(button_solid_color_classes(), "blue")
+    cond do
+      Map.has_key?(rest, key_a) ->
+        {Map.delete(rest, key_a), Map.get(rest, key_a)}
 
-    assigns = assign(assigns, :color_classes, color_classes)
+      Map.has_key?(rest, key_b) ->
+        {Map.delete(rest, key_b), Map.get(rest, key_b)}
 
-    ~H"""
-    <button
-      type={@type}
-      class={[
-        "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3 transition duration-150 ease-in-out disabled:cursor-not-allowed disabled:opacity-80",
-        "text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
-        @color_classes,
-        @class
-      ]}
-      {@rest}
-    >
-      {render_slot(@inner_block)}
-    </button>
-    """
+      true ->
+        {rest, nil}
+    end
+  end
+
+  defp use_button_loading_ui?(loading_text, is_link, rest, type) do
+    loading_text not in [nil, ""] and
+      (is_link or type != "button" or phx_live_button?(rest))
+  end
+
+  defp phx_live_button?(rest) do
+    rest = normalize_rest(rest)
+
+    Enum.any?(
+      [
+        "phx-click",
+        :"phx-click",
+        "phx-submit",
+        :"phx-submit",
+        "phx-change",
+        :"phx-change",
+        "phx-hook",
+        :"phx-hook"
+      ],
+      &Map.has_key?(rest, &1)
+    )
   end
 
   # Static class maps so Tailwind JIT sees full class names (dynamic bg-#{color}-700 is not purged).

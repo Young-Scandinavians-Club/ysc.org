@@ -882,13 +882,13 @@ defmodule YscWeb.AdminScannerLive do
                       No registration info
                     </span>
                   </div>
-                  <.button_link
+                  <.button
                     phx-click="check_in_single"
                     phx-value-ticket-id={ticket.id}
                     color="blue"
                   >
                     Check in only
-                  </.button_link>
+                  </.button>
                 </div>
               </div>
 
