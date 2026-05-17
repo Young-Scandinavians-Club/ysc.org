@@ -86,14 +86,14 @@ defmodule YscWeb.UserSettingsLive do
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your messages or
+              Didn't receive the code? Check your messages.
               <%= if sms_resend_available?(assigns) do %>
                 <.link
                   phx-click="resend_phone_code"
                   phx-disable-with="Sending..."
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  resend the code
+                  Resend the code
                 </.link>
               <% else %>
                 <% sms_countdown = sms_resend_seconds_remaining(assigns) %>
@@ -102,9 +102,11 @@ defmodule YscWeb.UserSettingsLive do
                   data-countdown={sms_countdown}
                   data-timer-type="sms"
                 >
-                  resend in {sms_countdown}s
+                  You can resend the code in {sms_countdown}{if sms_countdown == 1,
+                    do: " second",
+                    else: " seconds"}.
                 </span>
-              <% end %>.
+              <% end %>
             </p>
 
             <:actions>
@@ -166,14 +168,14 @@ defmodule YscWeb.UserSettingsLive do
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your email or
+              Didn't receive the code? Check your email.
               <%= if email_resend_available?(assigns) do %>
                 <.link
                   phx-click="resend_email_code"
                   phx-disable-with="Sending..."
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  resend the code
+                  Resend the code
                 </.link>
               <% else %>
                 <% email_countdown = email_resend_seconds_remaining(assigns) %>
@@ -182,9 +184,12 @@ defmodule YscWeb.UserSettingsLive do
                   data-countdown={email_countdown}
                   data-timer-type="email"
                 >
-                  resend in {email_countdown}s
+                  You can resend the code in {email_countdown}{if email_countdown ==
+                                                                    1,
+                                                                  do: " second",
+                                                                  else: " seconds"}.
                 </span>
-              <% end %>.
+              <% end %>
             </p>
 
             <:actions>
