@@ -2838,20 +2838,14 @@ defmodule YscWeb.UserSettingsLive do
     email_changeset = Accounts.change_user_email(user)
     profile_changeset = Accounts.change_user_profile(user)
 
-    # Newsletter checkbox reads from newsletter_subscribers (single source of truth)
-    effective_newsletter =
-      case Newsletter.get_subscriber_by_email(user.email) do
-        nil -> false
-        subscriber -> subscriber.subscribed
-      end
-
+    # Newsletter + pending family invites are loaded in `:load_settings_data` so the
+    # dead render skips two DB round-trips (see `handle_info/2` for `:load_settings_data`).
     notification_changeset =
       Accounts.change_notification_preferences(user, %{
-        "newsletter_notifications" => effective_newsletter
+        "newsletter_notifications" => false
       })
 
-    pending_family_invites =
-      FamilyInvites.list_pending_invites_for_email(user.email)
+    pending_family_invites = []
 
     # Base socket assigns that don't require expensive queries
     socket =
@@ -3039,6 +3033,20 @@ defmodule YscWeb.UserSettingsLive do
 
     board_member = Accounts.household_board_member(user)
 
+    effective_newsletter =
+      case Newsletter.get_subscriber_by_email(user.email) do
+        nil -> false
+        subscriber -> subscriber.subscribed
+      end
+
+    notification_changeset =
+      Accounts.change_notification_preferences(user, %{
+        "newsletter_notifications" => effective_newsletter
+      })
+
+    pending_family_invites =
+      FamilyInvites.list_pending_invites_for_email(user.email)
+
     {:noreply,
      socket
      |> assign(:user, user)
@@ -3055,6 +3063,8 @@ defmodule YscWeb.UserSettingsLive do
        :membership_form,
        to_form(%{"membership_type" => membership_type_to_select})
      )
+     |> assign(:notification_form, to_form(notification_changeset))
+     |> assign(:pending_family_invites, pending_family_invites)
      |> assign(:user_avatars, load_user_avatars(user))
      |> assign(:loading_avatars, false)
      |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
