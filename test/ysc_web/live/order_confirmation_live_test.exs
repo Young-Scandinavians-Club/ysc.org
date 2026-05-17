@@ -205,7 +205,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "See you at the Event, Alice"
+      assert html =~ "See you at the event, Alice"
       assert html =~ "Summer Party"
       assert html =~ "Order Confirmed"
     end
@@ -269,7 +269,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert has_element?(
                view,
                "#order-confirmation",
-               "See you at the Event, Lars"
+               "See you at the event, Lars"
              )
 
       assert has_element?(view, "#order-confirmation", "are confirmed")
@@ -1014,7 +1014,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "See you at the Event, Member"
+      assert html =~ "See you at the event, Member"
     end
 
     test "meta description assign reflected in page", %{conn: conn} do
