@@ -1865,6 +1865,67 @@ defmodule Ysc.LedgersTest do
              end)
     end
 
+    test "list_user_payments_paginated/3 total_count sums payments and completed free ticket orders",
+         %{user: user} do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      _free_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      {_items, total_count} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 10)
+
+      assert total_count == 2
+    end
+
+    test "list_user_payments_paginated/3 total_count ignores non-completed free ticket orders",
+         %{user: user} do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      _pending_free =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :pending
+        })
+
+      {_items, total_count} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 10)
+
+      assert total_count == 1
+    end
+
+    test "list_user_payments_paginated/3 total_count does not add ticket orders that reference a payment",
+         %{user: user, payment: payment} do
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      order
+      |> Ecto.Changeset.change(payment_id: payment.id)
+      |> Repo.update!()
+
+      {_items, total_count} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 10)
+
+      assert total_count == 1
+    end
+
     test "list_user_payments_paginated/3 returns paginated payments", %{
       user: user
     } do
