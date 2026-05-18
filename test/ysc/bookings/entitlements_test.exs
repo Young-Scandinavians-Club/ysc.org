@@ -336,13 +336,14 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      ids =
-        user.id
-        |> Entitlements.list_usable_for_user()
-        |> Enum.map(& &1.id)
+      usable = Entitlements.list_usable_for_user(user.id)
+      ids = Enum.map(usable, & &1.id)
 
       assert good.id in ids
       refute bad.id in ids
+
+      ent = Enum.find(usable, &(&1.id == good.id))
+      assert match?(%Ecto.Association.NotLoaded{}, ent.issued_by_user)
     end
   end
 

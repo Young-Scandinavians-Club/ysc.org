@@ -78,6 +78,9 @@ defmodule Ysc.Bookings.Entitlements do
   and not past `expires_at`.
 
   These are the rows that apply at checkout and are shown on the member payments page.
+
+  `issued_by_user` is not preloaded (the payments UI does not need it); call
+  `Repo.preload/2` when you need that association.
   """
   def list_usable_for_user(user_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -88,8 +91,7 @@ defmodule Ysc.Bookings.Entitlements do
       where: is_nil(e.consumed_at),
       where: is_nil(e.consumed_booking_id),
       where: is_nil(e.expires_at) or e.expires_at > ^now,
-      order_by: [asc: e.expires_at, asc: e.inserted_at],
-      preload: [:issued_by_user]
+      order_by: [asc: e.expires_at, asc: e.inserted_at]
     )
     |> Repo.all()
   end
