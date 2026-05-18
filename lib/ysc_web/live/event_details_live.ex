@@ -913,19 +913,17 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
                         <.icon
                           name="hero-exclamation-circle"
-                          class="text-orange-500 w-5 h-5 me-1 -mt-0.5"
+                          class="text-orange-500 w-6 h-6 me-1 -mt-0.5"
                         />
                         You need to be signed in and have an active membership to purchase tickets
                       </div>
                       <.button
                         class="w-full py-4 uppercase tracking-widest"
-                        phx-click={
-                          JS.navigate(
-                            ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
-                          )
+                        navigate={
+                          ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign In to Continue
+                        <.icon name="hero-ticket" class="w-6 h-6 me-2 -mt-0.5" />Sign In to Continue
                       </.button>
                     </div>
 
@@ -966,7 +964,7 @@ defmodule YscWeb.EventDetailsLive do
                           </svg>
                           <.icon
                             name="hero-arrow-top-right-on-square"
-                            class="w-4 h-4 -mt-0.5"
+                            class="w-5 h-5 -mt-0.5"
                           />
                         </.button>
                       </a>
@@ -980,7 +978,10 @@ defmodule YscWeb.EventDetailsLive do
                                 class="w-full py-4 uppercase tracking-widest"
                                 disabled
                               >
-                                <.icon name="hero-ticket" class="me-2 -mt-0.5" />Sold Out
+                                <.icon
+                                  name="hero-ticket"
+                                  class="me-1 w-6 h-6 -mt-0.5"
+                                />Sold Out
                               </.button>
                             </.tooltip>
                           </div>
@@ -990,7 +991,7 @@ defmodule YscWeb.EventDetailsLive do
                             class="w-full py-4 uppercase tracking-widest"
                             phx-click="open-ticket-modal"
                           >
-                            <.icon name="hero-ticket" class="me-2 -mt-0.5" />Get Tickets
+                            <.icon name="hero-ticket" class="me-1 w-6 h-6 -mt-0.5" />Get Tickets
                           </.button>
                         <% end %>
                       <% else %>
@@ -1139,10 +1140,8 @@ defmodule YscWeb.EventDetailsLive do
                       <%= if @current_user == nil && @has_ticket_tiers do %>
                         <.button
                           class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
-                          phx-click={
-                            JS.navigate(
-                              ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
-                            )
+                          navigate={
+                            ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
                           <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign In to Continue
@@ -1760,7 +1759,7 @@ defmodule YscWeb.EventDetailsLive do
               phx-click="proceed-to-checkout"
               disabled={!has_any_tickets_selected?(@selected_tickets)}
             >
-              <.icon name="hero-shopping-cart" class="me-2 -mt-1" />Proceed to Checkout
+              <.icon name="hero-shopping-cart" class="me-2 -mt-0.5" />Proceed to Checkout
             </.button>
           </div>
         </div>

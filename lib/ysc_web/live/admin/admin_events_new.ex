@@ -5,7 +5,6 @@ defmodule YscWeb.AdminEventsNewLive do
 
   require Ysc.Logging
 
-  alias Phoenix.LiveView.JS
   alias Ysc.Events.Event
   alias Ysc.Events
 
@@ -80,7 +79,10 @@ defmodule YscWeb.AdminEventsNewLive do
                     color="blue"
                     disabled
                   >
-                    <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-1 me-1" />Publish
+                    <.icon
+                      name="hero-document-arrow-up"
+                      class="w-5 h-5 -mt-0.5 me-1"
+                    />Publish
                   </.button>
                 </.tooltip>
                 <.button
@@ -90,7 +92,7 @@ defmodule YscWeb.AdminEventsNewLive do
                   phx-click="publish-event"
                   phx-disable-with="Publishing..."
                 >
-                  <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-1 me-1" />Publish
+                  <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-0.5 me-1" />Publish
                 </.button>
               </div>
 
@@ -101,7 +103,10 @@ defmodule YscWeb.AdminEventsNewLive do
                   phx-click="unpublish-event"
                   phx-disable-with="Unpublishing..."
                 >
-                  <.icon name="hero-document-arrow-down" class="w-5 h-5 -mt-1 me-1" />Unpublish
+                  <.icon
+                    name="hero-document-arrow-down"
+                    class="w-5 h-5 -mt-0.5 me-1"
+                  />Unpublish
                 </.button>
               </div>
 
@@ -109,7 +114,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 <.button
                   class="whitespace-nowrap"
                   color="green"
-                  phx-click={JS.navigate(~p"/admin/events/#{@event.id}/check-in")}
+                  navigate={~p"/admin/events/#{@event.id}/check-in"}
                 >
                   <.icon
                     name="hero-clipboard-document-check"
@@ -195,7 +200,7 @@ defmodule YscWeb.AdminEventsNewLive do
                         class="w-full text-left px-1"
                         phx-click="delete-event"
                       >
-                        <.icon name="hero-trash" class="w-5 h-5 -mt-1" />
+                        <.icon name="hero-trash" class="w-5 h-5 -mt-0.5" />
                         <span>Delete Event</span>
                       </button>
                     </li>

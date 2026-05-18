@@ -352,12 +352,10 @@ defmodule YscWeb.VolunteerLive do
               <.button
                 :if={!@submitted}
                 type="submit"
-                class="w-full md:w-auto phx-submit-loading:opacity-75"
+                phx-disable-with="Sending..."
+                class="w-full md:w-auto"
               >
-                <span class="phx-submit-loading:hidden">Submit Application →</span>
-                <span class="hidden phx-submit-loading:inline text-zinc-300">
-                  Sending...
-                </span>
+                Submit Application →
               </.button>
             </:actions>
           </.simple_form>

@@ -304,13 +304,15 @@ defmodule YscWeb.AdminNewslettersLive do
                   </div>
 
                   <div class="px-4 py-4">
-                    <button
-                      class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                      phx-click={JS.patch(~p"/admin/newsletters")}
+                    <.button
+                      patch={~p"/admin/newsletters"}
+                      variant="outline"
+                      color="zinc"
+                      class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
                     >
-                      <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" />
+                      <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
                       Clear filters
-                    </button>
+                    </.button>
                   </div>
                 </.dropdown>
               </div>
@@ -517,7 +519,7 @@ defmodule YscWeb.AdminNewslettersLive do
                 >
                   Cancel
                 </button>
-                <.button type="submit">Add</.button>
+                <.button type="submit" phx-disable-with="Adding...">Add</.button>
               </div>
             </.form>
           </.modal>

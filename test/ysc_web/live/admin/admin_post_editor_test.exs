@@ -273,11 +273,13 @@ defmodule YscWeb.AdminPostEditorLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
 
-      {:ok, _view, preview_html} =
-        view
-        |> element("a", "Preview")
-        |> render_click()
-        |> follow_redirect(conn, ~p"/admin/posts/#{post.id}/preview")
+      view
+      |> element("#post-editor-preview-patch")
+      |> render_click()
+
+      assert_patch(view, ~p"/admin/posts/#{post.id}/preview")
+
+      preview_html = render(view)
 
       # Preview modal should be shown
       assert preview_html =~ "hero-device-phone-mobile"

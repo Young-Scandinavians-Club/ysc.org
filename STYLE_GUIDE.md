@@ -175,14 +175,14 @@ focus:border-blue-600 focus:ring-blue-600
 ```
 
 - Never use `focus:ring-0 focus:outline-none` without providing an alternative visible indicator.
-- Buttons inherit focus from the `button` / `button_link` core component.
+- Buttons inherit focus from the `<.button>` core component (including link-style usage via `navigate`, `patch`, or `href`).
 - Minimum touch target: `min-h-[44px]` on all interactive elements (mobile).
 
 ---
 
 ## Buttons
 
-Buttons are defined in `core_components.ex`. Always use the `<.button>` or `<.button_link>` component.
+Buttons are defined in `core_components.ex`. Always use `<.button>`. For LiveView links that look like buttons, pass `navigate`, `patch`, or `href` to the same component. Use `phx-disable-with` or `loading_text` with LiveView actions so the built-in spinner and loading label appear while the request is in flight (the real `phx-disable-with` attribute is not forwarded; the label is used for the loading row only).
 
 **Base classes (applied automatically):**
 

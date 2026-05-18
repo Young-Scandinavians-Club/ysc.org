@@ -129,7 +129,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         </div>
 
         <div class="flex justify-end">
-          <.button type="submit">
+          <.button type="submit" phx-disable-with="Saving...">
             <%= if assigns[:ticket_tier] do %>
               <.icon name="hero-pencil" class="me-1 -mt-0.5" /> Update Ticket Tier
             <% else %>

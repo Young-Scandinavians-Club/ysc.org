@@ -176,7 +176,7 @@ defmodule YscWeb.AdminPostEditorLive do
               type="button"
               phx-click="publish-post"
             >
-              <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-0.5" />
               <span class="me-1">Publish</span>
             </.button>
 
@@ -187,18 +187,20 @@ defmodule YscWeb.AdminPostEditorLive do
               type="button"
               phx-click="restore-post"
             >
-              <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-0.5" />
               <span class="me-1">Restore</span>
             </.button>
 
-            <button
-              type="button"
-              class="hidden flex-none rounded px-3 py-2 text-zinc-800 transition duration-200 ease-in-out hover:bg-zinc-100 lg:mr-1 lg:block"
-              phx-click={JS.patch(~p"/admin/posts/#{@post_id}/preview")}
+            <.button
+              id="post-editor-preview-patch"
+              patch={~p"/admin/posts/#{@post_id}/preview"}
+              variant="outline"
+              color="zinc"
+              class="hidden flex-none lg:mr-1 lg:block px-3 py-2 text-zinc-800 transition duration-200 ease-in-out hover:bg-zinc-100"
             >
-              <.icon name="hero-computer-desktop" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-computer-desktop" class="w-5 h-5 -mt-0.5" />
               <span class="sr-only">Preview post</span>
-            </button>
+            </.button>
 
             <.dropdown
               id="edit-post-more"

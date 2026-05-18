@@ -17,15 +17,15 @@ defmodule YscWeb.AdminEventsLive do
         <.admin_page_title>Events</.admin_page_title>
 
         <div class="flex items-center gap-3">
-          <.button phx-click={JS.navigate(~p"/admin/scanner")}>
-            <.icon name="hero-qr-code" class="w-5 h-5 -mt-1" />
+          <.button navigate={~p"/admin/scanner"}>
+            <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5" />
             <span class="ms-1">
               Check-in &amp; Scan
             </span>
           </.button>
 
-          <.button phx-click={JS.navigate(~p"/admin/events/new")}>
-            <.icon name="hero-calendar" class="w-5 h-5 -mt-1" />
+          <.button navigate={~p"/admin/events/new"}>
+            <.icon name="hero-calendar" class="w-5 h-5 -mt-0.5" />
             <span class="ms-1">
               New Event
             </span>
@@ -129,12 +129,13 @@ defmodule YscWeb.AdminEventsLive do
               </div>
 
               <div class="px-4 py-4">
-                <button
-                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                  phx-click={JS.patch(~p"/admin/events")}
+                <.link
+                  patch={~p"/admin/events"}
+                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full flex items-center"
                 >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
-                </button>
+                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+                  Clear filters
+                </.link>
               </div>
             </.dropdown>
           </div>
@@ -142,9 +143,9 @@ defmodule YscWeb.AdminEventsLive do
           <div class="block md:hidden space-y-4">
             <%= for {_, event} <- @streams.events do %>
               <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-                <div
-                  class="mb-3 cursor-pointer"
-                  phx-click={JS.navigate(~p"/admin/events/#{event.id}/edit")}
+                <.link
+                  navigate={~p"/admin/events/#{event.id}/edit"}
+                  class="mb-3 cursor-pointer block"
                 >
                   <h3 class="text-base font-semibold text-zinc-900 mb-2">
                     {event.title}
@@ -175,7 +176,7 @@ defmodule YscWeb.AdminEventsLive do
                       </span>
                     </div>
                   </div>
-                </div>
+                </.link>
 
                 <div class="flex items-center justify-between gap-2 pt-3 border-t border-zinc-200">
                   <div>
@@ -320,10 +321,9 @@ defmodule YscWeb.AdminEventsLive do
               </button>
             </li>
             <li>
-              <button
+              <.link
                 id={"#{@menu_id}-edit"}
-                type="button"
-                phx-click={JS.navigate(~p"/admin/events/#{@event.id}/edit")}
+                navigate={~p"/admin/events/#{@event.id}/edit"}
                 class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
               >
                 <.icon
@@ -331,18 +331,17 @@ defmodule YscWeb.AdminEventsLive do
                   class="h-5 w-5 shrink-0 text-zinc-500"
                 />
                 <span>Edit</span>
-              </button>
+              </.link>
             </li>
             <li :if={@event.state in [:published, :scheduled]}>
-              <button
+              <.link
                 id={"#{@menu_id}-check-in"}
-                type="button"
-                phx-click={JS.navigate(~p"/admin/events/#{@event.id}/check-in")}
+                navigate={~p"/admin/events/#{@event.id}/check-in"}
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
               >
                 <.icon name="hero-qr-code" class="h-5 w-5 shrink-0" />
                 <span>Check in</span>
-              </button>
+              </.link>
             </li>
           </ul>
         </div>

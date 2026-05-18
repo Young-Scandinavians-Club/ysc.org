@@ -301,11 +301,12 @@ defmodule YscWeb.ConductViolationReportLive do
                     name="hero-lock-closed"
                     class="w-5 h-5 text-zinc-500 phx-submit-loading:opacity-50"
                   />
-                  <.button type="submit" class="px-8 py-3 text-base relative">
-                    <span class="phx-submit-loading:opacity-0">Submit Report</span>
-                    <span class="absolute inset-0 flex items-center justify-center phx-submit-loading:opacity-100 opacity-0">
-                      <.icon name="hero-arrow-path" class="w-5 h-5 animate-spin" />
-                    </span>
+                  <.button
+                    type="submit"
+                    phx-disable-with="Submitting..."
+                    class="px-8 py-3 text-base"
+                  >
+                    Submit Report
                   </.button>
                 </div>
                 <p class="text-xs text-zinc-500">

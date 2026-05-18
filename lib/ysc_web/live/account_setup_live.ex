@@ -159,39 +159,15 @@ defmodule YscWeb.AccountSetupLive do
               </div>
               <div id="payment-element"></div>
               <div class="flex justify-end items-center pt-2">
-                <button
+                <.button
                   id="submit"
                   type="submit"
-                  class="group inline-flex items-center phx-submit-loading:opacity-75 rounded py-2 px-3 transition duration-150 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                  phx-disable-with="Saving..."
+                  color="blue"
                 >
-                  <span class="inline-flex items-center gap-2 group-[.phx-submit-loading]:hidden">
-                    <.icon name="hero-credit-card" class="w-4 h-4" />
-                    Save Payment Method &amp; Continue
-                  </span>
-                  <span class="hidden items-center gap-2 group-[.phx-submit-loading]:inline-flex">
-                    <svg
-                      class="animate-spin w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Saving...
-                  </span>
-                </button>
+                  <.icon name="hero-credit-card" class="w-4 h-4" />
+                  Save Payment Method &amp; Continue
+                </.button>
               </div>
             </form>
           <% else %>

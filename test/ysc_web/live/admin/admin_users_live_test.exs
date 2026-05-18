@@ -98,9 +98,11 @@ defmodule YscWeb.AdminUsersLiveTest do
       {:ok, view, _html} =
         live(conn, ~p"/admin/users/#{pending_user.id}/review")
 
-      assert render(view) =~ "Review Application"
-      assert render(view) =~ "Approve Me"
-      assert render(view) =~ ~s(phx-disable-with="Approving...")
+      html = render(view)
+      assert html =~ "Review Application"
+      assert html =~ "Approve Me"
+      assert html =~ "Approving..."
+      refute html =~ ~s(phx-disable-with="Approving...")
 
       view
       |> element("#approve-membership-application-button")

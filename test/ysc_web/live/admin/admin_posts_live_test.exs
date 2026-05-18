@@ -40,7 +40,7 @@ defmodule YscWeb.AdminPostsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/posts")
 
       view
-      |> element("button", "New Post")
+      |> element("#admin-posts-new-post")
       |> render_click()
 
       assert_patched(view, ~p"/admin/posts/new")

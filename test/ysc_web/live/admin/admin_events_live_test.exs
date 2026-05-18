@@ -27,7 +27,7 @@ defmodule YscWeb.AdminEventsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events")
 
       view
-      |> element("button", "New Event")
+      |> element(~s|a[href="/admin/events/new"]|)
       |> render_click()
 
       assert_redirected(view, ~p"/admin/events/new")
@@ -37,7 +37,7 @@ defmodule YscWeb.AdminEventsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events")
 
       view
-      |> element("button", "Check-in & Scan")
+      |> element(~s|a[href="/admin/scanner"]|)
       |> render_click()
 
       assert_redirected(view, ~p"/admin/scanner")
@@ -49,7 +49,7 @@ defmodule YscWeb.AdminEventsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events")
 
       view
-      |> element("#admin_events_list button[phx-click*=\"#{event.id}/edit\"]")
+      |> element("#admin_events_list a[href*=\"#{event.id}/edit\"]")
       |> render_click()
 
       assert_redirected(view, ~p"/admin/events/#{event.id}/edit")

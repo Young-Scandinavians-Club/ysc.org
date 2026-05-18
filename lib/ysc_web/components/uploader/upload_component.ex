@@ -100,7 +100,7 @@ defmodule YscWeb.UploadComponent do
         </div>
       </label>
 
-      <.button type="submit">Upload</.button>
+      <.button type="submit" phx-disable-with="Uploading...">Upload</.button>
     </form>
     """
   end

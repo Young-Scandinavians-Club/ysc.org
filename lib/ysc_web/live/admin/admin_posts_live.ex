@@ -54,8 +54,8 @@ defmodule YscWeb.AdminPostsLive do
       <div class="flex justify-between py-6">
         <.admin_page_title>Posts</.admin_page_title>
 
-        <.button phx-click={JS.patch(~p"/admin/posts/new")}>
-          <.icon name="hero-document-plus" class="w-5 h-5 -mt-1" />
+        <.button id="admin-posts-new-post" patch={~p"/admin/posts/new"}>
+          <.icon name="hero-document-plus" class="w-5 h-5 -mt-0.5" />
           <span class="ms-1">
             New Post
           </span>
@@ -136,12 +136,16 @@ defmodule YscWeb.AdminPostsLive do
               </div>
 
               <div class="px-4 py-4">
-                <button
-                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                  phx-click={JS.patch(~p"/admin/posts")}
+                <.button
+                  id="admin-posts-clear-filters"
+                  patch={~p"/admin/posts"}
+                  variant="outline"
+                  color="zinc"
+                  class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
                 >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
-                </button>
+                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+                  Clear filters
+                </.button>
               </div>
             </.dropdown>
           </div>
@@ -323,18 +327,28 @@ defmodule YscWeb.AdminPostsLive do
               </.link>
             </li>
             <li>
-              <button
+              <.button
                 id={"#{@menu_id}-edit"}
-                type="button"
-                phx-click={JS.navigate(~p"/admin/posts/#{@post.id}")}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
+                navigate={~p"/admin/posts/#{@post.id}"}
+                variant="outline"
+                color="zinc"
+                class={
+                  Enum.join(
+                    [
+                      "w-full min-h-0 justify-start gap-2 rounded-none border-0 bg-transparent px-4 py-2",
+                      "font-normal text-zinc-700 shadow-none ring-0 ring-offset-0",
+                      "hover:bg-zinc-100"
+                    ],
+                    " "
+                  )
+                }
               >
                 <.icon
                   name="hero-pencil-square"
                   class="h-5 w-5 shrink-0 text-zinc-500"
                 />
                 <span>Edit</span>
-              </button>
+              </.button>
             </li>
             <li>
               <button

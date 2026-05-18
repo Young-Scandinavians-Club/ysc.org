@@ -1190,12 +1190,16 @@ defmodule YscWeb.HomeLive do
                 Set up passkey
               </.button>
 
-              <button
+              <.button
+                id="home-dismiss-passkey-prompt-later"
+                type="button"
                 phx-click="dismiss_passkey_prompt"
-                class="hidden md:block whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
+                variant="outline"
+                color="blue"
+                class="hidden md:block min-h-0 !border-0 !bg-transparent !shadow-none px-0 py-0 whitespace-nowrap text-sm font-medium !text-blue-600 hover:!bg-transparent hover:!text-blue-700 transition-colors duration-150 focus-visible:!ring-1 focus-visible:!ring-blue-400 focus-visible:!ring-offset-0"
               >
                 Maybe later
-              </button>
+              </.button>
 
               <button
                 type="button"
@@ -1335,18 +1339,12 @@ defmodule YscWeb.HomeLive do
                     Plan your next cabin getaway
                   </p>
                   <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                    <.link
-                      navigate={~p"/bookings/tahoe"}
-                      class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
-                    >
+                    <.button navigate={~p"/bookings/tahoe"} color="blue">
                       Book Lake Tahoe
-                    </.link>
-                    <.link
-                      navigate={~p"/bookings/clear-lake"}
-                      class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-green-700 hover:bg-green-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
-                    >
+                    </.button>
+                    <.button navigate={~p"/bookings/clear-lake"} color="green">
                       Book Clear Lake
-                    </.link>
+                    </.button>
                   </div>
                 </div>
 
@@ -1731,14 +1729,17 @@ defmodule YscWeb.HomeLive do
                       </.link>
                   <% end %>
 
-                  <button
+                  <.button
                     :if={@active_membership?}
+                    id="home-membership-qr-button"
+                    type="button"
                     phx-click="show_membership_qr"
-                    class="flex w-full items-center justify-center rounded mt-3 px-6 py-3 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/20"
+                    loading_text="Opening..."
+                    class="flex w-full mt-3 px-6 py-3 min-h-[48px] !bg-white/10 !text-white hover:!bg-white/20 backdrop-blur-md border border-white/20 focus-visible:!ring-2 focus-visible:!ring-white/50 focus-visible:!ring-offset-2"
                   >
-                    <.icon name="hero-qr-code" class="w-5 h-5 mr-2" />
+                    <.icon name="hero-qr-code" class="w-5 h-5 shrink-0" />
                     My Membership QR
-                  </button>
+                  </.button>
                 </div>
 
                 <div class="absolute right-[-10%] bottom-[-10%] z-0 opacity-10 rotate-12">
@@ -1983,12 +1984,9 @@ defmodule YscWeb.HomeLive do
               <p class="text-zinc-500 text-sm mb-6">
                 Check back later for new community events
               </p>
-              <.link
-                navigate={~p"/events"}
-                class="inline-flex items-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-zinc-700 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
-              >
+              <.button navigate={~p"/events"} color="zinc">
                 Browse Events
-              </.link>
+              </.button>
             </div>
 
             <div

@@ -682,7 +682,12 @@ defmodule YscWeb.AdminScannerLive do
                 />
               </div>
 
-              <.button type="submit" class="w-full" disabled={@selected_mode == nil}>
+              <.button
+                type="submit"
+                class="w-full"
+                disabled={@selected_mode == nil}
+                phx-disable-with="Starting..."
+              >
                 Start Session
               </.button>
             </.form>
@@ -882,13 +887,13 @@ defmodule YscWeb.AdminScannerLive do
                       No registration info
                     </span>
                   </div>
-                  <.button_link
+                  <.button
                     phx-click="check_in_single"
                     phx-value-ticket-id={ticket.id}
                     color="blue"
                   >
                     Check in only
-                  </.button_link>
+                  </.button>
                 </div>
               </div>
 
