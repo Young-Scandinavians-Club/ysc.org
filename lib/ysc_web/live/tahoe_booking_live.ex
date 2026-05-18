@@ -931,30 +931,13 @@ defmodule YscWeb.TahoeBookingLive do
             <!-- Left Column: Selection Area (2 columns on large screens) -->
             <div class="lg:col-span-2 space-y-8">
               <!-- Booking Eligibility Banner -->
-              <div
+              <.warning_callout
                 :if={!@can_book}
-                class="bg-amber-50 border border-amber-200 rounded p-4"
+                id="tahoe-booking-eligibility-banner-dashboard"
+                title={@booking_error_title}
               >
-                <div class="flex items-start">
-                  <div class="flex-shrink-0">
-                    <.icon
-                      name="hero-exclamation-triangle-solid"
-                      class="h-5 w-5 text-amber-600"
-                    />
-                  </div>
-                  <div class="ms-2 flex-1">
-                    <h3
-                      :if={@booking_error_title}
-                      class="text-sm font-semibold text-amber-900"
-                    >
-                      {@booking_error_title}
-                    </h3>
-                    <div class="mt-2 text-sm text-amber-800">
-                      <p>{raw(@booking_disabled_reason)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                {raw(@booking_disabled_reason)}
+              </.warning_callout>
               <div :if={!@can_book} class="relative opacity-60 pointer-events-none">
               </div>
               <!-- Step 1: Booking Mode Selection -->
@@ -2930,30 +2913,13 @@ defmodule YscWeb.TahoeBookingLive do
             </div>
           </div>
           <!-- Booking Eligibility Banner (shown when user can't book) -->
-          <div
+          <.warning_callout
             :if={!@can_book}
-            class="bg-amber-50 border border-amber-200 rounded p-4"
+            id="tahoe-booking-eligibility-banner-public"
+            title={@booking_error_title}
           >
-            <div class="flex items-start">
-              <div class="flex-shrink-0">
-                <.icon
-                  name="hero-exclamation-triangle-solid"
-                  class="h-5 w-5 text-amber-600"
-                />
-              </div>
-              <div class="ms-2 flex-1">
-                <h3
-                  :if={@booking_error_title}
-                  class="text-sm font-semibold text-amber-900"
-                >
-                  {@booking_error_title}
-                </h3>
-                <div class="mt-2 text-sm text-amber-800">
-                  <p>{raw(@booking_disabled_reason)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+            {raw(@booking_disabled_reason)}
+          </.warning_callout>
           <!-- Information Sections (Tab System) -->
           <div id="information-section" class="mt-12 max-w-screen-xl mx-auto">
             <!-- Tab Navigation (Sticky) -->
