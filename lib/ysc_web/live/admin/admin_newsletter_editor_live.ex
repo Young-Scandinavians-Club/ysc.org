@@ -726,14 +726,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     </button>
                   <% end %>
                 </div>
-                <button
+                <.admin_dashed_more_button
                   :if={length(@post_results) > @post_visible_count}
-                  type="button"
                   phx-click="show-more-posts"
-                  class="mt-3 w-full text-center text-xs font-medium text-zinc-500 hover:text-zinc-800 py-1.5 border border-dashed border-zinc-200 hover:border-zinc-400 rounded-lg transition-colors"
                 >
                   Show more ({length(@post_results) - @post_visible_count} remaining)
-                </button>
+                </.admin_dashed_more_button>
               </div>
               <div
                 :if={@selected_post_ids != [] && @picker_data_loaded?}
@@ -815,14 +813,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     </button>
                   <% end %>
                 </div>
-                <button
+                <.admin_dashed_more_button
                   :if={length(@event_results) > @event_visible_count}
-                  type="button"
                   phx-click="show-more-events"
-                  class="mt-3 w-full text-center text-xs font-medium text-zinc-500 hover:text-zinc-800 py-1.5 border border-dashed border-zinc-200 hover:border-zinc-400 rounded-lg transition-colors"
                 >
                   Show more ({length(@event_results) - @event_visible_count} remaining)
-                </button>
+                </.admin_dashed_more_button>
               </div>
               <div
                 :if={@selected_event_ids != [] && @picker_data_loaded?}
