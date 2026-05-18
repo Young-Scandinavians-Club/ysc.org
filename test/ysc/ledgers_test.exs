@@ -1971,25 +1971,38 @@ defmodule Ysc.LedgersTest do
       assert row.ticket_order != nil
     end
 
-    test "list_user_payments_paginated/3 total_count sums ledger payments and free ticket orders",
-         %{
-           user: user
-         } do
+    test "list_user_payments_paginated/3 total_count aggregates multiple payments and free ticket rows" do
+      user = user_fixture()
       event = event_fixture()
       tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
 
-      _free_order =
-        ticket_order_fixture(%{
-          user: user,
-          event: event,
-          tier: tier,
-          status: :completed
-        })
+      for n <- 1..2 do
+        assert {:ok, %Payment{}} =
+                 Ledgers.create_payment(%{
+                   user_id: user.id,
+                   amount: Money.new(1_000 + n, :USD),
+                   external_provider: :stripe,
+                   external_payment_id:
+                     "pi_payments_tab_total_#{n}_#{System.unique_integer([:positive])}",
+                   status: :completed,
+                   payment_date: DateTime.utc_now()
+                 })
+      end
+
+      for _ <- 1..2 do
+        _ =
+          ticket_order_fixture(%{
+            user: user,
+            event: event,
+            tier: tier,
+            status: :completed
+          })
+      end
 
       {_entries, total_count} =
         Ledgers.list_user_payments_paginated(user.id, 1, 10)
 
-      assert total_count == 2
+      assert total_count == 4
     end
 
     test "list_user_payments_paginated/3 page 2 returns second page", %{
