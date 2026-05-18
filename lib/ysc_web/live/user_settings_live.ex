@@ -4003,7 +4003,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Sub-accounts cannot purchase their own membership. You share the membership of your primary account.",
+           "Linked family members cannot purchase a separate membership. Your benefits are included in the primary account holder's family membership.",
            title: "Membership"
          )}
       else
@@ -4078,7 +4078,7 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Sub-accounts cannot purchase their own membership. You share the membership of your primary account.",
+               "Linked family members cannot purchase a separate membership. Your benefits are included in the primary account holder's family membership.",
                title: "Membership"
              )}
 
@@ -5111,7 +5111,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if sub_accounts != [] do
       {:error,
-       "Cannot downgrade membership while you have sub-accounts. Please remove all sub-accounts first."}
+       "Cannot switch to a single-person membership while family members are still linked to your account. On the Family page, remove each linked family member, then try again."}
     else
       :ok
     end

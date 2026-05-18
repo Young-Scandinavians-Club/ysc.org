@@ -991,7 +991,7 @@ defmodule Ysc.SubscriptionsTest do
                  :downgrade
                )
 
-      assert msg =~ "sub-accounts"
+      assert msg =~ "family members"
     end
 
     test "returns {:scheduled, subscription} for downgrade when callback returns scheduled" do
