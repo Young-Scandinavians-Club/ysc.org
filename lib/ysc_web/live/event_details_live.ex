@@ -2379,9 +2379,11 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3">
                   <.button
-                    class="sm:flex-[2] w-full sm:w-auto py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] active:transition-none disabled:opacity-50"
+                    class="sm:flex-[2] w-full sm:w-auto py-4"
                     id="submit-payment"
-                    disabled={!all_registrations_complete}
+                    disabled={
+                      !all_registrations_complete || !@stripe_payment_element_ready
+                    }
                   >
                     Confirm and Pay {calculate_total_price(
                       @selected_tickets,
@@ -3416,6 +3418,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:attendees_preview_count, @attendees_preview_count)
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
+    |> assign(:stripe_payment_element_ready, false)
     # Reservations - will be loaded async
     |> assign(:user_reservations, [])
     |> assign(:reservations_by_tier, %{})
@@ -3773,6 +3776,7 @@ defmodule YscWeb.EventDetailsLive do
           socket
           |> assign(:show_ticket_modal, false)
           |> assign(:show_payment_modal, false)
+          |> assign(:stripe_payment_element_ready, false)
           |> assign(:show_free_ticket_confirmation, false)
       end
 
@@ -4136,6 +4140,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:show_ticket_modal, false)
             |> assign(:show_payment_modal, true)
             |> assign(:checkout_expired, false)
+            |> assign(:stripe_payment_element_ready, false)
             |> assign(:payment_intent, payment_intent)
             |> assign(:ticket_order, ticket_order)
             |> assign(
@@ -4606,6 +4611,7 @@ defmodule YscWeb.EventDetailsLive do
       {:noreply,
        socket
        |> assign(:checkout_expired, true)
+       |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_intent, nil)
        |> assign(:ticket_order, nil)}
     else
@@ -4613,6 +4619,7 @@ defmodule YscWeb.EventDetailsLive do
       {:noreply,
        socket
        |> assign(:show_payment_modal, false)
+       |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_intent, nil)
        |> assign(:ticket_order, nil)
        |> assign(:selected_tickets, %{})}
@@ -4643,6 +4650,7 @@ defmodule YscWeb.EventDetailsLive do
       {:noreply,
        socket
        |> assign(:checkout_expired, true)
+       |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_intent, nil)
        |> assign(:ticket_order, nil)}
     else
@@ -4650,6 +4658,7 @@ defmodule YscWeb.EventDetailsLive do
       {:noreply,
        socket
        |> assign(:show_payment_modal, false)
+       |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_intent, nil)
        |> assign(:ticket_order, nil)
        |> assign(:selected_tickets, %{})}
@@ -5085,6 +5094,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:ticket_details_form, %{})
      |> assign(:tickets_for_me, %{})
      |> assign(:payment_redirect_in_progress, false)
+     |> assign(:stripe_payment_element_ready, false)
      |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
   end
 
@@ -5257,6 +5267,16 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   @impl true
+  def handle_event("stripe-payment-element-loading", _params, socket) do
+    {:noreply, assign(socket, :stripe_payment_element_ready, false)}
+  end
+
+  @impl true
+  def handle_event("stripe-payment-element-ready", _params, socket) do
+    {:noreply, assign(socket, :stripe_payment_element_ready, true)}
+  end
+
+  @impl true
   def handle_event(
         "payment-success",
         %{"payment_intent_id" => payment_intent_id},
@@ -5324,6 +5344,7 @@ defmodule YscWeb.EventDetailsLive do
        title: "Checkout"
      )
      |> assign(:show_payment_modal, false)
+     |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)
      |> assign(:ticket_order, nil)
      |> assign(:selected_tickets, %{})
@@ -5340,6 +5361,7 @@ defmodule YscWeb.EventDetailsLive do
      socket
      |> assign(:checkout_expired, false)
      |> assign(:show_payment_modal, false)
+     |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)
      |> assign(:ticket_order, nil)
      |> assign(:selected_tickets, %{})
@@ -6611,6 +6633,7 @@ defmodule YscWeb.EventDetailsLive do
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
+         |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, order_with_tickets)
          |> assign(:user_tickets, updated_user_tickets)
@@ -6630,7 +6653,8 @@ defmodule YscWeb.EventDetailsLive do
            "Payment processed but there was an issue confirming your tickets. Please contact support.",
            title: "Tickets"
          )
-         |> assign(:show_payment_modal, false)}
+         |> assign(:show_payment_modal, false)
+         |> assign(:stripe_payment_element_ready, false)}
     end
   end
 
@@ -7436,6 +7460,7 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:show_ticket_modal, false)
            |> assign(:show_payment_modal, true)
            |> assign(:checkout_expired, false)
+           |> assign(:stripe_payment_element_ready, false)
            |> assign(:payment_intent, payment_intent)
            |> assign(:ticket_order, ticket_order_with_tickets)
            |> assign(

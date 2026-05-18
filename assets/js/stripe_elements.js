@@ -47,6 +47,14 @@ function safePushEvent(hook, event, payload = {}) {
     pushEventIfConnected(hook, event, payload);
 }
 
+function notifyStripePaymentElementLoading(hook) {
+    safePushEvent(hook, 'stripe-payment-element-loading', {});
+}
+
+function notifyStripePaymentElementReady(hook) {
+    safePushEvent(hook, 'stripe-payment-element-ready', {});
+}
+
 const StripeElements = {
     mounted() {
         this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
@@ -86,6 +94,8 @@ const StripeElements = {
         this.initializing = true;
 
         try {
+            notifyStripePaymentElementLoading(this);
+
             const clientSecret = this.el.dataset.clientSecret;
 
             if (!clientSecret) {
@@ -111,7 +121,10 @@ const StripeElements = {
                     const hasStripeContent = paymentElementContainer.querySelector('.StripeElement') ||
                         paymentElementContainer.querySelector('[data-testid]') ||
                         paymentElementContainer.children.length > 0;
-                    if (hasStripeContent) return;
+                    if (hasStripeContent) {
+                        notifyStripePaymentElementReady(this);
+                        return;
+                    }
                 }
             }
 
@@ -217,6 +230,7 @@ const StripeElements = {
                             } catch (recreateError) {
                                 console.error('Failed to recreate payment element:', recreateError);
                                 this.showMessage('Failed to initialize payment form. Please refresh and try again.');
+                                return;
                             }
                         }
                     }
@@ -231,6 +245,8 @@ const StripeElements = {
                 submitButton.removeEventListener('click', this._boundHandleSubmit);
                 submitButton.addEventListener('click', this._boundHandleSubmit);
             }
+
+            notifyStripePaymentElementReady(this);
 
         } catch (error) {
             console.error('Error initializing Stripe Elements:', error);
