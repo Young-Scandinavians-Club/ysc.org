@@ -140,13 +140,13 @@ defmodule YscWeb.DevButtonShowcaseLive do
             <tr class="border-b border-zinc-100 align-middle">
               <td class="py-3 pr-4 text-sm font-medium text-zinc-700">patch</td>
               <td class="py-3 pr-4">
-                <.button patch={~p"/dev/button-showcase"} id="showcase-patch-live">
+                <.button patch="/dev/button-showcase" id="showcase-patch-live">
                   Patch here
                 </.button>
               </td>
               <td class="py-3">
                 <.button
-                  patch={~p"/dev/button-showcase"}
+                  patch="/dev/button-showcase"
                   class="phx-click-loading"
                   id="showcase-patch-forced"
                 >
