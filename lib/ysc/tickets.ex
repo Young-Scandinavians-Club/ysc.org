@@ -209,6 +209,45 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Ticket orders for the member "Your Tickets" list: not cancelled, linked to an event,
+  and the event start is strictly after `now` (same filter semantics as `UserTicketsLive`).
+
+  This avoids loading the full order history and filtering in application code.
+  """
+  def list_user_upcoming_ticket_orders(user_id, opts \\ []) do
+    now = Keyword.get(opts, :now, DateTime.utc_now())
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      where: to.status != ^:cancelled,
+      join: e in assoc(to, :event),
+      where: e.start_date > ^now,
+      order_by: [desc: to.inserted_at],
+      preload: [:tickets, :event, tickets: :ticket_tier]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Completed orders whose event start is before `now`, for the memory gallery (newest events first).
+  """
+  def list_user_past_memory_gallery_ticket_orders(user_id, opts \\ []) do
+    now = Keyword.get(opts, :now, DateTime.utc_now())
+    limit = Keyword.get(opts, :limit, 12)
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      where: to.status == ^:completed,
+      join: e in assoc(to, :event),
+      where: e.start_date < ^now,
+      order_by: [desc: e.start_date],
+      limit: ^limit,
+      preload: [:event]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Gets paginated ticket orders for a user with Flop.
   """
   def list_user_ticket_orders_paginated(user_id, params) do

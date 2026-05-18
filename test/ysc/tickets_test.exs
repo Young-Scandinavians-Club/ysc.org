@@ -237,6 +237,46 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "list_user_upcoming_ticket_orders/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns empty when all orders are for past events", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, _order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      past_date =
+        DateTime.utc_now()
+        |> DateTime.add(-7, :day)
+        |> DateTime.truncate(:second)
+
+      {1, _} =
+        Ysc.Repo.update_all(
+          from(e in Ysc.Events.Event, where: e.id == ^event.id),
+          set: [start_date: past_date]
+        )
+
+      assert Tickets.list_user_upcoming_ticket_orders(user.id) == []
+    end
+
+    test "returns pending orders for future events", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      upcoming = Tickets.list_user_upcoming_ticket_orders(user.id)
+      assert Enum.any?(upcoming, &(&1.id == order.id))
+    end
+  end
+
   describe "list_user_ticket_orders_paginated/2" do
     setup do
       tickets_setup()
