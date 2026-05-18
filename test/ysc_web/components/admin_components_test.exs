@@ -1,9 +1,11 @@
 defmodule YscWeb.AdminComponentsTest do
   use YscWeb.ConnCase, async: true
+  use Phoenix.Component
 
   require Phoenix.LiveViewTest
 
-  alias YscWeb.AdminComponents
+  import Phoenix.LiveViewTest, only: [rendered_to_string: 1]
+  import YscWeb.AdminComponents
 
   defp sample_meta do
     %Flop.Meta{
@@ -24,7 +26,7 @@ defmodule YscWeb.AdminComponentsTest do
       |> Map.merge(Map.new(opts))
 
     Phoenix.LiveViewTest.render_component(
-      &AdminComponents.admin_flop_pagination/1,
+      &admin_flop_pagination/1,
       assigns
     )
   end
@@ -33,7 +35,7 @@ defmodule YscWeb.AdminComponentsTest do
     test "renders nothing when meta is nil" do
       html =
         Phoenix.LiveViewTest.render_component(
-          &AdminComponents.admin_flop_pagination/1,
+          &admin_flop_pagination/1,
           %{
             meta: nil,
             path: "/admin/items",
@@ -60,6 +62,35 @@ defmodule YscWeb.AdminComponentsTest do
       html = render_pagination(%{})
       assert html =~ "hero-chevron-left"
       assert html =~ "hero-chevron-right"
+    end
+  end
+
+  describe "admin_dashed_more_button/1" do
+    test "renders a dashed full-width button with label and phx-click" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_dashed_more_button phx-click="show-more">
+          Load more
+        </.admin_dashed_more_button>
+        """)
+
+      assert html =~ ~s(phx-click="show-more")
+      assert html =~ "Load more"
+      assert html =~ "border-dashed"
+      assert html =~ "type=\"button\""
+    end
+
+    test "merges optional class onto the button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_dashed_more_button class="mb-2">x</.admin_dashed_more_button>
+        """)
+
+      assert html =~ "mb-2"
     end
   end
 end

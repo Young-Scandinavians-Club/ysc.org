@@ -170,6 +170,41 @@ defmodule YscWeb.AdminComponents do
     ]
 
   # ---------------------------------------------------------------------------
+  # admin_dashed_more_button
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Full-width dashed outline control for secondary actions such as “show more” rows
+  in admin pickers (e.g. newsletter post and event grids).
+
+  Pass LiveView attributes (`phx-click`, `phx-target`, etc.) via `rest`. Label
+  content goes in the default slot.
+  """
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the button"
+
+  attr :rest, :global, include: ~w(phx-click phx-target id disabled aria-label)
+
+  slot :inner_block, required: true
+
+  def admin_dashed_more_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={[
+        "mt-3 w-full text-center text-xs font-medium text-zinc-500 hover:text-zinc-800",
+        "py-1.5 border border-dashed border-zinc-200 hover:border-zinc-400 rounded-lg transition-colors",
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # side_menu
   # ---------------------------------------------------------------------------
 

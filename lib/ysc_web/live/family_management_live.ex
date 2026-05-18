@@ -35,7 +35,7 @@ defmodule YscWeb.FamilyManagementLive do
        |> assign(:page_title, "Family")
        |> assign(
          :meta_description,
-         "Manage your family members and sub-accounts in Young Scandinavians Club."
+         "Manage your family members and their linked accounts in Young Scandinavians Club."
        )
        |> assign(:live_action, :family)}
     else
@@ -72,7 +72,7 @@ defmodule YscWeb.FamilyManagementLive do
        |> assign(:page_title, "Family")
        |> assign(
          :meta_description,
-         "Manage your family members and sub-accounts in Young Scandinavians Club."
+         "Manage your family members and their linked accounts in Young Scandinavians Club."
        )
        |> assign(:live_action, :family)}
     end
@@ -239,7 +239,9 @@ defmodule YscWeb.FamilyManagementLive do
           {:noreply,
            socket
            |> assign(:sub_accounts, sub_accounts)
-           |> YscWeb.Flash.put_toast(:info, "Sub-account removed successfully.",
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Family member removed successfully.",
              title: "Family"
            )}
 
@@ -248,7 +250,7 @@ defmodule YscWeb.FamilyManagementLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to remove sub-account.",
+             "Could not remove this family member. Please try again.",
              title: "Family"
            )}
       end
@@ -257,7 +259,7 @@ defmodule YscWeb.FamilyManagementLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "Sub-account not found or unauthorized.",
+         "That family member could not be found, or you are not allowed to remove them.",
          title: "Family"
        )}
     end
@@ -498,7 +500,7 @@ defmodule YscWeb.FamilyManagementLive do
                   <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
                     <p class="text-sm text-amber-800">
                       You cannot send invites at this time. Please ensure you have an active family or
-                      lifetime membership and have not reached the maximum number of sub-accounts (10).
+                      lifetime membership and have not reached the limit of 10 linked family members.
                     </p>
                   </div>
                 <% end %>
@@ -566,14 +568,16 @@ defmodule YscWeb.FamilyManagementLive do
                   </:actions>
                 </.simple_form>
               </div>
-              <!-- Sub-Accounts Section -->
+              <!-- Linked family members (accepted invites) -->
               <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
                 <h2 class="text-zinc-900 font-bold text-xl">
-                  Family Accounts ({length(@sub_accounts)})
+                  Linked family members ({length(@sub_accounts)})
                 </h2>
 
                 <%= if @sub_accounts == [] do %>
-                  <p class="text-zinc-600 text-sm">No sub-accounts yet.</p>
+                  <p class="text-zinc-600 text-sm">
+                    No linked family members yet. When someone accepts your invitation, they will appear here.
+                  </p>
                 <% else %>
                   <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-zinc-200">
@@ -609,7 +613,7 @@ defmodule YscWeb.FamilyManagementLive do
                               phx-click="remove_sub_account"
                               phx-value-user_id={sub_account.id}
                               phx-disable-with="Removing..."
-                              data-confirm="Are you sure you want to remove this sub-account? They will lose access to membership benefits and receive an email notification."
+                              data-confirm="Are you sure you want to remove this family member from your membership? They will lose access to membership benefits and receive an email notification."
                               class="text-red-600 hover:text-red-800"
                             >
                               Remove

@@ -151,7 +151,7 @@ defmodule YscWeb.OrderConfirmationLive do
               <%= if @event_in_past do %>
                 Hope you had a blast, {@user_first_name}!
               <% else %>
-                See you at the Event, {@user_first_name}!
+                See you at the event, {@user_first_name}!
               <% end %>
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">

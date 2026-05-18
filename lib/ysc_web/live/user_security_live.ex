@@ -447,14 +447,11 @@ defmodule YscWeb.UserSecurityLive do
                 </div>
               </div>
 
-              <div
+              <.async_section_loader
                 :if={@passkeys_loading}
-                class="flex items-center justify-center py-8"
-              >
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
-                </div>
-                <span class="ml-3 text-zinc-600 text-sm">Loading passkeys...</span>
-              </div>
+                id="user-security-passkeys-loading"
+                label="Loading passkeys..."
+              />
 
               <div
                 :if={@passkeys_loaded && @passkeys == []}
@@ -585,16 +582,11 @@ defmodule YscWeb.UserSecurityLive do
                 Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out other sessions.
               </p>
 
-              <div
+              <.async_section_loader
                 :if={@login_history_loading}
-                class="flex items-center justify-center py-8"
-              >
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
-                </div>
-                <span class="ml-3 text-zinc-600 text-sm">
-                  Loading activity...
-                </span>
-              </div>
+                id="user-security-login-history-loading"
+                label="Loading activity..."
+              />
 
               <div
                 :if={!@login_history_loading && @login_history == []}

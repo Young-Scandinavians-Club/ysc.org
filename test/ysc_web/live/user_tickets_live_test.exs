@@ -46,7 +46,8 @@ defmodule YscWeb.UserTicketsLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/users/tickets")
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      html = render(view)
 
       # Check for main page structure
       assert html =~ "Member Portal"

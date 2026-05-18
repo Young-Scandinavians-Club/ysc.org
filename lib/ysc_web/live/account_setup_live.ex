@@ -69,13 +69,13 @@ defmodule YscWeb.AccountSetupLive do
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your spam folder or
+              Didn't receive the code? Check your spam folder.
               <%= if email_resend_available?(assigns) do %>
                 <.link
                   phx-click="resend_code"
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  resend the code
+                  Resend the code
                 </.link>
               <% else %>
                 <% email_countdown =
@@ -85,9 +85,12 @@ defmodule YscWeb.AccountSetupLive do
                   data-countdown={email_countdown}
                   data-timer-type="email"
                 >
-                  resend in {email_countdown}s
+                  You can resend the code in {email_countdown}{if email_countdown ==
+                                                                    1,
+                                                                  do: " second",
+                                                                  else: " seconds"}.
                 </span>
-              <% end %>.
+              <% end %>
             </p>
 
             <:actions>
@@ -329,13 +332,13 @@ defmodule YscWeb.AccountSetupLive do
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your messages or
+              Didn't receive the code? Check your messages.
               <%= if sms_resend_available?(assigns) do %>
                 <.link
                   phx-click="resend_phone_code"
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  resend the code
+                  Resend the code
                 </.link>
               <% else %>
                 <% sms_countdown = sms_resend_seconds_remaining(assigns) |> max(0) %>
@@ -344,9 +347,11 @@ defmodule YscWeb.AccountSetupLive do
                   data-countdown={sms_countdown}
                   data-timer-type="sms"
                 >
-                  resend in {sms_countdown}s
+                  You can resend the code in {sms_countdown}{if sms_countdown == 1,
+                    do: " second",
+                    else: " seconds"}.
                 </span>
-              <% end %>.
+              <% end %>
             </p>
 
             <div class="py-2">

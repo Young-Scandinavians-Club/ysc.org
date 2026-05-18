@@ -86,14 +86,14 @@ defmodule YscWeb.UserSettingsLive do
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your messages or
+              Didn't receive the code? Check your messages.
               <%= if sms_resend_available?(assigns) do %>
                 <.link
                   phx-click="resend_phone_code"
                   phx-disable-with="Sending..."
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  resend the code
+                  Resend the code
                 </.link>
               <% else %>
                 <% sms_countdown = sms_resend_seconds_remaining(assigns) %>
@@ -102,9 +102,11 @@ defmodule YscWeb.UserSettingsLive do
                   data-countdown={sms_countdown}
                   data-timer-type="sms"
                 >
-                  resend in {sms_countdown}s
+                  You can resend the code in {sms_countdown}{if sms_countdown == 1,
+                    do: " second",
+                    else: " seconds"}.
                 </span>
-              <% end %>.
+              <% end %>
             </p>
 
             <:actions>
@@ -166,14 +168,14 @@ defmodule YscWeb.UserSettingsLive do
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your email or
+              Didn't receive the code? Check your email.
               <%= if email_resend_available?(assigns) do %>
                 <.link
                   phx-click="resend_email_code"
                   phx-disable-with="Sending..."
                   class="text-blue-600 hover:underline cursor-pointer"
                 >
-                  resend the code
+                  Resend the code
                 </.link>
               <% else %>
                 <% email_countdown = email_resend_seconds_remaining(assigns) %>
@@ -182,9 +184,12 @@ defmodule YscWeb.UserSettingsLive do
                   data-countdown={email_countdown}
                   data-timer-type="email"
                 >
-                  resend in {email_countdown}s
+                  You can resend the code in {email_countdown}{if email_countdown ==
+                                                                    1,
+                                                                  do: " second",
+                                                                  else: " seconds"}.
                 </span>
-              <% end %>.
+              <% end %>
             </p>
 
             <:actions>
@@ -226,16 +231,12 @@ defmodule YscWeb.UserSettingsLive do
             Payment Method
           </h2>
           <%!-- Loading state --%>
-          <div
+          <.async_section_loader
             :if={assigns[:loading_payment_methods]}
-            class="flex items-center justify-center py-12"
-          >
-            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600">
-            </div>
-            <span class="ml-3 text-zinc-600 text-sm">
-              Loading payment methods...
-            </span>
-          </div>
+            id="user-settings-payment-methods-loading"
+            label="Loading payment methods..."
+            class="py-12"
+          />
           <%!-- Loaded content --%>
           <div :if={!assigns[:loading_payment_methods]}>
             <%!-- Section 1: Existing payment methods --%>
@@ -2838,20 +2839,14 @@ defmodule YscWeb.UserSettingsLive do
     email_changeset = Accounts.change_user_email(user)
     profile_changeset = Accounts.change_user_profile(user)
 
-    # Newsletter checkbox reads from newsletter_subscribers (single source of truth)
-    effective_newsletter =
-      case Newsletter.get_subscriber_by_email(user.email) do
-        nil -> false
-        subscriber -> subscriber.subscribed
-      end
-
+    # Newsletter + pending family invites are loaded in `:load_settings_data` so the
+    # dead render skips two DB round-trips (see `handle_info/2` for `:load_settings_data`).
     notification_changeset =
       Accounts.change_notification_preferences(user, %{
-        "newsletter_notifications" => effective_newsletter
+        "newsletter_notifications" => false
       })
 
-    pending_family_invites =
-      FamilyInvites.list_pending_invites_for_email(user.email)
+    pending_family_invites = []
 
     # Base socket assigns that don't require expensive queries
     socket =
@@ -3039,6 +3034,20 @@ defmodule YscWeb.UserSettingsLive do
 
     board_member = Accounts.household_board_member(user)
 
+    effective_newsletter =
+      case Newsletter.get_subscriber_by_email(user.email) do
+        nil -> false
+        subscriber -> subscriber.subscribed
+      end
+
+    notification_changeset =
+      Accounts.change_notification_preferences(user, %{
+        "newsletter_notifications" => effective_newsletter
+      })
+
+    pending_family_invites =
+      FamilyInvites.list_pending_invites_for_email(user.email)
+
     {:noreply,
      socket
      |> assign(:user, user)
@@ -3055,6 +3064,8 @@ defmodule YscWeb.UserSettingsLive do
        :membership_form,
        to_form(%{"membership_type" => membership_type_to_select})
      )
+     |> assign(:notification_form, to_form(notification_changeset))
+     |> assign(:pending_family_invites, pending_family_invites)
      |> assign(:user_avatars, load_user_avatars(user))
      |> assign(:loading_avatars, false)
      |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
@@ -4003,7 +4014,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Sub-accounts cannot purchase their own membership. You share the membership of your primary account.",
+           "Linked family members cannot purchase a separate membership. Your benefits are included in the primary account holder's family membership.",
            title: "Membership"
          )}
       else
@@ -4078,7 +4089,7 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Sub-accounts cannot purchase their own membership. You share the membership of your primary account.",
+               "Linked family members cannot purchase a separate membership. Your benefits are included in the primary account holder's family membership.",
                title: "Membership"
              )}
 
@@ -5111,7 +5122,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if sub_accounts != [] do
       {:error,
-       "Cannot downgrade membership while you have sub-accounts. Please remove all sub-accounts first."}
+       "Cannot switch to a single-person membership while family members are still linked to your account. On the Family page, remove each linked family member, then try again."}
     else
       :ok
     end
