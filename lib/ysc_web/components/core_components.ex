@@ -284,6 +284,10 @@ defmodule YscWeb.CoreComponents do
   (which would break the loading markup). When structured loading does not apply, the
   attribute is left unchanged for LiveView's default behavior.
 
+  If you omit both `loading_text` and `phx-disable-with` on a **LiveView** control (`navigate`,
+  `patch`, `href`, `type="submit"`, or `phx-click` / `phx-submit` / `phx-change` / `phx-hook`),
+  the label defaults to `"Loading..."` so the spinner state is used after a press.
+
   ## Examples
 
       <.button>Send!</.button>
@@ -310,6 +314,10 @@ defmodule YscWeb.CoreComponents do
     rest_raw = normalize_rest(assigns[:rest])
     disable_with = read_phx_disable_with(rest_raw)
 
+    is_link =
+      [assigns[:navigate], assigns[:patch], assigns[:href]]
+      |> Enum.any?(&(&1 not in [nil, ""]))
+
     loading_text =
       case assigns[:loading_text] do
         nil -> loading_text_to_string(disable_with)
@@ -317,9 +325,13 @@ defmodule YscWeb.CoreComponents do
         other -> loading_text_to_string(other)
       end
 
-    is_link =
-      [assigns[:navigate], assigns[:patch], assigns[:href]]
-      |> Enum.any?(&(&1 not in [nil, ""]))
+    loading_text =
+      if loading_text in [nil, ""] and
+           (is_link or phx_live_button?(rest_raw) or assigns[:type] == "submit") do
+        "Loading..."
+      else
+        loading_text
+      end
 
     use_loading_ui? =
       use_button_loading_ui?(
@@ -389,7 +401,7 @@ defmodule YscWeb.CoreComponents do
         >
           <.icon
             name="hero-arrow-path"
-            class="h-4 w-4 shrink-0 animate-spin text-blue-600"
+            class="h-4 w-4 shrink-0 animate-spin text-current"
           />
           <span class="text-current">{@loading_text}</span>
         </span>
@@ -413,7 +425,7 @@ defmodule YscWeb.CoreComponents do
         >
           <.icon
             name="hero-arrow-path"
-            class="h-4 w-4 shrink-0 animate-spin text-blue-600"
+            class="h-4 w-4 shrink-0 animate-spin text-current"
           />
           <span class="text-current">{@loading_text}</span>
         </span>

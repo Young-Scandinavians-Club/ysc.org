@@ -282,13 +282,14 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               label="Internal note (optional)"
               class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
             />
-            <button
+            <.button
               type="submit"
               id="grant-entitlement-submit-org"
-              class="mt-4 px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700"
+              phx-disable-with="Granting..."
+              class="mt-4"
             >
               Grant benefit & email member
-            </button>
+            </.button>
           </.form>
         </div>
 

@@ -197,6 +197,20 @@ defmodule YscWeb.Router do
 
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
+
+    scope "/dev", YscWeb do
+      pipe_through :browser
+
+      live_session :dev_button_showcase,
+        on_mount: [
+          {YscWeb.LiveToastMount, :mount_toasts_sync},
+          {YscWeb.UserAuth, :mount_current_user},
+          {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
+          {YscWeb.Plugs.RequestPath, :set_request_path}
+        ] do
+        live "/button-showcase", DevButtonShowcaseLive, :index
+      end
+    end
   end
 
   ## Authentication routes

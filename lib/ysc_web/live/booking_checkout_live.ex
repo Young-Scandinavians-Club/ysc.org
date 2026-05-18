@@ -737,7 +737,7 @@ defmodule YscWeb.BookingCheckoutLive do
                         Continue to Payment
                       <% end %>
                     </span>
-                    <.icon name="hero-arrow-right" class="w-5 h-5 -mt-1 ms-1" />
+                    <.icon name="hero-arrow-right" class="w-5 h-5 -mt-0.5 ms-1" />
                   </.button>
                   <button
                     type="button"
@@ -790,7 +790,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     class="flex-1 w-full text-lg py-3.5"
                     disabled={@is_expired}
                   >
-                    <.icon name="hero-check-circle" class="w-5 h-5 -mt-1 me-1" />
+                    <.icon name="hero-check-circle" class="w-5 h-5 -mt-0.5 me-1" />
                     <span class="text-lg font-semibold">Confirm booking</span>
                   </.button>
                   <button
@@ -827,7 +827,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     class="flex-1 w-full text-lg py-3.5"
                     disabled={@is_expired}
                   >
-                    <.icon name="hero-lock-closed" class="w-5 h-5 -mt-1 me-1" />
+                    <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
                     <span class="text-lg font-semibold">
                       Pay {MoneyHelper.format_money!(@total_price)} Securely
                     </span>
@@ -1015,7 +1015,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 Continue to Payment
               <% end %>
             </span>
-            <.icon name="hero-arrow-right" class="w-5 h-5 -mt-1 ms-1" />
+            <.icon name="hero-arrow-right" class="w-5 h-5 -mt-0.5 ms-1" />
           </.button>
         </div>
       </div>

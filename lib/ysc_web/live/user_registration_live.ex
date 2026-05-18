@@ -403,43 +403,39 @@ defmodule YscWeb.UserRegistrationLive do
             >
               <div>
                 <div :if={@current_step > 0}>
-                  <button
+                  <.button
+                    id="registration-prev-step"
                     type="button"
-                    class="flex items-center gap-x-1.5 rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
+                    variant="outline"
+                    color="zinc"
                     phx-click="prev-step"
+                    class="!min-h-0 !border-0 !bg-transparent !shadow-none hover:!bg-zinc-100 !text-zinc-800"
                   >
-                    <.icon name="hero-arrow-left-solid" class="w-4 h-4" />
+                    <.icon name="hero-arrow-left-solid" class="w-4 h-4 shrink-0" />
                     Previous step
-                  </button>
+                  </.button>
                 </div>
               </div>
 
               <div class={[@current_step > 1 && "flex-1 sm:flex-none ml-3"]}>
                 <div :if={@current_step < 2}>
-                  <button
+                  <% next_step_disabled? =
+                    disable_next_button(
+                      @current_step,
+                      @step_0_invalid,
+                      @step_1_invalid,
+                      @step_2_invalid
+                    ) %>
+                  <.button
+                    id="registration-next-step"
                     type="button"
-                    class="flex items-center gap-x-1.5 rounded bg-blue-700 hover:bg-blue-800 py-2 px-3 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
                     phx-click="next-step"
-                    disabled={
-                      disable_next_button(
-                        @current_step,
-                        @step_0_invalid,
-                        @step_1_invalid,
-                        @step_2_invalid
-                      )
-                    }
-                    aria-disabled={
-                      disable_next_button(
-                        @current_step,
-                        @step_0_invalid,
-                        @step_1_invalid,
-                        @step_2_invalid
-                      )
-                    }
+                    disabled={next_step_disabled?}
+                    aria-disabled={next_step_disabled?}
                   >
                     Next Step
-                    <.icon name="hero-arrow-right-solid" class="w-4 h-4" />
-                  </button>
+                    <.icon name="hero-arrow-right-solid" class="w-4 h-4 shrink-0" />
+                  </.button>
                 </div>
 
                 <div :if={@current_step > 1} class="w-full">

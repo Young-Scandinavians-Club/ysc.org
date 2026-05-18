@@ -504,7 +504,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               </div>
               <div id="payment-element"></div>
               <div class="flex justify-end mt-4">
-                <.button type="submit" id="submit">
+                <.button type="submit" id="submit" phx-disable-with="Saving...">
                   <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
                   Save Payment Method
                 </.button>
@@ -597,7 +597,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 >
                   Skip for now
                 </.button>
-                <.button type="submit" id="submit">
+                <.button type="submit" id="submit" phx-disable-with="Saving...">
                   <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
                   Save & Activate
                 </.button>

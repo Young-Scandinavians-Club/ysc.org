@@ -160,7 +160,9 @@ defmodule YscWeb.MediaPickerComponent do
               :if={length(@uploads.media_picker_file.entries) > 0}
               class="flex justify-end mt-3"
             >
-              <.button type="submit">Upload</.button>
+              <.button type="submit" phx-disable-with="Uploading...">
+                Upload
+              </.button>
             </div>
           </form>
 

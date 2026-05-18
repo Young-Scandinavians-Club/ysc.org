@@ -68,14 +68,15 @@ defmodule YscWeb.AdminUsersLive do
           />
 
           <div class="flex flex-row justify-end w-full pt-8">
-            <button
-              phx-click={
-                JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")
-              }
-              class="rounded hover:bg-zinc-100 py-2 px-3 mr-4 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-600"
+            <.button
+              id="admin-users-edit-modal-cancel"
+              patch={~p"/admin/users?#{list_params_for_back(@params)}"}
+              variant="outline"
+              color="zinc"
+              class="mr-4"
             >
               Cancel
-            </button>
+            </.button>
 
             <.button phx-disable-with="Saving..." type="submit">
               <.icon name="hero-check" class="w-5 h-5 mb-0.5 me-1" /> Save changes
@@ -392,8 +393,8 @@ defmodule YscWeb.AdminUsersLive do
         >
           <:button_block>
             <.tooltip tooltip_text="Export to CSV">
-              <.icon name="hero-document-arrow-down" class="w-5 h-5 -mt-1" />
-              <span class="me-1">Export</span>
+              <.icon name="hero-document-arrow-down" class="w-5 h-5 -mt-0.5" />
+              <span class="ms-1">Export</span>
             </.tooltip>
           </:button_block>
           <div class="w-full px-4 py-3">
@@ -562,12 +563,16 @@ defmodule YscWeb.AdminUsersLive do
               </div>
 
               <div class="px-4 py-4">
-                <button
-                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full"
-                  phx-click={JS.patch(~p"/admin/users")}
+                <.button
+                  id="admin-users-filter-clear"
+                  patch={~p"/admin/users"}
+                  variant="outline"
+                  color="zinc"
+                  class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
                 >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
-                </button>
+                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+                  Clear filters
+                </.button>
               </div>
             </.dropdown>
           </div>
@@ -642,12 +647,16 @@ defmodule YscWeb.AdminUsersLive do
               />
 
               <div class="px-4 py-4 flex items-center align-center justify-center">
-                <button
-                  class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
-                  phx-click={JS.patch(~p"/admin/users")}
+                <.button
+                  id="admin-users-clear-filters-empty-mobile"
+                  patch={~p"/admin/users"}
+                  variant="outline"
+                  color="zinc"
+                  class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
                 >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
-                </button>
+                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+                  Clear filters
+                </.button>
               </div>
             </div>
             <!-- Mobile Pagination -->
@@ -726,12 +735,16 @@ defmodule YscWeb.AdminUsersLive do
               />
 
               <div class="px-4 py-4 flex items-center align-center justify-center">
-                <button
-                  class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
-                  phx-click={JS.patch(~p"/admin/users")}
+                <.button
+                  id="admin-users-clear-filters-empty-desktop"
+                  patch={~p"/admin/users"}
+                  variant="outline"
+                  color="zinc"
+                  class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
                 >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" /> Clear filters
-                </button>
+                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+                  Clear filters
+                </.button>
               </div>
             </div>
 

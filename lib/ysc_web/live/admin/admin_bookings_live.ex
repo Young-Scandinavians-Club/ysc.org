@@ -100,11 +100,8 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button
-                  type="button"
-                  phx-click={
-                    JS.patch(
-                      ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
-                    )
+                  patch={
+                    ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
                   }
                   phx-disable-with="Loading..."
                 >
@@ -1856,19 +1853,13 @@ defmodule YscWeb.AdminBookingsLive do
         <.admin_page_title>
           {atom_to_readable(@selected_property)} Bookings
         </.admin_page_title>
-        <.link
+        <.button
+          id="admin-bookings-booking-entitlements"
           navigate={~p"/admin/bookings/entitlements"}
-          class={[
-            "inline-flex items-center justify-center gap-2 shrink-0",
-            "phx-submit-loading:opacity-75 phx-click-loading:opacity-75 rounded py-2 px-3",
-            "transition duration-150 ease-in-out font-semibold leading-6 text-sm",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
-            "bg-blue-700 hover:bg-blue-800 text-zinc-100",
-            "active:text-zinc-100/80 active:scale-[0.98] active:transition-none"
-          ]}
+          class="shrink-0"
         >
           <.icon name="hero-gift" class="w-5 h-5" /> Booking Entitlements
-        </.link>
+        </.button>
       </div>
       <!-- Property Tabs -->
       <div class="border-b border-zinc-200 mb-6">
@@ -2598,7 +2589,7 @@ defmodule YscWeb.AdminBookingsLive do
                     phx-click="clear-reservation-filters"
                     phx-disable-with="Clearing..."
                   >
-                    <.icon name="hero-x-circle" class="w-5 h-5 -mt-1" />
+                    <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" />
                     Clear filters
                   </button>
                 </div>
@@ -2986,7 +2977,7 @@ defmodule YscWeb.AdminBookingsLive do
               }
               phx-disable-with="Loading..."
             >
-              <.icon name="hero-plus" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
               <span class="ms-1">
                 New Pricing Rule
               </span>
@@ -3090,7 +3081,7 @@ defmodule YscWeb.AdminBookingsLive do
               }
               phx-disable-with="Loading..."
             >
-              <.icon name="hero-plus" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
               <span class="ms-1">
                 New Refund Policy
               </span>
@@ -3193,14 +3184,12 @@ defmodule YscWeb.AdminBookingsLive do
               </p>
             </div>
             <.button
-              phx-click={
-                JS.patch(
-                  ~p"/admin/bookings/rooms/new?property=#{@selected_property}&section=#{@current_section}"
-                )
+              patch={
+                ~p"/admin/bookings/rooms/new?property=#{@selected_property}&section=#{@current_section}"
               }
               phx-disable-with="Loading..."
             >
-              <.icon name="hero-plus" class="w-5 h-5 -mt-1" />
+              <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
               <span class="ms-1">
                 New Room
               </span>

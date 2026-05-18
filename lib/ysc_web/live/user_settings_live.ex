@@ -404,23 +404,25 @@ defmodule YscWeb.UserSettingsLive do
           </div>
           <%!-- Modal footer --%>
           <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
-            <button
-              type="button"
-              phx-click={JS.patch(~p"/users/membership")}
-              class="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 bg-white hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            <.button
+              patch={~p"/users/membership"}
+              variant="outline"
+              color="zinc"
+              class="px-4"
             >
               Close
-            </button>
-            <button
+            </.button>
+            <.button
               :if={@show_new_payment_form && @payment_intent_secret}
               type="submit"
               form="payment-form"
               id="submit"
               phx-disable-with="Saving..."
-              class="px-4 py-2 rounded-lg border border-transparent text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              color="blue"
+              class="px-4"
             >
               Save Payment Method
-            </button>
+            </.button>
           </div>
         </.modal>
 
@@ -1606,7 +1608,7 @@ defmodule YscWeb.UserSettingsLive do
                     My Membership QR
                   </.button>
                   <.button
-                    phx-click={JS.patch(~p"/users/membership/payment-method")}
+                    patch={~p"/users/membership/payment-method"}
                     variant="outline"
                     class="w-full sm:w-auto justify-center"
                   >

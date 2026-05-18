@@ -682,7 +682,12 @@ defmodule YscWeb.AdminScannerLive do
                 />
               </div>
 
-              <.button type="submit" class="w-full" disabled={@selected_mode == nil}>
+              <.button
+                type="submit"
+                class="w-full"
+                disabled={@selected_mode == nil}
+                phx-disable-with="Starting..."
+              >
                 Start Session
               </.button>
             </.form>

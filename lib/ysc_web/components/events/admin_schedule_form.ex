@@ -26,7 +26,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
         />
 
         <div class="flex justify-end">
-          <.button type="submit">Set Schedule</.button>
+          <.button type="submit" phx-disable-with="Saving...">Set Schedule</.button>
         </div>
       </.form>
     </div>
