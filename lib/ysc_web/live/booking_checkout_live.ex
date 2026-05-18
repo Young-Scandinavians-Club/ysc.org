@@ -167,6 +167,7 @@ defmodule YscWeb.BookingCheckoutLive do
         guests_for_me: %{},
         selected_family_members_for_guests: %{},
         show_price_details: false,
+        stripe_payment_element_ready: false,
         page_title: "Booking Checkout",
         meta_description:
           "Complete your cabin booking with Young Scandinavians Club."
@@ -232,7 +233,8 @@ defmodule YscWeb.BookingCheckoutLive do
           {:ok,
            assign(socket,
              payment_intent: payment_intent,
-             show_payment_form: true
+             show_payment_form: true,
+             stripe_payment_element_ready: false
            )}
 
         {:error, reason} ->
@@ -825,7 +827,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     id="submit-payment"
                     type="button"
                     class="flex-1 w-full text-lg py-3.5"
-                    disabled={@is_expired}
+                    disabled={@is_expired || !@stripe_payment_element_ready}
                   >
                     <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
                     <span class="text-lg font-semibold">
@@ -1660,6 +1662,7 @@ defmodule YscWeb.BookingCheckoutLive do
                  checkout_step: :payment,
                  payment_intent: nil,
                  show_payment_form: false,
+                 stripe_payment_element_ready: false,
                  guest_info_form: nil,
                  guest_info_errors: %{}
                )
@@ -1682,6 +1685,7 @@ defmodule YscWeb.BookingCheckoutLive do
                      checkout_step: :payment,
                      payment_intent: payment_intent,
                      show_payment_form: true,
+                     stripe_payment_element_ready: false,
                      guest_info_form: nil,
                      guest_info_errors: %{}
                    )
@@ -1805,7 +1809,8 @@ defmodule YscWeb.BookingCheckoutLive do
          |> assign(
            payment_error:
              "This booking has expired and is no longer available for payment.",
-           show_payment_form: false
+           show_payment_form: false,
+           stripe_payment_element_ready: false
          )
          |> YscWeb.Flash.put_toast(
            :error,
@@ -1883,6 +1888,16 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   @impl true
+  def handle_event("stripe-payment-element-loading", _params, socket) do
+    {:noreply, assign(socket, :stripe_payment_element_ready, false)}
+  end
+
+  @impl true
+  def handle_event("stripe-payment-element-ready", _params, socket) do
+    {:noreply, assign(socket, :stripe_payment_element_ready, true)}
+  end
+
+  @impl true
   def handle_event(
         "payment-success",
         %{"payment_intent_id" => payment_intent_id},
@@ -1895,7 +1910,8 @@ defmodule YscWeb.BookingCheckoutLive do
        |> assign(
          payment_error:
            "This booking has expired and is no longer available for payment.",
-         show_payment_form: false
+         show_payment_form: false,
+         stripe_payment_element_ready: false
        )
        |> YscWeb.Flash.put_toast(
          :error,
@@ -1948,6 +1964,7 @@ defmodule YscWeb.BookingCheckoutLive do
          booking: booking,
          is_expired: true,
          show_payment_form: false,
+         stripe_payment_element_ready: false,
          payment_error:
            "This booking has expired and is no longer available for payment."
        )

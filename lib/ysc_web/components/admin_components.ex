@@ -492,7 +492,7 @@ defmodule YscWeb.AdminComponents do
                 </.link>
               </li>
 
-              <li :if={@role == :admin}>
+              <li :if={@role == :admin && @board_position == :membership_director}>
                 <.link
                   navigate="/admin/memberships"
                   title="Memberships"
