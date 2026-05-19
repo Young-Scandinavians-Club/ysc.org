@@ -37,10 +37,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     if Accounts.needs_post_migration_onboarding?(user) do
       user =
         Accounts.get_user!(user.id, [
-          :subscriptions,
           :family_members,
           :registration_form,
-          :billing_address
+          :billing_address,
+          # Nested preload avoids two extra `list_subscriptions/1` queries on mount
+          # (see `find_active_real_subscription/1` and `resolve_membership_plan_from_subscriptions/1`).
+          subscriptions: :subscription_items
         ])
 
       membership_plan = resolve_membership_plan(user)
@@ -48,6 +50,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       has_real_subscription = not is_nil(active_subscription)
       needs_plan_selection = membership_plan == :unknown
       is_family_plan = membership_plan in [:family, :lifetime]
+
+      default_payment_method =
+        if connected?(socket) do
+          Ysc.Payments.get_default_payment_method(user)
+        else
+          nil
+        end
 
       # Only lifetime members skip the payment step entirely.
       # Users with an active subscription still see it (to review details + add PM if missing).
@@ -82,10 +91,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         )
         |> assign(:payment_intent_secret, nil)
         |> assign(:payment_method_saved, false)
-        |> assign(
-          :default_payment_method,
-          Ysc.Payments.get_default_payment_method(user)
-        )
+        |> assign(:default_payment_method, default_payment_method)
         # Membership selection step (only when plan is :unknown)
         |> assign(
           :membership_selection_form,
@@ -1622,8 +1628,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   defp migrated_subscription?(_), do: false
 
   defp find_active_real_subscription(user) do
-    user
-    |> Subscriptions.list_subscriptions()
+    user.subscriptions
     |> Enum.find(fn sub ->
       Subscriptions.active?(sub) and not migrated_subscription?(sub)
     end)
@@ -1642,7 +1647,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   defp resolve_membership_plan_from_subscriptions(user) do
     plans = Application.get_env(:ysc, :membership_plans, [])
-    subscriptions = Subscriptions.list_subscriptions(user)
+    subscriptions = user.subscriptions
 
     # First: real active subscription
     real_active =
