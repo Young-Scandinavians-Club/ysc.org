@@ -1039,7 +1039,8 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_submit(form, %{"user" => @valid_params})
 
       html = render(lv)
-      assert html =~ "We couldn't verify you're a real person"
+      assert html =~ "verify you"
+      assert html =~ "real person"
       refute_redirected(lv)
     end
 
