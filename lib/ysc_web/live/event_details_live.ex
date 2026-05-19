@@ -1781,11 +1781,11 @@ defmodule YscWeb.EventDetailsLive do
               <.icon name="hero-clock" class="w-16 h-16 mx-auto" />
             </div>
             <h2 class="text-2xl font-semibold text-red-700 mb-2">
-              Checkout Session Expired
+              Time ran out
             </h2>
             <p class="text-zinc-600 max-w-md">
-              Your checkout session has expired. The tickets you selected may no longer be available.
-              Please start over to select your tickets again.
+              You have 30 minutes to finish buying tickets. Your timer expired, so we released your hold.
+              Select your tickets again to continue.
             </p>
           </div>
 
@@ -1794,7 +1794,7 @@ defmodule YscWeb.EventDetailsLive do
               class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
               phx-click="retry-checkout"
             >
-              <.icon name="hero-arrow-path" class="w-5 h-5 me-2" /> Try Again
+              <.icon name="hero-arrow-path" class="w-5 h-5 me-2" /> Select tickets again
             </.button>
             <.button
               class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"

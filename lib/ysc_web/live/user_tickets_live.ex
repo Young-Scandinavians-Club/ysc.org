@@ -108,7 +108,7 @@ defmodule YscWeb.UserTicketsLive do
                     <div class="flex items-center gap-2 mb-4 text-sm text-amber-600">
                       <.icon name="hero-clock" class="w-4 h-4" />
                       <span class="font-semibold">
-                        Expires {format_time_remaining(ticket_order.expires_at)}
+                        Complete payment within {format_time_remaining(ticket_order.expires_at)}
                       </span>
                     </div>
                     <div class="flex gap-2">
@@ -117,7 +117,7 @@ defmodule YscWeb.UserTicketsLive do
                         phx-value-order-id={ticket_order.id}
                         class="flex-1"
                       >
-                        Resume Order
+                        Finish payment
                       </.button>
                       <.button
                         phx-click="cancel-order"

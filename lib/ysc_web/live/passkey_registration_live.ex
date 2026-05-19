@@ -69,7 +69,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
           </.button>
 
           <div :if={!@passkey_supported} class="text-center text-sm text-zinc-500">
-            Your device doesn't support passkeys. Please use a modern browser with WebAuthn support.
+            This device or browser can't set up sign-in with Face ID or fingerprint. You can still sign in with your email and password, or try again on a phone or computer that supports it.
           </div>
 
           <div class="mt-6 text-center">

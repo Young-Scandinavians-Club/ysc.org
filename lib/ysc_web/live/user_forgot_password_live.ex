@@ -33,7 +33,7 @@ defmodule YscWeb.UserForgotPasswordLive do
       </.simple_form>
 
       <div class="text-center mt-4">
-        <.back navigate={~p"/users/log-in"}>Back</.back>
+        <.back navigate={~p"/users/log-in"}>Back to sign in</.back>
       </div>
     </div>
     """

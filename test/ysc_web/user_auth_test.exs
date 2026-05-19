@@ -503,7 +503,7 @@ defmodule YscWeb.UserAuthTest do
       assert redirected_to(conn) == ~p"/pending-review"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Your account has not been approved yet"
+               "Your membership application is still under review. We'll email you when the board has made a decision."
     end
 
     test "redirects rejected users", %{conn: conn} do

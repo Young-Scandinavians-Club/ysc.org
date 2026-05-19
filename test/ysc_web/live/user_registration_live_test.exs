@@ -666,7 +666,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       html = render_submit(lv, "save", %{"user" => bad_params})
-      assert html =~ "Oops, something went wrong"
+      assert html =~ "Some required information is missing or incorrect"
     end
 
     test "recover_wizard restores step 1 when account fields are filled but not step 2 questions",
@@ -896,7 +896,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       html = render_submit(lv, "save", %{"user" => bad_params})
-      assert html =~ "Oops, something went wrong"
+      assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Eligibility"
     end
 
@@ -968,7 +968,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       html = render_submit(lv, "save", %{"user" => bad_params})
-      assert html =~ "Oops, something went wrong"
+      assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Additional Questions" or html =~ "Questions"
     end
   end
@@ -1039,7 +1039,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_submit(form, %{"user" => @valid_params})
 
       html = render(lv)
-      assert html =~ "Security check failed"
+      assert html =~ "We couldn't verify you're a real person"
       refute_redirected(lv)
     end
 

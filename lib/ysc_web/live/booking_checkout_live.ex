@@ -113,7 +113,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Your booking benefit is no longer valid for this reservation. Please start a new booking.",
+           "Your member discount or free night no longer applies to this reservation. Please start a new booking to see updated pricing.",
            title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
@@ -381,7 +381,7 @@ defmodule YscWeb.BookingCheckoutLive do
                   <div class="flex-1">
                     <div class="flex items-center gap-2 mb-1">
                       <p class="text-sm font-semibold text-blue-900">
-                        Booking Representative
+                        You (the member making this booking)
                       </p>
                       <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded">
                         Required
@@ -395,7 +395,7 @@ defmodule YscWeb.BookingCheckoutLive do
                       )}
                     </p>
                     <p class="text-xs text-blue-600">
-                      You as the booking member must be present. You are already included in the total count above.
+                      You must be staying at the cabin yourself. You're already counted in the guest total above.
                     </p>
                   </div>
                 </div>
@@ -893,7 +893,7 @@ defmodule YscWeb.BookingCheckoutLive do
             ]}>
               <.icon name="hero-clock" class="w-4 h-4" />
               <span class="text-xs font-semibold uppercase tracking-wide">
-                Hold Expires
+                Reservation timer
               </span>
             </div>
             <p class={[
@@ -903,14 +903,14 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "text-blue-700"
               )
             ]}>
-              Complete payment within
+              Your dates are saved for
               <span
                 class="font-bold tabular-nums"
                 id="hold-countdown"
               >
                 {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
-              to secure your booking.
+              . Finish checkout before the timer runs out, or someone else may book these dates.
             </p>
           </div>
           <!-- Price Details -->

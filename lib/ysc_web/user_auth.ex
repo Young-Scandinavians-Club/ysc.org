@@ -345,7 +345,9 @@ defmodule YscWeb.UserAuth do
     else
       socket =
         socket
-        |> YscWeb.Flash.put_toast(:error, "Your account is not active",
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "Your membership application is still under review. We'll email you when the board has made a decision.",
           title: "Account"
         )
         |> Phoenix.LiveView.redirect(to: ~p"/pending-review")
@@ -568,7 +570,7 @@ defmodule YscWeb.UserAuth do
       conn
       |> YscWeb.Flash.put_toast(
         :error,
-        "Your account has not been approved yet",
+        "Your membership application is still under review. We'll email you when the board has made a decision.",
         title: "Account"
       )
       |> redirect(to: ~p"/pending-review")
