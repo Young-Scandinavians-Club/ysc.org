@@ -170,6 +170,113 @@ defmodule YscWeb.AdminComponents do
     ]
 
   # ---------------------------------------------------------------------------
+  # admin_check_in_keyboard_hints
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Keyboard shortcut legend shown below admin check-in search bars.
+
+  Used on event and membership check-in LiveViews; keeps shortcut copy and
+  `admin_kbd` layout consistent.
+  """
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the hint row"
+
+  def admin_check_in_keyboard_hints(assigns) do
+    ~H"""
+    <p class={[
+      "mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none",
+      @class
+    ]}>
+      <span class="flex items-center gap-0.5">
+        <.admin_kbd size={:compact}>↑</.admin_kbd>
+        <.admin_kbd size={:compact}>↓</.admin_kbd>
+      </span>
+      <span>navigate</span>
+      <span class="text-zinc-300">·</span>
+      <.admin_kbd size={:inline}>↵ enter</.admin_kbd>
+      <span>check in</span>
+      <span class="text-zinc-300">·</span>
+      <span class="flex items-center gap-0.5">
+        <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
+        <.admin_kbd size={:compact}>1–3</.admin_kbd>
+      </span>
+      <span>quick check in</span>
+    </p>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_check_in_counter
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Live attendance counter for admin check-in sticky headers.
+
+  Pass `total` to show a `checked / total` fraction inside the green badge.
+  """
+  attr :count, :integer, required: true
+  attr :total, :integer, default: nil
+  attr :label, :string, default: "Checked in:"
+
+  def admin_check_in_counter(assigns) do
+    ~H"""
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-sm text-zinc-500 hidden sm:inline">{@label}</span>
+      <.badge type="green">
+        <.icon name="hero-user-group" class="inline -mt-0.5" />
+        {counter_text(@count, @total)}
+      </.badge>
+    </div>
+    """
+  end
+
+  defp counter_text(count, nil), do: "#{count}"
+  defp counter_text(count, total), do: "#{count} / #{total}"
+
+  # ---------------------------------------------------------------------------
+  # admin_section_heading
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Uppercase section label for admin check-in and similar list panels.
+
+  Optionally appends a pill count badge (`badge_tone` controls colors).
+  """
+  attr :count, :integer, default: nil
+  attr :badge_tone, :atom, default: :zinc, values: [:zinc, :emerald]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the heading"
+
+  slot :inner_block, required: true
+
+  def admin_section_heading(assigns) do
+    ~H"""
+    <h2 class={[
+      "text-sm font-semibold uppercase tracking-wide text-zinc-500",
+      @class
+    ]}>
+      {render_slot(@inner_block)}
+      <span
+        :if={@count != nil}
+        class={[
+          "ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+          section_badge_classes(@badge_tone)
+        ]}
+      >
+        {@count}
+      </span>
+    </h2>
+    """
+  end
+
+  defp section_badge_classes(:zinc), do: "bg-zinc-100 text-zinc-700"
+  defp section_badge_classes(:emerald), do: "bg-emerald-100 text-emerald-700"
+
+  # ---------------------------------------------------------------------------
   # admin_dashed_more_button
   # ---------------------------------------------------------------------------
 

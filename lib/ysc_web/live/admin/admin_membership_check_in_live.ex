@@ -37,16 +37,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               </div>
             </div>
 
-            <%!-- Live checked-in counter --%>
-            <div class="flex items-center gap-2 shrink-0">
-              <span class="text-sm text-zinc-500 hidden sm:inline">
-                Checked in:
-              </span>
-              <.badge type="green">
-                <.icon name="hero-user-group" class="inline -mt-0.5" />
-                {@checked_in_count}
-              </.badge>
-            </div>
+            <.admin_check_in_counter count={@checked_in_count} />
 
             <%!-- Actions --%>
             <div class="shrink-0 flex items-center gap-2">
@@ -135,22 +126,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             clear_event="clear-search"
             phx-hook="MembershipCheckInKeyboard"
           />
-          <p class="mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none">
-            <span class="flex items-center gap-0.5">
-              <.admin_kbd size={:compact}>↑</.admin_kbd>
-              <.admin_kbd size={:compact}>↓</.admin_kbd>
-            </span>
-            <span>navigate</span>
-            <span class="text-zinc-300">·</span>
-            <.admin_kbd size={:inline}>↵ enter</.admin_kbd>
-            <span>check in</span>
-            <span class="text-zinc-300">·</span>
-            <span class="flex items-center gap-0.5">
-              <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
-              <.admin_kbd size={:compact}>1–3</.admin_kbd>
-            </span>
-            <span>quick check in</span>
-          </p>
+          <.admin_check_in_keyboard_hints />
         </div>
       </div>
 
@@ -164,9 +140,9 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           <%!-- Search results (only when searching) --%>
           <%= if @search_query != "" do %>
             <div>
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-3">
+              <.admin_section_heading class="mb-3">
                 Search Results
-              </h2>
+              </.admin_section_heading>
 
               <div
                 :if={@search_results == []}
@@ -207,12 +183,12 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           <%!-- Checked-in list --%>
           <div>
             <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              <.admin_section_heading
+                count={@checked_in_count}
+                badge_tone={:emerald}
+              >
                 Checked In
-                <span class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                  {@checked_in_count}
-                </span>
-              </h2>
+              </.admin_section_heading>
             </div>
 
             <div
