@@ -114,7 +114,7 @@ defmodule YscWeb.UserRegistrationLive do
               >
                 <p class="font-medium">This email is already registered.</p>
                 <p class="mt-1 text-amber-700">
-                  If this is you, sign in to your account or reset your password if you've forgotten how to sign in.
+                  If this is you, sign in to your account. If you no longer know your password, use Reset password below.
                 </p>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <.link
