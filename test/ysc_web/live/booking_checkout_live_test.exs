@@ -47,6 +47,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
        }}
     end)
 
+    ensure_buyout_base_pricing!()
+
     {:ok, conn: conn}
   end
 
@@ -228,6 +230,26 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         |> render_click("payment-redirect-started", %{})
 
       assert html =~ "Complete Your Booking"
+    end
+
+    test "submit payment stays disabled until Stripe payment element reports ready",
+         %{
+           conn: conn,
+           booking: booking
+         } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert has_element?(view, "#stripe-payment-container")
+      html_before = render(view)
+      assert payment_submit_disabled?(html_before)
+
+      render_click(view, "stripe-payment-element-ready", %{})
+      html_ready = render(view)
+      refute payment_submit_disabled?(html_ready)
+
+      render_click(view, "stripe-payment-element-loading", %{})
+      html_loading = render(view)
+      assert payment_submit_disabled?(html_loading)
     end
 
     test "validate-guest-info with no guests param leaves socket unchanged", %{
@@ -418,6 +440,54 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       html = render_click(view, "select-guest-attendee", %{})
       assert html =~ "Complete Your Booking"
     end
+  end
+
+  defp payment_submit_disabled?(html) do
+    {:ok, doc} = Floki.parse_fragment(html)
+
+    case Floki.find(doc, "#submit-payment") do
+      [el | _] -> Floki.attribute(el, "disabled") != []
+      [] -> false
+    end
+  end
+
+  defp ensure_buyout_base_pricing! do
+    for prop <- [:tahoe, :clear_lake] do
+      case Bookings.create_pricing_rule(%{
+             amount: Money.new(430, :USD),
+             booking_mode: :buyout,
+             price_unit: :buyout_fixed,
+             property: prop,
+             season_id: nil,
+             room_id: nil,
+             room_category_id: nil
+           }) do
+        {:ok, _} ->
+          :ok
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          if duplicate_buyout_base_pricing_rule?(cs) do
+            :ok
+          else
+            flunk(
+              "unexpected Bookings.create_pricing_rule failure in ensure_buyout_base_pricing!: #{inspect(cs.errors)}"
+            )
+          end
+
+        {:error, other} ->
+          flunk(
+            "unexpected Bookings.create_pricing_rule result in ensure_buyout_base_pricing!: #{inspect(other)}"
+          )
+      end
+    end
+
+    :ok
+  end
+
+  defp duplicate_buyout_base_pricing_rule?(%Ecto.Changeset{} = cs) do
+    Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
+      meta[:constraint] == :unique
+    end)
   end
 
   describe "room booking guest step" do

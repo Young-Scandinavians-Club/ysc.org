@@ -231,16 +231,40 @@ defmodule YscWeb.VolunteerRoleTest do
   describe "sidebar navigation - admin" do
     setup [:create_admin]
 
-    test "shows all nav items", %{conn: conn} do
+    test "shows standard admin nav items", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
       assert has_element?(view, "a[href='/admin/users']")
-      assert has_element?(view, "a[href='/admin/memberships']")
+
+      refute has_element?(
+               view,
+               "#admin-sidebar-menu-scroll a[href='/admin/memberships']"
+             )
+
       assert has_element?(view, "a[href='/admin/bookings']")
       assert has_element?(view, "a[href='/admin/posts']")
       assert has_element?(view, "a[href='/admin/events']")
       assert has_element?(view, "a[href='/admin/newsletters']")
       assert has_element?(view, "a[href='/admin/media']")
+    end
+
+    test "shows memberships nav only for membership director board role", %{
+      conn: conn
+    } do
+      admin =
+        user_fixture(%{
+          role: "admin",
+          board_position: :membership_director
+        })
+
+      conn = log_in_user(conn, admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(
+               view,
+               "#admin-sidebar-menu-scroll a[href='/admin/memberships']"
+             )
     end
   end
 
@@ -260,7 +284,12 @@ defmodule YscWeb.VolunteerRoleTest do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
       refute has_element?(view, "a[href='/admin/users']")
-      refute has_element?(view, "a[href='/admin/memberships']")
+
+      refute has_element?(
+               view,
+               "#admin-sidebar-menu-scroll a[href='/admin/memberships']"
+             )
+
       refute has_element?(view, "a[href='/admin/bookings']")
     end
   end
