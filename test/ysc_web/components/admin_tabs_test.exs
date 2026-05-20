@@ -79,9 +79,10 @@ defmodule YscWeb.AdminTabsTest do
     test "renders spinner pill with default label" do
       assigns = %{}
 
-      html = rendered_to_string(~H"""
-      <.admin_sending_badge />
-      """)
+      html =
+        rendered_to_string(~H"""
+        <.admin_sending_badge />
+        """)
 
       assert html =~ "Sending…"
       assert html =~ "animate-spin"
@@ -91,9 +92,10 @@ defmodule YscWeb.AdminTabsTest do
     test "custom label" do
       assigns = %{}
 
-      html = rendered_to_string(~H"""
-      <.admin_sending_badge label="Processing" />
-      """)
+      html =
+        rendered_to_string(~H"""
+        <.admin_sending_badge label="Processing" />
+        """)
 
       assert html =~ "Processing"
       refute html =~ "Sending…"
@@ -106,7 +108,9 @@ defmodule YscWeb.AdminTabsTest do
 
       html =
         rendered_to_string(~H"""
-        <.admin_toggle_pill active={true} phx-click="filter" phx-value-filter="all">All</.admin_toggle_pill>
+        <.admin_toggle_pill active={true} phx-click="filter" phx-value-filter="all">
+          All
+        </.admin_toggle_pill>
         <.admin_toggle_pill active={false} phx-click="filter" phx-value-filter="active">
           Active
         </.admin_toggle_pill>

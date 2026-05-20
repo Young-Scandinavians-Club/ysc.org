@@ -260,18 +260,27 @@ defmodule YscWeb.AdminComponents do
     doc: "Additional classes merged onto the tab control"
 
   attr :rest, :global,
-    include: ~w(phx-click phx-value-tab phx-value-section phx-value-filter role aria-selected id type)
+    include:
+      ~w(phx-click phx-value-tab phx-value-section phx-value-filter role aria-selected id type)
 
   slot :inner_block, required: true
 
   def admin_tab(assigns) do
     ~H"""
     <%= if @patch || @navigate do %>
-      <.link patch={@patch} navigate={@navigate} class={admin_tab_class(@active, @density, @class)}>
+      <.link
+        patch={@patch}
+        navigate={@navigate}
+        class={admin_tab_class(@active, @density, @class)}
+      >
         {render_slot(@inner_block)}
       </.link>
     <% else %>
-      <button type="button" class={admin_tab_class(@active, @density, @class)} {@rest}>
+      <button
+        type="button"
+        class={admin_tab_class(@active, @density, @class)}
+        {@rest}
+      >
         {render_slot(@inner_block)}
       </button>
     <% end %>
@@ -290,18 +299,21 @@ defmodule YscWeb.AdminComponents do
       "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t"
 
   defp admin_tab_base(:spacious),
-    do: "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+    do:
+      "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
 
   defp admin_tab_state(true, :compact),
     do: "border-blue-500 text-blue-600 bg-white"
 
   defp admin_tab_state(false, :compact),
-    do: "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+    do:
+      "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
 
   defp admin_tab_state(true, :spacious), do: "border-blue-500 text-blue-600"
 
   defp admin_tab_state(false, :spacious),
-    do: "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+    do:
+      "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
 
   # ---------------------------------------------------------------------------
   # admin_sending_badge
@@ -338,7 +350,8 @@ defmodule YscWeb.AdminComponents do
     doc: "Additional classes merged onto the pill button"
 
   attr :rest, :global,
-    include: ~w(phx-click phx-value-filter phx-value-section id disabled aria-label)
+    include:
+      ~w(phx-click phx-value-filter phx-value-section id disabled aria-label)
 
   slot :inner_block, required: true
 
