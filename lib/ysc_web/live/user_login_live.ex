@@ -129,7 +129,7 @@ defmodule YscWeb.UserLoginLive do
               <.icon name="hero-finger-print" class="w-5 h-5" />
             <% end %>
             <%= if @is_ios_mobile do %>
-              Sign in with Face ID (Passkey)
+              Sign in with Face ID
             <% else %>
               Sign in with Passkey
             <% end %>

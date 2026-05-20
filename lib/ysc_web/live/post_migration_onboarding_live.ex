@@ -231,7 +231,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.input
           field={@form[:most_connected_country]}
           type="select"
-          label="Most Connected Nordic Country"
+          label="Which Nordic or Scandinavian country do you feel most connected to?"
           options={nordic_country_options()}
           prompt="Select a country"
         />
