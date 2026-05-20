@@ -78,6 +78,38 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(html)
     end
 
+    test "restored payment checkout disables submit until Stripe element is ready",
+         %{conn: conn, user: user} do
+      {event, _tier, order, payment_intent} = setup_pending_order(user)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: id,
+           client_secret: payment_intent.client_secret,
+           amount: order.total_amount.amount
+         })}
+      end)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+        )
+
+      view = wait_for_async(view)
+
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "#submit-payment")
+      assert payment_submit_disabled?(render(view))
+
+      render_click(view, "stripe-payment-element-ready", %{})
+      refute payment_submit_disabled?(render(view))
+
+      render_click(view, "stripe-payment-element-loading", %{})
+      assert payment_submit_disabled?(render(view))
+    end
+
     test "calculates correct total with multiple tickets", %{
       conn: conn,
       user: user
@@ -480,6 +512,15 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       result = render_click(view, "checkout-expired")
       assert is_binary(result)
+    end
+  end
+
+  defp payment_submit_disabled?(html) do
+    {:ok, doc} = Floki.parse_fragment(html)
+
+    case Floki.find(doc, "#submit-payment") do
+      [el | _] -> Floki.attribute(el, "disabled") != []
+      [] -> false
     end
   end
 end

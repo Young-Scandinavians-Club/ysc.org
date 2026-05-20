@@ -5,6 +5,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Repo
+  alias Ysc.Subscriptions
 
   # WP-style user inserted without going through register_user/1 (which marks
   # post-migration onboarding complete). Mirrors Accounts post-migration tests.
@@ -90,6 +91,68 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
         })
 
       assert html =~ new_first
+    end
+  end
+
+  describe "mount plan resolution (preloaded subscriptions)" do
+    test "omits membership selection when plan is inferred from a migrated subscription",
+         %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      family_plan = Enum.find(plans, &(&1.id == :family))
+      assert family_plan, "membership_plans must include family"
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Migrated Family",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_migrated_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_family",
+          stripe_price_id: family_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      conn = log_in_user(conn, user)
+      {:ok, view, html} = live(conn, ~p"/onboarding")
+
+      refute html =~ "Membership Type"
+      refute has_element?(view, "#membership-selection")
+    end
+
+    test "includes membership selection in the stepper when plan cannot be inferred",
+         %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/onboarding")
+
+      assert html =~ "Membership Type"
+    end
+
+    test "lifetime members skip the payment step in the stepper", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+      {:ok, view, html} = live(conn, ~p"/onboarding")
+
+      assert has_element?(view, ~s|button[phx-value-step="2"]|)
+      refute html =~ "Membership Type"
     end
   end
 end
