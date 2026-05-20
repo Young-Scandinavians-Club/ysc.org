@@ -19,6 +19,9 @@ defmodule YscWeb.FamilyManagementLiveTest do
     |> Repo.update!()
   end
 
+  # Family data loads after WebSocket connect; use render/1 not the initial live/2 HTML.
+  defp render_loaded(view), do: render(view)
+
   defp primary_with_linked_sub do
     primary = lifetime_member(%{phone_number: unique_phone()})
     sub = user_fixture(%{phone_number: unique_phone()})
@@ -40,9 +43,9 @@ defmodule YscWeb.FamilyManagementLiveTest do
       user = lifetime_member()
       conn = log_in_user(conn, user)
 
-      {:ok, view, html} = live(conn, ~p"/users/settings/family")
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
-      assert html =~ "Family Management"
+      assert render_loaded(view) =~ "Family Management"
       assert has_element?(view, "#invite-form")
     end
 
@@ -50,7 +53,9 @@ defmodule YscWeb.FamilyManagementLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/users/settings/family")
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+
+      html = render_loaded(view)
 
       assert html =~ "cannot send invites" or
                html =~ "cannot send invites at this time"
@@ -225,9 +230,9 @@ defmodule YscWeb.FamilyManagementLiveTest do
       {_primary, sub} = primary_with_linked_sub()
       conn = log_in_user(conn, sub)
 
-      {:ok, view, html} = live(conn, ~p"/users/settings/family")
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
-      assert html =~ "Primary Account Holder"
+      assert render_loaded(view) =~ "Primary Account Holder"
       assert has_element?(view, "button[phx-click='leave-family-membership']")
     end
 
