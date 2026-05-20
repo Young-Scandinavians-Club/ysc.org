@@ -44,6 +44,22 @@ defmodule Ysc.Accounts.UserTest do
       assert changeset.changes.last_name == "Doe"
     end
 
+    test "ignores role and state in attrs (mass-assignment hardening)" do
+      attrs = %{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        state: "active"
+      }
+
+      changeset =
+        User.registration_changeset(%User{}, attrs, validate_email: false)
+
+      refute Map.has_key?(changeset.changes, :role)
+      refute Map.has_key?(changeset.changes, :state)
+    end
+
     test "requires first_name" do
       attrs = %{
         email: @valid_email,
