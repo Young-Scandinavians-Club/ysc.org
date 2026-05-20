@@ -182,47 +182,30 @@ defmodule YscWeb.AdminNewslettersLive do
         </p>
       </div>
 
-      <div
+      <.admin_tabs
         id="newsletter-tabs"
         role="tablist"
-        aria-label="Newsletter sections"
-        class="flex gap-0 border-b border-zinc-200 mb-6"
+        aria_label="Newsletter sections"
       >
-        <button
-          type="button"
+        <.admin_tab
+          active={@current_tab == "editions"}
           role="tab"
           aria-selected={@current_tab == "editions"}
           phx-click="switch-tab"
           phx-value-tab="editions"
-          class={[
-            "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t",
-            if(@current_tab == "editions",
-              do: "border-blue-500 text-blue-600 bg-white",
-              else:
-                "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-            )
-          ]}
         >
           Editions
-        </button>
-        <button
-          type="button"
+        </.admin_tab>
+        <.admin_tab
+          active={@current_tab == "subscribers"}
           role="tab"
           aria-selected={@current_tab == "subscribers"}
           phx-click="switch-tab"
           phx-value-tab="subscribers"
-          class={[
-            "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t",
-            if(@current_tab == "subscribers",
-              do: "border-blue-500 text-blue-600 bg-white",
-              else:
-                "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-            )
-          ]}
         >
           Subscribers
-        </button>
-      </div>
+        </.admin_tab>
+      </.admin_tabs>
 
       <div class="w-full">
         <%!-- Editions tab: toolbar + content --%>
@@ -344,11 +327,7 @@ defmodule YscWeb.AdminNewslettersLive do
 
                 <div class="flex items-center gap-3 mt-2 flex-wrap">
                   <%= if edition.status == :sending do %>
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-                      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
-                      </span>
-                      Sending…
-                    </span>
+                    <.admin_sending_badge />
                   <% else %>
                     <.badge type={edition_status_badge(edition.status)}>
                       {format_status(edition.status)}
@@ -426,11 +405,7 @@ defmodule YscWeb.AdminNewslettersLive do
               </:col>
               <:col :let={{_, edition}} label="Status" field={:status}>
                 <%= if edition.status == :sending do %>
-                  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-                    <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
-                    </span>
-                    Sending…
-                  </span>
+                  <.admin_sending_badge />
                 <% else %>
                   <.badge type={edition_status_badge(edition.status)}>
                     {format_status(edition.status)}
@@ -540,48 +515,27 @@ defmodule YscWeb.AdminNewslettersLive do
               <span class="text-sm font-medium text-zinc-600 sr-only sm:not-sr-only">
                 Status:
               </span>
-              <button
-                type="button"
+              <.admin_toggle_pill
+                active={@sub_filter == "all"}
                 phx-click="filter-subscribers"
                 phx-value-filter="all"
-                class={[
-                  "rounded px-3 py-1.5 text-sm font-medium transition-colors",
-                  if(@sub_filter == "all",
-                    do: "bg-zinc-200 text-zinc-800",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 All
-              </button>
-              <button
-                type="button"
+              </.admin_toggle_pill>
+              <.admin_toggle_pill
+                active={@sub_filter == "active"}
                 phx-click="filter-subscribers"
                 phx-value-filter="active"
-                class={[
-                  "rounded px-3 py-1.5 text-sm font-medium transition-colors",
-                  if(@sub_filter == "active",
-                    do: "bg-zinc-200 text-zinc-800",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 Active
-              </button>
-              <button
-                type="button"
+              </.admin_toggle_pill>
+              <.admin_toggle_pill
+                active={@sub_filter == "inactive"}
                 phx-click="filter-subscribers"
                 phx-value-filter="inactive"
-                class={[
-                  "rounded px-3 py-1.5 text-sm font-medium transition-colors",
-                  if(@sub_filter == "inactive",
-                    do: "bg-zinc-200 text-zinc-800",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 Inactive
-              </button>
+              </.admin_toggle_pill>
               <.button
                 type="button"
                 phx-click="open-add-subscriber-modal"

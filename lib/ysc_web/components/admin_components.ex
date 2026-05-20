@@ -205,6 +205,163 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_tabs / admin_tab
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Underline tab bar wrapper for admin list pages (events, newsletters, bookings).
+
+  Place `<.admin_tab>` children inside the default slot. Set `role="tablist"` when tabs
+  use WAI-ARIA tab semantics on each `<.admin_tab>`.
+
+  - `density={:compact}` — `py-3 px-4`, rounded top, active tab has white background
+    (newsletters, events).
+  - `density={:spacious}` — `py-4 px-1`, no rounded top (bookings property/section tabs).
+  """
+  attr :id, :string, default: nil
+  attr :aria_label, :string, required: true
+  attr :role, :string, default: nil
+  attr :density, :atom, default: :compact, values: [:compact, :spacious]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes on the outer bordered container"
+
+  slot :inner_block, required: true
+
+  def admin_tabs(assigns) do
+    ~H"""
+    <div class={["border-b border-zinc-200 mb-6", @class]}>
+      <nav
+        id={@id}
+        class={admin_tabs_nav_class(@density)}
+        aria-label={@aria_label}
+        role={@role}
+      >
+        {render_slot(@inner_block)}
+      </nav>
+    </div>
+    """
+  end
+
+  @doc """
+  A single tab in `<.admin_tabs>`. Renders a `<button>` by default, or a `<.link>` when
+  `patch` or `navigate` is set.
+
+  Pass `phx-click`, `role="tab"`, `aria-selected`, etc. via `rest` on button tabs.
+  """
+  attr :active, :boolean, default: false
+  attr :density, :atom, default: :compact, values: [:compact, :spacious]
+  attr :patch, :any, default: nil
+  attr :navigate, :any, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the tab control"
+
+  attr :rest, :global,
+    include: ~w(phx-click phx-value-tab phx-value-section phx-value-filter role aria-selected id type)
+
+  slot :inner_block, required: true
+
+  def admin_tab(assigns) do
+    ~H"""
+    <%= if @patch || @navigate do %>
+      <.link patch={@patch} navigate={@navigate} class={admin_tab_class(@active, @density, @class)}>
+        {render_slot(@inner_block)}
+      </.link>
+    <% else %>
+      <button type="button" class={admin_tab_class(@active, @density, @class)} {@rest}>
+        {render_slot(@inner_block)}
+      </button>
+    <% end %>
+    """
+  end
+
+  defp admin_tabs_nav_class(:compact), do: "flex gap-0"
+  defp admin_tabs_nav_class(:spacious), do: "-mb-px flex space-x-8"
+
+  defp admin_tab_class(active, density, extra) do
+    [admin_tab_base(density), admin_tab_state(active, density), extra]
+  end
+
+  defp admin_tab_base(:compact),
+    do:
+      "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t"
+
+  defp admin_tab_base(:spacious),
+    do: "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+
+  defp admin_tab_state(true, :compact),
+    do: "border-blue-500 text-blue-600 bg-white"
+
+  defp admin_tab_state(false, :compact),
+    do: "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+
+  defp admin_tab_state(true, :spacious), do: "border-blue-500 text-blue-600"
+
+  defp admin_tab_state(false, :spacious),
+    do: "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+
+  # ---------------------------------------------------------------------------
+  # admin_sending_badge
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Inline pill with spinner for in-progress sends (newsletter editions, etc.).
+  """
+  attr :label, :string, default: "Sending…"
+
+  def admin_sending_badge(assigns) do
+    ~H"""
+    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
+      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+      </span>
+      {@label}
+    </span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_toggle_pill
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Segmented filter control (e.g. subscriber status All / Active / Inactive).
+
+  Pass `phx-click` and `phx-value-*` via `rest`.
+  """
+  attr :active, :boolean, default: false
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the pill button"
+
+  attr :rest, :global,
+    include: ~w(phx-click phx-value-filter phx-value-section id disabled aria-label)
+
+  slot :inner_block, required: true
+
+  def admin_toggle_pill(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={[
+        "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+        if(@active,
+          do: "bg-zinc-200 text-zinc-800",
+          else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+        ),
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # side_menu
   # ---------------------------------------------------------------------------
 
