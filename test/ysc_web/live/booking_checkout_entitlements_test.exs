@@ -390,7 +390,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       assert {:error, {:redirect, %{flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      assert flash["error"] =~ "discount" or flash["error"] =~ "no longer applies"
+      assert flash["error"] =~ "discount" or
+               flash["error"] =~ "no longer applies"
     end
   end
 
