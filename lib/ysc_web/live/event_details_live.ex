@@ -939,8 +939,7 @@ defmodule YscWeb.EventDetailsLive do
                           <.icon
                             name="hero-exclamation-circle"
                             class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
-                          />
-                          Renew or activate your membership to purchase tickets.
+                          /> Renew or activate your membership to purchase tickets.
                         </p>
                         <.link
                           navigate={~p"/users/membership"}

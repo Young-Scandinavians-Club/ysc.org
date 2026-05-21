@@ -527,7 +527,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <p class="text-xs font-black text-teal-400 uppercase">
                   Mandatory
                 </p>
-                <p class="text-xs font-bold leading-tight">Bring your own bed linens and towels</p>
+                <p class="text-xs font-bold leading-tight">
+                  Bring your own bed linens and towels
+                </p>
               </div>
             </div>
             <div class="flex items-center gap-3">

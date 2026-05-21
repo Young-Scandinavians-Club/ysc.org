@@ -112,7 +112,9 @@ defmodule YscWeb.UserResetPasswordLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Your password has been updated. Sign in with your new password.",
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your password has been updated. Sign in with your new password.",
            title: "Password"
          )
          |> redirect(to: ~p"/users/log-in")}

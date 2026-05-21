@@ -34,8 +34,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
 
       assert to[:to] == ~p"/"
 
-      assert to[:flash]["error"] ==
-               "Reset password link is invalid or it has expired."
+      assert to[:flash]["error"] =~ "invalid or has expired"
     end
 
     test "renders errors for invalid data", %{conn: conn, token: token} do
@@ -74,7 +73,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
       refute get_session(conn, :user_token)
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "Password reset successfully"
+               "Your password has been updated"
 
       assert Accounts.get_user_by_email_and_password(
                user.email,

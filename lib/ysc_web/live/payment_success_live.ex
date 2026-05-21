@@ -152,7 +152,9 @@ defmodule YscWeb.PaymentSuccessLive do
     ~H"""
     <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
       <div class="text-center">
-        <p class="text-zinc-600">Payment received — taking you to your confirmation…</p>
+        <p class="text-zinc-600">
+          Payment received — taking you to your confirmation…
+        </p>
       </div>
     </div>
     """
