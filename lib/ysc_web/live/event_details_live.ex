@@ -1794,7 +1794,8 @@ defmodule YscWeb.EventDetailsLive do
               class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
               phx-click="retry-checkout"
             >
-              <.icon name="hero-arrow-path" class="w-5 h-5 me-2" /> Select tickets again
+              <.icon name="hero-arrow-path" class="w-5 h-5 me-2" />
+              Select tickets again
             </.button>
             <.button
               class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
