@@ -9,73 +9,81 @@ defmodule YscWeb.FamilyManagementLive do
     user = socket.assigns.current_user
     is_sub_account = Accounts.sub_account?(user)
 
-    if is_sub_account do
-      # For sub-accounts, get the primary user and family group
-      primary_user = Accounts.get_primary_user(user)
-      family_group = Accounts.get_family_group(user)
+    invite_form =
+      to_form(
+        %{"email" => "", "family_member_id" => "", "relationship" => "child"},
+        as: "invite"
+      )
 
-      # Get all family members (excluding primary user, but including current user)
-      other_family_members =
-        family_group
-        |> then(fn members ->
-          if primary_user do
-            Enum.reject(members, &(&1.id == primary_user.id))
-          else
-            members
-          end
-        end)
+    socket =
+      socket
+      |> assign(:user, user)
+      |> assign(:is_sub_account, is_sub_account)
+      |> assign(:is_primary_user, not is_sub_account)
+      |> assign(:primary_user, nil)
+      |> assign(:other_family_members, [])
+      |> assign(:sub_accounts, [])
+      |> assign(:invites, [])
+      |> assign(:family_members, [])
+      |> assign(:invite_form, invite_form)
+      |> assign(:can_send_invite, false)
+      |> assign(:loading_family_data, true)
+      |> assign(:page_title, "Family")
+      |> assign(
+        :meta_description,
+        "Manage your family members and their linked accounts in Young Scandinavians Club."
+      )
+      |> assign(:live_action, :family)
 
-      {:ok,
-       socket
-       |> assign(:user, user)
-       |> assign(:is_sub_account, true)
-       |> assign(:is_primary_user, false)
-       |> assign(:primary_user, primary_user)
-       |> assign(:other_family_members, other_family_members)
-       |> assign(:page_title, "Family")
-       |> assign(
-         :meta_description,
-         "Manage your family members and their linked accounts in Young Scandinavians Club."
-       )
-       |> assign(:live_action, :family)}
-    else
-      # For primary users, show management interface
-      user = Accounts.get_user!(user.id, [:sub_accounts, :family_members])
-
-      # Get family members from user (family_members belong to User, not SignupApplication)
-      family_members =
-        if Ecto.assoc_loaded?(user.family_members) do
-          user.family_members
-        else
-          # Reload user with family_members if not loaded
-          Accounts.get_user!(user.id, [:family_members]).family_members || []
-        end
-
-      invites = FamilyInvites.list_invites(user)
-
-      invite_form =
-        to_form(
-          %{"email" => "", "family_member_id" => "", "relationship" => "child"},
-          as: "invite"
-        )
-
-      {:ok,
-       socket
-       |> assign(:user, user)
-       |> assign(:is_sub_account, false)
-       |> assign(:is_primary_user, true)
-       |> assign(:sub_accounts, Accounts.get_sub_accounts(user))
-       |> assign(:invites, invites)
-       |> assign(:family_members, family_members)
-       |> assign(:invite_form, invite_form)
-       |> assign(:can_send_invite, Accounts.can_send_family_invite?(user))
-       |> assign(:page_title, "Family")
-       |> assign(
-         :meta_description,
-         "Manage your family members and their linked accounts in Young Scandinavians Club."
-       )
-       |> assign(:live_action, :family)}
+    if connected?(socket) do
+      send(self(), :load_family_management_data)
     end
+
+    {:ok, socket}
+  end
+
+  # Swoosh mailbox preview delivers {:email, %Swoosh.Email{}} in dev/test.
+  def handle_info({:email, _email}, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info(:load_family_management_data, socket) do
+    user = socket.assigns.current_user
+
+    socket =
+      if socket.assigns.is_sub_account do
+        user = Accounts.get_user!(user.id, primary_user: :sub_accounts)
+        primary_user = user.primary_user
+
+        other_family_members =
+          if primary_user do
+            (primary_user.sub_accounts || [])
+            |> then(fn members -> [primary_user | members] end)
+            |> Enum.reject(&(&1.id == primary_user.id))
+          else
+            []
+          end
+
+        socket
+        |> assign(:user, user)
+        |> assign(:primary_user, primary_user)
+        |> assign(:other_family_members, other_family_members)
+      else
+        user =
+          Accounts.get_user!(user.id, [
+            :sub_accounts,
+            :family_members,
+            subscriptions: :subscription_items
+          ])
+
+        socket
+        |> assign(:user, user)
+        |> assign(:sub_accounts, Accounts.get_sub_accounts(user))
+        |> assign(:invites, FamilyInvites.list_invites(user))
+        |> assign(:family_members, user.family_members || [])
+        |> assign(:can_send_invite, Accounts.can_send_family_invite?(user))
+      end
+
+    {:noreply, assign(socket, :loading_family_data, false)}
   end
 
   @impl true
@@ -389,7 +397,12 @@ defmodule YscWeb.FamilyManagementLive do
         </ul>
 
         <div class="text-medium px-2 text-zinc-500 rounded w-full md:border-l md:border-1 md:border-zinc-100 md:pl-16">
-          <div class="space-y-8">
+          <.async_section_loader
+            :if={@loading_family_data}
+            id="family-management-loading"
+            label="Loading family settings..."
+          />
+          <div :if={!@loading_family_data} class="space-y-8">
             <%= if @is_sub_account do %>
               <!-- Sub-Account View: Show Primary User and Other Family Members -->
               <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">

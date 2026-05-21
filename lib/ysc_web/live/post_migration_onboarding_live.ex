@@ -231,7 +231,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.input
           field={@form[:most_connected_country]}
           type="select"
-          label="Most Connected Nordic Country"
+          label="Which Nordic or Scandinavian country do you feel most connected to?"
           options={nordic_country_options()}
           prompt="Select a country"
         />
@@ -887,10 +887,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         {:ok, _} ->
           updated_user =
             Accounts.get_user!(user.id, [
-              :subscriptions,
               :family_members,
               :registration_form,
-              :billing_address
+              :billing_address,
+              subscriptions: :subscription_items
             ])
 
           is_family_plan = plan == :family
@@ -1107,10 +1107,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:ok, _} ->
             updated_user =
               Accounts.get_user!(user.id, [
-                :subscriptions,
                 :family_members,
                 :registration_form,
-                :billing_address
+                :billing_address,
+                subscriptions: :subscription_items
               ])
 
             default_pm = Ysc.Payments.get_default_payment_method(updated_user)

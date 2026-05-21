@@ -1381,6 +1381,22 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert is_binary(result)
     end
 
+    test "stripe-payment-element-ready and loading events toggle payment button gating assign",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert render_click(view, "stripe-payment-element-ready", %{})
+             |> is_binary()
+
+      assert render_click(view, "stripe-payment-element-loading", %{})
+             |> is_binary()
+    end
+
     test "handles close-registration-modal event", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)

@@ -170,6 +170,113 @@ defmodule YscWeb.AdminComponents do
     ]
 
   # ---------------------------------------------------------------------------
+  # admin_check_in_keyboard_hints
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Keyboard shortcut legend shown below admin check-in search bars.
+
+  Used on event and membership check-in LiveViews; keeps shortcut copy and
+  `admin_kbd` layout consistent.
+  """
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the hint row"
+
+  def admin_check_in_keyboard_hints(assigns) do
+    ~H"""
+    <p class={[
+      "mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none",
+      @class
+    ]}>
+      <span class="flex items-center gap-0.5">
+        <.admin_kbd size={:compact}>↑</.admin_kbd>
+        <.admin_kbd size={:compact}>↓</.admin_kbd>
+      </span>
+      <span>navigate</span>
+      <span class="text-zinc-300">·</span>
+      <.admin_kbd size={:inline}>↵ enter</.admin_kbd>
+      <span>check in</span>
+      <span class="text-zinc-300">·</span>
+      <span class="flex items-center gap-0.5">
+        <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
+        <.admin_kbd size={:compact}>1–3</.admin_kbd>
+      </span>
+      <span>quick check in</span>
+    </p>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_check_in_counter
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Live attendance counter for admin check-in sticky headers.
+
+  Pass `total` to show a `checked / total` fraction inside the green badge.
+  """
+  attr :count, :integer, required: true
+  attr :total, :integer, default: nil
+  attr :label, :string, default: "Checked in:"
+
+  def admin_check_in_counter(assigns) do
+    ~H"""
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-sm text-zinc-500 hidden sm:inline">{@label}</span>
+      <.badge type="green">
+        <.icon name="hero-user-group" class="inline -mt-0.5" />
+        {counter_text(@count, @total)}
+      </.badge>
+    </div>
+    """
+  end
+
+  defp counter_text(count, nil), do: "#{count}"
+  defp counter_text(count, total), do: "#{count} / #{total}"
+
+  # ---------------------------------------------------------------------------
+  # admin_section_heading
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Uppercase section label for admin check-in and similar list panels.
+
+  Optionally appends a pill count badge (`badge_tone` controls colors).
+  """
+  attr :count, :integer, default: nil
+  attr :badge_tone, :atom, default: :zinc, values: [:zinc, :emerald]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the heading"
+
+  slot :inner_block, required: true
+
+  def admin_section_heading(assigns) do
+    ~H"""
+    <h2 class={[
+      "text-sm font-semibold uppercase tracking-wide text-zinc-500",
+      @class
+    ]}>
+      {render_slot(@inner_block)}
+      <span
+        :if={@count != nil}
+        class={[
+          "ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+          section_badge_classes(@badge_tone)
+        ]}
+      >
+        {@count}
+      </span>
+    </h2>
+    """
+  end
+
+  defp section_badge_classes(:zinc), do: "bg-zinc-100 text-zinc-700"
+  defp section_badge_classes(:emerald), do: "bg-emerald-100 text-emerald-700"
+
+  # ---------------------------------------------------------------------------
   # admin_dashed_more_button
   # ---------------------------------------------------------------------------
 
@@ -195,6 +302,176 @@ defmodule YscWeb.AdminComponents do
       class={[
         "mt-3 w-full text-center text-xs font-medium text-zinc-500 hover:text-zinc-800",
         "py-1.5 border border-dashed border-zinc-200 hover:border-zinc-400 rounded-lg transition-colors",
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_tabs / admin_tab
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Underline tab bar wrapper for admin list pages (events, newsletters, bookings).
+
+  Place `<.admin_tab>` children inside the default slot. Set `role="tablist"` when tabs
+  use WAI-ARIA tab semantics on each `<.admin_tab>`.
+
+  - `density={:compact}` — `py-3 px-4`, rounded top, active tab has white background
+    (newsletters, events).
+  - `density={:spacious}` — `py-4 px-1`, no rounded top (bookings property/section tabs).
+  """
+  attr :id, :string, default: nil
+  attr :aria_label, :string, required: true
+  attr :role, :string, default: nil
+  attr :density, :atom, default: :compact, values: [:compact, :spacious]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes on the outer bordered container"
+
+  slot :inner_block, required: true
+
+  def admin_tabs(assigns) do
+    ~H"""
+    <div class={["border-b border-zinc-200 mb-6", @class]}>
+      <nav
+        id={@id}
+        class={admin_tabs_nav_class(@density)}
+        aria-label={@aria_label}
+        role={@role}
+      >
+        {render_slot(@inner_block)}
+      </nav>
+    </div>
+    """
+  end
+
+  @doc """
+  A single tab in `<.admin_tabs>`. Renders a `<button>` by default, or a `<.link>` when
+  `patch` or `navigate` is set.
+
+  Pass `phx-click`, `role="tab"`, `aria-selected`, etc. via `rest` on button tabs.
+  """
+  attr :active, :boolean, default: false
+  attr :density, :atom, default: :compact, values: [:compact, :spacious]
+  attr :patch, :any, default: nil
+  attr :navigate, :any, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the tab control"
+
+  attr :rest, :global,
+    include:
+      ~w(phx-click phx-value-tab phx-value-section phx-value-filter role aria-selected id type)
+
+  slot :inner_block, required: true
+
+  def admin_tab(assigns) do
+    ~H"""
+    <%= if @patch || @navigate do %>
+      <.link
+        patch={@patch}
+        navigate={@navigate}
+        class={admin_tab_class(@active, @density, @class)}
+      >
+        {render_slot(@inner_block)}
+      </.link>
+    <% else %>
+      <button
+        type="button"
+        class={admin_tab_class(@active, @density, @class)}
+        {@rest}
+      >
+        {render_slot(@inner_block)}
+      </button>
+    <% end %>
+    """
+  end
+
+  defp admin_tabs_nav_class(:compact), do: "flex gap-0"
+  defp admin_tabs_nav_class(:spacious), do: "-mb-px flex space-x-8"
+
+  defp admin_tab_class(active, density, extra) do
+    [admin_tab_base(density), admin_tab_state(active, density), extra]
+  end
+
+  defp admin_tab_base(:compact),
+    do:
+      "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t"
+
+  defp admin_tab_base(:spacious),
+    do:
+      "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+
+  defp admin_tab_state(true, :compact),
+    do: "border-blue-500 text-blue-600 bg-white"
+
+  defp admin_tab_state(false, :compact),
+    do:
+      "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+
+  defp admin_tab_state(true, :spacious), do: "border-blue-500 text-blue-600"
+
+  defp admin_tab_state(false, :spacious),
+    do:
+      "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+
+  # ---------------------------------------------------------------------------
+  # admin_sending_badge
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Inline pill with spinner for in-progress sends (newsletter editions, etc.).
+  """
+  attr :label, :string, default: "Sending…"
+
+  def admin_sending_badge(assigns) do
+    ~H"""
+    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
+      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
+      </span>
+      {@label}
+    </span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_toggle_pill
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Segmented filter control (e.g. subscriber status All / Active / Inactive).
+
+  Pass `phx-click` and `phx-value-*` via `rest`.
+  """
+  attr :active, :boolean, default: false
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the pill button"
+
+  attr :rest, :global,
+    include:
+      ~w(phx-click phx-value-filter phx-value-section id disabled aria-label)
+
+  slot :inner_block, required: true
+
+  def admin_toggle_pill(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={[
+        "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+        if(@active,
+          do: "bg-zinc-200 text-zinc-800",
+          else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+        ),
         @class
       ]}
       {@rest}

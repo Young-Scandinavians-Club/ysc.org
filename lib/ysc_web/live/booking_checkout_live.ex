@@ -395,7 +395,7 @@ defmodule YscWeb.BookingCheckoutLive do
                       )}
                     </p>
                     <p class="text-xs text-blue-600">
-                      You must be staying at the cabin yourself. You're already counted in the guest total above.
+                      As the member making this reservation, you must be present during the stay. You're already counted in the guest total above.
                     </p>
                   </div>
                 </div>
@@ -893,7 +893,7 @@ defmodule YscWeb.BookingCheckoutLive do
             ]}>
               <.icon name="hero-clock" class="w-4 h-4" />
               <span class="text-xs font-semibold uppercase tracking-wide">
-                Reservation timer
+                Time remaining
               </span>
             </div>
             <p class={[

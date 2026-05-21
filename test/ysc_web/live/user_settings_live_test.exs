@@ -15,6 +15,7 @@ defmodule YscWeb.UserSettingsLiveTest do
   alias Ysc.Events.TicketReservation
   alias Ysc.LedgersFixtures
   alias Ysc.MessagePassingEvents
+  alias Ysc.Newsletter
   alias Ysc.Payments
   alias Ysc.Repo
   alias Ysc.Subscriptions
@@ -509,6 +510,80 @@ defmodule YscWeb.UserSettingsLiveTest do
   end
 
   describe "settings page — notifications" do
+    test "shows newsletter subscribed after async preferences load", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+
+      assert {:ok, _} =
+               Newsletter.subscribe(user.email,
+                 user_id: user.id,
+                 source: "test"
+               )
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/notifications")
+      render(view)
+
+      assert has_element?(
+               view,
+               "#notification_form[data-testid=notification-preferences-ready]"
+             )
+
+      subscriber = Newsletter.get_subscriber_by_email(user.email)
+      assert subscriber.subscribed
+
+      html = render(view)
+      assert html =~ ~r/name="user\[newsletter_notifications\]"[^>]*checked/s
+    end
+
+    test "update_notifications is ignored while notification preferences are loading",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+
+      assert {:ok, _} =
+               Newsletter.subscribe(user.email,
+                 user_id: user.id,
+                 source: "test"
+               )
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/notifications")
+      render(view)
+
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.UserSettingsLive.handle_event(
+                 "update_notifications",
+                 %{
+                   "user" => %{
+                     "newsletter_notifications" => "false",
+                     "event_notifications" => "true",
+                     "event_notifications_sms" => "false",
+                     "account_notifications_sms" => "false"
+                   }
+                 },
+                 %{
+                   socket
+                   | assigns:
+                       Map.put(
+                         socket.assigns,
+                         :loading_notification_preferences,
+                         true
+                       )
+                 }
+               )
+
+      subscriber = Newsletter.get_subscriber_by_email(user.email)
+      assert subscriber.subscribed
+      assert new_socket.assigns.loading_notification_preferences
+    end
+
     test "validates and saves notification preferences", %{conn: conn} do
       user = user_fixture(%{state: :active})
       conn = log_in_user(conn, user)
