@@ -814,7 +814,7 @@ defmodule YscWeb.UserSettingsLive do
                 <.input
                   field={@profile_form[:most_connected_country]}
                   type="select"
-                  label="Most Connected Country"
+                  label="Which Nordic or Scandinavian country do you feel most connected to?"
                   options={[
                     {"Sweden", "SE"},
                     {"Norway", "NO"},
