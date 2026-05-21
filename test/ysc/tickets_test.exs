@@ -549,8 +549,13 @@ defmodule Ysc.TicketsTest do
       {:ok, order} =
         Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
 
-      assert Tickets.get_user_ticket_order_event_id(user.id, order.id) == event.id
-      refute Tickets.get_user_ticket_order_event_id(user_fixture_unique().id, order.id)
+      assert Tickets.get_user_ticket_order_event_id(user.id, order.id) ==
+               event.id
+
+      refute Tickets.get_user_ticket_order_event_id(
+               user_fixture_unique().id,
+               order.id
+             )
     end
 
     test "get_user_ticket_order_by_reference scopes to user", %{

@@ -2201,7 +2201,11 @@ defmodule Ysc.Bookings do
       iex> calculate_refund(booking, ~D[2025-11-10])
       {:ok, %Money{amount: 500, currency: :USD}, %RefundPolicyRule{}}
   """
-  def calculate_refund(booking, cancellation_date \\ Date.utc_today(), opts \\ []) do
+  def calculate_refund(
+        booking,
+        cancellation_date \\ Date.utc_today(),
+        opts \\ []
+      ) do
     policy = get_active_refund_policy(booking.property, booking.booking_mode)
 
     days_before_checkin = Date.diff(booking.checkin_date, cancellation_date)

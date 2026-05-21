@@ -129,7 +129,8 @@ defmodule YscWeb.UserBookingDetailLive do
             updated_booking =
               Repo.preload(updated_booking, [:user, rooms: :room_category])
 
-            refund_info = get_refund_info(updated_booking, socket.assigns.payment)
+            refund_info =
+              get_refund_info(updated_booking, socket.assigns.payment)
 
             # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
             is_pending_refund =
@@ -566,7 +567,10 @@ defmodule YscWeb.UserBookingDetailLive do
   defp get_refund_info(booking, payment) do
     if can_cancel_booking?(booking) do
       policy =
-        Bookings.get_active_refund_policy(booking.property, booking.booking_mode)
+        Bookings.get_active_refund_policy(
+          booking.property,
+          booking.booking_mode
+        )
 
       rules = if policy, do: policy.rules || [], else: []
 
