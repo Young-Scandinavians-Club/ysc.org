@@ -46,8 +46,8 @@ defmodule Ysc.AccountsFixtures do
 
   def user_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
-    role = Map.get(attrs, :role)
-    state = Map.get(attrs, :state)
+    role = Map.get(attrs, :role, :member)
+    state = Map.get(attrs, :state, :active)
 
     {:ok, user} =
       attrs
@@ -57,8 +57,6 @@ defmodule Ysc.AccountsFixtures do
 
     apply_fixture_role_state(user, role, state)
   end
-
-  defp apply_fixture_role_state(user, nil, nil), do: user
 
   defp apply_fixture_role_state(user, role, state) do
     attrs =

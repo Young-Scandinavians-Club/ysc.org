@@ -440,7 +440,7 @@ defmodule Ysc.Accounts.UserTest do
       assert user2.event_notifications_sms == false
     end
 
-    test "accepts optional state and role fields" do
+    test "does not cast state or role from attrs" do
       attrs = %{
         email: @valid_email,
         first_name: "John",
@@ -452,8 +452,8 @@ defmodule Ysc.Accounts.UserTest do
       changeset = User.registration_changeset(%User{}, attrs)
 
       assert changeset.valid?
-      assert changeset.changes.state == :active
-      assert changeset.changes.role == :admin
+      refute Map.has_key?(changeset.changes, :state)
+      refute Map.has_key?(changeset.changes, :role)
     end
 
     test "accepts date_of_birth" do
