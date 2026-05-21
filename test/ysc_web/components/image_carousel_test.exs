@@ -369,4 +369,56 @@ defmodule YscWeb.Components.ImageCarouselTest do
       assert html =~ "/images/test-2024-01-01.jpg"
     end
   end
+
+  describe "image_carousel_autoplay/1" do
+    defp render_autoplay(assigns) do
+      assigns =
+        assigns
+        |> Map.put_new(:wrapper_class, "absolute inset-0 h-full w-full z-[2]")
+        |> Map.put_new(:scrim, true)
+
+      Phoenix.LiveViewTest.render_component(
+        &ImageCarousel.image_carousel_autoplay/1,
+        assigns
+      )
+    end
+
+    test "renders autoplay hook wrapper and carousel" do
+      html =
+        render_autoplay(%{
+          wrapper_id: "hero-carousel-wrapper",
+          id: "hero-carousel",
+          images: [%{src: "/images/test.jpg", alt: "Test"}]
+        })
+
+      assert html =~ ~s(id="hero-carousel-wrapper")
+      assert html =~ ~s(phx-hook="ImageCarouselAutoplay")
+      assert html =~ "image-carousel-container"
+      assert html =~ "/images/test.jpg"
+    end
+
+    test "renders dark scrim by default" do
+      html =
+        render_autoplay(%{
+          wrapper_id: "hero-wrapper",
+          id: "hero",
+          images: [%{src: "/images/a.jpg", alt: "A"}]
+        })
+
+      assert html =~ "bg-black/40"
+      assert html =~ ~s(aria-hidden="true")
+    end
+
+    test "omits scrim when scrim is false" do
+      html =
+        render_autoplay(%{
+          wrapper_id: "hero-wrapper",
+          id: "hero",
+          images: [%{src: "/images/a.jpg", alt: "A"}],
+          scrim: false
+        })
+
+      refute html =~ "bg-black/40"
+    end
+  end
 end

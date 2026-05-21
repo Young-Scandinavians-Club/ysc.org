@@ -50,6 +50,81 @@ defmodule YscWeb.AdminCheckInComponentsTest do
     end
   end
 
+  describe "admin_check_in_sticky_header/1" do
+    test "renders sticky shell with wide max width by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_sticky_header>
+          <:leading><span id="leading">Back</span></:leading>
+          <:center><span id="center">3 / 10</span></:center>
+          <:actions><span id="actions">Scan</span></:actions>
+        </.admin_check_in_sticky_header>
+        """)
+
+      assert html =~ "sticky top-0"
+      assert html =~ "max-w-7xl"
+      assert html =~ ~s(id="leading")
+      assert html =~ ~s(id="center")
+      assert html =~ ~s(id="actions")
+    end
+
+    test "renders narrow max width when max_width is :narrow" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_sticky_header max_width={:narrow}>
+          <:leading>Title</:leading>
+          <:actions>Go</:actions>
+        </.admin_check_in_sticky_header>
+        """)
+
+      assert html =~ "max-w-5xl"
+      refute html =~ "max-w-7xl"
+    end
+  end
+
+  describe "admin_mobile_icon_button/1" do
+    test "renders primary mobile icon button with phx-click" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_mobile_icon_button
+          icon="hero-qr-code"
+          aria_label="Open QR Scanner"
+          phx-click="launch-scanner"
+        />
+        """)
+
+      assert html =~ "sm:hidden"
+      assert html =~ "hero-qr-code"
+      assert html =~ ~s(aria-label="Open QR Scanner")
+      assert html =~ ~s(phx-click="launch-scanner")
+      assert html =~ "text-blue-700"
+    end
+
+    test "renders muted tone and data-confirm" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_mobile_icon_button
+          icon="hero-check-circle"
+          aria_label="Complete session"
+          tone={:muted}
+          phx-click="complete-session"
+          data-confirm="Complete this session?"
+        />
+        """)
+
+      assert html =~ "text-zinc-500"
+      assert html =~ ~s(data-confirm="Complete this session?")
+    end
+  end
+
   describe "admin_section_heading/1" do
     test "renders title without badge when count is omitted" do
       assigns = %{}

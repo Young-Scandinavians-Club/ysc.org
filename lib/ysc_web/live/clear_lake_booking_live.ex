@@ -461,47 +461,11 @@ defmodule YscWeb.ClearLakeBookingLive do
         id="hero-section"
         class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[40vh]"
       >
-        <div
-          id="clear-lake-carousel-wrapper"
-          phx-hook="ImageCarouselAutoplay"
-          class="absolute inset-0 h-full w-full z-[2]"
-        >
-          <YscWeb.Components.ImageCarousel.image_carousel
-            id="about-the-clear-lake-cabin-carousel-logged-in"
-            images={[
-              %{
-                src: ~p"/images/clear_lake/clear_lake_main.webp",
-                alt: "Clear Lake Cabin Exterior"
-              },
-              %{
-                src: ~p"/images/history/clear_lake_from_above.webp",
-                alt: "Clear Lake Aerial View"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_sweep.webp",
-                alt: "Clear Lake"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_cabin.webp",
-                alt: "Clear Lake Cabin"
-              }
-            ]}
-            class="h-full w-full"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
-          </div>
-        </div>
+        <YscWeb.Components.ImageCarousel.image_carousel_autoplay
+          wrapper_id="clear-lake-carousel-wrapper"
+          id="about-the-clear-lake-cabin-carousel-logged-in"
+          images={clear_lake_hero_images()}
+        />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
@@ -2421,47 +2385,11 @@ defmodule YscWeb.ClearLakeBookingLive do
         id="hero-section"
         class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[60vh] md:min-h-[75vh]"
       >
-        <div
-          id="clear-lake-carousel-wrapper-nonuser"
-          phx-hook="ImageCarouselAutoplay"
-          class="absolute inset-0 h-full w-full z-[2]"
-        >
-          <YscWeb.Components.ImageCarousel.image_carousel
-            id="about-the-clear-lake-cabin-carousel"
-            images={[
-              %{
-                src: ~p"/images/clear_lake/clear_lake_main.webp",
-                alt: "Clear Lake Cabin Exterior"
-              },
-              %{
-                src: ~p"/images/history/clear_lake_from_above.webp",
-                alt: "Clear Lake Aerial View"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_sweep.webp",
-                alt: "Clear Lake"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_cabin.webp",
-                alt: "Clear Lake Cabin"
-              }
-            ]}
-            class="h-full w-full"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
-          </div>
-        </div>
+        <YscWeb.Components.ImageCarousel.image_carousel_autoplay
+          wrapper_id="clear-lake-carousel-wrapper-nonuser"
+          id="about-the-clear-lake-cabin-carousel"
+          images={clear_lake_hero_images()}
+        />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
@@ -3968,4 +3896,15 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp default_timezone,
     do: Application.get_env(:ysc, :default_timezone, "America/Los_Angeles")
+
+  defp clear_lake_hero_images do
+    [
+      %{src: ~p"/images/clear_lake/clear_lake_main.webp", alt: "Clear Lake Cabin Exterior"},
+      %{src: ~p"/images/history/clear_lake_from_above.webp", alt: "Clear Lake Aerial View"},
+      %{src: ~p"/images/clear_lake/clear_lake_dock.webp", alt: "Clear Lake Dock"},
+      %{src: ~p"/images/clear_lake/clear_lake_dock_2.webp", alt: "Clear Lake Dock"},
+      %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Clear Lake"},
+      %{src: ~p"/images/clear_lake/clear_lake_cabin.webp", alt: "Clear Lake Cabin"}
+    ]
+  end
 end

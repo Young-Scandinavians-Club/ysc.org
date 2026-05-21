@@ -17,52 +17,37 @@ defmodule YscWeb.AdminEventCheckInLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-zinc-50">
-      <%!-- Sticky top bar --%>
-      <div class="bg-white border-b border-zinc-200 sticky top-0 z-10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex items-center justify-between h-16 gap-4">
-            <%!-- Back + event title --%>
-            <div class="flex items-center gap-3 min-w-0">
-              <.back navigate={~p"/admin/events"}>Events</.back>
-              <span class="text-zinc-300 select-none hidden sm:inline">/</span>
-              <h1 class="text-base font-semibold text-zinc-900 truncate hidden sm:block">
-                {@event.title}
-              </h1>
-            </div>
-
-            <.admin_check_in_counter
-              count={@checked_in_count}
-              total={@total_count}
-            />
-
-            <%!-- QR Scanner + Membership check-in links --%>
-            <div class="shrink-0 flex items-center gap-2">
-              <.button
-                phx-click="launch-membership-checkin"
-                variant="outline"
-                color="zinc"
-                class="hidden sm:inline-flex"
-              >
-                <.icon name="hero-identification" class="w-5 h-5 me-1 mt-0.5" />
-                Membership Check-in
-              </.button>
-              <.button
-                phx-click="launch-scanner"
-                class="hidden sm:inline-flex"
-              >
-                <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
-              </.button>
-              <button
-                phx-click="launch-scanner"
-                class="sm:hidden p-2 text-blue-700 hover:text-blue-900"
-                aria-label="Open QR Scanner"
-              >
-                <.icon name="hero-qr-code" class="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <.admin_check_in_sticky_header>
+        <:leading>
+          <.back navigate={~p"/admin/events"}>Events</.back>
+          <span class="text-zinc-300 select-none hidden sm:inline">/</span>
+          <h1 class="text-base font-semibold text-zinc-900 truncate hidden sm:block">
+            {@event.title}
+          </h1>
+        </:leading>
+        <:center>
+          <.admin_check_in_counter count={@checked_in_count} total={@total_count} />
+        </:center>
+        <:actions>
+          <.button
+            phx-click="launch-membership-checkin"
+            variant="outline"
+            color="zinc"
+            class="hidden sm:inline-flex"
+          >
+            <.icon name="hero-identification" class="w-5 h-5 me-1 mt-0.5" />
+            Membership Check-in
+          </.button>
+          <.button phx-click="launch-scanner" class="hidden sm:inline-flex">
+            <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
+          </.button>
+          <.admin_mobile_icon_button
+            icon="hero-qr-code"
+            aria_label="Open QR Scanner"
+            phx-click="launch-scanner"
+          />
+        </:actions>
+      </.admin_check_in_sticky_header>
 
       <%!-- Search bar --%>
       <div class="bg-white border-b border-zinc-200">

@@ -277,6 +277,84 @@ defmodule YscWeb.AdminComponents do
   defp section_badge_classes(:emerald), do: "bg-emerald-100 text-emerald-700"
 
   # ---------------------------------------------------------------------------
+  # admin_check_in_sticky_header
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Sticky top header shell for admin check-in LiveViews (event and membership).
+
+  Provides consistent border, background, and three-column layout. Pass page-specific
+  content via slots: `leading` (back link + title), `center` (counter), `actions` (buttons).
+
+  - `max_width={:wide}` — `max-w-7xl` (event check-in).
+  - `max_width={:narrow}` — `max-w-5xl` (membership check-in).
+  """
+  attr :max_width, :atom, default: :wide, values: [:wide, :narrow]
+
+  slot :leading, required: true
+  slot :center
+  slot :actions, required: true
+
+  def admin_check_in_sticky_header(assigns) do
+    ~H"""
+    <div class="bg-white border-b border-zinc-200 sticky top-0 z-10">
+      <div class={["mx-auto px-4 sm:px-6 lg:px-8", sticky_max_width_class(@max_width)]}>
+        <div class="flex items-center justify-between h-16 gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            {render_slot(@leading)}
+          </div>
+          <div :if={@center != []} class="shrink-0">
+            {render_slot(@center)}
+          </div>
+          <div class="shrink-0 flex items-center gap-2">
+            {render_slot(@actions)}
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp sticky_max_width_class(:wide), do: "max-w-7xl"
+  defp sticky_max_width_class(:narrow), do: "max-w-5xl"
+
+  # ---------------------------------------------------------------------------
+  # admin_mobile_icon_button
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Icon-only control visible below the `sm` breakpoint (admin check-in toolbars).
+
+  Pair with a desktop `<.button class="hidden sm:inline-flex">` that shares the same
+  `phx-click` handler. Pass `phx-click` and optional `data-confirm` via `rest`.
+  """
+  attr :icon, :string, required: true, doc: "Heroicon name, e.g. \"hero-qr-code\""
+  attr :aria_label, :string, required: true
+
+  attr :tone, :atom,
+    default: :primary,
+    values: [:primary, :muted],
+    doc: ":primary for scanner actions; :muted for secondary actions"
+
+  attr :rest, :global, include: ~w(phx-click phx-target id disabled data-confirm)
+
+  def admin_mobile_icon_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={["sm:hidden p-2", mobile_icon_tone_classes(@tone)]}
+      aria-label={@aria_label}
+      {@rest}
+    >
+      <.icon name={@icon} class="w-6 h-6" />
+    </button>
+    """
+  end
+
+  defp mobile_icon_tone_classes(:primary), do: "text-blue-700 hover:text-blue-900"
+  defp mobile_icon_tone_classes(:muted), do: "text-zinc-500 hover:text-zinc-700"
+
+  # ---------------------------------------------------------------------------
   # admin_dashed_more_button
   # ---------------------------------------------------------------------------
 
