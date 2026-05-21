@@ -2201,7 +2201,7 @@ defmodule Ysc.Bookings do
       iex> calculate_refund(booking, ~D[2025-11-10])
       {:ok, %Money{amount: 500, currency: :USD}, %RefundPolicyRule{}}
   """
-  def calculate_refund(booking, cancellation_date \\ Date.utc_today()) do
+  def calculate_refund(booking, cancellation_date \\ Date.utc_today(), opts \\ []) do
     policy = get_active_refund_policy(booking.property, booking.booking_mode)
 
     days_before_checkin = Date.diff(booking.checkin_date, cancellation_date)
@@ -2233,7 +2233,13 @@ defmodule Ysc.Bookings do
 
         if applied_rule do
           # Get the original payment amount for this booking
-          case get_booking_payment_amount(booking) do
+          original_amount_result =
+            case Keyword.get(opts, :original_amount) do
+              %Money{} = amount -> {:ok, amount}
+              _ -> get_booking_payment_amount(booking)
+            end
+
+          case original_amount_result do
             {:ok, original_amount} ->
               refund_percentage =
                 Decimal.to_float(applied_rule.refund_percentage)

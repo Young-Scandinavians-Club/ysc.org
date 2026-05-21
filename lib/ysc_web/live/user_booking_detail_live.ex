@@ -44,7 +44,7 @@ defmodule YscWeb.UserBookingDetailLive do
           # Additional authorization check using LetMe policy
           case Policy.authorize(:booking_read, user, booking) do
             :ok ->
-              # Get payment information
+              # Get payment information (amount reused for refund estimate when present)
               payment = get_booking_payment_info(booking)
 
               # Get timezone from connect params
@@ -64,7 +64,7 @@ defmodule YscWeb.UserBookingDetailLive do
               can_cancel = can_cancel_booking?(booking)
 
               # Get refund policy info for cancellation
-              refund_info = get_refund_info(booking)
+              refund_info = get_refund_info(booking, payment)
 
               {:ok,
                socket
@@ -129,7 +129,7 @@ defmodule YscWeb.UserBookingDetailLive do
             updated_booking =
               Repo.preload(updated_booking, [:user, rooms: :room_category])
 
-            refund_info = get_refund_info(updated_booking)
+            refund_info = get_refund_info(updated_booking, socket.assigns.payment)
 
             # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
             is_pending_refund =
@@ -563,18 +563,22 @@ defmodule YscWeb.UserBookingDetailLive do
     DateTime.compare(now_pst, checkin_datetime_today) == :lt
   end
 
-  defp get_refund_info(booking) do
+  defp get_refund_info(booking, payment) do
     if can_cancel_booking?(booking) do
-      case Bookings.calculate_refund(booking, Date.utc_today()) do
+      policy =
+        Bookings.get_active_refund_policy(booking.property, booking.booking_mode)
+
+      rules = if policy, do: policy.rules || [], else: []
+
+      refund_opts =
+        if payment && payment.amount do
+          [original_amount: payment.amount]
+        else
+          []
+        end
+
+      case Bookings.calculate_refund(booking, Date.utc_today(), refund_opts) do
         {:ok, refund_amount, applied_rule} ->
-          policy =
-            Bookings.get_active_refund_policy(
-              booking.property,
-              booking.booking_mode
-            )
-
-          rules = if policy, do: policy.rules || [], else: []
-
           %{
             estimated_refund: refund_amount,
             applied_rule: applied_rule,

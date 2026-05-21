@@ -3551,6 +3551,46 @@ defmodule YscWeb.EventDetailsLive do
     }
   end
 
+  # Recompute tier list and availability from sold counts (no BookingLocker transaction).
+  # Used for PubSub-driven UI updates where list_ticket_tiers_for_event already has fresh counts.
+  defp assign_ticket_tier_availability(socket, event_id, ticket_tiers_with_counts \\ nil) do
+    ticket_tiers_with_counts =
+      ticket_tiers_with_counts || Events.list_ticket_tiers_for_event(event_id)
+    ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
+    event = socket.assigns.event
+
+    availability_data =
+      compute_availability_from_tiers(event, ticket_tiers_with_counts)
+
+    event_at_capacity =
+      compute_event_at_capacity(event, ticket_tiers_with_counts, availability_data)
+
+    event_selling_fast = Events.event_selling_fast?(event_id)
+    available_capacity = get_available_capacity_from_data(availability_data)
+    sold_percentage = compute_sold_percentage(event, availability_data)
+
+    socket
+    |> assign(:ticket_tiers, ticket_tiers)
+    |> assign(:availability_data, availability_data)
+    |> assign(:event_at_capacity, event_at_capacity)
+    |> assign(:event_selling_fast, event_selling_fast)
+    |> assign(:available_capacity, available_capacity)
+    |> assign(:sold_percentage, sold_percentage)
+  end
+
+  defp assign_ticket_tier_pricing_and_list(socket, event_id) do
+    ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
+    ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
+    event = socket.assigns.event
+
+    event_with_pricing =
+      add_pricing_info_from_tiers(event, ticket_tiers_with_counts)
+
+    socket
+    |> assign(:event, event_with_pricing)
+    |> assign(:ticket_tiers, ticket_tiers)
+  end
+
   defp load_user_tickets(nil, _event_id), do: {[], %{}}
 
   defp load_user_tickets(current_user, event_id) do
@@ -4366,18 +4406,7 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      event = Events.get_event!(current_event_id) |> Repo.preload(:ticket_tiers)
-      event_with_pricing = add_pricing_info(event)
-
-      ticket_tiers_with_counts =
-        Events.list_ticket_tiers_for_event(current_event_id)
-
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
-
-      {:noreply,
-       socket
-       |> assign(:event, event_with_pricing)
-       |> assign(:ticket_tiers, ticket_tiers)}
+      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
     else
       {:noreply, socket}
     end
@@ -4392,18 +4421,7 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      event = Events.get_event!(current_event_id) |> Repo.preload(:ticket_tiers)
-      event_with_pricing = add_pricing_info(event)
-
-      ticket_tiers_with_counts =
-        Events.list_ticket_tiers_for_event(current_event_id)
-
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
-
-      {:noreply,
-       socket
-       |> assign(:event, event_with_pricing)
-       |> assign(:ticket_tiers, ticket_tiers)}
+      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
     else
       {:noreply, socket}
     end
@@ -4418,18 +4436,7 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      event = Events.get_event!(current_event_id) |> Repo.preload(:ticket_tiers)
-      event_with_pricing = add_pricing_info(event)
-
-      ticket_tiers_with_counts =
-        Events.list_ticket_tiers_for_event(current_event_id)
-
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
-
-      {:noreply,
-       socket
-       |> assign(:event, event_with_pricing)
-       |> assign(:ticket_tiers, ticket_tiers)}
+      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
     else
       {:noreply, socket}
     end
@@ -4676,38 +4683,7 @@ defmodule YscWeb.EventDetailsLive do
     ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
 
     if ticket_tier && ticket_tier.event_id == socket.assigns.event.id do
-      # Use the same refresh logic as TicketAvailabilityUpdated
-      event_id = socket.assigns.event.id
-      ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
-
-      availability_data =
-        case Ysc.Tickets.BookingLocker.check_availability_with_lock(event_id) do
-          {:ok, availability} -> availability
-          {:error, _} -> socket.assigns.availability_data
-        end
-
-      event = socket.assigns.event
-
-      event_at_capacity =
-        compute_event_at_capacity(
-          event,
-          ticket_tiers_with_counts,
-          availability_data
-        )
-
-      event_selling_fast = Events.event_selling_fast?(event_id)
-      available_capacity = get_available_capacity_from_data(availability_data)
-      sold_percentage = compute_sold_percentage(event, availability_data)
-
-      {:noreply,
-       socket
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:availability_data, availability_data)
-       |> assign(:event_at_capacity, event_at_capacity)
-       |> assign(:event_selling_fast, event_selling_fast)
-       |> assign(:available_capacity, available_capacity)
-       |> assign(:sold_percentage, sold_percentage)}
+      {:noreply, assign_ticket_tier_availability(socket, socket.assigns.event.id)}
     else
       {:noreply, socket}
     end
@@ -4725,38 +4701,7 @@ defmodule YscWeb.EventDetailsLive do
     ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
 
     if ticket_tier && ticket_tier.event_id == socket.assigns.event.id do
-      # Use the same refresh logic as TicketAvailabilityUpdated
-      event_id = socket.assigns.event.id
-      ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
-
-      availability_data =
-        case Ysc.Tickets.BookingLocker.check_availability_with_lock(event_id) do
-          {:ok, availability} -> availability
-          {:error, _} -> socket.assigns.availability_data
-        end
-
-      event = socket.assigns.event
-
-      event_at_capacity =
-        compute_event_at_capacity(
-          event,
-          ticket_tiers_with_counts,
-          availability_data
-        )
-
-      event_selling_fast = Events.event_selling_fast?(event_id)
-      available_capacity = get_available_capacity_from_data(availability_data)
-      sold_percentage = compute_sold_percentage(event, availability_data)
-
-      {:noreply,
-       socket
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:availability_data, availability_data)
-       |> assign(:event_at_capacity, event_at_capacity)
-       |> assign(:event_selling_fast, event_selling_fast)
-       |> assign(:available_capacity, available_capacity)
-       |> assign(:sold_percentage, sold_percentage)}
+      {:noreply, assign_ticket_tier_availability(socket, socket.assigns.event.id)}
     else
       {:noreply, socket}
     end
@@ -4774,38 +4719,7 @@ defmodule YscWeb.EventDetailsLive do
     ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
 
     if ticket_tier && ticket_tier.event_id == socket.assigns.event.id do
-      # Use the same refresh logic as TicketAvailabilityUpdated
-      event_id = socket.assigns.event.id
-      ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
-
-      availability_data =
-        case Ysc.Tickets.BookingLocker.check_availability_with_lock(event_id) do
-          {:ok, availability} -> availability
-          {:error, _} -> socket.assigns.availability_data
-        end
-
-      event = socket.assigns.event
-
-      event_at_capacity =
-        compute_event_at_capacity(
-          event,
-          ticket_tiers_with_counts,
-          availability_data
-        )
-
-      event_selling_fast = Events.event_selling_fast?(event_id)
-      available_capacity = get_available_capacity_from_data(availability_data)
-      sold_percentage = compute_sold_percentage(event, availability_data)
-
-      {:noreply,
-       socket
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:availability_data, availability_data)
-       |> assign(:event_at_capacity, event_at_capacity)
-       |> assign(:event_selling_fast, event_selling_fast)
-       |> assign(:available_capacity, available_capacity)
-       |> assign(:sold_percentage, sold_percentage)}
+      {:noreply, assign_ticket_tier_availability(socket, socket.assigns.event.id)}
     else
       {:noreply, socket}
     end
@@ -4845,36 +4759,11 @@ defmodule YscWeb.EventDetailsLive do
     # Handle ticket availability updates - refresh the event to get updated availability counts
     # Only process if this is for the current event
     if socket.assigns.event.id == event_id do
-      # Reload ticket tiers with fresh sold counts
       ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
-      ticket_tiers = get_ticket_tiers_from_list(ticket_tiers_with_counts)
 
-      # Refresh cached availability data
-      availability_data =
-        case Ysc.Tickets.BookingLocker.check_availability_with_lock(event_id) do
-          {:ok, availability} -> availability
-          {:error, _} -> socket.assigns.availability_data
-        end
-
-      # Recompute cached values with fresh data
-      event = socket.assigns.event
-
-      event_at_capacity =
-        compute_event_at_capacity(
-          event,
-          ticket_tiers_with_counts,
-          availability_data
-        )
-
-      event_selling_fast = Events.event_selling_fast?(event_id)
-      available_capacity = get_available_capacity_from_data(availability_data)
-      sold_percentage = compute_sold_percentage(event, availability_data)
-
-      # Update event with fresh pricing info
       event_with_pricing =
-        add_pricing_info_from_tiers(event, ticket_tiers_with_counts)
+        add_pricing_info_from_tiers(socket.assigns.event, ticket_tiers_with_counts)
 
-      # Refresh attendees list if user has active membership
       {_sold_ticket_count, attendees_count, attendees_list,
        ticket_counts_per_user, host_ids} =
         load_attendees(
@@ -4883,16 +4772,10 @@ defmodule YscWeb.EventDetailsLive do
           event_id
         )
 
-      # Trigger animation on all tier availability elements
       {:noreply,
        socket
        |> assign(:event, event_with_pricing)
-       |> assign(:ticket_tiers, ticket_tiers)
-       |> assign(:availability_data, availability_data)
-       |> assign(:event_at_capacity, event_at_capacity)
-       |> assign(:event_selling_fast, event_selling_fast)
-       |> assign(:available_capacity, available_capacity)
-       |> assign(:sold_percentage, sold_percentage)
+       |> assign_ticket_tier_availability(event_id, ticket_tiers_with_counts)
        |> assign(:attendees_count, attendees_count)
        |> assign(:attendees_list, attendees_list)
        |> assign(:ticket_counts_per_user, ticket_counts_per_user)

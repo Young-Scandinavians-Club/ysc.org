@@ -164,6 +164,19 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Returns `event_id` when the user owns the ticket order, otherwise `nil`.
+
+  Use for redirect/authorization checks that do not need full order preloads.
+  """
+  def get_user_ticket_order_event_id(user_id, order_id) do
+    from(to in TicketOrder,
+      where: to.id == ^order_id and to.user_id == ^user_id,
+      select: to.event_id
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Gets a ticket order by payment ID for a specific user with preloaded associations.
 
   This function filters by user_id to ensure users can only access their own ticket orders.

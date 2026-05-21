@@ -38,7 +38,7 @@ defmodule YscWeb.OrderConfirmationLive do
              where: to.id == ^order_id and to.user_id == ^user.id,
              preload: [
                :user,
-               event: [:cover_image, agendas: :agenda_items],
+               event: :cover_image,
                payment: :payment_method,
                tickets: [:ticket_tier, :registration]
              ]
