@@ -541,6 +541,23 @@ defmodule Ysc.TicketsTest do
       refute Tickets.get_user_ticket_order(other.id, order.id)
     end
 
+    test "get_user_ticket_order_event_id returns event_id for owner only", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert Tickets.get_user_ticket_order_event_id(user.id, order.id) ==
+               event.id
+
+      refute Tickets.get_user_ticket_order_event_id(
+               user_fixture_unique().id,
+               order.id
+             )
+    end
+
     test "get_user_ticket_order_by_reference scopes to user", %{
       user: user,
       event: event,

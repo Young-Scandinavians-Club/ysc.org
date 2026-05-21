@@ -18,7 +18,6 @@ defmodule YscWeb.BookingCheckoutLive do
     result =
       with :ok <- validate_user_signed_in(user),
            {:ok, booking} <- load_booking(booking_id, user),
-           booking <- preload_booking_rooms(booking),
            :ok <- validate_booking_status(booking),
            :ok <- validate_booking_not_expired(booking) do
         initialize_checkout(socket, booking, user, timezone)
@@ -59,17 +58,14 @@ defmodule YscWeb.BookingCheckoutLive do
     # This ensures we only fetch bookings that belong to the current user
     booking_query =
       from(b in Booking,
-        where: b.id == ^booking_id and b.user_id == ^user.id
+        where: b.id == ^booking_id and b.user_id == ^user.id,
+        preload: [:user, :booking_guests, rooms: :room_category]
       )
 
     case Repo.one(booking_query) do
       nil -> {:error, {:redirect, ~p"/", "Booking not found."}}
       booking -> {:ok, booking}
     end
-  end
-
-  defp preload_booking_rooms(booking) do
-    Repo.preload(booking, [:rooms, rooms: :room_category])
   end
 
   defp validate_booking_status(booking) do
@@ -143,7 +139,6 @@ defmodule YscWeb.BookingCheckoutLive do
          price_breakdown,
          timezone
        ) do
-    booking = Repo.preload(booking, [:user, :booking_guests])
     is_expired = booking_expired?(booking)
     {checkout_step, guest_info_form} = determine_checkout_step(booking, user)
     {family_members, other_family_members} = load_family_members(user)

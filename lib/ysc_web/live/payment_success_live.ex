@@ -300,13 +300,10 @@ defmodule YscWeb.PaymentSuccessLive do
   end
 
   defp verify_and_redirect_ticket_order(ticket_order_id, user) do
-    # SECURITY: Use user-scoped function to prevent unauthorized access
-    case Tickets.get_user_ticket_order(user.id, ticket_order_id) do
-      nil ->
-        {:error, :ticket_order_not_found}
-
-      _ticket_order ->
-        {:ok, ~p"/orders/#{ticket_order_id}/confirmation?confetti=true"}
+    if Tickets.get_user_ticket_order_event_id(user.id, ticket_order_id) do
+      {:ok, ~p"/orders/#{ticket_order_id}/confirmation?confetti=true"}
+    else
+      {:error, :ticket_order_not_found}
     end
   end
 
@@ -373,13 +370,9 @@ defmodule YscWeb.PaymentSuccessLive do
   end
 
   defp verify_ticket_order_access(ticket_order_id, user) do
-    # SECURITY: Use user-scoped function to prevent unauthorized access
-    case Tickets.get_user_ticket_order(user.id, ticket_order_id) do
-      nil ->
-        {:error, :ticket_order_not_found}
-
-      ticket_order ->
-        {:ok, ticket_order.event_id}
+    case Tickets.get_user_ticket_order_event_id(user.id, ticket_order_id) do
+      nil -> {:error, :ticket_order_not_found}
+      event_id -> {:ok, event_id}
     end
   end
 
