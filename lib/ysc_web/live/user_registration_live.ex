@@ -57,7 +57,7 @@ defmodule YscWeb.UserRegistrationLive do
           <div class="space-y-4 min-h-[28rem]">
             <p class="text-right text-xs text-zinc-400">* Required fields</p>
             <.error :if={@check_errors}>
-              Oops, something went wrong! Please check the errors below.
+              Some required information is missing or incorrect. Review the highlighted fields — you may need to go back to an earlier step.
             </.error>
 
             <div id="step-0-content" class={if @current_step !== 0, do: "hidden"}>
@@ -530,7 +530,7 @@ defmodule YscWeb.UserRegistrationLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Security check failed. Please try again.",
+           "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser.",
            title: "Registration"
          )
          |> turnstile_mod().refresh()}

@@ -9,7 +9,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
   |----------|---------------------------|
   | 100% percent-off (high cap), fixed amount ≥ subtotal, free nights = stay | Complimentary confirm |
   | Partial percent / fixed / free nights, or buyout cap | Stripe Elements (`#stripe-payment-container`) |
-  | Entitlement property or room mismatch (including wrong `room_id`) | Redirect + flash (invalid benefit) |
+  | Entitlement property or room mismatch (including wrong `room_id`) | Redirect + flash (invalid discount) |
 
   Buyout pricing is ensured via `ensure_buyout_base_pricing!/0` so totals are deterministic
   even when the DB has no seasonal buyout rules yet.
@@ -390,7 +390,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       assert {:error, {:redirect, %{flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      assert flash["error"] =~ "benefit" or flash["error"] =~ "valid"
+      assert flash["error"] =~ "discount" or
+               flash["error"] =~ "no longer applies"
     end
   end
 
@@ -1127,7 +1128,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
       err = Map.get(flash, "error") || Map.get(flash, :error) || ""
-      assert err =~ "benefit" or err =~ "valid"
+      assert err =~ "discount" or err =~ "no longer applies"
     end
 
     test "Clear Lake: redirects when locked entitlement room_id is not the booked room",
@@ -1204,7 +1205,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
       err = Map.get(flash, "error") || Map.get(flash, :error) || ""
-      assert err =~ "benefit" or err =~ "valid"
+      assert err =~ "discount" or err =~ "no longer applies"
     end
   end
 
