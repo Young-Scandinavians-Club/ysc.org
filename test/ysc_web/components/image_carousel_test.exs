@@ -3,6 +3,7 @@ defmodule YscWeb.Components.ImageCarouselTest do
 
   require Phoenix.LiveViewTest
   alias YscWeb.Components.ImageCarousel
+  alias YscWeb.Components.ImageCarouselAutoplay
 
   defp render_carousel(assigns) do
     assigns = Map.put_new(assigns, :class, "")
@@ -378,7 +379,7 @@ defmodule YscWeb.Components.ImageCarouselTest do
         |> Map.put_new(:scrim, true)
 
       Phoenix.LiveViewTest.render_component(
-        &ImageCarousel.image_carousel_autoplay/1,
+        &ImageCarouselAutoplay.image_carousel_autoplay/1,
         assigns
       )
     end

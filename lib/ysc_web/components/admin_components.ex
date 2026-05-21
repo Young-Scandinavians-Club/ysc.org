@@ -298,7 +298,10 @@ defmodule YscWeb.AdminComponents do
   def admin_check_in_sticky_header(assigns) do
     ~H"""
     <div class="bg-white border-b border-zinc-200 sticky top-0 z-10">
-      <div class={["mx-auto px-4 sm:px-6 lg:px-8", sticky_max_width_class(@max_width)]}>
+      <div class={[
+        "mx-auto px-4 sm:px-6 lg:px-8",
+        sticky_max_width_class(@max_width)
+      ]}>
         <div class="flex items-center justify-between h-16 gap-4">
           <div class="flex items-center gap-3 min-w-0">
             {render_slot(@leading)}
@@ -328,7 +331,10 @@ defmodule YscWeb.AdminComponents do
   Pair with a desktop `<.button class="hidden sm:inline-flex">` that shares the same
   `phx-click` handler. Pass `phx-click` and optional `data-confirm` via `rest`.
   """
-  attr :icon, :string, required: true, doc: "Heroicon name, e.g. \"hero-qr-code\""
+  attr :icon, :string,
+    required: true,
+    doc: "Heroicon name, e.g. \"hero-qr-code\""
+
   attr :aria_label, :string, required: true
 
   attr :tone, :atom,
@@ -336,7 +342,8 @@ defmodule YscWeb.AdminComponents do
     values: [:primary, :muted],
     doc: ":primary for scanner actions; :muted for secondary actions"
 
-  attr :rest, :global, include: ~w(phx-click phx-target id disabled data-confirm)
+  attr :rest, :global,
+    include: ~w(phx-click phx-target id disabled data-confirm)
 
   def admin_mobile_icon_button(assigns) do
     ~H"""
@@ -351,7 +358,9 @@ defmodule YscWeb.AdminComponents do
     """
   end
 
-  defp mobile_icon_tone_classes(:primary), do: "text-blue-700 hover:text-blue-900"
+  defp mobile_icon_tone_classes(:primary),
+    do: "text-blue-700 hover:text-blue-900"
+
   defp mobile_icon_tone_classes(:muted), do: "text-zinc-500 hover:text-zinc-700"
 
   # ---------------------------------------------------------------------------

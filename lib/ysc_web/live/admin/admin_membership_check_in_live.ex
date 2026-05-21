@@ -24,7 +24,10 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             <h1 class="text-base font-semibold text-zinc-900 truncate">
               {@session.name}
             </h1>
-            <p :if={@session.event} class="text-xs text-zinc-500 truncate leading-tight">
+            <p
+              :if={@session.event}
+              class="text-xs text-zinc-500 truncate leading-tight"
+            >
               {@session.event.title}
             </p>
           </div>
@@ -53,8 +56,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               phx-click="launch-scanner"
               class="hidden sm:inline-flex"
             >
-              <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" />
-              QR Scanner
+              <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
             </.button>
             <.admin_mobile_icon_button
               icon="hero-qr-code"

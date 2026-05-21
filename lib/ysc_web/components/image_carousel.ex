@@ -30,21 +30,6 @@ defmodule YscWeb.Components.ImageCarousel do
   """
   use Phoenix.Component
 
-  attr :wrapper_id, :string,
-    required: true,
-    doc: "DOM id for the autoplay hook wrapper",
-    for: :image_carousel_autoplay
-
-  attr :wrapper_class, :string,
-    default: "absolute inset-0 h-full w-full z-[2]",
-    doc: "Classes on the hook wrapper element",
-    for: :image_carousel_autoplay
-
-  attr :scrim, :boolean,
-    default: true,
-    doc: "When true, renders a dark overlay above slides (hero sections)",
-    for: :image_carousel_autoplay
-
   attr :id, :string,
     required: true,
     doc: "Unique ID for the carousel"
@@ -60,26 +45,6 @@ defmodule YscWeb.Components.ImageCarousel do
   slot :overlay,
     doc:
       "Optional overlay content (e.g., title section) that appears over the carousel"
-
-  @doc """
-  Hero-style carousel with `ImageCarouselAutoplay` hook and optional dark scrim.
-
-  Wraps `<.image_carousel>` for full-bleed booking page heroes. The wrapper uses
-  `phx-update="ignore"` because the hook manages slide timing client-side.
-  """
-  def image_carousel_autoplay(assigns) do
-    ~H"""
-    <div id={@wrapper_id} phx-hook="ImageCarouselAutoplay" class={@wrapper_class}>
-      <.image_carousel id={@id} images={@images} class="h-full w-full" />
-      <div
-        :if={@scrim}
-        class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-        aria-hidden="true"
-      >
-      </div>
-    </div>
-    """
-  end
 
   def image_carousel(assigns) do
     assigns =
