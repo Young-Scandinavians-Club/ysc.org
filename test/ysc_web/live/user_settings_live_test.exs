@@ -510,15 +510,26 @@ defmodule YscWeb.UserSettingsLiveTest do
   end
 
   describe "settings page — notifications" do
-    test "shows newsletter subscribed after async preferences load", %{conn: conn} do
+    test "shows newsletter subscribed after async preferences load", %{
+      conn: conn
+    } do
       user = user_fixture(%{state: :active})
-      assert {:ok, _} = Newsletter.subscribe(user.email, user_id: user.id, source: "test")
+
+      assert {:ok, _} =
+               Newsletter.subscribe(user.email,
+                 user_id: user.id,
+                 source: "test"
+               )
+
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/users/notifications")
       render(view)
 
-      assert has_element?(view, "#notification_form[data-testid=notification-preferences-ready]")
+      assert has_element?(
+               view,
+               "#notification_form[data-testid=notification-preferences-ready]"
+             )
 
       subscriber = Newsletter.get_subscriber_by_email(user.email)
       assert subscriber.subscribed
@@ -527,11 +538,18 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ ~r/name="user\[newsletter_notifications\]"[^>]*checked/s
     end
 
-    test "update_notifications is ignored while notification preferences are loading", %{
-      conn: conn
-    } do
+    test "update_notifications is ignored while notification preferences are loading",
+         %{
+           conn: conn
+         } do
       user = user_fixture(%{state: :active})
-      assert {:ok, _} = Newsletter.subscribe(user.email, user_id: user.id, source: "test")
+
+      assert {:ok, _} =
+               Newsletter.subscribe(user.email,
+                 user_id: user.id,
+                 source: "test"
+               )
+
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/users/notifications")
@@ -550,7 +568,15 @@ defmodule YscWeb.UserSettingsLiveTest do
                      "account_notifications_sms" => "false"
                    }
                  },
-                 %{socket | assigns: Map.put(socket.assigns, :loading_notification_preferences, true)}
+                 %{
+                   socket
+                   | assigns:
+                       Map.put(
+                         socket.assigns,
+                         :loading_notification_preferences,
+                         true
+                       )
+                 }
                )
 
       subscriber = Newsletter.get_subscriber_by_email(user.email)
