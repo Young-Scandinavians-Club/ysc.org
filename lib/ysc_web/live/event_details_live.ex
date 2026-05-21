@@ -915,7 +915,7 @@ defmodule YscWeb.EventDetailsLive do
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-6 h-6 me-1 -mt-0.5"
                         />
-                        You need to be signed in and have an active membership to purchase tickets
+                        Sign in with an active membership to purchase tickets. After you sign in, we'll bring you back to this event.
                       </div>
                       <.button
                         class="w-full py-4 uppercase tracking-widest"
@@ -923,7 +923,7 @@ defmodule YscWeb.EventDetailsLive do
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6 me-2 -mt-0.5" />Sign In to Continue
+                        <.icon name="hero-ticket" class="w-6 h-6 me-2 -mt-0.5" />Sign in to purchase tickets
                       </.button>
                     </div>
 
@@ -934,11 +934,20 @@ defmodule YscWeb.EventDetailsLive do
                       }
                       class="w-full"
                     >
-                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="text-orange-500 w-5 h-5 me-1 -mt-0.5"
-                        /> Active membership required to purchase tickets
+                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center space-y-2">
+                        <p>
+                          <.icon
+                            name="hero-exclamation-circle"
+                            class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
+                          />
+                          Renew or activate your membership to purchase tickets.
+                        </p>
+                        <.link
+                          navigate={~p"/users/membership"}
+                          class="inline-block font-semibold text-orange-800 hover:underline"
+                        >
+                          Go to Membership settings →
+                        </.link>
                       </div>
                     </div>
 
@@ -1144,7 +1153,7 @@ defmodule YscWeb.EventDetailsLive do
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
-                          <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign In to Continue
+                          <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign in to purchase tickets
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
@@ -1164,9 +1173,12 @@ defmodule YscWeb.EventDetailsLive do
                                 />Get Tickets
                               </.button>
                             <% else %>
-                              <div class="text-orange-700 font-black text-sm text-center">
-                                Membership Required
-                              </div>
+                              <.link
+                                navigate={~p"/users/membership"}
+                                class="text-orange-700 font-semibold text-sm text-center hover:underline"
+                              >
+                                Renew membership to buy tickets →
+                              </.link>
                             <% end %>
                           <% end %>
                         <% else %>

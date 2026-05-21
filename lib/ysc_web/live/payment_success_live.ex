@@ -76,7 +76,7 @@ defmodule YscWeb.PaymentSuccessLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :error,
-                   "Payment was successful, but we couldn't find your booking or order. Please contact support.",
+                   "Your payment went through, but we're still loading your confirmation. Check your email, or contact info@ysc.org with your payment date and amount.",
                    title: "Payment"
                  )
                  |> redirect(to: ~p"/")}
@@ -138,7 +138,7 @@ defmodule YscWeb.PaymentSuccessLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Payment status is unclear. Please check your booking or order status.",
+             "We couldn't confirm whether your payment completed. Check Bookings or My Tickets, or email info@ysc.org if you were charged.",
              title: "Payment"
            )
            |> redirect(to: ~p"/")}
@@ -152,7 +152,7 @@ defmodule YscWeb.PaymentSuccessLive do
     ~H"""
     <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
       <div class="text-center">
-        <p class="text-zinc-600">Processing your payment...</p>
+        <p class="text-zinc-600">Payment received — taking you to your confirmation…</p>
       </div>
     </div>
     """

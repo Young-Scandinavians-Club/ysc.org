@@ -131,7 +131,7 @@ defmodule YscWeb.UserLoginLive do
             <%= if @is_ios_mobile do %>
               Sign in with Face ID
             <% else %>
-              Sign in with fingerprint or face recognition
+              Sign in with this device (fingerprint or face)
             <% end %>
           <% end %>
         </.button>
@@ -324,7 +324,7 @@ defmodule YscWeb.UserLoginLive do
         YscWeb.Flash.put_toast(
           socket,
           :error,
-          "Invalid or expired login link. Please sign in again.",
+          "This sign-in link has expired. Please sign in with your email and password.",
           title: "Login"
         )
       else
@@ -557,7 +557,7 @@ defmodule YscWeb.UserLoginLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Invalid passkey. Please try again or use another sign-in method."
+             "We couldn't sign you in with your saved device login. Try email and password, Google, or Facebook."
            )
            |> assign(:passkey_loading, false)
            |> assign(:passkey_challenge, nil)
@@ -582,7 +582,7 @@ defmodule YscWeb.UserLoginLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Invalid passkey response. Please try again or use another sign-in method."
+                 "We couldn't sign you in with your saved device login. Try email and password, Google, or Facebook."
                )
                |> assign(:passkey_loading, false)
                |> assign(:passkey_challenge, nil)
@@ -611,7 +611,7 @@ defmodule YscWeb.UserLoginLive do
                  YscWeb.Flash.put_toast(
                    socket,
                    :error,
-                   "Invalid passkey response. Please try again or use another sign-in method."
+                   "We couldn't sign you in with your saved device login. Try email and password, Google, or Facebook."
                  )
                  |> assign(:passkey_loading, false)
                  |> assign(:passkey_challenge, nil)
@@ -641,7 +641,7 @@ defmodule YscWeb.UserLoginLive do
                    YscWeb.Flash.put_toast(
                      socket,
                      :error,
-                     "Passkey verification failed. Please try again or use another sign-in method."
+                     "We couldn't sign you in with your saved device login. Try email and password, Google, or Facebook."
                    )
                    |> assign(:passkey_loading, false)
                    |> assign(:passkey_challenge, nil)
@@ -771,7 +771,7 @@ defmodule YscWeb.UserLoginLive do
 
         "InvalidStateError" ->
           {:error,
-           "This passkey may have been removed. Please use another sign-in method."}
+           "Your saved device login may have been removed. Try email and password, Google, or Facebook."}
 
         "NotSupportedError" ->
           {:error,
@@ -928,8 +928,8 @@ defmodule YscWeb.UserLoginLive do
             |> assign(:passkey_challenge, nil)
             |> assign(:passkey_auth_mode, nil)
             |> YscWeb.Flash.success_with_title(
-              "Welcome back! 👋",
-              "Welcome back! 👋 Good to see you again."
+              "Welcome back",
+              "You're signed in."
             )
 
           # One-time DB token so the controller can trust this redirect came from
@@ -979,7 +979,7 @@ defmodule YscWeb.UserLoginLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Security check failed. Please try again."
+             "We couldn't verify your sign-in for security reasons. Please try again or use email and password."
            )
            |> assign(:passkey_loading, false)
            |> assign(:passkey_challenge, nil)
@@ -1013,7 +1013,7 @@ defmodule YscWeb.UserLoginLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Passkey verification failed. Please try again or use another sign-in method."
+           "We couldn't sign you in with your saved device login. Try email and password, Google, or Facebook."
          )
          |> assign(:passkey_loading, false)
          |> assign(:passkey_challenge, nil)

@@ -15,7 +15,7 @@ defmodule YscWeb.UserForgotPasswordLive do
       </.link>
       <.header class="text-center">
         Forgot your password?
-        <:subtitle>We'll send a password reset link to your inbox</:subtitle>
+        <:subtitle>We'll email you a link to reset your password</:subtitle>
       </.header>
 
       <.simple_form
@@ -27,7 +27,7 @@ defmodule YscWeb.UserForgotPasswordLive do
         <.input field={@form[:email]} type="email" placeholder="Email" required />
         <:actions>
           <.button phx-disable-with="Sending..." class="w-full">
-            Send password reset instructions
+            Email reset link
           </.button>
         </:actions>
       </.simple_form>

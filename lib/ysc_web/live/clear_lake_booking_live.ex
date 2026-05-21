@@ -527,7 +527,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <p class="text-xs font-black text-teal-400 uppercase">
                   Mandatory
                 </p>
-                <p class="text-xs font-bold leading-tight">BRING YOUR OWN LINENS</p>
+                <p class="text-xs font-bold leading-tight">Bring your own bed linens and towels</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -536,7 +536,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <p class="text-xs font-black text-zinc-400 uppercase">
                   Enforced
                 </p>
-                <p class="text-xs font-bold leading-tight">NO PETS / NO SMOKING</p>
+                <p class="text-xs font-bold leading-tight">No pets or smoking</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -546,7 +546,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Access
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  FREE BOAT MOORING (NOTIFY CABIN MASTER)
+                  Free boat mooring — notify the cabin manager before you arrive
                 </p>
               </div>
             </div>
@@ -557,7 +557,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Community
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  NOT A HOTEL: DO CHORES
+                  Members clean before leaving (see cabin rules)
                 </p>
               </div>
             </div>

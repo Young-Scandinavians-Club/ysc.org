@@ -112,7 +112,7 @@ defmodule YscWeb.UserResetPasswordLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Password reset successfully.",
+         |> YscWeb.Flash.put_toast(:info, "Your password has been updated. Sign in with your new password.",
            title: "Password"
          )
          |> redirect(to: ~p"/users/log-in")}
@@ -129,7 +129,7 @@ defmodule YscWeb.UserResetPasswordLive do
       socket
       |> YscWeb.Flash.put_toast(
         :error,
-        "Reset password link is invalid or it has expired.",
+        "This reset link is invalid or has expired. Request a new one from the sign-in page.",
         title: "Password reset"
       )
       |> redirect(to: ~p"/")
