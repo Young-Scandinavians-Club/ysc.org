@@ -2083,9 +2083,17 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
               </div>
 
+              <.async_section_loader
+                :if={@loading_notification_preferences}
+                id="notification-preferences-loading"
+                label="Loading notification preferences…"
+              />
+
               <.simple_form
+                :if={!@loading_notification_preferences}
                 for={@notification_form}
                 id="notification_form"
+                data-testid="notification-preferences-ready"
                 phx-submit="update_notifications"
                 phx-change="validate_notifications"
               >
@@ -2925,6 +2933,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:avatar_processing, false)
       |> assign(:selecting_avatar_id, nil)
       |> assign(:loading_avatars, true)
+      |> assign(:loading_notification_preferences, true)
       |> allow_upload(:avatar,
         accept: ~w(.jpg .jpeg .png .webp .gif),
         max_entries: 1,
@@ -3068,6 +3077,7 @@ defmodule YscWeb.UserSettingsLive do
      )
      |> assign(:notification_form, to_form(notification_changeset))
      |> assign(:pending_family_invites, pending_family_invites)
+     |> assign(:loading_notification_preferences, false)
      |> assign(:user_avatars, load_user_avatars(user))
      |> assign(:loading_avatars, false)
      |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
@@ -3903,6 +3913,11 @@ defmodule YscWeb.UserSettingsLive do
      |> push_patch(to: ~p"/users/settings")}
   end
 
+  def handle_event("validate_notifications", _params, socket)
+      when socket.assigns.loading_notification_preferences do
+    {:noreply, socket}
+  end
+
   def handle_event("validate_notifications", params, socket) do
     %{"user" => user_params} = params
 
@@ -3913,6 +3928,11 @@ defmodule YscWeb.UserSettingsLive do
       |> to_form()
 
     {:noreply, assign(socket, notification_form: notification_form)}
+  end
+
+  def handle_event("update_notifications", _params, socket)
+      when socket.assigns.loading_notification_preferences do
+    {:noreply, socket}
   end
 
   def handle_event("update_notifications", params, socket) do
