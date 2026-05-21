@@ -45,13 +45,36 @@ defmodule Ysc.AccountsFixtures do
   end
 
   def user_fixture(attrs \\ %{}) do
+    attrs = Map.new(attrs)
+    role = Map.get(attrs, :role, :member)
+    state = Map.get(attrs, :state, :active)
+
     {:ok, user} =
       attrs
+      |> Map.drop([:role, :state])
       |> valid_user_attributes()
       |> Ysc.Accounts.register_user()
 
-    user
+    apply_fixture_role_state(user, role, state)
   end
+
+  defp apply_fixture_role_state(user, role, state) do
+    attrs =
+      %{}
+      |> maybe_put_enum(:role, role)
+      |> maybe_put_enum(:state, state)
+
+    user
+    |> Ysc.Accounts.User.update_user_changeset(attrs)
+    |> Ysc.Repo.update!()
+  end
+
+  defp maybe_put_enum(attrs, _key, nil), do: attrs
+
+  defp maybe_put_enum(attrs, key, value) when is_atom(value),
+    do: Map.put(attrs, key, Atom.to_string(value))
+
+  defp maybe_put_enum(attrs, key, value), do: Map.put(attrs, key, value)
 
   @doc """
   Creates a user without a password (like an OAuth user).
@@ -59,6 +82,9 @@ defmodule Ysc.AccountsFixtures do
   """
   def oauth_user_fixture(attrs \\ %{}) do
     now = DateTime.truncate(DateTime.utc_now(), :second)
+    attrs = Map.new(attrs)
+    role = Map.get(attrs, :role, :member)
+    state = Map.get(attrs, :state, :active)
 
     user_attrs =
       %{
@@ -66,18 +92,19 @@ defmodule Ysc.AccountsFixtures do
         first_name: valid_user_first_name(),
         last_name: valid_user_last_name(),
         phone_number: unique_user_phone(),
-        state: :active,
-        role: :member,
         hashed_password: nil,
         password_set_at: nil,
         confirmed_at: now
       }
-      |> Map.merge(Enum.into(attrs, %{}))
+      |> Map.merge(Map.drop(attrs, [:role, :state]))
 
-    %Ysc.Accounts.User{}
-    |> Ysc.Accounts.User.registration_changeset(user_attrs)
-    |> Ecto.Changeset.put_change(:post_migration_onboarding_completed_at, now)
-    |> Ysc.Repo.insert!()
+    user =
+      %Ysc.Accounts.User{}
+      |> Ysc.Accounts.User.registration_changeset(user_attrs)
+      |> Ecto.Changeset.put_change(:post_migration_onboarding_completed_at, now)
+      |> Ysc.Repo.insert!()
+
+    apply_fixture_role_state(user, role, state)
   end
 
   def extract_user_token(fun) do

@@ -11,6 +11,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 11 (MEDIUM)   Session cookie signed-only, not encrypted
   Finding 12 (LOW)      Email address exposed in URL during email-change flow
   Finding 13 (LOW)      User's email interpolated in OAuth reauth error flash message
+  Finding 14 (CRITICAL) Registration mass assignment allowed role/state escalation
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -500,6 +501,37 @@ defmodule YscWeb.SecurityAuditTest do
       # The message must still be informative without leaking the address
       assert error_msg =~ "doesn't match" or error_msg =~ "social account",
              "Error message is expected to mention the mismatch generically"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 14 (CRITICAL): Registration must not accept role/state from params
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 14: registration cannot escalate role or state" do
+    test "registration insert uses DB defaults for role and state, not attacker params",
+         %{} do
+      alias Ysc.Accounts.User
+
+      email = "mass_assign_#{System.unique_integer([:positive])}@example.com"
+
+      attrs = %{
+        email: email,
+        first_name: "Attacker",
+        last_name: "User",
+        role: "admin",
+        state: "active"
+      }
+
+      user =
+        %User{}
+        |> User.registration_changeset(attrs, validate_email: false)
+        |> Repo.insert!()
+
+      user = Repo.get!(User, user.id)
+
+      assert user.role == :member
+      assert user.state == :pending_approval
     end
   end
 end

@@ -167,8 +167,6 @@ defmodule Ysc.Accounts.User do
     |> cast(attrs, [
       :email,
       :password,
-      :state,
-      :role,
       :first_name,
       :last_name,
       :phone_number,

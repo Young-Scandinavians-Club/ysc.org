@@ -44,6 +44,22 @@ defmodule Ysc.Accounts.UserTest do
       assert changeset.changes.last_name == "Doe"
     end
 
+    test "ignores role and state in attrs (mass-assignment hardening)" do
+      attrs = %{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        state: "active"
+      }
+
+      changeset =
+        User.registration_changeset(%User{}, attrs, validate_email: false)
+
+      refute Map.has_key?(changeset.changes, :role)
+      refute Map.has_key?(changeset.changes, :state)
+    end
+
     test "requires first_name" do
       attrs = %{
         email: @valid_email,
@@ -424,7 +440,7 @@ defmodule Ysc.Accounts.UserTest do
       assert user2.event_notifications_sms == false
     end
 
-    test "accepts optional state and role fields" do
+    test "does not cast state or role from attrs" do
       attrs = %{
         email: @valid_email,
         first_name: "John",
@@ -436,8 +452,8 @@ defmodule Ysc.Accounts.UserTest do
       changeset = User.registration_changeset(%User{}, attrs)
 
       assert changeset.valid?
-      assert changeset.changes.state == :active
-      assert changeset.changes.role == :admin
+      refute Map.has_key?(changeset.changes, :state)
+      refute Map.has_key?(changeset.changes, :role)
     end
 
     test "accepts date_of_birth" do
