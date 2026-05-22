@@ -8,7 +8,6 @@ defmodule YscWeb.UserBookingDetailLive do
   alias Ysc.Repo
   alias YscWeb.Authorization.Policy
   import Ecto.Query
-  require Ysc.Logging
 
   @impl true
   def mount(%{"id" => booking_id}, _session, socket) do
@@ -76,10 +75,10 @@ defmodule YscWeb.UserBookingDetailLive do
                 )
 
               if connected?(socket) do
-                {:ok, load_booking_detail_data_async(socket, booking)}
-              else
-                {:ok, socket}
+                send(self(), {:load_booking_detail_data, booking.id})
               end
+
+              {:ok, socket}
 
             {:error, _} ->
               {:ok,
@@ -92,6 +91,24 @@ defmodule YscWeb.UserBookingDetailLive do
                |> redirect(to: ~p"/")}
           end
       end
+    end
+  end
+
+  @impl true
+  def handle_info({:load_booking_detail_data, booking_id}, socket) do
+    booking = socket.assigns.booking
+
+    if booking.id == booking_id do
+      payment = get_booking_payment_info(booking)
+      refund_info = get_refund_info(booking, payment)
+
+      {:noreply,
+       socket
+       |> assign(:payment, payment)
+       |> assign(:refund_info, refund_info)
+       |> assign(:async_data_loaded, true)}
+    else
+      {:noreply, socket}
     end
   end
 
@@ -540,29 +557,6 @@ defmodule YscWeb.UserBookingDetailLive do
   end
 
   ## Helper Functions
-
-  defp load_booking_detail_data_async(socket, booking) do
-    start_async(socket, :load_booking_detail_data, fn ->
-      payment = get_booking_payment_info(booking)
-      refund_info = get_refund_info(booking, payment)
-      %{payment: payment, refund_info: refund_info}
-    end)
-  end
-
-  @impl true
-  def handle_async(:load_booking_detail_data, {:ok, results}, socket) do
-    {:noreply,
-     socket
-     |> assign(:payment, results.payment)
-     |> assign(:refund_info, results.refund_info)
-     |> assign(:async_data_loaded, true)}
-  end
-
-  def handle_async(:load_booking_detail_data, {:exit, reason}, socket) do
-    Ysc.Logging.error("Failed to load booking detail data async: #{inspect(reason)}")
-
-    {:noreply, assign(socket, :async_data_loaded, true)}
-  end
 
   defp get_booking_payment_info(booking) do
     case Bookings.get_booking_payment(booking) do
