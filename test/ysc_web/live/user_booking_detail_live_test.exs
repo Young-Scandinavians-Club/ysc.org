@@ -143,7 +143,11 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
-        booking_fixture(%{user_id: user.id, status: :complete, property: :tahoe})
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ booking.reference_id
@@ -1070,11 +1074,17 @@ defmodule YscWeb.UserBookingDetailLiveTest do
   end
 
   describe "handle_info load_booking_detail_data" do
-    test "loads payment and refund assigns when booking id matches", %{conn: conn} do
+    test "loads payment and refund assigns when booking id matches", %{
+      conn: conn
+    } do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
-        booking_fixture(%{user_id: user.id, status: :complete, property: :tahoe})
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
       %{socket: socket} = :sys.get_state(view.pid)
