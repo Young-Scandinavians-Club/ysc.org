@@ -1263,28 +1263,36 @@ defmodule YscWeb.BookingReceiptLive do
          end) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
-          # Process payment in ledger
-          case process_ledger_payment(booking, payment_intent) do
-            {:ok, _payment} ->
-              # Confirm booking
-              case BookingLocker.confirm_booking(booking.id) do
-                {:ok, confirmed_booking} ->
-                  {:ok, confirmed_booking}
+          reloaded_booking =
+            Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
 
-                {:error, reason} ->
-                  Ysc.Logging.error(
-                    "Failed to confirm booking: #{inspect(reason)}"
-                  )
+          if reloaded_booking.status == :complete do
+            {:ok, reloaded_booking}
+          else
+            case BookingLocker.confirm_booking(reloaded_booking.id) do
+              {:ok, confirmed_booking} ->
+                case process_ledger_payment(confirmed_booking, payment_intent) do
+                  {:ok, _payment} ->
+                    {:ok, confirmed_booking}
 
-                  {:error, :booking_confirmation_failed}
-              end
+                  {:error, reason} ->
+                    Ysc.Logging.error(
+                      "Booking confirmed but ledger payment recording failed",
+                      booking_id: confirmed_booking.id,
+                      error: inspect(reason)
+                    )
 
-            {:error, reason} ->
-              Ysc.Logging.error(
-                "Failed to process ledger payment: #{inspect(reason)}"
-              )
+                    {:error, :payment_processing_failed}
+                end
 
-              {:error, :payment_processing_failed}
+              {:error, reason} ->
+                Ysc.Logging.error(
+                  "Failed to confirm booking: #{inspect(reason)}",
+                  booking_id: reloaded_booking.id
+                )
+
+                {:error, :booking_confirmation_failed}
+            end
           end
         else
           {:error, :payment_not_succeeded}
