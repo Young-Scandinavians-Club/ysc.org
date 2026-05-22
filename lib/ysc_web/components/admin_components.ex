@@ -277,6 +277,110 @@ defmodule YscWeb.AdminComponents do
   defp section_badge_classes(:emerald), do: "bg-emerald-100 text-emerald-700"
 
   # ---------------------------------------------------------------------------
+  # admin_check_in_sticky_bar
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Sticky header shell for admin check-in LiveViews.
+
+  Use `width={:wide}` for event check-in (`max-w-7xl`); default is membership layout
+  (`max-w-5xl`). Place back link, title, counter, and action buttons in the slot.
+  """
+  attr :width, :atom, default: :standard, values: [:standard, :wide]
+
+  slot :inner_block, required: true
+
+  def admin_check_in_sticky_bar(assigns) do
+    ~H"""
+    <div class="bg-white border-b border-zinc-200 sticky top-0 z-10">
+      <div class={check_in_container_classes(@width)}>
+        <div class="flex items-center justify-between h-16 gap-4">
+          {render_slot(@inner_block)}
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_check_in_search_section
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Bordered search panel below the check-in sticky bar (search form + keyboard hints).
+  """
+  attr :width, :atom, default: :standard, values: [:standard, :wide]
+
+  slot :inner_block, required: true
+
+  def admin_check_in_search_section(assigns) do
+    ~H"""
+    <div class="bg-white border-b border-zinc-200">
+      <div class={[check_in_container_classes(@width), "pt-3 pb-2"]}>
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_check_in_content
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Main scrollable content area for admin check-in pages.
+  """
+  attr :width, :atom, default: :standard, values: [:standard, :wide]
+  attr :class, :any, default: nil
+
+  slot :inner_block, required: true
+
+  def admin_check_in_content(assigns) do
+    ~H"""
+    <div class={[
+      check_in_container_classes(@width),
+      "py-6 space-y-8",
+      @class
+    ]}>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_check_in_qr_scanner
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Responsive QR scanner control: full label on `sm+`, icon-only button on mobile.
+
+  Used on event and membership check-in sticky headers.
+  """
+  attr :id, :string, default: nil, doc: "Optional DOM id for the desktop button"
+  attr :phx_click, :string, default: "launch-scanner"
+
+  def admin_check_in_qr_scanner(assigns) do
+    ~H"""
+    <.button id={@id} phx-click={@phx_click} class="hidden sm:inline-flex">
+      <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
+    </.button>
+    <button
+      phx-click={@phx_click}
+      class="sm:hidden p-2 text-blue-700 hover:text-blue-900"
+      aria-label="Open QR Scanner"
+    >
+      <.icon name="hero-qr-code" class="w-6 h-6" />
+    </button>
+    """
+  end
+
+  defp check_in_container_classes(:standard),
+    do: "max-w-5xl mx-auto px-4 sm:px-6 lg:px-8"
+
+  defp check_in_container_classes(:wide),
+    do: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+
+  # ---------------------------------------------------------------------------
   # admin_dashed_more_button
   # ---------------------------------------------------------------------------
 

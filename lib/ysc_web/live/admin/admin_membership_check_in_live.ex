@@ -16,122 +16,96 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-zinc-50">
-      <%!-- Sticky top bar --%>
-      <div class="bg-white border-b border-zinc-200 sticky top-0 z-10">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex items-center justify-between h-16 gap-4">
-            <%!-- Back + session title --%>
-            <div class="flex items-center gap-3 min-w-0">
-              <.back navigate={~p"/admin/scanner"}>Back</.back>
-              <span class="text-zinc-300 select-none hidden sm:inline">/</span>
-              <div class="min-w-0 hidden sm:block">
-                <h1 class="text-base font-semibold text-zinc-900 truncate">
-                  {@session.name}
-                </h1>
-                <p
-                  :if={@session.event}
-                  class="text-xs text-zinc-500 truncate leading-tight"
-                >
-                  {@session.event.title}
-                </p>
-              </div>
-            </div>
-
-            <.admin_check_in_counter count={@checked_in_count} />
-
-            <%!-- Actions --%>
-            <div class="shrink-0 flex items-center gap-2">
-              <%= if @session.closed_at do %>
-                <.badge type="zinc" class="hidden sm:inline-block">
-                  <.icon
-                    name="hero-lock-closed"
-                    class="w-3 h-3 inline -mt-0.5 me-0.5"
-                  /> Completed
-                </.badge>
-                <.button
-                  id="export-csv-btn"
-                  phx-click="export-csv"
-                  variant="outline"
-                  color="zinc"
-                >
-                  <.icon name="hero-arrow-down-tray" class="w-5 h-5 me-1 mt-0.5" />
-                  Export CSV
-                </.button>
-              <% else %>
-                <.button
-                  id="launch-scanner-btn"
-                  phx-click="launch-scanner"
-                  class="hidden sm:inline-flex"
-                >
-                  <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" />
-                  QR Scanner
-                </.button>
-                <button
-                  phx-click="launch-scanner"
-                  class="sm:hidden p-2 text-blue-700 hover:text-blue-900"
-                  aria-label="Open QR Scanner"
-                >
-                  <.icon name="hero-qr-code" class="w-6 h-6" />
-                </button>
-                <.button
-                  id="copy-url-btn"
-                  phx-hook="ClipboardCopy"
-                  data-copy={url(~p"/admin/membership-check-in/#{@session.id}")}
-                  variant="outline"
-                  color="zinc"
-                  class="hidden sm:inline-flex"
-                  title="Copy session link for other admins to join"
-                >
-                  <.icon name="hero-clipboard" class="w-5 h-5 me-1 mt-0.5" /> Share
-                </.button>
-                <.button
-                  id="complete-session-btn"
-                  phx-click="complete-session"
-                  variant="outline"
-                  color="zinc"
-                  class="hidden sm:inline-flex"
-                  data-confirm="Complete this session? It will be locked and no longer appear as active."
-                >
-                  <.icon name="hero-check-circle" class="w-5 h-5 me-1 mt-0.5" />
-                  Complete
-                </.button>
-                <button
-                  phx-click="complete-session"
-                  class="sm:hidden p-2 text-zinc-500 hover:text-zinc-700"
-                  aria-label="Complete session"
-                  data-confirm="Complete this session? It will be locked and no longer appear as active."
-                >
-                  <.icon name="hero-check-circle" class="w-6 h-6" />
-                </button>
-              <% end %>
-            </div>
+      <.admin_check_in_sticky_bar>
+        <%!-- Back + session title --%>
+        <div class="flex items-center gap-3 min-w-0">
+          <.back navigate={~p"/admin/scanner"}>Back</.back>
+          <span class="text-zinc-300 select-none hidden sm:inline">/</span>
+          <div class="min-w-0 hidden sm:block">
+            <h1 class="text-base font-semibold text-zinc-900 truncate">
+              {@session.name}
+            </h1>
+            <p
+              :if={@session.event}
+              class="text-xs text-zinc-500 truncate leading-tight"
+            >
+              {@session.event.title}
+            </p>
           </div>
         </div>
-      </div>
 
-      <%!-- Search bar (hidden once session is completed) --%>
-      <div
-        :if={is_nil(@session.closed_at)}
-        class="bg-white border-b border-zinc-200"
-      >
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-2">
-          <.admin_search_bar
-            id="member-search-form"
-            input_id="member-search-input"
-            name="q"
-            value={@search_query}
-            placeholder="Search by name or email…"
-            on_change="search"
-            debounce="300"
-            clear_event="clear-search"
-            phx-hook="MembershipCheckInKeyboard"
-          />
-          <.admin_check_in_keyboard_hints />
+        <.admin_check_in_counter count={@checked_in_count} />
+
+        <%!-- Actions --%>
+        <div class="shrink-0 flex items-center gap-2">
+          <%= if @session.closed_at do %>
+            <.badge type="zinc" class="hidden sm:inline-block">
+              <.icon
+                name="hero-lock-closed"
+                class="w-3 h-3 inline -mt-0.5 me-0.5"
+              /> Completed
+            </.badge>
+            <.button
+              id="export-csv-btn"
+              phx-click="export-csv"
+              variant="outline"
+              color="zinc"
+            >
+              <.icon name="hero-arrow-down-tray" class="w-5 h-5 me-1 mt-0.5" />
+              Export CSV
+            </.button>
+          <% else %>
+            <.admin_check_in_qr_scanner id="launch-scanner-btn" />
+            <.button
+              id="copy-url-btn"
+              phx-hook="ClipboardCopy"
+              data-copy={url(~p"/admin/membership-check-in/#{@session.id}")}
+              variant="outline"
+              color="zinc"
+              class="hidden sm:inline-flex"
+              title="Copy session link for other admins to join"
+            >
+              <.icon name="hero-clipboard" class="w-5 h-5 me-1 mt-0.5" /> Share
+            </.button>
+            <.button
+              id="complete-session-btn"
+              phx-click="complete-session"
+              variant="outline"
+              color="zinc"
+              class="hidden sm:inline-flex"
+              data-confirm="Complete this session? It will be locked and no longer appear as active."
+            >
+              <.icon name="hero-check-circle" class="w-5 h-5 me-1 mt-0.5" />
+              Complete
+            </.button>
+            <button
+              phx-click="complete-session"
+              class="sm:hidden p-2 text-zinc-500 hover:text-zinc-700"
+              aria-label="Complete session"
+              data-confirm="Complete this session? It will be locked and no longer appear as active."
+            >
+              <.icon name="hero-check-circle" class="w-6 h-6" />
+            </button>
+          <% end %>
         </div>
-      </div>
+      </.admin_check_in_sticky_bar>
 
-      <%!-- Content --%>
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      <.admin_check_in_search_section :if={is_nil(@session.closed_at)}>
+        <.admin_search_bar
+          id="member-search-form"
+          input_id="member-search-input"
+          name="q"
+          value={@search_query}
+          placeholder="Search by name or email…"
+          on_change="search"
+          debounce="300"
+          clear_event="clear-search"
+          phx-hook="MembershipCheckInKeyboard"
+        />
+        <.admin_check_in_keyboard_hints />
+      </.admin_check_in_search_section>
+
+      <.admin_check_in_content>
         <%= if @loading do %>
           <div class="flex items-center justify-center py-24">
             <.spinner class="w-8 h-8 text-zinc-400" />
@@ -253,7 +227,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             </div>
           </div>
         <% end %>
-      </div>
+      </.admin_check_in_content>
     </div>
     """
   end
