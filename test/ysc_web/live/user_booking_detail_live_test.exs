@@ -128,9 +128,24 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           payment_method_id: nil
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      render_async(view)
+      html = render(view)
       assert html =~ "Payment Summary"
       assert html =~ "Total Paid"
+    end
+
+    test "async_data_loaded after render_async", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{user_id: user.id, status: :complete, property: :tahoe})
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      render_async(view)
+
+      assert view.socket.assigns.async_data_loaded == true
+      assert render(view) =~ booking.reference_id
     end
 
     test "renders price breakdown when pricing_items is set", %{conn: conn} do
@@ -1052,6 +1067,27 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       html = render(view)
       assert html =~ "Booking Total"
       assert html =~ "¥" or html =~ "JPY"
+    end
+  end
+
+  describe "handle_async load_booking_detail_data exit" do
+    test "marks async data loaded when async task exits", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{user_id: user.id, status: :complete, property: :tahoe})
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      %{socket: socket} = :sys.get_state(view.pid)
+
+      assert {:noreply, new_socket} =
+               YscWeb.UserBookingDetailLive.handle_async(
+                 :load_booking_detail_data,
+                 {:exit, :test_reason},
+                 socket
+               )
+
+      assert new_socket.assigns.async_data_loaded == true
     end
   end
 end

@@ -8,6 +8,7 @@ defmodule YscWeb.UserBookingDetailLive do
   alias Ysc.Repo
   alias YscWeb.Authorization.Policy
   import Ecto.Query
+  require Ysc.Logging
 
   @impl true
   def mount(%{"id" => booking_id}, _session, socket) do
@@ -44,10 +45,6 @@ defmodule YscWeb.UserBookingDetailLive do
           # Additional authorization check using LetMe policy
           case Policy.authorize(:booking_read, user, booking) do
             :ok ->
-              # Get payment information (amount reused for refund estimate when present)
-              payment = get_booking_payment_info(booking)
-
-              # Get timezone from connect params
               connect_params =
                 case get_connect_params(socket) do
                   nil -> %{}
@@ -57,30 +54,32 @@ defmodule YscWeb.UserBookingDetailLive do
               timezone =
                 Map.get(connect_params, "timezone", "America/Los_Angeles")
 
-              # Calculate price breakdown
               price_breakdown = calculate_price_breakdown(booking)
-
-              # Check if booking can be cancelled
               can_cancel = can_cancel_booking?(booking)
 
-              # Get refund policy info for cancellation
-              refund_info = get_refund_info(booking, payment)
+              # PERFORMANCE: booking + rooms only on mount; payment/refund load after connect
+              socket =
+                socket
+                |> assign(:booking, booking)
+                |> assign(:timezone, timezone)
+                |> assign(:price_breakdown, price_breakdown)
+                |> assign(:can_cancel, can_cancel)
+                |> assign(:payment, nil)
+                |> assign(:refund_info, nil)
+                |> assign(:async_data_loaded, false)
+                |> assign(:show_cancel_modal, false)
+                |> assign(:cancel_reason, "")
+                |> assign(:page_title, "Booking Details")
+                |> assign(
+                  :meta_description,
+                  "View the details of your cabin booking with Young Scandinavians Club."
+                )
 
-              {:ok,
-               socket
-               |> assign(:booking, booking)
-               |> assign(:payment, payment)
-               |> assign(:timezone, timezone)
-               |> assign(:price_breakdown, price_breakdown)
-               |> assign(:can_cancel, can_cancel)
-               |> assign(:refund_info, refund_info)
-               |> assign(:show_cancel_modal, false)
-               |> assign(:cancel_reason, "")
-               |> assign(:page_title, "Booking Details")
-               |> assign(
-                 :meta_description,
-                 "View the details of your cabin booking with Young Scandinavians Club."
-               )}
+              if connected?(socket) do
+                {:ok, load_booking_detail_data_async(socket, booking)}
+              else
+                {:ok, socket}
+              end
 
             {:error, _} ->
               {:ok,
@@ -219,7 +218,17 @@ defmodule YscWeb.UserBookingDetailLive do
 
         <div class="space-y-6">
           <!-- Cancellation Policy -->
-          <%= if @refund_info && @can_cancel do %>
+          <div
+            :if={!@async_data_loaded && @can_cancel}
+            class="bg-blue-50 border border-blue-200 rounded-lg p-6 animate-pulse"
+          >
+            <div class="h-5 w-48 bg-blue-200 rounded mb-4"></div>
+            <div class="space-y-2">
+              <div class="h-4 w-full bg-blue-100 rounded"></div>
+              <div class="h-4 w-3/4 bg-blue-100 rounded"></div>
+            </div>
+          </div>
+          <%= if @async_data_loaded && @refund_info && @can_cancel do %>
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <h2 class="text-lg font-semibold text-blue-900 mb-3">
                 Cancellation Policy
@@ -394,7 +403,20 @@ defmodule YscWeb.UserBookingDetailLive do
             </div>
           </div>
           <!-- Payment Summary -->
-          <%= if @payment do %>
+          <div
+            :if={!@async_data_loaded}
+            class="bg-white rounded-lg border border-zinc-200 p-6 animate-pulse"
+          >
+            <div class="h-6 w-40 bg-zinc-200 rounded mb-4"></div>
+            <div class="space-y-3">
+              <div class="h-4 w-full bg-zinc-100 rounded"></div>
+              <div class="h-4 w-2/3 bg-zinc-100 rounded"></div>
+              <div class="border-t border-zinc-200 pt-3">
+                <div class="h-8 w-32 bg-zinc-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+          <%= if @async_data_loaded && @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">
               <h2 class="text-xl font-semibold text-zinc-900 mb-4">
                 Payment Summary
@@ -519,13 +541,33 @@ defmodule YscWeb.UserBookingDetailLive do
 
   ## Helper Functions
 
+  defp load_booking_detail_data_async(socket, booking) do
+    start_async(socket, :load_booking_detail_data, fn ->
+      payment = get_booking_payment_info(booking)
+      refund_info = get_refund_info(booking, payment)
+      %{payment: payment, refund_info: refund_info}
+    end)
+  end
+
+  @impl true
+  def handle_async(:load_booking_detail_data, {:ok, results}, socket) do
+    {:noreply,
+     socket
+     |> assign(:payment, results.payment)
+     |> assign(:refund_info, results.refund_info)
+     |> assign(:async_data_loaded, true)}
+  end
+
+  def handle_async(:load_booking_detail_data, {:exit, reason}, socket) do
+    Ysc.Logging.error("Failed to load booking detail data async: #{inspect(reason)}")
+
+    {:noreply, assign(socket, :async_data_loaded, true)}
+  end
+
   defp get_booking_payment_info(booking) do
     case Bookings.get_booking_payment(booking) do
-      {:ok, payment} ->
-        Repo.preload(payment, :payment_method)
-
-      {:error, _} ->
-        nil
+      {:ok, payment} -> payment
+      {:error, _} -> nil
     end
   end
 
