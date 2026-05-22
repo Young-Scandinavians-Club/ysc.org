@@ -1994,6 +1994,78 @@ defmodule Ysc.BookingsTest do
 
       assert Money.equal?(refund, Money.new(0, :USD))
     end
+
+    test ":original_amount option matches ledger lookup result" do
+      user = user_fixture()
+
+      from(p in Ysc.Bookings.RefundPolicy,
+        where: p.property == :tahoe and p.booking_mode == :buyout
+      )
+      |> Ysc.Repo.update_all(set: [is_active: false])
+
+      {:ok, refund_policy} =
+        Bookings.create_refund_policy(%{
+          property: :tahoe,
+          booking_mode: :buyout,
+          is_active: true,
+          name: "Original amount opt #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: refund_policy.id,
+          days_before_checkin: 9999,
+          refund_percentage: 50,
+          priority: 1
+        })
+
+      base = Date.add(Date.utc_today(), 30)
+      day_of_week = Date.day_of_week(base)
+      days_to_monday = Integer.mod(8 - day_of_week, 7)
+      days_to_monday = if days_to_monday == 0, do: 7, else: days_to_monday
+      checkin = Date.add(base, days_to_monday)
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe,
+          booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+
+      payment_amount = Money.new(10_000, :USD)
+
+      {:ok, {_payment, _, _}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: payment_amount,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_original_amount_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(50, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      cancellation_date = Date.utc_today()
+
+      assert {:ok, refund_from_ledger, rule_from_ledger} =
+               Bookings.calculate_refund(booking, cancellation_date)
+
+      assert {:ok, refund_from_opt, rule_from_opt} =
+               Bookings.calculate_refund(booking, cancellation_date,
+                 original_amount: payment_amount
+               )
+
+      assert Money.equal?(refund_from_ledger, refund_from_opt)
+      assert rule_from_ledger.id == rule_from_opt.id
+      assert Money.equal?(refund_from_opt, Money.new(5_000, :USD))
+    end
   end
 
   describe "get_booking_payment_amount/1" do

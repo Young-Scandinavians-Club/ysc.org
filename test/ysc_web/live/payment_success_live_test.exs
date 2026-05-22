@@ -21,6 +21,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TicketsFixtures
 
   describe "mount/3 - authentication" do
     test "redirects unauthenticated users to home with error", %{conn: conn} do
@@ -139,6 +140,68 @@ defmodule YscWeb.PaymentSuccessLiveTest do
     end
   end
 
+  describe "mount/3 - successful payment with ticket order" do
+    setup %{conn: conn} do
+      user = user_fixture()
+      order = ticket_order_fixture(%{user: user})
+
+      {:module, client_module, _, _} =
+        defmodule :"TestStripeClientTicket#{System.unique_integer()}" do
+          @behaviour Ysc.StripeBehaviour
+
+          def create_payment_intent(_params, _opts), do: {:error, :not_implemented}
+          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+          def create_customer(_params), do: {:error, :not_implemented}
+          def update_customer(_id, _params), do: {:error, :not_implemented}
+          def retrieve_payment_method(_id), do: {:error, :not_implemented}
+
+          def retrieve_payment_intent(id, _opts) do
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: id,
+               metadata: Process.get(:test_metadata, %{}),
+               status: Process.get(:test_status, "succeeded")
+             }}
+          end
+        end
+
+      conn = log_in_user(conn, user)
+
+      %{
+        conn: conn,
+        user: user,
+        order: order,
+        client_module: client_module
+      }
+    end
+
+    test "redirects to order confirmation with confetti", %{
+      conn: conn,
+      order: order,
+      client_module: client_module
+    } do
+      payment_intent_id = "pi_ticket_success_#{order.id}"
+
+      Process.put(:test_metadata, %{"ticket_order_id" => order.id})
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        assert {:error, {:redirect, %{to: redirect_path}}} =
+                 live(
+                   conn,
+                   ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+                 )
+
+        assert redirect_path ==
+                 "/orders/#{order.id}/confirmation?confetti=true"
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+        Process.delete(:test_metadata)
+      end
+    end
+  end
+
   describe "mount/3 - security and authorization" do
     test "prevents access to other user's booking", %{conn: conn} do
       Logger.put_module_level(YscWeb.PaymentSuccessLive, :none)
@@ -172,6 +235,55 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         end
 
       Process.put(:test_metadata, %{"booking_id" => booking.id})
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        assert {:error, {:redirect, %{to: "/", flash: flash}}} =
+                 conn
+                 |> log_in_user(user1)
+                 |> live(
+                   ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+                 )
+
+        assert flash["error"] =~
+                 "Payment was successful, but we couldn't find your booking or order"
+      after
+        Logger.put_module_level(YscWeb.PaymentSuccessLive, :error)
+        Application.put_env(:ysc, :stripe_client, original_client)
+        Process.delete(:test_metadata)
+      end
+    end
+
+    test "prevents access to other user's ticket order", %{conn: conn} do
+      Logger.put_module_level(YscWeb.PaymentSuccessLive, :none)
+
+      user1 = user_fixture()
+      user2 = user_fixture()
+      order = ticket_order_fixture(%{user: user2})
+
+      payment_intent_id = "pi_ticket_unauthorized_#{order.id}"
+
+      {:module, client_module, _, _} =
+        defmodule :"TestStripeClientTicketAuth#{System.unique_integer()}" do
+          @behaviour Ysc.StripeBehaviour
+
+          def create_payment_intent(_params, _opts), do: {:error, :not_implemented}
+          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+          def create_customer(_params), do: {:error, :not_implemented}
+          def update_customer(_id, _params), do: {:error, :not_implemented}
+          def retrieve_payment_method(_id), do: {:error, :not_implemented}
+
+          def retrieve_payment_intent(id, _opts) do
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: id,
+               metadata: Process.get(:test_metadata, %{})
+             }}
+          end
+        end
+
+      Process.put(:test_metadata, %{"ticket_order_id" => order.id})
       original_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, client_module)
 
@@ -274,6 +386,36 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
         assert redirect_path == "/bookings/checkout/#{booking.id}"
         assert flash["error"] =~ "Payment was canceled"
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+        Process.delete(:test_metadata)
+        Process.delete(:test_status)
+      end
+    end
+
+    test "redirects to event page on failed ticket order payment", %{
+      conn: conn,
+      client_module: client_module
+    } do
+      user = user_fixture()
+      order = ticket_order_fixture(%{user: user})
+      payment_intent_id = "pi_ticket_failed_#{order.id}"
+
+      Process.put(:test_metadata, %{"ticket_order_id" => order.id})
+      Process.put(:test_status, "failed")
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        assert {:error, {:redirect, %{to: redirect_path, flash: flash}}} =
+                 conn
+                 |> log_in_user(user)
+                 |> live(
+                   ~p"/payment/success?redirect_status=failed&payment_intent=#{payment_intent_id}"
+                 )
+
+        assert redirect_path == "/events/#{order.event_id}"
+        assert flash["error"] =~ "Payment failed"
       after
         Application.put_env(:ysc, :stripe_client, original_client)
         Process.delete(:test_metadata)
