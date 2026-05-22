@@ -2180,7 +2180,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       html = render(view)
 
       assert html =~ "Booking Type"
-      assert html =~ "A La Carte"
+      assert html =~ "Shared stay"
     end
 
     test "toggle-guests-dropdown flips guests_dropdown_open assign", %{

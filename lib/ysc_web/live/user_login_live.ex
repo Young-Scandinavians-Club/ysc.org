@@ -779,7 +779,7 @@ defmodule YscWeb.UserLoginLive do
 
         _ ->
           {:error,
-           "Authentication failed: #{message}. Please try again or use another sign-in method."}
+           "We couldn't sign you in with Face ID or fingerprint. Try again, or sign in with your email and password, Google, or Facebook."}
       end
 
     {:noreply,

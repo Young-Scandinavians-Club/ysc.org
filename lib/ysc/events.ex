@@ -1035,7 +1035,7 @@ defmodule Ysc.Events do
 
   # Calculate pricing display information for an event
   defp calculate_event_pricing([]) do
-    %{display_text: "FREE", has_free_tiers: true, lowest_price: nil}
+    %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
   end
 
   defp calculate_event_pricing(ticket_tiers) do
@@ -1052,14 +1052,14 @@ defmodule Ysc.Events do
 
     case {has_free_tiers, paid_tiers} do
       {true, []} ->
-        %{display_text: "FREE", has_free_tiers: true, lowest_price: nil}
+        %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
 
       {true, _paid_tiers} ->
         # When there are both free and paid tiers, show "From $0.00"
         %{display_text: "From $0.00", has_free_tiers: true, lowest_price: nil}
 
       {false, []} ->
-        %{display_text: "FREE", has_free_tiers: false, lowest_price: nil}
+        %{display_text: "Free", has_free_tiers: false, lowest_price: nil}
 
       {false, paid_tiers} ->
         lowest_price = Enum.min_by(paid_tiers, & &1.price.amount, fn -> nil end)
@@ -1088,7 +1088,7 @@ defmodule Ysc.Events do
   defp format_price(_), do: "$0.00"
 
   @doc """
-  Returns a short display string for event pricing (e.g. "FREE", "From $10", "Tickets coming soon").
+  Returns a short display string for event pricing (e.g. "Free", "From $10", "Tickets coming soon").
   Use for newsletters and other places that need a single line. Event can have ticket_tiers preloaded
   or they will be loaded.
   """

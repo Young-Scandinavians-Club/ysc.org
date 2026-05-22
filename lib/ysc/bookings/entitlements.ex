@@ -240,8 +240,10 @@ defmodule Ysc.Bookings.Entitlements do
     "#{Decimal.round(e.percent_off || 0, 2)}% off stay"
   end
 
-  defp entitlement_summary(%BookingEntitlement{benefit_kind: :fixed_amount_off}) do
-    "Fixed amount off"
+  defp entitlement_summary(
+         %BookingEntitlement{benefit_kind: :fixed_amount_off} = e
+       ) do
+    "#{Ysc.MoneyHelper.format_money!(e.amount_off)} off stay"
   end
 
   @doc """

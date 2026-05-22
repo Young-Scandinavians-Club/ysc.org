@@ -14,7 +14,7 @@ defmodule YscWeb.UserConfirmationLiveTest do
   describe "Confirm user" do
     test "renders confirmation page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/confirm/some-token")
-      assert html =~ "Confirm Email"
+      assert html =~ "Confirm your email"
     end
 
     test "confirms the given token once", %{conn: conn, user: user} do
@@ -34,7 +34,7 @@ defmodule YscWeb.UserConfirmationLiveTest do
       assert {:ok, conn} = result
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "User confirmed successfully"
+               "Your email is confirmed"
 
       assert Accounts.get_user!(user.id).confirmed_at
       refute get_session(conn, :user_token)
@@ -52,7 +52,7 @@ defmodule YscWeb.UserConfirmationLiveTest do
       assert {:ok, conn} = result
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
-               "User confirmation link is invalid or it has expired"
+               "This confirmation link is invalid or has expired"
 
       # when logged in
       conn =
@@ -81,7 +81,7 @@ defmodule YscWeb.UserConfirmationLiveTest do
         |> follow_redirect(conn, ~p"/")
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
-               "User confirmation link is invalid or it has expired"
+               "This confirmation link is invalid or has expired"
 
       refute Accounts.get_user!(user.id).confirmed_at
     end
