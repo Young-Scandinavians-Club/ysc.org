@@ -26,42 +26,55 @@ defmodule Ysc.ExpenseReports do
   # Expense Reports
 
   def list_expense_reports(%User{} = user) do
-    Repo.all(
-      from er in ExpenseReport,
-        where: er.user_id == ^user.id,
-        order_by: [desc: :inserted_at],
-        preload: [:expense_items, :income_items, :address, :event]
-    )
-    |> Enum.map(fn report ->
-      # Load bank_account separately without accessing encrypted fields
+    user.id
+    |> expense_reports_query()
+    |> Repo.all()
+    |> attach_bank_accounts()
+  end
+
+  def get_expense_report!(id, %User{} = user) do
+    user.id
+    |> expense_reports_query()
+    |> where([er], er.id == ^id)
+    |> Repo.one!()
+    |> List.wrap()
+    |> attach_bank_accounts()
+    |> List.first()
+  end
+
+  defp expense_reports_query(user_id) do
+    from er in ExpenseReport,
+      where: er.user_id == ^user_id,
+      order_by: [desc: :inserted_at],
+      preload: [:expense_items, :income_items, :address, :event]
+  end
+
+  # Bank accounts are loaded in a second query so encrypted fields are not
+  # pulled via join/preload; batch by id to avoid N+1 on list endpoints.
+  defp attach_bank_accounts(reports) when is_list(reports) do
+    bank_account_ids =
+      reports
+      |> Enum.map(& &1.bank_account_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    accounts_by_id =
+      if bank_account_ids == [] do
+        %{}
+      else
+        from(ba in BankAccount, where: ba.id in ^bank_account_ids)
+        |> Repo.all()
+        |> Map.new(&{&1.id, &1})
+      end
+
+    Enum.map(reports, fn report ->
       bank_account =
         if report.bank_account_id do
-          Repo.get(BankAccount, report.bank_account_id)
-        else
-          nil
+          Map.get(accounts_by_id, report.bank_account_id)
         end
 
       %{report | bank_account: bank_account}
     end)
-  end
-
-  def get_expense_report!(id, %User{} = user) do
-    report =
-      Repo.one!(
-        from er in ExpenseReport,
-          where: er.id == ^id and er.user_id == ^user.id,
-          preload: [:expense_items, :income_items, :address, :event]
-      )
-
-    # Load bank_account separately without accessing encrypted fields
-    bank_account =
-      if report.bank_account_id do
-        Repo.get(BankAccount, report.bank_account_id)
-      else
-        nil
-      end
-
-    %{report | bank_account: bank_account}
   end
 
   def create_expense_report(attrs, %User{} = user) do
