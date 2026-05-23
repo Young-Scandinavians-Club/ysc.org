@@ -294,6 +294,51 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "payment-success records ledger when booking was already confirmed without payment",
+         %{
+           conn: conn,
+           user: user
+         } do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      pi_id = "pi_ledger_retry_#{System.unique_integer([:positive])}"
+
+      expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: pi_id,
+           status: "succeeded",
+           amount: 50_000,
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert {:ok, _confirmed} = BookingLocker.confirm_booking(booking.id)
+      assert booking_ledger_payment_count(booking.id) == 0
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               render_click(view, "payment-success", %{
+                 "payment_intent_id" => pi_id
+               })
+
+      assert receipt_path =~ "/receipt"
+      assert booking_ledger_payment_count(booking.id) == 1
+    end
+
     test "payment-success when intent status is not succeeded shows error", %{
       conn: conn,
       booking: booking
