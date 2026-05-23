@@ -16,6 +16,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Tickets
+  alias YscWeb.AdminBadgeHelpers
   alias YscWeb.Workers.MembershipRenewalReminderWorker
 
   require Ysc.Logging
@@ -812,7 +813,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 class="shrink-0"
               >
                 <.badge type={
-                  review_outcome_to_badge_type(
+                  AdminBadgeHelpers.review_outcome_badge_type(
                     @selected_user_application.review_outcome
                   )
                 }>
@@ -1640,15 +1641,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                           {format_datetime_for_display(notification.inserted_at)}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap">
-                          <.badge type={
-                            if notification.message_type == :email,
-                              do: "default",
-                              else: "green"
-                          }>
-                            {notification.message_type
-                            |> to_string()
-                            |> String.upcase()}
-                          </.badge>
+                          <.admin_message_type_badge
+                            message_type={notification.message_type}
+                            variant={:table}
+                          />
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
                           <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
@@ -1656,16 +1652,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                           </code>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
-                          <%= if notification.email do %>
-                            {notification.email}
+                          <%= if recipient = AdminBadgeHelpers.message_recipient_text(notification) do %>
+                            {recipient}
                           <% else %>
-                            <%= if notification.phone_number do %>
-                              {Ysc.Extensions.PhoneNumber.format_for_display(
-                                notification.phone_number
-                              ) || notification.phone_number}
-                            <% else %>
-                              <span class="text-zinc-400">—</span>
-                            <% end %>
+                            <span class="text-zinc-400">—</span>
                           <% end %>
                         </td>
                       </tr>
@@ -1733,11 +1723,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                       Type
                     </p>
                     <p class="text-sm text-zinc-800">
-                      <.badge>
-                        {@selected_notification.message_type
-                        |> to_string()
-                        |> String.capitalize()}
-                      </.badge>
+                      <.admin_message_type_badge
+                        message_type={@selected_notification.message_type}
+                        variant={:detail}
+                      />
                     </p>
                   </div>
 
@@ -1757,16 +1746,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                       Recipient
                     </p>
                     <p class="text-sm text-zinc-800">
-                      <%= if @selected_notification.email do %>
-                        {@selected_notification.email}
+                      <%= if recipient = AdminBadgeHelpers.message_recipient_text(@selected_notification) do %>
+                        {recipient}
                       <% else %>
-                        <%= if @selected_notification.phone_number do %>
-                          {Ysc.Extensions.PhoneNumber.format_for_display(
-                            @selected_notification.phone_number
-                          ) || @selected_notification.phone_number}
-                        <% else %>
-                          <span class="text-zinc-400">—</span>
-                        <% end %>
+                        <span class="text-zinc-400">—</span>
                       <% end %>
                     </p>
                   </div>
@@ -1847,7 +1830,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </div>
                       <% end %>
                     </div>
-                    <.badge type={user_state_to_badge_type(@primary_user.state)}>
+                    <.badge type={AdminBadgeHelpers.user_state_badge_type(@primary_user.state)}>
                       {user_state_to_readable(@primary_user.state)}
                     </.badge>
                   </.link>
@@ -4129,13 +4112,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:pending_invites, pending_invites)
   end
 
-  defp user_state_to_badge_type(:active), do: "green"
-  defp user_state_to_badge_type(:pending_approval), do: "yellow"
-  defp user_state_to_badge_type(:rejected), do: "red"
-  defp user_state_to_badge_type(:suspended), do: "red"
-  defp user_state_to_badge_type(:deleted), do: "dark"
-  defp user_state_to_badge_type(_), do: "default"
-
   defp user_state_to_readable(:pending_approval), do: "Pending Approval"
   defp user_state_to_readable(state), do: String.capitalize("#{state}")
 
@@ -4393,10 +4369,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     do: Timex.format!(date, "%b %d, %Y", :strftime)
 
   defp format_birth_date(other), do: to_string(other)
-
-  defp review_outcome_to_badge_type(:approved), do: "green"
-  defp review_outcome_to_badge_type(:rejected), do: "red"
-  defp review_outcome_to_badge_type(_), do: "default"
 
   defp entitlement_form_defaults do
     to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)

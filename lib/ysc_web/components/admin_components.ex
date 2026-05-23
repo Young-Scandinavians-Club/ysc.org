@@ -236,6 +236,37 @@ defmodule YscWeb.AdminComponents do
   defp counter_text(count, total), do: "#{count} / #{total}"
 
   # ---------------------------------------------------------------------------
+  # admin_message_type_badge
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Badge for notification / idempotency `message_type` (`:email` or `:sms`).
+
+  - `variant={:table}` — colored by channel (email blue, SMS green) with uppercase label
+  - `variant={:detail}` — default blue badge with sentence-case label (detail panels)
+  """
+  attr :message_type, :atom, required: true
+  attr :variant, :atom, default: :table, values: [:table, :detail]
+
+  def admin_message_type_badge(assigns) do
+    badge_type =
+      case assigns.variant do
+        :table -> YscWeb.AdminBadgeHelpers.message_type_badge_type(assigns.message_type)
+        :detail -> "default"
+      end
+
+    label = YscWeb.AdminBadgeHelpers.message_type_label(assigns.message_type, assigns.variant)
+
+    assigns = assign(assigns, badge_type: badge_type, label: label)
+
+    ~H"""
+    <.badge type={@badge_type}>
+      {@label}
+    </.badge>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_section_heading
   # ---------------------------------------------------------------------------
 
