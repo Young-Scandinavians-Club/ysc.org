@@ -251,11 +251,18 @@ defmodule YscWeb.AdminComponents do
   def admin_message_type_badge(assigns) do
     badge_type =
       case assigns.variant do
-        :table -> YscWeb.AdminBadgeHelpers.message_type_badge_type(assigns.message_type)
-        :detail -> "default"
+        :table ->
+          YscWeb.AdminBadgeHelpers.message_type_badge_type(assigns.message_type)
+
+        :detail ->
+          "default"
       end
 
-    label = YscWeb.AdminBadgeHelpers.message_type_label(assigns.message_type, assigns.variant)
+    label =
+      YscWeb.AdminBadgeHelpers.message_type_label(
+        assigns.message_type,
+        assigns.variant
+      )
 
     assigns = assign(assigns, badge_type: badge_type, label: label)
 

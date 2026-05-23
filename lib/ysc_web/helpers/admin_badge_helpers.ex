@@ -55,7 +55,8 @@ defmodule YscWeb.AdminBadgeHelpers do
   Recipient email or formatted phone for a notification row, or `nil` when absent.
   """
   @spec message_recipient_text(map()) :: String.t() | nil
-  def message_recipient_text(%{email: email}) when is_binary(email) and email != "" do
+  def message_recipient_text(%{email: email})
+      when is_binary(email) and email != "" do
     email
   end
 

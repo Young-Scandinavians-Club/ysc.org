@@ -1830,7 +1830,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </div>
                       <% end %>
                     </div>
-                    <.badge type={AdminBadgeHelpers.user_state_badge_type(@primary_user.state)}>
+                    <.badge type={
+                      AdminBadgeHelpers.user_state_badge_type(@primary_user.state)
+                    }>
                       {user_state_to_readable(@primary_user.state)}
                     </.badge>
                   </.link>

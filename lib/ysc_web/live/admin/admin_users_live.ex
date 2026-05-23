@@ -604,7 +604,9 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">Account Status:</span>
-                    <.badge type={AdminBadgeHelpers.user_state_badge_type(user.state)}>
+                    <.badge type={
+                      AdminBadgeHelpers.user_state_badge_type(user.state)
+                    }>
                       {user_state_to_readable(user.state)}
                     </.badge>
                   </div>

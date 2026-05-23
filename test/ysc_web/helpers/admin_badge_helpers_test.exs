@@ -6,7 +6,10 @@ defmodule YscWeb.AdminBadgeHelpersTest do
   describe "user_state_badge_type/1" do
     test "maps known user states" do
       assert AdminBadgeHelpers.user_state_badge_type(:active) == "green"
-      assert AdminBadgeHelpers.user_state_badge_type(:pending_approval) == "yellow"
+
+      assert AdminBadgeHelpers.user_state_badge_type(:pending_approval) ==
+               "yellow"
+
       assert AdminBadgeHelpers.user_state_badge_type(:rejected) == "red"
       assert AdminBadgeHelpers.user_state_badge_type(:suspended) == "red"
       assert AdminBadgeHelpers.user_state_badge_type(:deleted) == "dark"
@@ -43,7 +46,8 @@ defmodule YscWeb.AdminBadgeHelpersTest do
     test "prefers email when present" do
       notification = %{email: "user@example.com", phone_number: "+15551234567"}
 
-      assert AdminBadgeHelpers.message_recipient_text(notification) == "user@example.com"
+      assert AdminBadgeHelpers.message_recipient_text(notification) ==
+               "user@example.com"
     end
 
     test "formats phone when email is absent" do
@@ -53,7 +57,10 @@ defmodule YscWeb.AdminBadgeHelpersTest do
     end
 
     test "returns nil when no recipient" do
-      assert AdminBadgeHelpers.message_recipient_text(%{email: nil, phone_number: nil}) ==
+      assert AdminBadgeHelpers.message_recipient_text(%{
+               email: nil,
+               phone_number: nil
+             }) ==
                nil
     end
   end
