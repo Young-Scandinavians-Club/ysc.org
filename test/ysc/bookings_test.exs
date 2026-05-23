@@ -1973,6 +1973,82 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "calculate_refund/3 original_amount option" do
+    setup do
+      from(p in Ysc.Bookings.RefundPolicy,
+        where: p.property == :tahoe and p.booking_mode == :buyout
+      )
+      |> Repo.update_all(set: [is_active: false])
+
+      {:ok, refund_policy} =
+        Bookings.create_refund_policy(%{
+          property: :tahoe,
+          booking_mode: :buyout,
+          is_active: true,
+          name: "original_amount opt #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: refund_policy.id,
+          days_before_checkin: 9999,
+          refund_percentage: 50,
+          priority: 1
+        })
+
+      Ysc.Bookings.RefundPolicyCache.invalidate()
+
+      :ok
+    end
+
+    test "uses original_amount from opts without ledger payment lookup" do
+      user = user_fixture()
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :buyout,
+          status: :complete,
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+
+      payment_amount = Money.new(10_000, :USD)
+
+      assert {:ok, refund, rule} =
+               Bookings.calculate_refund(
+                 booking,
+                 Date.utc_today(),
+                 original_amount: payment_amount
+               )
+
+      assert %Ysc.Bookings.RefundPolicyRule{} = rule
+      assert Money.equal?(refund, Money.new(5_000, :USD))
+    end
+
+    test "falls back to ledger lookup when original_amount is omitted" do
+      user = user_fixture()
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :buyout,
+          status: :complete,
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+
+      assert {:error, :payment_not_found} =
+               Bookings.calculate_refund(booking, Date.utc_today())
+    end
+  end
+
   describe "calculate_refund/2" do
     test "returns zero refund when cancellation is after check-in" do
       user = user_fixture()
