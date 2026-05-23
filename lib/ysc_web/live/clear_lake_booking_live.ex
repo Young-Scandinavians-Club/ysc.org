@@ -527,7 +527,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <p class="text-xs font-black text-teal-400 uppercase">
                   Mandatory
                 </p>
-                <p class="text-xs font-bold leading-tight">BRING YOUR OWN LINENS</p>
+                <p class="text-xs font-bold leading-tight">
+                  Bring your own bed linens
+                </p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -536,7 +538,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <p class="text-xs font-black text-zinc-400 uppercase">
                   Enforced
                 </p>
-                <p class="text-xs font-bold leading-tight">NO PETS / NO SMOKING</p>
+                <p class="text-xs font-bold leading-tight">No pets or smoking</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -546,7 +548,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Access
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  FREE BOAT MOORING (NOTIFY CABIN MASTER)
+                  Free boat mooring — email the cabin host before you arrive
                 </p>
               </div>
             </div>
@@ -557,7 +559,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Community
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  NOT A HOTEL: DO CHORES
+                  Shared cabin — please help with chores before you leave
                 </p>
               </div>
             </div>
@@ -688,7 +690,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            A La Carte
+                            Shared stay
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -745,7 +747,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Full Buyout
+                            Reserve the whole cabin
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -758,7 +760,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           }
                           class="text-xs text-amber-600 mt-2 ml-9 font-medium"
                         >
-                          Buyout unavailable: Other members have already booked spots on these dates.
+                          Whole-cabin booking unavailable: Other members have already booked spots on these dates.
                         </p>
                       </label>
                     </div>
@@ -782,7 +784,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      A La Carte bookings are not available for the selected dates based on season settings.
+                      Shared stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -792,7 +794,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Full Buyout bookings are not available for the selected dates based on season settings.
+                      Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared stay if that option is open.
                     </span>
                   </p>
                 </div>
@@ -1164,7 +1166,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <p class="text-xs font-bold text-zinc-400 uppercase">
                       Booking Type
                     </p>
-                    <div class="text-sm text-zinc-700 font-medium">A La Carte</div>
+                    <div class="text-sm text-zinc-700 font-medium">Shared stay</div>
                   </div>
                   <!-- Sunday Morning Parking Tip -->
                   <div
@@ -1696,8 +1698,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                         to check availability and select your dates.
                       </li>
                       <li>
-                        Choose <strong>A La Carte</strong>
-                        (shared stay) or <strong>Full Buyout</strong>
+                        Choose <strong>Shared stay</strong>
+                        or <strong>Reserve the whole cabin</strong>
                         and enter your guest count.
                       </li>
                       <li>
@@ -3722,10 +3724,10 @@ defmodule YscWeb.ClearLakeBookingLive do
           "The date #{date_str} is blacked out and cannot be booked."
 
         day_availability && assigns[:selected_booking_mode] == :day ->
-          "The date #{date_str} is not available for a la carte bookings (a buyout may be in place)."
+          "The date #{date_str} isn't available for shared stays — the cabin may be reserved for a private group that day."
 
         day_availability && assigns[:selected_booking_mode] == :buyout ->
-          "The date #{date_str} cannot be booked as a buyout (there are existing day bookings or another buyout)."
+          "The date #{date_str} isn't available for reserving the whole cabin — there are existing shared-stay bookings or another whole-cabin reservation."
 
         true ->
           "The date #{date_str} is unavailable for your selected number of guests."
@@ -3829,10 +3831,10 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "A La Carte bookings are not available for the selected dates based on season settings."
+        "Shared stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
-        "Full Buyout bookings are not available for the selected dates based on season settings."
+        "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared stay if that option is open."
 
       true ->
         nil

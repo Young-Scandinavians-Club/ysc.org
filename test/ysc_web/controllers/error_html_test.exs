@@ -13,6 +13,6 @@ defmodule YscWeb.ErrorHTMLTest do
   test "renders 500.html" do
     html = render_to_string(YscWeb.ErrorHTML, "500", "html", [])
     assert html =~ "500"
-    assert html =~ "Internal Server Error"
+    assert html =~ "Something went wrong"
   end
 end
