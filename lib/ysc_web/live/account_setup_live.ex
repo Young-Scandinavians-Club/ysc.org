@@ -970,10 +970,9 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("validate_password", %{"user" => user_params}, socket) do
     # Only allow password validation if user is authenticated and needs password setup
-    current_user = socket.assigns.current_user
     user_needs = socket.assigns.user_needs
 
-    if current_user && user_needs.password_setup do
+    if setup_owner?(socket) && user_needs.password_setup do
       password_form =
         socket.assigns.user
         |> Accounts.change_user_password(user_params)
@@ -994,10 +993,9 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("validate_phone", %{"user" => user_params}, socket) do
     # Only allow phone validation if user is authenticated and needs phone setup
-    current_user = socket.assigns.current_user
     _user_needs = socket.assigns.user_needs
 
-    if current_user && socket.assigns.current_step == 3 do
+    if setup_owner?(socket) && socket.assigns.current_step == 3 do
       phone_form =
         socket.assigns.user
         |> Accounts.User.registration_changeset(user_params,
@@ -1021,10 +1019,9 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("change_phone_number", _params, socket) do
     # Allow authenticated user to change phone number by going back to step 2
-    current_user = socket.assigns.current_user
     _user_needs = socket.assigns.user_needs
 
-    if current_user do
+    if setup_owner?(socket) do
       {:noreply,
        socket
        |> assign(:current_step, 3)
@@ -1036,10 +1033,9 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("save_password", %{"user" => user_params}, socket) do
     # Ensure user is authenticated and needs password setup
-    current_user = socket.assigns.current_user
     user_needs = socket.assigns.user_needs
 
-    if is_nil(current_user) or not user_needs.password_setup do
+    if not setup_owner?(socket) or not user_needs.password_setup do
       YscWeb.Flash.send_toast(:error, "Please verify your email address first.",
         title: "Account setup"
       )
@@ -1088,10 +1084,9 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("save_phone", %{"user" => user_params}, socket) do
     # Ensure user is authenticated and needs phone setup
-    current_user = socket.assigns.current_user
     _user_needs = socket.assigns.user_needs
 
-    if is_nil(current_user) or socket.assigns.current_step != 3 do
+    if not setup_owner?(socket) or socket.assigns.current_step != 3 do
       YscWeb.Flash.send_toast(
         :error,
         "Phone setup is not available at this step.",
@@ -1142,9 +1137,7 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("skip_phone", _params, socket) do
     # Ensure user is authenticated - re-fetch user to get latest data
-    current_user = socket.assigns.current_user
-
-    if is_nil(current_user) do
+    if not setup_owner?(socket) do
       YscWeb.Flash.send_toast(:error, "Please complete account setup first.",
         title: "Account setup"
       )
@@ -1228,10 +1221,9 @@ defmodule YscWeb.AccountSetupLive do
         socket
       ) do
     # Only allow phone code validation if user is authenticated and needs phone verification
-    current_user = socket.assigns.current_user
     user_needs = socket.assigns.user_needs
 
-    if current_user && user_needs.phone_verification do
+    if setup_owner?(socket) && user_needs.phone_verification do
       # Accumulate digits in a dedicated assign (phx-input may send only the changed
       # field, or paste can send as map; merge so we normalize the full code)
       current_code = socket.assigns[:phone_verification_code_state] || %{}
@@ -1265,10 +1257,9 @@ defmodule YscWeb.AccountSetupLive do
         socket
       ) do
     # Ensure user is authenticated and needs phone verification
-    current_user = socket.assigns.current_user
     user_needs = socket.assigns.user_needs
 
-    if is_nil(current_user) or not user_needs.phone_verification do
+    if not setup_owner?(socket) or not user_needs.phone_verification do
       YscWeb.Flash.send_toast(:error, "Please complete phone setup first.",
         title: "Account setup"
       )
@@ -1329,10 +1320,9 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("resend_phone_code", _params, socket) do
     # Ensure user is authenticated and needs phone verification
-    current_user = socket.assigns.current_user
     user_needs = socket.assigns.user_needs
 
-    if is_nil(current_user) or not user_needs.phone_verification do
+    if not setup_owner?(socket) or not user_needs.phone_verification do
       YscWeb.Flash.send_toast(:error, "Please complete phone setup first.",
         title: "Account setup"
       )
@@ -1400,10 +1390,9 @@ defmodule YscWeb.AccountSetupLive do
         %{"payment_method_id" => payment_method_id},
         socket
       ) do
-    current_user = socket.assigns.current_user
     user = socket.assigns.user
 
-    if is_nil(current_user) or socket.assigns.current_step != 1 do
+    if not setup_owner?(socket) or socket.assigns.current_step != 1 do
       YscWeb.Flash.send_toast(
         :error,
         "Cannot save payment method at this step.",
@@ -1497,10 +1486,9 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   def handle_event("retry_payment_setup", _params, socket) do
-    current_user = socket.assigns.current_user
     user = socket.assigns.user
 
-    if is_nil(current_user) do
+    if not setup_owner?(socket) do
       YscWeb.Flash.send_toast(:error, "Please complete account setup first.",
         title: "Account setup"
       )
@@ -1622,4 +1610,11 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   defp normalize_verification_code(_), do: ""
+
+  # LiveView events are not gated by handle_params; require the session user to
+  # match the account in the URL before any post-verification setup action.
+  defp setup_owner?(%{assigns: %{current_user: %{id: id}, user: %{id: id}}}),
+    do: true
+
+  defp setup_owner?(_), do: false
 end
