@@ -44,10 +44,6 @@ defmodule YscWeb.UserBookingDetailLive do
           # Additional authorization check using LetMe policy
           case Policy.authorize(:booking_read, user, booking) do
             :ok ->
-              # Get payment information (amount reused for refund estimate when present)
-              payment = get_booking_payment_info(booking)
-
-              # Get timezone from connect params
               connect_params =
                 case get_connect_params(socket) do
                   nil -> %{}
@@ -57,30 +53,34 @@ defmodule YscWeb.UserBookingDetailLive do
               timezone =
                 Map.get(connect_params, "timezone", "America/Los_Angeles")
 
-              # Calculate price breakdown
               price_breakdown = calculate_price_breakdown(booking)
-
-              # Check if booking can be cancelled
               can_cancel = can_cancel_booking?(booking)
 
-              # Get refund policy info for cancellation
-              refund_info = get_refund_info(booking, payment)
+              socket =
+                socket
+                |> assign(:booking, booking)
+                |> assign(:payment, nil)
+                |> assign(:timezone, timezone)
+                |> assign(:price_breakdown, price_breakdown)
+                |> assign(:can_cancel, can_cancel)
+                |> assign(:refund_info, nil)
+                |> assign(:loading_booking_payment_details, !connected?(socket))
+                |> assign(:show_cancel_modal, false)
+                |> assign(:cancel_reason, "")
+                |> assign(:page_title, "Booking Details")
+                |> assign(
+                  :meta_description,
+                  "View the details of your cabin booking with Young Scandinavians Club."
+                )
 
-              {:ok,
-               socket
-               |> assign(:booking, booking)
-               |> assign(:payment, payment)
-               |> assign(:timezone, timezone)
-               |> assign(:price_breakdown, price_breakdown)
-               |> assign(:can_cancel, can_cancel)
-               |> assign(:refund_info, refund_info)
-               |> assign(:show_cancel_modal, false)
-               |> assign(:cancel_reason, "")
-               |> assign(:page_title, "Booking Details")
-               |> assign(
-                 :meta_description,
-                 "View the details of your cabin booking with Young Scandinavians Club."
-               )}
+              socket =
+                if connected?(socket) do
+                  assign_booking_payment_details(socket, booking)
+                else
+                  socket
+                end
+
+              {:ok, socket}
 
             {:error, _} ->
               {:ok,
@@ -393,6 +393,11 @@ defmodule YscWeb.UserBookingDetailLive do
               <% end %>
             </div>
           </div>
+          <.async_section_loader
+            :if={@loading_booking_payment_details}
+            id="booking-payment-loading"
+            label="Loading payment details..."
+          />
           <!-- Payment Summary -->
           <%= if @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">
@@ -518,6 +523,16 @@ defmodule YscWeb.UserBookingDetailLive do
   end
 
   ## Helper Functions
+
+  defp assign_booking_payment_details(socket, booking) do
+    payment = get_booking_payment_info(booking)
+    refund_info = get_refund_info(booking, payment)
+
+    socket
+    |> assign(:payment, payment)
+    |> assign(:refund_info, refund_info)
+    |> assign(:loading_booking_payment_details, false)
+  end
 
   defp get_booking_payment_info(booking) do
     case Bookings.get_booking_payment(booking) do
