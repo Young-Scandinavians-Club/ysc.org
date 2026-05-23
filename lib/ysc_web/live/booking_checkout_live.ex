@@ -2338,52 +2338,61 @@ defmodule YscWeb.BookingCheckoutLive do
 
             {:ok, reloaded_booking}
           else
-            # Process payment in ledger (handles idempotency - returns existing payment if already processed)
-            case process_ledger_payment(reloaded_booking, payment_intent) do
-              {:ok, _payment} ->
-                # Confirm booking (only if not already confirmed)
-                case BookingLocker.confirm_booking(reloaded_booking.id) do
-                  {:ok, confirmed_booking} ->
+            # Confirm before ledger: Stripe may already be captured, but we must not
+            # record a ledger payment for a booking that failed to confirm (e.g.
+            # entitlement already consumed by another hold).
+            case BookingLocker.confirm_booking(reloaded_booking.id) do
+              {:ok, confirmed_booking} ->
+                case process_ledger_payment(confirmed_booking, payment_intent) do
+                  {:ok, _payment} ->
                     {:ok, confirmed_booking}
-
-                  {:error, :invalid_status} ->
-                    # Booking was confirmed between reload and confirm attempt (race condition)
-                    # Reload again and return the confirmed booking
-                    final_booking =
-                      Repo.get!(Booking, reloaded_booking.id)
-                      |> Repo.preload([:rooms, :user])
-
-                    if final_booking.status == :complete do
-                      Ysc.Logging.info(
-                        "Booking confirmed by another process, returning confirmed booking",
-                        booking_id: booking.id
-                      )
-
-                      {:ok, final_booking}
-                    else
-                      Ysc.Logging.error(
-                        "Failed to confirm booking: invalid status",
-                        booking_id: booking.id,
-                        status: final_booking.status
-                      )
-
-                      {:error, :booking_confirmation_failed}
-                    end
 
                   {:error, reason} ->
                     Ysc.Logging.error(
-                      "Failed to confirm booking: #{inspect(reason)}"
+                      "Booking confirmed but ledger payment recording failed",
+                      booking_id: confirmed_booking.id,
+                      error: inspect(reason)
                     )
 
-                    {:error, :booking_confirmation_failed}
+                    {:error, :payment_processing_failed}
+                end
+
+              {:error, :invalid_status} ->
+                # Booking was confirmed between reload and confirm attempt (race condition)
+                final_booking =
+                  Repo.get!(Booking, reloaded_booking.id)
+                  |> Repo.preload([:rooms, :user])
+
+                if final_booking.status == :complete do
+                  Ysc.Logging.info(
+                    "Booking confirmed by another process, returning confirmed booking",
+                    booking_id: booking.id
+                  )
+
+                  case process_ledger_payment(final_booking, payment_intent) do
+                    {:ok, _payment} ->
+                      {:ok, final_booking}
+
+                    {:error, reason} ->
+                      {:error, {:ledger_payment_failed, reason}}
+                  end
+                else
+                  Ysc.Logging.error(
+                    "Failed to confirm booking: invalid status",
+                    booking_id: booking.id,
+                    status: final_booking.status
+                  )
+
+                  {:error, :booking_confirmation_failed}
                 end
 
               {:error, reason} ->
                 Ysc.Logging.error(
-                  "Failed to process ledger payment: #{inspect(reason)}"
+                  "Failed to confirm booking: #{inspect(reason)}",
+                  booking_id: reloaded_booking.id
                 )
 
-                {:error, :payment_processing_failed}
+                {:error, :booking_confirmation_failed}
             end
           end
         else
