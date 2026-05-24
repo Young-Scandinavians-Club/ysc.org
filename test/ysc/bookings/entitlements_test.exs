@@ -399,6 +399,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
         Date.utc_today()
         |> then(fn today ->
           base = Date.add(today, 40)
+
           checkin =
             case Date.day_of_week(base, :monday) do
               1 -> base

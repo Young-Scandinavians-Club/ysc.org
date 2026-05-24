@@ -727,11 +727,12 @@ defmodule YscWeb.BookingReceiptLiveTest do
       end)
 
       test_stripe_client =
-        {module, _, _, _} =
         defmodule :"ReceiptRedirectStripe#{System.unique_integer([:positive])}" do
           @behaviour Ysc.StripeBehaviour
 
-          def create_payment_intent(_params, _opts), do: {:error, :not_implemented}
+          def create_payment_intent(_params, _opts),
+            do: {:error, :not_implemented}
+
           def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
           def create_customer(_params), do: {:error, :not_implemented}
           def update_customer(_id, _params), do: {:error, :not_implemented}
@@ -739,7 +740,9 @@ defmodule YscWeb.BookingReceiptLiveTest do
           def list_events(_params, _opts), do: {:error, :not_implemented}
           def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
           def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
-          def list_balance_transactions(_params, _opts), do: {:error, :not_implemented}
+
+          def list_balance_transactions(_params, _opts),
+            do: {:error, :not_implemented}
 
           def retrieve_payment_intent(id, _opts) do
             {:ok,
@@ -753,8 +756,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
              }}
           end
         end
-
-        module
+        |> elem(0)
 
       Application.put_env(:ysc, :stripe_client, test_stripe_client)
       ensure_receipt_buyout_base_pricing!()
@@ -803,7 +805,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert :ok =
                Entitlements.consume_for_booking!(entitlement.id, booking_a.id)
 
-      payment_intent_id = "pi_receipt_entitlement_#{System.unique_integer([:positive])}"
+      payment_intent_id =
+        "pi_receipt_entitlement_#{System.unique_integer([:positive])}"
 
       {:ok, _view, html} =
         live(
@@ -1248,7 +1251,9 @@ defmodule YscWeb.BookingReceiptLiveTest do
           :ok
 
         {:error, %Ecto.Changeset{} = cs} ->
-          if duplicate_receipt_buyout_pricing_rule?(cs), do: :ok, else: raise(cs)
+          if duplicate_receipt_buyout_pricing_rule?(cs),
+            do: :ok,
+            else: raise(cs)
 
         {:error, other} ->
           raise("unexpected create_pricing_rule: #{inspect(other)}")

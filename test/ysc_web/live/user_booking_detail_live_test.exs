@@ -6,7 +6,6 @@ defmodule YscWeb.UserBookingDetailLiveTest do
   import Ysc.BookingsFixtures
 
   import Ecto.Query
-  import Plug.Conn
   import Phoenix.ConnTest
 
   alias Ysc.Bookings
