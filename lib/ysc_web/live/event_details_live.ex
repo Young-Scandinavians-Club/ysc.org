@@ -1821,7 +1821,7 @@ defmodule YscWeb.EventDetailsLive do
               phx-update="ignore"
               data-expires-at={@ticket_order.expires_at}
               data-expire-event="checkout-expired"
-              data-expire-text="EXPIRED"
+              data-expire-text="Time expired"
               data-color-self
             >
             </div>
@@ -6021,7 +6021,11 @@ defmodule YscWeb.EventDetailsLive do
 
   defp pricing_info_for_event(event, ticket_tiers) do
     if Map.get(event, :tickets_tbd) do
-      %{display_text: "COMING SOON", has_free_tiers: false, lowest_price: nil}
+      %{
+        display_text: "Tickets coming soon",
+        has_free_tiers: false,
+        lowest_price: nil
+      }
     else
       calculate_event_pricing(ticket_tiers)
     end
@@ -6151,7 +6155,7 @@ defmodule YscWeb.EventDetailsLive do
 
   # Calculate pricing display information for an event
   defp calculate_event_pricing([]) do
-    %{display_text: "FREE", has_free_tiers: true, lowest_price: nil}
+    %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
   end
 
   defp calculate_event_pricing(ticket_tiers) do
@@ -6168,14 +6172,14 @@ defmodule YscWeb.EventDetailsLive do
 
     case {has_free_tiers, paid_tiers} do
       {true, []} ->
-        %{display_text: "FREE", has_free_tiers: true, lowest_price: nil}
+        %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
 
       {true, _paid_tiers} ->
         # When there are both free and paid tiers, show "From $0.00"
         %{display_text: "From $0.00", has_free_tiers: true, lowest_price: nil}
 
       {false, []} ->
-        %{display_text: "FREE", has_free_tiers: false, lowest_price: nil}
+        %{display_text: "Free", has_free_tiers: false, lowest_price: nil}
 
       {false, paid_tiers} ->
         lowest_price = Enum.min_by(paid_tiers, & &1.price.amount, fn -> nil end)

@@ -7,8 +7,8 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
     ~H"""
     <div class="mx-auto max-w-sm">
       <.header class="text-center">
-        No confirmation instructions received?
-        <:subtitle>We'll send a new confirmation link to your inbox</:subtitle>
+        Didn't get your verification email?
+        <:subtitle>Enter your email and we'll send a new link.</:subtitle>
       </.header>
 
       <.simple_form
@@ -19,13 +19,13 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
         <.input field={@form[:email]} type="email" placeholder="Email" required />
         <:actions>
           <.button phx-disable-with="Sending..." class="w-full">
-            Resend confirmation instructions
+            Send verification email
           </.button>
         </:actions>
       </.simple_form>
 
       <p class="text-center mt-4">
-        <.link navigate={~p"/users/register"}>Register</.link>
+        <.link navigate={~p"/users/register"}>Apply for membership</.link>
         | <.link navigate={~p"/users/log-in"}>Sign in</.link>
       </p>
     </div>
@@ -35,10 +35,10 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket, form: to_form(%{}, as: "user"))
-     |> assign(:page_title, "Resend Confirmation Instructions")
+     |> assign(:page_title, "Resend verification email")
      |> assign(
        :meta_description,
-       "Resend the email confirmation instructions for your Young Scandinavians Club account."
+       "Request a new verification email for your Young Scandinavians Club account."
      )}
   end
 

@@ -28,6 +28,44 @@ defmodule Ysc.ExpenseReportsTest do
       assert result == []
     end
 
+    test "batch-loads bank_account for multiple reports in one query", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      for i <- 1..3 do
+        {:ok, _} =
+          ExpenseReports.create_expense_report(
+            %{
+              "status" => "draft",
+              "purpose" => "Batch list #{i}",
+              "reimbursement_method" => "bank_transfer",
+              "bank_account_id" => bank_account.id
+            },
+            user
+          )
+      end
+
+      reports = ExpenseReports.list_expense_reports(user)
+
+      assert length(reports) >= 3
+
+      assert Enum.all?(reports, fn report ->
+               if report.bank_account_id do
+                 report.bank_account.id == report.bank_account_id
+               else
+                 report.bank_account == nil
+               end
+             end)
+    end
+
     test "loads bank_account for each report when bank_account_id is set", %{
       user: user
     } do

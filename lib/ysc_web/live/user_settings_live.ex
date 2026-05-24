@@ -6704,13 +6704,13 @@ defmodule YscWeb.UserSettingsLive do
         n = ent.free_nights || 0
         cap = format_member_money(ent.buyout_max_discount)
 
-        "#{n} free night#{if n == 1, do: "", else: "s"} (up to #{cap} off buyout nights)"
+        "#{n} free night#{if n == 1, do: "", else: "s"} (up to #{cap} off when you reserve the whole cabin)"
 
       :percent_off ->
         pct = ent.percent_off || Decimal.new(0)
         cap = format_member_money(ent.buyout_max_discount)
 
-        "#{Decimal.round(pct, 2)}% off your stay (up to #{cap} toward buyout pricing)"
+        "#{Decimal.round(pct, 2)}% off your stay (up to #{cap} when booking the whole cabin)"
 
       :fixed_amount_off ->
         "#{format_member_money(ent.amount_off)} off your stay"

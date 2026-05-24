@@ -7,8 +7,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   import Ysc.BookingsFixtures
   import Mox
 
+  alias Money
   alias Ysc.Bookings
-  alias Ysc.Bookings.{BookingLocker, BookingRoom, RoomCategory}
+  alias Ysc.Bookings.{Booking, BookingLocker, BookingRoom, RoomCategory}
   alias Ysc.Bookings.Entitlements
   alias Ysc.Ledgers
   alias Ysc.Repo
@@ -442,6 +443,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     end
   end
 
+  defp booking_ledger_payment_count(booking_id) do
+    case Bookings.get_booking_payment(%Booking{id: booking_id}) do
+      {:ok, _} -> 1
+      {:error, :payment_not_found} -> 0
+    end
+  end
+
   defp payment_submit_disabled?(html) do
     {:ok, doc} = Floki.parse_fragment(html)
 
@@ -488,6 +496,96 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
       meta[:constraint] == :unique
     end)
+  end
+
+  describe "payment-success with shared booking entitlement" do
+    setup %{conn: conn} do
+      user = user_fixture()
+      admin = user_fixture()
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: admin.id,
+            benefit_kind: :fixed_amount_off,
+            amount_off: Money.new(:USD, 25)
+          },
+          send_notification: false
+        )
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      assert {:ok, booking_a} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      booking_b =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          property: :tahoe,
+          booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 4,
+          children_count: 0,
+          total_price: Money.new(500, :USD)
+        })
+        |> change(%{applied_booking_entitlement_id: entitlement.id})
+        |> Repo.update!()
+
+      %{
+        conn: log_in_user(conn, user),
+        user: user,
+        entitlement: entitlement,
+        booking_a: booking_a,
+        booking_b: booking_b
+      }
+    end
+
+    test "does not record ledger payment when entitlement was already consumed",
+         %{
+           conn: conn,
+           entitlement: entitlement,
+           booking_a: booking_a,
+           booking_b: booking_b
+         } do
+      expect(StripeMock, :retrieve_payment_intent, fn _id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_entitlement_shared_#{System.unique_integer([:positive])}",
+           status: "succeeded",
+           amount: 50_000,
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking_b.id}")
+
+      assert :ok =
+               Entitlements.consume_for_booking!(entitlement.id, booking_a.id)
+
+      html =
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => "pi_entitlement_shared_test"
+        })
+
+      assert html =~ "Something went wrong while confirming your booking"
+
+      reloaded = Repo.get!(Bookings.Booking, booking_b.id)
+      assert reloaded.status == :hold
+      assert booking_ledger_payment_count(booking_b.id) == 0
+
+      Mox.verify!(StripeMock)
+    end
   end
 
   describe "room booking guest step" do

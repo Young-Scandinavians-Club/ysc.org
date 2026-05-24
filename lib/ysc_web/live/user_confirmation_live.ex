@@ -13,14 +13,14 @@ defmodule YscWeb.UserConfirmationLive do
         <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
       </.link>
       <.header class="text-center">
-        Confirm Email
+        Confirm your email
       </.header>
 
       <.simple_form for={@form} id="confirmation_form" phx-submit="confirm_account">
         <.input field={@form[:token]} type="hidden" />
         <:actions>
           <.button phx-disable-with="Confirming..." class="w-full">
-            Confirm my account
+            Confirm email
           </.button>
         </:actions>
       </.simple_form>
@@ -39,7 +39,7 @@ defmodule YscWeb.UserConfirmationLive do
 
     {:ok,
      assign(socket, form: form)
-     |> assign(:page_title, "Confirm Email")
+     |> assign(:page_title, "Confirm your email")
      |> assign(
        :meta_description,
        "Confirm your Young Scandinavians Club email address."
@@ -55,8 +55,10 @@ defmodule YscWeb.UserConfirmationLive do
       {:ok, _} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "User confirmed successfully.",
-           title: "Account"
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your email is confirmed. You can sign in when you're ready.",
+           title: "Email confirmed"
          )
          |> redirect(to: ~p"/")}
 
@@ -75,7 +77,7 @@ defmodule YscWeb.UserConfirmationLive do
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "User confirmation link is invalid or it has expired.",
+               "This confirmation link is invalid or has expired. Request a new one from the sign-in page.",
                title: "Email confirmation"
              )
              |> redirect(to: ~p"/")}

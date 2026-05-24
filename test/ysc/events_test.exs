@@ -2266,7 +2266,7 @@ defmodule Ysc.EventsTest do
         })
 
       loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
-      assert Events.event_pricing_display_string(loaded) == "FREE"
+      assert Events.event_pricing_display_string(loaded) == "Free"
     end
 
     test "shows From $0.00 when both free and paid tiers exist", %{user: user} do
@@ -2323,7 +2323,7 @@ defmodule Ysc.EventsTest do
         })
 
       loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
-      assert Events.event_pricing_display_string(loaded) == "FREE"
+      assert Events.event_pricing_display_string(loaded) == "Free"
     end
   end
 
