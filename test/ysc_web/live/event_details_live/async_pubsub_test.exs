@@ -179,7 +179,7 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         event_with_tickets(
           tier_count: 1,
           state: :upcoming,
-          event_attrs: %{max_attendees: 2}
+          tier_attrs: %{quantity: 2}
         )
 
       event = Repo.preload(event, :ticket_tiers, force: true)
