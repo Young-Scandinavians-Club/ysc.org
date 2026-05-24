@@ -13,6 +13,7 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Customers
   alias Ysc.Payments
   alias Ysc.Subscriptions
+  alias YscWeb.AdminBadgeHelpers
 
   def render(assigns) do
     ~H"""
@@ -119,7 +120,7 @@ defmodule YscWeb.AdminUsersLive do
               class="shrink-0"
             >
               <.badge type={
-                review_outcome_to_badge_type(
+                AdminBadgeHelpers.review_outcome_badge_type(
                   @selected_user_application.review_outcome
                 )
               }>
@@ -603,7 +604,9 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">Account Status:</span>
-                    <.badge type={user_state_to_badge_type(user.state)}>
+                    <.badge type={
+                      AdminBadgeHelpers.user_state_badge_type(user.state)
+                    }>
                       {user_state_to_readable(user.state)}
                     </.badge>
                   </div>
@@ -698,7 +701,7 @@ defmodule YscWeb.AdminUsersLive do
                 field={:state}
                 thead_th_attrs={[class: "dance"]}
               >
-                <.badge type={user_state_to_badge_type(user.state)}>
+                <.badge type={AdminBadgeHelpers.user_state_badge_type(user.state)}>
                   {user_state_to_readable(user.state)}
                 </.badge>
               </:col>
@@ -1361,13 +1364,6 @@ defmodule YscWeb.AdminUsersLive do
   defp export_field_to_label(field), do: "#{field}"
 
   # "pending_approval", "rejected", "active", "suspended", "deleted"
-  defp user_state_to_badge_type(:active), do: "green"
-  defp user_state_to_badge_type(:pending_approval), do: "yellow"
-  defp user_state_to_badge_type(:rejected), do: "red"
-  defp user_state_to_badge_type(:suspended), do: "red"
-  defp user_state_to_badge_type(:deleted), do: "dark"
-  defp user_state_to_badge_type(_), do: "default"
-
   defp user_state_to_readable(:pending_approval), do: "Pending Approval"
   defp user_state_to_readable(state), do: String.capitalize("#{state}")
 
@@ -1415,10 +1411,6 @@ defmodule YscWeb.AdminUsersLive do
     do: Timex.format!(date, "%b %d, %Y", :strftime)
 
   defp format_birth_date(other), do: to_string(other)
-
-  defp review_outcome_to_badge_type(:approved), do: "green"
-  defp review_outcome_to_badge_type(:rejected), do: "red"
-  defp review_outcome_to_badge_type(_), do: "default"
 
   defp list_params_for_back(params) when is_map(params) do
     Map.drop(params, ["id"])
