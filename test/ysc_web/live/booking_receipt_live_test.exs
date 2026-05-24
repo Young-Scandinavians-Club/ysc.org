@@ -726,7 +726,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
         Application.put_env(:ysc, :stripe_client, original_stripe_client)
       end)
 
-      test_stripe_client =
+      {:module, test_stripe_client, _, _} =
         defmodule :"ReceiptRedirectStripe#{System.unique_integer([:positive])}" do
           @behaviour Ysc.StripeBehaviour
 
@@ -756,7 +756,6 @@ defmodule YscWeb.BookingReceiptLiveTest do
              }}
           end
         end
-        |> elem(0)
 
       Application.put_env(:ysc, :stripe_client, test_stripe_client)
       ensure_receipt_buyout_base_pricing!()
