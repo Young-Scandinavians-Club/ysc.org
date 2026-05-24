@@ -822,7 +822,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(
                view,
                "#member-ticket-reservations-section h2",
-               "Your price holds"
+               "Tickets waiting for checkout"
              )
 
       assert has_element?(

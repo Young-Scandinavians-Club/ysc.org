@@ -934,11 +934,20 @@ defmodule YscWeb.EventDetailsLive do
                       }
                       class="w-full"
                     >
-                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="text-orange-500 w-5 h-5 me-1 -mt-0.5"
-                        /> Active membership required to purchase tickets
+                      <div class="text-sm text-orange-800 px-3 py-3 bg-orange-50 rounded-xl border border-orange-200 text-center space-y-2">
+                        <p>
+                          <.icon
+                            name="hero-exclamation-circle"
+                            class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
+                          /> Member tickets require an active YSC membership.
+                        </p>
+                        <.link
+                          navigate={~p"/users/membership"}
+                          class="inline-flex items-center justify-center gap-1 text-sm font-semibold text-orange-900 underline underline-offset-2"
+                        >
+                          View membership status
+                          <.icon name="hero-arrow-right" class="w-4 h-4" />
+                        </.link>
                       </div>
                     </div>
 
@@ -1164,9 +1173,15 @@ defmodule YscWeb.EventDetailsLive do
                                 />Get Tickets
                               </.button>
                             <% else %>
-                              <div class="text-orange-700 font-black text-sm text-center">
-                                Membership Required
-                              </div>
+                              <.button
+                                class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                                navigate={~p"/users/membership"}
+                              >
+                                <.icon
+                                  name="hero-identification"
+                                  class="w-5 h-5 me-2 -mt-0.5"
+                                />View Membership
+                              </.button>
                             <% end %>
                           <% end %>
                         <% else %>

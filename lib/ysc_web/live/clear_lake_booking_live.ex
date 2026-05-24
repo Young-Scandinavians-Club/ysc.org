@@ -3291,10 +3291,15 @@ defmodule YscWeb.ClearLakeBookingLive do
       if Accounts.has_active_membership?(user) do
         {true, nil, nil}
       else
+        membership_path = ~p"/users/membership"
+
+        membership_link =
+          ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">go to Membership</a>)
+
         {
           false,
           "Membership Required",
-          "You need an active membership to make bookings. Please activate or renew your membership to continue."
+          "You need an active YSC membership to book a cabin. #{membership_link} to pay dues or renew."
         }
       end
     end
