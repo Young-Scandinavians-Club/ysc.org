@@ -1,8 +1,10 @@
 # See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
 # CI runs tests, linter, and mix deps.audit in parallel; deploy only runs if all CI passes on main branch.
 # Production: tag push (v*) → .github/workflows/fly-deploy-prod.yml (sandbox deploy gate, then prod; CI not duplicated there).
-# If a v* tag already points at the commit after CI, the Fly deploy steps are skipped so only Deploy
-# Production deploys sandbox (one deploy, no duplicate work). The job still runs so branch checks stay green.
+# If a v* tag already points at the commit after CI, the Fly deploy job is skipped so only Deploy
+# Production deploys sandbox (one deploy, no duplicate work). The gate job still runs so branch checks stay green.
+# Only deploy_sandbox uses the deploy-sandbox concurrency group — the gate job must not, or it cancels
+# in-progress Deploy Production sandbox deploys on release (main push + tag push from release.sh).
 #
 # Secrets: use FLY_SANDBOX_API_TOKEN for the sandbox Fly org (recommended). If unset, FLY_API_TOKEN
 # is used so existing repos keep working — do not point FLY_API_TOKEN at production.
@@ -167,12 +169,11 @@ jobs:
         run: mix deps.audit --ignore-file config/mix_audit.ignore
 
   deploy:
-    name: Deploy app sandbox
+    name: Deploy app sandbox (gate)
     runs-on: ubuntu-latest
     needs: [test, formatting, credo, security]
-    concurrency:
-      group: deploy-sandbox
-      cancel-in-progress: true
+    outputs:
+      skip: ${{ steps.sandbox_skip.outputs.skip }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
@@ -186,15 +187,25 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+
+  deploy_sandbox:
+    name: Deploy app sandbox
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: needs.deploy.outputs.skip != 'true'
+    concurrency:
+      group: deploy-sandbox
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
-        if: steps.sandbox_skip.outputs.skip != 'true'
       - name: Verify Fly token can access sandbox app
-        if: steps.sandbox_skip.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-sandbox
       - name: Deploy to Fly.io sandbox
-        if: steps.sandbox_skip.outputs.skip != 'true'
         run: |
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
