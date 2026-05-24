@@ -33,6 +33,12 @@ defmodule YscWeb.UserBookingDetailLiveTest do
     %{conn: log_in_user(conn, user), user: user}
   end
 
+  # Mounts connected LiveView and re-renders after post-connect payment/refund load.
+  defp live_booking_detail(conn, booking_id) do
+    {:ok, view, _html} = live(conn, ~p"/bookings/#{booking_id}")
+    {:ok, view, render(view)}
+  end
+
   describe "mount and render" do
     test "redirects unauthenticated user to login", %{conn: conn} do
       user = user_fixture()
@@ -62,7 +68,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           children_count: 1
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
 
       assert html =~ "Booking Details"
       assert html =~ booking.reference_id
@@ -133,7 +139,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           children_count: 0
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ Integer.to_string(booking.guests_count)
       refute html =~ "(0 children)"
     end
@@ -148,7 +154,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           property: :clear_lake
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Clear Lake Cabin"
     end
 
@@ -179,9 +185,23 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           payment_method_id: nil
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Payment Summary"
       assert html =~ "Total Paid"
+    end
+
+    test "loads payment details after connected mount", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
+      assert html =~ booking.reference_id
     end
 
     test "renders price breakdown when pricing_items is set", %{conn: conn} do
@@ -212,7 +232,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Booking Total"
     end
 
@@ -251,7 +271,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Pine"
       assert html =~ "nights"
     end
@@ -286,7 +306,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Room Booking"
       assert html =~ "3"
     end
@@ -316,7 +336,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :pending})
         |> Repo.update()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Pending"
     end
 
@@ -345,7 +365,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :refunded})
         |> Repo.update()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Refunded"
     end
   end
@@ -417,7 +437,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn: conn,
       booking: booking
     } do
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
       assert has_element?(view, "#cancel-booking-modal")
@@ -522,7 +542,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn: conn,
       booking: booking
     } do
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -540,7 +560,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
       assert has_element?(view, "#cancel-booking-modal")
@@ -553,7 +573,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -568,7 +588,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -585,7 +605,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -609,7 +629,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           property: :tahoe
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Full Buyout"
     end
 
@@ -624,7 +644,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           property: :tahoe
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Per Room"
     end
 
@@ -639,7 +659,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           property: :clear_lake
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Per Guest"
     end
   end
@@ -649,7 +669,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :hold})
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Hold"
     end
 
@@ -661,7 +681,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :refunded})
         |> Repo.update!()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Refunded"
     end
 
@@ -673,7 +693,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :draft})
         |> Repo.update!()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Draft"
     end
 
@@ -685,7 +705,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :canceled})
         |> Repo.update!()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Canceled"
     end
   end
@@ -730,7 +750,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         %BookingRoom{booking_id: booking.id, room_id: r2.id}
         |> Repo.insert()
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
 
       assert has_element?(view, "div", "Rooms")
       html = render(view)
@@ -766,7 +786,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
       html = render(view)
       assert html =~ "Booking Total"
       assert html =~ "€" or html =~ "EUR"
@@ -825,7 +845,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           payment_method_id: nil
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
 
       assert html =~ "Cancellation Policy"
       assert html =~ "forfeiture" and html =~ "50"
@@ -869,7 +889,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           checkout_date: checkout
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
 
       assert html =~
                "Cancellation refunds are calculated based on how many days"
@@ -921,7 +941,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{confirmed.id}")
+      {:ok, view, _html} = live_booking_detail(conn, confirmed.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -978,7 +998,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{payment_date: nil})
         |> Repo.update()
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
       html = render(view)
       assert html =~ "Card ending in 4242"
     end
@@ -1024,7 +1044,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           payment_method_id: pm.id
         })
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
       assert render(view) =~ "Bank account ending in 6789"
     end
 
@@ -1050,7 +1070,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :failed})
         |> Repo.update()
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
       html = render(view)
       assert html =~ "Failed"
     end
@@ -1082,8 +1102,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
-      html = render(view)
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Booking Total"
       assert html =~ "£" or html =~ "GBP"
 
@@ -1099,10 +1118,29 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
-      html = render(view)
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Booking Total"
       assert html =~ "¥" or html =~ "JPY"
+    end
+  end
+
+  describe "post-connect payment load" do
+    test "clears loading skeleton after payment details load", %{
+      conn: conn
+    } do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
+
+      refute html =~ "animate-pulse"
+      assert html =~ booking.reference_id
     end
   end
 end
