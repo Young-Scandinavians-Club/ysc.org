@@ -587,7 +587,13 @@ defmodule YscWeb.AdminEventCheckInLive do
   defp reload_tickets(socket, search) do
     event_id = socket.assigns.event.id
     tickets = Scanning.list_event_checkin_tickets(event_id, search)
-    {checked_in_count, total_count} = Scanning.event_checkin_counts(event_id)
+
+    {checked_in_count, total_count} =
+      if search in [nil, ""] do
+        {Enum.count(tickets, & &1.checked_in), length(tickets)}
+      else
+        Scanning.event_checkin_counts(event_id)
+      end
 
     pending = Enum.filter(tickets, &(!&1.checked_in))
     checked_in = Enum.filter(tickets, & &1.checked_in)

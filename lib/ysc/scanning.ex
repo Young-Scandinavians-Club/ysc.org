@@ -724,19 +724,14 @@ defmodule Ysc.Scanning do
   Returns the check-in counts for an event: {checked_in_count, total_confirmed_count}.
   """
   def event_checkin_counts(event_id) do
-    total =
+    %{checked_in: checked_in, total: total} =
       Ticket
       |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-      |> Repo.aggregate(:count)
-
-    checked_in =
-      Ticket
-      |> where(
-        [t],
-        t.event_id == ^event_id and t.status == :confirmed and
-          t.checked_in == true
-      )
-      |> Repo.aggregate(:count)
+      |> select([t], %{
+        total: count(t.id),
+        checked_in: count(t.id) |> filter(t.checked_in == true)
+      })
+      |> Repo.one!()
 
     {checked_in, total}
   end
@@ -989,21 +984,35 @@ defmodule Ysc.Scanning do
       []
     else
       users = Accounts.search_users(trimmed, limit: 20)
+      user_ids = Enum.map(users, & &1.id)
+      checked_in_user_ids = checked_in_user_ids(session_id, user_ids)
 
       Enum.map(users, fn user ->
         membership = MembershipCache.get_active_membership(user)
         active? = YscWeb.UserAuth.membership_active?(membership)
         plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
-        checked_in? = member_checked_in?(session_id, user.id)
 
         %{
           user: user,
           membership_status: if(active?, do: :active, else: :inactive),
           membership_type: plan_type,
-          checked_in?: checked_in?
+          checked_in?: MapSet.member?(checked_in_user_ids, user.id)
         }
       end)
     end
+  end
+
+  defp checked_in_user_ids(_session_id, []), do: MapSet.new()
+
+  defp checked_in_user_ids(session_id, user_ids) do
+    SessionCheckIn
+    |> where(
+      [sc],
+      sc.scan_session_id == ^session_id and sc.user_id in ^user_ids
+    )
+    |> select([sc], sc.user_id)
+    |> Repo.all()
+    |> MapSet.new()
   end
 
   @doc """
