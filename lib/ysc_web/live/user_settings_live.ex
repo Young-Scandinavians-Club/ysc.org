@@ -1255,7 +1255,14 @@ defmodule YscWeb.UserSettingsLive do
                       Account Pending Approval
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
-                      Your account must be approved by the board before you can purchase a membership. Please check back shortly.
+                      Your account must be approved by the board before you can purchase a membership. Reviews usually take up to 14 days — we'll email you when there's a decision.
+                      {" "}
+                      <.link
+                        navigate={~p"/pending-review"}
+                        class="font-semibold text-yellow-900 underline underline-offset-2"
+                      >
+                        View application status
+                      </.link>
                     </p>
                   </div>
                 </div>
@@ -2339,10 +2346,10 @@ defmodule YscWeb.UserSettingsLive do
                       Event tickets
                     </p>
                     <h2 class="text-zinc-900 font-extrabold text-2xl mt-1 tracking-tight">
-                      Your price holds
+                      Tickets waiting for checkout
                     </h2>
                     <p class="text-sm text-zinc-600 mt-1 max-w-xl">
-                      Active reservations lock in member-friendly pricing while you finish checkout — treat them like reserved coupons for the event.
+                      You started buying tickets but did not finish payment. Your selected tickets and member price are saved until the hold expires.
                     </p>
                   </div>
                   <div class="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 ring-2 ring-fuchsia-200/80">
@@ -2366,7 +2373,7 @@ defmodule YscWeb.UserSettingsLive do
                     <div class="relative p-5 sm:p-6 flex flex-col gap-4">
                       <div class="flex items-start justify-between gap-3">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-900/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-fuchsia-50 shadow-sm">
-                          <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Active hold
+                          <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Saved for checkout
                         </span>
                         <span class="text-xs font-semibold text-zinc-500 tabular-nums">
                           Qty {res.quantity}
@@ -2377,7 +2384,7 @@ defmodule YscWeb.UserSettingsLive do
                           <%= if res.ticket_tier && res.ticket_tier.event do %>
                             {res.ticket_tier.event.title}
                           <% else %>
-                            Ticket hold
+                            Tickets in progress
                           <% end %>
                         </p>
                         <p
@@ -2418,7 +2425,7 @@ defmodule YscWeb.UserSettingsLive do
                           navigate={~p"/events/#{res.ticket_tier.event.id}/tickets"}
                           class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:from-fuchsia-500 hover:to-violet-500 transition"
                         >
-                          Use this hold
+                          Finish buying tickets
                           <.icon name="hero-arrow-right" class="w-4 h-4" />
                         </.link>
                       <% end %>
