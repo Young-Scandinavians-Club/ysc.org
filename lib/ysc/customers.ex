@@ -20,99 +20,84 @@ defmodule Ysc.Customers do
   """
   @dialyzer {:nowarn_function, create_stripe_customer: 1}
   def create_stripe_customer(%User{} = user) do
-    if Ysc.Env.test?() do
-      # In tests we avoid calling the real Stripe API. We still persist a deterministic
-      # stripe_id so downstream code that relies on it behaves normally.
-      stripe_customer = %Stripe.Customer{id: "cus_test_#{user.id}"}
-
-      user = Repo.get!(User, user.id)
-
-      changeset =
-        User.update_user_changeset(user, %{stripe_id: stripe_customer.id})
-
-      _ = Repo.update(changeset)
-
-      {:ok, stripe_customer}
-    else
-      customer_params = %{
-        email: user.email,
-        name:
-          "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
-        phone: user.phone_number,
-        description: "User ID: #{user.id}",
-        metadata: %{
-          user_id: user.id
-        }
+    customer_params = %{
+      email: user.email,
+      name:
+        "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
+      phone: user.phone_number,
+      description: "User ID: #{user.id}",
+      metadata: %{
+        user_id: user.id
       }
+    }
 
-      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Customer.create(customer_params)
-           end) do
-        {:ok, stripe_customer} ->
-          # Reload user to get latest version and avoid stale entry errors
-          # This is important when called from async tasks
-          user = Repo.get!(User, user.id)
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           stripe_customer_module().create(customer_params)
+         end) do
+      {:ok, stripe_customer} ->
+        # Reload user to get latest version and avoid stale entry errors
+        # This is important when called from async tasks
+        user = Repo.get!(User, user.id)
 
-          # Update user with Stripe customer ID directly (bypass authorization for system operation)
-          changeset =
-            User.update_user_changeset(user, %{stripe_id: stripe_customer.id})
+        # Update user with Stripe customer ID directly (bypass authorization for system operation)
+        changeset =
+          User.update_user_changeset(user, %{stripe_id: stripe_customer.id})
 
-          case Repo.update(changeset) do
-            {:ok, _updated_user} ->
-              {:ok, stripe_customer}
+        case Repo.update(changeset) do
+          {:ok, _updated_user} ->
+            {:ok, stripe_customer}
 
-            {:error, %Ecto.StaleEntryError{}} ->
-              # User was updated concurrently, reload and retry once
-              require Ysc.Logging
+          {:error, %Ecto.StaleEntryError{}} ->
+            # User was updated concurrently, reload and retry once
+            require Ysc.Logging
 
-              Ysc.Logging.warning(
-                "Stale user entry when updating stripe_id, retrying",
-                user_id: user.id,
-                stripe_customer_id: stripe_customer.id
-              )
+            Ysc.Logging.warning(
+              "Stale user entry when updating stripe_id, retrying",
+              user_id: user.id,
+              stripe_customer_id: stripe_customer.id
+            )
 
-              # Reload and retry once
-              user = Repo.get!(User, user.id)
+            # Reload and retry once
+            user = Repo.get!(User, user.id)
 
-              changeset =
-                User.update_user_changeset(user, %{
-                  stripe_id: stripe_customer.id
-                })
+            changeset =
+              User.update_user_changeset(user, %{
+                stripe_id: stripe_customer.id
+              })
 
-              case Repo.update(changeset) do
-                {:ok, _updated_user} ->
-                  {:ok, stripe_customer}
+            case Repo.update(changeset) do
+              {:ok, _updated_user} ->
+                {:ok, stripe_customer}
 
-                {:error, changeset} ->
-                  Ysc.Logging.error(
-                    "Failed to update user with stripe_id after retry",
-                    user_id: user.id,
-                    stripe_customer_id: stripe_customer.id,
-                    changeset_errors: inspect(changeset.errors)
-                  )
+              {:error, changeset} ->
+                Ysc.Logging.error(
+                  "Failed to update user with stripe_id after retry",
+                  user_id: user.id,
+                  stripe_customer_id: stripe_customer.id,
+                  changeset_errors: inspect(changeset.errors)
+                )
 
-                  # Still return success for the customer creation, but log the error
-                  # The stripe_id will be set via webhook handler eventually
-                  {:ok, stripe_customer}
-              end
+                # Still return success for the customer creation, but log the error
+                # The stripe_id will be set via webhook handler eventually
+                {:ok, stripe_customer}
+            end
 
-            {:error, changeset} ->
-              require Ysc.Logging
+          {:error, changeset} ->
+            require Ysc.Logging
 
-              Ysc.Logging.error("Failed to update user with stripe_id",
-                user_id: user.id,
-                stripe_customer_id: stripe_customer.id,
-                changeset_errors: inspect(changeset.errors)
-              )
+            Ysc.Logging.error("Failed to update user with stripe_id",
+              user_id: user.id,
+              stripe_customer_id: stripe_customer.id,
+              changeset_errors: inspect(changeset.errors)
+            )
 
-              # Still return success for the customer creation, but log the error
-              # The stripe_id will be set via webhook handler eventually
-              {:ok, stripe_customer}
-          end
+            # Still return success for the customer creation, but log the error
+            # The stripe_id will be set via webhook handler eventually
+            {:ok, stripe_customer}
+        end
 
-        {:error, error} ->
-          {:error, error}
-      end
+      {:error, error} ->
+        {:error, error}
     end
   end
 
@@ -131,50 +116,49 @@ defmodule Ysc.Customers do
   @dialyzer {:nowarn_function, update_stripe_customer: 1}
   def update_stripe_customer(%User{} = user) do
     if user.stripe_id do
-      if Ysc.Env.test?() do
-        # Avoid Stripe API in tests; behave as if update succeeded.
-        {:ok, %Stripe.Customer{id: user.stripe_id}}
-      else
-        # Preload billing_address to ensure it's available for customer update
-        user = Repo.preload(user, :billing_address)
+      # Preload billing_address to ensure it's available for customer update
+      user = Repo.preload(user, :billing_address)
 
-        customer_params = %{
-          email: user.email,
-          name:
-            "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
-          phone: user.phone_number,
-          description: "User ID: #{user.id}",
-          metadata: %{
-            user_id: user.id
-          }
+      customer_params = %{
+        email: user.email,
+        name:
+          "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
+        phone: user.phone_number,
+        description: "User ID: #{user.id}",
+        metadata: %{
+          user_id: user.id
         }
+      }
 
-        # Add address if billing_address exists
-        customer_params =
-          if user.billing_address do
-            address = build_customer_address(user.billing_address)
-            Map.put(customer_params, :address, address)
-          else
-            customer_params
-          end
-
-        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.Customer.update(user.stripe_id, customer_params)
-             end) do
-          {:ok, stripe_customer} ->
-            {:ok, stripe_customer}
-
-          {:error, error} ->
-            require Ysc.Logging
-
-            Ysc.Logging.error("Failed to update Stripe customer",
-              user_id: user.id,
-              stripe_customer_id: user.stripe_id,
-              error: inspect(error)
-            )
-
-            {:error, error}
+      # Add address if billing_address exists
+      customer_params =
+        if user.billing_address do
+          address = build_customer_address(user.billing_address)
+          Map.put(customer_params, :address, address)
+        else
+          customer_params
         end
+
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_customer_module().update(
+               user.stripe_id,
+               customer_params,
+               []
+             )
+           end) do
+        {:ok, stripe_customer} ->
+          {:ok, stripe_customer}
+
+        {:error, error} ->
+          require Ysc.Logging
+
+          Ysc.Logging.error("Failed to update Stripe customer",
+            user_id: user.id,
+            stripe_customer_id: user.stripe_id,
+            error: inspect(error)
+          )
+
+          {:error, error}
       end
     else
       {:error, :no_stripe_customer}
@@ -391,6 +375,10 @@ defmodule Ysc.Customers do
   end
 
   # Helper functions
+
+  defp stripe_customer_module do
+    Application.get_env(:ysc, :stripe_customer_module, Stripe.Customer)
+  end
 
   defp stripe_payment_method_module do
     Application.get_env(

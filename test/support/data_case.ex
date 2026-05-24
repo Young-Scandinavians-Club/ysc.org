@@ -72,6 +72,22 @@ defmodule Ysc.DataCase do
 
     stub_with(Stripe.PaymentMethodMock, Ysc.TestStripePaymentMethodStub)
 
+    # Stripe Customer.create: deterministic test IDs from metadata user_id
+    stub(Stripe.CustomerMock, :create, fn params ->
+      user_id =
+        case params do
+          %{metadata: %{user_id: id}} -> id
+          %{"metadata" => %{"user_id" => id}} -> id
+          _ -> :erlang.unique_integer([:positive])
+        end
+
+      {:ok,
+       %Stripe.Customer{
+         id: "cus_test_#{user_id}",
+         email: Map.get(params, :email) || Map.get(params, "email")
+       }}
+    end)
+
     # Stripe Customer.retrieve: e.g. UserSettingsLive verifies customer exists before setup intents
     stub(Stripe.CustomerMock, :retrieve, fn id, _opts ->
       {:ok,
