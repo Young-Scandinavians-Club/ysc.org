@@ -1,10 +1,15 @@
 defmodule YscWeb.BookingReceiptLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Changeset
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
 
+  alias Money
+  alias Ysc.Bookings
+  alias Ysc.Bookings.{Booking, BookingLocker}
+  alias Ysc.Bookings.Entitlements
   alias Ysc.Repo
 
   describe "mount/3 - authentication and security" do
@@ -711,6 +716,109 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert html =~ "Booking Confirmation"
     end
+
+    test "does not record ledger payment when confirm fails after Stripe redirect succeeded",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
+      {:module, test_stripe_client, _, _} =
+        defmodule :"ReceiptRedirectStripe#{System.unique_integer([:positive])}" do
+          @behaviour Ysc.StripeBehaviour
+
+          def create_payment_intent(_params, _opts),
+            do: {:error, :not_implemented}
+
+          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+          def create_customer(_params), do: {:error, :not_implemented}
+          def update_customer(_id, _params), do: {:error, :not_implemented}
+          def retrieve_payment_method(_id), do: {:error, :not_implemented}
+          def list_events(_params, _opts), do: {:error, :not_implemented}
+          def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+          def list_balance_transactions(_params, _opts),
+            do: {:error, :not_implemented}
+
+          def retrieve_payment_intent(id, _opts) do
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: id,
+               status: "succeeded",
+               amount: 50_000,
+               customer: nil,
+               payment_method: nil,
+               latest_charge: nil
+             }}
+          end
+        end
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
+      ensure_receipt_buyout_base_pricing!()
+
+      user = user_fixture()
+      admin = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: admin.id,
+            benefit_kind: :fixed_amount_off,
+            amount_off: Money.new(:USD, 25)
+          },
+          send_notification: false
+        )
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      assert {:ok, booking_a} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      booking_b =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          property: :tahoe,
+          booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 4,
+          children_count: 0,
+          total_price: Money.new(500, :USD)
+        })
+        |> change(%{applied_booking_entitlement_id: entitlement.id})
+        |> Repo.update!()
+
+      assert :ok =
+               Entitlements.consume_for_booking!(entitlement.id, booking_a.id)
+
+      payment_intent_id =
+        "pi_receipt_entitlement_#{System.unique_integer([:positive])}"
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking_b.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+        )
+
+      assert html =~ "issue confirming your booking"
+
+      reloaded = Repo.get!(Booking, booking_b.id)
+      assert reloaded.status == :hold
+      assert receipt_ledger_payment_count(booking_b.id) == 0
+    end
   end
 
   describe "confirm-cancel" do
@@ -1118,5 +1226,45 @@ defmodule YscWeb.BookingReceiptLiveTest do
       })
 
     payment
+  end
+
+  defp receipt_ledger_payment_count(booking_id) do
+    case Bookings.get_booking_payment(%Booking{id: booking_id}) do
+      {:ok, _} -> 1
+      {:error, :payment_not_found} -> 0
+    end
+  end
+
+  defp ensure_receipt_buyout_base_pricing! do
+    for prop <- [:tahoe, :clear_lake] do
+      case Bookings.create_pricing_rule(%{
+             amount: Money.new(430, :USD),
+             booking_mode: :buyout,
+             price_unit: :buyout_fixed,
+             property: prop,
+             season_id: nil,
+             room_id: nil,
+             room_category_id: nil
+           }) do
+        {:ok, _} ->
+          :ok
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          if duplicate_receipt_buyout_pricing_rule?(cs),
+            do: :ok,
+            else: raise(cs)
+
+        {:error, other} ->
+          raise("unexpected create_pricing_rule: #{inspect(other)}")
+      end
+    end
+
+    :ok
+  end
+
+  defp duplicate_receipt_buyout_pricing_rule?(%Ecto.Changeset{} = cs) do
+    Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
+      meta[:constraint] == :unique
+    end)
   end
 end

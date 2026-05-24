@@ -315,6 +315,35 @@ defmodule Ysc.MembershipCheckInTest do
       assert result != nil
       assert result.membership_status == :inactive
     end
+
+    test "batch-loads checked_in? for multiple users in one search", %{
+      admin: admin,
+      session: session
+    } do
+      checked_in_member = make_active_member()
+      pending_member = make_active_member()
+
+      {:ok, _} = Scanning.check_in_member(session, checked_in_member, admin)
+
+      # Shared last name so one search returns both users.
+      shared_last = "BatchCheckin#{System.unique_integer([:positive])}"
+
+      checked_in_member =
+        checked_in_member
+        |> Ecto.Changeset.change(last_name: shared_last)
+        |> Ysc.Repo.update!()
+
+      pending_member =
+        pending_member
+        |> Ecto.Changeset.change(last_name: shared_last)
+        |> Ysc.Repo.update!()
+
+      results = Scanning.search_users_for_checkin(session.id, shared_last)
+      ids = Map.new(results, &{&1.user.id, &1.checked_in?})
+
+      assert ids[checked_in_member.id] == true
+      assert ids[pending_member.id] == false
+    end
   end
 
   # ---------------------------------------------------------------------------
