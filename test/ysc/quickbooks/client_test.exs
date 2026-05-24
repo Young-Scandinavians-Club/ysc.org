@@ -105,26 +105,6 @@ defmodule Ysc.Quickbooks.ClientTest do
   end
 
   describe "error handling" do
-    setup do
-      prev = Application.get_env(:ysc, :quickbooks, [])
-
-      Application.put_env(
-        :ysc,
-        :quickbooks,
-        Keyword.merge(prev,
-          client_id: nil,
-          client_secret: nil,
-          company_id: nil,
-          access_token: nil,
-          refresh_token: nil,
-          realm_id: nil
-        )
-      )
-
-      on_exit(fn -> Application.put_env(:ysc, :quickbooks, prev) end)
-      :ok
-    end
-
     test "returns error when QuickBooks credentials are not configured" do
       # These functions check configuration before making requests
       # Without valid config, they should return configuration errors

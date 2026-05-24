@@ -59,6 +59,8 @@ defmodule Ysc.EmailValidatorTestHelper do
   """
   def with_real_mx_lookup(fun) when is_function(fun, 0) do
     prev_app = Application.get_env(:ysc, EmailValidator)
+    prev_proc = Process.get(@process_mx_override_key)
+
     Process.delete(@process_mx_override_key)
 
     case prev_app do
@@ -78,7 +80,10 @@ defmodule Ysc.EmailValidatorTestHelper do
     try do
       fun.()
     after
-      Process.delete(@process_mx_override_key)
+      case prev_proc do
+        nil -> Process.delete(@process_mx_override_key)
+        val -> Process.put(@process_mx_override_key, val)
+      end
 
       case prev_app do
         nil -> Application.delete_env(:ysc, EmailValidator)

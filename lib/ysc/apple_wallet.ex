@@ -321,21 +321,29 @@ defmodule Ysc.AppleWallet do
 
   defp passbook_generate(pass, icon_files, certs, pass_name) do
     case Application.get_env(:ysc, :apple_wallet_passbook_generator) do
-      mod when is_atom(mod) ->
-        mod.generate(pass, icon_files, certs, pass_name)
+      mod when is_atom(mod) and not is_nil(mod) ->
+        if function_exported?(mod, :generate, 4) do
+          mod.generate(pass, icon_files, certs, pass_name)
+        else
+          passbook_generate_with_passbook(pass, icon_files, certs, pass_name)
+        end
 
       _ ->
-        Passbook.generate(
-          pass,
-          icon_files,
-          certs.wwdr,
-          certs.cert,
-          certs.key,
-          certs.password,
-          target_path: System.tmp_dir!() <> "/",
-          pass_name: pass_name
-        )
+        passbook_generate_with_passbook(pass, icon_files, certs, pass_name)
     end
+  end
+
+  defp passbook_generate_with_passbook(pass, icon_files, certs, pass_name) do
+    Passbook.generate(
+      pass,
+      icon_files,
+      certs.wwdr,
+      certs.cert,
+      certs.key,
+      certs.password,
+      target_path: System.tmp_dir!() <> "/",
+      pass_name: pass_name
+    )
   end
 
   defp apple_wallet_icon(filename) when is_binary(filename) do

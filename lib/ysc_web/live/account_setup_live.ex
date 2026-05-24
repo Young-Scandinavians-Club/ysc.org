@@ -7,16 +7,17 @@ defmodule YscWeb.AccountSetupLive do
   alias Ysc.Customers
   alias Ysc.Payments
 
-  @payment_method_module Application.compile_env(
-                           :ysc,
-                           :stripe_payment_method_module,
-                           Stripe.PaymentMethod
-                         )
-  @customer_module Application.compile_env(
-                     :ysc,
-                     :stripe_customer_module,
-                     Stripe.Customer
-                   )
+  defp payment_method_module do
+    Application.get_env(
+      :ysc,
+      :stripe_payment_method_module,
+      Stripe.PaymentMethod
+    )
+  end
+
+  defp customer_module do
+    Application.get_env(:ysc, :stripe_customer_module, Stripe.Customer)
+  end
 
   @impl true
   def render(assigns) do
@@ -1413,12 +1414,12 @@ defmodule YscWeb.AccountSetupLive do
       {:noreply, socket}
     else
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             @payment_method_module.retrieve(payment_method_id)
+             payment_method_module().retrieve(payment_method_id)
            end) do
         {:ok, stripe_payment_method} ->
           _ =
             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-              @payment_method_module.update(payment_method_id, %{
+              payment_method_module().update(payment_method_id, %{
                 metadata: %{"set_as_default" => "true"}
               })
             end)
@@ -1430,7 +1431,7 @@ defmodule YscWeb.AccountSetupLive do
             {:ok, _} ->
               _ =
                 Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                  @customer_module.update(
+                  customer_module().update(
                     user.stripe_id,
                     %{
                       invoice_settings: %{
