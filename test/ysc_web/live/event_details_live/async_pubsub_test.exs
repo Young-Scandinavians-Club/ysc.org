@@ -8,7 +8,10 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
 
   alias Ysc.Repo
   alias Ysc.Tickets.TicketOrder
+  alias Ysc.Events.Ticket
+  alias Ysc.Events.TicketReservation
   alias Ysc.MessagePassingEvents.TicketAvailabilityUpdated
+  alias Ysc.MessagePassingEvents.TicketReservationCreated
   alias Ysc.MessagePassingEvents.CheckoutSessionCancelled
   alias Ysc.MessagePassingEvents.CheckoutSessionExpired
 
@@ -166,6 +169,65 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
 
       html = render(view)
       assert is_binary(html)
+    end
+  end
+
+  describe "PubSub ticket reservation events" do
+    test "TicketReservationCreated refreshes availability without clearing sold-out state",
+         %{conn: conn, user: user} do
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          state: :upcoming
+        )
+
+      event = Repo.preload(event, :ticket_tiers, force: true)
+
+      tier =
+        event.ticket_tiers
+        |> hd()
+        |> Ecto.Changeset.change(quantity: 2)
+        |> Repo.update!()
+
+      expires_at =
+        DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 1, :day)
+
+      for _ <- 1..2 do
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at: expires_at
+        }
+        |> Repo.insert!()
+      end
+
+      reservation =
+        %TicketReservation{}
+        |> TicketReservation.changeset(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          created_by_id: user.id,
+          quantity: 1,
+          expires_at: expires_at
+        })
+        |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      html = render_async(view)
+
+      assert html =~ "Sold Out"
+
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        "events",
+        {Ysc.Events, %TicketReservationCreated{ticket_reservation: reservation}}
+      )
+
+      html = render(view)
+      assert html =~ "Sold Out"
     end
   end
 
