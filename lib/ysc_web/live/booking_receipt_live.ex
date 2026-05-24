@@ -1386,7 +1386,7 @@ defmodule YscWeb.BookingReceiptLive do
       pm_id when is_binary(pm_id) ->
         # Retrieve the full payment method from Stripe
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.PaymentMethod.retrieve(pm_id)
+               stripe_payment_method_module().retrieve(pm_id)
              end) do
           {:ok, stripe_payment_method} ->
             # Get the user to sync the payment method
@@ -1996,5 +1996,13 @@ defmodule YscWeb.BookingReceiptLive do
     else
       nil
     end
+  end
+
+  defp stripe_payment_method_module do
+    Application.get_env(
+      :ysc,
+      :stripe_payment_method_module,
+      Stripe.PaymentMethod
+    )
   end
 end

@@ -12,4 +12,14 @@ defmodule Ysc.Stripe.PaymentMethodBehaviour do
 
   @callback list(params :: map()) ::
               {:ok, Stripe.List.t(any())} | {:error, Stripe.Error.t()}
+
+  @callback update(payment_method_id :: String.t(), params :: map()) ::
+              {:ok, Stripe.PaymentMethod.t()} | {:error, Stripe.Error.t()}
+
+  @callback update(
+              payment_method_id :: String.t(),
+              params :: map(),
+              opts :: keyword()
+            ) ::
+              {:ok, Stripe.PaymentMethod.t()} | {:error, Stripe.Error.t()}
 end

@@ -11,7 +11,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
   alias Ysc.Repo
 
   defp create_user_with_lifetime_membership(attrs \\ %{}) do
-    user_fixture(attrs)
+    user_fixture_fast(attrs)
     |> Ecto.Changeset.change(
       lifetime_membership_awarded_at:
         DateTime.truncate(DateTime.utc_now(), :second)
@@ -780,7 +780,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         )
 
       invitee =
-        user_fixture(%{
+        user_fixture_fast(%{
           email: "family.link.member+inbox@gmail.com",
           first_name: "Invitee",
           last_name: "Alias"

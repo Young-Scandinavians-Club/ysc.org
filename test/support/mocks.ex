@@ -1,4 +1,5 @@
 Mox.defmock(Stripe.CustomerMock, for: Stripe.CustomerBehaviour)
+Mox.defmock(Stripe.SubscriptionMock, for: Stripe.SubscriptionBehaviour)
 Mox.defmock(Ysc.AccountsMock, for: Ysc.Accounts.Behaviour)
 Mox.defmock(Ysc.Quickbooks.ClientMock, for: Ysc.Quickbooks.ClientBehaviour)
 Mox.defmock(Ysc.StripeMock, for: Ysc.StripeBehaviour)

@@ -1,6 +1,13 @@
 import Config
 
+# Newsletter MX checks: never hit real DNS in tests unless @tag :external_dns
+config :ysc, Ysc.Newsletter.EmailValidator,
+  mx_resolver: fn _domain -> :ok end,
+  mx_lookup_timeout_ms: 200
+
 config :ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock
+
+# Credential keys are cleared in test/test_helper.exs so host .env never triggers Intuit HTTP.
 
 # Skip SNS signature verification in tests (no real AWS cert to fetch)
 config :ysc, :sns_skip_signature_verification, true
@@ -26,6 +33,7 @@ config :ysc,
   stripe_setup_intent_module: Ysc.TestStripeSetupIntent,
   stripe_payment_intent_module: Stripe.PaymentIntentMock,
   stripe_customer_module: Stripe.CustomerMock,
+  stripe_subscription_module: Stripe.SubscriptionMock,
   stripe_invoice_module: Stripe.InvoiceMock,
   customers_module: Ysc.CustomersMock,
   payments_module: Ysc.PaymentsMock,
@@ -156,3 +164,17 @@ config :wax_,
 
 # Disable season cache in tests to avoid race conditions with async tests
 config :ysc, :season_cache_enabled, false
+
+# Fail fast on accidental real Stripe HTTP (no retries; dummy key if unset)
+config :stripity_stripe,
+  api_key: System.get_env("STRIPE_SECRET") || "sk_test_stub_no_network",
+  public_key: System.get_env("STRIPE_PUBLIC_KEY") || "pk_test_stub"
+
+config :stripity_stripe, :retries, max_attempts: 1
+
+# Avoid real S3 uploads and OpenSSL pass signing in tests
+config :ysc, :media_s3_uploader, Ysc.Media.TestS3Uploader
+
+config :ysc,
+       :apple_wallet_passbook_generator,
+       Ysc.AppleWallet.TestPassbookGenerator

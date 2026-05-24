@@ -27,6 +27,7 @@ defmodule Ysc.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import Ysc.DataCase
+      import Ysc.EmailValidatorTestHelper
       import Mox
     end
   end
@@ -69,18 +70,21 @@ defmodule Ysc.DataCase do
        }}
     end)
 
-    # Stripe PaymentMethod: return a generic mock payment method
-    stub(Stripe.PaymentMethodMock, :retrieve, fn _id ->
-      {:ok, %Stripe.PaymentMethod{id: "pm_stub", type: "card"}}
-    end)
+    stub_with(Stripe.PaymentMethodMock, Ysc.TestStripePaymentMethodStub)
 
-    stub(Stripe.PaymentMethodMock, :list, fn _params ->
+    # Stripe Customer.create: deterministic test IDs from metadata user_id
+    stub(Stripe.CustomerMock, :create, fn params ->
+      user_id =
+        case params do
+          %{metadata: %{user_id: id}} -> id
+          %{"metadata" => %{"user_id" => id}} -> id
+          _ -> :erlang.unique_integer([:positive])
+        end
+
       {:ok,
-       %Stripe.List{
-         data: [],
-         has_more: false,
-         object: "list",
-         url: "/v1/payment_methods"
+       %Stripe.Customer{
+         id: "cus_test_#{user_id}",
+         email: Map.get(params, :email) || Map.get(params, "email")
        }}
     end)
 
@@ -92,6 +96,16 @@ defmodule Ysc.DataCase do
          invoice_settings: %{default_payment_method: nil}
        }}
     end)
+
+    stub(Stripe.CustomerMock, :update, fn id, _params, _opts ->
+      {:ok,
+       %Stripe.Customer{
+         id: id,
+         invoice_settings: %{default_payment_method: nil}
+       }}
+    end)
+
+    stub_with(Stripe.SubscriptionMock, Ysc.TestStripeSubscriptionStub)
 
     # Stripe Invoice: return empty list and not-found for retrieve/pay
     stub(Stripe.InvoiceMock, :list, fn _params ->

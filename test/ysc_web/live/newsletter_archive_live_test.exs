@@ -131,13 +131,13 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
     test "subscribe_newsletter shows error for domain with no MX records", %{
       conn: conn
     } do
+      stub_mx_no_records()
       clear_newsletter_rate_limit()
 
       {:ok, view, _html} = live(conn, ~p"/newsletters")
       render_async(view)
 
-      domain =
-        "nonexistent-domain-#{System.unique_integer([:positive])}-test.com"
+      domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
 
       html =
         view

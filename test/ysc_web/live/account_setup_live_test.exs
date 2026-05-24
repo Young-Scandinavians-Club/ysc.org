@@ -30,7 +30,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
   # Creates a pending user with all setup incomplete.
   defp unverified_pending_user(attrs \\ %{}) do
-    user_fixture(
+    user_fixture_fast(
       Map.merge(
         %{
           state: :pending_approval,
@@ -52,7 +52,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   # Creates an active user who still needs to set a password (skips payment step).
   defp active_user_needing_password do
     user =
-      user_fixture(%{
+      user_fixture_fast(%{
         state: :active,
         email_verified_at: nil,
         password_set_at: nil
@@ -65,7 +65,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   # Creates an active user who needs password and has no phone stored.
   defp active_user_needing_password_no_phone do
     user =
-      user_fixture(%{
+      user_fixture_fast(%{
         state: :active,
         email_verified_at: nil,
         password_set_at: nil,

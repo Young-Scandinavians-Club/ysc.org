@@ -39,11 +39,6 @@ This document provides a visual overview of how all the pieces fit together in y
 │  │  │  MinIO (9000 API / 9001 console)    │                           │  │
 │  │  │  (S3-compatible storage for uploads) │                           │  │
 │  │  └─────────────────────────────────────┘                           │  │
-│  │           │                                                         │  │
-│  │  ┌────────▼────────────────────────────┐                           │  │
-│  │  │  PgAdmin (Port 8888)                │                           │  │
-│  │  │  (Database management UI)           │                           │  │
-│  │  └─────────────────────────────────────┘                           │  │
 │  └─────────────────────────────────────────────────────────────────────┘  │
 │                                                                           │
 │  ┌───────────────────────────────────────────────────────────────────┐  │
@@ -156,7 +151,6 @@ User subscribes → Phoenix LiveView → Save to YSC DB
 | PostgreSQL    | 5432 | localhost:5432                   | Database                   |
 | MinIO S3 API    | 9000 | http://localhost:9000            | Local S3-compatible API    |
 | MinIO Console   | 9001 | http://localhost:9001            | Bucket/object web UI       |
-| PgAdmin       | 8888 | http://localhost:8888            | Database management UI     |
 
 ## Environment Files
 
@@ -253,7 +247,6 @@ ysc-redesign-ex/
 ### Development Services (Docker)
 - **PostgreSQL**: Database for the YSC app
 - **MinIO**: S3-compatible storage (buckets seeded via `minio-init` in docker-compose)
-- **PgAdmin**: Database management UI
 
 ## Understanding the Codebase
 
@@ -336,8 +329,8 @@ lib/
    └── Docker container logs: docker-compose logs
 
 3. Inspect database
-   ├── Use PgAdmin: http://localhost:8888
-   └── Or psql: PGPASSWORD=postgres psql -h localhost -U postgres -d ysc_dev
+   └── psql: PGPASSWORD=postgres psql -h localhost -U postgres -d ysc_dev
+       (or docker compose -f etc/docker/docker-compose.yml exec postgres psql -U postgres -d ysc_dev)
 ```
 
 ### Testing Newsletters
@@ -397,7 +390,7 @@ lib/
 
 ## Additional Resources
 
-- **README.md**: Full setup instructions
+- **README.md**: Overview and quick setup; **NEW_DEVELOPER_GUIDE.md** for detailed install
 - **QUICKREF.md**: Quick reference for common commands
 - **docs/TROUBLESHOOTING.md**: Detailed troubleshooting guide
 - **docs/**: Additional project documentation

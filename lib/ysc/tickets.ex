@@ -1295,7 +1295,7 @@ defmodule Ysc.Tickets do
       payment_method_id when is_binary(payment_method_id) ->
         # Retrieve the full payment method from Stripe
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.PaymentMethod.retrieve(payment_method_id)
+               stripe_payment_method_module().retrieve(payment_method_id)
              end) do
           {:ok, stripe_payment_method} ->
             user = Ysc.Accounts.get_user!(user_id)
@@ -1567,5 +1567,13 @@ defmodule Ysc.Tickets do
 
         :error
     end
+  end
+
+  defp stripe_payment_method_module do
+    Application.get_env(
+      :ysc,
+      :stripe_payment_method_module,
+      Stripe.PaymentMethod
+    )
   end
 end

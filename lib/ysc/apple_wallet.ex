@@ -254,15 +254,11 @@ defmodule Ysc.AppleWallet do
     icon_files = base_files ++ strip_files
 
     result =
-      Passbook.generate(
+      passbook_generate(
         pass,
         icon_files,
-        certs.wwdr,
-        certs.cert,
-        certs.key,
-        certs.password,
-        target_path: System.tmp_dir!() <> "/",
-        pass_name: "ticket-#{ticket.reference_id}"
+        certs,
+        "ticket-#{ticket.reference_id}"
       )
 
     Enum.each(strip_tmp_paths, &File.rm/1)
@@ -320,6 +316,24 @@ defmodule Ysc.AppleWallet do
       "logo@2x.png": apple_wallet_icon("logo@2x.png")
     ]
 
+    passbook_generate(pass, icon_files, certs, "membership-#{user.id}")
+  end
+
+  defp passbook_generate(pass, icon_files, certs, pass_name) do
+    case Application.get_env(:ysc, :apple_wallet_passbook_generator) do
+      mod when is_atom(mod) and not is_nil(mod) ->
+        if function_exported?(mod, :generate, 4) do
+          mod.generate(pass, icon_files, certs, pass_name)
+        else
+          passbook_generate_with_passbook(pass, icon_files, certs, pass_name)
+        end
+
+      _ ->
+        passbook_generate_with_passbook(pass, icon_files, certs, pass_name)
+    end
+  end
+
+  defp passbook_generate_with_passbook(pass, icon_files, certs, pass_name) do
     Passbook.generate(
       pass,
       icon_files,
@@ -328,7 +342,7 @@ defmodule Ysc.AppleWallet do
       certs.key,
       certs.password,
       target_path: System.tmp_dir!() <> "/",
-      pass_name: "membership-#{user.id}"
+      pass_name: pass_name
     )
   end
 

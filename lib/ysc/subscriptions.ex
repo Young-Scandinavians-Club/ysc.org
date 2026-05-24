@@ -418,6 +418,10 @@ defmodule Ysc.Subscriptions do
     )
   end
 
+  defp stripe_subscription_module do
+    Application.get_env(:ysc, :stripe_subscription_module, Stripe.Subscription)
+  end
+
   defp do_get_scheduled_downgrade_info(%Subscription{} = subscription) do
     with {:ok, stripe_sub} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -1263,13 +1267,13 @@ defmodule Ysc.Subscriptions do
 
       if idempotency_key do
         Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          Stripe.Subscription.create(stripe_params,
+          stripe_subscription_module().create(stripe_params,
             headers: %{"Idempotency-Key" => idempotency_key}
           )
         end)
       else
         Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          Stripe.Subscription.create(stripe_params)
+          stripe_subscription_module().create(stripe_params)
         end)
       end
     end

@@ -32,21 +32,13 @@ defmodule Ysc.AppleWalletTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  # Starts a Plug.Cowboy HTTP server on a random free port.
-  # Registers an on_exit callback to shut it down after each test.
-  defp start_http_server(plug_module) do
-    {:ok, socket} =
-      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
-
-    {:ok, port} = :inet.port(socket)
-    :gen_tcp.close(socket)
-
-    ref = :"apple_wallet_http_#{port}_#{System.unique_integer([:positive])}"
-    {:ok, _} = Plug.Cowboy.http(plug_module, [], port: port, ref: ref)
-
-    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
-
-    port
+  setup_all do
+    {:ok,
+     test_image_port:
+       Ysc.HttpTestServer.ensure_started(
+         Ysc.AppleWallet.TestImagePlug,
+         :apple_wallet_test_image
+       )}
   end
 
   defp member_with_confirmed_ticket do
@@ -441,9 +433,9 @@ defmodule Ysc.AppleWalletTest do
     test "downloads the cover image and includes it as a strip file", %{
       user: user,
       ticket: ticket,
-      event: event
+      event: event,
+      test_image_port: port
     } do
-      port = start_http_server(Ysc.AppleWallet.TestImagePlug)
       url = "http://127.0.0.1:#{port}/cover.png"
 
       {:ok, image} =

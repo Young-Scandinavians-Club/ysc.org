@@ -1,6 +1,6 @@
 # YSC Development Quick Reference
 
-This is a quick reference guide for common development tasks. For full setup instructions, see [README.md](README.md).
+Quick reference for daily development. Setup overview: [README.md](README.md). Detailed install & env: [docs/NEW_DEVELOPER_GUIDE.md](docs/NEW_DEVELOPER_GUIDE.md).
 
 ## Daily Development Workflow
 
@@ -103,9 +103,6 @@ make dev-setup        # Set up everything from scratch
 - **Email Preview (Swoosh)**: http://localhost:4000/dev/mailbox
   - View all app emails (registration, notifications, tickets, etc.)
   - Emails stored in memory (cleared on restart)
-- **PgAdmin** (Database UI): http://localhost:8888
-  - Email: `admin@ysc.org`
-  - Password: `password`
 - **MinIO** (local S3): API http://localhost:9000, console http://localhost:9001
 
 ## Stripe Testing
@@ -356,18 +353,6 @@ Ysc.Repo.aggregate(Ysc.Accounts.User, :count)
 ```
 
 ## Database Access
-
-### Using PgAdmin
-
-1. Open http://localhost:8888
-2. Login: `admin@ysc.org` / `password`
-3. Add server:
-   - Name: `Local Dev`
-   - Host: `postgres` (or `localhost` from host machine)
-   - Port: `5432`
-   - Database: `ysc_dev`
-   - Username: `postgres`
-   - Password: `postgres`
 
 ### Using psql (Command Line)
 

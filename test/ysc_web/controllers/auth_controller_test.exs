@@ -597,7 +597,7 @@ defmodule YscWeb.AuthControllerTest do
     end
 
     test "successfully authenticates with Facebook", %{conn: conn} do
-      user = user_fixture(%{state: "active", email: "fbuser@facebook.com"})
+      user = user_fixture_fast(%{state: "active", email: "fbuser@facebook.com"})
       auth = build_oauth_auth(user.email, :facebook)
 
       conn =

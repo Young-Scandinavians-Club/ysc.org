@@ -10,7 +10,7 @@ defmodule YscWeb.MediaPickerComponentTest do
   alias Ysc.Repo
 
   defp create_admin(%{conn: conn}) do
-    user = user_fixture(%{role: "admin"})
+    user = user_fixture_fast(%{role: "admin"})
     %{conn: log_in_user(conn, user), admin: user}
   end
 

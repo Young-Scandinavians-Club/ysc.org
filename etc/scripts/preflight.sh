@@ -77,7 +77,7 @@ echo "${GREEN}✓ Sobelow security audit passed${RESET}"
 echo ""
 
 next_step "Running dependency audit..."
-if ! mix deps.audit; then
+if ! mix deps.audit --ignore-file config/mix_audit.ignore; then
   echo "${RED}✗ Dependency audit failed${RESET}"
   exit 1
 fi

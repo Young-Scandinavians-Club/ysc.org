@@ -487,6 +487,17 @@ defmodule Ysc.Media do
 
   def upload_file_to_s3(path, key, opts)
       when is_binary(key) and is_list(opts) do
+    case Application.get_env(:ysc, :media_s3_uploader) do
+      mod when is_atom(mod) and not is_nil(mod) ->
+        mod.upload(path, key, opts)
+
+      _ ->
+        ex_aws_upload_file_to_s3(path, key, opts)
+    end
+  end
+
+  defp ex_aws_upload_file_to_s3(path, key, opts)
+       when is_binary(key) and is_list(opts) do
     bucket_name = S3Config.bucket_name()
     key = String.trim_leading(key, "/")
 

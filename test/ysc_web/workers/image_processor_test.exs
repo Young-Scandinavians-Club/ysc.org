@@ -53,20 +53,16 @@ defmodule YscWeb.Workers.ImageProcessorTest do
     end
   end
 
-  defp start_http_server(plug_module) do
-    {:ok, socket} =
-      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
-
-    {:ok, port} = :inet.port(socket)
-    :gen_tcp.close(socket)
-
-    ref = :"image_processor_http_#{port}_#{System.unique_integer([:positive])}"
-
-    {:ok, _} = Plug.Cowboy.http(plug_module, [], port: port, ref: ref)
-
-    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
-
-    port
+  setup_all do
+    {:ok,
+     http_ports: %{
+       png:
+         Ysc.HttpTestServer.ensure_started(ServePngPlug, :image_processor_png),
+       text:
+         Ysc.HttpTestServer.ensure_started(ServeTextPlug, :image_processor_text),
+       not_found:
+         Ysc.HttpTestServer.ensure_started(Serve404Plug, :image_processor_404)
+     }}
   end
 
   describe "perform/1" do
@@ -86,9 +82,9 @@ defmodule YscWeb.Workers.ImageProcessorTest do
       assert {:error, "Image not found"} = result
     end
 
-    test "sets image processing_state to failed when downloaded bytes fail image validation" do
+    test "sets image processing_state to failed when downloaded bytes fail image validation",
+         %{http_ports: %{text: port}} do
       _ = Application.ensure_all_started(:inets)
-      port = start_http_server(ServeTextPlug)
 
       image =
         create_test_image(%{
@@ -111,9 +107,9 @@ defmodule YscWeb.Workers.ImageProcessorTest do
       assert updated.processing_state == :failed
     end
 
-    test "sets image processing_state to failed when HTTP response is not saved to file" do
+    test "sets image processing_state to failed when HTTP response is not saved to file",
+         %{http_ports: %{not_found: port}} do
       _ = Application.ensure_all_started(:inets)
-      port = start_http_server(Serve404Plug)
 
       image =
         create_test_image(%{
@@ -161,9 +157,9 @@ defmodule YscWeb.Workers.ImageProcessorTest do
       assert updated.processing_state == :failed
     end
 
-    test "reuses an existing completed image when the raw file hash matches" do
+    test "reuses an existing completed image when the raw file hash matches",
+         %{http_ports: %{png: port}} do
       _ = Application.ensure_all_started(:inets)
-      port = start_http_server(ServePngPlug)
 
       expected_hash = Media.compute_file_hash(@tiny_png_path)
 
@@ -213,9 +209,9 @@ defmodule YscWeb.Workers.ImageProcessorTest do
       assert reloaded.thumbnail_path == source.thumbnail_path
     end
 
-    test "does not short-circuit when the only matching hash belongs to the image itself" do
+    test "does not short-circuit when the only matching hash belongs to the image itself",
+         %{http_ports: %{png: port}} do
       _ = Application.ensure_all_started(:inets)
-      port = start_http_server(ServePngPlug)
 
       expected_hash = Media.compute_file_hash(@tiny_png_path)
 

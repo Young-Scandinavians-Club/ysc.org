@@ -54,7 +54,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 pid_format=$!
 
 (
-  mix deps.audit >"$tmpdir/audit.log" 2>&1 &&
+  mix deps.audit --ignore-file config/mix_audit.ignore >"$tmpdir/audit.log" 2>&1 &&
     echo "✓ deps.audit" >"$tmpdir/audit.status" ||
     echo "✗ deps.audit" >"$tmpdir/audit.status"
 ) &

@@ -218,6 +218,13 @@ defmodule Ysc.Logging do
   end
 
   @doc """
+  Sets the log level for an OTP application (passthrough to `Logger.put_application_level/2`).
+  """
+  def put_application_level(app, level) do
+    Logger.put_application_level(app, level)
+  end
+
+  @doc """
   Log a debug message (no Sentry capture).
   """
   defmacro debug(message, opts \\ []) do
