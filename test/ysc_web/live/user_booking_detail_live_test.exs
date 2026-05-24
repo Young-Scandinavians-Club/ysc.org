@@ -85,8 +85,9 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn = get(conn, ~p"/bookings/#{booking.id}")
       html = html_response(conn, 200)
 
-      assert html =~ "Loading payment details"
-      refute html =~ "Payment Summary"
+      assert html =~ "Loading payment details..."
+      refute html =~ "Payment Method"
+      refute html =~ "Total Paid"
     end
 
     test "connected LiveView loads payment summary after mount", %{conn: conn} do
