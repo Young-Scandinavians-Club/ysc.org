@@ -12,7 +12,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 12 (LOW)      Email address exposed in URL during email-change flow
   Finding 13 (LOW)      User's email interpolated in OAuth reauth error flash message
   Finding 14 (CRITICAL) Registration mass assignment allowed role/state escalation
-  Finding 15 (HIGH)     Family invite accept allowed a different email than the invite
+  Finding 15 (HIGH)     AccountSetupLive IDOR on post-verification setup events
+  Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -537,10 +538,49 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Finding 15 (HIGH): Family invite accept must require invite email
+  # Finding 15 (HIGH): AccountSetupLive IDOR on post-verification events
   # ---------------------------------------------------------------------------
 
-  describe "Finding 15: accept_invite rejects email mismatch" do
+  describe "Finding 15: AccountSetupLive setup events require ownership" do
+    test "authenticated non-owner cannot set victim password via save_password",
+         %{} do
+      victim =
+        user_fixture(%{
+          state: :active,
+          email_verified_at: nil,
+          password_set_at: nil
+        })
+
+      {:ok, victim} = Accounts.mark_email_verified(victim)
+
+      attacker_password = "blocked_by_owner_check_99!"
+      conn = log_in_user(build_conn(), user_fixture())
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{victim.id}")
+
+      view
+      |> render_submit("save_password", %{
+        "user" => %{
+          "password" => attacker_password,
+          "password_confirmation" => attacker_password
+        }
+      })
+
+      victim = Accounts.get_user!(victim.id)
+      assert is_nil(victim.password_set_at)
+
+      refute Accounts.get_user_by_email_and_password(
+               victim.email,
+               attacker_password
+             )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 16 (HIGH): Family invite accept must require invite email
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 16: accept_invite rejects email mismatch" do
     test "accept_invite returns email_mismatch when attrs email differs from invite",
          %{} do
       alias Ysc.Accounts.FamilyInvites
@@ -553,12 +593,15 @@ defmodule YscWeb.SecurityAuditTest do
         )
         |> Repo.update!()
 
-      invited_email = "invited_#{System.unique_integer([:positive])}@example.com"
+      invited_email =
+        "invited_#{System.unique_integer([:positive])}@example.com"
+
       {:ok, invite} = FamilyInvites.create_invite(primary, invited_email)
 
       assert {:error, :email_mismatch} =
                FamilyInvites.accept_invite(invite.token, %{
-                 email: "attacker_#{System.unique_integer([:positive])}@example.com",
+                 email:
+                   "attacker_#{System.unique_integer([:positive])}@example.com",
                  password: "password1234",
                  first_name: "Bad",
                  last_name: "Actor",

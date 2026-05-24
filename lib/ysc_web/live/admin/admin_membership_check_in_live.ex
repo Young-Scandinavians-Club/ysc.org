@@ -368,8 +368,6 @@ defmodule YscWeb.AdminMembershipCheckInLive do
       Scanning.subscribe_membership_checkin(session_id)
     end
 
-    checked_in_count = Scanning.membership_check_in_count(session_id)
-
     socket =
       socket
       |> assign(:active_page, :scanner)
@@ -377,7 +375,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
       |> assign(:session, session)
       |> assign(:search_query, "")
       |> assign(:search_results, [])
-      |> assign(:checked_in_count, checked_in_count)
+      |> assign(:checked_in_count, 0)
       |> assign(:loading, true)
       |> stream(:checked_in_members, [])
 

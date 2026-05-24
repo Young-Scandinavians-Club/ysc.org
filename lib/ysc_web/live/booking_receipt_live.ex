@@ -1256,11 +1256,11 @@ defmodule YscWeb.BookingReceiptLive do
       end
 
     # Stripe rejects `expand[]=latest_charge.payment_method` on PaymentIntent retrieve.
-    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.PaymentIntent.retrieve(payment_intent_id, %{
-             expand: ["payment_method", "latest_charge"]
-           })
-         end) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["payment_method", "latest_charge"]
+         }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
           reloaded_booking =

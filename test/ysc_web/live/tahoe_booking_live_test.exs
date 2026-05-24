@@ -54,6 +54,22 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "Tahoe"
     end
 
+    test "shows readable essential alerts for members", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+      html = render(view)
+
+      assert html =~ "Bring your own bed linens"
+      assert html =~ "No pets or smoking"
+      assert html =~ "Winter: carry chains or use 4WD with snow tires"
+      assert html =~ "please help with chores before you leave"
+      refute html =~ "BRING YOUR OWN LINENS"
+      refute html =~ "NOT A HOTEL"
+    end
+
     test "sets page title", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)

@@ -829,7 +829,9 @@ defmodule YscWeb.TahoeBookingLive do
                 <p class="text-xs font-black text-blue-400 uppercase">
                   Mandatory
                 </p>
-                <p class="text-xs font-bold leading-tight">BRING YOUR OWN LINENS</p>
+                <p class="text-xs font-bold leading-tight">
+                  Bring your own bed linens
+                </p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -838,7 +840,7 @@ defmodule YscWeb.TahoeBookingLive do
                 <p class="text-xs font-black text-zinc-400 uppercase">
                   Enforced
                 </p>
-                <p class="text-xs font-bold leading-tight">NO PETS / NO SMOKING</p>
+                <p class="text-xs font-bold leading-tight">No pets or smoking</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
@@ -848,7 +850,7 @@ defmodule YscWeb.TahoeBookingLive do
                   Safety
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  WINTER 4WD / CHAINS REQ.
+                  Winter: carry chains or use 4WD with snow tires
                 </p>
               </div>
             </div>
@@ -859,7 +861,7 @@ defmodule YscWeb.TahoeBookingLive do
                   Community
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  NOT A HOTEL: DO CHORES
+                  Member-run cabin — please help with chores before you leave
                 </p>
               </div>
             </div>

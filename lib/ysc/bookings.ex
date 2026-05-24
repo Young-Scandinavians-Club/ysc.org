@@ -2563,7 +2563,7 @@ defmodule Ysc.Bookings do
         where: e.related_entity_id == ^booking.id,
         where: e.debit_credit == "debit",
         where: a.name == "stripe_account",
-        preload: [:payment],
+        preload: [payment: :payment_method],
         order_by: [desc: e.inserted_at],
         limit: 1
       )
