@@ -54,7 +54,7 @@ defmodule Ysc.TestDataFactory do
   def user_with_membership(type \\ :lifetime, attrs \\ %{})
 
   def user_with_membership(:lifetime, attrs) do
-    user = user_fixture(attrs)
+    user = user_fixture_fast(attrs)
 
     {:ok, user} =
       user
@@ -71,7 +71,7 @@ defmodule Ysc.TestDataFactory do
     # Create user and set up mock subscription
     # Note: In real tests, you'd mock the Stripe API calls
     user =
-      user_fixture(
+      user_fixture_fast(
         Map.put(attrs, :stripe_id, "cus_test_#{System.unique_integer()}")
       )
 
@@ -79,7 +79,7 @@ defmodule Ysc.TestDataFactory do
   end
 
   def user_with_membership(:none, attrs) do
-    user_fixture(attrs)
+    user_fixture_fast(attrs)
   end
 
   @doc """

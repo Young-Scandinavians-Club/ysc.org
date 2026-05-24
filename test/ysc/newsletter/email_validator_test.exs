@@ -1,6 +1,8 @@
 defmodule Ysc.Newsletter.EmailValidatorTest do
   use ExUnit.Case, async: false
 
+  import Ysc.EmailValidatorTestHelper
+
   alias Ysc.Newsletter.EmailValidator
 
   setup do
@@ -152,14 +154,26 @@ defmodule Ysc.Newsletter.EmailValidatorTest do
     end
   end
 
-  describe "validate_email/1 (real DNS for MX)" do
-    test "rejects domain with no MX records" do
-      domain =
-        "this-domain-definitely-does-not-exist-#{System.unique_integer([:positive])}.com"
+  describe "validate_email/1 (injected no_mx resolver)" do
+    test "rejects domain when mx resolver returns no_mx_records" do
+      stub_mx_no_records()
+
+      domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
 
       assert {:error, :no_mx_records} =
                EmailValidator.validate_email("user@#{domain}")
     end
+  end
+
+  @tag :external_dns
+  test "rejects domain with no MX records via real DNS", %{} do
+    domain =
+      "this-domain-definitely-does-not-exist-#{System.unique_integer([:positive])}.com"
+
+    with_real_mx_lookup(fn ->
+      assert {:error, :no_mx_records} =
+               EmailValidator.validate_email("user@#{domain}")
+    end)
   end
 
   describe "init_ets_table/0" do

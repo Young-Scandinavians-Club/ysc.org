@@ -7,6 +7,17 @@ defmodule YscWeb.AccountSetupLive do
   alias Ysc.Customers
   alias Ysc.Payments
 
+  @payment_method_module Application.compile_env(
+                           :ysc,
+                           :stripe_payment_method_module,
+                           Stripe.PaymentMethod
+                         )
+  @customer_module Application.compile_env(
+                     :ysc,
+                     :stripe_customer_module,
+                     Stripe.Customer
+                   )
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -1402,12 +1413,12 @@ defmodule YscWeb.AccountSetupLive do
       {:noreply, socket}
     else
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.PaymentMethod.retrieve(payment_method_id)
+             @payment_method_module.retrieve(payment_method_id)
            end) do
         {:ok, stripe_payment_method} ->
           _ =
             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-              Stripe.PaymentMethod.update(payment_method_id, %{
+              @payment_method_module.update(payment_method_id, %{
                 metadata: %{"set_as_default" => "true"}
               })
             end)
@@ -1419,11 +1430,15 @@ defmodule YscWeb.AccountSetupLive do
             {:ok, _} ->
               _ =
                 Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                  Stripe.Customer.update(user.stripe_id, %{
-                    invoice_settings: %{
-                      default_payment_method: payment_method_id
-                    }
-                  })
+                  @customer_module.update(
+                    user.stripe_id,
+                    %{
+                      invoice_settings: %{
+                        default_payment_method: payment_method_id
+                      }
+                    },
+                    []
+                  )
                 end)
 
               # Advance to the next required step (password, phone, or pending-review)

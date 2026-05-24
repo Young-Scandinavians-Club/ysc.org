@@ -49,9 +49,9 @@ defmodule Ysc.NewsletterTest do
     end
 
     test "returns error for domains with no MX records" do
-      # Using a non-existent domain
-      domain =
-        "nonexistent-domain-#{System.unique_integer([:positive])}-test.com"
+      stub_mx_no_records()
+
+      domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
 
       assert {:error, :no_mx_records} =
                Newsletter.subscribe("user@#{domain}")

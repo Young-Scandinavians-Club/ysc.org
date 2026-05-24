@@ -3029,7 +3029,18 @@ defmodule Ysc.Quickbooks.Client do
 
   defp get_access_token do
     if Ysc.Env.test?() do
-      {:ok, "test_access_token"}
+      qb = Application.get_env(:ysc, :quickbooks, [])
+
+      cond do
+        is_binary(qb[:access_token]) and String.trim(qb[:access_token]) != "" ->
+          {:ok, qb[:access_token]}
+
+        credentials_missing?(qb) ->
+          {:error, :quickbooks_access_token_not_configured}
+
+        true ->
+          {:ok, "test_access_token"}
+      end
     else
       # Step 1: Check cache for access token first
       cached_access_token = get_cached_access_token()
@@ -3097,6 +3108,18 @@ defmodule Ysc.Quickbooks.Client do
     else
       {:error, :quickbooks_company_id_not_configured}
     end
+  end
+
+  defp credentials_missing?(qb) do
+    blank? = fn
+      nil -> true
+      "" -> true
+      val when is_binary(val) -> String.trim(val) == ""
+      _ -> false
+    end
+
+    blank?.(qb[:client_id]) and blank?.(qb[:client_secret]) and
+      blank?.(qb[:access_token]) and blank?.(qb[:refresh_token])
   end
 
   defp refresh_access_token do

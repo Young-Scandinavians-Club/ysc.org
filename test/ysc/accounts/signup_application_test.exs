@@ -914,9 +914,13 @@ defmodule Ysc.Accounts.SignupApplicationTest do
 
     test "blocks email with no MX records in production environment" do
       Application.put_env(:ysc, :environment, "production")
+      stub_mx_no_records()
 
-      # Create a user with a domain that has no MX records
-      user = user_fixture(%{email: "test@nonexistentdomain123456789.com"})
+      user =
+        user_fixture(%{
+          email:
+            "user@mx-reject-#{System.unique_integer([:positive])}.example.org"
+        })
 
       attrs =
         valid_application_attrs(%{

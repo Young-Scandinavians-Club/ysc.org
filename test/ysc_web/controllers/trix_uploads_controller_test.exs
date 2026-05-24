@@ -349,6 +349,17 @@ defmodule YscWeb.TrixUploadsControllerTest do
     @tiny_png_path "test/support/fixtures/tiny.png"
 
     setup do
+      # These tests drive ExAws against MockS3Plug; the suite-wide TestS3Uploader
+      # bypasses ExAws and changes upload/timing behaviour for concurrent dedup.
+      prev_uploader = Application.get_env(:ysc, :media_s3_uploader)
+      Application.delete_env(:ysc, :media_s3_uploader)
+
+      on_exit(fn ->
+        if prev_uploader do
+          Application.put_env(:ysc, :media_s3_uploader, prev_uploader)
+        end
+      end)
+
       port = start_mock_s3_server()
       override_exaws_s3_port(port)
       :ok

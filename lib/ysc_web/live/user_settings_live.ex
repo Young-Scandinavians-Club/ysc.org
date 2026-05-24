@@ -4210,12 +4210,12 @@ defmodule YscWeb.UserSettingsLive do
     else
       # Retrieve the payment method from Stripe and store it locally
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.PaymentMethod.retrieve(payment_method_id)
+             stripe_payment_method_module().retrieve(payment_method_id)
            end) do
         {:ok, stripe_payment_method} ->
           _ =
             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-              Stripe.PaymentMethod.update(payment_method_id, %{
+              stripe_payment_method_module().update(payment_method_id, %{
                 metadata: %{"set_as_default" => "true"}
               })
             end)
@@ -4226,11 +4226,15 @@ defmodule YscWeb.UserSettingsLive do
                ) do
             {:ok, _} ->
               case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                     Stripe.Customer.update(user.stripe_id, %{
-                       invoice_settings: %{
-                         default_payment_method: payment_method_id
-                       }
-                     })
+                     stripe_customer_module().update(
+                       user.stripe_id,
+                       %{
+                         invoice_settings: %{
+                           default_payment_method: payment_method_id
+                         }
+                       },
+                       []
+                     )
                    end) do
                 {:ok, _stripe_customer} ->
                   # Reload user and payment methods to get updated info
@@ -4998,11 +5002,15 @@ defmodule YscWeb.UserSettingsLive do
     )
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Customer.update(user.stripe_id, %{
-             invoice_settings: %{
-               default_payment_method: selected_payment_method.provider_id
-             }
-           })
+           stripe_customer_module().update(
+             user.stripe_id,
+             %{
+               invoice_settings: %{
+                 default_payment_method: selected_payment_method.provider_id
+               }
+             },
+             []
+           )
          end) do
       {:ok, _stripe_customer} ->
         Ysc.Logging.info(
@@ -5704,6 +5712,14 @@ defmodule YscWeb.UserSettingsLive do
 
   defp stripe_customer_module do
     Application.get_env(:ysc, :stripe_customer_module, Stripe.Customer)
+  end
+
+  defp stripe_payment_method_module do
+    Application.get_env(
+      :ysc,
+      :stripe_payment_method_module,
+      Stripe.PaymentMethod
+    )
   end
 
   # Helper function to safely fetch user invoices

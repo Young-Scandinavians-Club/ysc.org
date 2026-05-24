@@ -27,6 +27,7 @@ defmodule Ysc.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import Ysc.DataCase
+      import Ysc.EmailValidatorTestHelper
       import Mox
     end
   end
@@ -69,20 +70,7 @@ defmodule Ysc.DataCase do
        }}
     end)
 
-    # Stripe PaymentMethod: return a generic mock payment method
-    stub(Stripe.PaymentMethodMock, :retrieve, fn _id ->
-      {:ok, %Stripe.PaymentMethod{id: "pm_stub", type: "card"}}
-    end)
-
-    stub(Stripe.PaymentMethodMock, :list, fn _params ->
-      {:ok,
-       %Stripe.List{
-         data: [],
-         has_more: false,
-         object: "list",
-         url: "/v1/payment_methods"
-       }}
-    end)
+    stub_with(Stripe.PaymentMethodMock, Ysc.TestStripePaymentMethodStub)
 
     # Stripe Customer.retrieve: e.g. UserSettingsLive verifies customer exists before setup intents
     stub(Stripe.CustomerMock, :retrieve, fn id, _opts ->
@@ -92,6 +80,16 @@ defmodule Ysc.DataCase do
          invoice_settings: %{default_payment_method: nil}
        }}
     end)
+
+    stub(Stripe.CustomerMock, :update, fn id, _params, _opts ->
+      {:ok,
+       %Stripe.Customer{
+         id: id,
+         invoice_settings: %{default_payment_method: nil}
+       }}
+    end)
+
+    stub_with(Stripe.SubscriptionMock, Ysc.TestStripeSubscriptionStub)
 
     # Stripe Invoice: return empty list and not-found for retrieve/pay
     stub(Stripe.InvoiceMock, :list, fn _params ->

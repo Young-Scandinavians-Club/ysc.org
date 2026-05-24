@@ -77,6 +77,16 @@ defmodule Ysc.AccountsFixtures do
   defp maybe_put_enum(attrs, key, value), do: Map.put(attrs, key, value)
 
   @doc """
+  Inserts an active user directly (skips `register_user/1` and Argon2).
+
+  Use when a test needs a logged-in user or DB row but does not exercise
+  registration or password hashing.
+  """
+  def user_fixture_fast(attrs \\ %{}) do
+    oauth_user_fixture(Map.merge(%{state: :active}, attrs))
+  end
+
+  @doc """
   Creates a user without a password (like an OAuth user).
   Directly inserts into the database to bypass password requirement.
   """

@@ -47,6 +47,7 @@ defmodule YscWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import YscWeb.ConnCase
+      import Ysc.EmailValidatorTestHelper
       import Mox
 
       setup tags do
@@ -56,8 +57,13 @@ defmodule YscWeb.ConnCase do
         end
 
         Ysc.DataCase.setup_sandbox(tags)
-        # Ensure basic site settings exist
-        Ysc.Settings.ensure_settings_exist()
+
+        unless tags[:skip_settings_setup] do
+          if Ysc.Repo.aggregate(Ysc.SiteSettings.SiteSetting, :count) == 0 do
+            Ysc.Settings.ensure_settings_exist()
+          end
+        end
+
         Ysc.DataCase.stub_default_external_mocks()
 
         secret_key_base =
@@ -97,6 +103,29 @@ defmodule YscWeb.ConnCase do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_token, token)
+  end
+
+  @doc """
+  Returns `{conn, csrf_token}` by running session + CSRF plugs (no page render).
+
+  Use for controller POST tests instead of `get(conn, ~p"/")` + `fetch_conn_csrf_from_html/1`.
+  The token is valid for any pipeline that uses `:protect_from_forgery` on the same session.
+  """
+  def fetch_conn_csrf(conn) do
+    conn =
+      conn
+      |> ensure_test_session()
+      |> Plug.Conn.fetch_session()
+      |> Plug.CSRFProtection.call(Plug.CSRFProtection.init([]))
+
+    {conn, Plug.CSRFProtection.get_csrf_token()}
+  end
+
+  defp ensure_test_session(%{private: %{plug_session_fetch: :done}} = conn),
+    do: conn
+
+  defp ensure_test_session(conn) do
+    Phoenix.ConnTest.init_test_session(conn, %{})
   end
 
   @doc """

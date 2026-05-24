@@ -437,7 +437,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn: conn,
       booking: booking
     } do
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
       assert has_element?(view, "#cancel-booking-modal")
@@ -542,7 +542,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn: conn,
       booking: booking
     } do
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -560,7 +560,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
       assert has_element?(view, "#cancel-booking-modal")
@@ -573,7 +573,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -588,7 +588,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -605,7 +605,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
@@ -750,7 +750,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         %BookingRoom{booking_id: booking.id, room_id: r2.id}
         |> Repo.insert()
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
 
       assert has_element?(view, "div", "Rooms")
       html = render(view)
@@ -786,7 +786,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
         |> Repo.update()
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
       html = render(view)
       assert html =~ "Booking Total"
       assert html =~ "€" or html =~ "EUR"
@@ -998,7 +998,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{payment_date: nil})
         |> Repo.update()
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
       html = render(view)
       assert html =~ "Card ending in 4242"
     end
@@ -1044,7 +1044,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           payment_method_id: pm.id
         })
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
       assert render(view) =~ "Bank account ending in 6789"
     end
 
@@ -1070,7 +1070,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{status: :failed})
         |> Repo.update()
 
-      {:ok, view, html} = live_booking_detail(conn, booking.id)
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
       html = render(view)
       assert html =~ "Failed"
     end

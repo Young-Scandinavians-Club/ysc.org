@@ -139,11 +139,16 @@ defmodule Ysc.Newsletter.EmailValidator do
     end
   end
 
+  defp mx_lookup_timeout_ms do
+    Application.get_env(:ysc, __MODULE__, [])
+    |> Keyword.get(:mx_lookup_timeout_ms, 5_000)
+  end
+
   defp perform_inet_mx_lookup(domain) do
     charlist_domain = String.to_charlist(domain)
+    timeout = mx_lookup_timeout_ms()
 
-    # Set a reasonable timeout for DNS lookups (5 seconds)
-    case :inet_res.lookup(charlist_domain, :in, :mx, timeout: 5000) do
+    case :inet_res.lookup(charlist_domain, :in, :mx, timeout: timeout) do
       [] ->
         Ysc.Logging.info("No MX records found for domain",
           domain: domain,

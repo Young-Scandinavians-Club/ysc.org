@@ -21,6 +21,17 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   alias Ysc.Customers
   alias Ysc.Subscriptions
 
+  @payment_method_module Application.compile_env(
+                           :ysc,
+                           :stripe_payment_method_module,
+                           Stripe.PaymentMethod
+                         )
+  @customer_module Application.compile_env(
+                     :ysc,
+                     :stripe_customer_module,
+                     Stripe.Customer
+                   )
+
   # Step constants
   @step_profile 1
   @step_address 2
@@ -1090,12 +1101,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     user = socket.assigns.user
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.PaymentMethod.retrieve(payment_method_id)
+           @payment_method_module.retrieve(payment_method_id)
          end) do
       {:ok, stripe_payment_method} ->
         _ =
           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-            Stripe.PaymentMethod.update(payment_method_id, %{
+            @payment_method_module.update(payment_method_id, %{
               metadata: %{"set_as_default" => "true"}
             })
           end)
@@ -1117,11 +1128,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             if updated_user.stripe_id do
               case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                     Stripe.Customer.update(updated_user.stripe_id, %{
-                       invoice_settings: %{
-                         default_payment_method: payment_method_id
-                       }
-                     })
+                     @customer_module.update(
+                       updated_user.stripe_id,
+                       %{
+                         invoice_settings: %{
+                           default_payment_method: payment_method_id
+                         }
+                       },
+                       []
+                     )
                    end) do
                 {:ok, _} ->
                   {:noreply,

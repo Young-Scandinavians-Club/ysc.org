@@ -5,12 +5,11 @@ defmodule YscWeb.ImpersonationControllerTest do
 
   describe "POST /admin/impersonate/:user_id" do
     test "redirects unauthenticated users to log in", %{conn: conn} do
-      target = user_fixture()
-      conn = get(conn, ~p"/")
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      target_id = Ecto.ULID.generate()
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
-        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+        post(conn, ~p"/admin/impersonate/#{target_id}", %{
           "_csrf_token" => token
         })
 
@@ -19,15 +18,11 @@ defmodule YscWeb.ImpersonationControllerTest do
     end
 
     test "redirects non-admin users to / with error", %{conn: conn} do
-      member = user_fixture(%{role: "member"})
-      target = user_fixture()
+      member = user_fixture_fast(%{role: "member"})
+      target = user_fixture_fast()
 
-      conn =
-        conn
-        |> log_in_user(member)
-        |> get(~p"/")
-
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      conn = log_in_user(conn, member)
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/impersonate/#{target.id}", %{
@@ -43,15 +38,11 @@ defmodule YscWeb.ImpersonationControllerTest do
     test "redirects to /admin/users with error when user_id does not exist", %{
       conn: conn
     } do
-      admin = user_fixture(%{role: "admin"})
+      admin = user_fixture_fast(%{role: "admin"})
       fake_id = Ecto.ULID.generate()
 
-      conn =
-        conn
-        |> log_in_user(admin)
-        |> get(~p"/admin/users")
-
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      conn = log_in_user(conn, admin)
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/impersonate/#{fake_id}", %{"_csrf_token" => token})
@@ -66,15 +57,11 @@ defmodule YscWeb.ImpersonationControllerTest do
          %{
            conn: conn
          } do
-      admin = user_fixture(%{role: "admin"})
-      target = user_fixture(%{first_name: "Jane", last_name: "Smith"})
+      admin = user_fixture_fast(%{role: "admin"})
+      target = user_fixture_fast(%{first_name: "Jane", last_name: "Smith"})
 
-      conn =
-        conn
-        |> log_in_user(admin)
-        |> get(~p"/admin/users")
-
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      conn = log_in_user(conn, admin)
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/impersonate/#{target.id}", %{
@@ -90,15 +77,11 @@ defmodule YscWeb.ImpersonationControllerTest do
     test "after impersonating, home page shows impersonation banner", %{
       conn: conn
     } do
-      admin = user_fixture(%{role: "admin"})
-      target = user_fixture(%{first_name: "Jane", last_name: "Smith"})
+      admin = user_fixture_fast(%{role: "admin"})
+      target = user_fixture_fast(%{first_name: "Jane", last_name: "Smith"})
 
-      conn =
-        conn
-        |> log_in_user(admin)
-        |> get(~p"/admin/users")
-
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      conn = log_in_user(conn, admin)
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/impersonate/#{target.id}", %{
@@ -116,14 +99,10 @@ defmodule YscWeb.ImpersonationControllerTest do
 
   describe "POST /admin/stop-impersonation" do
     test "redirects to / when not impersonating", %{conn: conn} do
-      admin = user_fixture(%{role: "admin"})
+      admin = user_fixture_fast(%{role: "admin"})
 
-      conn =
-        conn
-        |> log_in_user(admin)
-        |> get(~p"/admin/users")
-
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      conn = log_in_user(conn, admin)
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => token})
@@ -137,8 +116,8 @@ defmodule YscWeb.ImpersonationControllerTest do
          %{
            conn: conn
          } do
-      admin = user_fixture(%{role: "admin"})
-      target = user_fixture()
+      admin = user_fixture_fast(%{role: "admin"})
+      target = user_fixture_fast()
       token = Ysc.Accounts.generate_user_session_token(admin)
 
       conn =
@@ -147,9 +126,8 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> put_session(:user_token, token)
         |> put_session(:impersonated_user_id, target.id)
         |> put_session(:original_admin_id, admin.id)
-        |> get(~p"/")
 
-      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+      {conn, csrf} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => csrf})
@@ -167,7 +145,7 @@ defmodule YscWeb.ImpersonationControllerTest do
          %{
            conn: conn
          } do
-      admin = user_fixture(%{role: "admin"})
+      admin = user_fixture_fast(%{role: "admin"})
       token = Ysc.Accounts.generate_user_session_token(admin)
 
       conn =
@@ -175,9 +153,8 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> init_test_session(%{})
         |> put_session(:user_token, token)
         |> put_session(:original_admin_id, admin.id)
-        |> get(~p"/")
 
-      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+      {conn, csrf} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => csrf})
@@ -193,9 +170,9 @@ defmodule YscWeb.ImpersonationControllerTest do
 
     test "clears impersonation and redirects to / when original_admin_id does not match session admin",
          %{conn: conn} do
-      admin1 = user_fixture(%{role: "admin"})
-      admin2 = user_fixture(%{role: "admin"})
-      target = user_fixture()
+      admin1 = user_fixture_fast(%{role: "admin"})
+      admin2 = user_fixture_fast(%{role: "admin"})
+      target = user_fixture_fast()
 
       # Tampered session: logged in as admin1 but original_admin_id is admin2 (e.g. session tampering)
       token = Ysc.Accounts.generate_user_session_token(admin1)
@@ -206,9 +183,8 @@ defmodule YscWeb.ImpersonationControllerTest do
         |> put_session(:user_token, token)
         |> put_session(:impersonated_user_id, target.id)
         |> put_session(:original_admin_id, admin2.id)
-        |> get(~p"/")
 
-      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+      {conn, csrf} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => csrf})
@@ -223,8 +199,7 @@ defmodule YscWeb.ImpersonationControllerTest do
     end
 
     test "unauthenticated user is redirected to log in", %{conn: conn} do
-      conn = get(conn, ~p"/")
-      {conn, token} = fetch_conn_csrf_from_html(conn)
+      {conn, token} = fetch_conn_csrf(conn)
 
       conn =
         post(conn, ~p"/admin/stop-impersonation", %{"_csrf_token" => token})
