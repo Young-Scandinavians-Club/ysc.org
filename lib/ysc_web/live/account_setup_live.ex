@@ -1137,13 +1137,7 @@ defmodule YscWeb.AccountSetupLive do
 
   def handle_event("skip_phone", _params, socket) do
     # Ensure user is authenticated - re-fetch user to get latest data
-    if not setup_owner?(socket) do
-      YscWeb.Flash.send_toast(:error, "Please complete account setup first.",
-        title: "Account setup"
-      )
-
-      {:noreply, socket}
-    else
+    if setup_owner?(socket) do
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
 
@@ -1156,6 +1150,12 @@ defmodule YscWeb.AccountSetupLive do
        |> Phoenix.LiveView.redirect(
          to: ~p"/users/log-in/auto?#{%{token: one_time_token}}"
        )}
+    else
+      YscWeb.Flash.send_toast(:error, "Please complete account setup first.",
+        title: "Account setup"
+      )
+
+      {:noreply, socket}
     end
   end
 
@@ -1488,13 +1488,7 @@ defmodule YscWeb.AccountSetupLive do
   def handle_event("retry_payment_setup", _params, socket) do
     user = socket.assigns.user
 
-    if not setup_owner?(socket) do
-      YscWeb.Flash.send_toast(:error, "Please complete account setup first.",
-        title: "Account setup"
-      )
-
-      {:noreply, socket}
-    else
+    if setup_owner?(socket) do
       case Customers.create_setup_intent(user,
              stripe: %{payment_method_types: ["card", "us_bank_account"]}
            ) do
@@ -1511,6 +1505,12 @@ defmodule YscWeb.AccountSetupLive do
 
           {:noreply, socket}
       end
+    else
+      YscWeb.Flash.send_toast(:error, "Please complete account setup first.",
+        title: "Account setup"
+      )
+
+      {:noreply, socket}
     end
   end
 
