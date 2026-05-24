@@ -1255,8 +1255,7 @@ defmodule YscWeb.UserSettingsLive do
                       Account Pending Approval
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
-                      Your account must be approved by the board before you can purchase a membership. Reviews usually take up to 14 days — we'll email you when there's a decision.
-                      {" "}
+                      Your account must be approved by the board before you can purchase a membership. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
                       <.link
                         navigate={~p"/pending-review"}
                         class="font-semibold text-yellow-900 underline underline-offset-2"
@@ -2373,7 +2372,8 @@ defmodule YscWeb.UserSettingsLive do
                     <div class="relative p-5 sm:p-6 flex flex-col gap-4">
                       <div class="flex items-start justify-between gap-3">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-900/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-fuchsia-50 shadow-sm">
-                          <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Saved for checkout
+                          <.icon name="hero-bolt" class="w-3.5 h-3.5" />
+                          Saved for checkout
                         </span>
                         <span class="text-xs font-semibold text-zinc-500 tabular-nums">
                           Qty {res.quantity}
