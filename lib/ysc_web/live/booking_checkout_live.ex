@@ -2250,7 +2250,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
     cond do
       reloaded_booking.status == :complete ->
-        {:ok, reloaded_booking}
+        post_complimentary_ledger_payment(booking, reloaded_booking)
 
       true ->
         case BookingLocker.confirm_booking(reloaded_booking.id) do
@@ -2328,15 +2328,16 @@ defmodule YscWeb.BookingCheckoutLive do
           reloaded_booking =
             Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
 
-          # Check if booking is already confirmed (e.g., by webhook)
+          # Booking may already be :complete after a prior confirm; still record ledger
+          # (idempotent on payment_intent id) so retries recover from ledger failures.
           if reloaded_booking.status == :complete do
             Ysc.Logging.info(
-              "Booking already confirmed (likely by webhook), returning existing booking",
+              "Booking already confirmed, ensuring ledger payment is recorded",
               booking_id: booking.id,
               payment_intent_id: payment_intent_id
             )
 
-            {:ok, reloaded_booking}
+            finalize_paid_ledger_payment(reloaded_booking, payment_intent)
           else
             # Confirm before ledger: Stripe may already be captured, but we must not
             # record a ledger payment for a booking that failed to confirm (e.g.
@@ -2365,17 +2366,11 @@ defmodule YscWeb.BookingCheckoutLive do
 
                 if final_booking.status == :complete do
                   Ysc.Logging.info(
-                    "Booking confirmed by another process, returning confirmed booking",
+                    "Booking confirmed by another process, ensuring ledger payment",
                     booking_id: booking.id
                   )
 
-                  case process_ledger_payment(final_booking, payment_intent) do
-                    {:ok, _payment} ->
-                      {:ok, final_booking}
-
-                    {:error, reason} ->
-                      {:error, {:ledger_payment_failed, reason}}
-                  end
+                  finalize_paid_ledger_payment(final_booking, payment_intent)
                 else
                   Ysc.Logging.error(
                     "Failed to confirm booking: invalid status",
@@ -2405,6 +2400,16 @@ defmodule YscWeb.BookingCheckoutLive do
         )
 
         {:error, :payment_verification_failed}
+    end
+  end
+
+  defp finalize_paid_ledger_payment(booking, payment_intent) do
+    case process_ledger_payment(booking, payment_intent) do
+      {:ok, _payment} ->
+        {:ok, booking}
+
+      {:error, reason} ->
+        {:error, {:ledger_payment_failed, reason}}
     end
   end
 
