@@ -139,7 +139,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert html =~ "Total Paid"
     end
 
-    test "async_data_loaded after render_async", %{conn: conn} do
+    test "loads payment details after connected mount", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
@@ -1073,8 +1073,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
     end
   end
 
-  describe "handle_info load_booking_detail_data" do
-    test "loads payment and refund assigns when booking id matches", %{
+  describe "post-connect payment load" do
+    test "clears loading skeleton after payment details load", %{
       conn: conn
     } do
       %{conn: conn, user: user} = log_in_member(conn)
@@ -1086,16 +1086,10 @@ defmodule YscWeb.UserBookingDetailLiveTest do
           property: :tahoe
         })
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
-      %{socket: socket} = :sys.get_state(view.pid)
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
 
-      assert {:noreply, new_socket} =
-               YscWeb.UserBookingDetailLive.handle_info(
-                 {:load_booking_detail_data, booking.id},
-                 socket
-               )
-
-      assert new_socket.assigns.async_data_loaded == true
+      refute html =~ "animate-pulse"
+      assert html =~ booking.reference_id
     end
   end
 end

@@ -56,16 +56,15 @@ defmodule YscWeb.UserBookingDetailLive do
               price_breakdown = calculate_price_breakdown(booking)
               can_cancel = can_cancel_booking?(booking)
 
-              # PERFORMANCE: booking + rooms only on mount; payment/refund load after connect
               socket =
                 socket
                 |> assign(:booking, booking)
+                |> assign(:payment, nil)
                 |> assign(:timezone, timezone)
                 |> assign(:price_breakdown, price_breakdown)
                 |> assign(:can_cancel, can_cancel)
-                |> assign(:payment, nil)
                 |> assign(:refund_info, nil)
-                |> assign(:async_data_loaded, false)
+                |> assign(:loading_booking_payment_details, !connected?(socket))
                 |> assign(:show_cancel_modal, false)
                 |> assign(:cancel_reason, "")
                 |> assign(:page_title, "Booking Details")
@@ -74,9 +73,12 @@ defmodule YscWeb.UserBookingDetailLive do
                   "View the details of your cabin booking with Young Scandinavians Club."
                 )
 
-              if connected?(socket) do
-                send(self(), {:load_booking_detail_data, booking.id})
-              end
+              socket =
+                if connected?(socket) do
+                  assign_booking_payment_details(socket, booking)
+                else
+                  socket
+                end
 
               {:ok, socket}
 
@@ -91,24 +93,6 @@ defmodule YscWeb.UserBookingDetailLive do
                |> redirect(to: ~p"/")}
           end
       end
-    end
-  end
-
-  @impl true
-  def handle_info({:load_booking_detail_data, booking_id}, socket) do
-    booking = socket.assigns.booking
-
-    if booking.id == booking_id do
-      payment = get_booking_payment_info(booking)
-      refund_info = get_refund_info(booking, payment)
-
-      {:noreply,
-       socket
-       |> assign(:payment, payment)
-       |> assign(:refund_info, refund_info)
-       |> assign(:async_data_loaded, true)}
-    else
-      {:noreply, socket}
     end
   end
 
@@ -235,17 +219,7 @@ defmodule YscWeb.UserBookingDetailLive do
 
         <div class="space-y-6">
           <!-- Cancellation Policy -->
-          <div
-            :if={!@async_data_loaded && @can_cancel}
-            class="bg-blue-50 border border-blue-200 rounded-lg p-6 animate-pulse"
-          >
-            <div class="h-5 w-48 bg-blue-200 rounded mb-4"></div>
-            <div class="space-y-2">
-              <div class="h-4 w-full bg-blue-100 rounded"></div>
-              <div class="h-4 w-3/4 bg-blue-100 rounded"></div>
-            </div>
-          </div>
-          <%= if @async_data_loaded && @refund_info && @can_cancel do %>
+          <%= if @refund_info && @can_cancel do %>
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <h2 class="text-lg font-semibold text-blue-900 mb-3">
                 Cancellation Policy
@@ -419,21 +393,13 @@ defmodule YscWeb.UserBookingDetailLive do
               <% end %>
             </div>
           </div>
+          <.async_section_loader
+            :if={@loading_booking_payment_details}
+            id="booking-payment-loading"
+            label="Loading payment details..."
+          />
           <!-- Payment Summary -->
-          <div
-            :if={!@async_data_loaded}
-            class="bg-white rounded-lg border border-zinc-200 p-6 animate-pulse"
-          >
-            <div class="h-6 w-40 bg-zinc-200 rounded mb-4"></div>
-            <div class="space-y-3">
-              <div class="h-4 w-full bg-zinc-100 rounded"></div>
-              <div class="h-4 w-2/3 bg-zinc-100 rounded"></div>
-              <div class="border-t border-zinc-200 pt-3">
-                <div class="h-8 w-32 bg-zinc-200 rounded"></div>
-              </div>
-            </div>
-          </div>
-          <%= if @async_data_loaded && @payment do %>
+          <%= if @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">
               <h2 class="text-xl font-semibold text-zinc-900 mb-4">
                 Payment Summary
@@ -558,10 +524,23 @@ defmodule YscWeb.UserBookingDetailLive do
 
   ## Helper Functions
 
+  defp assign_booking_payment_details(socket, booking) do
+    payment = get_booking_payment_info(booking)
+    refund_info = get_refund_info(booking, payment)
+
+    socket
+    |> assign(:payment, payment)
+    |> assign(:refund_info, refund_info)
+    |> assign(:loading_booking_payment_details, false)
+  end
+
   defp get_booking_payment_info(booking) do
     case Bookings.get_booking_payment(booking) do
-      {:ok, payment} -> payment
-      {:error, _} -> nil
+      {:ok, payment} ->
+        Repo.preload(payment, :payment_method)
+
+      {:error, _} ->
+        nil
     end
   end
 
