@@ -178,12 +178,16 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       event =
         event_with_tickets(
           tier_count: 1,
-          state: :upcoming,
-          tier_attrs: %{quantity: 2}
+          state: :upcoming
         )
 
       event = Repo.preload(event, :ticket_tiers, force: true)
-      tier = hd(event.ticket_tiers)
+
+      tier =
+        event.ticket_tiers
+        |> hd()
+        |> Ecto.Changeset.change(quantity: 2)
+        |> Repo.update!()
 
       expires_at =
         DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 1, :day)
