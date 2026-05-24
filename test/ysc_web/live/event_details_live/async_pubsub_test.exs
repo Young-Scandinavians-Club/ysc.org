@@ -211,8 +211,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         })
         |> Repo.insert!()
 
-      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
-      render_async(view)
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      html = render_async(view)
 
       assert html =~ "Sold Out"
 
