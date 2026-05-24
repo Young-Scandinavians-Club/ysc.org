@@ -197,6 +197,15 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          )
          |> redirect(to: ~p"/")}
 
+      {:error, :email_mismatch} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "The email address must match the one this invitation was sent to.",
+           title: "Invitation"
+         )}
+
       {:error, changeset} ->
         {:noreply, assign(socket, form: to_form(changeset, as: "user"))}
     end
@@ -263,7 +272,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
             phx-submit="save"
             phx-change="validate"
           >
-            <.input field={@form[:email]} type="email" label="Email" required />
+            <.input
+              field={@form[:email]}
+              type="email"
+              label="Email"
+              required
+              readonly
+            />
             <.input field={@form[:first_name]} label="First Name" required />
             <.input field={@form[:last_name]} label="Last Name" required />
             <.input

@@ -90,6 +90,9 @@ defmodule Ysc.Accounts.FamilyInvites do
       not FamilyInvite.valid?(invite) ->
         {:error, :invite_expired_or_used}
 
+      not invite_email_matches_attrs?(invite, user_attrs) ->
+        {:error, :email_mismatch}
+
       true ->
         Repo.transaction(fn ->
           # Create sub-account user
@@ -279,6 +282,17 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   defp emails_match?(_, _), do: false
+
+  defp invite_email_matches_attrs?(%FamilyInvite{} = invite, user_attrs)
+       when is_map(user_attrs) do
+    submitted_email =
+      Map.get(user_attrs, "email") || Map.get(user_attrs, :email)
+
+    is_binary(submitted_email) and
+      emails_match?(submitted_email, invite.email)
+  end
+
+  defp invite_email_matches_attrs?(_, _), do: false
 
   @doc """
   Lists all invites for a primary user (pending and accepted).
