@@ -13,6 +13,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 13 (LOW)      User's email interpolated in OAuth reauth error flash message
   Finding 14 (CRITICAL) Registration mass assignment allowed role/state escalation
   Finding 15 (HIGH)     AccountSetupLive IDOR on post-verification setup events
+  Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -572,6 +573,41 @@ defmodule YscWeb.SecurityAuditTest do
                victim.email,
                attacker_password
              )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 16 (HIGH): Family invite accept must require invite email
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 16: accept_invite rejects email mismatch" do
+    test "accept_invite returns email_mismatch when attrs email differs from invite",
+         %{} do
+      alias Ysc.Accounts.FamilyInvites
+
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      invited_email =
+        "invited_#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, invite} = FamilyInvites.create_invite(primary, invited_email)
+
+      assert {:error, :email_mismatch} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email:
+                   "attacker_#{System.unique_integer([:positive])}@example.com",
+                 password: "password1234",
+                 first_name: "Bad",
+                 last_name: "Actor",
+                 phone_number: "+14155551234",
+                 date_of_birth: ~D[1990-01-01]
+               })
     end
   end
 end

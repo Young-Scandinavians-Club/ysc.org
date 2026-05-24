@@ -376,6 +376,23 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                })
     end
 
+    test "returns email_mismatch when submitted email differs from invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      assert {:error, :email_mismatch} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: unique_user_email(),
+                 password: "password1234",
+                 first_name: "Sub",
+                 last_name: "User",
+                 phone_number: "+14159098268",
+                 date_of_birth: ~D[1990-01-01]
+               })
+    end
+
     test "copies billing address from primary user" do
       primary_user = create_user_with_lifetime_membership()
 
