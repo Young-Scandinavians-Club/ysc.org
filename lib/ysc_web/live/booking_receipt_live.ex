@@ -1200,12 +1200,6 @@ defmodule YscWeb.BookingReceiptLive do
                "Payment successful! Your booking is confirmed."
              ), true}
 
-          {:error, :already_processed} ->
-            # Payment was already processed (maybe via webhook or client-side)
-            {socket
-             |> YscWeb.Flash.put_toast(:info, "Your booking is confirmed."),
-             false}
-
           {:error, reason} ->
             Ysc.Logging.error("Failed to process payment from redirect",
               booking_id: booking.id,
@@ -1234,13 +1228,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp process_payment_from_redirect(booking, payment_intent_id) do
-    # Check if booking is already confirmed (avoid double processing)
-    if booking.status == :complete do
-      {:error, :already_processed}
-    else
-      # Use the same logic as checkout page
-      process_payment_success(booking, payment_intent_id)
-    end
+    process_payment_success(booking, payment_intent_id)
   end
 
   @dialyzer {:nowarn_function, process_payment_success: 2}
@@ -1267,7 +1255,7 @@ defmodule YscWeb.BookingReceiptLive do
             Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
 
           if reloaded_booking.status == :complete do
-            {:ok, reloaded_booking}
+            finalize_paid_ledger_payment(reloaded_booking, payment_intent)
           else
             case BookingLocker.confirm_booking(reloaded_booking.id) do
               {:ok, confirmed_booking} ->
@@ -1304,6 +1292,16 @@ defmodule YscWeb.BookingReceiptLive do
         )
 
         {:error, :payment_verification_failed}
+    end
+  end
+
+  defp finalize_paid_ledger_payment(booking, payment_intent) do
+    case process_ledger_payment(booking, payment_intent) do
+      {:ok, _payment} ->
+        {:ok, booking}
+
+      {:error, reason} ->
+        {:error, {:ledger_payment_failed, reason}}
     end
   end
 
