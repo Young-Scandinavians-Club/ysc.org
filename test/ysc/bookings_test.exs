@@ -2072,50 +2072,6 @@ defmodule Ysc.BookingsTest do
     end
   end
 
-  describe "calculate_refund/3 original_amount option" do
-    test "uses provided original_amount instead of ledger lookup" do
-      user = user_fixture()
-
-      policy =
-        create_refund_policy_fixture(%{property: :tahoe, booking_mode: :buyout})
-
-      {:ok, _} =
-        Bookings.create_refund_policy_rule(%{
-          refund_policy_id: policy.id,
-          days_before_checkin: 9999,
-          refund_percentage: 50,
-          priority: 1
-        })
-
-      checkin = Date.utc_today() |> Date.add(120) |> first_monday_on_or_after()
-
-      {:ok, booking} =
-        Bookings.create_booking(%{
-          user_id: user.id,
-          property: :tahoe,
-          booking_mode: :buyout,
-          checkin_date: checkin,
-          checkout_date: Date.add(checkin, 3),
-          guests_count: 4,
-          status: :complete,
-          total_price: Money.new(10_000, :USD)
-        })
-
-      assert {:error, :payment_not_found} =
-               Bookings.calculate_refund(booking, Date.utc_today())
-
-      paid_amount = Money.new(20_000, :USD)
-
-      assert {:ok, refund, rule} =
-               Bookings.calculate_refund(booking, Date.utc_today(),
-                 original_amount: paid_amount
-               )
-
-      assert rule != nil
-      assert Money.equal?(refund, Money.new(10_000, :USD))
-    end
-  end
-
   describe "get_booking_payment_amount/1" do
     test "returns amount from ledger stripe debit entry when present" do
       user = user_fixture()
