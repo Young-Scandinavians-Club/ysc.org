@@ -5,11 +5,8 @@ Welcome! This document provides an overview of all the documentation available t
 ## Quick Links
 
 ### 🚀 Getting Started (Start Here!)
-- **[README.md](../README.md)** - Complete setup guide for new developers
-  - Prerequisites installation (Docker, Elixir, Stripe CLI, ShellCheck/shfmt)
-  - Environment configuration
-  - Initial setup and verification
-  - Troubleshooting quick fixes
+- **[README.md](../README.md)** - Project overview and condensed setup
+- **This guide** - Detailed prerequisites, env vars, and local dev workflows (below)
 
 ### 📋 Daily Reference
 - **[QUICKREF.md](../QUICKREF.md)** - Quick reference guide and cheat sheet
@@ -45,7 +42,7 @@ Welcome! This document provides an overview of all the documentation available t
 
 ```
 ysc-redesign-ex/
-├── README.md                           # Main setup guide (START HERE)
+├── README.md                           # Overview & quick setup (START HERE)
 ├── QUICKREF.md                         # Daily reference cheat sheet
 ├── .env.example                        # Template for environment variables
 │
@@ -67,24 +64,11 @@ ysc-redesign-ex/
 
 ### For Brand New Developers
 
-1. **Start with [README.md](../README.md)**
-   - Follow the setup guide step by step
-   - Install prerequisites (Docker, Elixir, Stripe CLI, ShellCheck, shfmt)
-   - Configure environment
-   - Run initial setup
-   - Verify everything works
-
-2. **Bookmark [QUICKREF.md](../QUICKREF.md)**
-   - Keep it open while developing
-   - Reference common commands
-   - Learn keyboard shortcuts and workflows
-
-3. **Skim [DEVELOPMENT_ARCHITECTURE.md](DEVELOPMENT_ARCHITECTURE.md)**
-   - Understand how everything connects
-   - Learn the technology stack
-   - Understand the codebase structure
-
-4. **Keep [TROUBLESHOOTING.md](TROUBLESHOOTING.md) handy**
+1. **Start with [README.md](../README.md)** — run `make dev-setup` and `make dev`
+2. **Use this guide** for OS-specific installs, env vars, email/QuickBooks testing
+3. **Bookmark [QUICKREF.md](../QUICKREF.md)** for daily commands
+4. **Skim [DEVELOPMENT_ARCHITECTURE.md](DEVELOPMENT_ARCHITECTURE.md)** for stack and codebase layout
+5. **Keep [TROUBLESHOOTING.md](TROUBLESHOOTING.md) handy**
    - Reference when things go wrong
    - Learn common solutions
 
@@ -97,14 +81,64 @@ If you're already familiar with Elixir/Phoenix development:
 3. **Run Setup** - `make dev-setup && make dev`
 4. **Architecture** - Skim [DEVELOPMENT_ARCHITECTURE.md](DEVELOPMENT_ARCHITECTURE.md) to understand specifics
 
-## Prerequisites
+## Detailed prerequisites
 
-Before running setup, ensure you have installed:
+Install these before `make dev-setup`. Versions for Elixir/Erlang are pinned in `.tool-versions`.
 
-- **Docker** - For PostgreSQL and MinIO
-- **Elixir/Erlang** (via asdf) - See `.tool-versions` for versions
-- **Stripe CLI** - For webhook forwarding during development
-- **ShellCheck and shfmt** - For shell script linting (required for `mix precommit` and `make preflight`)
+### Docker
+
+**macOS:** [Docker Desktop](https://www.docker.com/products/docker-desktop) or `brew install --cask docker`
+
+**Linux (Ubuntu/Debian):**
+
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+sudo usermod -aG docker $USER && newgrp docker
+sudo apt-get install docker-compose-plugin
+```
+
+Verify: `docker --version` and `docker compose version`
+
+### Elixir & Erlang (asdf)
+
+**macOS:**
+
+```bash
+brew install asdf
+echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc && source ~/.zshrc
+asdf plugin add erlang && asdf plugin add elixir
+cd /path/to/ysc-redesign-ex && asdf install
+```
+
+**Linux:**
+
+```bash
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0
+echo '. "$HOME/.asdf/asdf.sh"' >> ~/.bashrc && source ~/.bashrc
+# Erlang build deps (Ubuntu): build-essential autoconf m4 libncurses5-dev ...
+asdf plugin add erlang && asdf plugin add elixir
+cd /path/to/ysc-redesign-ex && asdf install
+```
+
+Verify: `elixir --version`
+
+### Stripe CLI
+
+```bash
+# macOS
+brew install stripe/stripe-cli/stripe
+
+# Linux — see https://github.com/stripe/stripe-cli/releases
+stripe login
+stripe listen --forward-to localhost:4000/webhooks/stripe
+# Copy the whsec_... secret into .env as STRIPE_WEBHOOK_SECRET
+```
+
+API keys (test mode): [Stripe Dashboard → API keys](https://dashboard.stripe.com/test/apikeys)
+
+### ShellCheck & shfmt
+
+Required for `make preflight`:
 
 ```bash
 # macOS
@@ -114,7 +148,51 @@ brew install shellcheck shfmt
 sudo apt-get install -y shellcheck shfmt
 ```
 
-See [README.md](../README.md) for complete installation instructions.
+## Environment variables
+
+Copy `.env.example` to `.env`. **Required for `make dev`:**
+
+| Variable | Source |
+| --- | --- |
+| `STRIPE_SECRET` | Dashboard secret key (`sk_test_...`) |
+| `STRIPE_PUBLIC_KEY` | Dashboard publishable key (`pk_test_...`) |
+| `STRIPE_WEBHOOK_SECRET` | Output of `stripe listen` (`whsec_...`) |
+
+**Optional** (defaults work for most local dev):
+
+- `RADAR_PUBLIC_KEY` — maps (defaults to test key)
+- `EMAIL_*` — sender addresses (see `.env.example`)
+- `QUICKBOOKS_*` — only if testing accounting sync (see [Optional integrations](#optional-integrations))
+
+Exported shell vars override `.env`. Never commit `.env`.
+
+## Email in development
+
+Emails are not sent externally. They are stored in memory and viewable at [http://localhost:4000/dev/mailbox](http://localhost:4000/dev/mailbox) while the server runs (cleared on restart).
+
+Adapter: `Swoosh.Adapters.Local` in dev. Trigger flows by registering a user, resetting a password, or buying a ticket, then open the mailbox.
+
+## Newsletter (IEx)
+
+Subscription state only (no campaign sending):
+
+```elixir
+Ysc.Newsletter.subscribe("test@example.com", source: "public_signup")
+Ysc.Newsletter.get_subscriber_by_email("test@example.com")
+Ysc.Newsletter.unsubscribe("test@example.com")
+```
+
+Public unsubscribe: `/newsletter/unsubscribe/:token`
+
+## Optional integrations
+
+### QuickBooks (sandbox)
+
+1. [Intuit Developer](https://developer.intuit.com/) — create sandbox app and company
+2. Add credentials from `.env.example` (all `QUICKBOOKS_*` vars)
+3. Create a payment in the app; monitor sync in Oban at `/admin/settings`
+
+See also [QUICKBOOKS_SYNC_DESIGN.md](QUICKBOOKS_SYNC_DESIGN.md).
 
 ## Essential Commands
 
@@ -278,9 +356,8 @@ Try these to get familiar with the system:
    - See LiveReload in action
 
 2. **Inspect database**
-   - Open http://localhost:8888 (PgAdmin)
-   - Connect to database
-   - Browse tables
+   - `docker compose -f etc/docker/docker-compose.yml exec postgres psql -U postgres -d ysc_dev`
+   - Or `make shell` and query via `Ysc.Repo`
 
 3. **Run IEx shell**
    - Run `make shell`
