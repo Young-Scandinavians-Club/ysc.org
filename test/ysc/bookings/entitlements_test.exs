@@ -373,4 +373,86 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert msg =~ "Expired 1"
     end
   end
+
+  describe "price_with_locked_entitlement/4 entitlement summary" do
+    test "fixed_amount_off summary includes formatted discount amount", %{
+      user: user,
+      admin: admin
+    } do
+      for prop <- [:tahoe, :clear_lake] do
+        case Bookings.create_pricing_rule(%{
+               amount: Money.new(430, :USD),
+               booking_mode: :buyout,
+               price_unit: :buyout_fixed,
+               property: prop,
+               season_id: nil,
+               room_id: nil,
+               room_category_id: nil
+             }) do
+          {:ok, _} -> :ok
+          {:error, %Ecto.Changeset{} = cs} -> assert duplicate_pricing_rule?(cs)
+          {:error, other} -> flunk("unexpected pricing rule: #{inspect(other)}")
+        end
+      end
+
+      {checkin, checkout} =
+        Date.utc_today()
+        |> then(fn today ->
+          base = Date.add(today, 40)
+          checkin =
+            case Date.day_of_week(base, :monday) do
+              1 -> base
+              n -> Date.add(base, 8 - n)
+            end
+
+          {checkin, Date.add(checkin, 3)}
+        end)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: admin.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(:USD, 25),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      subtotal = Money.new(:USD, 430)
+
+      assert {:ok, priced} =
+               Entitlements.price_with_locked_entitlement(
+                 booking,
+                 subtotal,
+                 :buyout
+               )
+
+      assert priced.breakdown_additions.entitlement_summary == "$25.00 off stay"
+    end
+  end
+
+  defp duplicate_pricing_rule?(%Ecto.Changeset{} = cs) do
+    Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
+      meta[:constraint] == :unique
+    end)
+  end
 end

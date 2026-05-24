@@ -6,6 +6,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
   import Ysc.BookingsFixtures
 
   import Ecto.Query
+  import Plug.Conn
+  import Phoenix.ConnTest
 
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingLocker, BookingRoom, Room}
@@ -67,6 +69,55 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert html =~ booking.reference_id
       assert html =~ "Lake Tahoe Cabin"
       assert html =~ "children"
+    end
+
+    test "static HTML shows payment loading before websocket connects", %{
+      conn: conn
+    } do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      conn = get(conn, ~p"/bookings/#{booking.id}")
+      html = html_response(conn, 200)
+
+      assert html =~ "Loading payment details"
+      refute html =~ "Payment Summary"
+    end
+
+    test "connected LiveView loads payment summary after mount", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      {:ok, {_payment, _, _}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id: "pi_deferred_load_#{booking.id}",
+          stripe_fee: Money.new(50, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}")
+
+      refute has_element?(view, "#booking-payment-loading")
+      html = render(view)
+      assert html =~ "Payment Summary"
     end
 
     test "does not show children suffix when children_count is zero", %{
