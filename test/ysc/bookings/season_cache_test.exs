@@ -322,6 +322,35 @@ defmodule Ysc.Bookings.SeasonCacheTest do
     end
   end
 
+  describe "shared fetch_cached/2 behavior" do
+    test "invalidate refreshes both date lookup and property list caches" do
+      season =
+        create_season(%{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-11-01],
+          end_date: ~D[2025-04-30]
+        })
+
+      Cachex.put(:ysc_cache, "season:version", System.system_time(:second) - 10)
+
+      assert SeasonCache.get(:tahoe, ~D[2024-12-15]).name == "Winter"
+      assert length(SeasonCache.get_all_for_property(:tahoe)) == 1
+
+      SeasonCache.invalidate()
+
+      {:ok, updated_season} =
+        season
+        |> Season.changeset(%{name: "Shared Invalidation Winter"})
+        |> Repo.update()
+
+      assert SeasonCache.get(:tahoe, ~D[2024-12-15]).id == updated_season.id
+
+      assert hd(SeasonCache.get_all_for_property(:tahoe)).name ==
+               "Shared Invalidation Winter"
+    end
+  end
+
   describe "cache version validation" do
     test "refetches when cache version is stale" do
       season =
