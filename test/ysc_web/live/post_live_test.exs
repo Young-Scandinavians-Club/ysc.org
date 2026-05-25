@@ -76,6 +76,17 @@ defmodule YscWeb.PostLiveTest do
       assert html =~ "Club News"
     end
 
+    test "draft posts are not accessible on the public post page", %{conn: conn} do
+      post =
+        create_post(%{
+          title: "Secret Draft Headline",
+          state: :draft,
+          published_on: nil
+        })
+
+      assert {:error, {:redirect, %{to: "/news"}}} = live(conn, ~p"/posts/#{post.id}")
+    end
+
     test "loads post by url_name successfully", %{conn: conn} do
       _post = create_post(%{title: "Test Article", url_name: "my-test-article"})
 

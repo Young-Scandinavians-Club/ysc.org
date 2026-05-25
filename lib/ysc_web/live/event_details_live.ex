@@ -3307,9 +3307,9 @@ defmodule YscWeb.EventDetailsLive do
     # Support lookup by either ULID (id) or reference_id (e.g. "EVT-XXXX")
     event =
       if String.starts_with?(id_or_ref, "EVT-") do
-        Events.get_event_by_reference(id_or_ref)
+        Events.get_public_event_by_reference(id_or_ref)
       else
-        Repo.get(Event, id_or_ref)
+        Events.get_public_event(id_or_ref)
       end
 
     case event do

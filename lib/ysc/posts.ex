@@ -27,6 +27,30 @@ defmodule Ysc.Posts do
     Repo.get_by!(Post, url_name: url_name)
   end
 
+  @doc """
+  Returns a published post by id for public pages, or nil if missing or not published.
+  """
+  def get_public_post(id, preloads \\ []) do
+    from(p in Post, where: p.id == ^id and p.state == :published)
+    |> Repo.one()
+    |> preload_public_post(preloads)
+  end
+
+  @doc """
+  Returns a published post by url_name for public pages, or nil if missing or not published.
+  """
+  def get_public_post_by_url_name(url_name, preloads \\ []) do
+    from(p in Post, where: p.url_name == ^url_name and p.state == :published)
+    |> Repo.one()
+    |> preload_public_post(preloads)
+  end
+
+  defp preload_public_post(nil, _preloads), do: nil
+
+  defp preload_public_post(post, preloads) do
+    Repo.preload(post, preloads)
+  end
+
   def get_post_by_id_or_url_name(value) do
     Repo.one(
       from p in Post, where: p.id == ^value, or_where: p.url_name == ^value

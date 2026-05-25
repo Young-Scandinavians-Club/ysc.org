@@ -225,10 +225,10 @@ defmodule YscWeb.PostLive do
     post =
       case Ecto.ULID.cast(id) do
         {:ok, ulid_id} ->
-          Posts.get_post(ulid_id, [{:author, :current_avatar}, :featured_image])
+          Posts.get_public_post(ulid_id, [{:author, :current_avatar}, :featured_image])
 
         :error ->
-          Posts.get_post_by_url_name(id, [
+          Posts.get_public_post_by_url_name(id, [
             {:author, :current_avatar},
             :featured_image
           ])

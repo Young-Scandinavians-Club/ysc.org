@@ -52,6 +52,26 @@ defmodule Ysc.Events do
     Repo.get_by(Event, reference_id: reference_id)
   end
 
+  @public_event_states [:published, :cancelled]
+
+  @doc """
+  Returns an event visible on public pages (published or cancelled), or nil.
+  """
+  def get_public_event(id) do
+    from(e in Event, where: e.id == ^id and e.state in ^@public_event_states)
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns an event visible on public pages by reference id, or nil.
+  """
+  def get_public_event_by_reference(reference_id) do
+    from(e in Event,
+      where: e.reference_id == ^reference_id and e.state in ^@public_event_states
+    )
+    |> Repo.one()
+  end
+
   @doc """
   List all events, optionally with filters.
   """
