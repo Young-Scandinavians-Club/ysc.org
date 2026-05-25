@@ -480,18 +480,89 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  # Compute user_needs map from a user struct
-  defp compute_user_needs(user) do
+  # Compute user_needs map from a user struct.
+  #
+  # On the dead (static) render, `check_payment?: false` avoids a payment-method
+  # lookup; pending users are treated as needing payment until connect refines.
+  defp compute_user_needs(user, opts \\ []) do
+    check_payment? = Keyword.get(opts, :check_payment?, true)
+
+    payment_method_setup =
+      if user.state == :pending_approval do
+        if check_payment? do
+          is_nil(Payments.get_default_payment_method(user))
+        else
+          true
+        end
+      else
+        false
+      end
+
     %{
       email_verification: is_nil(user.email_verified_at),
       password_setup: is_nil(user.password_set_at),
       phone_setup: is_nil(user.phone_number),
       phone_verification:
         not is_nil(user.phone_number) and is_nil(user.phone_verified_at),
-      payment_method_setup:
-        user.state == :pending_approval and
-          is_nil(Payments.get_default_payment_method(user))
+      payment_method_setup: payment_method_setup
     }
+  end
+
+  defp signup_plan_for(user, user_needs) do
+    if user_needs.payment_method_setup do
+      registration_form = user.registration_form
+
+      if registration_form do
+        plans = Application.get_env(:ysc, :membership_plans, [])
+        membership_type = registration_form.membership_type || :single
+        Enum.find(plans, &(&1.id == membership_type))
+      end
+    end
+  end
+
+  defp starting_step_for(user_needs, is_owner) do
+    cond do
+      user_needs.email_verification ->
+        0
+
+      user_needs.payment_method_setup and is_owner ->
+        1
+
+      user_needs.password_setup and is_owner ->
+        2
+
+      user_needs.phone_setup and is_owner ->
+        3
+
+      user_needs.phone_verification and is_owner ->
+        4
+
+      true ->
+        5
+    end
+  end
+
+  defp ensure_verification_email_sent(user) do
+    case Ysc.VerificationCache.get_code(user.id, :email_verification) do
+      {:ok, _existing_code} ->
+        :ok
+
+      {:error, _} ->
+        code = Accounts.generate_and_store_email_verification_code(user)
+        _job = Accounts.send_email_verification_code(user, code, "initial")
+    end
+  end
+
+  defp maybe_adjust_step_after_payment_refine(socket, user_needs) do
+    if socket.assigns.current_step == 1 and not user_needs.payment_method_setup do
+      assign(
+        socket,
+        :current_step,
+        starting_step_for(user_needs, socket.assigns.is_owner)
+      )
+    else
+      socket
+    end
   end
 
   # Helper function to check if we're in dev/sandbox mode
@@ -530,140 +601,37 @@ defmodule YscWeb.AccountSetupLive do
 
   @impl true
   def mount(%{"user_id" => user_id}, _session, socket) do
-    user = Accounts.get_user!(user_id)
+    user = Accounts.get_user!(user_id, [:registration_form])
     current_user = socket.assigns.current_user
-
-    # Determine user's current setup status
-    email_verified = not is_nil(user.email_verified_at)
-    password_set = not is_nil(user.password_set_at)
-    phone_verified = not is_nil(user.phone_verified_at)
-    phone_number_exists = not is_nil(user.phone_number)
-
-    # Check if user owns this setup (is authenticated as this user)
     is_owner = !!(current_user && current_user.id == user.id)
 
-    # Determine what the user actually needs to complete
-    needs_email_verification = not email_verified
-    needs_password_setup = not password_set
-    needs_phone_setup = not phone_number_exists
-    needs_phone_verification = phone_number_exists and not phone_verified
+    user_needs = compute_user_needs(user, check_payment?: connected?(socket))
+    needs_any_setup = user_needs_needs_setup?(user_needs)
 
-    needs_payment_method_setup =
-      user.state == :pending_approval and
-        is_nil(Payments.get_default_payment_method(user))
-
-    # User needs setup if they have incomplete requirements
-    needs_any_setup =
-      needs_email_verification or needs_password_setup or needs_phone_setup or
-        needs_phone_verification or needs_payment_method_setup
-
-    # Access control logic:
-    # 1. If user doesn't need any setup, deny access
-    # 2. Email verification step: always allow (for signup flow)
-    # 3. Password/Phone/Payment steps: require ownership (authentication)
-    can_access =
-      if needs_any_setup do
-        # User needs some setup - check specific access rules
-        true
-      else
-        # User has everything set up already
-        false
-      end
+    can_access = needs_any_setup
 
     if can_access do
-      # Determine which steps the user needs (don't skip, just don't show unnecessary ones)
-      user_needs = %{
-        email_verification: not email_verified,
-        password_setup: not password_set,
-        phone_setup: not phone_number_exists,
-        phone_verification: phone_number_exists and not phone_verified,
-        payment_method_setup: needs_payment_method_setup
-      }
+      signup_plan = signup_plan_for(user, user_needs)
+      current_step = starting_step_for(user_needs, is_owner)
 
-      # Load the membership plan chosen during registration for pending users
-      signup_plan =
-        if needs_payment_method_setup do
-          registration_form =
-            Accounts.get_user!(user.id)
-            |> Ysc.Repo.preload(:registration_form)
-            |> Map.get(:registration_form)
-
-          if registration_form do
-            plans = Application.get_env(:ysc, :membership_plans, [])
-            membership_type = registration_form.membership_type || :single
-            Enum.find(plans, &(&1.id == membership_type))
-          end
-        end
-
-      # Determine starting step based on what user needs and their auth status
-      starting_step =
-        cond do
-          # If user needs email verification, start there (always accessible)
-          user_needs.email_verification ->
-            0
-
-          # If user needs payment method setup and is authenticated (comes before password)
-          user_needs.payment_method_setup and is_owner ->
-            1
-
-          # If user needs password setup and is authenticated
-          user_needs.password_setup and is_owner ->
-            2
-
-          # If user needs phone setup and is authenticated
-          user_needs.phone_setup and is_owner ->
-            3
-
-          # If user needs phone verification and is authenticated
-          user_needs.phone_verification and is_owner ->
-            4
-
-          # User has completed all necessary steps
-          true ->
-            5
-        end
-
-      # Create phone changeset with existing phone number if available
       phone_changeset =
-        if phone_number_exists do
-          # Pre-fill with existing phone number
+        if user_needs.phone_setup or is_nil(user.phone_number) do
+          Ysc.Accounts.User.registration_changeset(user, %{},
+            hash_password: false,
+            validate_email: false
+          )
+        else
           Ysc.Accounts.User.registration_changeset(
             user,
             %{"phone_number" => user.phone_number},
             hash_password: false,
             validate_email: false
           )
-        else
-          Ysc.Accounts.User.registration_changeset(user, %{},
-            hash_password: false,
-            validate_email: false
-          )
         end
 
       phone_verification_changeset = %{"verification_code" => ""} |> to_form()
-
-      # Start at the appropriate step
-      current_step = starting_step
       password_changeset = Accounts.change_user_password(user)
-
-      # Only send email verification when this user still needs it. Otherwise an
-      # unauthenticated visitor with a guessed or leaked user_id could trigger
-      # verification emails (and, after expiry, repeat) for unrelated flows such
-      # as payment setup.
-      if user_needs.email_verification do
-        case Ysc.VerificationCache.get_code(user.id, :email_verification) do
-          {:ok, _existing_code} ->
-            :ok
-
-          {:error, _} ->
-            code = Accounts.generate_and_store_email_verification_code(user)
-            _job = Accounts.send_email_verification_code(user, code, "initial")
-        end
-      end
-
       email_changeset = %{"verification_code" => ""} |> to_form()
-
-      # Start at step 0 - user progresses through the flow
 
       display_email = if is_owner, do: user.email, else: mask_email(user.email)
 
@@ -677,6 +645,7 @@ defmodule YscWeb.AccountSetupLive do
           "Complete your Young Scandinavians Club membership account setup."
         )
         |> assign(:user, user)
+        |> assign(:is_owner, is_owner)
         |> assign(:display_email, display_email)
         |> assign(:current_step, current_step)
         |> assign(:email_verified, false)
@@ -698,10 +667,42 @@ defmodule YscWeb.AccountSetupLive do
         |> assign(:signup_plan, signup_plan)
         |> assign(:public_key, public_key)
 
+      socket =
+        if connected?(socket) do
+          socket
+          |> refine_setup_needs_assigns(user)
+          |> then(fn s ->
+            if s.assigns.user_needs.email_verification do
+              ensure_verification_email_sent(user)
+            end
+
+            s
+          end)
+        else
+          socket
+        end
+
       {:ok, socket}
     else
       {:ok, redirect(socket, to: ~p"/")}
     end
+  end
+
+  defp user_needs_needs_setup?(user_needs) do
+    user_needs.email_verification or user_needs.password_setup or
+      user_needs.phone_setup or user_needs.phone_verification or
+      user_needs.payment_method_setup
+  end
+
+  defp refine_setup_needs_assigns(socket, user) do
+    user_needs = compute_user_needs(user, check_payment?: true)
+    signup_plan = signup_plan_for(user, user_needs)
+
+    socket
+    |> assign(:user_needs, user_needs)
+    |> assign(:stepper_needs, user_needs)
+    |> assign(:signup_plan, signup_plan)
+    |> maybe_adjust_step_after_payment_refine(user_needs)
   end
 
   @impl true

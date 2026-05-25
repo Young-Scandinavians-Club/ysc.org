@@ -415,22 +415,7 @@ defmodule YscWeb.TicketQrLive do
     google_wallet_urls =
       if socket.assigns.google_wallet_enabled? do
         user_id = socket.assigns.current_user.id
-
-        Enum.reduce(data.tickets, %{}, fn ticket, acc ->
-          case GoogleWallet.generate_ticket_save_url(ticket.id, user_id) do
-            {:ok, url} ->
-              Map.put(acc, ticket.id, url)
-
-            {:error, reason} ->
-              Ysc.Logging.error(
-                "Failed to generate Google Wallet URL for ticket",
-                ticket_id: ticket.id,
-                error: inspect(reason)
-              )
-
-              acc
-          end
-        end)
+        generate_google_wallet_ticket_urls(data.tickets, user_id)
       else
         %{}
       end
@@ -630,6 +615,39 @@ defmodule YscWeb.TicketQrLive do
     else
       date_str
     end
+  end
+
+  defp generate_google_wallet_ticket_urls(tickets, user_id) do
+    tickets
+    |> Task.async_stream(
+      fn ticket ->
+        {ticket.id, GoogleWallet.generate_ticket_save_url(ticket.id, user_id)}
+      end,
+      max_concurrency: 5,
+      ordered: true,
+      timeout: :infinity
+    )
+    |> Enum.reduce(%{}, fn
+      {:ok, {ticket_id, {:ok, url}}}, acc ->
+        Map.put(acc, ticket_id, url)
+
+      {:ok, {ticket_id, {:error, reason}}}, acc ->
+        Ysc.Logging.error(
+          "Failed to generate Google Wallet URL for ticket",
+          ticket_id: ticket_id,
+          error: inspect(reason)
+        )
+
+        acc
+
+      {:exit, reason}, acc ->
+        Ysc.Logging.error(
+          "Google Wallet URL generation task exited",
+          error: inspect(reason)
+        )
+
+        acc
+    end)
   end
 
   # Reads the wallet platform from LiveView connect_params (populated from
