@@ -65,6 +65,69 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "quickbooks_sync_status_badge_type/1" do
+    test "maps known sync statuses to badge types" do
+      assert quickbooks_sync_status_badge_type("pending") == "yellow"
+      assert quickbooks_sync_status_badge_type("synced") == "green"
+      assert quickbooks_sync_status_badge_type("failed") == "red"
+      assert quickbooks_sync_status_badge_type("processing") == "default"
+      assert quickbooks_sync_status_badge_type(nil) == "dark"
+    end
+  end
+
+  describe "format_quickbooks_sync_error/1" do
+    test "returns empty string for nil" do
+      assert format_quickbooks_sync_error(nil) == ""
+    end
+
+    test "pretty-prints map errors as JSON" do
+      assert format_quickbooks_sync_error(%{"Fault" => %{"Error" => [%{"Message" => "x"}]}}) =~
+               "Fault"
+    end
+  end
+
+  describe "admin_quickbooks_sync_status/1" do
+    test "inline layout renders badge only" do
+      html =
+        rendered_to_string(~H"""
+        <.admin_quickbooks_sync_status status="synced" layout={:inline} />
+        """)
+
+      assert html =~ "Synced"
+      refute html =~ "cursor-help"
+    end
+
+    test "stack layout renders error label hint when error_hint is label" do
+      html =
+        rendered_to_string(~H"""
+        <.admin_quickbooks_sync_status
+          status="failed"
+          error={%{"message" => "timeout"}}
+          error_hint={:label}
+        />
+        """)
+
+      assert html =~ "Failed"
+      assert html =~ ">Error<"
+      assert html =~ "timeout"
+    end
+
+    test "stack layout truncates error text when error_hint is truncate" do
+      html =
+        rendered_to_string(~H"""
+        <.admin_quickbooks_sync_status
+          status="pending"
+          error="Connection refused"
+          default_label="unknown"
+        />
+        """)
+
+      assert html =~ "Pending"
+      assert html =~ "Connection refused"
+      assert html =~ "truncate"
+    end
+  end
+
   describe "admin_dashed_more_button/1" do
     test "renders a dashed full-width button with label and phx-click" do
       assigns = %{}
