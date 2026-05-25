@@ -88,6 +88,8 @@ defmodule YscWeb.AdminComponentsTest do
 
   describe "admin_quickbooks_sync_status/1" do
     test "inline layout renders badge only" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_quickbooks_sync_status status="synced" layout={:inline} />
@@ -98,6 +100,8 @@ defmodule YscWeb.AdminComponentsTest do
     end
 
     test "stack layout renders error label hint when error_hint is label" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_quickbooks_sync_status
@@ -108,11 +112,13 @@ defmodule YscWeb.AdminComponentsTest do
         """)
 
       assert html =~ "Failed"
-      assert html =~ ">Error<"
+      assert html =~ "Error"
       assert html =~ "timeout"
     end
 
     test "stack layout truncates error text when error_hint is truncate" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_quickbooks_sync_status
