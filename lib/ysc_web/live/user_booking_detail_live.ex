@@ -367,15 +367,15 @@ defmodule YscWeb.UserBookingDetailLive do
               </div>
 
               <div>
-                <div class="text-sm text-zinc-600">Booking Mode</div>
+                <div class="text-sm text-zinc-600">Reservation type</div>
                 <div class="font-medium text-zinc-900">
                   <%= if @booking.booking_mode == :buyout do %>
-                    Full Buyout
+                    Entire cabin
                   <% else %>
                     <%= if @booking.booking_mode == :room do %>
-                      Per Room
+                      Individual room(s)
                     <% else %>
-                      Per Guest
+                      Shared stay
                     <% end %>
                   <% end %>
                 </div>

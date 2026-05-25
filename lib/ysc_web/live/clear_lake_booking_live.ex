@@ -1367,13 +1367,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                         Please select number of guests
                       </li>
                       <li :if={@form_errors && map_size(@form_errors) > 0}>
-                        Please fix form errors above
+                        Complete the required fields above
                       </li>
                       <li :if={
                         @date_validation_errors &&
                           map_size(@date_validation_errors) > 0
                       }>
-                        Please fix date validation errors
+                        Review the date messages above
                       </li>
                     </ul>
                   </div>
