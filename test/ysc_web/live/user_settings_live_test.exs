@@ -1071,6 +1071,16 @@ defmodule YscWeb.UserSettingsLiveTest do
       refute render(view) =~ "data-testid=\"change-membership-plan-button\""
     end
 
+    test "pending approval user sees link to application status page", %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      assert has_element?(view, "a[href=\"/pending-review\"]", "View application status")
+    end
+
     test "sub-account can leave family membership", %{conn: conn} do
       primary = user_fixture(%{phone_number: "+14159098401", state: :active})
 

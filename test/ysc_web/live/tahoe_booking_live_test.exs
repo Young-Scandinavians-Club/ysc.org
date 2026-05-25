@@ -39,8 +39,14 @@ defmodule YscWeb.TahoeBookingLiveTest do
       render_async(view, 2_000)
       html = render(view)
 
-      # Shows membership requirement or disabled state
-      assert html =~ "Tahoe" or html =~ "membership" or html =~ "Information"
+      assert html =~ "Tahoe"
+      assert has_element?(view, "#tahoe-booking-eligibility-banner-public", "Membership Required")
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public a[href=\"/users/membership\"]",
+               "go to Membership"
+             )
     end
   end
 

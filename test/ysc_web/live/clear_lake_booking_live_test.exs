@@ -101,9 +101,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       html = render(view)
 
-      # Shows membership requirement or disabled state
-      assert html =~ "Clear Lake" or html =~ "membership" or
-               html =~ "Information"
+      assert html =~ "Clear Lake"
+      assert has_element?(view, "#clear-lake-booking-eligibility-banner", "Membership Required")
+
+      assert has_element?(
+               view,
+               "#clear-lake-booking-eligibility-banner a[href=\"/users/membership\"]",
+               "go to Membership"
+             )
     end
   end
 

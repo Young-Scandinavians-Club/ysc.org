@@ -200,10 +200,20 @@ defmodule YscWeb.EventDetailsLiveTest do
       conn = log_in_user(conn, user)
       event = event_with_tickets(tier_count: 2, state: :upcoming)
 
-      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
 
-      # Should see event but membership requirement for tickets
       assert html =~ event.title
+      assert html =~ "Member tickets require an active YSC membership"
+
+      assert has_element?(
+               view,
+               ~s(a[href="/users/membership"]),
+               "View membership status"
+             )
+
+      assert has_element?(view, ~s(a[href="/users/membership"]), "View Membership")
+      refute has_element?(view, "button", "Get Tickets")
     end
   end
 
