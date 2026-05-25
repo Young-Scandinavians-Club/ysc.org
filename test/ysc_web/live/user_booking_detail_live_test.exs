@@ -618,7 +618,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
   end
 
   describe "booking mode label" do
-    test "shows Full Buyout when booking_mode is buyout", %{conn: conn} do
+    test "shows Entire cabin when booking_mode is buyout", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
@@ -630,10 +630,10 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Full Buyout"
+      assert html =~ "Entire cabin"
     end
 
-    test "shows Per Room when booking_mode is room", %{conn: conn} do
+    test "shows Individual room(s) when booking_mode is room", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
@@ -645,10 +645,10 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Per Room"
+      assert html =~ "Individual room(s)"
     end
 
-    test "shows Per Guest when booking_mode is day (per guest)", %{conn: conn} do
+    test "shows Shared stay when booking_mode is day", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
@@ -660,7 +660,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Per Guest"
+      assert html =~ "Shared stay"
     end
   end
 

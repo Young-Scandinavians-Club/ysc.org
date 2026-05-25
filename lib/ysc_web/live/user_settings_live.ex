@@ -4267,12 +4267,12 @@ defmodule YscWeb.UserSettingsLive do
                    )
                    |> push_patch(to: ~p"/users/membership")}
 
-                {:error, stripe_error} ->
+                {:error, _stripe_error} ->
                   {:noreply,
                    YscWeb.Flash.put_toast(
                      socket,
                      :error,
-                     "Payment method saved but failed to set as default in Stripe: #{stripe_error.message}",
+                     "We saved your card, but couldn't make it your default. Please try again, or contact us at info@ysc.org if this keeps happening.",
                      title: "Payment"
                    )}
               end
@@ -4292,7 +4292,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Failed to retrieve payment method from Stripe",
+             "We couldn't load your saved payment methods. Please refresh the page or try again in a few minutes.",
              title: "Payment"
            )}
       end
@@ -5062,12 +5062,12 @@ defmodule YscWeb.UserSettingsLive do
      )}
   end
 
-  defp handle_stripe_error(socket, stripe_error) do
+  defp handle_stripe_error(socket, _stripe_error) do
     {:noreply,
      revert_optimistic_update(socket)
      |> YscWeb.Flash.put_toast(
        :error,
-       "Failed to update default payment method in Stripe: #{stripe_error.message}",
+       "We couldn't update your default payment method. Please try again, or contact us at info@ysc.org if this keeps happening.",
        title: "Payment"
      )}
   end

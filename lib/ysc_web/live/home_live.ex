@@ -1306,7 +1306,7 @@ defmodule YscWeb.HomeLive do
                     navigate={~p"/users/payments"}
                     class="text-xs font-bold text-blue-600 hover:underline"
                   >
-                    View all payments
+                    View payment history
                   </.link>
                 </div>
 
@@ -1429,7 +1429,7 @@ defmodule YscWeb.HomeLive do
                           </span>
                           <%= if booking.booking_mode == :buyout do %>
                             <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
-                              Full Buyout
+                              Entire cabin
                             </span>
                           <% end %>
                         </div>

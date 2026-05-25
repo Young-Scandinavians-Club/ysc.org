@@ -2416,16 +2416,16 @@ defmodule YscWeb.TahoeBookingLive do
                           @selected_booking_mode == :buyout &&
                           @date_validation_errors[:availability]
                       }>
-                        Full buyout unavailable for selected dates
+                        Entire-cabin reservation isn't available for these dates. Try different dates or book individual rooms.
                       </li>
                       <li :if={@form_errors && map_size(@form_errors) > 0}>
-                        Please fix form errors above
+                        Complete the required fields above
                       </li>
                       <li :if={
                         @date_validation_errors &&
                           map_size(@date_validation_errors) > 0
                       }>
-                        Please fix date validation errors
+                        Review the date messages above
                       </li>
                     </ul>
                   </div>
@@ -3527,9 +3527,9 @@ defmodule YscWeb.TahoeBookingLive do
                             class="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5"
                           />
                           <p class="text-sm text-blue-900">
-                            <strong>Important:</strong>
-                            Full cabin buyouts are <strong>NOT available</strong>
-                            during the winter season.
+                            <strong>Winter note:</strong>
+                            From December through April, you can book individual rooms only.
+                            Reserving the entire cabin is available May through November.
                           </p>
                         </div>
                       </div>
