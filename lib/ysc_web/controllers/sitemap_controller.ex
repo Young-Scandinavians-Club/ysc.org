@@ -17,6 +17,7 @@ defmodule YscWeb.SitemapController do
     content = """
     User-agent: *
     Disallow: /admin/
+    Disallow: /annual_meetings/
     Disallow: /expensereport
     Disallow: /users/
     Disallow: /onboarding

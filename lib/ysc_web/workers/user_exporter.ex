@@ -371,7 +371,7 @@ defmodule YscWeb.Workers.UserExporter do
         YscWeb.Endpoint.broadcast(
           channel,
           "user_export:complete",
-          "/exports/#{Path.basename(export_path)}"
+          "/admin/exports/#{Path.basename(export_path)}"
         )
     after
       30_000 ->
