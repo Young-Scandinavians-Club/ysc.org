@@ -682,7 +682,12 @@ defmodule YscWeb.AccountSetupLive do
           socket
         end
 
-      {:ok, socket}
+      if connected?(socket) and
+           not user_needs_needs_setup?(socket.assigns.user_needs) do
+        {:ok, redirect(socket, to: ~p"/")}
+      else
+        {:ok, socket}
+      end
     else
       {:ok, redirect(socket, to: ~p"/")}
     end

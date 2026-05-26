@@ -5,6 +5,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts
+  alias Ysc.Payments
 
   # ---------------------------------------------------------------------------
   # Shared helpers
@@ -871,6 +872,34 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       {path, _flash} = assert_redirect(view)
       assert String.starts_with?(path, "/users/log-in/auto")
+    end
+  end
+
+  describe "mount redirects when setup is already complete" do
+    test "pending user with payment on file is redirected away from account setup",
+         %{
+           conn: conn
+         } do
+      user = verified_pending_user(%{phone_number: "+12065551234"})
+      {:ok, user} = Accounts.mark_password_set(user)
+      {:ok, user} = Accounts.mark_phone_verified(user)
+
+      assert {:ok, _pm} =
+               Payments.insert_payment_method(%{
+                 user_id: user.id,
+                 provider: :stripe,
+                 provider_id:
+                   "pm_setup_complete_#{System.unique_integer([:positive])}",
+                 provider_customer_id: "cus_test",
+                 type: :card,
+                 provider_type: "card",
+                 is_default: true
+               })
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               live(conn, ~p"/account/setup/#{user.id}")
     end
   end
 end
