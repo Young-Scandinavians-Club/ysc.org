@@ -84,7 +84,8 @@ defmodule YscWeb.PostLiveTest do
           published_on: nil
         })
 
-      assert {:error, {:redirect, %{to: "/news"}}} = live(conn, ~p"/posts/#{post.id}")
+      assert {:error, {:redirect, %{to: "/news"}}} =
+               live(conn, ~p"/posts/#{post.id}")
     end
 
     test "loads post by url_name successfully", %{conn: conn} do

@@ -48,7 +48,9 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert path == "/events"
     end
 
-    test "draft events are not accessible on the public event page", %{conn: conn} do
+    test "draft events are not accessible on the public event page", %{
+      conn: conn
+    } do
       event =
         event_fixture(%{
           title: "Secret Draft Event",
@@ -56,7 +58,9 @@ defmodule YscWeb.EventDetailsLiveTest do
           published_at: nil
         })
 
-      assert {:error, {:redirect, %{to: path}}} = live(conn, ~p"/events/#{event.id}")
+      assert {:error, {:redirect, %{to: path}}} =
+               live(conn, ~p"/events/#{event.id}")
+
       assert path == "/events"
     end
 

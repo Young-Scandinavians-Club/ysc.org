@@ -67,7 +67,8 @@ defmodule Ysc.Events do
   """
   def get_public_event_by_reference(reference_id) do
     from(e in Event,
-      where: e.reference_id == ^reference_id and e.state in ^@public_event_states
+      where:
+        e.reference_id == ^reference_id and e.state in ^@public_event_states
     )
     |> Repo.one()
   end
