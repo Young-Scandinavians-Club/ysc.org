@@ -7,7 +7,9 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
   - Event type handling
   - Error handling
   """
-  use Ysc.DataCase, async: true
+  # Stripe client is configured via Application env; async tests race with DataCase
+  # setup and other suites that pin Ysc.TestStripeClient or Ysc.StripeMock.
+  use Ysc.DataCase, async: false
 
   import Mox
 
@@ -17,17 +19,9 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Tickets.WebhookHandler
 
-  # Make sure mocks are verified when the test exits
   setup :verify_on_exit!
 
   setup do
-    # Configure StripeService to use the mock
-    original_stripe_client = Application.get_env(:ysc, :stripe_client)
-
-    on_exit(fn ->
-      Application.put_env(:ysc, :stripe_client, original_stripe_client)
-    end)
-
     pin_stripe_mock!()
     :ok
   end
@@ -36,19 +30,16 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
   end
 
+  defp cancel_timeout_jobs_for_order!(ticket_order_id) do
+    from(j in Oban.Job,
+      where: j.worker == "Ysc.Tickets.TimeoutWorker",
+      where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Repo.delete_all()
+  end
+
   describe "handle_webhook_event/2" do
-    setup do
-      # Configure StripeService to use the mock
-      original_stripe_client = Application.get_env(:ysc, :stripe_client)
-
-      on_exit(fn ->
-        Application.put_env(:ysc, :stripe_client, original_stripe_client)
-      end)
-
-      pin_stripe_mock!()
-      :ok
-    end
-
     test "handles payment_intent.succeeded event" do
       payment_intent_id = "pi_test_123"
       event_data = %{"id" => payment_intent_id}
@@ -153,6 +144,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
+        cancel_timeout_jobs_for_order!(ticket_order.id)
         payment_intent_id = "pi_failed_with_order_#{ticket_order.id}"
 
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
@@ -184,6 +176,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
+        cancel_timeout_jobs_for_order!(ticket_order.id)
         payment_intent_id = "pi_canceled_with_order_#{ticket_order.id}"
 
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
