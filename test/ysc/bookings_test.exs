@@ -2003,8 +2003,7 @@ defmodule Ysc.BookingsTest do
 
     test "uses original_amount from opts without ledger payment lookup" do
       user = user_fixture()
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       booking =
         booking_fixture(%{
@@ -2031,8 +2030,7 @@ defmodule Ysc.BookingsTest do
 
     test "falls back to ledger lookup when original_amount is omitted" do
       user = user_fixture()
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       booking =
         booking_fixture(%{

@@ -12,7 +12,9 @@ defmodule YscWeb.TicketQrGoogleWalletLiveTest do
   import Ysc.TicketsFixtures
   import Ysc.GoogleWalletCredentialsHelper
 
-  test "renders a save link per confirmed ticket after async load", %{conn: conn} do
+  test "renders a save link per confirmed ticket after async load", %{
+    conn: conn
+  } do
     Ysc.Ledgers.ensure_basic_accounts()
 
     member =
@@ -51,7 +53,8 @@ defmodule YscWeb.TicketQrGoogleWalletLiveTest do
 
       {:ok, doc} = Floki.parse_fragment(html)
 
-      assert length(Floki.find(doc, "a[href*='pay.google.com/gp/v/save/']")) == 2
+      assert length(Floki.find(doc, "a[href*='pay.google.com/gp/v/save/']")) ==
+               2
     end)
   end
 end

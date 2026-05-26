@@ -321,9 +321,10 @@ defmodule YscWeb.AccountSetupLiveTest do
   # ---------------------------------------------------------------------------
 
   describe "pending user with payment on file" do
-    test "lands on password step when a default payment method already exists", %{
-      conn: conn
-    } do
+    test "lands on password step when a default payment method already exists",
+         %{
+           conn: conn
+         } do
       user = pending_user_with_default_payment()
       conn = log_in_user(conn, user)
 
