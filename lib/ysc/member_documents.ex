@@ -9,16 +9,22 @@ defmodule Ysc.MemberDocuments do
                           "annual_meetings"
                         ])
 
+  @doc false
+  def annual_meetings_root, do: @annual_meetings_root
+
   @doc """
   Returns the absolute filesystem path for a relative annual meeting document,
   or `:error` when the path is invalid or the file does not exist.
   """
   @spec annual_meeting_path(String.t()) :: {:ok, String.t()} | :error
   def annual_meeting_path(relative_path) when is_binary(relative_path) do
+    expanded_root = Path.expand(@annual_meetings_root)
+
     with :ok <- validate_annual_meeting_relative_path(relative_path),
-         absolute = Path.join(@annual_meetings_root, relative_path),
-         true <- File.regular?(absolute),
-         true <- path_within_root?(absolute) do
+         {:ok, safe_relative} <-
+           Path.safe_relative(relative_path, expanded_root),
+         absolute = Path.join(expanded_root, safe_relative),
+         true <- File.regular?(absolute) do
       {:ok, absolute}
     else
       _ -> :error
@@ -42,11 +48,5 @@ defmodule Ysc.MemberDocuments do
       true ->
         :ok
     end
-  end
-
-  defp path_within_root?(absolute_path) do
-    expanded = Path.expand(absolute_path)
-    root = Path.expand(@annual_meetings_root)
-    String.starts_with?(expanded, root <> "/") or expanded == root
   end
 end

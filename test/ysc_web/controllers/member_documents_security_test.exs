@@ -21,6 +21,12 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
       conn = log_in_user(conn, user) |> get("/annual_meetings/#{@sample_pdf}")
 
       assert conn.status == 200
+
+      assert String.starts_with?(
+               hd(get_resp_header(conn, "content-type")),
+               "application/pdf"
+             )
+
       assert get_resp_header(conn, "content-disposition") != []
       assert conn.resp_body != ""
     end
@@ -59,6 +65,31 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
         )
 
       assert redirected_to(conn) == ~p"/"
+    end
+
+    test "admin can download export with csv content type", %{conn: conn} do
+      user = user_fixture(%{state: :active, role: :admin})
+      filename = "ysc-user-export-2026-05-26-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
+      exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
+      File.mkdir_p!(exports_root)
+      file_path = Path.join(exports_root, filename)
+      File.write!(file_path, "id,email\n1,test@example.com")
+      on_exit(fn -> File.rm(file_path) end)
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> get("/admin/exports/#{filename}")
+
+      assert conn.status == 200
+
+      assert String.starts_with?(
+               hd(get_resp_header(conn, "content-type")),
+               "text/csv"
+             )
+
+      assert get_resp_header(conn, "content-disposition") != []
+      assert conn.resp_body == "id,email\n1,test@example.com"
     end
   end
 end

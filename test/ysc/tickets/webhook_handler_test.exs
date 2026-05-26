@@ -28,8 +28,12 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       Application.put_env(:ysc, :stripe_client, original_stripe_client)
     end)
 
-    Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+    pin_stripe_mock!()
     :ok
+  end
+
+  defp pin_stripe_mock! do
+    Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
   end
 
   describe "handle_webhook_event/2" do
@@ -41,7 +45,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
         Application.put_env(:ysc, :stripe_client, original_stripe_client)
       end)
 
-      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      pin_stripe_mock!()
       :ok
     end
 
@@ -54,6 +58,8 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn _id, _opts ->
         {:ok, %{id: payment_intent_id, status: "succeeded", metadata: %{}}}
       end)
+
+      pin_stripe_mock!()
 
       result =
         WebhookHandler.handle_webhook_event(
@@ -78,6 +84,8 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
          }}
       end)
 
+      pin_stripe_mock!()
+
       result =
         WebhookHandler.handle_webhook_event(
           "payment_intent.payment_failed",
@@ -95,6 +103,8 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn _id, _opts ->
         {:ok, %{id: payment_intent_id, status: "canceled", metadata: %{}}}
       end)
+
+      pin_stripe_mock!()
 
       result =
         WebhookHandler.handle_webhook_event(
@@ -127,6 +137,8 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
       # The handler should return :ok even if processing fails
       # This prevents webhook retries for non-retryable errors
+      pin_stripe_mock!()
+
       result =
         WebhookHandler.handle_webhook_event(
           "payment_intent.succeeded",
@@ -138,54 +150,64 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
     test "payment_intent.payment_failed cancels ticket order when metadata references order" do
       Ysc.Ledgers.ensure_basic_accounts()
-      ticket_order = ticket_order_fixture()
-      payment_intent_id = "pi_failed_with_order_#{ticket_order.id}"
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
-        assert id == payment_intent_id
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_failed_with_order_#{ticket_order.id}"
 
-        {:ok,
-         %{
-           id: id,
-           status: "requires_payment_method",
-           metadata: %{"ticket_order_id" => ticket_order.id}
-         }}
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          assert id == payment_intent_id
+
+          {:ok,
+           %{
+             id: id,
+             status: "requires_payment_method",
+             metadata: %{"ticket_order_id" => ticket_order.id}
+           }}
+        end)
+
+        pin_stripe_mock!()
+
+        assert :ok =
+                 WebhookHandler.handle_webhook_event(
+                   "payment_intent.payment_failed",
+                   %{"id" => payment_intent_id}
+                 )
+
+        assert %TicketOrder{status: :cancelled} =
+                 Repo.get!(TicketOrder, ticket_order.id)
       end)
-
-      assert :ok =
-               WebhookHandler.handle_webhook_event(
-                 "payment_intent.payment_failed",
-                 %{"id" => payment_intent_id}
-               )
-
-      assert %TicketOrder{status: :cancelled} =
-               Repo.get!(TicketOrder, ticket_order.id)
     end
 
     test "payment_intent.canceled cancels ticket order when metadata references order" do
       Ysc.Ledgers.ensure_basic_accounts()
-      ticket_order = ticket_order_fixture()
-      payment_intent_id = "pi_canceled_with_order_#{ticket_order.id}"
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
-        assert id == payment_intent_id
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_canceled_with_order_#{ticket_order.id}"
 
-        {:ok,
-         %{
-           id: id,
-           status: "canceled",
-           metadata: %{"ticket_order_id" => ticket_order.id}
-         }}
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          assert id == payment_intent_id
+
+          {:ok,
+           %{
+             id: id,
+             status: "canceled",
+             metadata: %{"ticket_order_id" => ticket_order.id}
+           }}
+        end)
+
+        pin_stripe_mock!()
+
+        assert :ok =
+                 WebhookHandler.handle_webhook_event(
+                   "payment_intent.canceled",
+                   %{"id" => payment_intent_id}
+                 )
+
+        assert %TicketOrder{status: :cancelled} =
+                 Repo.get!(TicketOrder, ticket_order.id)
       end)
-
-      assert :ok =
-               WebhookHandler.handle_webhook_event(
-                 "payment_intent.canceled",
-                 %{"id" => payment_intent_id}
-               )
-
-      assert %TicketOrder{status: :cancelled} =
-               Repo.get!(TicketOrder, ticket_order.id)
     end
   end
 end

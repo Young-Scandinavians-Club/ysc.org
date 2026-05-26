@@ -5,6 +5,8 @@ defmodule YscWeb.AdminExportController do
   """
   use YscWeb, :controller
 
+  alias YscWeb.SafeSendFile
+
   require Ysc.Logging
 
   @exports_root Path.join([:code.priv_dir(:ysc), "static", "exports"])
@@ -39,33 +41,30 @@ defmodule YscWeb.AdminExportController do
   defp valid_export_filename?(_), do: false
 
   defp serve_export(conn, filename, user) do
-    absolute_path = Path.join(@exports_root, filename)
+    case SafeSendFile.send_within(conn, 200, @exports_root, filename,
+           prepare: fn conn, _absolute_path ->
+             conn
+             |> put_resp_header(
+               "content-disposition",
+               ~s(attachment; filename="#{filename}")
+             )
+             |> put_resp_content_type("text/csv")
+           end
+         ) do
+      {:ok, conn} ->
+        conn
 
-    if File.regular?(absolute_path) and path_within_exports_root?(absolute_path) do
-      conn
-      |> put_resp_header(
-        "content-disposition",
-        ~s(attachment; filename="#{filename}")
-      )
-      |> put_resp_content_type("text/csv")
-      |> send_file(200, absolute_path)
-    else
-      Ysc.Logging.warning(
-        "Admin export download requested for missing file",
-        user_id: user.id,
-        filename: filename
-      )
+      :error ->
+        Ysc.Logging.warning(
+          "Admin export download requested for missing file",
+          user_id: user.id,
+          filename: filename
+        )
 
-      conn
-      |> put_status(:not_found)
-      |> put_view(html: YscWeb.ErrorHTML)
-      |> render(:"404")
+        conn
+        |> put_status(:not_found)
+        |> put_view(html: YscWeb.ErrorHTML)
+        |> render(:"404")
     end
-  end
-
-  defp path_within_exports_root?(absolute_path) do
-    expanded = Path.expand(absolute_path)
-    root = Path.expand(@exports_root)
-    String.starts_with?(expanded, root <> "/")
   end
 end
