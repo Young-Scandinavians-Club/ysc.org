@@ -2254,22 +2254,17 @@ defmodule YscWeb.UserSettingsLive do
               <div
                 :if={@booking_entitlements_count > 0}
                 id="member-booking-entitlements-section"
-                class="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/90 p-5 sm:p-6 shadow-sm ring-1 ring-amber-100/60"
+                class="rounded border border-zinc-200 bg-white py-6 px-4 sm:px-6"
               >
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+                <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <p class="text-xs font-bold uppercase tracking-widest text-amber-800/90">
-                      Cabin savings
-                    </p>
-                    <h2 class="text-zinc-900 font-extrabold text-2xl mt-1 tracking-tight">
-                      Your stay perks
-                    </h2>
-                    <p class="text-sm text-zinc-600 mt-1 max-w-xl">
-                      Apply these automatically when you book a qualifying cabin stay — like a coupon on file for members.
+                    <h2 class="text-lg font-bold text-zinc-900">Your stay perks</h2>
+                    <p class="text-sm text-zinc-500 mt-1 max-w-xl">
+                      Applied automatically when you book a qualifying cabin stay.
                     </p>
                   </div>
-                  <div class="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-2 ring-amber-200/80">
-                    <.icon name="hero-home-modern" class="w-7 h-7" />
+                  <div class="hidden sm:flex items-center text-zinc-400">
+                    <.icon name="hero-sparkles" class="w-6 h-6" />
                   </div>
                 </div>
                 <div
@@ -2280,55 +2275,42 @@ defmodule YscWeb.UserSettingsLive do
                   <div
                     :for={{id, ent} <- @streams.booking_entitlements}
                     id={id}
-                    class={[
-                      "relative overflow-hidden rounded-2xl border-2 border-dashed bg-white/90 backdrop-blur-sm shadow-md transition hover:shadow-lg hover:-translate-y-0.5",
-                      member_entitlement_coupon_frame_class(ent.property)
-                    ]}
+                    class="flex flex-col rounded-lg border border-zinc-200 bg-zinc-50/50 p-5 transition-colors hover:border-zinc-300"
                   >
-                    <div class={[
-                      "absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-25 blur-2xl",
-                      member_entitlement_coupon_blob_class(ent.property)
-                    ]}>
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                      <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-sm">
+                        <.icon
+                          name="hero-sparkles"
+                          class="w-3.5 h-3.5 text-blue-600"
+                        /> Member perk
+                      </span>
+                      <span class="text-xs font-medium text-zinc-500 mt-1 tabular-nums">
+                        Since {Calendar.strftime(ent.inserted_at, "%b %Y")}
+                      </span>
                     </div>
-                    <div class={[
-                      "absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r opacity-95",
-                      member_entitlement_coupon_ribbon_class(ent.property)
-                    ]}>
+                    <div class="mb-4 flex-grow">
+                      <p class="text-base font-bold text-zinc-900">
+                        {member_entitlement_coupon_headline(ent)}
+                      </p>
+                      <p class="mt-1 text-sm text-zinc-600">
+                        {member_entitlement_benefit_summary(ent)}
+                      </p>
                     </div>
-                    <div class="relative p-5 sm:p-6 flex flex-col gap-4">
-                      <div class="flex items-start justify-between gap-3">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-zinc-900/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-50 shadow-sm">
-                          <.icon name="hero-sparkles" class="w-3.5 h-3.5" />
-                          Member perk
-                        </span>
-                        <span class="text-xs font-semibold text-zinc-500 tabular-nums">
-                          Since {Calendar.strftime(ent.inserted_at, "%b %Y")}
-                        </span>
-                      </div>
-                      <div>
-                        <p class="text-2xl sm:text-3xl font-black text-zinc-900 leading-tight tracking-tight">
-                          {member_entitlement_coupon_headline(ent)}
-                        </p>
-                        <p class="mt-2 text-sm text-zinc-600 leading-relaxed">
-                          {member_entitlement_benefit_summary(ent)}
-                        </p>
-                      </div>
-                      <div class="flex flex-wrap items-center gap-2 text-sm">
-                        <span class="inline-flex items-center rounded-lg bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800">
-                          <.icon
-                            name="hero-map-pin"
-                            class="w-4 h-4 me-1 text-zinc-500"
-                          />
-                          {member_entitlement_property_label(ent.property)}
-                        </span>
-                        <span class="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 font-medium text-emerald-900 ring-1 ring-emerald-200/80">
-                          <.icon
-                            name="hero-clock"
-                            class="w-4 h-4 me-1 text-emerald-600"
-                          />
-                          {member_entitlement_coupon_expiry_phrase(ent)}
-                        </span>
-                      </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <span class="inline-flex items-center rounded bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
+                        <.icon
+                          name="hero-map-pin"
+                          class="w-3.5 h-3.5 me-1 text-zinc-500"
+                        />
+                        {member_entitlement_property_label(ent.property)}
+                      </span>
+                      <span class="inline-flex items-center rounded bg-emerald-50 px-2 py-1 font-medium text-emerald-800 border border-emerald-100">
+                        <.icon
+                          name="hero-clock"
+                          class="w-3.5 h-3.5 me-1 text-emerald-600"
+                        />
+                        {member_entitlement_coupon_expiry_phrase(ent)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2337,22 +2319,19 @@ defmodule YscWeb.UserSettingsLive do
               <div
                 :if={@ticket_reservations_count > 0}
                 id="member-ticket-reservations-section"
-                class="rounded-2xl border border-fuchsia-200/80 bg-gradient-to-br from-fuchsia-50 via-white to-violet-50/90 p-5 sm:p-6 shadow-sm ring-1 ring-fuchsia-100/60"
+                class="rounded border border-zinc-200 bg-white py-6 px-4 sm:px-6"
               >
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+                <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <p class="text-xs font-bold uppercase tracking-widest text-fuchsia-800/90">
-                      Event tickets
-                    </p>
-                    <h2 class="text-zinc-900 font-extrabold text-2xl mt-1 tracking-tight">
+                    <h2 class="text-lg font-bold text-zinc-900">
                       Tickets waiting for checkout
                     </h2>
-                    <p class="text-sm text-zinc-600 mt-1 max-w-xl">
+                    <p class="text-sm text-zinc-500 mt-1 max-w-xl">
                       You started buying tickets but did not finish payment. Your selected tickets and member price are saved until the hold expires.
                     </p>
                   </div>
-                  <div class="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 ring-2 ring-fuchsia-200/80">
-                    <.icon name="hero-ticket" class="w-7 h-7" />
+                  <div class="hidden sm:flex items-center text-zinc-400">
+                    <.icon name="hero-ticket" class="w-6 h-6" />
                   </div>
                 </div>
                 <div
@@ -2363,73 +2342,67 @@ defmodule YscWeb.UserSettingsLive do
                   <div
                     :for={{id, res} <- @streams.ticket_reservations}
                     id={id}
-                    class="relative overflow-hidden rounded-2xl border-2 border-dashed border-fuchsia-300/90 bg-white/90 backdrop-blur-sm shadow-md transition hover:shadow-lg hover:-translate-y-0.5"
+                    class="flex flex-col rounded-lg border border-zinc-200 bg-zinc-50/50 p-5 transition-colors hover:border-zinc-300"
                   >
-                    <div class="absolute -left-10 bottom-0 h-28 w-28 rounded-full bg-gradient-to-tr from-fuchsia-400/20 to-violet-400/20 blur-2xl">
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                      <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-sm">
+                        <.icon name="hero-bolt" class="w-3.5 h-3.5 text-blue-600" />
+                        Saved for checkout
+                      </span>
+                      <span class="text-xs font-medium text-zinc-500 mt-1 tabular-nums">
+                        Qty {res.quantity}
+                      </span>
                     </div>
-                    <div class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-fuchsia-500 via-violet-500 to-purple-500 opacity-90">
+                    <div class="mb-4 flex-grow">
+                      <p class="text-base font-bold text-zinc-900">
+                        <%= if res.ticket_tier && res.ticket_tier.event do %>
+                          {res.ticket_tier.event.title}
+                        <% else %>
+                          Tickets in progress
+                        <% end %>
+                      </p>
+                      <p :if={res.ticket_tier} class="mt-1 text-sm text-zinc-600">
+                        {res.ticket_tier.name}
+                      </p>
+                      <p
+                        :if={ticket_reservation_discount_phrase(res)}
+                        class="mt-2 inline-flex items-center gap-1.5 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800 border border-blue-100"
+                      >
+                        <.icon
+                          name="hero-receipt-percent"
+                          class="w-3.5 h-3.5 text-blue-600"
+                        />
+                        {ticket_reservation_discount_phrase(res)}
+                      </p>
                     </div>
-                    <div class="relative p-5 sm:p-6 flex flex-col gap-4">
-                      <div class="flex items-start justify-between gap-3">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-900/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-fuchsia-50 shadow-sm">
-                          <.icon name="hero-bolt" class="w-3.5 h-3.5" />
-                          Saved for checkout
-                        </span>
-                        <span class="text-xs font-semibold text-zinc-500 tabular-nums">
-                          Qty {res.quantity}
-                        </span>
-                      </div>
-                      <div>
-                        <p class="text-xl sm:text-2xl font-black text-zinc-900 leading-snug">
-                          <%= if res.ticket_tier && res.ticket_tier.event do %>
-                            {res.ticket_tier.event.title}
-                          <% else %>
-                            Tickets in progress
-                          <% end %>
-                        </p>
-                        <p
-                          :if={res.ticket_tier}
-                          class="mt-1 text-sm font-semibold text-fuchsia-900/90"
-                        >
-                          {res.ticket_tier.name}
-                        </p>
-                        <p
-                          :if={ticket_reservation_discount_phrase(res)}
-                          class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-950 ring-1 ring-amber-300/70"
-                        >
-                          <.icon name="hero-receipt-percent" class="w-4 h-4" />
-                          {ticket_reservation_discount_phrase(res)}
-                        </p>
-                      </div>
-                      <div class="flex flex-wrap items-center gap-2 text-sm">
-                        <span class="inline-flex items-center rounded-lg bg-violet-50 px-2.5 py-1 font-medium text-violet-900 ring-1 ring-violet-200/80">
-                          <.icon
-                            name="hero-clock"
-                            class="w-4 h-4 me-1 text-violet-600"
-                          />
-                          <%= if res.expires_at do %>
-                            Hold until {Calendar.strftime(
-                              DateTime.shift_zone!(
-                                res.expires_at,
-                                "America/Los_Angeles"
-                              ),
-                              "%b %-d, %Y %H:%M PT"
-                            )}
-                          <% else %>
-                            No timer — finish checkout when you are ready
-                          <% end %>
-                        </span>
-                      </div>
-                      <%= if res.ticket_tier && res.ticket_tier.event do %>
-                        <.link
-                          navigate={~p"/events/#{res.ticket_tier.event.id}/tickets"}
-                          class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:from-fuchsia-500 hover:to-violet-500 transition"
-                        >
-                          Finish buying tickets
-                          <.icon name="hero-arrow-right" class="w-4 h-4" />
-                        </.link>
-                      <% end %>
+                    <div class="flex flex-wrap items-center gap-2 text-xs mb-4">
+                      <span class="inline-flex items-center rounded bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
+                        <.icon
+                          name="hero-clock"
+                          class="w-3.5 h-3.5 me-1 text-zinc-500"
+                        />
+                        <%= if res.expires_at do %>
+                          Hold until {Calendar.strftime(
+                            DateTime.shift_zone!(
+                              res.expires_at,
+                              "America/Los_Angeles"
+                            ),
+                            "%b %-d, %Y %H:%M PT"
+                          )}
+                        <% else %>
+                          No timer — finish checkout when you are ready
+                        <% end %>
+                      </span>
                     </div>
+                    <%= if res.ticket_tier && res.ticket_tier.event do %>
+                      <.link
+                        navigate={~p"/events/#{res.ticket_tier.event.id}/tickets"}
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                      >
+                        Finish buying tickets
+                        <.icon name="hero-arrow-right" class="w-4 h-4" />
+                      </.link>
+                    <% end %>
                   </div>
                 </div>
               </div>
@@ -6647,28 +6620,6 @@ defmodule YscWeb.UserSettingsLive do
     do: Calendar.strftime(date, "%b %-d")
 
   defp format_payment_date(_), do: ""
-
-  defp member_entitlement_coupon_frame_class(:tahoe),
-    do: "border-sky-400/80 shadow-sky-100/80"
-
-  defp member_entitlement_coupon_frame_class(:clear_lake),
-    do: "border-emerald-400/80 shadow-emerald-100/80"
-
-  defp member_entitlement_coupon_frame_class(_),
-    do: "border-violet-400/80 shadow-violet-100/80"
-
-  defp member_entitlement_coupon_blob_class(:tahoe), do: "bg-sky-400"
-  defp member_entitlement_coupon_blob_class(:clear_lake), do: "bg-emerald-400"
-  defp member_entitlement_coupon_blob_class(_), do: "bg-violet-400"
-
-  defp member_entitlement_coupon_ribbon_class(:tahoe),
-    do: "from-sky-500 via-sky-300 to-blue-600"
-
-  defp member_entitlement_coupon_ribbon_class(:clear_lake),
-    do: "from-emerald-500 via-teal-400 to-cyan-600"
-
-  defp member_entitlement_coupon_ribbon_class(_),
-    do: "from-violet-500 via-fuchsia-400 to-purple-600"
 
   defp member_entitlement_coupon_headline(ent) do
     case ent.benefit_kind do
