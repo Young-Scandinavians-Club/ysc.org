@@ -1727,30 +1727,11 @@ defmodule YscWeb.AdminMoneyLive do
                   </.badge>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="flex flex-col">
-                    <.badge type={
-                      get_quickbooks_sync_status_badge_type(
-                        expense_report.quickbooks_sync_status
-                      )
-                    }>
-                      {String.capitalize(
-                        expense_report.quickbooks_sync_status || "unknown"
-                      )}
-                    </.badge>
-                    <%= if expense_report.quickbooks_sync_error do %>
-                      <.tooltip
-                        tooltip_text={
-                          format_qb_error(expense_report.quickbooks_sync_error)
-                        }
-                        max_width="max-w-md"
-                        text_align="text-left"
-                      >
-                        <span class="text-xs text-red-600 mt-1 truncate max-w-xs cursor-help">
-                          {format_qb_error(expense_report.quickbooks_sync_error)}
-                        </span>
-                      </.tooltip>
-                    <% end %>
-                  </div>
+                  <.admin_quickbooks_sync_status
+                    status={expense_report.quickbooks_sync_status}
+                    error={expense_report.quickbooks_sync_error}
+                    default_label="unknown"
+                  />
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
                   <%= if expense_report.quickbooks_bill_id do %>
@@ -2229,15 +2210,10 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="font-medium text-zinc-700">Sync Status</p>
               <p class="text-zinc-900">
-                <.badge type={
-                  get_quickbooks_sync_status_badge_type(
-                    @selected_payout.quickbooks_sync_status
-                  )
-                }>
-                  {String.capitalize(
-                    @selected_payout.quickbooks_sync_status || "not_synced"
-                  )}
-                </.badge>
+                <.admin_quickbooks_sync_status
+                  status={@selected_payout.quickbooks_sync_status}
+                  layout={:inline}
+                />
               </p>
             </div>
             <%= if @selected_payout.quickbooks_deposit_id do %>
@@ -2277,13 +2253,17 @@ defmodule YscWeb.AdminMoneyLive do
                 <p class="font-medium text-zinc-700">Sync Error</p>
                 <.tooltip
                   tooltip_text={
-                    format_qb_error(@selected_payout.quickbooks_sync_error)
+                    format_quickbooks_sync_error(
+                      @selected_payout.quickbooks_sync_error
+                    )
                   }
                   max_width="max-w-md"
                   text_align="text-left"
                 >
                   <p class="text-red-600 text-xs cursor-help">
-                    {format_qb_error(@selected_payout.quickbooks_sync_error)}
+                    {format_quickbooks_sync_error(
+                      @selected_payout.quickbooks_sync_error
+                    )}
                   </p>
                 </.tooltip>
               </div>
@@ -2357,30 +2337,11 @@ defmodule YscWeb.AdminMoneyLive do
                     </span>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
-                    <div class="flex flex-col">
-                      <.badge type={
-                        get_quickbooks_sync_status_badge_type(
-                          payment.quickbooks_sync_status
-                        )
-                      }>
-                        {String.capitalize(
-                          payment.quickbooks_sync_status || "not_synced"
-                        )}
-                      </.badge>
-                      <%= if payment.quickbooks_sync_error do %>
-                        <.tooltip
-                          tooltip_text={
-                            format_qb_error(payment.quickbooks_sync_error)
-                          }
-                          max_width="max-w-md"
-                          text_align="text-left"
-                        >
-                          <span class="text-xs text-red-600 mt-1 cursor-help">
-                            Error
-                          </span>
-                        </.tooltip>
-                      <% end %>
-                    </div>
+                    <.admin_quickbooks_sync_status
+                      status={payment.quickbooks_sync_status}
+                      error={payment.quickbooks_sync_error}
+                      error_hint={:label}
+                    />
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
                     {format_datetime(
@@ -2487,30 +2448,11 @@ defmodule YscWeb.AdminMoneyLive do
                     </span>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
-                    <div class="flex flex-col">
-                      <.badge type={
-                        get_quickbooks_sync_status_badge_type(
-                          refund.quickbooks_sync_status
-                        )
-                      }>
-                        {String.capitalize(
-                          refund.quickbooks_sync_status || "not_synced"
-                        )}
-                      </.badge>
-                      <%= if refund.quickbooks_sync_error do %>
-                        <.tooltip
-                          tooltip_text={
-                            format_qb_error(refund.quickbooks_sync_error)
-                          }
-                          max_width="max-w-md"
-                          text_align="text-left"
-                        >
-                          <span class="text-xs text-red-600 mt-1 cursor-help">
-                            Error
-                          </span>
-                        </.tooltip>
-                      <% end %>
-                    </div>
+                    <.admin_quickbooks_sync_status
+                      status={refund.quickbooks_sync_status}
+                      error={refund.quickbooks_sync_error}
+                      error_hint={:label}
+                    />
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap text-xs">
                     {format_datetime(
@@ -2743,15 +2685,10 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">Sync Status</p>
                 <p class="text-zinc-900">
-                  <.badge type={
-                    get_quickbooks_sync_status_badge_type(
-                      @selected_payment.quickbooks_sync_status
-                    )
-                  }>
-                    {String.capitalize(
-                      @selected_payment.quickbooks_sync_status || "not_synced"
-                    )}
-                  </.badge>
+                  <.admin_quickbooks_sync_status
+                    status={@selected_payment.quickbooks_sync_status}
+                    layout={:inline}
+                  />
                 </p>
               </div>
               <%= if @selected_payment.quickbooks_sales_receipt_id do %>
@@ -2790,7 +2727,9 @@ defmodule YscWeb.AdminMoneyLive do
                 <div class="col-span-2">
                   <p class="font-medium text-zinc-700">Sync Error</p>
                   <p class="text-red-600 text-xs">
-                    {format_qb_error(@selected_payment.quickbooks_sync_error)}
+                    {format_quickbooks_sync_error(
+                      @selected_payment.quickbooks_sync_error
+                    )}
                   </p>
                 </div>
               <% end %>
@@ -2904,30 +2843,11 @@ defmodule YscWeb.AdminMoneyLive do
                       </span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
-                      <div class="flex flex-col">
-                        <.badge type={
-                          get_quickbooks_sync_status_badge_type(
-                            refund.quickbooks_sync_status
-                          )
-                        }>
-                          {String.capitalize(
-                            refund.quickbooks_sync_status || "not_synced"
-                          )}
-                        </.badge>
-                        <%= if refund.quickbooks_sync_error do %>
-                          <.tooltip
-                            tooltip_text={
-                              format_qb_error(refund.quickbooks_sync_error)
-                            }
-                            max_width="max-w-md"
-                            text_align="text-left"
-                          >
-                            <span class="text-xs text-red-600 mt-1 cursor-help">
-                              Error
-                            </span>
-                          </.tooltip>
-                        <% end %>
-                      </div>
+                      <.admin_quickbooks_sync_status
+                        status={refund.quickbooks_sync_status}
+                        error={refund.quickbooks_sync_error}
+                        error_hint={:label}
+                      />
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-xs">
                       {format_datetime(
@@ -3168,15 +3088,11 @@ defmodule YscWeb.AdminMoneyLive do
             <div>
               <p class="font-medium text-zinc-700">Sync Status</p>
               <p class="text-zinc-900">
-                <.badge type={
-                  get_quickbooks_sync_status_badge_type(
-                    @selected_expense_report.quickbooks_sync_status
-                  )
-                }>
-                  {String.capitalize(
-                    @selected_expense_report.quickbooks_sync_status || "unknown"
-                  )}
-                </.badge>
+                <.admin_quickbooks_sync_status
+                  status={@selected_expense_report.quickbooks_sync_status}
+                  layout={:inline}
+                  default_label="unknown"
+                />
               </p>
             </div>
             <%= if @selected_expense_report.quickbooks_bill_id do %>
@@ -3223,7 +3139,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div class="col-span-2">
                 <p class="font-medium text-zinc-700">Sync Error</p>
                 <p class="text-red-600 text-xs">
-                  {format_qb_error(@selected_expense_report.quickbooks_sync_error)}
+                  {format_quickbooks_sync_error(
+                    @selected_expense_report.quickbooks_sync_error
+                  )}
                 </p>
               </div>
             <% end %>
@@ -3441,19 +3359,6 @@ defmodule YscWeb.AdminMoneyLive do
   defp format_datetime(nil, _timezone, _format), do: "—"
   defp format_datetime(_, _timezone, _format), do: "—"
 
-  # Format QuickBooks sync error for display (can be string, map, or nil)
-  defp format_qb_error(nil), do: ""
-  defp format_qb_error(error) when is_binary(error), do: error
-
-  defp format_qb_error(error) when is_map(error) do
-    case Jason.encode(error, pretty: true) do
-      {:ok, json} -> json
-      {:error, _} -> inspect(error)
-    end
-  end
-
-  defp format_qb_error(error), do: inspect(error)
-
   defp get_payment_type_color(payment_type) do
     case payment_type do
       "Membership" -> "text-blue-600"
@@ -3663,16 +3568,6 @@ defmodule YscWeb.AdminMoneyLive do
       "approved" -> "green"
       "rejected" -> "red"
       "paid" -> "sky"
-      _ -> "dark"
-    end
-  end
-
-  defp get_quickbooks_sync_status_badge_type(status) do
-    case String.downcase(to_string(status || "")) do
-      "pending" -> "yellow"
-      "synced" -> "green"
-      "failed" -> "red"
-      "processing" -> "default"
       _ -> "dark"
     end
   end

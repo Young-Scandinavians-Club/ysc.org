@@ -315,6 +315,94 @@ defmodule YscWeb.AdminComponents do
   defp section_badge_classes(:emerald), do: "bg-emerald-100 text-emerald-700"
 
   # ---------------------------------------------------------------------------
+  # QuickBooks sync status (admin money / ledgers)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Maps a QuickBooks sync status string to a `<.badge>` type.
+
+  Used by `admin_quickbooks_sync_status/1` and available for custom layouts.
+  """
+  def quickbooks_sync_status_badge_type(status) do
+    case String.downcase(to_string(status || "")) do
+      "pending" -> "yellow"
+      "synced" -> "green"
+      "failed" -> "red"
+      "processing" -> "default"
+      _ -> "dark"
+    end
+  end
+
+  @doc """
+  Formats a QuickBooks sync error for display (string, map, or nil).
+  """
+  def format_quickbooks_sync_error(nil), do: ""
+  def format_quickbooks_sync_error(error) when is_binary(error), do: error
+
+  def format_quickbooks_sync_error(error) when is_map(error) do
+    case Jason.encode(error, pretty: true) do
+      {:ok, json} -> json
+      {:error, _} -> inspect(error)
+    end
+  end
+
+  def format_quickbooks_sync_error(error), do: inspect(error)
+
+  @doc """
+  Renders QuickBooks sync status badge with optional sync error hint.
+
+  Use in admin money tables and detail panels. `default_label` is shown when
+  status is nil (expense reports use `"unknown"`, ledger entities use `"not_synced"`).
+  """
+  attr :status, :string, default: nil
+  attr :error, :any, default: nil
+  attr :default_label, :string, default: "not_synced"
+  attr :layout, :atom, default: :stack, values: [:stack, :inline]
+  attr :error_hint, :atom, default: :truncate, values: [:truncate, :label]
+
+  def admin_quickbooks_sync_status(assigns) do
+    label = String.capitalize(assigns.status || assigns.default_label)
+    badge_type = quickbooks_sync_status_badge_type(assigns.status)
+    error_text = format_quickbooks_sync_error(assigns.error)
+
+    assigns =
+      assigns
+      |> assign(:label, label)
+      |> assign(:badge_type, badge_type)
+      |> assign(:error_text, error_text)
+
+    ~H"""
+    <%= if @layout == :inline do %>
+      <.badge type={@badge_type}>{@label}</.badge>
+    <% else %>
+      <div class="flex flex-col">
+        <.badge type={@badge_type}>{@label}</.badge>
+        <%= if @error do %>
+          <.tooltip
+            tooltip_text={@error_text}
+            max_width="max-w-md"
+            text_align="text-left"
+          >
+            <span class={error_hint_classes(@error_hint)}>
+              {error_hint_content(@error_hint, @error_text)}
+            </span>
+          </.tooltip>
+        <% end %>
+      </div>
+    <% end %>
+    """
+  end
+
+  defp error_hint_classes(:label),
+    do: "text-xs text-red-600 mt-1 cursor-help"
+
+  defp error_hint_classes(:truncate),
+    do: "text-xs text-red-600 mt-1 truncate max-w-xs cursor-help"
+
+  defp error_hint_content(:label, _error_text), do: "Error"
+  defp error_hint_content(:truncate, error_text), do: error_text
+
+  # ---------------------------------------------------------------------------
   # admin_check_in_sticky_bar
   # ---------------------------------------------------------------------------
 
