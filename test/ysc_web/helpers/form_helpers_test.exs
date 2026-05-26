@@ -10,7 +10,8 @@ defmodule YscWeb.FormHelpersTest do
     end
 
     test "extracts message from message tuple" do
-      assert FormHelpers.format_form_error({"can't be blank", []}) == "can't be blank"
+      assert FormHelpers.format_form_error({"can't be blank", []}) ==
+               "can't be blank"
     end
   end
 end
