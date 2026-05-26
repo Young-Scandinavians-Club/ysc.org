@@ -2253,13 +2253,17 @@ defmodule YscWeb.AdminMoneyLive do
                 <p class="font-medium text-zinc-700">Sync Error</p>
                 <.tooltip
                   tooltip_text={
-                    format_quickbooks_sync_error(@selected_payout.quickbooks_sync_error)
+                    format_quickbooks_sync_error(
+                      @selected_payout.quickbooks_sync_error
+                    )
                   }
                   max_width="max-w-md"
                   text_align="text-left"
                 >
                   <p class="text-red-600 text-xs cursor-help">
-                    {format_quickbooks_sync_error(@selected_payout.quickbooks_sync_error)}
+                    {format_quickbooks_sync_error(
+                      @selected_payout.quickbooks_sync_error
+                    )}
                   </p>
                 </.tooltip>
               </div>
@@ -2723,7 +2727,9 @@ defmodule YscWeb.AdminMoneyLive do
                 <div class="col-span-2">
                   <p class="font-medium text-zinc-700">Sync Error</p>
                   <p class="text-red-600 text-xs">
-                    {format_quickbooks_sync_error(@selected_payment.quickbooks_sync_error)}
+                    {format_quickbooks_sync_error(
+                      @selected_payment.quickbooks_sync_error
+                    )}
                   </p>
                 </div>
               <% end %>
@@ -3133,7 +3139,9 @@ defmodule YscWeb.AdminMoneyLive do
               <div class="col-span-2">
                 <p class="font-medium text-zinc-700">Sync Error</p>
                 <p class="text-red-600 text-xs">
-                  {format_quickbooks_sync_error(@selected_expense_report.quickbooks_sync_error)}
+                  {format_quickbooks_sync_error(
+                    @selected_expense_report.quickbooks_sync_error
+                  )}
                 </p>
               </div>
             <% end %>

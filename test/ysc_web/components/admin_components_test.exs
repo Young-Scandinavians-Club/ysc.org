@@ -81,7 +81,9 @@ defmodule YscWeb.AdminComponentsTest do
     end
 
     test "pretty-prints map errors as JSON" do
-      assert format_quickbooks_sync_error(%{"Fault" => %{"Error" => [%{"Message" => "x"}]}}) =~
+      assert format_quickbooks_sync_error(%{
+               "Fault" => %{"Error" => [%{"Message" => "x"}]}
+             }) =~
                "Fault"
     end
   end
