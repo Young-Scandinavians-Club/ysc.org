@@ -126,13 +126,15 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Save Your Payment Method
             <:subtitle>
-              Add a payment method to complete your application. You won't be charged unless you're approved.
+              Save a payment method so we can activate your membership if you're approved. You won't be charged until the board approves your application.
             </:subtitle>
           </.header>
 
           <%= if @signup_plan do %>
             <div class="mt-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p class="text-sm font-semibold text-blue-900 mb-1">Selected plan</p>
+              <p class="text-sm font-semibold text-blue-900 mb-1">
+                Membership type on your application
+              </p>
               <p class="text-base font-bold text-blue-800">
                 {@signup_plan.name} &mdash; {Money.to_string!(
                   Money.new(:USD, @signup_plan.amount)

@@ -1696,7 +1696,7 @@ defmodule YscWeb.EventDetailsLive do
                     <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
                       <div class="flex justify-between text-sm text-green-600">
                         <span>
-                          Reserved discount ({breakdown.discount_percentage
+                          Member discount ({breakdown.discount_percentage
                           |> Float.round(2)}%)
                         </span>
                         <span class="font-medium">
@@ -2482,7 +2482,7 @@ defmodule YscWeb.EventDetailsLive do
                       <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
                         <div class="flex justify-between text-sm text-green-600">
                           <span>
-                            Reserved discount ({breakdown.discount_percentage
+                            Member discount ({breakdown.discount_percentage
                             |> Float.round(2)}%)
                           </span>
                           <span class="font-medium">
@@ -3121,7 +3121,7 @@ defmodule YscWeb.EventDetailsLive do
                     end %>
                   <div class="flex justify-between text-xs text-green-600 px-3">
                     <span>
-                      Reserved discount<%= if discount_percentage do %>
+                      Member discount<%= if discount_percentage do %>
                         ({discount_percentage}%)
                       <% end %>
                     </span>
