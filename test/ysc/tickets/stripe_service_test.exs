@@ -2,7 +2,7 @@ defmodule Ysc.Tickets.StripeServiceTest do
   @moduledoc """
   Tests for Ysc.Tickets.StripeService module.
   """
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   import Mox
   alias Ysc.Tickets.StripeService
