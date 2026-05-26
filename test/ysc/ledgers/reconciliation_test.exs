@@ -1683,13 +1683,17 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
 
     test "handles concurrent payment and refund operations", %{user: user} do
+      payments_before = Repo.aggregate(Payment, :count, :id)
+      refunds_before = Repo.aggregate(Refund, :count, :id)
+      payment_suffix = System.unique_integer([:positive])
+
       # Create payment
       {:ok, {payment, _transaction, _entries}} =
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(50_000, :USD),
           external_provider: :stripe,
-          external_payment_id: "pi_concurrent",
+          external_payment_id: "pi_concurrent_#{payment_suffix}",
           payment_date: DateTime.truncate(DateTime.utc_now(), :second),
           entity_type: :membership,
           entity_id: Ecto.ULID.generate(),
@@ -1706,7 +1710,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
           payment_id: payment.id,
           refund_amount: Money.new(10_000, :USD),
           external_provider: :stripe,
-          external_refund_id: "re_concurrent_#{i}",
+          external_refund_id: "re_concurrent_#{payment_suffix}_#{i}",
           reason: "customer_request"
         })
       end
@@ -1716,8 +1720,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       # Verify the key checks pass
       assert report.checks.payments.status == :ok
       assert report.checks.ledger_balance.balanced == true
-      assert report.checks.payments.total_payments == 1
-      assert report.checks.refunds.total_refunds == 3
+      assert report.checks.payments.total_payments == payments_before + 1
+      assert report.checks.refunds.total_refunds == refunds_before + 3
       assert report.checks.payments.discrepancies_count == 0
 
       # Refunds status might be :error due to ledger entries calculation issue (3x counting)
