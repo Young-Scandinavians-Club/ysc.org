@@ -29,10 +29,35 @@ defmodule YscWeb.SafeSendFile do
   defp do_send_file(conn, status, absolute_path) do
     conn =
       case get_resp_header(conn, "content-type") do
-        [] -> put_resp_content_type(conn, MIME.from_path(absolute_path))
+        [] -> put_content_type_for_extension(conn, absolute_path)
         _ -> conn
       end
 
     send_file(conn, status, absolute_path)
+  end
+
+  defp put_content_type_for_extension(conn, absolute_path) do
+    case String.downcase(Path.extname(absolute_path)) do
+      ".csv" ->
+        put_resp_content_type(conn, "text/csv")
+
+      ".pdf" ->
+        put_resp_content_type(conn, "application/pdf")
+
+      ".docx" ->
+        put_resp_content_type(
+          conn,
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+      ".pptx" ->
+        put_resp_content_type(
+          conn,
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+
+      _ ->
+        put_resp_content_type(conn, "application/octet-stream")
+    end
   end
 end

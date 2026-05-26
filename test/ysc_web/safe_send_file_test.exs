@@ -23,7 +23,8 @@ defmodule YscWeb.SafeSendFileTest do
     File.write!(Path.join(root, filename), "a,b,c")
 
     conn =
-      conn("/")
+      :get
+      |> conn("/")
       |> put_resp_content_type("text/csv")
 
     assert {:ok, conn} = SafeSendFile.send_within(conn, 200, root, filename)
@@ -48,14 +49,47 @@ defmodule YscWeb.SafeSendFileTest do
     on_exit(fn -> File.rm(outside) end)
 
     traversal = Path.relative_to(outside, root)
-    conn = conn("/")
+    conn = conn(:get, "/")
 
     assert :error = SafeSendFile.send_within(conn, 200, root, traversal)
   end
 
   test "send_within/4 rejects missing files", %{root: root} do
-    conn = conn("/")
+    conn = conn(:get, "/")
 
     assert :error = SafeSendFile.send_within(conn, 200, root, "missing.csv")
+  end
+
+  test "send_within/4 sets content type from file extension when unset", %{
+    root: root
+  } do
+    filename = "report.pdf"
+    File.write!(Path.join(root, filename), "%PDF-1.4")
+
+    conn = conn(:get, "/")
+
+    assert {:ok, conn} = SafeSendFile.send_within(conn, 200, root, filename)
+
+    assert String.starts_with?(
+             hd(get_resp_header(conn, "content-type")),
+             "application/pdf"
+           )
+  end
+
+  test "send_within/4 preserves an existing content type", %{root: root} do
+    filename = "report.pdf"
+    File.write!(Path.join(root, filename), "%PDF-1.4")
+
+    conn =
+      :get
+      |> conn("/")
+      |> put_resp_content_type("text/csv")
+
+    assert {:ok, conn} = SafeSendFile.send_within(conn, 200, root, filename)
+
+    assert String.starts_with?(
+             hd(get_resp_header(conn, "content-type")),
+             "text/csv"
+           )
   end
 end
