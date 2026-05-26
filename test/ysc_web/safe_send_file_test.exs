@@ -4,6 +4,7 @@ defmodule YscWeb.SafeSendFileTest do
   alias YscWeb.SafeSendFile
 
   import Plug.Conn
+  import Plug.Test
 
   setup do
     root =
@@ -22,13 +23,12 @@ defmodule YscWeb.SafeSendFileTest do
     File.write!(Path.join(root, filename), "a,b,c")
 
     conn =
-      :get
-      |> conn("/")
+      conn("/")
       |> put_resp_content_type("text/csv")
 
     assert {:ok, conn} = SafeSendFile.send_within(conn, 200, root, filename)
-    assert conn.state == :sent
-    assert conn.resp_body == "a,b,c"
+    assert conn.state == :file
+    assert String.starts_with?(hd(get_resp_header(conn, "content-type")), "text/csv")
   end
 
   test "send_within/4 rejects path traversal", %{root: root} do
@@ -44,13 +44,13 @@ defmodule YscWeb.SafeSendFileTest do
     on_exit(fn -> File.rm(outside) end)
 
     traversal = Path.relative_to(outside, root)
-    conn = conn(:get, "/")
+    conn = conn("/")
 
     assert :error = SafeSendFile.send_within(conn, 200, root, traversal)
   end
 
   test "send_within/4 rejects missing files", %{root: root} do
-    conn = conn(:get, "/")
+    conn = conn("/")
 
     assert :error = SafeSendFile.send_within(conn, 200, root, "missing.csv")
   end
