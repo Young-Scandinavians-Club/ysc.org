@@ -41,15 +41,16 @@ defmodule YscWeb.AdminExportController do
   defp valid_export_filename?(_), do: false
 
   defp serve_export(conn, filename, user) do
-    conn =
-      conn
-      |> put_resp_header(
-        "content-disposition",
-        ~s(attachment; filename="#{filename}")
-      )
-      |> put_resp_content_type("text/csv")
-
-    case SafeSendFile.send_within(conn, 200, @exports_root, filename) do
+    case SafeSendFile.send_within(conn, 200, @exports_root, filename,
+           prepare: fn conn, _absolute_path ->
+             conn
+             |> put_resp_header(
+               "content-disposition",
+               ~s(attachment; filename="#{filename}")
+             )
+             |> put_resp_content_type("text/csv")
+           end
+         ) do
       {:ok, conn} ->
         conn
 

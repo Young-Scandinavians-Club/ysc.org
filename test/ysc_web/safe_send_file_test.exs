@@ -39,16 +39,14 @@ defmodule YscWeb.SafeSendFileTest do
   test "send_within/4 rejects path traversal", %{root: root} do
     outside_dir = Path.dirname(root)
 
-    outside =
-      Path.join(
-        outside_dir,
-        "outside-#{System.unique_integer([:positive])}.txt"
-      )
+    outside_filename = "outside-#{System.unique_integer([:positive])}.txt"
+
+    outside = Path.join(outside_dir, outside_filename)
 
     File.write!(outside, "secret")
     on_exit(fn -> File.rm(outside) end)
 
-    traversal = Path.relative_to(outside, root)
+    traversal = "../#{outside_filename}"
     conn = conn(:get, "/")
 
     assert :error = SafeSendFile.send_within(conn, 200, root, traversal)
