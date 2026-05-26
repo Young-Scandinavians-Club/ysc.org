@@ -390,7 +390,7 @@ defmodule YscWeb.OrderConfirmationLive do
                       <div class="mt-3 pt-3 border-t border-zinc-300">
                         <div class="flex justify-between text-xs text-green-600">
                           <span>
-                            Reserved discount<%= if discount_percentage do %>
+                            Member discount<%= if discount_percentage do %>
                               ({discount_percentage}%)
                             <% end %>
                           </span>

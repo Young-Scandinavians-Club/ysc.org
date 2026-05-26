@@ -532,9 +532,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <% else %>
         <%!-- No active subscription: offer to set one up, with a skip option --%>
         <.header class="text-left">
-          Set Up Auto-Renewal
+          Set Up Renewal Payment
           <:subtitle>
-            Your membership is not currently active. Add a payment method to activate auto-renewal, or skip for now.
+            We don't have a payment method on file for annual renewal. Add one to set up auto-renewal, or skip for now and add it later in account settings.
           </:subtitle>
         </.header>
 

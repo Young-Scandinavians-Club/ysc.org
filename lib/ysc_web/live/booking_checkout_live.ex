@@ -600,7 +600,7 @@ defmodule YscWeb.BookingCheckoutLive do
                               class="w-5 h-5 text-green-600"
                             />
                             <span class="text-xs font-semibold text-green-800">
-                              Applied: {selected_family_member.first_name} {selected_family_member.last_name}
+                              Guest: {selected_family_member.first_name} {selected_family_member.last_name}
                             </span>
                           </div>
                         <% else %>

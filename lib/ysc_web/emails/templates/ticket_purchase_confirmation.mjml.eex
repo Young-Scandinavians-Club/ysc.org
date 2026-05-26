@@ -120,7 +120,7 @@
       <%= if ticket_summary.discount_percentage && ticket_summary.discount_percentage > 0 && ticket_summary.discount_amount && ticket_summary.discount_amount != "$0.00" do %>
       <tr style="border-bottom:1px solid #f0f0f0; background-color:#F0FDF4;">
         <td colspan="3" style="padding: 12px 16px; font-size:14px; color:#16A34A;">
-          Reserved discount (<%= ticket_summary.discount_percentage |> Float.round(2) %>%)
+          Member discount (<%= ticket_summary.discount_percentage |> Float.round(2) %>%)
         </td>
         <td style="padding: 12px 16px; font-size:14px; text-align:right; color:#16A34A; font-weight:500;">
           -<%= ticket_summary.discount_amount %>
