@@ -5,10 +5,28 @@ defmodule YscWeb.AccountSetupLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts
+  alias Ysc.Payments
 
   # ---------------------------------------------------------------------------
   # Shared helpers
   # ---------------------------------------------------------------------------
+
+  defp pending_user_with_default_payment(attrs \\ %{}) do
+    user = verified_pending_user(Map.merge(%{password_set_at: nil}, attrs))
+
+    {:ok, _pm} =
+      Payments.insert_payment_method(%{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: "pm_#{System.unique_integer([:positive])}",
+        provider_customer_id: "cus_#{System.unique_integer([:positive])}",
+        type: :card,
+        provider_type: "card",
+        is_default: true
+      })
+
+    user
+  end
 
   # The sandbox mode makes 000000 a universally accepted OTP code.
   @valid_otp %{
@@ -295,6 +313,38 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
 
       refute has_element?(view, "#password_form")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Regression: deferred payment lookup on mount (#351)
+  # ---------------------------------------------------------------------------
+
+  describe "pending user with payment on file" do
+    test "lands on password step when a default payment method already exists", %{
+      conn: conn
+    } do
+      user = pending_user_with_default_payment()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      assert has_element?(view, "#password_form")
+      refute has_element?(view, "#setup-payment-form")
+      refute has_element?(view, "[phx-click=\"retry_payment_setup\"]")
+    end
+
+    test "does not keep user on payment step when URL requests step=1", %{
+      conn: conn
+    } do
+      user = pending_user_with_default_payment()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      assert has_element?(view, "#password_form")
+      refute has_element?(view, "#setup-payment-form")
     end
   end
 
