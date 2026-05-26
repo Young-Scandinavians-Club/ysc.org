@@ -18,15 +18,11 @@ defmodule YscWeb.AdminMembershipsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    # Membership list loads in handle_params/3 (including the initial filter).
-    # Stats are loaded once here; avoid duplicating list_memberships/1 on connect.
-    stats = Accounts.get_membership_stats()
-
     {:ok,
      socket
      |> assign(:active_page, :memberships)
      |> assign(:page_title, "Memberships")
-     |> assign(:stats, stats)
+     |> assign(:stats, %{total: 0, single: 0, family: 0, lifetime: 0})
      |> assign(:memberships, [])
      |> assign(:type_filter, nil)}
   end
@@ -41,14 +37,15 @@ defmodule YscWeb.AdminMembershipsLive do
         _ -> nil
       end
 
-    memberships =
-      Accounts.list_memberships(
+    {stats, memberships} =
+      Accounts.load_admin_memberships_page(
         limit: 200,
         type: type_filter
       )
 
     {:noreply,
      socket
+     |> assign(:stats, stats)
      |> assign(:type_filter, type_filter)
      |> assign(:memberships, memberships)}
   end
