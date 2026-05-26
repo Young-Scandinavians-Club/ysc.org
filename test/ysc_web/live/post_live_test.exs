@@ -76,6 +76,70 @@ defmodule YscWeb.PostLiveTest do
       assert html =~ "Club News"
     end
 
+    test "draft posts are not accessible on the public post page", %{conn: conn} do
+      post =
+        create_post(%{
+          title: "Secret Draft Headline",
+          state: :draft,
+          published_on: nil
+        })
+
+      assert {:error, {:redirect, %{to: "/news"}}} =
+               live(conn, ~p"/posts/#{post.id}")
+    end
+
+    test "admin can preview draft posts on the public post page", %{conn: conn} do
+      post =
+        create_post(%{
+          title: "Draft Preview Headline",
+          state: :draft,
+          published_on: nil
+        })
+
+      admin = user_fixture(%{role: :admin})
+      conn = log_in_user(conn, admin)
+
+      {:ok, view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ "Draft Preview Headline"
+      assert has_element?(view, "#post-content-preview-banner")
+    end
+
+    test "volunteer can preview draft posts on the public post page", %{
+      conn: conn
+    } do
+      post =
+        create_post(%{
+          title: "Volunteer Draft Preview",
+          state: :draft,
+          published_on: nil
+        })
+
+      volunteer = user_fixture(%{role: :volunteer})
+      conn = log_in_user(conn, volunteer)
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ "Volunteer Draft Preview"
+    end
+
+    test "members cannot preview draft posts on the public post page", %{
+      conn: conn
+    } do
+      post =
+        create_post(%{
+          title: "Member Blocked Draft",
+          state: :draft,
+          published_on: nil
+        })
+
+      member = user_fixture(%{role: :member, state: :active})
+      conn = log_in_user(conn, member)
+
+      assert {:error, {:redirect, %{to: "/news"}}} =
+               live(conn, ~p"/posts/#{post.id}")
+    end
+
     test "loads post by url_name successfully", %{conn: conn} do
       _post = create_post(%{title: "Test Article", url_name: "my-test-article"})
 

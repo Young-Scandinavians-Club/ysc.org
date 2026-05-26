@@ -27,6 +27,90 @@ defmodule Ysc.Posts do
     Repo.get_by!(Post, url_name: url_name)
   end
 
+  @doc """
+  Returns a published post by id for public pages, or nil if missing or not published.
+  """
+  def get_public_post(id, preloads \\ []) do
+    from(p in Post, where: p.id == ^id and p.state == :published)
+    |> Repo.one()
+    |> preload_public_post(preloads)
+  end
+
+  @doc """
+  Returns a published post by url_name for public pages, or nil if missing or not published.
+  """
+  def get_public_post_by_url_name(url_name, preloads \\ []) do
+    from(p in Post, where: p.url_name == ^url_name and p.state == :published)
+    |> Repo.one()
+    |> preload_public_post(preloads)
+  end
+
+  @staff_preview_post_states [:draft]
+
+  @doc """
+  Returns a post for the public post page.
+
+  Published posts are visible to everyone. Admins and volunteers may also preview
+  draft posts on the public page layout.
+  """
+  def get_post_for_page(id, viewer, preloads \\ []) do
+    case get_public_post(id, preloads) do
+      %Post{} = post ->
+        post
+
+      nil ->
+        get_staff_preview_post(id, viewer, preloads)
+    end
+  end
+
+  @doc """
+  Returns a post by url_name for the public post page.
+
+  See `get_post_for_page/3`.
+  """
+  def get_post_for_page_by_url_name(url_name, viewer, preloads \\ []) do
+    case get_public_post_by_url_name(url_name, preloads) do
+      %Post{} = post ->
+        post
+
+      nil ->
+        get_staff_preview_post_by_url_name(url_name, viewer, preloads)
+    end
+  end
+
+  defp get_staff_preview_post(id, viewer, preloads) do
+    if staff_content_preview?(viewer) do
+      from(p in Post,
+        where: p.id == ^id and p.state in ^@staff_preview_post_states
+      )
+      |> Repo.one()
+      |> preload_public_post(preloads)
+    end
+  end
+
+  defp get_staff_preview_post_by_url_name(url_name, viewer, preloads) do
+    if staff_content_preview?(viewer) do
+      from(p in Post,
+        where:
+          p.url_name == ^url_name and p.state in ^@staff_preview_post_states
+      )
+      |> Repo.one()
+      |> preload_public_post(preloads)
+    end
+  end
+
+  defp staff_content_preview?(%User{role: role})
+       when role in [:admin, :volunteer],
+       do: true
+
+  defp staff_content_preview?(_), do: false
+
+  defp preload_public_post(nil, _preloads), do: nil
+
+  defp preload_public_post(post, preloads) do
+    Repo.preload(post, preloads)
+  end
+
   def get_post_by_id_or_url_name(value) do
     Repo.one(
       from p in Post, where: p.id == ^value, or_where: p.url_name == ^value

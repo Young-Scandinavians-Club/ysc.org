@@ -37,6 +37,17 @@ defmodule YscWeb.PostLive do
       </div>
     </div>
 
+    <div
+      :if={@content_preview?}
+      id="post-content-preview-banner"
+      class="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center"
+    >
+      <p class="text-sm font-semibold text-amber-900">
+        <.icon name="hero-eye" class="w-4 h-4 inline -mt-0.5 me-1" />
+        Staff preview — this article is not published yet.
+      </p>
+    </div>
+
     <div class="py-8 lg:py-10">
       <div :if={@post == nil} class="my-14 mx-auto">
         <.empty_viking_state
@@ -221,17 +232,17 @@ defmodule YscWeb.PostLive do
 
   @impl true
   def mount(%{"id" => id} = _params, _session, socket) do
+    preloads = [{:author, :current_avatar}, :featured_image]
+    viewer = socket.assigns.current_user
+
     # Load post synchronously - essential for SEO (title, content, image)
     post =
       case Ecto.ULID.cast(id) do
         {:ok, ulid_id} ->
-          Posts.get_post(ulid_id, [{:author, :current_avatar}, :featured_image])
+          Posts.get_post_for_page(ulid_id, viewer, preloads)
 
         :error ->
-          Posts.get_post_by_url_name(id, [
-            {:author, :current_avatar},
-            :featured_image
-          ])
+          Posts.get_post_for_page_by_url_name(id, viewer, preloads)
       end
 
     case post do
@@ -252,6 +263,7 @@ defmodule YscWeb.PostLive do
           socket
           |> assign(:post_id, id)
           |> assign(:post, post)
+          |> assign(:content_preview?, post.state != :published)
           |> assign(:page_title, post.title)
           |> assign(
             :meta_description,

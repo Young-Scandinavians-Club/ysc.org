@@ -52,6 +52,85 @@ defmodule Ysc.Events do
     Repo.get_by(Event, reference_id: reference_id)
   end
 
+  @public_event_states [:published, :cancelled]
+  @staff_preview_event_states [:draft, :scheduled]
+
+  @doc """
+  Returns an event visible on public pages (published or cancelled), or nil.
+  """
+  def get_public_event(id) do
+    from(e in Event, where: e.id == ^id and e.state in ^@public_event_states)
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns an event visible on public pages by reference id, or nil.
+  """
+  def get_public_event_by_reference(reference_id) do
+    from(e in Event,
+      where:
+        e.reference_id == ^reference_id and e.state in ^@public_event_states
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns an event for the public event page.
+
+  Published and cancelled events are visible to everyone. Admins and volunteers may
+  also preview draft and scheduled events on the public page layout.
+  """
+  def get_event_for_page(id, viewer) do
+    case get_public_event(id) do
+      %Event{} = event ->
+        event
+
+      nil ->
+        get_staff_preview_event(id, viewer)
+    end
+  end
+
+  @doc """
+  Returns an event by reference id for the public event page.
+
+  See `get_event_for_page/2`.
+  """
+  def get_event_for_page_by_reference(reference_id, viewer) do
+    case get_public_event_by_reference(reference_id) do
+      %Event{} = event ->
+        event
+
+      nil ->
+        get_staff_preview_event_by_reference(reference_id, viewer)
+    end
+  end
+
+  defp get_staff_preview_event(id, viewer) do
+    if staff_content_preview?(viewer) do
+      from(e in Event,
+        where: e.id == ^id and e.state in ^@staff_preview_event_states
+      )
+      |> Repo.one()
+    end
+  end
+
+  defp get_staff_preview_event_by_reference(reference_id, viewer) do
+    if staff_content_preview?(viewer) do
+      from(e in Event,
+        where:
+          e.reference_id == ^reference_id and
+            e.state in ^@staff_preview_event_states
+      )
+      |> Repo.one()
+    end
+  end
+
+  defp staff_content_preview?(%User{role: role})
+       when role in [:admin, :volunteer],
+       do: true
+
+  defp staff_content_preview?(_), do: false
+
   @doc """
   List all events, optionally with filters.
   """

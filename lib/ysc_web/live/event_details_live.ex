@@ -17,6 +17,16 @@ defmodule YscWeb.EventDetailsLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen">
+      <div
+        :if={@content_preview?}
+        id="event-content-preview-banner"
+        class="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center"
+      >
+        <p class="text-sm font-semibold text-amber-900">
+          <.icon name="hero-eye" class="w-4 h-4 inline -mt-0.5 me-1" />
+          Staff preview — this event is not published yet.
+        </p>
+      </div>
       <%!-- Split-Header: Event Cover Image with Floating Card --%>
       <div class="max-w-screen-xl mx-auto px-4 pt-8">
         <div class="relative mb-4 lg:mb-24">
@@ -3304,12 +3314,14 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def mount(%{"id" => id_or_ref}, _session, socket) do
+    viewer = socket.assigns.current_user
+
     # Support lookup by either ULID (id) or reference_id (e.g. "EVT-XXXX")
     event =
       if String.starts_with?(id_or_ref, "EVT-") do
-        Events.get_event_by_reference(id_or_ref)
+        Events.get_event_for_page_by_reference(id_or_ref, viewer)
       else
-        Repo.get(Event, id_or_ref)
+        Events.get_event_for_page(id_or_ref, viewer)
       end
 
     case event do
@@ -3324,7 +3336,12 @@ defmodule YscWeb.EventDetailsLive do
 
         # For disconnected mount: minimal data for fast static HTML
         # For connected mount: full data loading via assign_async
-        socket = mount_minimal_assigns(socket, event, event_id)
+        socket =
+          mount_minimal_assigns(socket, event, event_id)
+          |> assign(
+            :content_preview?,
+            event.state not in [:published, :cancelled]
+          )
 
         if connected?(socket) do
           # Subscribe to real-time updates only when connected
