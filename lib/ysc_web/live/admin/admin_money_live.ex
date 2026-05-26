@@ -1187,24 +1187,13 @@ defmodule YscWeb.AdminMoneyLive do
         </p>
       </div>
       <!-- Account Balances -->
-      <div class="mb-8 bg-white rounded border">
-        <button
-          phx-click="toggle_section"
-          phx-value-section="accounts"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
-        >
-          <h2 class="text-xl font-semibold text-zinc-800">Account Balances</h2>
-          <.icon
-            name={
-              if @sections_collapsed.accounts,
-                do: "hero-chevron-right",
-                else: "hero-chevron-down"
-            }
-            class="w-5 h-5 text-zinc-600"
-          />
-        </button>
-        <div :if={!@sections_collapsed.accounts} class="p-4 pt-0">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <.admin_collapsible_section
+        section="accounts"
+        title="Account Balances"
+        collapsed?={@sections_collapsed.accounts}
+        content_variant={:padded}
+      >
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div
               :for={account_data <- @accounts_with_balances}
               class="bg-white p-4 rounded border"
@@ -1230,27 +1219,14 @@ defmodule YscWeb.AdminMoneyLive do
               </p>
             </div>
           </div>
-        </div>
-      </div>
+      </.admin_collapsible_section>
       <!-- Recent Payments -->
-      <div class="mb-8 bg-white rounded border">
-        <button
-          phx-click="toggle_section"
-          phx-value-section="payments"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
-        >
-          <h2 class="text-xl font-semibold text-zinc-800">Recent Payments</h2>
-          <.icon
-            name={
-              if @sections_collapsed.payments,
-                do: "hero-chevron-right",
-                else: "hero-chevron-down"
-            }
-            class="w-5 h-5 text-zinc-600"
-          />
-        </button>
-        <div :if={!@sections_collapsed.payments} class="overflow-hidden">
-          <table class="min-w-full divide-y divide-zinc-200">
+      <.admin_collapsible_section
+        section="payments"
+        title="Recent Payments"
+        collapsed?={@sections_collapsed.payments}
+      >
+        <table class="min-w-full divide-y divide-zinc-200">
             <thead class="bg-zinc-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -1386,27 +1362,15 @@ defmodule YscWeb.AdminMoneyLive do
               </.button>
             </div>
           </div>
-        </div>
-      </div>
+      </.admin_collapsible_section>
       <!-- Ledger Entries -->
-      <div class="mb-8 rounded border">
-        <button
-          phx-click="toggle_section"
-          phx-value-section="ledger_entries"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
-        >
-          <h2 class="text-xl font-semibold text-zinc-800">Ledger Entries</h2>
-          <.icon
-            name={
-              if @sections_collapsed.ledger_entries,
-                do: "hero-chevron-right",
-                else: "hero-chevron-down"
-            }
-            class="w-5 h-5 text-zinc-600"
-          />
-        </button>
-        <div :if={!@sections_collapsed.ledger_entries} class="overflow-hidden">
-          <table class="min-w-full divide-y divide-zinc-200">
+      <.admin_collapsible_section
+        section="ledger_entries"
+        title="Ledger Entries"
+        collapsed?={@sections_collapsed.ledger_entries}
+        class="mb-8 rounded border"
+      >
+        <table class="min-w-full divide-y divide-zinc-200">
             <thead class="bg-zinc-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -1539,27 +1503,15 @@ defmodule YscWeb.AdminMoneyLive do
               </.button>
             </div>
           </div>
-        </div>
-      </div>
+      </.admin_collapsible_section>
       <!-- Stripe Webhooks -->
-      <div class="mb-8 rounded border">
-        <button
-          phx-click="toggle_section"
-          phx-value-section="webhooks"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
-        >
-          <h2 class="text-xl font-semibold text-zinc-800">Stripe Webhook Events</h2>
-          <.icon
-            name={
-              if @sections_collapsed.webhooks,
-                do: "hero-chevron-right",
-                else: "hero-chevron-down"
-            }
-            class="w-5 h-5 text-zinc-600"
-          />
-        </button>
-        <div :if={!@sections_collapsed.webhooks} class="overflow-hidden">
-          <table class="min-w-full divide-y divide-zinc-200">
+      <.admin_collapsible_section
+        section="webhooks"
+        title="Stripe Webhook Events"
+        collapsed?={@sections_collapsed.webhooks}
+        class="mb-8 rounded border"
+      >
+        <table class="min-w-full divide-y divide-zinc-200">
             <thead class="bg-zinc-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -1646,27 +1598,15 @@ defmodule YscWeb.AdminMoneyLive do
               </.button>
             </div>
           </div>
-        </div>
-      </div>
+      </.admin_collapsible_section>
       <!-- Expense Reports -->
-      <div class="mb-8 rounded border">
-        <button
-          phx-click="toggle_section"
-          phx-value-section="expense_reports"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
-        >
-          <h2 class="text-xl font-semibold text-zinc-800">Expense Reports</h2>
-          <.icon
-            name={
-              if @sections_collapsed.expense_reports,
-                do: "hero-chevron-right",
-                else: "hero-chevron-down"
-            }
-            class="w-5 h-5 text-zinc-600"
-          />
-        </button>
-        <div :if={!@sections_collapsed.expense_reports} class="overflow-hidden">
-          <table class="min-w-full divide-y divide-zinc-200">
+      <.admin_collapsible_section
+        section="expense_reports"
+        title="Expense Reports"
+        collapsed?={@sections_collapsed.expense_reports}
+        class="mb-8 rounded border"
+      >
+        <table class="min-w-full divide-y divide-zinc-200">
             <thead class="bg-zinc-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -1796,8 +1736,7 @@ defmodule YscWeb.AdminMoneyLive do
               </.button>
             </div>
           </div>
-        </div>
-      </div>
+      </.admin_collapsible_section>
       <!-- Refund Modal -->
       <.modal
         :if={@live_action == :refund_payment}

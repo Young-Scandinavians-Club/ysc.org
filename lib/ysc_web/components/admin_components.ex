@@ -10,6 +10,7 @@ defmodule YscWeb.AdminComponents do
   use Gettext, backend: YscWeb.Gettext
 
   alias Phoenix.LiveView.JS
+  alias YscWeb.FormHelpers
 
   import Flop.Phoenix
   import YscWeb.CoreComponents
@@ -49,14 +50,11 @@ defmodule YscWeb.AdminComponents do
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
-        {format_form_error(msg)}
+        {FormHelpers.format_form_error(msg)}
       </.error>
     </div>
     """
   end
-
-  defp format_form_error({_key, {msg, _type}}), do: msg
-  defp format_form_error({msg, _type}), do: msg
 
   # ---------------------------------------------------------------------------
   # admin_page_title
@@ -313,6 +311,63 @@ defmodule YscWeb.AdminComponents do
 
   defp section_badge_classes(:zinc), do: "bg-zinc-100 text-zinc-700"
   defp section_badge_classes(:emerald), do: "bg-emerald-100 text-emerald-700"
+
+  # ---------------------------------------------------------------------------
+  # admin_collapsible_section
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Collapsible panel for admin pages (e.g. Money Management sections).
+
+  Fires `phx-click="toggle_section"` with `phx-value-section` set to `section`.
+  The parent LiveView should track collapse state in a map assign (e.g.
+  `sections_collapsed`).
+
+  - `content_variant={:padded}` — content wrapper uses `p-4 pt-0` (card grids)
+  - `content_variant={:table}` — content wrapper uses `overflow-hidden` (tables)
+  """
+  attr :section, :string, required: true
+  attr :title, :string, required: true
+  attr :collapsed?, :boolean, required: true
+
+  attr :content_variant, :atom,
+    default: :table,
+    values: [:padded, :table]
+
+  attr :class, :any,
+    default: "mb-8 bg-white rounded border",
+    doc: "Classes on the outer bordered container"
+
+  slot :inner_block, required: true
+
+  def admin_collapsible_section(assigns) do
+    ~H"""
+    <div class={@class}>
+      <button
+        type="button"
+        phx-click="toggle_section"
+        phx-value-section={@section}
+        class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
+      >
+        <h2 class="text-xl font-semibold text-zinc-800">{@title}</h2>
+        <.icon
+          name={
+            if @collapsed?,
+              do: "hero-chevron-right",
+              else: "hero-chevron-down"
+          }
+          class="w-5 h-5 text-zinc-600"
+        />
+      </button>
+      <div :if={!@collapsed?} class={collapsible_content_classes(@content_variant)}>
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  defp collapsible_content_classes(:padded), do: "p-4 pt-0"
+  defp collapsible_content_classes(:table), do: "overflow-hidden"
 
   # ---------------------------------------------------------------------------
   # QuickBooks sync status (admin money / ledgers)

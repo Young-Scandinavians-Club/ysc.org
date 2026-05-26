@@ -21,6 +21,7 @@ defmodule YscWeb.CoreComponents do
   import Phoenix.Controller, only: [get_csrf_token: 0]
 
   alias Phoenix.LiveView.JS
+  alias YscWeb.FormHelpers
 
   @doc """
   Renders a modal.
@@ -1191,19 +1192,16 @@ defmodule YscWeb.CoreComponents do
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
-        {format_form_error(msg)}
+        {FormHelpers.format_form_error(msg)}
       </.error>
     </div>
     <div :if={Phoenix.Component.used_input?(@end_date_field)}>
       <.error :for={msg <- @end_date_field.errors}>
-        {format_form_error(msg)}
+        {FormHelpers.format_form_error(msg)}
       </.error>
     </div>
     """
   end
-
-  defp format_form_error({_key, {msg, _type}}), do: msg
-  defp format_form_error({msg, _type}), do: msg
 
   attr :class, :string, default: nil
 
