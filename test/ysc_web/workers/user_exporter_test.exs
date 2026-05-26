@@ -58,7 +58,12 @@ defmodule YscWeb.Workers.UserExporterTest do
   end
 
   defp parse_csv(relative_path) do
-    full_path = "#{:code.priv_dir(:ysc)}/static#{relative_path}"
+    filename =
+      relative_path
+      |> String.replace_prefix("/admin/exports/", "")
+      |> Path.basename()
+
+    full_path = Path.join([:code.priv_dir(:ysc), "static", "exports", filename])
 
     on_exit(fn -> File.rm(full_path) end)
 

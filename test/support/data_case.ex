@@ -148,6 +148,8 @@ defmodule Ysc.DataCase do
     end)
 
     stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+    Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
   end
 
   @doc """

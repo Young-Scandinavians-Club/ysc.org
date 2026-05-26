@@ -12,6 +12,19 @@ defmodule YscWeb.BookingReceiptLiveTest do
   alias Ysc.Bookings.Entitlements
   alias Ysc.Repo
 
+  @async_timeout_ms 5_000
+
+  setup do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+    Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    :ok
+  end
+
   describe "mount/3 - authentication and security" do
     test "redirects to home when user is not authenticated", %{conn: conn} do
       booking = booking_fixture()
@@ -209,7 +222,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      render_async(view)
+      render_async(view, @async_timeout_ms)
 
       html = render(view)
       assert html =~ "Payment Summary" or html =~ "$100.00"
@@ -406,7 +419,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      render_async(view)
+      render_async(view, @async_timeout_ms)
 
       assert has_element?(view, ~s(button), "Cancel Reservation")
     end
@@ -491,7 +504,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      render_async(view)
+      render_async(view, @async_timeout_ms)
 
       html = render(view)
       refute html =~ "Your Door Code"
@@ -521,7 +534,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      render_async(view)
+      render_async(view, @async_timeout_ms)
 
       html = render(view)
       refute html =~ "Your Door Code"
@@ -833,7 +846,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       render_click(view, "show-cancel-modal")
-      render_async(view)
+      render_async(view, @async_timeout_ms)
 
       result =
         view
@@ -1009,7 +1022,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       create_payment_for_booking(booking, Money.new(10_000, :USD))
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
-      render_async(view)
+      render_async(view, @async_timeout_ms)
       html = render(view)
 
       assert html =~ "Full Buyout"
@@ -1061,7 +1074,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       create_payment_for_booking(booking, Money.new(25_000, :USD))
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
-      render_async(view)
+      render_async(view, @async_timeout_ms)
       html = render(view)
 
       assert html =~ "Children"
@@ -1101,7 +1114,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       create_payment_for_booking(booking, Money.new(10_000, :USD))
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
-      render_async(view)
+      render_async(view, @async_timeout_ms)
       html = render(view)
 
       assert html =~ "Spot Rental"
@@ -1122,7 +1135,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      render_async(view)
+      render_async(view, @async_timeout_ms)
       html = render(view)
       assert html =~ "Payment Summary" or html =~ "$100.00"
     end
@@ -1135,7 +1148,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      render_async(view)
+      render_async(view, @async_timeout_ms)
       html = render(view)
       assert html =~ booking.reference_id
     end
