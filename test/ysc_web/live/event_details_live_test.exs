@@ -212,7 +212,12 @@ defmodule YscWeb.EventDetailsLiveTest do
                "View membership status"
              )
 
-      assert has_element?(view, ~s(a[href="/users/membership"]), "View Membership")
+      assert has_element?(
+               view,
+               ~s(a[href="/users/membership"]),
+               "View Membership"
+             )
+
       refute has_element?(view, "button", "Get Tickets")
     end
   end

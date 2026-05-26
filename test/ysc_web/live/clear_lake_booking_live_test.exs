@@ -102,7 +102,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       html = render(view)
 
       assert html =~ "Clear Lake"
-      assert has_element?(view, "#clear-lake-booking-eligibility-banner", "Membership Required")
+
+      assert has_element?(
+               view,
+               "#clear-lake-booking-eligibility-banner",
+               "Membership Required"
+             )
 
       assert has_element?(
                view,
