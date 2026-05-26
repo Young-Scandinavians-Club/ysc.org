@@ -158,8 +158,13 @@ defmodule YscWeb.AdminPostsLive do
               >
                 <div class="flex items-start justify-between mb-3">
                   <div class="flex-1 min-w-0">
-                    <h3 class="text-base font-semibold text-zinc-900 mb-1 truncate">
-                      {post.title}
+                    <h3 class="text-base font-semibold text-zinc-900 mb-1 flex items-center gap-1.5 min-w-0">
+                      <.icon
+                        :if={post.featured_post}
+                        name="hero-star-solid"
+                        class="h-4 w-4 shrink-0 text-yellow-500"
+                      />
+                      <span class="truncate">{post.title}</span>
                     </h3>
                     <div class="flex items-center gap-2 flex-wrap">
                       <span class="text-sm text-zinc-600">
@@ -205,12 +210,6 @@ defmodule YscWeb.AdminPostsLive do
                       {post.comment_count}
                     </span>
                   </div>
-
-                  <.icon
-                    :if={post.featured_post}
-                    name="hero-star-solid"
-                    class="w-5 h-5 text-yellow-500"
-                  />
                 </div>
               </div>
             <% end %>
@@ -236,17 +235,24 @@ defmodule YscWeb.AdminPostsLive do
               opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
             >
               <:col :let={{_, post}} label="Title" field={:title}>
-                <p class="text-sm font-semibold">
-                  {post.title}
-                  <span
-                    :if={post.comment_count > 0}
-                    class="relative text-zinc-600 ml-2 rounded px-2 py-1 text-sm"
-                  >
-                    <.icon
-                      name="hero-chat-bubble-oval-left"
-                      class="w-4 h-4 -mt-0.5"
-                    />
-                    {post.comment_count}
+                <p class="text-sm font-semibold flex items-center gap-1.5">
+                  <.icon
+                    :if={post.featured_post}
+                    name="hero-star-solid"
+                    class="h-4 w-4 shrink-0 text-yellow-500"
+                  />
+                  <span>
+                    {post.title}
+                    <span
+                      :if={post.comment_count > 0}
+                      class="relative text-zinc-600 ml-2 rounded px-2 py-1 text-sm"
+                    >
+                      <.icon
+                        name="hero-chat-bubble-oval-left"
+                        class="w-4 h-4 -mt-0.5"
+                      />
+                      {post.comment_count}
+                    </span>
                   </span>
                 </p>
               </:col>
@@ -327,28 +333,17 @@ defmodule YscWeb.AdminPostsLive do
               </.link>
             </li>
             <li>
-              <.button
+              <.link
                 id={"#{@menu_id}-edit"}
                 navigate={~p"/admin/posts/#{@post.id}"}
-                variant="outline"
-                color="zinc"
-                class={
-                  Enum.join(
-                    [
-                      "w-full min-h-0 justify-start gap-2 rounded-none border-0 bg-transparent px-4 py-2",
-                      "font-normal text-zinc-700 shadow-none ring-0 ring-offset-0",
-                      "hover:bg-zinc-100"
-                    ],
-                    " "
-                  )
-                }
+                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
               >
                 <.icon
                   name="hero-pencil-square"
                   class="h-5 w-5 shrink-0 text-zinc-500"
                 />
                 <span>Edit</span>
-              </.button>
+              </.link>
             </li>
             <li>
               <button

@@ -41,13 +41,15 @@ insert_site_setting = fn attrs ->
   end
 end
 
-# registration_changeset/3 does not cast verification or onboarding fields; they must
-# be set on the %User{} after insert (same pattern as priv/repo/seeds.exs).
+# registration_changeset/3 does not cast role, state, verification, or onboarding fields;
+# they must be set with put_change/3 (same pattern as priv/repo/seeds.exs).
 mark_prod_admin_fully_verified = fn user ->
   now = DateTime.utc_now() |> DateTime.truncate(:second)
 
   user
   |> Ecto.Changeset.change()
+  |> Ecto.Changeset.put_change(:role, :admin)
+  |> Ecto.Changeset.put_change(:state, :active)
   |> Ecto.Changeset.put_change(:confirmed_at, now)
   |> Ecto.Changeset.put_change(:email_verified_at, now)
   |> Ecto.Changeset.put_change(:phone_verified_at, now)
@@ -98,8 +100,6 @@ admin_user =
           email: "admin@ysc.org",
           password:
             System.get_env("ADMIN_PASSWORD") || "change_me_in_production",
-          role: :admin,
-          state: :active,
           first_name: "Admin",
           last_name: "User",
           phone_number: "+14159009009",
@@ -132,6 +132,8 @@ admin_user =
             browser_timezone: "America/Los_Angeles"
           }
         })
+        |> Ecto.Changeset.put_change(:role, :admin)
+        |> Ecto.Changeset.put_change(:state, :active)
 
       case Repo.insert(admin_changeset, on_conflict: :nothing) do
         {:ok, user} when not is_nil(user) ->

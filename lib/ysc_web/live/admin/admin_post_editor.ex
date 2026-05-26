@@ -172,23 +172,23 @@ defmodule YscWeb.AdminPostEditorLive do
           <div class="flex shrink-0 flex-row items-center gap-2 pt-0.5">
             <.button
               :if={@post.state == :draft}
-              class="hidden lg:mr-1 lg:block lg:w-28"
+              class="hidden lg:mr-1 lg:inline-flex lg:w-28"
               type="button"
               phx-click="publish-post"
             >
-              <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-0.5" />
-              <span class="me-1">Publish</span>
+              <.icon name="hero-document-arrow-up" class="h-5 w-5 shrink-0" />
+              <span>Publish</span>
             </.button>
 
             <.button
               :if={@post.state == :deleted}
               color="green"
-              class="hidden lg:mr-1 lg:block lg:w-28"
+              class="hidden lg:mr-1 lg:inline-flex lg:w-28"
               type="button"
               phx-click="restore-post"
             >
-              <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-0.5" />
-              <span class="me-1">Restore</span>
+              <.icon name="hero-cloud-arrow-up" class="h-5 w-5 shrink-0" />
+              <span>Restore</span>
             </.button>
 
             <.button
@@ -196,9 +196,9 @@ defmodule YscWeb.AdminPostEditorLive do
               patch={~p"/admin/posts/#{@post_id}/preview"}
               variant="outline"
               color="zinc"
-              class="hidden flex-none lg:mr-1 lg:block px-3 py-2 text-zinc-800 transition duration-200 ease-in-out hover:bg-zinc-100"
+              class="hidden flex-none lg:mr-1 lg:inline-flex px-3 py-2 text-zinc-800 transition duration-200 ease-in-out hover:bg-zinc-100"
             >
-              <.icon name="hero-computer-desktop" class="w-5 h-5 -mt-0.5" />
+              <.icon name="hero-computer-desktop" class="h-5 w-5 shrink-0" />
               <span class="sr-only">Preview post</span>
             </.button>
 
@@ -222,9 +222,9 @@ defmodule YscWeb.AdminPostEditorLive do
                     >
                       <.icon
                         name="hero-document-arrow-up"
-                        class="h-5 w-5 shrink-0"
+                        class="h-5 w-5 shrink-0 text-zinc-500"
                       />
-                      <span class="leading-none">Publish</span>
+                      <span>Publish</span>
                     </button>
                   </li>
                   <li :if={@post.state == :deleted}>
@@ -238,20 +238,20 @@ defmodule YscWeb.AdminPostEditorLive do
                         name="hero-cloud-arrow-up"
                         class="h-5 w-5 shrink-0"
                       />
-                      <span class="leading-none">Restore</span>
+                      <span>Restore</span>
                     </button>
                   </li>
                   <li>
                     <.link
                       id={"preview-post-#{@post_id}"}
                       navigate={~p"/admin/posts/#{@post_id}/preview"}
-                      class="flex w-full items-center gap-2 px-4 py-2 transition duration-300 ease-in-out hover:bg-zinc-100"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left transition duration-300 ease-in-out hover:bg-zinc-100"
                     >
                       <.icon
                         name="hero-computer-desktop"
-                        class="h-5 w-5 shrink-0"
+                        class="h-5 w-5 shrink-0 text-zinc-500"
                       />
-                      <span class="leading-none">Preview</span>
+                      <span>Preview</span>
                     </.link>
                   </li>
                 </ul>

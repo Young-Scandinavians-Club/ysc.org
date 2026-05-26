@@ -686,6 +686,47 @@ defmodule YscWeb.UserAuthTest do
 
       assert redirected_to(conn) == ~p"/pending-review"
     end
+
+    test "redirects to onboarding instead of redirect_to when onboarding is required",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          post_migration_onboarding_completed_at: nil,
+          email_verified_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          state: :active
+        })
+        |> Ysc.Repo.update()
+
+      conn = UserAuth.log_in_user(conn, user, %{}, "/admin")
+
+      assert redirected_to(conn) == ~p"/onboarding"
+    end
+
+    test "redirects to onboarding instead of user_return_to when onboarding is required",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          post_migration_onboarding_completed_at: nil,
+          email_verified_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          state: :active
+        })
+        |> Ysc.Repo.update()
+
+      conn =
+        conn
+        |> put_session(:user_return_to, "/financials")
+        |> UserAuth.log_in_user(user, %{})
+
+      assert redirected_to(conn) == ~p"/onboarding"
+    end
   end
 
   describe "on_mount(:ensure_admin, ...)" do

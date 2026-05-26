@@ -10,7 +10,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text font-size="32px" line-height="1.25" padding="0px">
-      <strong>📧 New Contact Form Submission</strong>
+      <strong>New Contact Form Submission</strong>
     </mj-text>
   </mj-column>
 </mj-section>

@@ -2011,7 +2011,6 @@ defmodule YscWeb.AdminBookingsLive do
                 <.button
                   phx-click="prev-month"
                   title="Previous 30 days"
-                  phx-disable-with="Loading..."
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <.icon name="hero-arrow-left" class="w-5 h-5" />
@@ -2019,7 +2018,6 @@ defmodule YscWeb.AdminBookingsLive do
                 <.button
                   phx-click="today"
                   title="Go to current month"
-                  phx-disable-with="Loading..."
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <span class="hidden sm:inline">Today</span>
@@ -2028,7 +2026,6 @@ defmodule YscWeb.AdminBookingsLive do
                 <.button
                   phx-click="next-month"
                   title="Next 30 days"
-                  phx-disable-with="Loading..."
                   class="flex-1 sm:flex-none mt-2"
                 >
                   <.icon name="hero-arrow-right" class="w-5 h-5" />

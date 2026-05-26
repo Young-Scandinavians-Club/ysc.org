@@ -75,23 +75,34 @@ defmodule YscWeb.UserAuth do
     # Log sign-in after session is set so auth_events.session_id is populated (for "Current session" on Security page)
     AuthService.log_login_success(user, conn, params)
 
-    redirect(conn,
-      to: validated_redirect || signed_in_path_for_user(user, conn)
-    )
+    redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
   end
 
-  # Get the appropriate signed-in path for a user
+  # Post-login destination: onboarding wins over redirect_to / return_to, then account setup, etc.
+  defp post_login_redirect(user, conn, validated_redirect) do
+    cond do
+      Accounts.needs_post_migration_onboarding?(user) ->
+        ~p"/onboarding"
+
+      validated_redirect ->
+        validated_redirect
+
+      true ->
+        signed_in_path_for_user(user, conn)
+    end
+  end
+
+  # Default signed-in path when no explicit redirect_to / user_return_to is provided.
   defp signed_in_path_for_user(user, conn) do
     cond do
+      Accounts.needs_post_migration_onboarding?(user) ->
+        ~p"/onboarding"
+
       is_nil(user.email_verified_at) ->
-        # User hasn't verified email, redirect to account setup
         ~p"/account/setup/#{user.id}"
 
       user.state == :pending_approval ->
         ~p"/pending-review"
-
-      Accounts.needs_post_migration_onboarding?(user) ->
-        ~p"/onboarding"
 
       true ->
         signed_in_path(conn)
@@ -596,8 +607,8 @@ defmodule YscWeb.UserAuth do
   defp signed_in_path(%Plug.Conn{} = conn) do
     if user = conn.assigns[:current_user] do
       cond do
-        user.state == :pending_approval -> ~p"/pending-review"
         Accounts.needs_post_migration_onboarding?(user) -> ~p"/onboarding"
+        user.state == :pending_approval -> ~p"/pending-review"
         true -> ~p"/"
       end
     else
@@ -608,8 +619,8 @@ defmodule YscWeb.UserAuth do
   defp signed_in_path(socket) do
     if user = socket.assigns[:current_user] do
       cond do
-        user.state == :pending_approval -> ~p"/pending-review"
         Accounts.needs_post_migration_onboarding?(user) -> ~p"/onboarding"
+        user.state == :pending_approval -> ~p"/pending-review"
         true -> ~p"/"
       end
     else
