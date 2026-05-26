@@ -3102,46 +3102,27 @@ defmodule Ysc.Accounts do
   List of maps: `%{primary_user: user, type: atom, associated_users: [user], user_count: integer}`
   """
   def list_memberships(opts \\ []) do
-    type_filter = Keyword.get(opts, :type)
-    limit = Keyword.get(opts, :limit, 100)
-    offset = Keyword.get(opts, :offset, 0)
+    {_stats, memberships} = load_admin_memberships_page(opts)
+    memberships
+  end
 
-    # Get all primary users (no primary_user_id) with active state
-    primary_users =
-      from(u in User,
-        where: is_nil(u.primary_user_id),
-        where: u.state == :active,
-        order_by: [asc: u.last_name, asc: u.first_name],
-        limit: ^limit,
-        offset: ^offset,
-        preload: [
-          {:sub_accounts, :current_avatar},
-          :current_avatar,
-          subscriptions: :subscription_items
-        ]
-      )
-      |> Repo.all()
+  @doc """
+  Loads admin membership stats and list rows in one database round-trip.
 
-    # Filter to those with active membership and determine type
-    primary_users
-    |> Enum.filter(&has_active_membership?/1)
-    |> Enum.map(fn primary ->
-      type = get_membership_type_for_primary(primary)
-      associated = get_family_group(primary)
-      user_count = length(associated)
+  Stats always reflect all active memberships; `opts` (`:type`, `:limit`, `:offset`)
+  only filter the returned list.
 
-      if type_filter && type != type_filter do
-        nil
-      else
-        %{
-          primary_user: primary,
-          type: type,
-          associated_users: associated,
-          user_count: user_count
-        }
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
+  ## Returns
+  `{stats, memberships}` where `stats` matches `get_membership_stats/0` and
+  `memberships` matches `list_memberships/1`.
+  """
+  def load_admin_memberships_page(opts \\ []) do
+    rows =
+      membership_rows_from_primaries(active_primary_users_for_memberships())
+
+    stats = membership_stats_from_rows(rows)
+    memberships = paginate_membership_rows(rows, opts)
+    {stats, memberships}
   end
 
   @doc """
@@ -3151,28 +3132,78 @@ defmodule Ysc.Accounts do
   `%{total: integer, single: integer, family: integer, lifetime: integer}`
   """
   def get_membership_stats do
-    primary_users =
-      from(u in User,
-        where: is_nil(u.primary_user_id),
-        where: u.state == :active,
-        preload: [:sub_accounts, subscriptions: :subscription_items]
-      )
-      |> Repo.all()
+    active_primary_users_for_membership_stats()
+    |> Enum.filter(&has_active_membership?/1)
+    |> Enum.map(&get_membership_type_for_primary/1)
+    |> membership_stats_from_types()
+  end
 
-    # Filter to those with active membership
-    with_membership =
-      primary_users
-      |> Enum.filter(&has_active_membership?/1)
+  defp active_primary_users_for_membership_stats do
+    from(u in User,
+      where: is_nil(u.primary_user_id),
+      where: u.state == :active,
+      preload: [:sub_accounts, subscriptions: :subscription_items]
+    )
+    |> Repo.all()
+  end
 
-    total = length(with_membership)
+  defp active_primary_users_for_memberships do
+    from(u in User,
+      where: is_nil(u.primary_user_id),
+      where: u.state == :active,
+      order_by: [asc: u.last_name, asc: u.first_name],
+      preload: [
+        {:sub_accounts, :current_avatar},
+        :current_avatar,
+        subscriptions: :subscription_items
+      ]
+    )
+    |> Repo.all()
+  end
 
-    by_type =
-      with_membership
-      |> Enum.map(&get_membership_type_for_primary/1)
-      |> Enum.frequencies()
+  defp membership_rows_from_primaries(primary_users) do
+    primary_users
+    |> Enum.filter(&has_active_membership?/1)
+    |> Enum.map(fn primary ->
+      associated = get_family_group(primary)
+
+      %{
+        primary_user: primary,
+        type: get_membership_type_for_primary(primary),
+        associated_users: associated,
+        user_count: length(associated)
+      }
+    end)
+  end
+
+  defp paginate_membership_rows(rows, opts) do
+    type_filter = Keyword.get(opts, :type)
+    limit = Keyword.get(opts, :limit, 100)
+    offset = Keyword.get(opts, :offset, 0)
+
+    rows
+    |> maybe_filter_membership_rows_by_type(type_filter)
+    |> Enum.drop(offset)
+    |> Enum.take(limit)
+  end
+
+  defp maybe_filter_membership_rows_by_type(rows, nil), do: rows
+
+  defp maybe_filter_membership_rows_by_type(rows, type_filter) do
+    Enum.filter(rows, &(&1.type == type_filter))
+  end
+
+  defp membership_stats_from_rows(rows) do
+    rows
+    |> Enum.map(& &1.type)
+    |> membership_stats_from_types()
+  end
+
+  defp membership_stats_from_types(types) do
+    by_type = Enum.frequencies(types)
 
     %{
-      total: total,
+      total: length(types),
       single: Map.get(by_type, :single, 0),
       family: Map.get(by_type, :family, 0),
       lifetime: Map.get(by_type, :lifetime, 0)
