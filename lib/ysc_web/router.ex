@@ -313,6 +313,7 @@ defmodule YscWeb.Router do
     ]
 
     get "/financials", PageController, :financials
+    get "/annual_meetings/*path", AnnualMeetingDocumentController, :show
     get "/expensereport/files/:encoded_path", ExpenseReportFileController, :show
     get "/wallet/tickets/:ticket_id", AppleWalletController, :ticket
     get "/wallet/membership", AppleWalletController, :membership
@@ -404,6 +405,8 @@ defmodule YscWeb.Router do
 
   scope "/admin", YscWeb do
     pipe_through [:admin_browser, :require_authenticated_user, :require_admin]
+
+    get "/exports/:filename", AdminExportController, :show
 
     # Handle uploads from editors (accessible to volunteers for content creation)
     post "/trix-uploads", TrixUploadsController, :create
