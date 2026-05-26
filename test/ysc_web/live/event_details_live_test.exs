@@ -4,6 +4,7 @@ defmodule YscWeb.EventDetailsLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
   import Ysc.EventsFixtures
+  import Ysc.AccountsFixtures
   import Mox
   import EventDetailsLiveHelpers
 
@@ -57,6 +58,62 @@ defmodule YscWeb.EventDetailsLiveTest do
           state: :draft,
           published_at: nil
         })
+
+      assert {:error, {:redirect, %{to: path}}} =
+               live(conn, ~p"/events/#{event.id}")
+
+      assert path == "/events"
+    end
+
+    test "admin can preview draft events on the public event page", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Draft Event Preview",
+          state: :draft,
+          published_at: nil
+        })
+
+      admin = user_fixture(%{role: :admin})
+      conn = log_in_user(conn, admin)
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "Draft Event Preview"
+      assert has_element?(view, "#event-content-preview-banner")
+    end
+
+    test "volunteer can preview scheduled events on the public event page", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Scheduled Event Preview",
+          state: :scheduled,
+          published_at: nil
+        })
+
+      volunteer = user_fixture(%{role: :volunteer})
+      conn = log_in_user(conn, volunteer)
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "Scheduled Event Preview"
+    end
+
+    test "members cannot preview draft events on the public event page", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Member Blocked Draft Event",
+          state: :draft,
+          published_at: nil
+        })
+
+      member = user_fixture(%{role: :member, state: :active})
+      conn = log_in_user(conn, member)
 
       assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/events/#{event.id}")
