@@ -40,7 +40,12 @@ defmodule YscWeb.TahoeBookingLiveTest do
       html = render(view)
 
       assert html =~ "Tahoe"
-      assert has_element?(view, "#tahoe-booking-eligibility-banner-public", "Membership Required")
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "Membership Required"
+             )
 
       assert has_element?(
                view,
