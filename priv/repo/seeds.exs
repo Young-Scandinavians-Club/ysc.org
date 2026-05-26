@@ -183,21 +183,56 @@ mark_user_verified = fn user ->
   end
 end
 
+# registration_changeset/3 does not cast role, state, confirmed_at, or onboarding fields.
+ensure_seed_admin_user = fn user ->
+  now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+  admin_ready? =
+    user.role == :admin and user.state == :active and
+      not is_nil(user.confirmed_at) and
+      not is_nil(user.post_migration_onboarding_completed_at)
+
+  if admin_ready? do
+    user
+  else
+    user
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.put_change(:role, :admin)
+    |> Ecto.Changeset.put_change(:state, :active)
+    |> Ecto.Changeset.put_change(:confirmed_at, user.confirmed_at || now)
+    |> Ecto.Changeset.put_change(
+      :post_migration_onboarding_completed_at,
+      user.post_migration_onboarding_completed_at || now
+    )
+    |> Repo.update()
+    |> case do
+      {:ok, updated_user} ->
+        updated_user
+
+      {:error, changeset} ->
+        IO.puts(
+          "Failed to set admin privileges for #{user.email}: #{inspect(changeset.errors)}"
+        )
+
+        user
+    end
+  end
+end
+
 # Get or create admin user
 admin_user =
   case Repo.get_by(User, email: "admin@ysc.org") do
     nil ->
+      confirmed_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
       admin_changeset =
         User.registration_changeset(%User{}, %{
           email: "admin@ysc.org",
           password: "very_secure_password",
-          role: :admin,
-          state: :active,
           first_name: "Admin",
           last_name: "User",
           phone_number: "+14159009009",
           most_connected_country: countries |> Enum.shuffle() |> hd(),
-          confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second),
           date_of_birth: ~D[1980-01-15],
           registration_form: %{
             membership_type: "family",
@@ -227,6 +262,9 @@ admin_user =
             browser_timezone: "America/Los_Angeles"
           }
         })
+        |> Ecto.Changeset.put_change(:role, :admin)
+        |> Ecto.Changeset.put_change(:state, :active)
+        |> Ecto.Changeset.put_change(:confirmed_at, confirmed_at)
 
       case Repo.insert(admin_changeset, on_conflict: :nothing) do
         {:ok, user} when not is_nil(user) ->
@@ -261,6 +299,7 @@ admin_user =
       # Mark email as verified and password as set
       mark_user_verified.(existing_user)
   end
+  |> ensure_seed_admin_user.()
 
 Enum.each(0..n_approved_users, fn n ->
   membership_type =
