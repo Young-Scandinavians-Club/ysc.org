@@ -28,7 +28,11 @@ defmodule YscWeb.SafeSendFileTest do
 
     assert {:ok, conn} = SafeSendFile.send_within(conn, 200, root, filename)
     assert conn.state == :file
-    assert String.starts_with?(hd(get_resp_header(conn, "content-type")), "text/csv")
+
+    assert String.starts_with?(
+             hd(get_resp_header(conn, "content-type")),
+             "text/csv"
+           )
   end
 
   test "send_within/4 rejects path traversal", %{root: root} do

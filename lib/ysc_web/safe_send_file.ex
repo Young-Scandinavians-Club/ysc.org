@@ -27,6 +27,12 @@ defmodule YscWeb.SafeSendFile do
   # Paths are validated with Path.safe_relative/2 before send_file is invoked.
   # sobelow_skip ["Traversal.SendFile"]
   defp do_send_file(conn, status, absolute_path) do
+    conn =
+      case get_resp_header(conn, "content-type") do
+        [] -> put_resp_content_type(conn, MIME.from_path(absolute_path))
+        _ -> conn
+      end
+
     send_file(conn, status, absolute_path)
   end
 end
