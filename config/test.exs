@@ -140,6 +140,7 @@ config :ysc,
 # FlowRoute SMS configuration for tests
 # Use a fake number since we're in noop mode anyway
 config :ysc, :flowroute, from_number: "12061231234"
+config :ysc, :flowroute_force_noop, true
 
 # Enables `Application.put_env(:ysc, :flowroute_test_raise, ...)` in SMS tests only.
 config :ysc, :flowroute_test_inject_enabled, true

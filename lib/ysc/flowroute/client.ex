@@ -459,9 +459,9 @@ defmodule Ysc.Flowroute.Client do
 
       _ ->
         env = get_environment()
-        test_suite? = Code.ensure_loaded?(Mix) and Mix.env() == :test
 
-        test_suite? or env in [:dev, :test, :sandbox, :development]
+        Application.get_env(:ysc, :flowroute_force_noop, false) or
+          env in [:dev, :test, :sandbox, :development]
     end
   end
 
