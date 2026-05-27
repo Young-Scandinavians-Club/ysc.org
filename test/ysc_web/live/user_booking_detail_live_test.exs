@@ -665,12 +665,16 @@ defmodule YscWeb.UserBookingDetailLiveTest do
   end
 
   describe "status display" do
-    test "shows hold status badge", %{conn: conn} do
+    test "shows awaiting payment status and checkout link for hold bookings", %{
+      conn: conn
+    } do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :hold})
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Hold"
+      assert html =~ "Awaiting payment"
+      assert html =~ "Complete checkout"
+      assert html =~ "/bookings/checkout/#{booking.id}"
     end
 
     test "shows refunded status when booking was refunded", %{conn: conn} do
@@ -706,7 +710,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Repo.update!()
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Canceled"
+      assert html =~ "Cancelled"
     end
   end
 

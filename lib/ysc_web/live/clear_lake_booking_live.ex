@@ -600,8 +600,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                     {booking.guests_count} {if booking.guests_count == 1,
                       do: "Guest",
                       else: "Guests"} • {if booking.booking_mode == :buyout,
-                      do: "Full Buyout",
-                      else: "Shared Stay"}
+                      do: "Entire cabin",
+                      else: "Shared stay"}
                   </p>
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -1154,7 +1154,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <p class="text-xs font-bold text-zinc-400 uppercase">
                       Booking Type
                     </p>
-                    <div class="text-sm text-zinc-700 font-medium">Full Buyout</div>
+                    <div class="text-sm text-zinc-700 font-medium">Entire cabin</div>
                   </div>
                   <div
                     :if={
@@ -1277,7 +1277,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               Money.mult(price_per_night, nights) |> elem(1) %>
                           <div class="flex justify-between items-center text-zinc-600">
                             <span>
-                              Full Buyout ({nights} night{if nights != 1,
+                              Entire cabin ({nights} night{if nights != 1,
                                 do: "s",
                                 else: ""})
                             </span>

@@ -207,9 +207,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     ~H"""
     <div>
       <.header class="text-left">
-        Welcome Back! Let's confirm your details.
+        Welcome back — let's make sure your details are up to date
         <:subtitle>
-          We've imported your account from our previous system. Please review and update your information below.
+          We recently moved member accounts to our new website. Please review the information below and update anything that has changed.
         </:subtitle>
       </.header>
 
@@ -534,7 +534,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set Up Renewal Payment
           <:subtitle>
-            We don't have a payment method on file for annual renewal. Add one to set up auto-renewal, or skip for now and add it later in account settings.
+            Add a card or bank account so your membership can renew automatically each year. You won't be charged today unless your renewal date has passed. You can skip for now and add a payment method later in account settings.
           </:subtitle>
         </.header>
 
@@ -568,9 +568,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </.button>
             <.button
               phx-click="confirm_payment_step"
-              phx-disable-with="Activating..."
+              phx-disable-with="Saving..."
             >
-              Activate Membership
+              Turn on auto-renewal
               <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>
@@ -616,7 +616,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 </.button>
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
                   <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
-                  Save & Activate
+                  Save payment method
                 </.button>
               </div>
             </form>

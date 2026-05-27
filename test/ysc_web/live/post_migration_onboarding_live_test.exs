@@ -61,8 +61,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/onboarding")
 
       assert has_element?(view, "#onboarding-profile-form")
-      assert render(view) =~ "Welcome Back!"
-      assert render(view) =~ "confirm your details"
+      assert render(view) =~ "make sure your details are up to date"
+      assert render(view) =~ "recently moved member accounts"
     end
   end
 
