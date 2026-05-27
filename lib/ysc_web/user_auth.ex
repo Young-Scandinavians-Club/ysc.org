@@ -13,6 +13,7 @@ defmodule YscWeb.UserAuth do
   alias Ysc.Accounts.AuthService
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Subscriptions
+  alias YscWeb.AccountSetupAccess
 
   # Make the remember me cookie valid for 60 days.
   # If you want bump or reduce this value, also change
@@ -99,7 +100,7 @@ defmodule YscWeb.UserAuth do
         ~p"/onboarding"
 
       is_nil(user.email_verified_at) ->
-        ~p"/account/setup/#{user.id}"
+        AccountSetupAccess.setup_path(user.id)
 
       user.state == :pending_approval ->
         ~p"/pending-review"

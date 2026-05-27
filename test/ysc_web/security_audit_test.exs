@@ -14,6 +14,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 14 (CRITICAL) Registration mass assignment allowed role/state escalation
   Finding 15 (HIGH)     AccountSetupLive IDOR on post-verification setup events
   Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
+  Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -608,6 +609,63 @@ defmodule YscWeb.SecurityAuditTest do
                  phone_number: "+14155551234",
                  date_of_birth: ~D[1990-01-01]
                })
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 17 (MEDIUM): Account setup email verification requires setup token
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 17: Account setup email verification requires setup token" do
+    test "unauthenticated mount without setup_token does not create verification code",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval, email_verified_at: nil})
+
+      assert {:ok, _view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      assert match?(
+               {:error, _},
+               Ysc.VerificationCache.get_code(user.id, :email_verification)
+             )
+    end
+
+    test "unauthenticated resend_code without setup_token does not send email",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval, email_verified_at: nil})
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      render_click(view, "resend_code", %{})
+
+      assert match?(
+               {:error, _},
+               Ysc.VerificationCache.get_code(user.id, :email_verification)
+             )
+    end
+
+    test "unauthenticated verify_code without setup_token cannot mark email verified",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval, email_verified_at: nil})
+      code = Accounts.generate_and_store_email_verification_code(user)
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      render_submit(view, "verify_code", %{"verification_code" => code})
+
+      user = Accounts.get_user!(user.id)
+      assert is_nil(user.email_verified_at)
+    end
+
+    test "mount with valid setup_token allows verification flow",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval, email_verified_at: nil})
+
+      {:ok, view, _html} = live(conn, account_setup_path(user))
+
+      render_click(view, "resend_code", %{})
+
+      assert {:ok, _code} =
+               Ysc.VerificationCache.get_code(user.id, :email_verification)
     end
   end
 end

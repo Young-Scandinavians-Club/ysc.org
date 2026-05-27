@@ -282,6 +282,7 @@ defmodule YscWeb.Router do
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.UserAuth, :mount_current_user},
+        {YscWeb.AccountSetupAccess, :default},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do

@@ -674,7 +674,9 @@ defmodule YscWeb.UserAuthTest do
 
       conn = UserAuth.log_in_user(conn, user)
 
-      assert redirected_to(conn) =~ "/account/setup/"
+      redirect = redirected_to(conn)
+      assert redirect =~ "/account/setup/#{user.id}"
+      assert redirect =~ "setup_token="
     end
 
     test "redirects pending_approval user to pending-review when no redirect_to provided",

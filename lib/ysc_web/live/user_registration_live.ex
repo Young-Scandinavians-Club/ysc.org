@@ -620,7 +620,12 @@ defmodule YscWeb.UserRegistrationLive do
                "Application submitted successfully! Please complete your account setup.",
                title: "Registration"
              )
-             |> redirect(to: ~p"/account/setup/#{user.id}?from_signup=true")}
+             |> redirect(
+               to:
+                 YscWeb.AccountSetupAccess.setup_path(user.id, %{
+                   "from_signup" => "true"
+                 })
+             )}
 
           {:error, %Ecto.Changeset{} = changeset} ->
             email_taken? = email_already_taken_error?(changeset)

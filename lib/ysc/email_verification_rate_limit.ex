@@ -2,8 +2,8 @@ defmodule Ysc.EmailVerificationRateLimit do
   @moduledoc """
   Rate limits email verification code submission attempts (account setup and similar flows).
 
-  Without this, an unauthenticated visitor could load `/account/setup/:user_id` and brute-force
-  the short numeric verification code before it expires.
+  Limits guess volume per target account. Sending codes and submitting guesses also require a
+  signed `setup_token` from `YscWeb.AccountSetupAccess` (see account setup security tests).
   """
   use Hammer, backend: :ets
 
