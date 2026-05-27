@@ -162,19 +162,16 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       if post_ids == Map.get(socket.assigns, :_cached_post_ids) do
         socket.assigns.preview_posts
       else
-        post_ids
-        |> Enum.map(fn id -> Posts.get_post(id, [:featured_image]) end)
-        |> Enum.reject(&is_nil/1)
+        Posts.list_posts_by_ids(post_ids, [:featured_image])
       end
 
     preview_events =
       if event_ids == Map.get(socket.assigns, :_cached_event_ids) do
         socket.assigns.preview_events
       else
-        event_ids
-        |> Enum.map(&Events.get_event/1)
-        |> Enum.reject(&is_nil/1)
-        |> Repo.preload([:cover_image, :ticket_tiers])
+        Events.list_events_by_ids(event_ids,
+          preloads: [:cover_image, :ticket_tiers]
+        )
       end
 
     cover_image_url =

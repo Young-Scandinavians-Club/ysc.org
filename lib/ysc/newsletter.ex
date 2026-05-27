@@ -578,16 +578,12 @@ defmodule Ysc.Newsletter do
 
     edition = Repo.preload(edition, :cover_image)
 
-    posts =
-      (edition.post_ids || [])
-      |> Enum.map(fn id -> Posts.get_post(id, [:featured_image]) end)
-      |> Enum.reject(&is_nil/1)
+    posts = Posts.list_posts_by_ids(edition.post_ids || [], [:featured_image])
 
     events =
-      (edition.event_ids || [])
-      |> Enum.map(&Events.get_event/1)
-      |> Enum.reject(&is_nil/1)
-      |> Repo.preload([:cover_image, :ticket_tiers])
+      Events.list_events_by_ids(edition.event_ids || [],
+        preloads: [:cover_image, :ticket_tiers]
+      )
 
     fake_subscriber = %{
       first_name: user.first_name || "there",

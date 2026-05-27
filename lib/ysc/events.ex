@@ -1888,6 +1888,79 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Returns confirmed tickets for `user_id` with event, tier, and order preloaded.
+
+  Uses start of today in `America/Los_Angeles` as a coarse `start_date` filter so
+  callers (e.g. the member home page) avoid loading the user's full ticket history.
+  Finer "event has not started yet" filtering should happen in the caller when needed.
+
+  ## Options
+
+    * `:row_limit` - max rows from the database (default `100`)
+  """
+  def list_upcoming_confirmed_tickets_for_user(user_id, opts \\ []) do
+    row_limit = Keyword.get(opts, :row_limit, 100)
+    start_of_today_pst_utc = start_of_today_in_pst_as_utc()
+
+    Ticket
+    |> where([t], t.user_id == ^user_id and t.status == :confirmed)
+    |> join(:inner, [t], e in assoc(t, :event), as: :event)
+    |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
+    |> join(:left, [t], to in assoc(t, :ticket_order), as: :ticket_order)
+    |> where([event: e], not is_nil(e.start_date))
+    |> where([event: e], e.start_date >= ^start_of_today_pst_utc)
+    |> preload([event: e, ticket_tier: tt, ticket_order: to],
+      event: e,
+      ticket_tier: tt,
+      ticket_order: to
+    )
+    |> order_by([event: e], asc: e.start_date)
+    |> limit(^row_limit)
+    |> Repo.all()
+  end
+
+  defp start_of_today_in_pst_as_utc do
+    "America/Los_Angeles"
+    |> DateTime.now!()
+    |> DateTime.to_date()
+    |> DateTime.new!(~T[00:00:00], "America/Los_Angeles")
+    |> DateTime.shift_zone!("Etc/UTC")
+  end
+
+  defp order_records_by_ids(records, ids) do
+    by_id = Map.new(records, &{&1.id, &1})
+
+    Enum.flat_map(ids, fn id ->
+      case Map.fetch(by_id, id) do
+        {:ok, record} -> [record]
+        :error -> []
+      end
+    end)
+  end
+
+  @doc """
+  Loads events by id in one query. Returns records in the same order as `ids`
+  (skipping missing ids).
+
+  ## Options
+
+    * `:preloads` - association preloads (default `[]`)
+  """
+  def list_events_by_ids(ids, opts \\ []) when is_list(ids) do
+    preloads = Keyword.get(opts, :preloads, [])
+    ids = Enum.uniq(Enum.reject(ids, &is_nil/1))
+
+    if ids == [] do
+      []
+    else
+      from(e in Event, where: e.id in ^ids)
+      |> preload(^preloads)
+      |> Repo.all()
+      |> order_records_by_ids(ids)
+    end
+  end
+
+  @doc """
   List upcoming events that a user has tickets for.
   """
   def list_upcoming_events_for_user(user_id) do

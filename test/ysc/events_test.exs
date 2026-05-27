@@ -1082,6 +1082,92 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(tickets, &(&1.id == ticket.id))
     end
 
+    test "list_upcoming_confirmed_tickets_for_user/2 excludes past events and non-confirmed tickets" do
+      user = user_fixture()
+
+      {:ok, upcoming_event} =
+        Events.create_event(%{
+          title: "Upcoming",
+          description: "Soon",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 3, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, past_event} =
+        Events.create_event(%{
+          title: "Past",
+          description: "Gone",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 5, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, upcoming_tier} =
+        create_ticket_tier_fixture(%{event_id: upcoming_event.id})
+
+      {:ok, past_tier} = create_ticket_tier_fixture(%{event_id: past_event.id})
+
+      upcoming_ticket =
+        create_ticket_fixture(%{
+          event_id: upcoming_event.id,
+          user_id: user.id,
+          ticket_tier_id: upcoming_tier.id,
+          status: :confirmed
+        })
+
+      past_ticket =
+        create_ticket_fixture(%{
+          event_id: past_event.id,
+          user_id: user.id,
+          ticket_tier_id: past_tier.id,
+          status: :confirmed
+        })
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -10, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        past_event
+        |> Ecto.Changeset.change(%{start_date: past_start})
+        |> Repo.update()
+
+      _pending_ticket =
+        create_ticket_fixture(%{
+          event_id: upcoming_event.id,
+          user_id: user.id,
+          ticket_tier_id: upcoming_tier.id,
+          status: :pending
+        })
+
+      tickets = Events.list_upcoming_confirmed_tickets_for_user(user.id)
+      ids = Enum.map(tickets, & &1.id)
+
+      assert upcoming_ticket.id in ids
+      refute past_ticket.id in ids
+      assert Enum.all?(tickets, &(&1.status == :confirmed))
+    end
+
+    test "list_events_by_ids/2 returns events in id order" do
+      user = user_fixture()
+      event_a = event_fixture(%{organizer_id: user.id})
+      event_b = event_fixture(%{organizer_id: user.id})
+
+      events =
+        Events.list_events_by_ids([event_b.id, event_a.id],
+          preloads: [:cover_image]
+        )
+
+      assert Enum.map(events, & &1.id) == [event_b.id, event_a.id]
+    end
+
     test "count_tickets_sold_excluding_donations/1 counts non-donation tickets" do
       {:ok, event} = create_event_fixture()
       user = user_fixture()

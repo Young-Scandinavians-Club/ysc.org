@@ -15,6 +15,34 @@ defmodule Ysc.Posts do
     Repo.get(Post, id) |> Repo.preload(preloads)
   end
 
+  @doc """
+  Loads posts by id in one query. Returns records in the same order as `ids`
+  (skipping missing ids).
+  """
+  def list_posts_by_ids(ids, preloads \\ []) when is_list(ids) do
+    ids = Enum.uniq(Enum.reject(ids, &is_nil/1))
+
+    if ids == [] do
+      []
+    else
+      from(p in Post, where: p.id in ^ids)
+      |> Repo.all()
+      |> Repo.preload(preloads)
+      |> order_records_by_ids(ids)
+    end
+  end
+
+  defp order_records_by_ids(records, ids) do
+    by_id = Map.new(records, &{&1.id, &1})
+
+    Enum.flat_map(ids, fn id ->
+      case Map.fetch(by_id, id) do
+        {:ok, record} -> [record]
+        :error -> []
+      end
+    end)
+  end
+
   def get_post!(id) do
     Repo.get!(Post, id)
   end
