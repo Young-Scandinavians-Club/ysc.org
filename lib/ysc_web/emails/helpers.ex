@@ -37,4 +37,44 @@ defmodule YscWeb.Emails.Helpers do
   end
 
   def member_greeting_name(_), do: @member_default
+
+  @doc """
+  Absolute URL for the member membership management page.
+  """
+  def membership_url, do: absolute_url("/users/membership")
+
+  @doc """
+  Absolute URL for the public events listing.
+  """
+  def upcoming_events_url, do: absolute_url("/events")
+
+  @doc """
+  Absolute URL for the member payment methods page.
+  """
+  def payment_methods_url, do: absolute_url("/users/payment-methods")
+
+  @doc """
+  Absolute URL for the public news listing.
+  """
+  def news_url, do: absolute_url("/news")
+
+  @doc """
+  Absolute URL for the site home page.
+  """
+  def home_url, do: absolute_url("/")
+
+  @doc """
+  Shared assign map for membership payment reminder emails (7-day and 30-day).
+  """
+  def membership_payment_reminder_data(user) do
+    if is_nil(user) do
+      raise ArgumentError, "User cannot be nil"
+    end
+
+    %{
+      first_name: member_greeting_name(user),
+      pay_membership_url: membership_url(),
+      upcoming_events_url: upcoming_events_url()
+    }
+  end
 end

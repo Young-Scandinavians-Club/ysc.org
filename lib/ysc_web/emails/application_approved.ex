@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.ApplicationApproved do
     mjml_template: "templates/application_approved.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: [membership_url: 0, upcoming_events_url: 0]
 
   def get_template_name() do
     "application_approved"
@@ -16,13 +16,5 @@ defmodule YscWeb.Emails.ApplicationApproved do
 
   def get_subject() do
     "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)"
-  end
-
-  def upcoming_events_url() do
-    absolute_url("/events")
-  end
-
-  def pay_membership_url() do
-    absolute_url("/users/membership")
   end
 end

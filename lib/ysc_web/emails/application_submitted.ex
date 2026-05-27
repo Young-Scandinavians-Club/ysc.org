@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.ApplicationSubmitted do
     mjml_template: "templates/application_submitted.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: [news_url: 0, upcoming_events_url: 0]
 
   alias Ysc.Settings
 
@@ -20,13 +20,7 @@ defmodule YscWeb.Emails.ApplicationSubmitted do
     "Your Young Scandinavians Club application is in! 🎉"
   end
 
-  def upcoming_events_url() do
-    absolute_url("/events")
-  end
-
-  def latest_news_url() do
-    absolute_url("/news")
-  end
+  def latest_news_url(), do: news_url()
 
   def facebook_path() do
     Settings.get_social_url("facebook")
