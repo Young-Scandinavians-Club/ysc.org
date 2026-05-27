@@ -359,123 +359,19 @@ defmodule Ysc.Payments do
   This is used by webhooks to sync payment method data.
   """
   def sync_payment_method_from_stripe(user, stripe_payment_method) do
-    attrs = %{
-      provider: :stripe,
-      provider_id: stripe_payment_method.id,
-      provider_customer_id: stripe_payment_method.customer,
-      type: map_stripe_type_to_payment_method_type(stripe_payment_method),
-      provider_type: stripe_payment_method.type,
-      last_four: get_last_four(stripe_payment_method),
-      display_brand: get_display_brand(stripe_payment_method),
-      exp_month:
-        stripe_payment_method.card && stripe_payment_method.card.exp_month,
-      exp_year:
-        stripe_payment_method.card && stripe_payment_method.card.exp_year,
-      account_type:
-        stripe_payment_method.us_bank_account &&
-          stripe_payment_method.us_bank_account.account_type,
-      routing_number:
-        stripe_payment_method.us_bank_account &&
-          stripe_payment_method.us_bank_account.routing_number,
-      bank_name:
-        stripe_payment_method.us_bank_account &&
-          stripe_payment_method.us_bank_account.bank_name,
-      user_id: user.id,
-      payload: stripe_payment_method_to_map(stripe_payment_method)
-    }
-
-    case get_payment_method_by_provider_for_user(
-           user,
-           :stripe,
-           stripe_payment_method.id
-         ) do
-      nil ->
-        if payment_method_provider_conflict?(
-             user,
-             :stripe,
-             stripe_payment_method.id
-           ) do
-          {:error, :payment_method_owned_by_another_user}
-        else
-          # For new payment methods, set as default if user has no default
-          insert_payment_method(attrs)
-          |> case do
-            {:ok, payment_method} ->
-              set_default_payment_method_if_none(user, payment_method)
-
-            error ->
-              error
-          end
-        end
-
-      existing_payment_method ->
-        # Do not pass is_default so we never overwrite it. Default is owned by
-        # user actions (e.g. add payment method, select default); webhooks only
-        # sync metadata. This avoids a race where payment_method.attached runs
-        # after the LiveView set the new PM as default but still had a stale
-        # read of is_default: false, which would overwrite the default.
-        update_payment_method(existing_payment_method, attrs)
-    end
+    persist_payment_method_from_stripe(user, stripe_payment_method, :sync)
   end
 
   @doc """
   Creates or updates a payment method from Stripe data.
   """
   def upsert_payment_method_from_stripe(user, stripe_payment_method) do
-    attrs = %{
-      provider: :stripe,
-      provider_id: stripe_payment_method.id,
-      provider_customer_id: stripe_payment_method.customer,
-      type: map_stripe_type_to_payment_method_type(stripe_payment_method),
-      provider_type: stripe_payment_method.type,
-      last_four: get_last_four(stripe_payment_method),
-      display_brand: get_display_brand(stripe_payment_method),
-      exp_month:
-        stripe_payment_method.card && stripe_payment_method.card.exp_month,
-      exp_year:
-        stripe_payment_method.card && stripe_payment_method.card.exp_year,
-      account_type:
-        stripe_payment_method.us_bank_account &&
-          stripe_payment_method.us_bank_account.account_type,
-      routing_number:
-        stripe_payment_method.us_bank_account &&
-          stripe_payment_method.us_bank_account.routing_number,
-      bank_name:
-        stripe_payment_method.us_bank_account &&
-          stripe_payment_method.us_bank_account.bank_name,
-      user_id: user.id,
-      payload: stripe_payment_method_to_map(stripe_payment_method)
-    }
-
-    result =
-      case get_payment_method_by_provider_for_user(
-             user,
-             :stripe,
-             stripe_payment_method.id
-           ) do
-        nil ->
-          if payment_method_provider_conflict?(
-               user,
-               :stripe,
-               stripe_payment_method.id
-             ) do
-            {:error, :payment_method_owned_by_another_user}
-          else
-            insert_payment_method(attrs)
-          end
-
-        existing_payment_method ->
-          # Preserve the is_default field when updating
-          attrs_with_default =
-            Map.put(attrs, :is_default, existing_payment_method.is_default)
-
-          update_payment_method(existing_payment_method, attrs_with_default)
-      end
-
-    # If the payment method was successfully created/updated, ensure it's set as default if needed
-    case result do
-      {:ok, payment_method} ->
-        # Check if user has any default payment method, if not, set this one as default
+    case persist_payment_method_from_stripe(
+           user,
+           stripe_payment_method,
+           :upsert
+         ) do
+      {:ok, payment_method} = result ->
         set_default_payment_method_if_none(user, payment_method)
         result
 
@@ -486,11 +382,129 @@ defmodule Ysc.Payments do
 
   # Private functions
 
-  defp handle_duplicate_payment_method(
-         {:error,
-          %Ecto.Changeset{errors: [provider_id: {"has already been taken", _}]}}
+  # Persists a Stripe payment method. Handles races where a webhook and LiveView
+  # both try to insert the same provider_id by recovering from unique violations.
+  defp persist_payment_method_from_stripe(user, stripe_payment_method, mode) do
+    attrs = build_stripe_payment_method_attrs(user, stripe_payment_method)
+    provider_id = stripe_payment_method.id
+
+    case get_payment_method_by_provider_for_user(user, :stripe, provider_id) do
+      nil ->
+        if payment_method_provider_conflict?(user, :stripe, provider_id) do
+          {:error, :payment_method_owned_by_another_user}
+        else
+          insert_payment_method_resilient(user, attrs, mode)
+          |> maybe_set_default_after_sync_insert(user, mode)
+        end
+
+      existing_payment_method ->
+        update_payment_method_from_stripe(existing_payment_method, attrs, mode)
+    end
+  end
+
+  defp build_stripe_payment_method_attrs(user, stripe_payment_method) do
+    %{
+      provider: :stripe,
+      provider_id: stripe_payment_method.id,
+      provider_customer_id: stripe_payment_method.customer,
+      type: map_stripe_type_to_payment_method_type(stripe_payment_method),
+      provider_type: stripe_payment_method.type,
+      last_four: get_last_four(stripe_payment_method),
+      display_brand: get_display_brand(stripe_payment_method),
+      exp_month:
+        stripe_payment_method.card && stripe_payment_method.card.exp_month,
+      exp_year:
+        stripe_payment_method.card && stripe_payment_method.card.exp_year,
+      account_type:
+        stripe_payment_method.us_bank_account &&
+          stripe_payment_method.us_bank_account.account_type,
+      routing_number:
+        stripe_payment_method.us_bank_account &&
+          stripe_payment_method.us_bank_account.routing_number,
+      bank_name:
+        stripe_payment_method.us_bank_account &&
+          stripe_payment_method.us_bank_account.bank_name,
+      user_id: user.id,
+      payload: stripe_payment_method_to_map(stripe_payment_method)
+    }
+  end
+
+  defp insert_payment_method_resilient(user, attrs, mode) do
+    case insert_payment_method(attrs) do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, reason} = error ->
+        if duplicate_payment_method_error?(reason) do
+          recover_payment_method_insert_conflict(user, attrs, mode)
+        else
+          error
+        end
+    end
+  end
+
+  defp recover_payment_method_insert_conflict(user, attrs, mode) do
+    provider = attrs.provider
+    provider_id = attrs.provider_id
+
+    case get_payment_method_by_provider_for_user(user, provider, provider_id) do
+      %PaymentMethod{} = existing ->
+        update_payment_method_from_stripe(existing, attrs, mode)
+
+      nil ->
+        if payment_method_provider_conflict?(user, provider, provider_id) do
+          {:error, :payment_method_owned_by_another_user}
+        else
+          {:error, :duplicate_payment_method}
+        end
+    end
+  end
+
+  defp update_payment_method_from_stripe(existing_payment_method, attrs, :sync) do
+    # Do not pass is_default so we never overwrite it. Default is owned by
+    # user actions (e.g. add payment method, select default); webhooks only
+    # sync metadata. This avoids a race where payment_method.attached runs
+    # after the LiveView set the new PM as default but still had a stale
+    # read of is_default: false, which would overwrite the default.
+    update_payment_method(existing_payment_method, attrs)
+  end
+
+  defp update_payment_method_from_stripe(
+         existing_payment_method,
+         attrs,
+         :upsert
        ) do
-    {:error, :duplicate_payment_method}
+    attrs_with_default =
+      Map.put(attrs, :is_default, existing_payment_method.is_default)
+
+    update_payment_method(existing_payment_method, attrs_with_default)
+  end
+
+  defp maybe_set_default_after_sync_insert({:ok, payment_method}, user, :sync) do
+    set_default_payment_method_if_none(user, payment_method)
+    {:ok, payment_method}
+  end
+
+  defp maybe_set_default_after_sync_insert(result, _user, _mode), do: result
+
+  defp duplicate_payment_method_error?(:duplicate_payment_method), do: true
+
+  defp duplicate_payment_method_error?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn
+      {:provider_id, {"has already been taken", _}} -> true
+      {:provider, {"has already been taken", _}} -> true
+      _ -> false
+    end)
+  end
+
+  defp duplicate_payment_method_error?(_), do: false
+
+  defp handle_duplicate_payment_method({:error, %Ecto.Changeset{} = changeset}) do
+    if duplicate_payment_method_error?(changeset) do
+      {:error, :duplicate_payment_method}
+    else
+      {:error, changeset}
+    end
   end
 
   defp handle_duplicate_payment_method(result), do: result

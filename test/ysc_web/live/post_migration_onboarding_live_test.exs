@@ -125,6 +125,33 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       refute html =~ "Membership Type"
       refute has_element?(view, "#membership-selection")
+      assert html =~ ">Family</span>"
+      refute html =~ "Add Family Members"
+    end
+
+    test "includes family step when membership application is family", %{
+      conn: conn
+    } do
+      user = user_needing_post_migration_onboarding()
+      signup_application_fixture(user, %{membership_type: "family"})
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/onboarding")
+
+      assert html =~ ">Family</span>"
+      refute html =~ "Membership Type"
+    end
+
+    test "omits family step when membership application is single", %{
+      conn: conn
+    } do
+      user = user_needing_post_migration_onboarding()
+      signup_application_fixture(user, %{membership_type: "single"})
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/onboarding")
+
+      refute html =~ ">Family</span>"
     end
 
     test "includes membership selection in the stepper when plan cannot be inferred",
@@ -151,8 +178,11 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       conn = log_in_user(conn, user)
       {:ok, view, html} = live(conn, ~p"/onboarding")
 
-      assert has_element?(view, ~s|button[phx-value-step="2"]|)
+      assert has_element?(view, ~s|button[phx-value-step="1"]|)
+      refute has_element?(view, ~s|button[phx-value-step="2"]|)
       refute html =~ "Membership Type"
+      refute html =~ ">Family</span>"
+      refute html =~ "Add Family Members"
     end
   end
 end
