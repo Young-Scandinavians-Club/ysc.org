@@ -963,4 +963,81 @@ defmodule Ysc.PostsTest do
       assert is_binary(topic)
     end
   end
+
+  describe "public post page access (#353)" do
+    test "get_public_post/2 returns only published posts", %{author: author} do
+      {:ok, draft} =
+        Posts.create_post(
+          %{
+            "title" => "Draft",
+            "body" => "Body",
+            "url_name" => "public-access-draft-#{System.unique_integer()}"
+          },
+          author
+        )
+
+      {:ok, published} =
+        Posts.create_post(
+          %{
+            "title" => "Published",
+            "body" => "Body",
+            "url_name" => "public-access-published-#{System.unique_integer()}",
+            "state" => "published",
+            "published_on" => DateTime.utc_now() |> DateTime.truncate(:second)
+          },
+          author
+        )
+
+      assert Posts.get_public_post(draft.id) == nil
+      assert %Post{id: id} = Posts.get_public_post(published.id)
+      assert id == published.id
+    end
+
+    test "get_post_for_page/3 hides drafts from members but allows staff preview",
+         %{
+           author: author,
+           regular_user: member
+         } do
+      {:ok, draft} =
+        Posts.create_post(
+          %{
+            "title" => "Staff preview draft",
+            "body" => "Body",
+            "url_name" => "staff-preview-draft-#{System.unique_integer()}"
+          },
+          author
+        )
+
+      admin = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      assert Posts.get_post_for_page(draft.id, member) == nil
+      assert %Post{id: id} = Posts.get_post_for_page(draft.id, admin)
+      assert id == draft.id
+      assert %Post{id: id} = Posts.get_post_for_page(draft.id, volunteer)
+      assert id == draft.id
+    end
+
+    test "get_post_for_page_by_url_name/3 mirrors id-based access rules", %{
+      author: author,
+      regular_user: member
+    } do
+      url_name = "url-name-access-#{System.unique_integer()}"
+
+      {:ok, draft} =
+        Posts.create_post(
+          %{"title" => "Draft", "body" => "Body", "url_name" => url_name},
+          author
+        )
+
+      admin = user_fixture(%{role: :admin})
+
+      assert Posts.get_post_for_page_by_url_name(url_name, member) == nil
+
+      assert %Post{id: id} =
+               Posts.get_post_for_page_by_url_name(url_name, admin)
+
+      assert id == draft.id
+    end
+  end
 end
