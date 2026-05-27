@@ -2076,8 +2076,12 @@ defmodule YscWeb.HomeLive do
   defp membership_scheduled_for_cancellation?(_), do: false
 
   defp get_upcoming_tickets(user_id, event_limit \\ 10) do
-    # Get all confirmed tickets for the user
-    tickets = Events.list_tickets_for_user(user_id)
+    row_limit = max(event_limit * 20, 50)
+
+    tickets =
+      Events.list_upcoming_confirmed_tickets_for_user(user_id,
+        row_limit: row_limit
+      )
 
     # Filter for upcoming events only and confirmed tickets
     # Use PST timezone for comparison

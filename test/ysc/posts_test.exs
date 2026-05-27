@@ -39,6 +39,25 @@ defmodule Ysc.PostsTest do
     end
   end
 
+  describe "list_posts_by_ids/2" do
+    test "returns posts in the same order as ids", %{author: author} do
+      {:ok, post_a} =
+        Posts.create_post(
+          %{"title" => "A", "body" => "Body", "url_name" => "post-a"},
+          author
+        )
+
+      {:ok, post_b} =
+        Posts.create_post(
+          %{"title" => "B", "body" => "Body", "url_name" => "post-b"},
+          author
+        )
+
+      posts = Posts.list_posts_by_ids([post_b.id, post_a.id])
+      assert Enum.map(posts, & &1.id) == [post_b.id, post_a.id]
+    end
+  end
+
   describe "get_post/2" do
     test "returns post by id", %{author: author} do
       {:ok, post} =
