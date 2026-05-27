@@ -357,25 +357,24 @@ document.addEventListener("paste", (event) => {
 
         // Always start filling from the first input when pasting
         // This ensures the full OTP code is entered correctly regardless of which box has focus
-        for (let i = 0; i < paste.length && i < inputs.length; i++) {
+        const filledCount = Math.min(paste.length, inputs.length);
+
+        for (let i = 0; i < filledCount; i++) {
             inputs[i].value = paste[i];
             // Trigger input event on each filled input to ensure LiveView picks up the change
             inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
         }
 
-        // Trigger change event on the form to validate the code
-        const form = container.closest("form");
-        if (form) {
-            form.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
-        // Focus the last filled input or the next empty input
-        const filledCount = Math.min(paste.length, inputs.length);
+        // Trigger change on the last filled input so phx-change validates the code.
+        // Do not dispatch change on the form element itself — LiveView pushInput
+        // requires a form control (input.form), and HTMLFormElement has no .form.
         if (filledCount > 0) {
+            inputs[filledCount - 1].dispatchEvent(new Event("change", { bubbles: true }));
+
             if (filledCount < inputs.length) {
                 inputs[filledCount].focus(); // Focus next empty input
             } else {
-                inputs[inputs.length - 1].focus(); // Focus last input if all filled
+                inputs[filledCount - 1].focus(); // Focus last input if all filled
             }
         }
     }
