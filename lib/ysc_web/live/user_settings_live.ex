@@ -2248,33 +2248,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
 
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-6">
-              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <h2 class="text-zinc-900 font-bold text-xl">Payment History</h2>
-                <%= if @yearly_stats && (@yearly_stats.nights > 0 || @yearly_stats.events > 0) do %>
-                  <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-                    <p class="text-sm text-blue-900 font-semibold">
-                      In {@yearly_stats_year}, you've enjoyed
-                      <%= if @yearly_stats.nights > 0 do %>
-                        <strong>{@yearly_stats.nights}</strong>
-                        {if @yearly_stats.nights == 1,
-                          do: "night",
-                          else: "nights"} at the cabins {if @yearly_stats.events >
-                                                              0,
-                                                            do: "and",
-                                                            else: ""}
-                      <% end %>
-                      <%= if @yearly_stats.events > 0 do %>
-                        attended <strong>{@yearly_stats.events}</strong>
-                        {if @yearly_stats.events == 1,
-                          do: "club event",
-                          else: "club events"}!
-                      <% else %>
-                        !
-                      <% end %>
-                    </p>
-                  </div>
-                <% end %>
-              </div>
+              <h2 class="text-zinc-900 font-bold text-xl">Payment History</h2>
               <!-- Loading state for payments -->
               <div
                 :if={assigns[:loading_payments]}
@@ -2774,8 +2748,6 @@ defmodule YscWeb.UserSettingsLive do
         |> assign(:payment_filter, :all)
         |> assign(:filtered_payments_count, 0)
         |> assign(:filtered_payments_list, [])
-        |> assign(:yearly_stats, nil)
-        |> assign(:yearly_stats_year, nil)
         |> assign(:loading_payments, true)
         |> assign(:booking_entitlements_count, 0)
         |> assign(:ticket_reservations_count, 0)
@@ -2929,10 +2901,6 @@ defmodule YscWeb.UserSettingsLive do
 
     total_pages = div(total_count + per_page - 1, per_page)
 
-    # Calculate yearly impact stats
-    yearly_stats_year = pst_today().year
-    yearly_stats = calculate_yearly_stats(all_payments)
-
     {:noreply,
      socket
      |> assign(:payments_total, total_count)
@@ -2941,8 +2909,6 @@ defmodule YscWeb.UserSettingsLive do
      |> stream(:payments, all_payments, reset: true, dom_id: &payment_dom_id/1)
      |> assign(:filtered_payments_count, length(all_payments))
      |> assign(:filtered_payments_list, all_payments)
-     |> assign(:yearly_stats, yearly_stats)
-     |> assign(:yearly_stats_year, yearly_stats_year)
      |> assign(:booking_entitlements_count, length(booking_entitlements))
      |> assign(:ticket_reservations_count, length(ticket_reservations))
      |> stream(:booking_entitlements, booking_entitlements,
@@ -5207,67 +5173,6 @@ defmodule YscWeb.UserSettingsLive do
 
   defp apply_payment_filter(payments, _), do: payments
 
-  defp calculate_yearly_stats(payments) do
-    current_year = pst_today().year
-
-    stats =
-      Enum.reduce(
-        payments,
-        %{nights: 0, events: 0, total_amount: Money.new(0, :USD)},
-        fn payment_info, acc ->
-          # Check if payment is from current year
-          payment_date =
-            cond do
-              payment_info.payment && payment_info.payment.payment_date ->
-                to_pst_date(payment_info.payment.payment_date)
-
-              payment_info.payment && payment_info.payment.inserted_at ->
-                to_pst_date(payment_info.payment.inserted_at)
-
-              payment_info.ticket_order && payment_info.ticket_order.inserted_at ->
-                to_pst_date(payment_info.ticket_order.inserted_at)
-
-              true ->
-                nil
-            end
-
-          if payment_date && payment_date.year == current_year do
-            acc
-            |> add_booking_nights(payment_info)
-            |> add_event_count(payment_info)
-            |> add_payment_amount(payment_info)
-          else
-            acc
-          end
-        end
-      )
-
-    stats
-  end
-
-  defp add_booking_nights(acc, %{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    nights = Date.diff(booking.checkout_date, booking.checkin_date)
-    Map.update(acc, :nights, nights, &(&1 + nights))
-  end
-
-  defp add_booking_nights(acc, _), do: acc
-
-  defp add_event_count(acc, %{type: :ticket}) do
-    Map.update(acc, :events, 1, &(&1 + 1))
-  end
-
-  defp add_event_count(acc, _), do: acc
-
-  defp add_payment_amount(acc, %{payment: payment}) when not is_nil(payment) do
-    case Money.add(acc.total_amount, payment.amount) do
-      {:ok, new_total} -> %{acc | total_amount: new_total}
-      _ -> acc
-    end
-  end
-
-  defp add_payment_amount(acc, _), do: acc
-
   defp get_price_id(memberhip_type) do
     plans = Application.get_env(:ysc, :membership_plans)
 
@@ -6519,14 +6424,6 @@ defmodule YscWeb.UserSettingsLive do
     do: "Only one photo at a time"
 
   defp avatar_upload_error_to_string(_), do: "Upload failed"
-
-  defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-
-  defp to_pst_date(%DateTime{} = dt),
-    do: dt |> DateTime.shift_zone!("America/Los_Angeles") |> DateTime.to_date()
-
-  defp to_pst_date(%Date{} = d), do: d
-  defp to_pst_date(_), do: nil
 
   defp format_utc_date(%DateTime{} = dt, format) do
     dt
