@@ -365,6 +365,11 @@ document.addEventListener("paste", (event) => {
             inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
         }
 
+        for (let i = filledCount; i < inputs.length; i++) {
+            inputs[i].value = "";
+            inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
         // Trigger change on the last filled input so phx-change validates the code.
         // Do not dispatch change on the form element itself — LiveView pushInput
         // requires a form control (input.form), and HTMLFormElement has no .form.
