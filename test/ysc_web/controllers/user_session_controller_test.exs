@@ -39,7 +39,9 @@ defmodule YscWeb.UserSessionControllerTest do
           }
         })
 
-      assert redirected_to(conn) == ~p"/account/setup/#{user.id}"
+      redirect = redirected_to(conn)
+      assert redirect =~ "/account/setup/#{user.id}"
+      assert redirect =~ "setup_token="
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
                "Please verify your email address before signing in"
@@ -122,7 +124,9 @@ defmodule YscWeb.UserSessionControllerTest do
           }
         })
 
-      assert redirected_to(conn) == ~p"/account/setup/#{user.id}"
+      redirect = redirected_to(conn)
+      assert redirect =~ "/account/setup/#{user.id}"
+      assert redirect =~ "setup_token="
 
       # The email verification message takes precedence over the registration message
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~

@@ -106,6 +106,13 @@ defmodule YscWeb.ConnCase do
   end
 
   @doc """
+  Account setup URL including the signed `setup_token` required for email verification.
+  """
+  def account_setup_path(user, extra_params \\ %{}) do
+    YscWeb.AccountSetupAccess.setup_path(user.id, extra_params)
+  end
+
+  @doc """
   Returns `{conn, csrf_token}` by running session + CSRF plugs (no page render).
 
   Use for controller POST tests instead of `get(conn, ~p"/")` + `fetch_conn_csrf_from_html/1`.

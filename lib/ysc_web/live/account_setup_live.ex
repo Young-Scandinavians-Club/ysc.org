@@ -5,6 +5,7 @@ defmodule YscWeb.AccountSetupLive do
 
   alias Ysc.Accounts
   alias Ysc.Customers
+  alias YscWeb.AccountSetupAccess
   alias Ysc.Payments
 
   defp payment_method_module do
@@ -674,7 +675,8 @@ defmodule YscWeb.AccountSetupLive do
           socket
           |> refine_setup_needs_assigns(user)
           |> then(fn s ->
-            if s.assigns.user_needs.email_verification do
+            if s.assigns.user_needs.email_verification and
+                 email_verification_authorized?(s) do
               ensure_verification_email_sent(user)
             end
 
@@ -907,6 +909,14 @@ defmodule YscWeb.AccountSetupLive do
         %{"verification_code" => entered_code},
         socket
       ) do
+    if email_verification_authorized?(socket) do
+      do_handle_verify_code(socket, entered_code)
+    else
+      return_unauthorized_email_verification(socket)
+    end
+  end
+
+  defp do_handle_verify_code(socket, entered_code) do
     # Handle both OTP array format and single string format
     code = normalize_verification_code(entered_code)
 
@@ -928,6 +938,14 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   def handle_event("resend_code", _params, socket) do
+    if email_verification_authorized?(socket) do
+      do_handle_resend_code(socket)
+    else
+      return_unauthorized_email_verification(socket)
+    end
+  end
+
+  defp do_handle_resend_code(socket) do
     user_id = socket.assigns.user.id
 
     case Ysc.ResendRateLimiter.check_and_record_resend(user_id, :email) do
@@ -1641,4 +1659,22 @@ defmodule YscWeb.AccountSetupLive do
     do: true
 
   defp setup_owner?(_), do: false
+
+  defp email_verification_authorized?(socket) do
+    AccountSetupAccess.email_verification_authorized?(
+      socket.assigns.user.id,
+      socket.assigns.current_user,
+      Map.get(socket.assigns, :setup_access_granted, false)
+    )
+  end
+
+  defp return_unauthorized_email_verification(socket) do
+    YscWeb.Flash.send_toast(
+      :error,
+      "Open the account setup link from your registration or sign-in email to verify your address.",
+      title: "Email verification"
+    )
+
+    {:noreply, socket}
+  end
 end

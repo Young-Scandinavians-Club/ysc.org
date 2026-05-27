@@ -128,14 +128,14 @@ defmodule YscWeb.AccountSetupLiveTest do
   describe "step 0: email verification" do
     test "shows the email verification form", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       assert has_element?(view, "#email_form")
     end
 
     test "stepper is hidden during email verification", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       # Stepper only shows once the user has passed step 0
       refute has_element?(view, "ol li", "Payment")
@@ -148,14 +148,14 @@ defmodule YscWeb.AccountSetupLiveTest do
       user = unverified_pending_user()
 
       {:ok, view, _html} =
-        live(conn, ~p"/account/setup/#{user.id}?from_signup=true")
+        live(conn, account_setup_path(user, %{"from_signup" => "true"}))
 
       assert render(view) =~ "application is submitted"
     end
 
     test "invalid code shows error", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       view
       |> form("#email_form", %{"verification_code" => @invalid_otp})
@@ -169,7 +169,7 @@ defmodule YscWeb.AccountSetupLiveTest do
            conn: conn
          } do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       for _ <- 1..12 do
         view
@@ -191,7 +191,7 @@ defmodule YscWeb.AccountSetupLiveTest do
     test "valid code redirects to auto-login pointing at step 1 for pending users",
          %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       view
       |> form("#email_form", %{"verification_code" => @valid_otp})
@@ -217,7 +217,7 @@ defmodule YscWeb.AccountSetupLiveTest do
           password_set_at: nil
         })
 
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       view
       |> form("#email_form", %{"verification_code" => @valid_otp})
@@ -235,7 +235,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "OTP pasted as map verifies correctly", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       view
       |> form("#email_form", %{"verification_code" => @valid_otp})
@@ -253,7 +253,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn
     } do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       view
       |> form("#email_form", %{
@@ -277,7 +277,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "resend code shows confirmation toast", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       render_click(view, "resend_code", %{})
 
@@ -288,7 +288,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn
     } do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       render_click(view, "update_resend_timers", %{})
       render_click(view, "resend_timer_expired", %{"type" => "email"})
@@ -301,7 +301,9 @@ defmodule YscWeb.AccountSetupLiveTest do
          %{conn: conn} do
       user = unverified_pending_user()
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       # Email not verified → blocked, stays on email form
       assert has_element?(view, "#email_form")
@@ -310,7 +312,9 @@ defmodule YscWeb.AccountSetupLiveTest do
     test "step 2 is inaccessible without email verification", %{conn: conn} do
       user = unverified_pending_user()
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       refute has_element?(view, "#password_form")
     end
@@ -328,7 +332,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       user = pending_user_with_default_payment()
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       assert has_element?(view, "#password_form")
       refute has_element?(view, "#setup-payment-form")
@@ -342,7 +346,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} =
-        live(conn, ~p"/account/setup/#{user.id}?step=1")
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       assert has_element?(view, "#password_form")
       refute has_element?(view, "#setup-payment-form")
@@ -361,7 +365,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows payment form or try-again fallback", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       # Stripe setup-intent creation fails in tests; the fallback UI appears
       assert has_element?(view, "#setup-payment-form") or
@@ -369,14 +374,18 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows no-charge-until-approved copy", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
       html = render(view)
 
       assert html =~ "not be charged until your application is approved"
     end
 
     test "shows authorization and auto-renewal copy", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
       html = render(view)
 
       assert html =~ "authorize"
@@ -384,7 +393,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "stepper is visible on step 1", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       assert has_element?(view, "ol")
     end
@@ -394,7 +404,9 @@ defmodule YscWeb.AccountSetupLiveTest do
            conn: conn,
            user: user
          } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
       html = render(view)
 
       assert html =~ "Payment"
@@ -406,7 +418,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       render_click(view, "payment-method-set", %{
         "payment_method_id" => "pm_test_nonexistent"
@@ -422,7 +435,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       user: user
     } do
       # Navigate to step 2 (password) and then fire the payment event from there
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       render_click(view, "payment-method-set", %{
         "payment_method_id" => "pm_test_123"
@@ -432,7 +446,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "retry_payment_setup event does not crash", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       render_click(view, "retry_payment_setup", %{})
 
@@ -443,7 +458,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "unauthenticated user cannot access step 1", %{user: user} do
       {:ok, view, _html} =
-        live(build_conn(), ~p"/account/setup/#{user.id}?step=1")
+        live(build_conn(), account_setup_path(user, %{"step" => "1"}))
 
       # Not logged in → access denied
       refute has_element?(view, "#setup-payment-form")
@@ -454,7 +469,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       other_conn = log_in_user(build_conn(), user_fixture())
 
       {:ok, view, _html} =
-        live(other_conn, ~p"/account/setup/#{user.id}?step=1")
+        live(other_conn, account_setup_path(user, %{"step" => "1"}))
 
       # Non-owner → access denied; page stays on email verification step
       refute has_element?(view, "#setup-payment-form")
@@ -475,13 +490,15 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows the password form", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       assert has_element?(view, "#password_form")
     end
 
     test "stepper is visible on step 2", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       assert has_element?(view, "ol")
     end
@@ -490,7 +507,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       view
       |> form("#password_form", %{
@@ -505,7 +523,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "password too short shows validation error", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       view
       |> form("#password_form", %{
@@ -520,7 +539,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       view
       |> form("#password_form", %{
@@ -538,7 +558,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "unauthenticated user cannot access step 2", %{user: user} do
       {:ok, view, _html} =
-        live(build_conn(), ~p"/account/setup/#{user.id}?step=2")
+        live(build_conn(), account_setup_path(user, %{"step" => "2"}))
 
       refute has_element?(view, "#password_form")
     end
@@ -564,19 +584,22 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows the phone form", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
 
       assert has_element?(view, "#phone_form")
     end
 
     test "shows skip button", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
 
       assert has_element?(view, "[phx-click=\"skip_phone\"]")
     end
 
     test "skip phone redirects to auto-login", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
 
       render_click(view, "skip_phone", %{})
 
@@ -588,7 +611,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
 
       # The phone input uses a LivePhone component that controls a hidden field via JS.
       # To test the save_phone event directly without JS, use render_submit/3:
@@ -603,7 +627,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
 
       render_submit(view, "save_phone", %{
         "user" => %{"phone_number" => "", "sms_opt_in" => "false"}
@@ -614,7 +639,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "unauthenticated user cannot access step 3", %{user: user} do
       {:ok, view, _html} =
-        live(build_conn(), ~p"/account/setup/#{user.id}?step=3")
+        live(build_conn(), account_setup_path(user, %{"step" => "3"}))
 
       refute has_element?(view, "#phone_form")
     end
@@ -632,13 +657,15 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows the phone verification form", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       assert has_element?(view, "#phone_verification_form")
     end
 
     test "invalid code shows error", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       view
       |> form("#phone_verification_form", %{"verification_code" => @invalid_otp})
@@ -648,7 +675,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "valid code redirects to auto-login", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       view
       |> form("#phone_verification_form", %{"verification_code" => @valid_otp})
@@ -666,7 +694,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       view
       |> form("#phone_verification_form", %{
@@ -689,7 +718,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "resend phone code shows confirmation toast", %{conn: conn, user: user} do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       render_click(view, "resend_phone_code", %{})
 
@@ -700,7 +730,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       render_click(view, "change_phone_number", %{})
 
@@ -709,7 +740,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "unauthenticated user cannot access step 4", %{user: user} do
       {:ok, view, _html} =
-        live(build_conn(), ~p"/account/setup/#{user.id}?step=4")
+        live(build_conn(), account_setup_path(user, %{"step" => "4"}))
 
       refute has_element?(view, "#phone_verification_form")
     end
@@ -722,7 +753,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   describe "stepper" do
     test "is hidden on step 0 (email verification)", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       refute has_element?(view, "ol li", "Password")
       refute has_element?(view, "ol li", "Payment")
@@ -732,7 +763,10 @@ defmodule YscWeb.AccountSetupLiveTest do
          %{conn: conn} do
       user = verified_pending_user(%{password_set_at: nil})
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
       html = render(view)
 
       assert html =~ "Payment"
@@ -743,7 +777,9 @@ defmodule YscWeb.AccountSetupLiveTest do
     test "does not show payment label for active users", %{conn: conn} do
       user = active_user_needing_password()
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       # Active users don't have a payment step in the stepper
       html = render(view)
@@ -756,7 +792,9 @@ defmodule YscWeb.AccountSetupLiveTest do
          } do
       user = verified_pending_user(%{password_set_at: nil})
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       # Stepper shows payment on step 1
       assert render(view) =~ "Payment"
@@ -782,7 +820,10 @@ defmodule YscWeb.AccountSetupLiveTest do
         })
 
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
+
       html = render(view)
 
       assert html =~ "Phone"
@@ -797,14 +838,16 @@ defmodule YscWeb.AccountSetupLiveTest do
   describe "access control" do
     test "step 0 is accessible without login", %{conn: conn} do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       assert has_element?(view, "#email_form")
     end
 
     test "step 1 requires login", %{conn: conn} do
       user = verified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       # Not logged in → stays on email verification (can_access_step returns false)
       refute has_element?(view, "#setup-payment-form")
@@ -813,7 +856,9 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "step 2 requires login", %{conn: conn} do
       user = active_user_needing_password()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       refute has_element?(view, "#password_form")
     end
@@ -823,7 +868,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       other = user_fixture()
       conn = log_in_user(conn, other)
 
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{owner.id}?step=1")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(owner, %{"step" => "1"}))
 
       refute has_element?(view, "#setup-payment-form")
       refute has_element?(view, "[phx-click=\"retry_payment_setup\"]")
@@ -834,7 +880,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       other = user_fixture()
       conn = log_in_user(conn, other)
 
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{owner.id}?step=2")
+      {:ok, view, _html} =
+        live(conn, account_setup_path(owner, %{"step" => "2"}))
 
       refute has_element?(view, "#password_form")
     end
@@ -842,7 +889,9 @@ defmodule YscWeb.AccountSetupLiveTest do
     test "set-step event to invalid step redirects away", %{conn: conn} do
       user = verified_pending_user(%{password_set_at: nil})
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
 
       render_click(view, "set-step", %{"step" => "99"})
 
@@ -854,7 +903,7 @@ defmodule YscWeb.AccountSetupLiveTest do
            conn: conn
          } do
       user = unverified_pending_user()
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+      {:ok, view, _html} = live(conn, account_setup_path(user))
 
       assert has_element?(view, "#email_form")
 
@@ -877,7 +926,9 @@ defmodule YscWeb.AccountSetupLiveTest do
          %{conn: conn} do
       user = active_user_needing_password()
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=2")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
 
       # Submit valid password — push_patches to next phone step
       view
@@ -902,7 +953,9 @@ defmodule YscWeb.AccountSetupLiveTest do
          %{conn: conn} do
       user = user_at_phone_verify_step()
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=4")
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
 
       # Invalid OTP — triggers error toast
       view
@@ -949,7 +1002,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       conn = log_in_user(conn, user)
 
       assert {:error, {:redirect, %{to: "/"}}} =
-               live(conn, ~p"/account/setup/#{user.id}")
+               live(conn, account_setup_path(user))
     end
   end
 end

@@ -146,7 +146,7 @@ defmodule YscWeb.UserSessionController do
           "Please verify your email address before signing in.",
           title: "Login"
         )
-        |> redirect(to: ~p"/account/setup/#{user.id}")
+        |> redirect(to: YscWeb.AccountSetupAccess.setup_path(user.id))
       else
         # Check if user is in an allowed state for login
         if user.state in [:pending_approval, :active] do
