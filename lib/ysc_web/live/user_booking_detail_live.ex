@@ -324,8 +324,19 @@ defmodule YscWeb.UserBookingDetailLive do
                   }
                   class="text-sm"
                 >
-                  {String.capitalize(to_string(@booking.status))}
+                  {booking_status_label(@booking.status)}
                 </.badge>
+                <%= if @booking.status == :hold do %>
+                  <p class="mt-2 text-sm text-zinc-600">
+                    Payment is still required to confirm this reservation.
+                    <.link
+                      navigate={~p"/bookings/checkout/#{@booking.id}"}
+                      class="font-medium text-teal-600 hover:underline"
+                    >
+                      Complete checkout
+                    </.link>
+                  </p>
+                <% end %>
               </div>
 
               <div>
@@ -727,4 +738,12 @@ defmodule YscWeb.UserBookingDetailLive do
   end
 
   defp format_money_from_map(_), do: "N/A"
+
+  defp booking_status_label(:hold), do: "Awaiting payment"
+  defp booking_status_label(:complete), do: "Confirmed"
+  defp booking_status_label(:canceled), do: "Cancelled"
+  defp booking_status_label(:refunded), do: "Refunded"
+
+  defp booking_status_label(status),
+    do: status |> to_string() |> String.capitalize()
 end
