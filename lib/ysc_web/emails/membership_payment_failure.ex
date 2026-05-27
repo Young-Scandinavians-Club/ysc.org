@@ -8,7 +8,8 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
     mjml_template: "templates/membership_payment_failure.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [absolute_url: 1, member_greeting_name: 1, membership_url: 0]
 
   def get_template_name() do
     "membership_payment_failure"
@@ -18,9 +19,7 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
     "Action Needed: YSC Membership Payment Issue"
   end
 
-  def pay_membership_url() do
-    absolute_url("/users/membership")
-  end
+  def pay_membership_url(), do: membership_url()
 
   def retry_payment_url(invoice_id) when is_binary(invoice_id) do
     absolute_url(

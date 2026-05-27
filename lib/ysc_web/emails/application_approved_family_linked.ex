@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.ApplicationApprovedFamilyLinked do
     mjml_template: "templates/application_approved_family_linked.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: []
 
   def get_template_name do
     "application_approved_family_linked"
@@ -18,11 +18,7 @@ defmodule YscWeb.Emails.ApplicationApprovedFamilyLinked do
     "Velkommen! You're officially a Young Scandinavian 🎉"
   end
 
-  def upcoming_events_url do
-    absolute_url("/events")
-  end
+  def upcoming_events_url, do: YscWeb.Emails.Helpers.upcoming_events_url()
 
-  def home_url do
-    absolute_url("/")
-  end
+  def home_url, do: YscWeb.Emails.Helpers.home_url()
 end

@@ -11,7 +11,11 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
       "templates/membership_renewal_payment_method_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1]
+
+  def membership_url(), do: YscWeb.Emails.Helpers.membership_url()
+
+  def payment_methods_url(), do: YscWeb.Emails.Helpers.payment_methods_url()
 
   def get_template_name() do
     "membership_renewal_payment_method_reminder"
@@ -19,14 +23,6 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
 
   def get_subject() do
     "Action Required: Add Payment Method for Membership Renewal"
-  end
-
-  def payment_methods_url() do
-    absolute_url("/users/payment-methods")
-  end
-
-  def membership_url() do
-    absolute_url("/users/membership")
   end
 
   def prepare_email_data(user, subscription) do

@@ -9,7 +9,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
     mjml_template: "templates/application_approved_payment_success.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: []
 
   def get_template_name() do
     "application_approved_payment_success"
@@ -19,11 +19,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
     "Velkommen! Your YSC Membership is Active! 🎉"
   end
 
-  def dashboard_url() do
-    absolute_url("/")
-  end
+  def dashboard_url(), do: YscWeb.Emails.Helpers.home_url()
 
-  def upcoming_events_url() do
-    absolute_url("/events")
-  end
+  def upcoming_events_url(), do: YscWeb.Emails.Helpers.upcoming_events_url()
 end
