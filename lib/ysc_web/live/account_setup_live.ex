@@ -916,93 +916,11 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  defp do_handle_verify_code(socket, entered_code) do
-    # Handle both OTP array format and single string format
-    code = normalize_verification_code(entered_code)
-
-    user_id = socket.assigns.user.id
-
-    case Ysc.EmailVerificationRateLimit.check(user_id) do
-      :ok ->
-        do_verify_email_code(socket, code)
-
-      :rate_limited ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Too many verification attempts. Please wait a minute and try again.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-    end
-  end
-
   def handle_event("resend_code", _params, socket) do
     if email_verification_authorized?(socket) do
       do_handle_resend_code(socket)
     else
       return_unauthorized_email_verification(socket)
-    end
-  end
-
-  defp do_handle_resend_code(socket) do
-    user_id = socket.assigns.user.id
-
-    case Ysc.ResendRateLimiter.check_and_record_resend(user_id, :email) do
-      {:ok, :allowed} ->
-        # Resend allowed, proceed with sending email
-        {code, is_existing} =
-          case Ysc.VerificationCache.get_code(user_id, :email_verification) do
-            {:ok, existing_code} ->
-              {existing_code, true}
-
-            {:error, _} ->
-              # Generate new code if none exists
-              new_code =
-                Accounts.generate_and_store_email_verification_code(
-                  socket.assigns.user
-                )
-
-              {new_code, false}
-          end
-
-        # Use timestamp to make idempotency key unique for resend attempts
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-
-        suffix =
-          if is_existing,
-            do: "resend_existing_#{timestamp}",
-            else: "resend_new_#{timestamp}"
-
-        _job =
-          Accounts.send_email_verification_code(
-            socket.assigns.user,
-            code,
-            suffix
-          )
-
-        YscWeb.Flash.send_toast(
-          :info,
-          "A new verification code has been sent to your email.",
-          title: "Email verification",
-          icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
-        )
-
-        {:noreply,
-         assign(
-           socket,
-           :email_resend_disabled_until,
-           Ysc.ResendRateLimiter.disabled_until(60)
-         )}
-
-      {:error, :rate_limited, _remaining} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Please wait before requesting another verification code.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
     end
   end
 
@@ -1553,6 +1471,88 @@ defmodule YscWeb.AccountSetupLive do
       )
 
       {:noreply, socket}
+    end
+  end
+
+  defp do_handle_verify_code(socket, entered_code) do
+    # Handle both OTP array format and single string format
+    code = normalize_verification_code(entered_code)
+
+    user_id = socket.assigns.user.id
+
+    case Ysc.EmailVerificationRateLimit.check(user_id) do
+      :ok ->
+        do_verify_email_code(socket, code)
+
+      :rate_limited ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Too many verification attempts. Please wait a minute and try again.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
+    end
+  end
+
+  defp do_handle_resend_code(socket) do
+    user_id = socket.assigns.user.id
+
+    case Ysc.ResendRateLimiter.check_and_record_resend(user_id, :email) do
+      {:ok, :allowed} ->
+        # Resend allowed, proceed with sending email
+        {code, is_existing} =
+          case Ysc.VerificationCache.get_code(user_id, :email_verification) do
+            {:ok, existing_code} ->
+              {existing_code, true}
+
+            {:error, _} ->
+              # Generate new code if none exists
+              new_code =
+                Accounts.generate_and_store_email_verification_code(
+                  socket.assigns.user
+                )
+
+              {new_code, false}
+          end
+
+        # Use timestamp to make idempotency key unique for resend attempts
+        timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
+        suffix =
+          if is_existing,
+            do: "resend_existing_#{timestamp}",
+            else: "resend_new_#{timestamp}"
+
+        _job =
+          Accounts.send_email_verification_code(
+            socket.assigns.user,
+            code,
+            suffix
+          )
+
+        YscWeb.Flash.send_toast(
+          :info,
+          "A new verification code has been sent to your email.",
+          title: "Email verification",
+          icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
+        )
+
+        {:noreply,
+         assign(
+           socket,
+           :email_resend_disabled_until,
+           Ysc.ResendRateLimiter.disabled_until(60)
+         )}
+
+      {:error, :rate_limited, _remaining} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Please wait before requesting another verification code.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
     end
   end
 
