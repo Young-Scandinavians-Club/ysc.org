@@ -23,6 +23,8 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Repo
   alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias YscWeb.PaymentMethodFormatter
+  alias YscWeb.PaymentMethodLogo
   alias YscWeb.S3.SimpleS3Upload
 
   import Ecto.Query
@@ -266,62 +268,13 @@ defmodule YscWeb.UserSettingsLive do
                   }
                   phx-value-payment_method_id={payment_method.id}
                 >
-                  <div class="flex items-center space-x-3">
-                    <div class="flex-shrink-0">
-                      <svg
-                        :if={payment_method.type == :card}
-                        stroke="currentColor"
-                        fill="currentColor"
-                        stroke-width="0"
-                        viewBox="0 0 576 512"
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="w-6 h-6 fill-zinc-800 text-zinc-800"
-                      >
-                        <path d={payment_method_icon(payment_method)}></path>
-                      </svg>
-                      <svg
-                        :if={payment_method.type == :bank_account}
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke-width="1.5"
-                        stroke="currentColor"
-                        class="w-6 h-6 text-zinc-800"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          d={payment_method_icon(payment_method)}
-                        >
-                        </path>
-                      </svg>
-                    </div>
+                  <div class="flex items-center space-x-3 flex-1 min-w-0">
                     <div class="flex-1 min-w-0">
-                      <p class="text-zinc-800 text-sm font-semibold">
-                        {payment_method_display_text(payment_method)}
-                      </p>
-                      <p
-                        :if={
-                          payment_method.type == :card && payment_method.exp_month &&
-                            payment_method.exp_year
-                        }
-                        class="text-zinc-500 text-xs mt-0.5"
-                      >
-                        Expires {String.pad_leading(
-                          to_string(payment_method.exp_month),
-                          2,
-                          "0"
-                        )} / {payment_method.exp_year}
-                      </p>
-                      <p
-                        :if={
-                          payment_method.type == :bank_account &&
-                            payment_method.account_type
-                        }
-                        class="text-zinc-500 text-xs mt-0.5"
-                      >
-                        {payment_method.account_type}
-                      </p>
+                      <.stored_payment_method_display
+                        payment_method={payment_method}
+                        text_class="text-zinc-800 text-sm font-semibold"
+                        expiry_class="text-zinc-500 text-xs mt-0.5"
+                      />
                     </div>
                     <div class="flex-shrink-0">
                       <div
@@ -1371,66 +1324,9 @@ defmodule YscWeb.UserSettingsLive do
                       }
                       class="flex items-center justify-between p-4 bg-white border border-zinc-200 rounded-lg"
                     >
-                      <div class="flex items-center gap-3">
-                        <div class="flex-shrink-0">
-                          <svg
-                            :if={@default_payment_method.type == :card}
-                            stroke="currentColor"
-                            fill="currentColor"
-                            stroke-width="0"
-                            viewBox="0 0 576 512"
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-6 h-6 fill-zinc-700"
-                          >
-                            <path d={payment_method_icon(@default_payment_method)}>
-                            </path>
-                          </svg>
-                          <svg
-                            :if={@default_payment_method.type == :bank_account}
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.5"
-                            stroke="currentColor"
-                            class="w-6 h-6 text-zinc-700"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              d={payment_method_icon(@default_payment_method)}
-                            >
-                            </path>
-                          </svg>
-                        </div>
-                        <div>
-                          <p class="text-sm font-semibold text-zinc-700">
-                            {payment_method_display_text(@default_payment_method)}
-                          </p>
-                          <p
-                            :if={
-                              @default_payment_method.type == :card &&
-                                @default_payment_method.exp_month &&
-                                @default_payment_method.exp_year
-                            }
-                            class="text-xs text-zinc-500"
-                          >
-                            Expires {String.pad_leading(
-                              to_string(@default_payment_method.exp_month),
-                              2,
-                              "0"
-                            )} / {@default_payment_method.exp_year}
-                          </p>
-                          <p
-                            :if={
-                              @default_payment_method.type == :bank_account &&
-                                @default_payment_method.account_type
-                            }
-                            class="text-xs text-zinc-500"
-                          >
-                            {@default_payment_method.account_type}
-                          </p>
-                        </div>
-                      </div>
+                      <.stored_payment_method_display payment_method={
+                        @default_payment_method
+                      } />
                       <.link
                         navigate={~p"/users/membership/payment-method"}
                         class="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
@@ -1867,66 +1763,9 @@ defmodule YscWeb.UserSettingsLive do
                       }
                       class="flex items-center justify-between p-4 bg-white border border-zinc-200 rounded-lg"
                     >
-                      <div class="flex items-center gap-3">
-                        <div class="flex-shrink-0">
-                          <svg
-                            :if={@default_payment_method.type == :card}
-                            stroke="currentColor"
-                            fill="currentColor"
-                            stroke-width="0"
-                            viewBox="0 0 576 512"
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-6 h-6 fill-zinc-700"
-                          >
-                            <path d={payment_method_icon(@default_payment_method)}>
-                            </path>
-                          </svg>
-                          <svg
-                            :if={@default_payment_method.type == :bank_account}
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.5"
-                            stroke="currentColor"
-                            class="w-6 h-6 text-zinc-700"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              d={payment_method_icon(@default_payment_method)}
-                            >
-                            </path>
-                          </svg>
-                        </div>
-                        <div>
-                          <p class="text-sm font-semibold text-zinc-700">
-                            {payment_method_display_text(@default_payment_method)}
-                          </p>
-                          <p
-                            :if={
-                              @default_payment_method.type == :card &&
-                                @default_payment_method.exp_month &&
-                                @default_payment_method.exp_year
-                            }
-                            class="text-xs text-zinc-500"
-                          >
-                            Expires {String.pad_leading(
-                              to_string(@default_payment_method.exp_month),
-                              2,
-                              "0"
-                            )} / {@default_payment_method.exp_year}
-                          </p>
-                          <p
-                            :if={
-                              @default_payment_method.type == :bank_account &&
-                                @default_payment_method.account_type
-                            }
-                            class="text-xs text-zinc-500"
-                          >
-                            {@default_payment_method.account_type}
-                          </p>
-                        </div>
-                      </div>
+                      <.stored_payment_method_display payment_method={
+                        @default_payment_method
+                      } />
                       <.link
                         navigate={~p"/users/membership/payment-method"}
                         class="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
@@ -2409,33 +2248,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
 
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-6">
-              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <h2 class="text-zinc-900 font-bold text-xl">Payment History</h2>
-                <%= if @yearly_stats && (@yearly_stats.nights > 0 || @yearly_stats.events > 0) do %>
-                  <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-                    <p class="text-sm text-blue-900 font-semibold">
-                      In {@yearly_stats_year}, you've enjoyed
-                      <%= if @yearly_stats.nights > 0 do %>
-                        <strong>{@yearly_stats.nights}</strong>
-                        {if @yearly_stats.nights == 1,
-                          do: "night",
-                          else: "nights"} at the cabins {if @yearly_stats.events >
-                                                              0,
-                                                            do: "and",
-                                                            else: ""}
-                      <% end %>
-                      <%= if @yearly_stats.events > 0 do %>
-                        attended <strong>{@yearly_stats.events}</strong>
-                        {if @yearly_stats.events == 1,
-                          do: "club event",
-                          else: "club events"}!
-                      <% else %>
-                        !
-                      <% end %>
-                    </p>
-                  </div>
-                <% end %>
-              </div>
+              <h2 class="text-zinc-900 font-bold text-xl">Payment History</h2>
               <!-- Loading state for payments -->
               <div
                 :if={assigns[:loading_payments]}
@@ -2935,8 +2748,6 @@ defmodule YscWeb.UserSettingsLive do
         |> assign(:payment_filter, :all)
         |> assign(:filtered_payments_count, 0)
         |> assign(:filtered_payments_list, [])
-        |> assign(:yearly_stats, nil)
-        |> assign(:yearly_stats_year, nil)
         |> assign(:loading_payments, true)
         |> assign(:booking_entitlements_count, 0)
         |> assign(:ticket_reservations_count, 0)
@@ -3090,10 +2901,6 @@ defmodule YscWeb.UserSettingsLive do
 
     total_pages = div(total_count + per_page - 1, per_page)
 
-    # Calculate yearly impact stats
-    yearly_stats_year = pst_today().year
-    yearly_stats = calculate_yearly_stats(all_payments)
-
     {:noreply,
      socket
      |> assign(:payments_total, total_count)
@@ -3102,8 +2909,6 @@ defmodule YscWeb.UserSettingsLive do
      |> stream(:payments, all_payments, reset: true, dom_id: &payment_dom_id/1)
      |> assign(:filtered_payments_count, length(all_payments))
      |> assign(:filtered_payments_list, all_payments)
-     |> assign(:yearly_stats, yearly_stats)
-     |> assign(:yearly_stats_year, yearly_stats_year)
      |> assign(:booking_entitlements_count, length(booking_entitlements))
      |> assign(:ticket_reservations_count, length(ticket_reservations))
      |> stream(:booking_entitlements, booking_entitlements,
@@ -5368,67 +5173,6 @@ defmodule YscWeb.UserSettingsLive do
 
   defp apply_payment_filter(payments, _), do: payments
 
-  defp calculate_yearly_stats(payments) do
-    current_year = pst_today().year
-
-    stats =
-      Enum.reduce(
-        payments,
-        %{nights: 0, events: 0, total_amount: Money.new(0, :USD)},
-        fn payment_info, acc ->
-          # Check if payment is from current year
-          payment_date =
-            cond do
-              payment_info.payment && payment_info.payment.payment_date ->
-                to_pst_date(payment_info.payment.payment_date)
-
-              payment_info.payment && payment_info.payment.inserted_at ->
-                to_pst_date(payment_info.payment.inserted_at)
-
-              payment_info.ticket_order && payment_info.ticket_order.inserted_at ->
-                to_pst_date(payment_info.ticket_order.inserted_at)
-
-              true ->
-                nil
-            end
-
-          if payment_date && payment_date.year == current_year do
-            acc
-            |> add_booking_nights(payment_info)
-            |> add_event_count(payment_info)
-            |> add_payment_amount(payment_info)
-          else
-            acc
-          end
-        end
-      )
-
-    stats
-  end
-
-  defp add_booking_nights(acc, %{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    nights = Date.diff(booking.checkout_date, booking.checkin_date)
-    Map.update(acc, :nights, nights, &(&1 + nights))
-  end
-
-  defp add_booking_nights(acc, _), do: acc
-
-  defp add_event_count(acc, %{type: :ticket}) do
-    Map.update(acc, :events, 1, &(&1 + 1))
-  end
-
-  defp add_event_count(acc, _), do: acc
-
-  defp add_payment_amount(acc, %{payment: payment}) when not is_nil(payment) do
-    case Money.add(acc.total_amount, payment.amount) do
-      {:ok, new_total} -> %{acc | total_amount: new_total}
-      _ -> acc
-    end
-  end
-
-  defp add_payment_amount(acc, _), do: acc
-
   defp get_price_id(memberhip_type) do
     plans = Application.get_env(:ysc, :membership_plans)
 
@@ -5560,6 +5304,13 @@ defmodule YscWeb.UserSettingsLive do
     do:
       "M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z"
 
+  defp payment_method_display_text(%{type: :link} = pm) do
+    PaymentMethodFormatter.format_link_payment_method(
+      pm.last_four,
+      pm.display_brand
+    )
+  end
+
   defp payment_method_display_text(%{type: :card, last_four: last_four})
        when not is_nil(last_four) do
     "**** **** **** #{last_four}"
@@ -5590,6 +5341,91 @@ defmodule YscWeb.UserSettingsLive do
 
   defp payment_method_display_text(_) do
     "Payment Method"
+  end
+
+  defp payment_method_shows_expiration?(%{
+         type: type,
+         exp_month: exp_month,
+         exp_year: exp_year
+       })
+       when type in [:card, :link] and not is_nil(exp_month) and
+              not is_nil(exp_year),
+       do: true
+
+  defp payment_method_shows_expiration?(_), do: false
+
+  attr :payment_method, :map, required: true
+  attr :text_class, :string, default: "text-sm font-semibold text-zinc-700"
+  attr :expiry_class, :string, default: "text-xs text-zinc-500"
+
+  defp stored_payment_method_display(assigns) do
+    ~H"""
+    <div class="flex items-center gap-3">
+      <div class="flex-shrink-0">
+        <%= if logo = PaymentMethodLogo.path_for_payment_method(@payment_method) do %>
+          <img
+            src={logo}
+            alt=""
+            class="h-6 w-auto max-w-[4rem] object-contain"
+            loading="lazy"
+            decoding="async"
+          />
+        <% else %>
+          <svg
+            :if={@payment_method.type == :card}
+            stroke="currentColor"
+            fill="currentColor"
+            stroke-width="0"
+            viewBox="0 0 576 512"
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-6 h-6 fill-zinc-700"
+          >
+            <path d={payment_method_icon(@payment_method)}></path>
+          </svg>
+          <svg
+            :if={@payment_method.type == :bank_account}
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="w-6 h-6 text-zinc-700"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d={payment_method_icon(@payment_method)}
+            >
+            </path>
+          </svg>
+          <.icon
+            :if={@payment_method.type not in [:card, :bank_account]}
+            name="hero-credit-card"
+            class="w-6 h-6 text-zinc-700"
+          />
+        <% end %>
+      </div>
+      <div>
+        <p class={@text_class}>
+          {payment_method_display_text(@payment_method)}
+        </p>
+        <p
+          :if={payment_method_shows_expiration?(@payment_method)}
+          class={@expiry_class}
+        >
+          Expires {String.pad_leading(to_string(@payment_method.exp_month), 2, "0")} / {@payment_method.exp_year}
+        </p>
+        <p
+          :if={
+            @payment_method.type == :bank_account && @payment_method.account_type
+          }
+          class={@expiry_class}
+        >
+          {@payment_method.account_type}
+        </p>
+      </div>
+    </div>
+    """
   end
 
   # Helper function to ensure Stripe customer exists
@@ -6588,14 +6424,6 @@ defmodule YscWeb.UserSettingsLive do
     do: "Only one photo at a time"
 
   defp avatar_upload_error_to_string(_), do: "Upload failed"
-
-  defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-
-  defp to_pst_date(%DateTime{} = dt),
-    do: dt |> DateTime.shift_zone!("America/Los_Angeles") |> DateTime.to_date()
-
-  defp to_pst_date(%Date{} = d), do: d
-  defp to_pst_date(_), do: nil
 
   defp format_utc_date(%DateTime{} = dt, format) do
     dt

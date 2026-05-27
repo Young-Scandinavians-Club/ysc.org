@@ -647,12 +647,55 @@ defmodule Ysc.PaymentsTest do
       assert m.bank_name == "Test Bank"
     end
 
+    test "upserts card with Stripe Link wallet as type link" do
+      user = user_fixture()
+      pm_id = "pm_link_wallet_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_link",
+        type: "card",
+        card: %{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2029,
+          brand: "visa",
+          display_brand: "visa",
+          wallet: %{type: "link", link: %{}}
+        },
+        us_bank_account: nil
+      }
+
+      assert {:ok, _} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      m = Payments.get_payment_method_by_provider(:stripe, pm_id)
+      assert m.type == :link
+      assert m.last_four == "4242"
+    end
+
+    test "upserts Stripe payment method with type link" do
+      user = user_fixture()
+      pm_id = "pm_link_type_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_link_type",
+        type: "link",
+        card: nil
+      }
+
+      assert {:ok, %Ysc.Payments.PaymentMethod{} = m} =
+               Payments.upsert_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.type == :link
+    end
+
     test "Stripe type mapping covers non-card types (stored type may fail PaymentMethodType enum)" do
       user = user_fixture()
 
       for stripe_type <- [
             "sepa_debit",
-            "link",
             "paypal",
             "affirm",
             "klarna",
