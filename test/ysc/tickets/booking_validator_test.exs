@@ -354,6 +354,22 @@ defmodule Ysc.Tickets.BookingValidatorTest do
                )
     end
 
+    test "returns event_not_available for draft events", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, event} = Events.update_event(event, %{state: :draft})
+      ticket_selections = %{tier1.id => 1}
+
+      assert {:error, :event_not_available} =
+               BookingValidator.validate_booking(
+                 user.id,
+                 event.id,
+                 ticket_selections
+               )
+    end
+
     test "returns error when event is in the past", %{user: user, tier1: tier1} do
       # Create event in the past
       organizer = user_fixture()

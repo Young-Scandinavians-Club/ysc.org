@@ -92,6 +92,28 @@ defmodule Ysc.Tickets.BookingLockerTest do
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
     end
 
+    test "returns event_not_available for draft events", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_event(event, %{state: :draft})
+
+      assert {:error, :event_not_available} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
+    test "returns event_not_available for scheduled events", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_event(event, %{state: :scheduled})
+
+      assert {:error, :event_not_available} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
     test "returns tier_validation_failed for unknown tier id", %{
       user: user,
       event: event
