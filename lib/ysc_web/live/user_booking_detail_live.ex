@@ -743,5 +743,7 @@ defmodule YscWeb.UserBookingDetailLive do
   defp booking_status_label(:complete), do: "Confirmed"
   defp booking_status_label(:canceled), do: "Cancelled"
   defp booking_status_label(:refunded), do: "Refunded"
-  defp booking_status_label(status), do: status |> to_string() |> String.capitalize()
+
+  defp booking_status_label(status),
+    do: status |> to_string() |> String.capitalize()
 end
