@@ -11,12 +11,11 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
       "templates/membership_renewal_payment_method_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers,
-    only: [
-      member_greeting_name: 1,
-      membership_url: 0,
-      payment_methods_url: 0
-    ]
+  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1]
+
+  def membership_url(), do: YscWeb.Emails.Helpers.membership_url()
+
+  def payment_methods_url(), do: YscWeb.Emails.Helpers.payment_methods_url()
 
   def get_template_name() do
     "membership_renewal_payment_method_reminder"
