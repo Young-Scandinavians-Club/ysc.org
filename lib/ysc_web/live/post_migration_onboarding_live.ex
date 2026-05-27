@@ -19,6 +19,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
+  alias Ysc.Accounts.FamilyMembers
   alias Ysc.Customers
   alias Ysc.Subscriptions
 
@@ -1906,13 +1907,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             |> Enum.reject(&(&1 in [nil, ""]))
             |> MapSet.new()
 
-          delete_removed_family_members(user, kept_ids)
+          FamilyMembers.delete_removed_members(user, kept_ids)
 
           {save_results, invite_results, save_ok?} =
             Enum.reduce(validated_params, {[], [], true}, fn params,
                                                              {results, invites,
                                                               ok} ->
-              case upsert_family_member_record(user, params) do
+              case FamilyMembers.upsert_family_member(user, params) do
                 {:ok, family_member} ->
                   invite = maybe_send_family_invite(user, params, family_member)
 
@@ -2000,23 +2001,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp validate_family_member_params(user, params) do
-    user
-    |> family_member_struct_for_params(params)
-    |> FamilyMember.family_member_changeset(family_member_record_attrs(params))
-    |> Ecto.Changeset.apply_action(:insert)
-    |> case do
-      {:ok, _} -> {:ok, params}
-      {:error, changeset} -> {:error, changeset}
-    end
+    FamilyMembers.validate_params(user, params)
   end
 
   defp family_member_form_with_errors(user, params, idx) do
     changeset =
       user
-      |> family_member_struct_for_params(params)
-      |> FamilyMember.family_member_changeset(
-        family_member_record_attrs(params)
-      )
+      |> FamilyMembers.changeset_for_params(params)
 
     errors =
       Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
@@ -2058,39 +2049,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     })
   end
 
-  defp family_member_struct_for_params(user, params) do
-    find_family_member(user, params) || %FamilyMember{}
-  end
-
   defp family_member_form_id_from_params(user, params) do
-    case find_family_member(user, params) do
+    case FamilyMembers.find_by_id(user, params["id"]) do
       %FamilyMember{id: id} -> to_string(id)
       _ -> params["id"] || ""
-    end
-  end
-
-  defp find_family_member(user, params) do
-    id = params["id"]
-
-    if id in [nil, ""] do
-      nil
-    else
-      user
-      |> family_members_for_user()
-      |> Enum.find(&(to_string(&1.id) == to_string(id)))
-    end
-  end
-
-  defp family_members_for_user(user) do
-    case user.family_members do
-      %Ecto.Association.NotLoaded{} ->
-        Ysc.Repo.preload(user, :family_members).family_members || []
-
-      members when is_list(members) ->
-        members
-
-      _ ->
-        []
     end
   end
 
@@ -2100,7 +2062,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   defp delete_family_member_if_saved(socket, id) do
     user = socket.assigns.user
 
-    case find_family_member(user, %{"id" => id}) do
+    case FamilyMembers.find_by_id(user, id) do
       %FamilyMember{} = member ->
         case Ysc.Repo.delete(member) do
           {:ok, _} ->
@@ -2120,32 +2082,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       _ ->
         socket
     end
-  end
-
-  defp delete_removed_family_members(user, kept_ids) do
-    for member <- family_members_for_user(user),
-        not MapSet.member?(kept_ids, to_string(member.id)) do
-      Ysc.Repo.delete(member)
-    end
-  end
-
-  defp family_member_record_attrs(params) do
-    relationship_str = params["relationship"] || "child"
-    birth_date = params["birth_date"]
-
-    type =
-      case relationship_str do
-        "spouse" -> :spouse
-        _ -> :child
-      end
-
-    %{
-      "first_name" => String.trim(params["first_name"] || ""),
-      "last_name" => String.trim(params["last_name"] || ""),
-      "type" => type,
-      "birth_date" =>
-        if(birth_date == "" or is_nil(birth_date), do: nil, else: birth_date)
-    }
   end
 
   defp family_member_display_name(params) do
@@ -2268,36 +2204,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
 
     socket
-  end
-
-  defp upsert_family_member_record(user, params) do
-    attrs = family_member_record_attrs(params)
-    first_name = attrs["first_name"]
-    last_name = attrs["last_name"]
-    family_members = family_members_for_user(user)
-
-    existing =
-      case find_family_member(user, params) do
-        %FamilyMember{} = member ->
-          member
-
-        nil ->
-          Enum.find(family_members, fn fm ->
-            String.downcase(fm.first_name || "") == String.downcase(first_name) and
-              String.downcase(fm.last_name || "") == String.downcase(last_name)
-          end)
-      end
-
-    if existing do
-      existing
-      |> FamilyMember.family_member_changeset(attrs)
-      |> Ysc.Repo.update()
-    else
-      %FamilyMember{}
-      |> FamilyMember.family_member_changeset(attrs)
-      |> Ecto.Changeset.put_change(:user_id, user.id)
-      |> Ysc.Repo.insert()
-    end
   end
 
   defp get_price_id(plan_id) do

@@ -4,6 +4,7 @@ defmodule YscWeb.FamilyManagementLive do
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
+  alias Ysc.Accounts.FamilyMembers
   alias Ysc.Repo
 
   @impl true
@@ -228,10 +229,7 @@ defmodule YscWeb.FamilyManagementLive do
 
     form =
       user
-      |> family_member_struct_for_params(params)
-      |> FamilyMember.family_member_changeset(
-        family_member_record_attrs(params)
-      )
+      |> FamilyMembers.changeset_for_params(params)
       |> to_form(as: "family_member")
 
     {:noreply, assign(socket, :family_member_form, form)}
@@ -240,9 +238,9 @@ defmodule YscWeb.FamilyManagementLive do
   def handle_event("save_family_member", %{"family_member" => params}, socket) do
     user = socket.assigns.user
 
-    case validate_family_member_params(user, params) do
+    case FamilyMembers.validate_params(user, params) do
       {:ok, validated_params} ->
-        case upsert_family_member_record(user, validated_params) do
+        case FamilyMembers.upsert_family_member(user, validated_params) do
           {:ok, _member} ->
             user = Accounts.get_user!(user.id, [:family_members])
 
@@ -277,7 +275,7 @@ defmodule YscWeb.FamilyManagementLive do
   def handle_event("delete_family_member", %{"id" => id}, socket) do
     user = socket.assigns.user
 
-    case find_family_member(user, %{"id" => id}) do
+    case FamilyMembers.find_by_id(user, id) do
       %FamilyMember{} = member ->
         case Repo.delete(member) do
           {:ok, _} ->
@@ -1116,81 +1114,6 @@ defmodule YscWeb.FamilyManagementLive do
       "birth_date" => birth_date,
       "relationship" => relationship
     }
-  end
-
-  defp family_member_record_attrs(params) do
-    relationship_str = params["relationship"] || "child"
-    birth_date = params["birth_date"]
-
-    type =
-      case relationship_str do
-        "spouse" -> :spouse
-        _ -> :child
-      end
-
-    %{
-      "first_name" => String.trim(params["first_name"] || ""),
-      "last_name" => String.trim(params["last_name"] || ""),
-      "type" => type,
-      "birth_date" => if(birth_date in [nil, ""], do: nil, else: birth_date)
-    }
-  end
-
-  defp validate_family_member_params(user, params) do
-    user
-    |> family_member_struct_for_params(params)
-    |> FamilyMember.family_member_changeset(family_member_record_attrs(params))
-    |> Ecto.Changeset.apply_action(:insert)
-    |> case do
-      {:ok, _} -> {:ok, params}
-      {:error, changeset} -> {:error, changeset}
-    end
-  end
-
-  defp family_member_struct_for_params(user, params) do
-    find_family_member(user, params) || %FamilyMember{}
-  end
-
-  defp find_family_member(user, params) do
-    id = params["id"]
-
-    if id in [nil, ""] do
-      nil
-    else
-      user.family_members
-      |> List.wrap()
-      |> Enum.find(&(to_string(&1.id) == to_string(id)))
-    end
-  end
-
-  defp upsert_family_member_record(user, params) do
-    attrs = family_member_record_attrs(params)
-    first_name = attrs["first_name"]
-    last_name = attrs["last_name"]
-    family_members = user.family_members || []
-
-    existing =
-      case find_family_member(user, params) do
-        %FamilyMember{} = member ->
-          member
-
-        nil ->
-          Enum.find(family_members, fn fm ->
-            String.downcase(fm.first_name || "") == String.downcase(first_name) and
-              String.downcase(fm.last_name || "") == String.downcase(last_name)
-          end)
-      end
-
-    if existing do
-      existing
-      |> FamilyMember.family_member_changeset(attrs)
-      |> Repo.update()
-    else
-      %FamilyMember{}
-      |> FamilyMember.family_member_changeset(attrs)
-      |> Ecto.Changeset.put_change(:user_id, user.id)
-      |> Repo.insert()
-    end
   end
 
   defp format_relationship(nil), do: "Child"
