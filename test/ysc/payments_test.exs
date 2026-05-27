@@ -328,11 +328,14 @@ defmodule Ysc.PaymentsTest do
 
       assert {:ok, _} = Payments.insert_payment_method(attrs)
 
-      assert {:error, %Ecto.Changeset{} = cs} =
-               Payments.insert_payment_method(attrs)
+      case Payments.insert_payment_method(attrs) do
+        {:error, :duplicate_payment_method} ->
+          :ok
 
-      assert Keyword.has_key?(cs.errors, :provider) or
-               Keyword.has_key?(cs.errors, :provider_id)
+        {:error, %Ecto.Changeset{} = cs} ->
+          assert Keyword.has_key?(cs.errors, :provider) or
+                   Keyword.has_key?(cs.errors, :provider_id)
+      end
     end
 
     test "returns changeset error when required fields are missing" do
@@ -393,6 +396,66 @@ defmodule Ysc.PaymentsTest do
       assert method.provider_id == pm_id
       assert method.last_four == "4242"
       assert Payments.get_default_payment_method(user) != nil
+    end
+
+    test "upsert succeeds when payment method already exists (webhook/LiveView race)" do
+      user = user_fixture()
+      pm_id = "pm_race_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_race",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, from_webhook} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      stripe_pm_updated = %{
+        stripe_pm
+        | card: %{stripe_pm.card | last4: "9999"}
+      }
+
+      assert {:ok, from_liveview} =
+               Payments.upsert_payment_method_from_stripe(
+                 user,
+                 stripe_pm_updated
+               )
+
+      assert from_liveview.id == from_webhook.id
+      assert from_liveview.last_four == "9999"
+    end
+
+    test "sync is idempotent when called twice for the same Stripe payment method" do
+      user = user_fixture()
+      pm_id = "pm_sync_idem_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_idem",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, first} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert {:ok, second} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert first.id == second.id
+      assert Payments.list_payment_methods(user) |> length() == 1
     end
 
     test "upsert updates an existing payment method" do
@@ -769,6 +832,34 @@ defmodule Ysc.PaymentsTest do
           brand: "visa"
         }
       }
+
+      assert {:ok, _} =
+               Payments.upsert_and_set_default_payment_method_from_stripe(
+                 user,
+                 stripe_pm
+               )
+
+      assert Payments.get_default_payment_method(user).provider_id == pm_id
+    end
+
+    test "succeeds when payment method already exists from webhook before LiveView upsert" do
+      user = user_fixture()
+      pm_id = "pm_race_default_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_race_def",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa"
+        }
+      }
+
+      assert {:ok, _} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
 
       assert {:ok, _} =
                Payments.upsert_and_set_default_payment_method_from_stripe(

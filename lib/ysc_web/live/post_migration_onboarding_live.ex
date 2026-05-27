@@ -6,7 +6,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     1 - Profile review/edit (name, phone, date of birth, country)
     2 - Phone verification via SMS OTP (only if phone was added/changed or unverified)
     3 - Payment method collection + Stripe subscription creation
-    4 - Family member listing + invite sending (family plans only)
+    5 - Family member listing; saved on continue, invites sent when email provided (family plans only)
   """
   use YscWeb, :live_view
 
@@ -18,6 +18,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyInvites
+  alias Ysc.Accounts.FamilyMember
   alias Ysc.Customers
   alias Ysc.Subscriptions
 
@@ -60,7 +61,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       active_subscription = find_active_real_subscription(user)
       has_real_subscription = not is_nil(active_subscription)
       needs_plan_selection = membership_plan == :unknown
-      is_family_plan = membership_plan in [:family, :lifetime]
+      needs_family_members_step = needs_family_members_step?(membership_plan)
+      skip_payment = membership_plan == :lifetime
 
       default_payment_method =
         if connected?(socket) do
@@ -69,10 +71,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           nil
         end
 
-      # Only lifetime members skip the payment step entirely.
-      # Users with an active subscription still see it (to review details + add PM if missing).
-      skip_payment = membership_plan == :lifetime
-      steps = build_steps(is_family_plan, skip_payment, needs_plan_selection)
+      steps =
+        build_steps(
+          needs_family_members_step,
+          skip_payment,
+          needs_plan_selection
+        )
 
       socket =
         socket
@@ -82,9 +86,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         |> assign(:steps, steps)
         |> assign(:membership_plan, membership_plan)
         |> assign(:needs_plan_selection, needs_plan_selection)
+        |> assign(:needs_family_members_step, needs_family_members_step)
+        |> assign(:skip_payment, skip_payment)
         |> assign(:has_real_subscription, has_real_subscription)
         |> assign(:active_subscription, active_subscription)
-        |> assign(:is_family_plan, is_family_plan)
         # Profile step
         |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
         |> assign(:original_phone, user.phone_number)
@@ -117,8 +122,14 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             as: "membership_selection"
           )
         )
-        # Family step
-        |> assign(:family_members_forms, [])
+        # Family step (family membership only)
+        |> assign(
+          :family_members_forms,
+          if(needs_family_members_step,
+            do: initial_family_members_forms(user),
+            else: []
+          )
+        )
         |> assign(:invite_results, [])
 
       {:ok, socket}
@@ -181,7 +192,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               default_payment_method={@default_payment_method}
             />
           <% end %>
-          <%= if @current_step == 5 do %>
+          <%= if @current_step == 5 and @needs_family_members_step do %>
             <.step_family
               user={@user}
               family_members_forms={@family_members_forms}
@@ -637,7 +648,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Add Family Members
         <:subtitle>
-          Your Family membership covers your spouse or partner and children under 18. Add them below and we'll send each an invite to create their account.
+          Your Family membership covers your spouse or partner and children under 18. List everyone below — we'll save their details when you continue, and email an invite to anyone you add an email address for.
         </:subtitle>
       </.header>
 
@@ -665,8 +676,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             <div class="flex items-center justify-between">
               <h4 class="text-sm font-semibold text-zinc-700">
                 Family Member {idx + 1}
+                <span
+                  :if={family_member_form_id(form) != ""}
+                  class="ms-2 font-normal text-zinc-500"
+                >
+                  (saved)
+                </span>
               </h4>
               <.button
+                :if={length(@family_members_forms) > 1}
                 type="button"
                 variant="outline"
                 color="red"
@@ -678,12 +696,16 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </div>
             <.simple_form
               for={form}
-              id={"family-member-form-#{idx}"}
-              phx-submit="submit_family_member"
+              id={family_member_form_dom_id(idx)}
               phx-change="validate_family_member"
               phx-value-index={idx}
               class="space-y-3"
             >
+              <input
+                type="hidden"
+                name={"family_members[#{idx}][id]"}
+                value={family_member_form_id(form)}
+              />
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <.input
                   field={form[:first_name]}
@@ -691,7 +713,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                   label="First Name"
                   required
                 />
-                <.input field={form[:last_name]} type="text" label="Last Name" />
+                <.input
+                  field={form[:last_name]}
+                  type="text"
+                  label="Last Name"
+                  required
+                />
               </div>
               <.input
                 field={form[:email]}
@@ -699,6 +726,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 label="Email Address (optional)"
                 placeholder="member@example.com"
               />
+              <p class="text-xs text-zinc-500 -mt-2">
+                If provided, we'll email them an invite when you continue.
+              </p>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <.input field={form[:birth_date]} type="date" label="Date of Birth" />
                 <.input
@@ -708,14 +738,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                   options={[{"Child", "child"}, {"Spouse", "spouse"}]}
                 />
               </div>
-              <:actions>
-                <div class="flex justify-end">
-                  <.button type="submit" phx-disable-with="Sending...">
-                    <.icon name="hero-paper-airplane" class="w-4 h-4 me-1" />
-                    Send Invite
-                  </.button>
-                </div>
-              </:actions>
             </.simple_form>
           </div>
         <% end %>
@@ -731,13 +753,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <.icon name="hero-plus-circle" class="w-4 h-4 me-1" /> Add a family member
         </.button>
 
-        <.button phx-click="complete_family_step" phx-disable-with="Finishing...">
-          <.icon name="hero-check-circle" class="w-4 h-4 me-1" />
-          <%= if @family_members_forms == [] do %>
-            Skip & Finish
-          <% else %>
-            Finish
-          <% end %>
+        <.button phx-click="complete_family_step" phx-disable-with="Saving...">
+          <.icon name="hero-check-circle" class="w-4 h-4 me-1" /> Save & Continue
         </.button>
       </div>
     </div>
@@ -868,7 +885,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     {:noreply,
      socket
      |> assign(:membership_plan, plan)
-     |> assign(:membership_selection_form, form)}
+     |> assign(:membership_selection_form, form)
+     |> rebuild_onboarding_steps()}
   end
 
   def handle_event(
@@ -904,12 +922,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               subscriptions: :subscription_items
             ])
 
-          is_family_plan = plan == :family
-          skip_payment = false
           needs_plan_selection = false
-
-          steps =
-            build_steps(is_family_plan, skip_payment, needs_plan_selection)
 
           # Rebuild steps without the selection step, then advance from address
           # (the step that precedes payment in the rebuilt list).
@@ -917,9 +930,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             socket
             |> assign(:user, updated_user)
             |> assign(:membership_plan, plan)
-            |> assign(:is_family_plan, is_family_plan)
             |> assign(:needs_plan_selection, needs_plan_selection)
-            |> assign(:steps, steps)
+            |> rebuild_onboarding_steps()
 
           {:noreply, advance_to_next_step(socket, @step_address)}
 
@@ -1200,7 +1212,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     cond do
       socket.assigns.has_real_subscription ->
         # Already subscribed — just advance without touching Stripe subscriptions.
-        {:noreply, advance_to_next_step(socket, @step_payment)}
+        {:noreply,
+         socket
+         |> sync_onboarding_plan_from_user()
+         |> advance_to_next_step(@step_payment)}
 
       is_nil(default_pm) ->
         YscWeb.Flash.send_toast(
@@ -1218,7 +1233,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                default_pm
              ) do
           {:ok, _subscription} ->
-            {:noreply, advance_to_next_step(socket, @step_payment)}
+            {:noreply,
+             socket
+             |> sync_onboarding_plan_from_user()
+             |> advance_to_next_step(@step_payment)}
 
           {:error, :user_already_has_active_subscription} ->
             Ysc.Logging.error(
@@ -1261,7 +1279,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     case Integer.parse(step_str) do
       {index, ""} when index >= 0 and index < length(steps) ->
         {_label, step_num} = Enum.fetch!(steps, index)
-        {:noreply, assign(socket, :current_step, step_num)}
+
+        socket =
+          socket
+          |> assign(:current_step, step_num)
+          |> ensure_family_members_forms()
+
+        {:noreply, socket}
 
       _ ->
         {:noreply, socket}
@@ -1269,32 +1293,58 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   def handle_event("add_family_member", _params, socket) do
-    new_form =
-      to_form(
-        %{
-          "first_name" => "",
-          "last_name" => "",
-          "email" => "",
-          "birth_date" => "",
-          "relationship" => "child"
-        },
-        as: "family_member"
-      )
+    params_list =
+      socket.assigns.family_members_forms
+      |> Enum.map(&family_member_params_from_form/1)
+      |> Kernel.++([family_member_form_params()])
 
-    updated_forms = socket.assigns.family_members_forms ++ [new_form]
-    {:noreply, assign(socket, :family_members_forms, updated_forms)}
+    {:noreply,
+     assign(
+       socket,
+       :family_members_forms,
+       reindex_family_member_forms(params_list)
+     )}
   end
 
   def handle_event("remove_family_member", %{"index" => idx_str}, socket) do
-    idx = String.to_integer(idx_str)
-    updated_forms = List.delete_at(socket.assigns.family_members_forms, idx)
-    {:noreply, assign(socket, :family_members_forms, updated_forms)}
+    if length(socket.assigns.family_members_forms) <= 1 do
+      {:noreply, socket}
+    else
+      idx = String.to_integer(idx_str)
+      form = Enum.at(socket.assigns.family_members_forms, idx)
+      member_params = family_member_params_from_form(form)
+
+      socket =
+        socket
+        |> delete_family_member_if_saved(member_params["id"])
+        |> reload_user_family_members()
+
+      params_list =
+        socket.assigns.family_members_forms
+        |> Enum.map(&family_member_params_from_form/1)
+        |> List.delete_at(idx)
+
+      {:noreply,
+       assign(
+         socket,
+         :family_members_forms,
+         reindex_family_member_forms(params_list)
+       )}
+    end
   end
 
   def handle_event("validate_family_member", params, socket) do
     idx = String.to_integer(params["index"] || "0")
-    member_params = params["family_member"] || %{}
-    form = to_form(member_params, as: "family_member")
+    member_params = family_member_params_from_event(params, idx)
+
+    member_params =
+      merge_family_member_form_params(
+        member_params,
+        socket.assigns.family_members_forms,
+        idx
+      )
+
+    form = indexed_family_member_form(member_params, idx)
 
     updated_forms =
       List.replace_at(socket.assigns.family_members_forms, idx, form)
@@ -1302,184 +1352,47 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     {:noreply, assign(socket, :family_members_forms, updated_forms)}
   end
 
-  def handle_event("submit_family_member", params, socket) do
-    idx = String.to_integer(params["index"] || "0")
-    member_params = params["family_member"] || %{}
-    user = socket.assigns.user
-
-    email = String.trim(member_params["email"] || "")
-
-    relationship =
-      case member_params["relationship"] do
-        "spouse" -> :spouse
-        _ -> :child
-      end
-
-    # Always persist the family member record regardless of whether an invite is sent.
-    _ = upsert_family_member_record(user, member_params)
-
-    result =
-      if email == "" do
-        %{ok: true, message: "Family member saved."}
-      else
-        case FamilyInvites.create_invite(user, email,
-               relationship: relationship
-             ) do
-          {:ok, _invite} ->
-            %{ok: true, message: "Invite sent to #{email}"}
-
-          {:error, :invalid_membership_type} ->
-            %{
-              ok: false,
-              message: "Your membership plan doesn't support family invites."
-            }
-
-          {:error, :max_sub_accounts_reached} ->
-            %{ok: false, message: "Maximum number of family members reached."}
-
-          {:error, :email_already_registered} ->
-            %{
-              ok: false,
-              message:
-                "#{email} already has an account. They can be linked in Family Settings."
-            }
-
-          {:error, :pending_invite_exists} ->
-            %{ok: false, message: "An invite was already sent to #{email}."}
-
-          {:error, :max_spouses_reached} ->
-            %{
-              ok: false,
-              message:
-                "You can only have one spouse or partner on the family membership."
-            }
-
-          {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
-            errors =
-              Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} ->
-                msg
-              end)
-
-            Ysc.Logging.warning(
-              "Family invite failed during onboarding (validation)",
-              user_id: user.id,
-              errors: inspect(errors)
-            )
-
-            %{
-              ok: false,
-              message:
-                "Could not send invite. Please check the information and try again."
-            }
-
-          {:error, reason} ->
-            Ysc.Logging.warning(
-              "Family invite failed during onboarding",
-              user_id: user.id,
-              reason: inspect(reason)
-            )
-
-            %{
-              ok: false,
-              message:
-                "Could not send invite. Please try again, or contact info@ysc.org for help."
-            }
-        end
-      end
-
-    updated_results = socket.assigns.invite_results ++ [result]
-
-    updated_forms =
-      if result.ok,
-        do: List.delete_at(socket.assigns.family_members_forms, idx),
-        else: socket.assigns.family_members_forms
-
-    {:noreply,
-     socket
-     |> assign(:family_members_forms, updated_forms)
-     |> assign(:invite_results, updated_results)}
+  def handle_event("complete_family_step", _params, socket) do
+    if socket.assigns.needs_family_members_step do
+      complete_family_step_with_members(socket)
+    else
+      {:noreply, finalize_onboarding(socket)}
+    end
   end
 
-  def handle_event("complete_family_step", _params, socket) do
+  defp complete_family_step_with_members(socket) do
     user = socket.assigns.user
-    pending_forms = socket.assigns.family_members_forms
+    forms = socket.assigns.family_members_forms
 
-    # Auto-process any forms the user filled in but didn't explicitly submit.
-    # Always upsert the family member record; send an invite only when email is present.
-    new_results =
-      Enum.reduce(pending_forms, socket.assigns.invite_results, fn form,
-                                                                   results ->
-        member_params = form.source || %{}
-        first_name = String.trim(member_params["first_name"] || "")
-        email = String.trim(member_params["email"] || "")
+    case process_family_step(user, forms) do
+      {:ok, validated_forms, results} ->
+        socket =
+          socket
+          |> assign(:family_members_forms, validated_forms)
+          |> assign(:invite_results, socket.assigns.invite_results ++ results)
+          |> reload_user_family_members()
+          |> flash_family_invite_results(results)
 
-        if first_name == "" do
-          # Skip entirely empty forms
-          results
-        else
-          _ = upsert_family_member_record(user, member_params)
+        {:noreply, finalize_onboarding(socket)}
 
-          result =
-            if email == "" do
-              %{ok: true, message: "Family member saved."}
-            else
-              relationship =
-                case member_params["relationship"] do
-                  "spouse" -> :spouse
-                  _ -> :child
-                end
+      {:error, :no_members} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Please add at least one family member before continuing.",
+          title: "Family Members Required"
+        )
 
-              case FamilyInvites.create_invite(user, email,
-                     relationship: relationship
-                   ) do
-                {:ok, _invite} ->
-                  %{ok: true, message: "Invite sent to #{email}"}
+        {:noreply, socket}
 
-                {:error, :pending_invite_exists} ->
-                  %{ok: true, message: "An invite was already sent to #{email}"}
+      {:error, :validation_failed, updated_forms} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Please fix the errors below before continuing.",
+          title: "Check Family Member Details"
+        )
 
-                {:error, :email_already_registered} ->
-                  %{
-                    ok: false,
-                    message:
-                      "#{email} already has an account. They can be linked in Family Settings."
-                  }
-
-                {:error, :max_sub_accounts_reached} ->
-                  %{
-                    ok: false,
-                    message: "Maximum number of family members reached."
-                  }
-
-                {:error, :max_spouses_reached} ->
-                  %{
-                    ok: false,
-                    message:
-                      "You can only have one spouse or partner on the family membership."
-                  }
-
-                {:error, :invalid_membership_type} ->
-                  %{
-                    ok: false,
-                    message:
-                      "Your membership plan doesn't support family invites."
-                  }
-
-                {:error, _} ->
-                  %{ok: false, message: "Could not send invite to #{email}."}
-              end
-            end
-
-          results ++ [result]
-        end
-      end)
-
-    socket =
-      socket
-      |> assign(:invite_results, new_results)
-      |> assign(:family_members_forms, [])
-
-    {:noreply, finalize_onboarding(socket)}
+        {:noreply, assign(socket, :family_members_forms, updated_forms)}
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -1496,7 +1409,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  defp build_steps(is_family_plan, skip_payment, needs_plan_selection) do
+  defp needs_family_members_step?(plan), do: plan == :family
+
+  defp build_steps(
+         needs_family_members_step,
+         skip_payment,
+         needs_plan_selection
+       ) do
     base = [
       {"Profile", @step_profile},
       {"Address", @step_address}
@@ -1512,8 +1431,66 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         do: base,
         else: base ++ [{"Membership", @step_payment}]
 
-    base = if is_family_plan, do: base ++ [{"Family", @step_family}], else: base
-    base
+    if needs_family_members_step,
+      do: base ++ [{"Family", @step_family}],
+      else: base
+  end
+
+  defp rebuild_onboarding_steps(socket) do
+    needs_family_members_step =
+      needs_family_members_step?(socket.assigns.membership_plan)
+
+    steps =
+      build_steps(
+        needs_family_members_step,
+        socket.assigns.skip_payment,
+        socket.assigns.needs_plan_selection
+      )
+
+    family_members_forms =
+      if needs_family_members_step and socket.assigns.family_members_forms == [] do
+        initial_family_members_forms(socket.assigns.user)
+      else
+        socket.assigns.family_members_forms
+      end
+
+    socket
+    |> assign(:needs_family_members_step, needs_family_members_step)
+    |> assign(:steps, steps)
+    |> assign(:family_members_forms, family_members_forms)
+  end
+
+  defp sync_onboarding_plan_from_user(socket) do
+    user =
+      Accounts.get_user!(socket.assigns.user.id, [
+        :family_members,
+        :registration_form,
+        :billing_address,
+        subscriptions: :subscription_items
+      ])
+
+    membership_plan = resolve_membership_plan(user)
+    needs_family_members_step = needs_family_members_step?(membership_plan)
+    skip_payment = membership_plan == :lifetime
+
+    steps =
+      build_steps(
+        needs_family_members_step,
+        skip_payment,
+        socket.assigns.needs_plan_selection
+      )
+
+    socket
+    |> assign(:user, user)
+    |> assign(:membership_plan, membership_plan)
+    |> assign(:needs_family_members_step, needs_family_members_step)
+    |> assign(:skip_payment, skip_payment)
+    |> assign(:steps, steps)
+    |> assign(
+      :has_real_subscription,
+      not is_nil(find_active_real_subscription(user))
+    )
+    |> assign(:active_subscription, find_active_real_subscription(user))
   end
 
   # Advance from the given step to the next applicable step.
@@ -1538,6 +1515,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         @step_complete
       end
 
+    next_step = maybe_skip_family_step(socket, next_step)
+
     cond do
       next_step == @step_payment ->
         socket
@@ -1548,7 +1527,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         finalize_onboarding(socket)
 
       true ->
-        assign(socket, :current_step, next_step)
+        socket
+        |> assign(:current_step, next_step)
+        |> ensure_family_members_forms()
     end
   end
 
@@ -1751,9 +1732,404 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  defp upsert_family_member_record(user, params) do
-    first_name = params["first_name"] || ""
-    last_name = params["last_name"] || ""
+  defp initial_family_members_forms(user) do
+    members =
+      case user.family_members do
+        %Ecto.Association.NotLoaded{} -> []
+        members when is_list(members) -> members
+        _ -> []
+      end
+
+    params_list =
+      case members do
+        [] ->
+          [family_member_form_params()]
+
+        members ->
+          Enum.map(members, &family_member_params_from_record/1)
+      end
+
+    reindex_family_member_forms(params_list)
+  end
+
+  defp maybe_skip_family_step(socket, @step_family) do
+    if socket.assigns.needs_family_members_step do
+      @step_family
+    else
+      @step_complete
+    end
+  end
+
+  defp maybe_skip_family_step(_socket, step), do: step
+
+  defp ensure_family_members_forms(socket) do
+    if socket.assigns.current_step == @step_family and
+         socket.assigns.needs_family_members_step do
+      merge_family_members_forms(socket)
+    else
+      socket
+    end
+  end
+
+  defp merge_family_members_forms(socket) do
+    user = Accounts.get_user!(socket.assigns.user.id, [:family_members])
+
+    unsaved_params =
+      socket.assigns.family_members_forms
+      |> Enum.map(&family_member_params_from_form/1)
+      |> Enum.filter(fn params ->
+        id = params["id"]
+        id in [nil, ""] and not family_member_params_blank?(params)
+      end)
+
+    db_params =
+      Enum.map(user.family_members || [], &family_member_params_from_record/1)
+
+    forms =
+      case db_params ++ unsaved_params do
+        [] -> reindex_family_member_forms([family_member_form_params()])
+        params_list -> reindex_family_member_forms(params_list)
+      end
+
+    socket
+    |> assign(:user, user)
+    |> assign(:family_members_forms, forms)
+  end
+
+  defp family_member_form_dom_id(idx), do: "family-member-form-#{idx}"
+
+  defp family_member_form_name(idx), do: "family_members[#{idx}]"
+
+  defp indexed_family_member_form(params, idx, opts \\ []) do
+    opts =
+      Keyword.merge(
+        [as: family_member_form_name(idx), id: family_member_form_dom_id(idx)],
+        opts
+      )
+
+    to_form(family_member_form_params(params), opts)
+  end
+
+  defp reindex_family_member_forms(params_list) do
+    params_list
+    |> Enum.with_index()
+    |> Enum.map(fn {params, idx} -> indexed_family_member_form(params, idx) end)
+  end
+
+  defp family_member_params_from_form(form) do
+    case form.source do
+      %{} = params -> params
+      _ -> family_member_form_params()
+    end
+  end
+
+  defp family_member_params_from_event(params, idx) do
+    get_in(params, ["family_members", Integer.to_string(idx)]) || %{}
+  end
+
+  defp family_member_form_params(attrs \\ %{}) do
+    Map.merge(
+      %{
+        "id" => "",
+        "first_name" => "",
+        "last_name" => "",
+        "email" => "",
+        "birth_date" => "",
+        "relationship" => "child"
+      },
+      attrs
+    )
+  end
+
+  defp family_member_params_from_record(%FamilyMember{} = member) do
+    relationship =
+      case member.type do
+        :spouse -> "spouse"
+        "spouse" -> "spouse"
+        _ -> "child"
+      end
+
+    birth_date =
+      case member.birth_date do
+        %Date{} = date -> Date.to_iso8601(date)
+        _ -> ""
+      end
+
+    family_member_form_params(%{
+      "id" => to_string(member.id),
+      "first_name" => member.first_name || "",
+      "last_name" => member.last_name || "",
+      "birth_date" => birth_date,
+      "relationship" => relationship
+    })
+  end
+
+  defp family_member_form_id(form) do
+    case form[:id] do
+      %{value: value} when is_binary(value) -> value
+      _ -> get_in(form.source, ["id"]) || ""
+    end
+  end
+
+  defp merge_family_member_form_params(member_params, forms, idx) do
+    existing =
+      forms
+      |> Enum.at(idx)
+      |> case do
+        %{source: source} when is_map(source) -> source
+        _ -> %{}
+      end
+
+    id = member_params["id"] || existing["id"] || ""
+
+    Map.merge(existing, member_params, fn _key, _existing, new -> new end)
+    |> Map.put("id", id)
+  end
+
+  defp process_family_step(user, forms) do
+    params_list = Enum.map(forms, &(&1.source || %{}))
+
+    filled =
+      Enum.reject(params_list, &family_member_params_blank?/1)
+
+    if filled == [] do
+      {:error, :no_members}
+    else
+      case validate_all_family_members(user, params_list) do
+        {:error, updated_forms} ->
+          {:error, :validation_failed, updated_forms}
+
+        {:ok, validated_params} ->
+          kept_ids =
+            validated_params
+            |> Enum.map(& &1["id"])
+            |> Enum.reject(&(&1 in [nil, ""]))
+            |> MapSet.new()
+
+          delete_removed_family_members(user, kept_ids)
+
+          {save_results, invite_results, save_ok?} =
+            Enum.reduce(validated_params, {[], [], true}, fn params,
+                                                             {results, invites,
+                                                              ok} ->
+              case upsert_family_member_record(user, params) do
+                {:ok, family_member} ->
+                  invite = maybe_send_family_invite(user, params, family_member)
+
+                  saved_params =
+                    family_member_form_params_from_record(family_member, params)
+
+                  {
+                    [{:ok, saved_params} | results],
+                    if(invite, do: [invite | invites], else: invites),
+                    ok
+                  }
+
+                {:error, _changeset} ->
+                  {[{:error, params} | results], invites, false}
+              end
+            end)
+
+          updated_forms =
+            if save_ok? do
+              save_results
+              |> Enum.reverse()
+              |> Enum.map(fn {:ok, params} -> params end)
+              |> reindex_family_member_forms()
+            else
+              save_results
+              |> Enum.reverse()
+              |> Enum.with_index()
+              |> Enum.map(fn
+                {{:ok, params}, idx} ->
+                  indexed_family_member_form(params, idx)
+
+                {{:error, params}, idx} ->
+                  family_member_form_with_errors(user, params, idx)
+              end)
+            end
+
+          invite_results = Enum.reverse(invite_results)
+
+          if save_ok? do
+            {:ok, updated_forms, invite_results}
+          else
+            {:error, :validation_failed, updated_forms}
+          end
+      end
+    end
+  end
+
+  defp validate_all_family_members(user, params_list) do
+    {forms, filled, valid?} =
+      Enum.reduce(Enum.with_index(params_list), {[], [], true}, fn {params, idx},
+                                                                   {forms,
+                                                                    filled,
+                                                                    valid} ->
+        cond do
+          family_member_params_blank?(params) ->
+            {[indexed_family_member_form(params, idx) | forms], filled, valid}
+
+          true ->
+            case validate_family_member_params(user, params) do
+              {:ok, _} ->
+                {[indexed_family_member_form(params, idx) | forms],
+                 [params | filled], valid}
+
+              {:error, _} ->
+                {[family_member_form_with_errors(user, params, idx) | forms],
+                 filled, false}
+            end
+        end
+      end)
+
+    forms = Enum.reverse(forms)
+
+    if valid? do
+      {:ok, Enum.reverse(filled)}
+    else
+      {:error, forms}
+    end
+  end
+
+  defp family_member_params_blank?(params) do
+    Enum.all?(
+      ["first_name", "last_name", "email", "birth_date"],
+      fn field -> String.trim(params[field] || "") == "" end
+    )
+  end
+
+  defp validate_family_member_params(user, params) do
+    user
+    |> family_member_struct_for_params(params)
+    |> FamilyMember.family_member_changeset(family_member_record_attrs(params))
+    |> Ecto.Changeset.apply_action(:insert)
+    |> case do
+      {:ok, _} -> {:ok, params}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
+  defp family_member_form_with_errors(user, params, idx) do
+    changeset =
+      user
+      |> family_member_struct_for_params(params)
+      |> FamilyMember.family_member_changeset(
+        family_member_record_attrs(params)
+      )
+
+    errors =
+      Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
+
+    form_params =
+      family_member_form_params(%{
+        "id" => family_member_form_id_from_params(user, params),
+        "first_name" => params["first_name"] || "",
+        "last_name" => params["last_name"] || "",
+        "email" => params["email"] || "",
+        "birth_date" => params["birth_date"] || "",
+        "relationship" => params["relationship"] || "child"
+      })
+
+    indexed_family_member_form(form_params, idx, errors: errors)
+  end
+
+  defp family_member_form_params_from_record(%FamilyMember{} = member, params) do
+    relationship =
+      case member.type do
+        :spouse -> "spouse"
+        "spouse" -> "spouse"
+        _ -> "child"
+      end
+
+    birth_date =
+      case member.birth_date do
+        %Date{} = date -> Date.to_iso8601(date)
+        _ -> params["birth_date"] || ""
+      end
+
+    family_member_form_params(%{
+      "id" => to_string(member.id),
+      "first_name" => member.first_name || "",
+      "last_name" => member.last_name || "",
+      "email" => params["email"] || "",
+      "birth_date" => birth_date,
+      "relationship" => relationship
+    })
+  end
+
+  defp family_member_struct_for_params(user, params) do
+    find_family_member(user, params) || %FamilyMember{}
+  end
+
+  defp family_member_form_id_from_params(user, params) do
+    case find_family_member(user, params) do
+      %FamilyMember{id: id} -> to_string(id)
+      _ -> params["id"] || ""
+    end
+  end
+
+  defp find_family_member(user, params) do
+    id = params["id"]
+
+    if id in [nil, ""] do
+      nil
+    else
+      user
+      |> family_members_for_user()
+      |> Enum.find(&(to_string(&1.id) == to_string(id)))
+    end
+  end
+
+  defp family_members_for_user(user) do
+    case user.family_members do
+      %Ecto.Association.NotLoaded{} ->
+        Ysc.Repo.preload(user, :family_members).family_members || []
+
+      members when is_list(members) ->
+        members
+
+      _ ->
+        []
+    end
+  end
+
+  defp delete_family_member_if_saved(socket, id) when id in [nil, ""],
+    do: socket
+
+  defp delete_family_member_if_saved(socket, id) do
+    user = socket.assigns.user
+
+    case find_family_member(user, %{"id" => id}) do
+      %FamilyMember{} = member ->
+        case Ysc.Repo.delete(member) do
+          {:ok, _} ->
+            socket
+
+          {:error, reason} ->
+            Ysc.Logging.warning(
+              "Failed to delete family member during onboarding",
+              user_id: user.id,
+              family_member_id: id,
+              reason: inspect(reason)
+            )
+
+            socket
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp delete_removed_family_members(user, kept_ids) do
+    for member <- family_members_for_user(user),
+        not MapSet.member?(kept_ids, to_string(member.id)) do
+      Ysc.Repo.delete(member)
+    end
+  end
+
+  defp family_member_record_attrs(params) do
     relationship_str = params["relationship"] || "child"
     birth_date = params["birth_date"]
 
@@ -1763,36 +2139,162 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         _ -> :child
       end
 
-    attrs = %{
-      "first_name" => first_name,
-      "last_name" => last_name,
+    %{
+      "first_name" => String.trim(params["first_name"] || ""),
+      "last_name" => String.trim(params["last_name"] || ""),
       "type" => type,
       "birth_date" =>
         if(birth_date == "" or is_nil(birth_date), do: nil, else: birth_date)
     }
+  end
 
-    family_members =
-      case user.family_members do
-        %Ecto.Association.NotLoaded{} ->
-          Ysc.Repo.preload(user, :family_members).family_members
+  defp family_member_display_name(params) do
+    first = String.trim(params["first_name"] || "")
+    last = String.trim(params["last_name"] || "")
+    String.trim("#{first} #{last}")
+  end
 
-        members ->
-          members || []
+  defp maybe_send_family_invite(user, params, family_member) do
+    email = String.trim(params["email"] || "")
+
+    if email == "" do
+      nil
+    else
+      relationship =
+        case params["relationship"] do
+          "spouse" -> :spouse
+          _ -> :child
+        end
+
+      name = family_member_display_name(params)
+
+      case FamilyInvites.create_invite(user, email,
+             relationship: relationship,
+             family_member_id: family_member.id
+           ) do
+        {:ok, _invite} ->
+          %{ok: true, message: "Invite sent to #{email} (#{name})"}
+
+        {:error, :pending_invite_exists} ->
+          %{
+            ok: true,
+            message: "An invite was already sent to #{email} (#{name})"
+          }
+
+        {:error, :email_already_registered} ->
+          %{
+            ok: false,
+            message:
+              "#{email} (#{name}) already has an account. They can be linked in Family Settings."
+          }
+
+        {:error, :max_sub_accounts_reached} ->
+          %{ok: false, message: "Maximum number of family members reached."}
+
+        {:error, :max_spouses_reached} ->
+          %{
+            ok: false,
+            message:
+              "You can only have one spouse or partner on the family membership."
+          }
+
+        {:error, :invalid_membership_type} ->
+          %{
+            ok: false,
+            message: "Your membership plan doesn't support family invites."
+          }
+
+        {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+          Ysc.Logging.warning(
+            "Family invite failed during onboarding (validation)",
+            user_id: user.id,
+            email: email
+          )
+
+          %{ok: false, message: "Could not send invite to #{email} (#{name})."}
+
+        {:error, reason} ->
+          Ysc.Logging.warning(
+            "Family invite failed during onboarding",
+            user_id: user.id,
+            email: email,
+            reason: inspect(reason)
+          )
+
+          %{
+            ok: false,
+            message:
+              "Could not send invite to #{email} (#{name}). Please try again from Family Settings."
+          }
+      end
+    end
+  end
+
+  defp reload_user_family_members(socket) do
+    user = Accounts.get_user!(socket.assigns.user.id, [:family_members])
+    assign(socket, :user, user)
+  end
+
+  defp flash_family_invite_results(socket, []), do: socket
+
+  defp flash_family_invite_results(socket, results) do
+    sent = Enum.count(results, & &1.ok)
+    failed = length(results) - sent
+
+    message =
+      cond do
+        sent > 0 and failed > 0 ->
+          "Saved your family members. Sent #{sent} invite(s); #{failed} could not be sent — you can retry from Family Settings."
+
+        sent > 0 ->
+          "Saved your family members and sent #{sent} invite(s)."
+
+        failed > 0 ->
+          "Saved your family members, but #{failed} invite(s) could not be sent — you can retry from Family Settings."
+
+        true ->
+          nil
       end
 
+    if message do
+      kind = if failed > 0, do: :warning, else: :info
+
+      YscWeb.Flash.send_toast(
+        kind,
+        message,
+        title:
+          if(failed > 0, do: "Invites Partially Sent", else: "Invites Sent")
+      )
+    end
+
+    socket
+  end
+
+  defp upsert_family_member_record(user, params) do
+    attrs = family_member_record_attrs(params)
+    first_name = attrs["first_name"]
+    last_name = attrs["last_name"]
+    family_members = family_members_for_user(user)
+
     existing =
-      Enum.find(family_members, fn fm ->
-        String.downcase(fm.first_name || "") == String.downcase(first_name) and
-          String.downcase(fm.last_name || "") == String.downcase(last_name)
-      end)
+      case find_family_member(user, params) do
+        %FamilyMember{} = member ->
+          member
+
+        nil ->
+          Enum.find(family_members, fn fm ->
+            String.downcase(fm.first_name || "") == String.downcase(first_name) and
+              String.downcase(fm.last_name || "") == String.downcase(last_name)
+          end)
+      end
 
     if existing do
       existing
-      |> Ysc.Accounts.FamilyMember.family_member_changeset(attrs)
+      |> FamilyMember.family_member_changeset(attrs)
       |> Ysc.Repo.update()
     else
-      %Ysc.Accounts.FamilyMember{}
-      |> Ysc.Accounts.FamilyMember.family_member_changeset(attrs)
+      %FamilyMember{}
+      |> FamilyMember.family_member_changeset(attrs)
       |> Ecto.Changeset.put_change(:user_id, user.id)
       |> Ysc.Repo.insert()
     end

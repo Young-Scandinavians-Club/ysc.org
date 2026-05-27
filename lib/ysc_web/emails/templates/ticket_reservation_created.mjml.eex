@@ -67,11 +67,6 @@
       View event &amp; complete tickets →
     </mj-button>
     <mj-spacer height="28px"></mj-spacer>
-    <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" color="#6B7280">
-      Manage notification preferences:
-      <a href="<%= @notification_settings_url %>" style="color: #1447e6;"><%= @notification_settings_url %></a>
-    </mj-text>
-    <mj-spacer height="16px"></mj-spacer>
     <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
       Vi ses!
     </mj-text>
