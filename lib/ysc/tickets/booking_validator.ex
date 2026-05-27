@@ -140,6 +140,9 @@ defmodule Ysc.Tickets.BookingValidator do
       %Event{state: :cancelled} ->
         {:error, :event_cancelled}
 
+      %Event{state: state} when state != :published ->
+        {:error, :event_not_available}
+
       %Event{} = event ->
         if event_in_past?(event) do
           {:error, :event_in_past}
