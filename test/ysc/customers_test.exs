@@ -344,6 +344,69 @@ defmodule Ysc.CustomersTest do
     end
   end
 
+  describe "create_setup_intent/2" do
+    defmodule SetupIntentParamsCapture do
+      @moduledoc false
+      def create(params) do
+        send(self(), {:setup_intent_params, params})
+        Ysc.TestStripeSetupIntent.create(params)
+      end
+    end
+
+    setup do
+      original = Application.get_env(:ysc, :stripe_setup_intent_module)
+
+      Application.put_env(
+        :ysc,
+        :stripe_setup_intent_module,
+        SetupIntentParamsCapture
+      )
+
+      on_exit(fn ->
+        Application.put_env(
+          :ysc,
+          :stripe_setup_intent_module,
+          original
+        )
+      end)
+
+      :ok
+    end
+
+    test "includes Stripe Link in default payment_method_types" do
+      user = user_fixture_unique() |> update_user_stripe_id("cus_setup_link")
+
+      assert {:ok, %Stripe.SetupIntent{}} = Customers.create_setup_intent(user)
+
+      assert_receive {:setup_intent_params,
+                      %{
+                        payment_method_types: [
+                          "card",
+                          "us_bank_account",
+                          "link"
+                        ],
+                        customer: "cus_setup_link",
+                        usage: "off_session"
+                      }}
+    end
+
+    test "honors stripe payment_method_types override" do
+      user =
+        user_fixture_unique() |> update_user_stripe_id("cus_setup_override")
+
+      assert {:ok, %Stripe.SetupIntent{}} =
+               Customers.create_setup_intent(user,
+                 stripe: %{payment_method_types: ["card"]}
+               )
+
+      assert_receive {:setup_intent_params,
+                      %{
+                        payment_method_types: ["card"],
+                        customer: "cus_setup_override"
+                      }}
+    end
+  end
+
   describe "create_subscription/2" do
     test "returns error for sub-accounts" do
       primary = user_fixture_unique()

@@ -2901,4 +2901,65 @@ defmodule Ysc.EventsTest do
       end)
     end
   end
+
+  describe "public event page access (#353)" do
+    test "get_public_event/1 returns published and cancelled events only" do
+      {:ok, published} = create_event_fixture(%{state: :published})
+      {:ok, cancelled} = create_event_fixture(%{state: :cancelled})
+      {:ok, draft} = create_event_fixture(%{state: :draft, published_at: nil})
+
+      assert %Event{id: id} = Events.get_public_event(published.id)
+      assert id == published.id
+
+      assert %Event{id: id} = Events.get_public_event(cancelled.id)
+      assert id == cancelled.id
+
+      assert Events.get_public_event(draft.id) == nil
+    end
+
+    test "get_event_for_page/2 hides draft events from members but allows staff preview" do
+      {:ok, draft} =
+        create_event_fixture(%{
+          title: "Draft preview event",
+          state: :draft,
+          published_at: nil
+        })
+
+      member = user_fixture(%{state: :active})
+      admin = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      assert Events.get_event_for_page(draft.id, member) == nil
+      assert %Event{id: id} = Events.get_event_for_page(draft.id, admin)
+      assert id == draft.id
+      assert %Event{id: id} = Events.get_event_for_page(draft.id, volunteer)
+      assert id == draft.id
+    end
+
+    test "get_event_for_page_by_reference/2 allows staff to preview scheduled events" do
+      {:ok, scheduled} =
+        create_event_fixture(%{
+          title: "Scheduled preview",
+          state: :scheduled,
+          published_at: nil
+        })
+
+      member = user_fixture(%{state: :active})
+      admin = user_fixture(%{role: :admin})
+
+      assert Events.get_event_for_page_by_reference(
+               scheduled.reference_id,
+               member
+             ) ==
+               nil
+
+      assert %Event{id: id} =
+               Events.get_event_for_page_by_reference(
+                 scheduled.reference_id,
+                 admin
+               )
+
+      assert id == scheduled.id
+    end
+  end
 end

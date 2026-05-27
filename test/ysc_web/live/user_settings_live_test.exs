@@ -1406,6 +1406,43 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "#update-payment-method-modal")
     end
 
+    test "renders Stripe Link payment methods with logo and formatted label", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_link_pm_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_link_display",
+          provider_customer_id: user.stripe_id,
+          type: :link,
+          provider_type: "link",
+          display_brand: "visa",
+          last_four: "4242",
+          exp_month: 12,
+          exp_year: 2030,
+          is_default: true
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      html = render(view)
+
+      assert html =~ "/images/cards/link.png"
+      assert html =~ "Link · Visa ending in 4242"
+      assert html =~ "Expires 12 / 2030"
+    end
+
     test "select-payment-method sets default when Stripe customer update succeeds",
          %{
            conn: conn
