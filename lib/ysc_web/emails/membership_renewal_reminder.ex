@@ -9,7 +9,8 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
     mjml_template: "templates/membership_renewal_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1, membership_url: 0]
+  import YscWeb.Emails.Helpers,
+    only: [member_greeting_name: 1, membership_url: 0]
 
   def get_template_name() do
     "membership_renewal_reminder"
