@@ -102,6 +102,7 @@ defmodule YscWeb.NewsLiveTest do
       assert page_title(view) =~ "News"
     end
 
+    @tag process_caches: true
     test "refreshes posts when public content cache is invalidated", %{
       conn: conn
     } do

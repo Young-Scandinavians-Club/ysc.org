@@ -1756,6 +1756,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert booking.booking_mode == :buyout
     end
 
+    @tag process_caches: true
     test "invalidates Clear Lake availability cache", %{user: user} do
       alias Ysc.Bookings.AvailabilityCache
 

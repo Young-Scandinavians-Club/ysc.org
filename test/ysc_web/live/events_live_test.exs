@@ -104,6 +104,7 @@ defmodule YscWeb.EventsLiveTest do
       assert html =~ "What" or html =~ "Calendar"
     end
 
+    @tag process_caches: true
     test "refreshes when event list cache is invalidated", %{conn: conn} do
       title = "Live Events Refresh #{System.unique_integer()}"
 

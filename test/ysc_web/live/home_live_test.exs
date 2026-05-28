@@ -36,6 +36,7 @@ defmodule YscWeb.HomeLiveTest do
       assert render(view) =~ "Young Scandinavians Club"
     end
 
+    @tag process_caches: true
     test "refreshes latest news when public content cache is invalidated", %{
       conn: conn
     } do

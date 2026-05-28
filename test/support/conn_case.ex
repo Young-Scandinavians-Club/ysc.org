@@ -66,6 +66,14 @@ defmodule YscWeb.ConnCase do
 
         Ysc.DataCase.invalidate_shared_caches()
 
+        if tags[:process_caches] do
+          Application.put_env(:ysc, :process_caches_enabled, true)
+
+          on_exit(fn ->
+            Application.put_env(:ysc, :process_caches_enabled, false)
+          end)
+        end
+
         Ysc.DataCase.stub_default_external_mocks()
 
         secret_key_base =
