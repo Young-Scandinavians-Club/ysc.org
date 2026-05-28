@@ -4,6 +4,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Bookings
 
   alias Ysc.Bookings.{
+    AvailabilityCache,
     Booking,
     Season,
     SeasonCache,
@@ -168,13 +169,16 @@ defmodule YscWeb.ClearLakeBookingLive do
         day_booking_allowed: day_booking_allowed,
         buyout_booking_allowed: buyout_booking_allowed,
         active_bookings: active_bookings,
-        load_radar: true
+        load_radar: true,
+        availability_cache_version: 0
       )
 
     # Validate all conditions (availability, booking mode, guests, etc.)
     # Only run heavy validation when connected (availability checks run queries)
     socket =
       if connected?(socket) do
+        AvailabilityCache.subscribe()
+
         socket
         |> validate_all_conditions(
           checkin_date,
@@ -967,6 +971,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     property={:clear_lake}
                     today={@today}
                     guests_count={@guests_count}
+                    availability_cache_version={@availability_cache_version}
                   />
                   <!-- Error Messages -->
                   <div class="mt-4 space-y-1">
@@ -1029,6 +1034,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     property={:clear_lake}
                     today={@today}
                     guests_count={@guests_count}
+                    availability_cache_version={@availability_cache_version}
                   />
                   <!-- Error Messages -->
                   <div class="mt-4 space-y-1">
@@ -3101,6 +3107,15 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   @impl true
+  def handle_info(:availability_cache_invalidated, socket) do
+    {:noreply,
+     assign(
+       socket,
+       :availability_cache_version,
+       System.unique_integer([:positive])
+     )}
+  end
+
   def handle_info(
         {:availability_calendar_date_changed,
          %{checkin_date: checkin_date, checkout_date: checkout_date}},

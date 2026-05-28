@@ -245,8 +245,26 @@ defmodule YscWeb.EventsListLive do
     # Check if we should defer loading (for initial static render performance)
     defer_load = Map.get(assigns, :defer_load, false)
 
+    cache_version_changed =
+      Map.has_key?(assigns, :event_list_cache_version) &&
+        socket.assigns[:event_list_cache_version] != nil &&
+        assigns.event_list_cache_version !=
+          socket.assigns[:event_list_cache_version]
+
     socket =
       cond do
+        Map.get(assigns, :reload_from_cache) || cache_version_changed ->
+          socket = ensure_required_assigns(socket, assigns)
+          socket = ensure_stream_initialized_for_message(socket)
+
+          socket
+          |> reload_all_events()
+          |> assign(
+            :event_list_cache_version,
+            assigns[:event_list_cache_version]
+          )
+          |> assign(:defer_load, false)
+
         event_message ->
           # Handle event message from parent LiveView
           # This is a real-time update, only modify the stream, don't reload everything
@@ -302,6 +320,10 @@ defmodule YscWeb.EventsListLive do
     |> assign(:upcoming, upcoming)
     |> assign(:limit, limit)
     |> assign(:defer_load, defer_load)
+    |> assign(
+      :event_list_cache_version,
+      Map.get(assigns, :event_list_cache_version)
+    )
   end
 
   # Ensure stream is initialized when handling event messages

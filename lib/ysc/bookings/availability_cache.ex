@@ -6,7 +6,22 @@ defmodule Ysc.Bookings.AvailabilityCache do
   require Ysc.Logging
 
   @cache_name :ysc_cache
+  @pubsub_topic "availability_cache:invalidate"
   @default_ttl 2 * 60 * 1000
+
+  @doc """
+  Subscribes the current process to availability cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
+
+  @doc """
+  Unsubscribes the current process from availability cache invalidation events.
+  """
+  def unsubscribe do
+    Phoenix.PubSub.unsubscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   def get_clear_lake_daily_availability(start_date, end_date) do
     cache_key =
@@ -55,6 +70,14 @@ defmodule Ysc.Bookings.AvailabilityCache do
 
       _ ->
         :ok
+    end
+
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        :availability_cache_invalidated
+      )
     end
 
     :ok

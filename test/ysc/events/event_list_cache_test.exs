@@ -11,6 +11,14 @@ defmodule Ysc.Events.EventListCacheTest do
     :ok
   end
 
+  test "subscribe receives invalidation broadcast" do
+    EventListCache.subscribe()
+    EventListCache.invalidate()
+
+    assert_receive {:event_list_cache_invalidated, version}
+    assert is_integer(version)
+  end
+
   describe "list_past_events/1" do
     test "cache miss and hit return same ids" do
       past =

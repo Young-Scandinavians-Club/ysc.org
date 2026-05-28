@@ -103,6 +103,18 @@ defmodule YscWeb.EventsLiveTest do
       # Either "What's Next" or "The Calendar"
       assert html =~ "What" or html =~ "Calendar"
     end
+
+    test "refreshes when event list cache is invalidated", %{conn: conn} do
+      title = "Live Events Refresh #{System.unique_integer()}"
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_events_async(view)
+
+      _event = create_event(%{title: title, past: false})
+      Ysc.Events.EventListCache.invalidate()
+
+      assert render(view) =~ title
+    end
   end
 
   describe "page structure" do

@@ -7,7 +7,22 @@ defmodule Ysc.Events.EventListCache do
 
   @cache_name :ysc_cache
   @cache_version_key "event_list:version"
+  @pubsub_topic "event_list_cache:invalidate"
   @default_ttl 3 * 60 * 1000
+
+  @doc """
+  Subscribes the current process to event list cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
+
+  @doc """
+  Unsubscribes the current process from event list cache invalidation events.
+  """
+  def unsubscribe do
+    Phoenix.PubSub.unsubscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   def list_past_events(limit) when is_integer(limit) and limit > 0 do
     cache_key = "event_list:past:#{limit}"
@@ -38,7 +53,7 @@ defmodule Ysc.Events.EventListCache do
     if Process.whereis(Ysc.PubSub) do
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
-        "event_list_cache:invalidate",
+        @pubsub_topic,
         {:event_list_cache_invalidated, new_version}
       )
     end

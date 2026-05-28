@@ -8,6 +8,13 @@ defmodule Ysc.Bookings.AvailabilityCacheTest do
     :ok
   end
 
+  test "subscribe receives invalidation broadcast" do
+    AvailabilityCache.subscribe()
+    AvailabilityCache.invalidate()
+
+    assert_receive :availability_cache_invalidated
+  end
+
   test "returns availability map for date range" do
     start_date = Date.utc_today()
     end_date = Date.add(start_date, 7)

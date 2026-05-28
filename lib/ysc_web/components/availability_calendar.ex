@@ -284,10 +284,17 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     new_booking_mode = assigns[:selected_booking_mode] || :day
     booking_mode_changed = existing_booking_mode != new_booking_mode
 
+    new_availability_version = Map.get(assigns, :availability_cache_version)
+
+    availability_version_changed =
+      new_availability_version != nil &&
+        new_availability_version != socket.assigns[:availability_cache_version]
+
     property = assigns[:property] || :clear_lake
 
     availability =
-      if !has_valid_availability || booking_mode_changed do
+      if !has_valid_availability || booking_mode_changed ||
+           availability_version_changed do
         case property do
           :clear_lake ->
             Bookings.get_clear_lake_daily_availability(start_date, end_date)
@@ -327,6 +334,10 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       |> assign(:property, property)
       |> assign(:seasons, seasons)
       |> assign(:selected_booking_mode, assigns[:selected_booking_mode] || :day)
+      |> assign(
+        :availability_cache_version,
+        new_availability_version || socket.assigns[:availability_cache_version]
+      )
       |> assign(:state, new_state)
 
     {:ok, updated_socket}
