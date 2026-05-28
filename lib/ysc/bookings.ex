@@ -621,10 +621,10 @@ defmodule Ysc.Bookings do
   @doc """
   Updates a booking.
   """
-  def update_booking(%Booking{} = booking, attrs) do
+  def update_booking(%Booking{} = booking, attrs, opts \\ []) do
     result =
       booking
-      |> Booking.changeset(attrs)
+      |> Booking.changeset(attrs, opts)
       |> Repo.update()
 
     invalidate_availability_caches(result)

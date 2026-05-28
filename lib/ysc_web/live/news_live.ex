@@ -5,7 +5,7 @@ defmodule YscWeb.NewsLive do
 
   alias HtmlSanitizeEx.Scrubber
 
-  alias Ysc.Posts
+  alias Ysc.{Posts, PublicContentCache}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
 
@@ -305,7 +305,7 @@ defmodule YscWeb.NewsLive do
       |> assign(:async_data_loaded, false)
 
     if connected?(socket) do
-      # Load all data asynchronously after WebSocket connection
+      PublicContentCache.subscribe()
       {:ok, load_news_data_async(socket)}
     else
       {:ok, socket}
@@ -361,8 +361,34 @@ defmodule YscWeb.NewsLive do
   end
 
   @impl true
+  def handle_info({:public_content_cache_invalidated, _version}, socket) do
+    {:noreply, reload_news_content(socket)}
+  end
+
+  @impl true
   def handle_event("next-page", _, socket) do
     {:noreply, paginate_posts(socket)}
+  end
+
+  defp reload_news_content(socket) do
+    per_page = socket.assigns.per_page
+    featured = PublicContentCache.get_featured_post()
+    posts = PublicContentCache.list_recent_posts(per_page)
+    post_count = Posts.count_published_posts()
+
+    new_cursor =
+      case List.last(posts) do
+        nil -> nil
+        post -> post.published_on
+      end
+
+    socket
+    |> assign(:featured, featured)
+    |> assign(:post_count, post_count)
+    |> assign(:cursor, new_cursor)
+    |> assign(:end_of_timeline?, length(posts) < per_page)
+    |> assign(:async_data_loaded, true)
+    |> stream(:posts, posts, reset: true)
   end
 
   defp paginate_posts(socket) do

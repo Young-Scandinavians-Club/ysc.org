@@ -1382,6 +1382,7 @@ defmodule Ysc.Bookings.BookingLocker do
           schedule_checkout_reminder(booking)
         end
 
+        Ysc.Bookings.AvailabilityCache.invalidate()
         {:ok, booking}
 
       {:error, reason} ->

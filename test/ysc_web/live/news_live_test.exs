@@ -86,6 +86,31 @@ defmodule YscWeb.NewsLiveTest do
       assert page_title(view) =~ "News"
     end
 
+    test "refreshes posts when public content cache is invalidated", %{
+      conn: conn
+    } do
+      author = user_fixture(%{role: "admin"})
+      title = "PubSub Post #{System.unique_integer()}"
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      assert {:ok, _} =
+               Posts.create_post(
+                 %{
+                   "title" => title,
+                   "body" => "<p>Content</p>",
+                   "url_name" => "pubsub-post-#{System.unique_integer()}",
+                   "state" => "published",
+                   "featured_post" => false,
+                   "published_on" => DateTime.utc_now()
+                 },
+                 author
+               )
+
+      assert render(view) =~ title
+    end
+
     test "loads async data after connection", %{conn: conn} do
       # Create some posts
       create_post(%{title: "Test Post 1"})

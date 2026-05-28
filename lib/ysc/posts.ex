@@ -298,7 +298,7 @@ defmodule Ysc.Posts do
       result =
         post |> Post.update_post_changeset(params, opts) |> Repo.update()
 
-      maybe_invalidate_public_post_cache(result)
+      maybe_invalidate_public_post_cache(result, post)
       result
     end
   end
@@ -526,13 +526,17 @@ defmodule Ysc.Posts do
     "#{String.capitalize(first)} #{String.downcase(last)}"
   end
 
-  defp maybe_invalidate_public_post_cache({:ok, %Post{} = post}) do
-    if post.state == :published do
+  defp maybe_invalidate_public_post_cache(result, previous_post \\ nil)
+
+  defp maybe_invalidate_public_post_cache({:ok, %Post{} = post}, previous_post) do
+    was_public = match?(%Post{state: :published}, previous_post)
+
+    if was_public or post.state == :published do
       Ysc.PublicContentCache.invalidate_posts()
     end
 
     {:ok, post}
   end
 
-  defp maybe_invalidate_public_post_cache(other), do: other
+  defp maybe_invalidate_public_post_cache(other, _), do: other
 end

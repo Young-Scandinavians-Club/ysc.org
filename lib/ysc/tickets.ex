@@ -539,6 +539,7 @@ defmodule Ysc.Tickets do
           reason: reason
         )
 
+        broadcast_ticket_availability_update(ticket_order.event_id)
         {:ok, refund_info}
 
       {:error, reason} ->
@@ -1476,6 +1477,8 @@ defmodule Ysc.Tickets do
   end
 
   defp broadcast_ticket_availability_update(event_id) do
+    Ysc.Events.invalidate_event_caches()
+
     # Broadcast a simple event to notify all viewers that ticket availability has changed
     event = %Ysc.MessagePassingEvents.TicketAvailabilityUpdated{
       event_id: event_id

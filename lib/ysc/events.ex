@@ -1890,6 +1890,7 @@ defmodule Ysc.Events do
     |> Repo.insert()
     |> case do
       {:ok, ticket} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.TicketCreated{ticket: ticket})
         {:ok, ticket}
 
@@ -2184,6 +2185,8 @@ defmodule Ysc.Events do
     |> Repo.insert()
     |> case do
       {:ok, reservation} ->
+        invalidate_event_caches()
+
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCreated{
           ticket_reservation: reservation
         })
@@ -2434,6 +2437,8 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, reservation} ->
+        invalidate_event_caches()
+
         broadcast(%Ysc.MessagePassingEvents.TicketReservationFulfilled{
           ticket_reservation: reservation
         })
@@ -2457,6 +2462,8 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, reservation} ->
+        invalidate_event_caches()
+
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
           ticket_reservation: reservation
         })
@@ -2546,6 +2553,8 @@ defmodule Ysc.Events do
          ) do
       {1, _} ->
         reservation = Repo.get!(TicketReservation, reservation_id)
+
+        invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
           ticket_reservation: reservation
@@ -2843,7 +2852,12 @@ defmodule Ysc.Events do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, event})
   end
 
-  defp invalidate_event_caches do
+  @doc """
+  Invalidates event list, pricing, and public upcoming-event caches.
+
+  Call after ticket inventory or public event list data changes (sales, holds, tiers).
+  """
+  def invalidate_event_caches do
     Ysc.Events.EventListCache.invalidate()
     Ysc.Events.EventPricingCache.invalidate()
     :ok

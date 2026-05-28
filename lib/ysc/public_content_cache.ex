@@ -9,7 +9,22 @@ defmodule Ysc.PublicContentCache do
 
   @cache_name :ysc_cache
   @cache_version_key "public_content:version"
+  @pubsub_topic "public_content:invalidate"
   @default_ttl 5 * 60 * 1000
+
+  @doc """
+  Subscribes the current process to public content cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
+
+  @doc """
+  Unsubscribes the current process from public content cache invalidation events.
+  """
+  def unsubscribe do
+    Phoenix.PubSub.unsubscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   @doc """
   Recent published posts (non-featured), with preloads.
@@ -52,7 +67,7 @@ defmodule Ysc.PublicContentCache do
   Invalidates all public content list caches.
   """
   def invalidate do
-    bump_version("public_content:invalidate")
+    bump_version(@pubsub_topic)
   end
 
   @doc """

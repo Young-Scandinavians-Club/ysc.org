@@ -1,7 +1,7 @@
 defmodule Ysc.PublicContentCacheTest do
   use Ysc.DataCase, async: false
 
-  alias Ysc.PublicContentCache
+  alias Ysc.{Posts, PublicContentCache}
   alias Ysc.Posts.Post
   alias Ysc.Repo
 
@@ -12,6 +12,17 @@ defmodule Ysc.PublicContentCacheTest do
     PublicContentCache.invalidate()
     Cachex.clear(:ysc_cache)
     :ok
+  end
+
+  describe "subscribe/0" do
+    test "receives invalidation broadcast" do
+      PublicContentCache.subscribe()
+
+      PublicContentCache.invalidate_posts()
+
+      assert_receive {:public_content_cache_invalidated, version}
+      assert is_integer(version)
+    end
   end
 
   describe "list_recent_posts/1" do
@@ -33,6 +44,72 @@ defmodule Ysc.PublicContentCacheTest do
 
       assert posts1 != []
       assert Enum.map(posts1, & &1.id) == Enum.map(posts2, & &1.id)
+    end
+
+    test "unpublishing via Posts.update_post removes post from cached list" do
+      author = user_fixture(%{role: "admin"})
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "To Unpublish",
+            "body" => "Body",
+            "url_name" => "to-unpublish-#{System.unique_integer()}",
+            "state" => "published",
+            "featured_post" => false,
+            "published_on" => DateTime.utc_now()
+          },
+          author
+        )
+
+      assert Enum.any?(
+               PublicContentCache.list_recent_posts(10),
+               &(&1.id == post.id)
+             )
+
+      assert {:ok, _} =
+               Posts.update_post(
+                 post,
+                 %{"state" => "draft", "published_on" => nil},
+                 author
+               )
+
+      posts = PublicContentCache.list_recent_posts(10)
+      refute Enum.any?(posts, &(&1.id == post.id))
+    end
+
+    test "deleting via Posts.update_post removes post from cached list" do
+      author = user_fixture(%{role: "admin"})
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "To Delete",
+            "body" => "Body",
+            "url_name" => "to-delete-#{System.unique_integer()}",
+            "state" => "published",
+            "featured_post" => false,
+            "published_on" => DateTime.utc_now()
+          },
+          author
+        )
+
+      PublicContentCache.list_recent_posts(10)
+
+      assert {:ok, _} =
+               Posts.update_post(
+                 post,
+                 %{
+                   "state" => "deleted",
+                   "deleted_on" => DateTime.utc_now(),
+                   "published_on" => nil,
+                   "featured_post" => false
+                 },
+                 author
+               )
+
+      posts = PublicContentCache.list_recent_posts(10)
+      refute Enum.any?(posts, &(&1.id == post.id))
     end
 
     test "invalidation refetches after post update" do

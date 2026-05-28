@@ -1756,6 +1756,57 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert booking.booking_mode == :buyout
     end
 
+    test "invalidates Clear Lake availability cache", %{user: user} do
+      alias Ysc.Bookings.AvailabilityCache
+
+      checkin = Date.utc_today() |> Date.add(412)
+      checkout = Date.add(checkin, 2)
+
+      AvailabilityCache.get_clear_lake_daily_availability(checkin, checkout)
+
+      {_cached, queries_before} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            AvailabilityCache.get_clear_lake_daily_availability(
+              checkin,
+              checkout
+            )
+          end,
+          pattern: ~r/FROM "bookings"/i
+        )
+
+      assert queries_before == 0
+
+      attrs = %{
+        user_id: user.id,
+        property: :clear_lake,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 6,
+        total_price: Money.new(:USD, "600.00")
+      }
+
+      assert {:ok, %Booking{}} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {_refetched, queries_after} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            AvailabilityCache.get_clear_lake_daily_availability(
+              checkin,
+              checkout
+            )
+          end,
+          pattern: ~r/FROM "bookings"/i
+        )
+
+      assert queries_after >= 1
+    end
+
     test "creates a complete per-guest (day) booking for Clear Lake", %{
       user: user
     } do

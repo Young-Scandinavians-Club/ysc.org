@@ -1,8 +1,10 @@
 defmodule Ysc.Events.EventPricingCacheTest do
   use Ysc.DataCase, async: false
 
+  alias Ysc.Events
   alias Ysc.Events.EventPricingCache
 
+  import Ysc.AccountsFixtures
   import Ysc.EventsFixtures, only: [event_fixture: 1, ticket_tier_fixture: 1]
 
   setup do
@@ -41,6 +43,34 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert enriched.selling_fast == true
     assert enriched.recent_tickets_count == 12
     assert Map.has_key?(enriched, :pricing_info)
+  end
+
+  test "create_ticket_reservation invalidates pricing cache" do
+    admin = user_fixture(%{role: "admin"})
+    event = event_fixture(%{organizer_id: admin.id})
+    tier = ticket_tier_fixture(%{event_id: event.id})
+    member = user_fixture()
+
+    EventPricingCache.enrich_event(event)
+
+    {:ok, version_before} = Cachex.get(:ysc_cache, "event_pricing:version")
+
+    expires_at =
+      DateTime.utc_now()
+      |> DateTime.truncate(:second)
+      |> DateTime.add(2, :day)
+
+    assert {:ok, _reservation} =
+             Events.create_ticket_reservation(%{
+               ticket_tier_id: tier.id,
+               user_id: member.id,
+               created_by_id: admin.id,
+               quantity: 1,
+               expires_at: expires_at
+             })
+
+    {:ok, version_after} = Cachex.get(:ysc_cache, "event_pricing:version")
+    assert version_after != version_before
   end
 
   test "invalidate refetches pricing after tier change" do
