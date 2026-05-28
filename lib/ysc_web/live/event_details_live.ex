@@ -1540,7 +1540,6 @@ defmodule YscWeb.EventDetailsLive do
                             @event,
                             @availability_data,
                             @ticket_tiers,
-                            @current_user && @current_user.id,
                             @reservations_by_tier
                           ) %>
                         <button
@@ -5735,7 +5734,6 @@ defmodule YscWeb.EventDetailsLive do
              socket.assigns.event,
              socket.assigns.availability_data,
              socket.assigns.ticket_tiers,
-             socket.assigns.current_user && socket.assigns.current_user.id,
              socket.assigns.reservations_by_tier
            ) do
         new_quantity = current_quantity + 1
@@ -6629,8 +6627,7 @@ defmodule YscWeb.EventDetailsLive do
          event,
          availability_data,
          ticket_tiers,
-         user_id \\ nil,
-         reservations_by_tier \\ %{}
+         reservations_by_tier
        ) do
     if tier_on_sale?(ticket_tier) do
       if donation_tier?(ticket_tier) do
@@ -6643,7 +6640,6 @@ defmodule YscWeb.EventDetailsLive do
           selected_tickets,
           event,
           ticket_tiers,
-          user_id,
           reservations_by_tier
         )
       end
@@ -6663,7 +6659,6 @@ defmodule YscWeb.EventDetailsLive do
          selected_tickets,
          event,
          ticket_tiers,
-         user_id,
          reservations_by_tier
        )
 
@@ -6674,7 +6669,6 @@ defmodule YscWeb.EventDetailsLive do
          _selected_tickets,
          _event,
          _ticket_tiers,
-         _user_id,
          _reservations_by_tier
        ) do
     # Async availability not loaded yet — avoid BookingLocker transaction fallback
@@ -6688,7 +6682,6 @@ defmodule YscWeb.EventDetailsLive do
          selected_tickets,
          event,
          ticket_tiers,
-         user_id,
          reservations_by_tier
        ) do
     tier_info = Enum.find(availability.tiers, &(&1.tier_id == ticket_tier.id))
