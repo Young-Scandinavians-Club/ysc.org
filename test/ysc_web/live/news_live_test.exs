@@ -482,13 +482,16 @@ defmodule YscWeb.NewsLiveTest do
       assert html =~ "#{url_prefix}-10"
       refute html =~ "#{url_prefix}-11"
 
-      render_click(view, "next-page")
+      assert has_element?(view, "#news-grid[phx-viewport-bottom=\"next-page\"]")
 
-      rendered = :sys.get_state(view.pid)
-      assert rendered.socket.assigns.end_of_timeline?
+      html = render_click(view, "next-page")
+      assert html =~ "#{url_prefix}-11"
+      refute has_element?(view, "#news-grid[phx-viewport-bottom=\"next-page\"]")
 
       html = render_click(view, "next-page")
       assert html =~ "Club News"
+      assert html =~ "#{url_prefix}-11"
+      refute has_element?(view, "#news-grid[phx-viewport-bottom=\"next-page\"]")
     end
   end
 
