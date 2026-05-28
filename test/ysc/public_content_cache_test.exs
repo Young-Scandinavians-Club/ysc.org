@@ -1,6 +1,8 @@
 defmodule Ysc.PublicContentCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.{Posts, PublicContentCache}
   alias Ysc.Posts.Post
   alias Ysc.Repo

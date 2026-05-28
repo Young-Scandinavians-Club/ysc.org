@@ -24,6 +24,17 @@ defmodule Ysc.Bookings.AvailabilityCache do
   end
 
   def get_clear_lake_daily_availability(start_date, end_date) do
+    if Ysc.ProcessCache.enabled?() do
+      do_get_clear_lake_daily_availability(start_date, end_date)
+    else
+      Ysc.Bookings.get_clear_lake_daily_availability_from_db(
+        start_date,
+        end_date
+      )
+    end
+  end
+
+  defp do_get_clear_lake_daily_availability(start_date, end_date) do
     cache_key =
       "availability:clear_lake:#{Date.to_iso8601(start_date)}:#{Date.to_iso8601(end_date)}"
 
@@ -60,24 +71,26 @@ defmodule Ysc.Bookings.AvailabilityCache do
   end
 
   def invalidate do
-    case Cachex.keys(@cache_name) do
-      {:ok, keys} ->
-        keys
-        |> Enum.filter(
-          &(is_binary(&1) and String.starts_with?(&1, "availability:"))
+    if Ysc.ProcessCache.enabled?() do
+      case Cachex.keys(@cache_name) do
+        {:ok, keys} ->
+          keys
+          |> Enum.filter(
+            &(is_binary(&1) and String.starts_with?(&1, "availability:"))
+          )
+          |> Enum.each(&Cachex.del(@cache_name, &1))
+
+        _ ->
+          :ok
+      end
+
+      if Process.whereis(Ysc.PubSub) do
+        Phoenix.PubSub.broadcast(
+          Ysc.PubSub,
+          @pubsub_topic,
+          :availability_cache_invalidated
         )
-        |> Enum.each(&Cachex.del(@cache_name, &1))
-
-      _ ->
-        :ok
-    end
-
-    if Process.whereis(Ysc.PubSub) do
-      Phoenix.PubSub.broadcast(
-        Ysc.PubSub,
-        @pubsub_topic,
-        :availability_cache_invalidated
-      )
+      end
     end
 
     :ok

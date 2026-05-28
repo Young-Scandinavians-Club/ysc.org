@@ -1,6 +1,8 @@
 defmodule Ysc.Bookings.RoomsListCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Bookings.{Room, RoomsListCache}
   alias Ysc.Repo
 

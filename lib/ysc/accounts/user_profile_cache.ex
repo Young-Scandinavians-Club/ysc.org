@@ -10,6 +10,14 @@ defmodule Ysc.Accounts.UserProfileCache do
   @default_ttl 5 * 60 * 1000
 
   def get_user!(user_id, preloads \\ []) when is_binary(user_id) do
+    if Ysc.ProcessCache.enabled?() do
+      do_get_user!(user_id, preloads)
+    else
+      Ysc.Accounts.get_user_from_db!(user_id, preloads)
+    end
+  end
+
+  defp do_get_user!(user_id, preloads) do
     preloads_key = preloads |> List.wrap() |> Enum.sort() |> :erlang.phash2()
     cache_key = "#{@cache_prefix}#{user_id}:#{preloads_key}"
 

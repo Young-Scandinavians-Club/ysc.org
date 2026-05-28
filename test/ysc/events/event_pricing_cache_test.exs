@@ -1,6 +1,8 @@
 defmodule Ysc.Events.EventPricingCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Events
   alias Ysc.Events.EventPricingCache
 

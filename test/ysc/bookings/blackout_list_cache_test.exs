@@ -1,6 +1,8 @@
 defmodule Ysc.Bookings.BlackoutListCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Bookings.{Blackout, BlackoutListCache}
   alias Ysc.Repo
 

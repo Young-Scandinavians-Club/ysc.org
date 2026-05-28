@@ -44,6 +44,14 @@ defmodule Ysc.DataCase do
 
     invalidate_shared_caches()
 
+    if tags[:process_caches] do
+      Application.put_env(:ysc, :process_caches_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :process_caches_enabled, false)
+      end)
+    end
+
     stub_default_external_mocks()
 
     {:ok, sandbox_owner: owner}

@@ -20,13 +20,24 @@ defmodule Ysc.Bookings.BlackoutListCache do
   end
 
   def invalidate do
-    new_version = System.unique_integer([:monotonic, :positive])
-    Cachex.put(@cache_name, @cache_version_key, new_version)
-    Ysc.Bookings.AvailabilityCache.invalidate()
+    if Ysc.ProcessCache.enabled?() do
+      new_version = System.unique_integer([:monotonic, :positive])
+      Cachex.put(@cache_name, @cache_version_key, new_version)
+      Ysc.Bookings.AvailabilityCache.invalidate()
+    end
+
     :ok
   end
 
   defp fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
+    if Ysc.ProcessCache.enabled?() do
+      do_fetch_cached(cache_key, fetch_fun)
+    else
+      fetch_fun.()
+    end
+  end
+
+  defp do_fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
     case Cachex.get(@cache_name, cache_key) do
       {:ok, nil} ->
         fetch_and_cache(cache_key, fetch_fun)

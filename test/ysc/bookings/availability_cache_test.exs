@@ -1,6 +1,8 @@
 defmodule Ysc.Bookings.AvailabilityCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Bookings.AvailabilityCache
 
   setup do

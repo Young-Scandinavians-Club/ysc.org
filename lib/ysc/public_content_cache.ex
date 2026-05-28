@@ -68,8 +68,11 @@ defmodule Ysc.PublicContentCache do
   Invalidates all public content list caches.
   """
   def invalidate do
-    bump_version(:posts)
-    bump_version(:events)
+    if Ysc.ProcessCache.enabled?() do
+      bump_version(:posts)
+      bump_version(:events)
+    end
+
     :ok
   end
 
@@ -77,7 +80,10 @@ defmodule Ysc.PublicContentCache do
   Invalidates post-related caches only.
   """
   def invalidate_posts do
-    bump_version(:posts)
+    if Ysc.ProcessCache.enabled?() do
+      bump_version(:posts)
+    end
+
     :ok
   end
 
@@ -85,11 +91,23 @@ defmodule Ysc.PublicContentCache do
   Invalidates event-related caches only.
   """
   def invalidate_events do
-    bump_version(:events)
+    if Ysc.ProcessCache.enabled?() do
+      bump_version(:events)
+    end
+
     :ok
   end
 
   defp fetch_cached(domain, cache_key, fetch_fun)
+       when is_function(fetch_fun, 0) do
+    if Ysc.ProcessCache.enabled?() do
+      do_fetch_cached(domain, cache_key, fetch_fun)
+    else
+      fetch_fun.()
+    end
+  end
+
+  defp do_fetch_cached(domain, cache_key, fetch_fun)
        when is_function(fetch_fun, 0) do
     version_key = version_key(domain)
 

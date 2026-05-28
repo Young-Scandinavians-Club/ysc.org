@@ -1,6 +1,8 @@
 defmodule Ysc.Events.EventListCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Events.EventListCache
 
   import Ysc.EventsFixtures, only: [event_fixture: 1]

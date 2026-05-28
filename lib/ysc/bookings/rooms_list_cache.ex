@@ -17,21 +17,31 @@ defmodule Ysc.Bookings.RoomsListCache do
   end
 
   def invalidate do
-    new_version = System.unique_integer([:monotonic, :positive])
-    Cachex.put(@cache_name, @cache_version_key, new_version)
+    if Ysc.ProcessCache.enabled?() do
+      new_version = System.unique_integer([:monotonic, :positive])
+      Cachex.put(@cache_name, @cache_version_key, new_version)
 
-    if Process.whereis(Ysc.PubSub) do
-      Phoenix.PubSub.broadcast(
-        Ysc.PubSub,
-        "rooms_list_cache:invalidate",
-        {:rooms_list_cache_invalidated, new_version}
-      )
+      if Process.whereis(Ysc.PubSub) do
+        Phoenix.PubSub.broadcast(
+          Ysc.PubSub,
+          "rooms_list_cache:invalidate",
+          {:rooms_list_cache_invalidated, new_version}
+        )
+      end
     end
 
     :ok
   end
 
   defp fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
+    if Ysc.ProcessCache.enabled?() do
+      do_fetch_cached(cache_key, fetch_fun)
+    else
+      fetch_fun.()
+    end
+  end
+
+  defp do_fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
     case Cachex.get(@cache_name, cache_key) do
       {:ok, nil} ->
         fetch_and_cache(cache_key, fetch_fun)

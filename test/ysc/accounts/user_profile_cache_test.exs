@@ -1,6 +1,8 @@
 defmodule Ysc.Accounts.UserProfileCacheTest do
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Accounts
   alias Ysc.Accounts.UserProfileCache
 
