@@ -64,6 +64,9 @@ defmodule YscWeb.ConnCase do
           end
         end
 
+        Ysc.PublicContentCache.invalidate()
+        Ysc.Events.EventListCache.invalidate()
+
         Ysc.DataCase.stub_default_external_mocks()
 
         secret_key_base =

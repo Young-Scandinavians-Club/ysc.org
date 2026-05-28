@@ -42,6 +42,9 @@ defmodule Ysc.DataCase do
       end
     end
 
+    Ysc.PublicContentCache.invalidate()
+    Ysc.Events.EventListCache.invalidate()
+
     stub_default_external_mocks()
 
     {:ok, sandbox_owner: owner}

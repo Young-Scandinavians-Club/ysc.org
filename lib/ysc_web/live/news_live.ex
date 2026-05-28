@@ -317,13 +317,9 @@ defmodule YscWeb.NewsLive do
     start_async(socket, :load_news_data, fn ->
       # Run queries in parallel
       tasks = [
-        {:featured,
-         fn ->
-           Posts.get_featured_post()
-           |> Ysc.Repo.preload([{:author, :current_avatar}, :featured_image])
-         end},
+        {:featured, fn -> Ysc.PublicContentCache.get_featured_post() end},
         {:post_count, fn -> Posts.count_published_posts() end},
-        {:posts, fn -> Posts.list_posts(nil, 10) end}
+        {:posts, fn -> Ysc.PublicContentCache.list_recent_posts(10) end}
       ]
 
       tasks

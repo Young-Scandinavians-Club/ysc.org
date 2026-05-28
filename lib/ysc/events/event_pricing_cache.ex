@@ -1,0 +1,97 @@
+defmodule Ysc.Events.EventPricingCache do
+  @moduledoc """
+  Per-event cache for pricing enrichment (tiers, counts, images).
+  """
+
+  require Ysc.Logging
+
+  @cache_name :ysc_cache
+  @cache_version_key "event_pricing:version"
+
+  # Fields computed in list_upcoming_events_from_db / list_past_events_from_db — not part of
+  # pricing enrichment but must not be dropped when serving a cached pricing payload.
+  @transient_list_fields [:selling_fast, :recent_tickets_count]
+
+  def enrich_events(events) when is_list(events) do
+    if events == [] do
+      []
+    else
+      Enum.map(events, &enrich_event/1)
+    end
+  end
+
+  def enrich_event(event) do
+    cache_key = "event:pricing:#{event.id}"
+
+    enriched =
+      fetch_cached(cache_key, fn ->
+        Ysc.Events.enrich_single_event_with_pricing_from_db(event)
+      end)
+
+    merge_transient_list_fields(enriched, event)
+  end
+
+  def invalidate do
+    new_version = System.unique_integer([:monotonic, :positive])
+    Cachex.put(@cache_name, @cache_version_key, new_version)
+    Ysc.Events.EventListCache.invalidate()
+    :ok
+  end
+
+  def invalidate_event(_event_id) do
+    invalidate()
+  end
+
+  defp fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
+    case Cachex.get(@cache_name, cache_key) do
+      {:ok, nil} ->
+        value = fetch_fun.()
+        cache_with_version(cache_key, value)
+        value
+
+      {:ok, {:version, version, value}} ->
+        case Cachex.get(@cache_name, @cache_version_key) do
+          {:ok, current_version} when current_version == version ->
+            value
+
+          _ ->
+            refetch_and_cache(cache_key, fetch_fun)
+        end
+
+      {:ok, value} ->
+        cache_with_version(cache_key, value)
+        value
+
+      {:error, _reason} ->
+        fetch_fun.()
+    end
+  end
+
+  defp refetch_and_cache(cache_key, fetch_fun) do
+    Cachex.del(@cache_name, cache_key)
+    value = fetch_fun.()
+    cache_with_version(cache_key, value)
+    value
+  end
+
+  defp merge_transient_list_fields(enriched, source) do
+    Enum.reduce(@transient_list_fields, enriched, fn field, acc ->
+      case Map.fetch(source, field) do
+        {:ok, value} -> Map.put(acc, field, value)
+        :error -> acc
+      end
+    end)
+  end
+
+  defp cache_with_version(key, value) do
+    case Cachex.get(@cache_name, @cache_version_key) do
+      {:ok, version} when is_integer(version) ->
+        Cachex.put(@cache_name, key, {:version, version, value})
+
+      _ ->
+        version = System.unique_integer([:monotonic, :positive])
+        Cachex.put(@cache_name, @cache_version_key, version)
+        Cachex.put(@cache_name, key, {:version, version, value})
+    end
+  end
+end

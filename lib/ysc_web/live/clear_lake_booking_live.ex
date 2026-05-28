@@ -2,7 +2,16 @@ defmodule YscWeb.ClearLakeBookingLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, SeasonHelpers, PricingHelpers, BookingLocker}
+
+  alias Ysc.Bookings.{
+    Booking,
+    Season,
+    SeasonCache,
+    SeasonHelpers,
+    PricingHelpers,
+    BookingLocker
+  }
+
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
@@ -15,12 +24,13 @@ defmodule YscWeb.ClearLakeBookingLive do
 
     timezone = get_timezone_from_socket(socket)
     today = today_in_timezone(timezone)
+    seasons = SeasonCache.get_all_for_property(:clear_lake)
 
     {current_season, season_start_date, season_end_date} =
-      SeasonHelpers.get_current_season_info(:clear_lake, today)
+      SeasonHelpers.get_current_season_info(:clear_lake, today, seasons)
 
     max_booking_date =
-      SeasonHelpers.calculate_max_booking_date(:clear_lake, today)
+      SeasonHelpers.calculate_max_booking_date(:clear_lake, today, seasons)
 
     # Parse query parameters, handling malformed/double-encoded URLs
     parsed_params = parse_mount_params(params)
@@ -50,30 +60,9 @@ defmodule YscWeb.ClearLakeBookingLive do
         # Load user with subscriptions and subscription_items FIRST (to avoid multiple fetches)
         # Preloading subscription_items prevents duplicate queries in get_membership_plan_type
         user_with_subs =
-          if user do
-            # Check if subscriptions are already preloaded from auth
-            if Ecto.assoc_loaded?(user.subscriptions) do
-              # Check if subscription_items are also preloaded
-              subscriptions_with_items_loaded? =
-                Enum.all?(user.subscriptions, fn sub ->
-                  Ecto.assoc_loaded?(sub.subscription_items)
-                end)
-
-              if subscriptions_with_items_loaded? do
-                user
-              else
-                # Preload subscription_items if subscriptions are loaded but items are not
-                user
-                |> Ysc.Repo.preload(subscriptions: :subscription_items)
-              end
-            else
-              # Load subscriptions with subscription_items to avoid duplicate queries
-              Accounts.get_user!(user.id)
-              |> Ysc.Repo.preload(subscriptions: :subscription_items)
-            end
-          else
-            nil
-          end
+          if user,
+            do: Accounts.preload_user_subscriptions_for_booking(user),
+            else: nil
 
         # Check if user can book (pass user_with_subs to avoid re-fetching)
         {can_book, booking_error_title, booking_disabled_reason} =
@@ -102,7 +91,8 @@ defmodule YscWeb.ClearLakeBookingLive do
             :clear_lake,
             checkin_date,
             checkout_date,
-            current_season
+            current_season,
+            seasons
           )
 
         # Resolve booking mode based on allowed modes (handles defaults and invalid selections)
@@ -158,6 +148,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         current_season: current_season,
         season_start_date: season_start_date,
         season_end_date: season_end_date,
+        seasons: seasons,
         selected_booking_mode: booking_mode,
         guests_count: guests_count,
         guests_dropdown_open: false,
@@ -297,11 +288,17 @@ defmodule YscWeb.ClearLakeBookingLive do
           timezone = socket.assigns[:timezone] || "America/Los_Angeles"
           today = today_in_timezone(timezone)
 
+          seasons = socket.assigns.seasons
+
           {current_season, season_start_date, season_end_date} =
-            SeasonHelpers.get_current_season_info(:clear_lake, today)
+            SeasonHelpers.get_current_season_info(:clear_lake, today, seasons)
 
           max_booking_date =
-            SeasonHelpers.calculate_max_booking_date(:clear_lake, today)
+            SeasonHelpers.calculate_max_booking_date(
+              :clear_lake,
+              today,
+              seasons
+            )
 
           {today, max_booking_date, current_season, season_start_date,
            season_end_date}
@@ -330,7 +327,8 @@ defmodule YscWeb.ClearLakeBookingLive do
           :clear_lake,
           checkin_date,
           checkout_date,
-          current_season
+          current_season,
+          socket.assigns.seasons
         )
 
       # Resolve booking mode based on allowed modes
@@ -2676,7 +2674,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket.assigns.property,
         socket.assigns.checkin_date,
         socket.assigns.checkout_date,
-        socket.assigns.current_season
+        socket.assigns.current_season,
+        socket.assigns.seasons
       )
 
     # Validate availability for the new booking mode if dates are selected
@@ -2723,7 +2722,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket.assigns.property,
         socket.assigns.checkin_date,
         socket.assigns.checkout_date,
-        socket.assigns.current_season
+        socket.assigns.current_season,
+        socket.assigns.seasons
       )
 
     # Validate availability for the new booking mode if dates are selected
@@ -3137,7 +3137,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket.assigns.property,
         checkin_date,
         checkout_date,
-        socket.assigns.current_season
+        socket.assigns.current_season,
+        socket.assigns.seasons
       )
 
     socket =
@@ -3760,7 +3761,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket.assigns.property,
         checkin_date,
         checkout_date,
-        current_season
+        current_season,
+        socket.assigns.seasons
       )
 
     validated_guests_count = normalize_guests_count(guests_count)
@@ -3911,16 +3913,14 @@ defmodule YscWeb.ClearLakeBookingLive do
          property,
          checkin_date,
          _checkout_date,
-         current_season
+         current_season,
+         seasons
        ) do
     case property do
       :clear_lake ->
-        # Determine the effective season
-        # If dates are selected, use the check-in date's season
-        # If not, use the current season (based on today)
         season =
           if checkin_date do
-            Bookings.Season.for_date(:clear_lake, checkin_date)
+            Season.find_season_for_date(seasons, checkin_date)
           else
             current_season
           end

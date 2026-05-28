@@ -55,6 +55,12 @@ function notifyStripePaymentElementReady(hook) {
     safePushEvent(hook, 'stripe-payment-element-ready', {});
 }
 
+function paymentElementHasStripeContent(container) {
+    return container.querySelector('.StripeElement') ||
+        container.querySelector('[data-testid]') ||
+        container.children.length > 0;
+}
+
 const StripeElements = {
     mounted() {
         this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
@@ -82,7 +88,19 @@ const StripeElements = {
             newClientSecret !== this.clientSecret &&
             (!this.elements || !this.paymentElement)) {
             this.initializeStripe();
+            return;
         }
+
+        const paymentElementContainer = document.getElementById('payment-element');
+        if (paymentElementContainer && paymentElementHasStripeContent(paymentElementContainer)) {
+            this.showPaymentElementContainer(paymentElementContainer);
+        }
+    },
+
+    showPaymentElementContainer(container) {
+        if (!container) return;
+        container.classList.remove('hidden');
+        container.style.display = '';
     },
 
     async initializeStripe() {
@@ -118,10 +136,8 @@ const StripeElements = {
             if (this.clientSecret === clientSecret && this.elements && this.paymentElement) {
                 const paymentElementContainer = document.getElementById('payment-element');
                 if (paymentElementContainer && document.contains(paymentElementContainer)) {
-                    const hasStripeContent = paymentElementContainer.querySelector('.StripeElement') ||
-                        paymentElementContainer.querySelector('[data-testid]') ||
-                        paymentElementContainer.children.length > 0;
-                    if (hasStripeContent) {
+                    if (paymentElementHasStripeContent(paymentElementContainer)) {
+                        this.showPaymentElementContainer(paymentElementContainer);
                         notifyStripePaymentElementReady(this);
                         return;
                     }
@@ -193,8 +209,7 @@ const StripeElements = {
                 // Only mount if the container is still in the DOM
                 if (document.contains(paymentElementContainer)) {
                     this.paymentElement.mount('#payment-element');
-                    // Show the payment element after mounting
-                    paymentElementContainer.classList.remove('hidden');
+                    this.showPaymentElementContainer(paymentElementContainer);
                 } else {
                     console.error('Payment element container is not in the DOM');
                     this.showMessage('Payment form container is not available. Please refresh and try again.');
@@ -204,16 +219,11 @@ const StripeElements = {
                 // If elements already exist but payment element is not mounted, try to mount it
                 if (this.paymentElement && document.contains(paymentElementContainer)) {
                     // Check if Stripe content exists in the container
-                    const hasStripeContent = paymentElementContainer.querySelector('.StripeElement') ||
-                        paymentElementContainer.querySelector('[data-testid]') ||
-                        paymentElementContainer.children.length > 0;
-
-                    if (!hasStripeContent) {
+                    if (!paymentElementHasStripeContent(paymentElementContainer)) {
                         try {
                             // Try to mount the payment element
                             this.paymentElement.mount('#payment-element');
-                            // Show the payment element after mounting
-                            paymentElementContainer.classList.remove('hidden');
+                            this.showPaymentElementContainer(paymentElementContainer);
                         } catch (mountError) {
                             console.error('Failed to mount payment element:', mountError);
                             // Recreate the payment element
@@ -225,8 +235,7 @@ const StripeElements = {
                                     }
                                 });
                                 this.paymentElement.mount('#payment-element');
-                                // Show the payment element after mounting
-                                paymentElementContainer.classList.remove('hidden');
+                                this.showPaymentElementContainer(paymentElementContainer);
                             } catch (recreateError) {
                                 console.error('Failed to recreate payment element:', recreateError);
                                 this.showMessage('Failed to initialize payment form. Please refresh and try again.');
@@ -294,11 +303,7 @@ const StripeElements = {
 
         // Verify the payment element container exists and has Stripe content
         // Check if the payment element container has any Stripe-generated content
-        const hasStripeContent = paymentElementContainer.querySelector('.StripeElement') ||
-            paymentElementContainer.querySelector('[data-testid]') ||
-            paymentElementContainer.children.length > 0;
-
-        if (!hasStripeContent && this.paymentElement) {
+        if (!paymentElementHasStripeContent(paymentElementContainer) && this.paymentElement) {
             // Element exists but might not be mounted - try to mount it
             try {
                 if (document.contains(paymentElementContainer)) {
@@ -313,7 +318,7 @@ const StripeElements = {
                 // If mount fails, the element might already be mounted or there's a real issue
                 console.warn('Could not mount payment element, proceeding anyway:', mountError);
             }
-        } else if (!hasStripeContent && !this.paymentElement) {
+        } else if (!paymentElementHasStripeContent(paymentElementContainer) && !this.paymentElement) {
             // No element exists at all - this is a real problem
             this.showMessage('Payment form is not ready. Please refresh and try again.');
             return;

@@ -1540,7 +1540,8 @@ defmodule YscWeb.EventDetailsLive do
                             @event,
                             @availability_data,
                             @ticket_tiers,
-                            @current_user && @current_user.id
+                            @current_user && @current_user.id,
+                            @reservations_by_tier
                           ) %>
                         <button
                           phx-click="increase-ticket-quantity"
@@ -3891,7 +3892,7 @@ defmodule YscWeb.EventDetailsLive do
       current_user_id: socket.assigns.current_user.id
     )
 
-    case Ysc.Tickets.get_ticket_order(order_id) do
+    case fetch_ticket_order_for_checkout(socket, order_id) do
       nil ->
         Ysc.Logging.warning("restore_checkout_state_from_url: Order not found",
           order_id: order_id
@@ -3990,7 +3991,7 @@ defmodule YscWeb.EventDetailsLive do
     )
 
     # Determine checkout step based on order amount
-    case Ysc.Tickets.get_ticket_order(order_id) do
+    case fetch_ticket_order_for_checkout(socket, order_id) do
       nil ->
         Ysc.Logging.warning("restore_checkout_state: Order not found",
           order_id: order_id
@@ -4088,10 +4089,13 @@ defmodule YscWeb.EventDetailsLive do
       checkout_step: checkout_step
     )
 
-    # Reload ticket order with tickets and tiers
-    ticket_order = Ysc.Tickets.get_ticket_order(ticket_order.id)
+    ticket_order =
+      ensure_ticket_order_for_checkout(
+        ticket_order,
+        socket.assigns.current_user.id
+      )
 
-    Ysc.Logging.debug("restore_payment_state_from_url: Ticket order reloaded",
+    Ysc.Logging.debug("restore_payment_state_from_url: Ticket order ready",
       order_id: ticket_order.id,
       tickets_count: length(ticket_order.tickets || []),
       total_amount: ticket_order.total_amount
@@ -4945,7 +4949,9 @@ defmodule YscWeb.EventDetailsLive do
   @impl true
   def handle_event("open-ticket-modal", _params, socket) do
     {:noreply,
-     socket |> push_navigate(to: ~p"/events/#{socket.assigns.event.id}/tickets")}
+     socket
+     |> assign(:show_ticket_modal, true)
+     |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")}
   end
 
   @impl true
@@ -5728,7 +5734,9 @@ defmodule YscWeb.EventDetailsLive do
              socket.assigns.selected_tickets,
              socket.assigns.event,
              socket.assigns.availability_data,
-             socket.assigns.ticket_tiers
+             socket.assigns.ticket_tiers,
+             socket.assigns.current_user && socket.assigns.current_user.id,
+             socket.assigns.reservations_by_tier
            ) do
         new_quantity = current_quantity + 1
 
@@ -6621,7 +6629,8 @@ defmodule YscWeb.EventDetailsLive do
          event,
          availability_data,
          ticket_tiers,
-         user_id \\ nil
+         user_id \\ nil,
+         reservations_by_tier \\ %{}
        ) do
     if tier_on_sale?(ticket_tier) do
       if donation_tier?(ticket_tier) do
@@ -6634,7 +6643,8 @@ defmodule YscWeb.EventDetailsLive do
           selected_tickets,
           event,
           ticket_tiers,
-          user_id
+          user_id,
+          reservations_by_tier
         )
       end
     else
@@ -6653,27 +6663,22 @@ defmodule YscWeb.EventDetailsLive do
          selected_tickets,
          event,
          ticket_tiers,
-         user_id
+         user_id,
+         reservations_by_tier
        )
 
   defp check_availability_cached(
          nil,
-         ticket_tier,
-         current_quantity,
-         selected_tickets,
-         event,
-         ticket_tiers,
-         user_id
+         _ticket_tier,
+         _current_quantity,
+         _selected_tickets,
+         _event,
+         _ticket_tiers,
+         _user_id,
+         _reservations_by_tier
        ) do
-    # Fallback to query if cache is not available
-    can_increase_quantity?(
-      ticket_tier,
-      current_quantity,
-      selected_tickets,
-      event,
-      ticket_tiers,
-      user_id
-    )
+    # Async availability not loaded yet — avoid BookingLocker transaction fallback
+    false
   end
 
   defp check_availability_cached(
@@ -6683,7 +6688,8 @@ defmodule YscWeb.EventDetailsLive do
          selected_tickets,
          event,
          ticket_tiers,
-         user_id
+         user_id,
+         reservations_by_tier
        ) do
     tier_info = Enum.find(availability.tiers, &(&1.tier_id == ticket_tier.id))
     event_capacity = availability.event_capacity
@@ -6693,7 +6699,7 @@ defmodule YscWeb.EventDetailsLive do
         tier_info,
         current_quantity,
         ticket_tier.id,
-        user_id
+        reservations_by_tier
       )
 
     event_available =
@@ -6702,28 +6708,31 @@ defmodule YscWeb.EventDetailsLive do
         selected_tickets,
         event.id,
         ticket_tiers,
-        user_id
+        reservations_by_tier
       )
 
     tier_available && event_available
   end
 
-  defp check_tier_availability(nil, _current_quantity, _tier_id, _user_id),
-    do: false
+  defp check_tier_availability(
+         nil,
+         _current_quantity,
+         _tier_id,
+         _reservations_by_tier
+       ),
+       do: false
 
-  defp check_tier_availability(tier_info, current_quantity, tier_id, user_id) do
+  defp check_tier_availability(
+         tier_info,
+         current_quantity,
+         tier_id,
+         reservations_by_tier
+       ) do
     if tier_info.available == :unlimited do
       true
     else
-      # If user has reservations, add their reserved quantity to available
-      user_available =
-        if user_id do
-          user_reserved = Events.get_user_reserved_quantity(tier_id, user_id)
-          tier_info.available + user_reserved
-        else
-          tier_info.available
-        end
-
+      user_reserved = Map.get(reservations_by_tier, tier_id, 0)
+      user_available = tier_info.available + user_reserved
       current_quantity < user_available
     end
   end
@@ -6733,20 +6742,14 @@ defmodule YscWeb.EventDetailsLive do
          selected_tickets,
          event_id,
          ticket_tiers,
-         user_id
+         reservations_by_tier
        ) do
     case event_capacity.available do
       :unlimited ->
         true
 
       available ->
-        # If user has reservations, allow bypassing event capacity
-        user_has_reservations =
-          if user_id do
-            Events.list_ticket_reservations_for_user(user_id, event_id) != []
-          else
-            false
-          end
+        user_has_reservations = map_size(reservations_by_tier) > 0
 
         if user_has_reservations do
           true
@@ -6760,72 +6763,6 @@ defmodule YscWeb.EventDetailsLive do
 
           total_selected + 1 <= available
         end
-    end
-  end
-
-  # Original version kept for fallback
-  defp can_increase_quantity?(
-         ticket_tier,
-         current_quantity,
-         selected_tickets,
-         event,
-         ticket_tiers,
-         user_id
-       ) do
-    if tier_on_sale?(ticket_tier) do
-      if donation_tier?(ticket_tier) do
-        true
-      else
-        check_availability_with_lock(
-          ticket_tier,
-          current_quantity,
-          selected_tickets,
-          event,
-          ticket_tiers,
-          user_id
-        )
-      end
-    else
-      false
-    end
-  end
-
-  defp check_availability_with_lock(
-         ticket_tier,
-         current_quantity,
-         selected_tickets,
-         event,
-         ticket_tiers,
-         user_id
-       ) do
-    case Ysc.Tickets.BookingLocker.check_availability_with_lock(event.id) do
-      {:ok, availability} ->
-        tier_info =
-          Enum.find(availability.tiers, &(&1.tier_id == ticket_tier.id))
-
-        event_capacity = availability.event_capacity
-
-        tier_available =
-          check_tier_availability(
-            tier_info,
-            current_quantity,
-            ticket_tier.id,
-            user_id
-          )
-
-        event_available =
-          check_event_capacity(
-            event_capacity,
-            selected_tickets,
-            event.id,
-            ticket_tiers,
-            user_id
-          )
-
-        tier_available && event_available
-
-      {:error, _} ->
-        false
     end
   end
 
@@ -7318,14 +7255,50 @@ defmodule YscWeb.EventDetailsLive do
       compute_availability_from_tiers(socket.assigns.event, ticket_tiers)
   end
 
+  defp fetch_ticket_order_for_checkout(socket, order_id) do
+    user_id = socket.assigns.current_user.id
+
+    assigned_order =
+      case socket.assigns[:ticket_order] do
+        %{id: ^order_id} = order -> order
+        _ -> nil
+      end
+
+    if assigned_order != nil && checkout_order_ready?(assigned_order) do
+      assigned_order
+    else
+      Ysc.Tickets.get_user_ticket_order_for_checkout(user_id, order_id)
+    end
+  end
+
+  defp ensure_ticket_order_for_checkout(order, user_id)
+       when not is_nil(order) do
+    if checkout_order_ready?(order) do
+      order
+    else
+      Ysc.Tickets.get_user_ticket_order_for_checkout(user_id, order.id) || order
+    end
+  end
+
+  defp ensure_ticket_order_for_checkout(nil, _user_id), do: nil
+
+  defp checkout_order_ready?(order) do
+    order &&
+      Ecto.assoc_loaded?(order.tickets) &&
+      Enum.all?(order.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+  end
+
   # Proceed to payment or free ticket confirmation after registration (if needed)
   defp proceed_to_payment_or_free(socket, ticket_order) do
-    # Reload ticket order with tickets and their tiers
-    ticket_order_with_tickets = Ysc.Tickets.get_ticket_order(ticket_order.id)
+    ticket_order =
+      ensure_ticket_order_for_checkout(
+        ticket_order,
+        socket.assigns.current_user.id
+      )
 
     # Check if any tickets require registration
     tickets_requiring_registration =
-      get_tickets_requiring_registration(ticket_order_with_tickets.tickets)
+      get_tickets_requiring_registration(ticket_order.tickets)
 
     # Load family members for the current user
     family_members = Ysc.Accounts.get_family_group(socket.assigns.current_user)
@@ -7343,14 +7316,14 @@ defmodule YscWeb.EventDetailsLive do
       )
 
     # Check if this is a free order (zero amount)
-    if Money.zero?(ticket_order_with_tickets.total_amount) do
+    if Money.zero?(ticket_order.total_amount) do
       # For free tickets, show confirmation modal instead of payment form
       # Update URL to reflect checkout state
       {:noreply,
        socket
        |> assign(:show_ticket_modal, false)
        |> assign(:show_free_ticket_confirmation, true)
-       |> assign(:ticket_order, ticket_order_with_tickets)
+       |> assign(:ticket_order, ticket_order)
        |> assign(
          :tickets_requiring_registration,
          tickets_requiring_registration
@@ -7365,12 +7338,12 @@ defmodule YscWeb.EventDetailsLive do
        )
        |> push_patch(
          to:
-           ~p"/events/#{socket.assigns.event.id}?checkout=free&order_id=#{ticket_order_with_tickets.id}"
+           ~p"/events/#{socket.assigns.event.id}?checkout=free&order_id=#{ticket_order.id}"
        )}
     else
       # For paid tickets, create Stripe payment intent
       case Ysc.Tickets.StripeService.create_payment_intent(
-             ticket_order_with_tickets,
+             ticket_order,
              customer_id: socket.assigns.current_user.stripe_id
            ) do
         {:ok, payment_intent} ->
@@ -7383,7 +7356,7 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:checkout_expired, false)
            |> assign(:stripe_payment_element_ready, false)
            |> assign(:payment_intent, payment_intent)
-           |> assign(:ticket_order, ticket_order_with_tickets)
+           |> assign(:ticket_order, ticket_order)
            |> assign(
              :tickets_requiring_registration,
              tickets_requiring_registration
@@ -7400,7 +7373,7 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:payment_redirect_in_progress, false)
            |> push_patch(
              to:
-               ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order_with_tickets.id}"
+               ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order.id}"
            )}
 
         {:error, reason} ->

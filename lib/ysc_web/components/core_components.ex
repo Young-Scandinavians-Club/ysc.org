@@ -1164,6 +1164,7 @@ defmodule YscWeb.CoreComponents do
   attr(:date_tooltips, :map, default: %{})
   attr(:property, :atom, default: nil)
   attr(:today, :any, default: nil)
+  attr(:seasons, :list, default: nil)
 
   attr(:allow_saturdays, :boolean,
     default: false,
@@ -1188,6 +1189,7 @@ defmodule YscWeb.CoreComponents do
       date_tooltips={@date_tooltips}
       property={@property}
       today={@today}
+      seasons={@seasons}
       allow_saturdays={@allow_saturdays}
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>

@@ -25,20 +25,18 @@ defmodule Ysc.SettingsTest do
     end
   end
 
-  describe "start_link/0" do
-    test "starts the settings GenServer and runs init/1 cache warm-up" do
+  describe "supervised Settings process" do
+    test "warm_cache reloads settings when supervised GenServer is running" do
       name = "start_link_warm_#{System.unique_integer([:positive])}"
 
       %SiteSetting{name: name, value: "from_start_link", group: "g"}
       |> Repo.insert!()
 
       Settings.clear_cache()
+      assert Process.whereis(Ysc.Settings) != nil
 
-      assert {:ok, pid} = Settings.start_link()
-      assert Process.alive?(pid)
+      assert :ok = Settings.warm_cache()
       assert Settings.get_setting(name) == "from_start_link"
-
-      GenServer.stop(pid)
     end
   end
 
@@ -429,6 +427,25 @@ defmodule Ysc.SettingsTest do
 
       loaded = Settings.settings()
       assert Enum.any?(loaded, &(&1.name == name))
+    end
+  end
+
+  describe "warm_cache/0" do
+    test "loads settings into cache so get_setting_safe avoids DB" do
+      Settings.ensure_settings_exist()
+      Settings.clear_cache()
+      Settings.warm_cache()
+
+      {_value, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            assert Settings.get_setting_safe("instagram") != nil
+            assert Settings.get_setting_safe("facebook") != nil
+          end,
+          pattern: ~r/FROM "site_settings"/i
+        )
+
+      assert query_count == 0
     end
   end
 

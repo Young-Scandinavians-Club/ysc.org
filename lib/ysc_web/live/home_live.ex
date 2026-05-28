@@ -3,7 +3,8 @@ defmodule YscWeb.HomeLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Accounts, Events, Newsletter, Posts, Tickets}
+  alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
+  alias Ysc.Accounts.UserProfileCache
   alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
@@ -108,10 +109,10 @@ defmodule YscWeb.HomeLive do
       [
         {:guest_events,
          fn ->
-           Events.list_upcoming_events(3)
+           PublicContentCache.list_upcoming_events(3)
            |> Enum.reject(&(&1.state == :cancelled))
          end},
-        {:guest_news, fn -> Posts.list_posts(3) end}
+        {:guest_news, fn -> PublicContentCache.list_recent_posts(3) end}
       ]
       |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
         timeout: :infinity,
@@ -163,10 +164,10 @@ defmodule YscWeb.HomeLive do
       {:bookings, fn -> get_future_active_bookings(user_id) end},
       {:events,
        fn ->
-         Events.list_upcoming_events(3)
+         PublicContentCache.list_upcoming_events(3)
          |> Enum.reject(&(&1.state == :cancelled))
        end},
-      {:news, fn -> Posts.list_posts(3) end}
+      {:news, fn -> PublicContentCache.list_recent_posts(3) end}
     ]
 
     tasks
@@ -189,8 +190,7 @@ defmodule YscWeb.HomeLive do
       end
 
     user_with_subs =
-      Accounts.get_user!(user_id)
-      |> Ysc.Repo.preload(preloads)
+      UserProfileCache.get_user!(user_id, preloads)
       |> Accounts.User.populate_virtual_fields()
 
     is_sub_account = Accounts.sub_account?(user_with_subs)

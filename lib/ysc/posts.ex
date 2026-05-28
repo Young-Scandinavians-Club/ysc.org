@@ -294,7 +294,12 @@ defmodule Ysc.Posts do
   def update_post(post, params, %User{} = current_user, opts \\ []) do
     with :ok <- Policy.authorize(:post_update, current_user, post) do
       params = maybe_set_board_position_at_publish(post, params)
-      post |> Post.update_post_changeset(params, opts) |> Repo.update()
+
+      result =
+        post |> Post.update_post_changeset(params, opts) |> Repo.update()
+
+      maybe_invalidate_public_post_cache(result)
+      result
     end
   end
 
@@ -328,7 +333,10 @@ defmodule Ysc.Posts do
   def create_post(params, %User{} = current_user) do
     with :ok <- Policy.authorize(:post_create, current_user) do
       new_params = Map.put(params, "user_id", current_user.id)
-      Post.new_post_changeset(%Post{}, new_params) |> Repo.insert()
+
+      result = Post.new_post_changeset(%Post{}, new_params) |> Repo.insert()
+      maybe_invalidate_public_post_cache(result)
+      result
     end
   end
 
@@ -517,4 +525,14 @@ defmodule Ysc.Posts do
   defp name_format(%{"author_first" => first, "author_last" => last}) do
     "#{String.capitalize(first)} #{String.downcase(last)}"
   end
+
+  defp maybe_invalidate_public_post_cache({:ok, %Post{} = post}) do
+    if post.state == :published do
+      Ysc.PublicContentCache.invalidate_posts()
+    end
+
+    {:ok, post}
+  end
+
+  defp maybe_invalidate_public_post_cache(other), do: other
 end

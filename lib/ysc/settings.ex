@@ -4,6 +4,8 @@ defmodule Ysc.Settings do
 
   Provides functions for retrieving and caching application-wide site settings.
   """
+  use GenServer
+
   require Ysc.Logging
   import Ecto.Query, warn: false
 
@@ -14,8 +16,8 @@ defmodule Ysc.Settings do
   @settings_cache_key "all-site-settings"
   @site_setting_name_max_length 255
 
-  def start_link do
-    GenServer.start_link(__MODULE__, %{})
+  def start_link(_opts \\ []) do
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
   def init(state) do
@@ -336,11 +338,16 @@ defmodule Ysc.Settings do
   end
 
   @doc """
-  Ensures that all default site settings exist in the database.
-  Useful for tests and initial setup.
+  Reloads all site settings into Cachex. Used at application boot and in tests.
+  """
+  def warm_cache do
+    cache_all_settings()
+    :ok
+  end
 
-  Note: This function does NOT update the cache. If you need the cache
-  to be updated, call cache_all_settings() after this function.
+  @doc """
+  Ensures that all default site settings exist in the database and warms the cache.
+  Useful for tests and initial setup.
   """
   def ensure_settings_exist do
     default_settings = [
@@ -377,8 +384,6 @@ defmodule Ysc.Settings do
       end
     end
 
-    # Don't update cache here - let the cache be lazy-loaded on first access
-    # This prevents cache pollution in tests that clear the cache in their setup
-    :ok
+    warm_cache()
   end
 end

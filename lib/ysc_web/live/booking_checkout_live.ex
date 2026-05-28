@@ -810,8 +810,19 @@ defmodule YscWeb.BookingCheckoutLive do
                 data-client-secret={@payment_intent.client_secret}
                 data-booking-id={@booking.id}
               >
-                <div id="payment-element" class="mb-6 hidden">
-                  <!-- Stripe Elements will mount here -->
+                <div
+                  :if={!@stripe_payment_element_ready}
+                  id="payment-element-loading"
+                  class="mb-6 flex items-center justify-center min-h-[12rem] bg-zinc-50 rounded-lg border border-zinc-200"
+                >
+                  <p class="text-sm text-zinc-500">Loading secure payment form…</p>
+                </div>
+                <%!-- phx-update="ignore" keeps LiveView from re-applying hidden on each assign --%>
+                <div
+                  id="payment-element"
+                  phx-update="ignore"
+                  class="mb-6 min-h-[12rem]"
+                >
                 </div>
                 <div id="payment-message" class="hidden mt-4"></div>
               </div>

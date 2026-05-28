@@ -221,6 +221,14 @@ defmodule Ysc.Bookings do
   Lists all rooms, optionally filtered by property.
   """
   def list_rooms(property \\ nil) do
+    if property do
+      Ysc.Bookings.RoomsListCache.list(property)
+    else
+      list_rooms_from_db(property)
+    end
+  end
+
+  def list_rooms_from_db(property \\ nil) do
     query =
       from r in Room,
         order_by: [asc: r.property, asc: r.name],
@@ -248,25 +256,48 @@ defmodule Ysc.Bookings do
   Creates a room.
   """
   def create_room(attrs \\ %{}) do
-    %Room{}
-    |> Room.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Room{}
+      |> Room.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, _} -> Ysc.Bookings.RoomsListCache.invalidate()
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
   Updates a room.
   """
   def update_room(%Room{} = room, attrs) do
-    room
-    |> Room.changeset(attrs)
-    |> Repo.update()
+    result =
+      room
+      |> Room.changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, _} -> Ysc.Bookings.RoomsListCache.invalidate()
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
   Deletes a room.
   """
   def delete_room(%Room{} = room) do
-    Repo.delete(room)
+    result = Repo.delete(room)
+
+    case result do
+      {:ok, _} -> Ysc.Bookings.RoomsListCache.invalidate()
+      _ -> :ok
+    end
+
+    result
   end
 
   ## Room Categories
@@ -578,25 +609,35 @@ defmodule Ysc.Bookings do
   Creates a booking.
   """
   def create_booking(attrs \\ %{}) do
-    %Booking{}
-    |> Booking.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Booking{}
+      |> Booking.changeset(attrs)
+      |> Repo.insert()
+
+    invalidate_availability_caches(result)
+    result
   end
 
   @doc """
   Updates a booking.
   """
   def update_booking(%Booking{} = booking, attrs) do
-    booking
-    |> Booking.changeset(attrs)
-    |> Repo.update()
+    result =
+      booking
+      |> Booking.changeset(attrs)
+      |> Repo.update()
+
+    invalidate_availability_caches(result)
+    result
   end
 
   @doc """
   Deletes a booking.
   """
   def delete_booking(%Booking{} = booking) do
-    Repo.delete(booking)
+    result = Repo.delete(booking)
+    invalidate_availability_caches(result)
+    result
   end
 
   ## Booking Guests
@@ -862,6 +903,18 @@ defmodule Ysc.Bookings do
       list_blackouts(nil, ~D[2025-11-01], ~D[2025-11-30])
   """
   def list_blackouts(property \\ nil, start_date \\ nil, end_date \\ nil) do
+    if property && start_date && end_date do
+      Ysc.Bookings.BlackoutListCache.list(property, start_date, end_date)
+    else
+      list_blackouts_from_db(property, start_date, end_date)
+    end
+  end
+
+  def list_blackouts_from_db(
+        property \\ nil,
+        start_date \\ nil,
+        end_date \\ nil
+      ) do
     query = from b in Blackout, order_by: [asc: b.property, asc: b.start_date]
 
     query =
@@ -900,26 +953,50 @@ defmodule Ysc.Bookings do
   Creates a blackout.
   """
   def create_blackout(attrs \\ %{}) do
-    %Blackout{}
-    |> Blackout.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Blackout{}
+      |> Blackout.changeset(attrs)
+      |> Repo.insert()
+
+    invalidate_blackout_caches(result)
+    result
   end
 
   @doc """
   Updates a blackout.
   """
   def update_blackout(%Blackout{} = blackout, attrs) do
-    blackout
-    |> Blackout.changeset(attrs)
-    |> Repo.update()
+    result =
+      blackout
+      |> Blackout.changeset(attrs)
+      |> Repo.update()
+
+    invalidate_blackout_caches(result)
+    result
   end
 
   @doc """
   Deletes a blackout.
   """
   def delete_blackout(%Blackout{} = blackout) do
-    Repo.delete(blackout)
+    result = Repo.delete(blackout)
+    invalidate_blackout_caches(result)
+    result
   end
+
+  defp invalidate_availability_caches({:ok, _}) do
+    Ysc.Bookings.AvailabilityCache.invalidate()
+    :ok
+  end
+
+  defp invalidate_availability_caches(_), do: :ok
+
+  defp invalidate_blackout_caches({:ok, _}) do
+    Ysc.Bookings.BlackoutListCache.invalidate()
+    :ok
+  end
+
+  defp invalidate_blackout_caches(_), do: :ok
 
   @doc """
   Checks if a blackout overlaps with a booking date range, accounting for check-in/check-out times.
@@ -983,6 +1060,11 @@ defmodule Ysc.Bookings do
   Gets all blackouts that overlap with a date range for a property.
   """
   def get_overlapping_blackouts(property, start_date, end_date)
+      when is_atom(property) do
+    Ysc.Bookings.BlackoutListCache.list(property, start_date, end_date)
+  end
+
+  def get_overlapping_blackouts_from_db(property, start_date, end_date)
       when is_atom(property) do
     from(b in Blackout,
       where: b.property == ^property,
@@ -2595,6 +2677,13 @@ defmodule Ysc.Bookings do
   A map of dates to availability information.
   """
   def get_clear_lake_daily_availability(start_date, end_date) do
+    Ysc.Bookings.AvailabilityCache.get_clear_lake_daily_availability(
+      start_date,
+      end_date
+    )
+  end
+
+  def get_clear_lake_daily_availability_from_db(start_date, end_date) do
     date_range = Date.range(start_date, end_date) |> Enum.to_list()
 
     # Get all bookings that overlap with the date range OR have checkout/checkin dates in the range

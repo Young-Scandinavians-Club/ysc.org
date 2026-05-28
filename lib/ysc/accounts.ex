@@ -176,6 +176,10 @@ defmodule Ysc.Accounts do
 
   """
   def get_user!(id, preloads \\ []) do
+    Ysc.Accounts.UserProfileCache.get_user!(id, preloads)
+  end
+
+  def get_user_from_db!(id, preloads \\ []) do
     Repo.get!(User, id) |> Repo.preload(preloads)
   end
 
@@ -1411,6 +1415,8 @@ defmodule Ysc.Accounts do
 
       case user |> User.update_user_changeset(params) |> Repo.update() do
         {:ok, updated_user} ->
+          Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
           Task.start(fn ->
             Ysc.Customers.update_stripe_customer(updated_user)
           end)
@@ -1548,7 +1554,8 @@ defmodule Ysc.Accounts do
   def update_user_profile(user, attrs) do
     with {:ok, updated_user} <-
            user |> User.profile_changeset(attrs) |> Repo.update() do
-      # Update Stripe customer with new information
+      Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
       Task.start(fn ->
         Ysc.Customers.update_stripe_customer(updated_user)
       end)
@@ -1822,36 +1829,71 @@ defmodule Ysc.Accounts do
     user = Repo.one(query)
 
     if user do
-      # Check membership cache first - if we have cached membership data, we can skip
-      # subscription preload to reduce DB queries. The membership cache will load
-      # subscriptions on-demand if needed (when cache misses or expires).
-      #
-      # Note: This means subscriptions may not be preloaded on the user object.
-      # Code that needs subscriptions should check Ecto.assoc_loaded?/1 or use
-      # the membership cache functions which handle this automatically.
-      cache_key = "membership:#{user.id}:active"
-
-      case :ysc_cache |> Cachex.get(cache_key) do
-        {:ok, nil} ->
-          # Cache miss - preload subscriptions for membership check and other uses
-          preload_active_subscriptions_for_auth(user)
-
-        {:ok, _cached_membership} ->
-          # Cache hit - skip subscription preload but still load avatar
-          Repo.preload(user, :current_avatar)
-
-        {:error, _reason} ->
-          # Cache error - fallback to preloading for safety
-          preload_active_subscriptions_for_auth(user)
+      if user_subscriptions_fully_loaded?(user) do
+        Repo.preload(user, :current_avatar)
+      else
+        load_user_for_session_with_membership_cache(user)
       end
     else
       nil
     end
   end
 
+  defp load_user_for_session_with_membership_cache(user) do
+    # Check membership cache first - if we have cached membership data, we can skip
+    # subscription preload to reduce DB queries. The membership cache will load
+    # subscriptions on-demand if needed (when cache misses or expires).
+    #
+    # Note: This means subscriptions may not be preloaded on the user object.
+    # Code that needs subscriptions should check Ecto.assoc_loaded?/1 or use
+    # the membership cache functions which handle this automatically.
+    cache_key = "membership:#{user.id}:active"
+
+    case :ysc_cache |> Cachex.get(cache_key) do
+      {:ok, nil} ->
+        # Cache miss - preload subscriptions for membership check and other uses
+        preload_active_subscriptions_for_auth(user)
+
+      {:ok, _cached_membership} ->
+        # Cache hit - skip subscription preload but still load avatar
+        Repo.preload(user, :current_avatar)
+
+      {:error, _reason} ->
+        # Cache error - fallback to preloading for safety
+        preload_active_subscriptions_for_auth(user)
+    end
+  end
+
+  defp user_subscriptions_fully_loaded?(user) do
+    Ecto.assoc_loaded?(user.subscriptions) and
+      Enum.all?(user.subscriptions, fn sub ->
+        Ecto.assoc_loaded?(sub.subscription_items)
+      end)
+  end
+
+  @doc """
+  Ensures a user has active subscriptions and subscription_items loaded for booking flows.
+  Reuses existing preloads when present to avoid duplicate queries.
+  """
+  def preload_user_subscriptions_for_booking(user) do
+    if user_subscriptions_fully_loaded?(user) do
+      user
+    else
+      preload_active_subscriptions_for_auth(user)
+    end
+  end
+
   # Optimized preload that only fetches active subscriptions with subscription_items
   # This reduces queries from 2+ (user + all subscriptions) to 1 (user + active subscriptions)
   defp preload_active_subscriptions_for_auth(user) do
+    if Ecto.assoc_loaded?(user.subscriptions) do
+      Repo.preload(user, :current_avatar)
+    else
+      do_preload_active_subscriptions_for_auth(user)
+    end
+  end
+
+  defp do_preload_active_subscriptions_for_auth(user) do
     active_subscriptions =
       from(s in Ysc.Subscriptions.Subscription,
         where: s.user_id == ^user.id,

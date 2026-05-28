@@ -366,6 +366,7 @@ defmodule Ysc.Events do
 
     case Repo.transaction(multi) do
       {:ok, %{event: event}} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
         {:ok, event}
 
@@ -567,6 +568,7 @@ defmodule Ysc.Events do
 
     case result do
       {:ok, new_event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventAdded{event: new_event})
         {:ok, new_event}
 
@@ -584,6 +586,7 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         {:ok, event}
 
@@ -601,6 +604,7 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
         {:ok, event}
 
@@ -622,6 +626,10 @@ defmodule Ysc.Events do
   Count the number of upcoming events without loading all event data.
   """
   def count_upcoming_events do
+    Ysc.Events.EventListCache.count_upcoming_events()
+  end
+
+  def count_upcoming_events_from_db do
     from(e in Event,
       where: e.start_date > ^DateTime.utc_now(),
       where: e.state in [:published, :cancelled]
@@ -648,6 +656,10 @@ defmodule Ysc.Events do
   Optimized to batch load ticket tiers and ticket counts to avoid N+1 queries.
   """
   def list_upcoming_events(limit \\ 50) do
+    Ysc.Events.EventListCache.list_upcoming_events(limit)
+  end
+
+  def list_upcoming_events_from_db(limit \\ 50) do
     three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
 
     events =
@@ -855,6 +867,10 @@ defmodule Ysc.Events do
   Optimized to batch load ticket tiers and ticket counts to avoid N+1 queries.
   """
   def list_past_events(limit \\ 20) do
+    Ysc.Events.EventListCache.list_past_events(limit)
+  end
+
+  def list_past_events_from_db(limit \\ 20) do
     three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
 
     events =
@@ -946,11 +962,13 @@ defmodule Ysc.Events do
 
   # Batch load pricing info for all events to avoid N+1 queries
   defp add_pricing_info_batch(events) when is_list(events) do
-    if events == [] do
-      []
-    else
-      enrich_events_with_pricing_info(events)
-    end
+    Ysc.Events.EventPricingCache.enrich_events(events)
+  end
+
+  @doc false
+  def enrich_single_event_with_pricing_from_db(event) do
+    [enriched] = enrich_events_with_pricing_info([event])
+    enriched
   end
 
   defp enrich_events_with_pricing_info(events) do
@@ -1231,11 +1249,12 @@ defmodule Ysc.Events do
         |> Repo.update()
         |> case do
           {:ok, updated_event} ->
+            invalidate_event_caches()
+
             broadcast(%Ysc.MessagePassingEvents.EventUpdated{
               event: updated_event
             })
 
-            # Schedule event notification emails (1 hour after publish)
             schedule_event_notifications(updated_event, now)
 
             {:ok, updated_event}
@@ -1274,6 +1293,7 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         {:ok, event}
 
@@ -1288,6 +1308,7 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         {:ok, event}
 
@@ -1328,6 +1349,7 @@ defmodule Ysc.Events do
 
     case Repo.update(changeset) do
       {:ok, event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         {:ok, event}
 
@@ -1526,6 +1548,7 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, updated_event} ->
+        invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: updated_event})
 
         if was_tbd and not tbd do
@@ -1551,6 +1574,8 @@ defmodule Ysc.Events do
 
     case result do
       {:ok, ticket_tier} ->
+        invalidate_event_caches()
+
         broadcast(%Ysc.MessagePassingEvents.TicketTierAdded{
           ticket_tier: ticket_tier
         })
@@ -1581,6 +1606,8 @@ defmodule Ysc.Events do
     |> Repo.update()
     |> case do
       {:ok, ticket_tier} ->
+        invalidate_event_caches()
+
         broadcast(%Ysc.MessagePassingEvents.TicketTierUpdated{
           ticket_tier: ticket_tier
         })
@@ -1599,6 +1626,8 @@ defmodule Ysc.Events do
     Repo.delete(ticket_tier)
     |> case do
       {:ok, ticket_tier} ->
+        invalidate_event_caches()
+
         broadcast(%Ysc.MessagePassingEvents.TicketTierDeleted{
           ticket_tier: ticket_tier
         })
@@ -2812,5 +2841,11 @@ defmodule Ysc.Events do
 
   defp broadcast(event) do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, event})
+  end
+
+  defp invalidate_event_caches do
+    Ysc.Events.EventListCache.invalidate()
+    Ysc.Events.EventPricingCache.invalidate()
+    :ok
   end
 end

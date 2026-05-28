@@ -188,6 +188,45 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "get_ticket_order_for_checkout/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns order with checkout preloads only", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      found = Tickets.get_ticket_order_for_checkout(order.id)
+      assert found.id == order.id
+      assert Ecto.assoc_loaded?(found.user)
+      refute Ecto.assoc_loaded?(found.event)
+      assert Ecto.assoc_loaded?(found.tickets)
+      assert Enum.all?(found.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+
+    test "get_user_ticket_order_for_checkout scopes to user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert Tickets.get_user_ticket_order_for_checkout(user.id, order.id).id ==
+               order.id
+
+      assert Tickets.get_user_ticket_order_for_checkout(
+               Ecto.ULID.generate(),
+               order.id
+             ) == nil
+    end
+  end
+
   describe "get_ticket_order_by_reference/1" do
     setup do
       tickets_setup()

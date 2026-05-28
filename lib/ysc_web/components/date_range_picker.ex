@@ -122,7 +122,8 @@ defmodule YscWeb.Components.DateRangePicker do
                     @max,
                     @property,
                     @today,
-                    @allow_saturdays
+                    @allow_saturdays,
+                    @seasons
                   ) &&
                     get_date_tooltip(day, @date_tooltips),
                   do: "group",
@@ -144,7 +145,8 @@ defmodule YscWeb.Components.DateRangePicker do
                     @max,
                     @property,
                     @today,
-                    @allow_saturdays
+                    @allow_saturdays,
+                    @seasons
                   )
                 }
                 class={[
@@ -158,7 +160,8 @@ defmodule YscWeb.Components.DateRangePicker do
                     @max,
                     @property,
                     @today,
-                    @allow_saturdays
+                    @allow_saturdays,
+                    @seasons
                   ) &&
                     "text-zinc-300 cursor-not-allowed opacity-50",
                   !date_disabled?(
@@ -169,7 +172,8 @@ defmodule YscWeb.Components.DateRangePicker do
                     @max,
                     @property,
                     @today,
-                    @allow_saturdays
+                    @allow_saturdays,
+                    @seasons
                   ) &&
                     !before_min_date?(day, @min) &&
                     "hover:bg-blue-300 hover:border hover:border-blue-500",
@@ -195,7 +199,8 @@ defmodule YscWeb.Components.DateRangePicker do
                     @max,
                     @property,
                     @today,
-                    @allow_saturdays
+                    @allow_saturdays,
+                    @seasons
                   ) &&
                     get_date_tooltip(day, @date_tooltips)
                 }
@@ -277,6 +282,7 @@ defmodule YscWeb.Components.DateRangePicker do
       |> assign(:property, assigns[:property])
       |> assign(:today, today)
       |> assign(:date_tooltips, assigns[:date_tooltips] || %{})
+      |> assign(:seasons, assigns[:seasons])
       |> assign(:allow_saturdays, assigns[:allow_saturdays] || false)
       # Only reset state if we don't have a range yet, otherwise preserve it
       |> assign(
@@ -415,7 +421,8 @@ defmodule YscWeb.Components.DateRangePicker do
                  socket.assigns[:max],
                  socket.assigns[:property],
                  socket.assigns[:today],
-                 socket.assigns[:allow_saturdays] || false
+                 socket.assigns[:allow_saturdays] || false,
+                 socket.assigns[:seasons]
                ) do
               nil
             else
@@ -610,7 +617,8 @@ defmodule YscWeb.Components.DateRangePicker do
          max,
          property,
          today,
-         allow_saturdays
+         allow_saturdays,
+         seasons
        ) do
     if before_min_date?(day, min) do
       true
@@ -624,7 +632,8 @@ defmodule YscWeb.Components.DateRangePicker do
           state,
           property,
           today,
-          allow_saturdays
+          allow_saturdays,
+          seasons
         )
       end
     end
@@ -640,12 +649,13 @@ defmodule YscWeb.Components.DateRangePicker do
          state,
          property,
          today,
-         allow_saturdays
+         allow_saturdays,
+         seasons
        ) do
     if property && today do
       alias Ysc.Bookings.SeasonHelpers
 
-      if SeasonHelpers.date_selectable?(property, day, today) do
+      if SeasonHelpers.date_selectable?(property, day, today, seasons) do
         check_other_rules(day, range_start, state, allow_saturdays)
       else
         true
@@ -720,7 +730,8 @@ defmodule YscWeb.Components.DateRangePicker do
         if SeasonHelpers.date_selectable?(
              socket.assigns[:property],
              date,
-             socket.assigns[:today]
+             socket.assigns[:today],
+             socket.assigns[:seasons]
            ) do
           # Continue with other checks
           check_other_selection_rules(socket, date)
