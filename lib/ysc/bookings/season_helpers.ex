@@ -14,11 +14,28 @@ defmodule Ysc.Bookings.SeasonHelpers do
   @doc """
   Gets the current season and its actual date range for a property.
 
+  When `seasons` is a preloaded list (e.g. from `SeasonCache`), no DB query is made.
+
   Returns `{current_season, season_start_date, season_end_date}`.
   """
-  def get_current_season_info(property, today \\ Date.utc_today()) do
-    current_season = Season.for_date(property, today)
+  def get_current_season_info(
+        property,
+        today \\ Date.utc_today(),
+        seasons \\ nil
+      )
 
+  def get_current_season_info(_property, today, seasons)
+      when is_list(seasons) do
+    current_season = Season.find_season_for_date(seasons, today)
+    season_info_for_current(current_season, today)
+  end
+
+  def get_current_season_info(property, today, nil) do
+    current_season = Season.for_date(property, today)
+    season_info_for_current(current_season, today)
+  end
+
+  defp season_info_for_current(current_season, today) do
     if current_season do
       {season_start_date, season_end_date} =
         get_season_date_range(current_season, today)
@@ -50,33 +67,45 @@ defmodule Ysc.Bookings.SeasonHelpers do
   Individual date validation (checking if dates fall into restricted seasons) is handled
   by date_selectable?/3, which will disable dates in restricted seasons.
   """
-  def calculate_max_booking_date(property, today \\ Date.utc_today()) do
-    current_season = Season.for_date(property, today)
+  def calculate_max_booking_date(
+        property,
+        today \\ Date.utc_today(),
+        seasons \\ nil
+      )
 
+  def calculate_max_booking_date(_property, today, seasons)
+      when is_list(seasons) do
+    current_season = Season.find_season_for_date(seasons, today)
+    max_booking_date_for_current_season(current_season, today, seasons)
+  end
+
+  def calculate_max_booking_date(property, today, nil) do
+    current_season = Season.for_date(property, today)
+    max_booking_date_for_current_season(current_season, today, nil)
+  end
+
+  defp max_booking_date_for_current_season(current_season, today, seasons) do
     if current_season do
-      calculate_max_booking_date_with_season(property, current_season, today)
+      calculate_max_booking_date_with_season(current_season, today, seasons)
     else
-      # No current season found - use a conservative default
       Date.add(today, 365)
     end
   end
 
-  defp calculate_max_booking_date_with_season(property, current_season, today) do
+  defp calculate_max_booking_date_with_season(current_season, today, seasons) do
     if current_season.advance_booking_days &&
          current_season.advance_booking_days > 0 do
       # Current season has a limit - apply it
       Date.add(today, current_season.advance_booking_days)
     else
-      # Current season has no limit - allow up to the end of current season
-      calculate_max_booking_date_no_limit(property, current_season, today)
+      calculate_max_booking_date_no_limit(current_season, today, seasons)
     end
   end
 
-  defp calculate_max_booking_date_no_limit(property, current_season, today) do
+  defp calculate_max_booking_date_no_limit(current_season, today, seasons) do
     {_season_start, season_end} = get_season_date_range(current_season, today)
 
-    # Also check if we can book into the next season (if it has a limit)
-    next_season = get_next_season(property, today)
+    next_season = get_next_season(current_season, today, seasons)
 
     max_date = season_end
 
@@ -103,15 +132,28 @@ defmodule Ysc.Bookings.SeasonHelpers do
   - It's in a season with no advance booking limit, OR
   - It's in a season with a limit AND it's within the advance booking window
   """
-  def date_selectable?(property, date, today \\ Date.utc_today()) do
-    season = Season.for_date(property, date)
+  def date_selectable?(
+        property,
+        date,
+        today \\ Date.utc_today(),
+        seasons \\ nil
+      )
 
+  def date_selectable?(_property, date, today, seasons) when is_list(seasons) do
+    season = Season.find_season_for_date(seasons, date)
+    date_selectable_for_season?(season, date, today)
+  end
+
+  def date_selectable?(property, date, today, nil) do
+    season = Season.for_date(property, date)
+    date_selectable_for_season?(season, date, today)
+  end
+
+  defp date_selectable_for_season?(season, date, today) do
     if season && season.advance_booking_days && season.advance_booking_days > 0 do
-      # Season has a limit - check if date is within the advance booking window
       max_booking_date = Date.add(today, season.advance_booking_days)
       Date.compare(date, max_booking_date) != :gt
     else
-      # No limit for this season - date is selectable
       true
     end
   end
@@ -263,11 +305,15 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   # Gets the next season that comes after the given date
-  defp get_next_season(property, reference_date) do
-    # Use cached seasons list for better performance
+  defp get_next_season(current_season, reference_date, seasons) do
     alias Ysc.Bookings.SeasonCache
-    all_seasons = SeasonCache.get_all_for_property(property)
-    current_season = Season.for_date(property, reference_date)
+
+    all_seasons =
+      if is_list(seasons) do
+        seasons
+      else
+        SeasonCache.get_all_for_property(current_season.property)
+      end
 
     if current_season && length(all_seasons) > 1 do
       # Find the next season by calculating which one starts next

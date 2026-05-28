@@ -5,6 +5,7 @@ defmodule Ysc.Subscriptions do
 
   import Ecto.Query, warn: false
   alias Ysc.Accounts.MembershipCache
+  alias Ysc.Accounts.UserProfileCache
   alias Ysc.Repo
   alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
 
@@ -98,12 +99,10 @@ defmodule Ysc.Subscriptions do
       |> Subscription.changeset(attrs)
       |> Repo.update()
 
-    # Invalidate membership cache when subscription is updated
     case result do
       {:ok, updated_subscription} ->
-        # Invalidate cache for the user
         if updated_subscription.user_id do
-          MembershipCache.invalidate_user(updated_subscription.user_id)
+          invalidate_membership_caches(updated_subscription.user_id)
           broadcast_membership_updated(updated_subscription.user_id)
         end
 
@@ -130,11 +129,10 @@ defmodule Ysc.Subscriptions do
     user_id = subscription.user_id
     result = Repo.delete(subscription)
 
-    # Invalidate membership cache when subscription is deleted
     case result do
       {:ok, _} ->
         if user_id do
-          MembershipCache.invalidate_user(user_id)
+          invalidate_membership_caches(user_id)
           broadcast_membership_updated(user_id)
         end
 
@@ -499,7 +497,7 @@ defmodule Ysc.Subscriptions do
              Stripe.SubscriptionSchedule.release(schedule_id)
            end) do
       if subscription.user_id do
-        MembershipCache.invalidate_user(subscription.user_id)
+        invalidate_membership_caches(subscription.user_id)
       end
 
       {:ok, subscription}
@@ -561,7 +559,7 @@ defmodule Ysc.Subscriptions do
              |> Repo.update() do
           {:ok, updated_subscription} ->
             if updated_subscription.user_id do
-              MembershipCache.invalidate_user(updated_subscription.user_id)
+              invalidate_membership_caches(updated_subscription.user_id)
             end
 
             {:ok, Repo.preload(updated_subscription, :subscription_items)}
@@ -1555,7 +1553,7 @@ defmodule Ysc.Subscriptions do
           )
 
           # Invalidate membership cache when subscription is created
-          MembershipCache.invalidate_user(user.id)
+          invalidate_membership_caches(user.id)
           broadcast_membership_updated(user.id)
 
           {:ok, subscription}
@@ -1703,4 +1701,10 @@ defmodule Ysc.Subscriptions do
   end
 
   defp broadcast_membership_updated(_), do: :ok
+
+  defp invalidate_membership_caches(user_id) when is_binary(user_id) do
+    MembershipCache.invalidate_user(user_id)
+    UserProfileCache.invalidate_user(user_id)
+    :ok
+  end
 end

@@ -18,6 +18,7 @@ defmodule Ysc.Accounts do
     FamilyInvite,
     MembershipCache,
     User,
+    UserProfileCache,
     UserToken,
     UserNotifier,
     AuthService,
@@ -176,8 +177,20 @@ defmodule Ysc.Accounts do
 
   """
   def get_user!(id, preloads \\ []) do
+    Ysc.Accounts.UserProfileCache.get_user!(id, preloads)
+  end
+
+  def get_user_from_db!(id, preloads \\ []) do
     Repo.get!(User, id) |> Repo.preload(preloads)
   end
+
+  defp invalidate_user_profile_cache(%User{id: id}),
+    do: UserProfileCache.invalidate_user(id)
+
+  defp invalidate_user_profile_cache(id) when is_binary(id),
+    do: UserProfileCache.invalidate_user(id)
+
+  defp invalidate_user_profile_cache(_), do: :ok
 
   @doc """
   Gets a single user, returns nil if not found.
@@ -343,11 +356,18 @@ defmodule Ysc.Accounts do
   Dismisses the passkey prompt for a user by setting passkey_prompt_dismissed_at to current time.
   """
   def dismiss_passkey_prompt(user) do
-    user
-    |> User.update_user_changeset(%{
-      passkey_prompt_dismissed_at: DateTime.utc_now()
-    })
-    |> Repo.update()
+    case user
+         |> User.update_user_changeset(%{
+           passkey_prompt_dismissed_at: DateTime.utc_now()
+         })
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -818,6 +838,8 @@ defmodule Ysc.Accounts do
              validate_email: false
            )
            |> Repo.update() do
+      invalidate_user_profile_cache(updated_user)
+
       # Update Stripe customer with new phone information
       Task.start(fn ->
         Ysc.Customers.update_stripe_customer(updated_user)
@@ -1411,6 +1433,8 @@ defmodule Ysc.Accounts do
 
       case user |> User.update_user_changeset(params) |> Repo.update() do
         {:ok, updated_user} ->
+          Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
           Task.start(fn ->
             Ysc.Customers.update_stripe_customer(updated_user)
           end)
@@ -1434,6 +1458,8 @@ defmodule Ysc.Accounts do
            |> User.update_user_with_address_changeset(params)
            |> Repo.update() do
         {:ok, updated_user} ->
+          Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
           Task.start(fn ->
             Ysc.Customers.update_stripe_customer(updated_user)
           end)
@@ -1487,6 +1513,8 @@ defmodule Ysc.Accounts do
 
       case result do
         {:ok, updated_user} ->
+          Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
           Task.start(fn ->
             Ysc.Customers.update_stripe_customer(updated_user)
           end)
@@ -1548,7 +1576,8 @@ defmodule Ysc.Accounts do
   def update_user_profile(user, attrs) do
     with {:ok, updated_user} <-
            user |> User.profile_changeset(attrs) |> Repo.update() do
-      # Update Stripe customer with new information
+      Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
       Task.start(fn ->
         Ysc.Customers.update_stripe_customer(updated_user)
       end)
@@ -1568,9 +1597,16 @@ defmodule Ysc.Accounts do
   Updates the user notification preferences.
   """
   def update_notification_preferences(user, attrs) do
-    user
-    |> User.notification_preferences_changeset(attrs)
-    |> Repo.update()
+    case user
+         |> User.notification_preferences_changeset(attrs)
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -1595,6 +1631,7 @@ defmodule Ysc.Accounts do
            address
            |> Address.changeset(attrs_with_user_id)
            |> Repo.insert_or_update() do
+      Ysc.Accounts.UserProfileCache.invalidate_user(user.id)
       # Reload user with updated billing address and update Stripe customer
       updated_user = get_user!(user.id, [:billing_address])
 
@@ -1635,6 +1672,8 @@ defmodule Ysc.Accounts do
          {:ok, %{user: updated_user}} <-
            Repo.transaction(user_email_multi(user, email, context)),
          reloaded_user <- Repo.get!(User, updated_user.id) do
+      invalidate_user_profile_cache(reloaded_user)
+
       # Update Stripe customer with new email
       Task.start(fn ->
         Ysc.Customers.update_stripe_customer(reloaded_user)
@@ -1822,36 +1861,71 @@ defmodule Ysc.Accounts do
     user = Repo.one(query)
 
     if user do
-      # Check membership cache first - if we have cached membership data, we can skip
-      # subscription preload to reduce DB queries. The membership cache will load
-      # subscriptions on-demand if needed (when cache misses or expires).
-      #
-      # Note: This means subscriptions may not be preloaded on the user object.
-      # Code that needs subscriptions should check Ecto.assoc_loaded?/1 or use
-      # the membership cache functions which handle this automatically.
-      cache_key = "membership:#{user.id}:active"
-
-      case :ysc_cache |> Cachex.get(cache_key) do
-        {:ok, nil} ->
-          # Cache miss - preload subscriptions for membership check and other uses
-          preload_active_subscriptions_for_auth(user)
-
-        {:ok, _cached_membership} ->
-          # Cache hit - skip subscription preload but still load avatar
-          Repo.preload(user, :current_avatar)
-
-        {:error, _reason} ->
-          # Cache error - fallback to preloading for safety
-          preload_active_subscriptions_for_auth(user)
+      if user_subscriptions_fully_loaded?(user) do
+        Repo.preload(user, :current_avatar)
+      else
+        load_user_for_session_with_membership_cache(user)
       end
     else
       nil
     end
   end
 
+  defp load_user_for_session_with_membership_cache(user) do
+    # Check membership cache first - if we have cached membership data, we can skip
+    # subscription preload to reduce DB queries. The membership cache will load
+    # subscriptions on-demand if needed (when cache misses or expires).
+    #
+    # Note: This means subscriptions may not be preloaded on the user object.
+    # Code that needs subscriptions should check Ecto.assoc_loaded?/1 or use
+    # the membership cache functions which handle this automatically.
+    cache_key = "membership:#{user.id}:active"
+
+    case :ysc_cache |> Cachex.get(cache_key) do
+      {:ok, nil} ->
+        # Cache miss - preload subscriptions for membership check and other uses
+        preload_active_subscriptions_for_auth(user)
+
+      {:ok, _cached_membership} ->
+        # Cache hit - skip subscription preload but still load avatar
+        Repo.preload(user, :current_avatar)
+
+      {:error, _reason} ->
+        # Cache error - fallback to preloading for safety
+        preload_active_subscriptions_for_auth(user)
+    end
+  end
+
+  defp user_subscriptions_fully_loaded?(user) do
+    Ecto.assoc_loaded?(user.subscriptions) and
+      Enum.all?(user.subscriptions, fn sub ->
+        Ecto.assoc_loaded?(sub.subscription_items)
+      end)
+  end
+
+  @doc """
+  Ensures a user has active subscriptions and subscription_items loaded for booking flows.
+  Reuses existing preloads when present to avoid duplicate queries.
+  """
+  def preload_user_subscriptions_for_booking(user) do
+    if user_subscriptions_fully_loaded?(user) do
+      user
+    else
+      preload_active_subscriptions_for_auth(user)
+    end
+  end
+
   # Optimized preload that only fetches active subscriptions with subscription_items
   # This reduces queries from 2+ (user + all subscriptions) to 1 (user + active subscriptions)
   defp preload_active_subscriptions_for_auth(user) do
+    if user_subscriptions_fully_loaded?(user) do
+      Repo.preload(user, :current_avatar)
+    else
+      do_preload_active_subscriptions_for_auth(user)
+    end
+  end
+
+  defp do_preload_active_subscriptions_for_auth(user) do
     active_subscriptions =
       from(s in Ysc.Subscriptions.Subscription,
         where: s.user_id == ^user.id,
@@ -2688,31 +2762,52 @@ defmodule Ysc.Accounts do
   Marks a user's email as verified by setting the email_verified_at timestamp.
   """
   def mark_email_verified(user) do
-    user
-    |> User.email_verification_changeset(%{
-      email_verified_at: DateTime.utc_now()
-    })
-    |> Repo.update()
+    case user
+         |> User.email_verification_changeset(%{
+           email_verified_at: DateTime.utc_now()
+         })
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
   Marks a user's phone as verified by setting the phone_verified_at timestamp.
   """
   def mark_phone_verified(user) do
-    user
-    |> User.phone_verification_changeset(%{
-      phone_verified_at: DateTime.utc_now()
-    })
-    |> Repo.update()
+    case user
+         |> User.phone_verification_changeset(%{
+           phone_verified_at: DateTime.utc_now()
+         })
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
   Marks a user's password as set by setting the password_set_at timestamp.
   """
   def mark_password_set(user) do
-    user
-    |> User.password_set_changeset(%{password_set_at: DateTime.utc_now()})
-    |> Repo.update()
+    case user
+         |> User.password_set_changeset(%{password_set_at: DateTime.utc_now()})
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   ## Family Account Functions

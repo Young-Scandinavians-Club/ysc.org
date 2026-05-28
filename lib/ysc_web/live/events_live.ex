@@ -4,6 +4,7 @@ defmodule YscWeb.EventsLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.Events
+  alias Ysc.Events.EventListCache
   alias Ysc.Media.Image
 
   @impl true
@@ -35,6 +36,7 @@ defmodule YscWeb.EventsLive do
               show_hero={true}
               upcoming={true}
               defer_load={!@async_data_loaded}
+              event_list_cache_version={@event_list_cache_version}
             />
           </div>
 
@@ -148,7 +150,11 @@ defmodule YscWeb.EventsLive do
                 What Was
               </span>
             </h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div
+              id="past-events"
+              phx-update="stream"
+              class="grid grid-cols-2 md:grid-cols-4 gap-4"
+            >
               <div
                 :for={{id, event} <- @streams.past_events}
                 id={id}
@@ -231,11 +237,13 @@ defmodule YscWeb.EventsLive do
       |> assign(:past_events_limit, 10)
       |> assign(:has_more_past_events, false)
       |> assign(:async_data_loaded, false)
+      |> assign(:event_list_cache_version, 0)
       |> stream(:past_events, [], reset: true)
 
     if connected?(socket) do
       # Subscribe to real-time updates only when connected
       Events.subscribe()
+      EventListCache.subscribe()
 
       # Load all data asynchronously after WebSocket connection
       {:ok, load_events_data_async(socket)}
@@ -249,51 +257,17 @@ defmodule YscWeb.EventsLive do
     past_events_limit = socket.assigns.past_events_limit
 
     start_async(socket, :load_events_data, fn ->
-      # Run queries in parallel
-      tasks = [
-        {:upcoming_count, fn -> Events.count_upcoming_events() end},
-        {:past_events, fn -> Events.list_past_events(past_events_limit) end}
-      ]
-
-      results =
-        tasks
-        |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
-          timeout: :infinity
-        )
-        |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
-          Map.put(acc, key, value)
-        end)
-
-      # Compute has_more_past_events based on results
-      past_events = Map.get(results, :past_events, [])
-
-      has_more =
-        if length(past_events) == past_events_limit do
-          # Allow sandbox access for this query
-          allow_sandbox_access()
-          Events.has_more_past_events?(past_events_limit)
-        else
-          false
-        end
-
-      Map.put(results, :has_more_past_events, has_more)
+      %{past_events_limit: past_events_limit}
     end)
   end
 
   @impl true
-  def handle_async(:load_events_data, {:ok, results}, socket) do
-    total_upcoming_count = Map.get(results, :upcoming_count, 0)
-    past_events = Map.get(results, :past_events, [])
-    has_more_past_events = Map.get(results, :has_more_past_events, false)
-    past_events_exist = Enum.any?(past_events)
-
-    {:noreply,
-     socket
-     |> assign(:total_upcoming_count, total_upcoming_count)
-     |> assign(:past_events_exist, past_events_exist)
-     |> assign(:has_more_past_events, has_more_past_events)
-     |> assign(:async_data_loaded, true)
-     |> stream(:past_events, past_events, reset: true)}
+  def handle_async(
+        :load_events_data,
+        {:ok, %{past_events_limit: past_events_limit}},
+        socket
+      ) do
+    {:noreply, assign_cached_events_data(socket, past_events_limit)}
   end
 
   def handle_async(:load_events_data, {:exit, reason}, socket) do
@@ -303,6 +277,13 @@ defmodule YscWeb.EventsLive do
   end
 
   @impl true
+  def handle_info({:event_list_cache_invalidated, _version}, socket) do
+    {:noreply,
+     socket
+     |> assign(:event_list_cache_version, System.unique_integer([:positive]))
+     |> refresh_events_from_cache()}
+  end
+
   def handle_info({Ysc.Events, %_event{event: _} = base_event}, socket) do
     notify_events_list_update(socket, base_event)
   end
@@ -362,6 +343,33 @@ defmodule YscWeb.EventsLive do
   end
 
   defp upcoming_events_list_id, do: "upcoming_events"
+
+  defp refresh_events_from_cache(socket) do
+    if socket.assigns.async_data_loaded do
+      assign_cached_events_data(socket, socket.assigns.past_events_limit)
+    else
+      socket
+    end
+  end
+
+  defp assign_cached_events_data(socket, past_events_limit) do
+    past_events = Events.list_past_events(past_events_limit)
+
+    has_more_past_events =
+      if length(past_events) == past_events_limit do
+        allow_sandbox_access()
+        Events.has_more_past_events?(past_events_limit)
+      else
+        false
+      end
+
+    socket
+    |> assign(:total_upcoming_count, Events.count_upcoming_events())
+    |> assign(:past_events_exist, Enum.any?(past_events))
+    |> assign(:has_more_past_events, has_more_past_events)
+    |> assign(:async_data_loaded, true)
+    |> stream(:past_events, past_events, reset: true)
+  end
 
   defp notify_events_list_update(socket, event_message) do
     send_update(YscWeb.EventsListLive,

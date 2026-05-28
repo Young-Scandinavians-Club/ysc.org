@@ -263,6 +263,40 @@ defmodule Ysc.BookingsTest do
       assert booking.guests_count == 4
     end
 
+    test "update_booking/3 with opts passes changeset options" do
+      alias Ysc.Bookings.AvailabilityCache
+
+      booking =
+        booking_fixture(%{property: :clear_lake}) |> Ysc.Repo.preload(:rooms)
+
+      start_date = booking.checkin_date
+      end_date = booking.checkout_date
+
+      AvailabilityCache.get_clear_lake_daily_availability(start_date, end_date)
+
+      assert {:ok, %Booking{} = updated} =
+               Bookings.update_booking(
+                 booking,
+                 %{guests_count: booking.guests_count + 1},
+                 skip_validation: true
+               )
+
+      assert updated.guests_count == booking.guests_count + 1
+
+      {_cached, queries_after} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            AvailabilityCache.get_clear_lake_daily_availability(
+              start_date,
+              end_date
+            )
+          end,
+          pattern: ~r/FROM "bookings"/i
+        )
+
+      assert queries_after >= 1
+    end
+
     test "update_booking/2 with invalid data returns error changeset" do
       booking = booking_fixture() |> Ysc.Repo.preload(:rooms)
 

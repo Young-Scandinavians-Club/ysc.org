@@ -36,6 +36,33 @@ defmodule YscWeb.HomeLiveTest do
       assert render(view) =~ "Young Scandinavians Club"
     end
 
+    test "refreshes latest news when public content cache is invalidated", %{
+      conn: conn
+    } do
+      author = user_fixture(%{role: "admin"})
+      title = "PubSub News #{System.unique_integer()}"
+
+      {:ok, view, _html} = live(conn, ~p"/")
+      render(view)
+
+      url_name = "pubsub-news-#{System.unique_integer()}"
+
+      assert {:ok, _post} =
+               Posts.create_post(
+                 %{
+                   "title" => title,
+                   "body" => "Body",
+                   "url_name" => url_name,
+                   "state" => "published",
+                   "featured_post" => false,
+                   "published_on" => DateTime.utc_now()
+                 },
+                 author
+               )
+
+      assert has_element?(view, "a[href='/posts/#{url_name}']", title)
+    end
+
     test "shows upcoming event title when an upcoming event exists", %{
       conn: conn
     } do

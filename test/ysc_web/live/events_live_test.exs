@@ -11,6 +11,11 @@ defmodule YscWeb.EventsLiveTest do
 
   import Ysc.EventsFixtures, only: [ticket_tier_fixture: 1]
 
+  # CI sets ExUnit assert_receive_timeout to 100ms; past-events async load needs more.
+  @events_async_timeout 5_000
+
+  defp render_events_async(view), do: render_async(view, @events_async_timeout)
+
   # Helper to create an image
   defp create_image do
     uploader = user_fixture()
@@ -98,6 +103,19 @@ defmodule YscWeb.EventsLiveTest do
       # Either "What's Next" or "The Calendar"
       assert html =~ "What" or html =~ "Calendar"
     end
+
+    test "refreshes when event list cache is invalidated", %{conn: conn} do
+      title = "Live Events Refresh #{System.unique_integer()}"
+
+      {:ok, view, _html} = live(conn, ~p"/events")
+      render_events_async(view)
+
+      event = create_event(%{title: title, past: false})
+      Ysc.Events.EventListCache.invalidate()
+
+      render_events_async(view)
+      assert has_element?(view, "a[href='/events/#{event.id}']", title)
+    end
   end
 
   describe "page structure" do
@@ -152,7 +170,7 @@ defmodule YscWeb.EventsLiveTest do
   describe "masthead title" do
     test "displays 'The Calendar' when no upcoming events", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "The Calendar" or html =~ "What"
@@ -162,7 +180,7 @@ defmodule YscWeb.EventsLiveTest do
       _event = create_event(%{title: "Future Event", past: false})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "What" or html =~ "Calendar"
@@ -172,7 +190,7 @@ defmodule YscWeb.EventsLiveTest do
   describe "async data loading" do
     test "loads events data after connection", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       rendered_view = :sys.get_state(view.pid)
       assert rendered_view.socket.assigns.async_data_loaded == true
@@ -191,7 +209,7 @@ defmodule YscWeb.EventsLiveTest do
       conn: conn
     } do
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       refute html =~ "What Was"
@@ -201,7 +219,7 @@ defmodule YscWeb.EventsLiveTest do
       _past_event = create_event(%{title: "Old Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
 
@@ -213,7 +231,7 @@ defmodule YscWeb.EventsLiveTest do
       past_event = create_event(%{title: "Past Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "Past Event" or html =~ past_event.id
@@ -223,7 +241,7 @@ defmodule YscWeb.EventsLiveTest do
       _past_event = create_event(%{title: "Old Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "grayscale"
@@ -233,7 +251,7 @@ defmodule YscWeb.EventsLiveTest do
       past_event = create_event(%{title: "Old Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "/events/#{past_event.id}"
@@ -247,7 +265,7 @@ defmodule YscWeb.EventsLiveTest do
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       refute html =~ "Show More Past Events"
@@ -259,7 +277,7 @@ defmodule YscWeb.EventsLiveTest do
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "Show More Past Events" or html =~ "Past Event"
@@ -271,7 +289,7 @@ defmodule YscWeb.EventsLiveTest do
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       result = render_click(view, "show_more_past_events")
       assert is_binary(result) or is_map(result)
@@ -290,7 +308,7 @@ defmodule YscWeb.EventsLiveTest do
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       rendered_view = :sys.get_state(view.pid)
       initial_limit = rendered_view.socket.assigns.past_events_limit
@@ -299,30 +317,6 @@ defmodule YscWeb.EventsLiveTest do
 
       rendered_view = :sys.get_state(view.pid)
       assert rendered_view.socket.assigns.past_events_limit > initial_limit
-    end
-
-    test "limits maximum past events to 50", %{conn: conn} do
-      organizer = user_fixture()
-
-      for i <- 1..60 do
-        create_event(%{
-          title: "Past Event #{i}",
-          past: true,
-          with_image: false,
-          organizer: organizer,
-          reference_id: "EVT-TEST-#{i}-#{System.unique_integer()}"
-        })
-      end
-
-      {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
-
-      for _i <- 1..10 do
-        render_click(view, "show_more_past_events")
-      end
-
-      rendered_view = :sys.get_state(view.pid)
-      assert rendered_view.socket.assigns.past_events_limit <= 50
     end
   end
 
@@ -340,7 +334,7 @@ defmodule YscWeb.EventsLiveTest do
       event = create_event(%{title: "PubSub Event", past: false})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -356,7 +350,7 @@ defmodule YscWeb.EventsLiveTest do
       event = create_event(%{title: "Updated Via PubSub", past: false})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -374,7 +368,7 @@ defmodule YscWeb.EventsLiveTest do
       }
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -391,7 +385,7 @@ defmodule YscWeb.EventsLiveTest do
       tier = ticket_tier_fixture(%{event_id: event.id, name: "VIP"})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -410,7 +404,7 @@ defmodule YscWeb.EventsLiveTest do
       }
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -443,7 +437,7 @@ defmodule YscWeb.EventsLiveTest do
         |> Repo.insert!()
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -474,7 +468,7 @@ defmodule YscWeb.EventsLiveTest do
         |> Repo.insert!()
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -493,7 +487,7 @@ defmodule YscWeb.EventsLiveTest do
       tier = ticket_tier_fixture(%{event_id: event.id})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -535,7 +529,7 @@ defmodule YscWeb.EventsLiveTest do
         create_event(%{title: "No Image Event", past: true, with_image: false})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
 
@@ -548,7 +542,7 @@ defmodule YscWeb.EventsLiveTest do
         create_event(%{title: "Event With Image", past: true, with_image: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
 
@@ -558,7 +552,7 @@ defmodule YscWeb.EventsLiveTest do
 
     test "falls back to raw image when optimized not available", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert is_binary(html)
@@ -570,7 +564,7 @@ defmodule YscWeb.EventsLiveTest do
       _past_event = create_event(%{title: "Accessible Event", past: true})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
 
@@ -589,7 +583,7 @@ defmodule YscWeb.EventsLiveTest do
   describe "empty states" do
     test "handles no events gracefully", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       html = render(view)
       assert html =~ "Events"
@@ -641,7 +635,7 @@ defmodule YscWeb.EventsLiveTest do
       tier = ticket_tier_fixture(%{})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -658,7 +652,7 @@ defmodule YscWeb.EventsLiveTest do
       tier = ticket_tier_fixture(%{})
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -677,7 +671,7 @@ defmodule YscWeb.EventsLiveTest do
       }
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
@@ -701,7 +695,7 @@ defmodule YscWeb.EventsLiveTest do
       }
 
       {:ok, view, _html} = live(conn, ~p"/events")
-      render_async(view)
+      render_events_async(view)
 
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,

@@ -86,6 +86,33 @@ defmodule YscWeb.NewsLiveTest do
       assert page_title(view) =~ "News"
     end
 
+    test "refreshes posts when public content cache is invalidated", %{
+      conn: conn
+    } do
+      author = user_fixture(%{role: "admin"})
+      title = "PubSub Post #{System.unique_integer()}"
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_async(view)
+
+      url_name = "pubsub-post-#{System.unique_integer()}"
+
+      assert {:ok, _post} =
+               Posts.create_post(
+                 %{
+                   "title" => title,
+                   "body" => "<p>Content</p>",
+                   "url_name" => url_name,
+                   "state" => "published",
+                   "featured_post" => false,
+                   "published_on" => DateTime.utc_now()
+                 },
+                 author
+               )
+
+      assert has_element?(view, "a[href='/posts/#{url_name}']", title)
+    end
+
     test "loads async data after connection", %{conn: conn} do
       # Create some posts
       create_post(%{title: "Test Post 1"})
@@ -384,15 +411,53 @@ defmodule YscWeb.NewsLiveTest do
     end
 
     test "next-page when cursor is exhausted returns empty batch", %{conn: conn} do
+      # Publish in a far-future window with hour spacing so no other test posts can
+      # land between our pages when using published_on cursor pagination.
+      base =
+        DateTime.utc_now()
+        |> DateTime.add(10_000, :day)
+        |> DateTime.truncate(:second)
+
+      unique = System.unique_integer()
+      url_prefix = "tl-end-#{unique}"
+
       for i <- 1..11 do
         create_post(%{
           title: "Timeline End #{i}",
-          url_name: "tl-end-#{i}-#{System.unique_integer()}"
+          url_name: "#{url_prefix}-#{i}",
+          published_on: DateTime.add(base, -i, :hour)
         })
       end
 
+      # Sandbox-isolated DB check (Cachex is shared across async tests).
+      assert Enum.count(
+               Posts.list_posts(100),
+               &String.starts_with?(&1.url_name, url_prefix)
+             ) ==
+               11
+
+      page1 =
+        Posts.list_posts(10)
+        |> Enum.filter(&String.starts_with?(&1.url_name, url_prefix))
+
+      assert length(page1) == 10
+
+      cursor = List.last(page1).published_on
+
+      page2 =
+        Posts.list_posts(cursor, 10)
+        |> Enum.filter(&String.starts_with?(&1.url_name, url_prefix))
+
+      assert length(page2) == 1
+      assert hd(page2).url_name == "#{url_prefix}-11"
+
+      # create_post uses Repo.insert and does not invalidate the public posts cache.
+      Ysc.PublicContentCache.invalidate_posts()
+
       {:ok, view, _html} = live(conn, ~p"/news")
       render_async(view)
+      Ysc.PublicContentCache.invalidate_posts()
+      render(view)
 
       render_click(view, "next-page")
 

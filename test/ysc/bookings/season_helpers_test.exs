@@ -327,4 +327,27 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
       refute errors.advance_booking_limit =~ summer.name
     end
   end
+
+  describe "date_selectable?/4 with preloaded seasons" do
+    test "matches Season.for_date behavior without per-date DB lookups" do
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Advance Window",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-10-31],
+          advance_booking_days: 30
+        })
+        |> Repo.insert()
+
+      seasons = Ysc.Bookings.SeasonCache.get_all_for_property(:tahoe)
+      today = ~D[2025-06-01]
+      inside = Date.add(today, 20)
+      outside = Date.add(today, 60)
+
+      assert SeasonHelpers.date_selectable?(:tahoe, inside, today, seasons)
+      refute SeasonHelpers.date_selectable?(:tahoe, outside, today, seasons)
+    end
+  end
 end

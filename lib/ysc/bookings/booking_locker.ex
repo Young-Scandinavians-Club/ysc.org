@@ -207,6 +207,7 @@ defmodule Ysc.Bookings.BookingLocker do
       error ->
         error
     end
+    |> invalidate_availability_cache()
   end
 
   defp ensure_property_inventory_for_days(property, days) do
@@ -604,6 +605,7 @@ defmodule Ysc.Bookings.BookingLocker do
         error ->
           error
       end
+      |> invalidate_availability_cache()
     end
   end
 
@@ -981,6 +983,7 @@ defmodule Ysc.Bookings.BookingLocker do
       error ->
         error
     end
+    |> invalidate_availability_cache()
   end
 
   defp validate_per_guest_availability(
@@ -1304,7 +1307,7 @@ defmodule Ysc.Bookings.BookingLocker do
         # Schedule checkout reminder email (evening before checkout at 6:00 PM PST)
         schedule_checkout_reminder(confirmed_booking)
 
-        {:ok, confirmed_booking}
+        invalidate_availability_cache({:ok, confirmed_booking})
 
       # Booking was already confirmed by a prior call - return success without
       # re-triggering emails, SMS, or re-scheduling reminders.
@@ -1387,6 +1390,7 @@ defmodule Ysc.Bookings.BookingLocker do
       {:error, reason} ->
         {:error, reason}
     end
+    |> invalidate_availability_cache()
   end
 
   # Updates inventory to mark dates as booked for an admin-created booking
@@ -1744,6 +1748,7 @@ defmodule Ysc.Bookings.BookingLocker do
           Repo.rollback({:error, changeset})
       end
     end)
+    |> invalidate_availability_cache()
   end
 
   defp stripe_payment_intent_module do
@@ -1928,6 +1933,7 @@ defmodule Ysc.Bookings.BookingLocker do
           Repo.rollback({:error, changeset})
       end
     end)
+    |> invalidate_availability_cache()
   end
 
   @doc """
@@ -2036,9 +2042,17 @@ defmodule Ysc.Bookings.BookingLocker do
           Repo.rollback({:error, changeset})
       end
     end)
+    |> invalidate_availability_cache()
   end
 
   ## Private Functions
+
+  defp invalidate_availability_cache({:ok, _} = result) do
+    Ysc.Bookings.AvailabilityCache.invalidate()
+    result
+  end
+
+  defp invalidate_availability_cache(result), do: result
 
   defp ensure_property_inventory_row(property, day, capacity_total) do
     Repo.insert_all(

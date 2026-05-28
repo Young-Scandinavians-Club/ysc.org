@@ -3,7 +3,8 @@ defmodule YscWeb.HomeLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Accounts, Events, Newsletter, Posts, Tickets}
+  alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
+  alias Ysc.Accounts.UserProfileCache
   alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
@@ -35,6 +36,7 @@ defmodule YscWeb.HomeLive do
       # It will be cleared on the next page navigation
 
       if connected?(socket) do
+        PublicContentCache.subscribe()
         {:ok, load_home_data_async(socket)}
       else
         {:ok, socket}
@@ -43,6 +45,15 @@ defmodule YscWeb.HomeLive do
       # Guest user: load data synchronously for SEO
       # Search engines need to see content in the initial HTML response
       socket = mount_guest_with_data(socket)
+
+      socket =
+        if connected?(socket) do
+          PublicContentCache.subscribe()
+          socket
+        else
+          socket
+        end
+
       {:ok, socket}
     end
   end
@@ -108,10 +119,10 @@ defmodule YscWeb.HomeLive do
       [
         {:guest_events,
          fn ->
-           Events.list_upcoming_events(3)
+           PublicContentCache.list_upcoming_events(3)
            |> Enum.reject(&(&1.state == :cancelled))
          end},
-        {:guest_news, fn -> Posts.list_posts(3) end}
+        {:guest_news, fn -> PublicContentCache.list_recent_posts(3) end}
       ]
       |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
         timeout: :infinity,
@@ -160,13 +171,7 @@ defmodule YscWeb.HomeLive do
       {:user_data,
        fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
-      {:bookings, fn -> get_future_active_bookings(user_id) end},
-      {:events,
-       fn ->
-         Events.list_upcoming_events(3)
-         |> Enum.reject(&(&1.state == :cancelled))
-       end},
-      {:news, fn -> Posts.list_posts(3) end}
+      {:bookings, fn -> get_future_active_bookings(user_id) end}
     ]
 
     tasks
@@ -189,8 +194,7 @@ defmodule YscWeb.HomeLive do
       end
 
     user_with_subs =
-      Accounts.get_user!(user_id)
-      |> Ysc.Repo.preload(preloads)
+      UserProfileCache.get_user!(user_id, preloads)
       |> Accounts.User.populate_virtual_fields()
 
     is_sub_account = Accounts.sub_account?(user_with_subs)
@@ -242,22 +246,20 @@ defmodule YscWeb.HomeLive do
 
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
-    upcoming_events = Map.get(results, :events, [])
-    latest_news = Map.get(results, :news, [])
 
     socket =
-      assign(socket,
+      socket
+      |> assign(
         is_sub_account: is_sub_account,
         primary_user: primary_user,
         other_family_members: other_family_members,
         membership_paused_by_board: membership_paused_by_board,
         upcoming_tickets: upcoming_tickets,
         future_bookings: future_bookings,
-        upcoming_events: upcoming_events,
         show_passkey_prompt: show_passkey_prompt,
-        latest_news: latest_news,
         async_data_loaded: true
       )
+      |> assign_public_content_slices()
 
     {:noreply, socket}
   end
@@ -267,6 +269,35 @@ defmodule YscWeb.HomeLive do
     Ysc.Logging.error("Failed to load home data async: #{inspect(reason)}")
     # Mark as loaded to avoid infinite loading state
     {:noreply, assign(socket, :async_data_loaded, true)}
+  end
+
+  @impl true
+  def handle_info({:public_content_cache_invalidated, domain, _version}, socket) do
+    {:noreply, refresh_public_content(socket, domain)}
+  end
+
+  defp assign_public_content_slices(socket) do
+    assign(socket,
+      upcoming_events: list_home_upcoming_events(),
+      latest_news: PublicContentCache.list_recent_posts(3)
+    )
+  end
+
+  defp refresh_public_content(socket, :posts) do
+    assign(socket, latest_news: PublicContentCache.list_recent_posts(3))
+  end
+
+  defp refresh_public_content(socket, :events) do
+    assign(socket, upcoming_events: list_home_upcoming_events())
+  end
+
+  defp refresh_public_content(socket, _) do
+    assign_public_content_slices(socket)
+  end
+
+  defp list_home_upcoming_events do
+    PublicContentCache.list_upcoming_events(3)
+    |> Enum.reject(&(&1.state == :cancelled))
   end
 
   @impl true

@@ -121,6 +121,29 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Gets a ticket order for checkout UI (payment modal, registration).
+
+  Lighter preload than `get_ticket_order/1` — no event agendas or payment.
+  """
+  def get_ticket_order_for_checkout(id) do
+    TicketOrder
+    |> where([to], to.id == ^id)
+    |> preload([:user, tickets: :ticket_tier])
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets a ticket order for checkout for a specific user (authorization + light preload).
+  """
+  def get_user_ticket_order_for_checkout(user_id, order_id) do
+    from(to in TicketOrder,
+      where: to.id == ^order_id and to.user_id == ^user_id,
+      preload: [:user, tickets: :ticket_tier]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Gets a ticket order by payment ID with preloaded associations.
   """
   def get_ticket_order_by_payment_id(payment_id) do
@@ -516,6 +539,7 @@ defmodule Ysc.Tickets do
           reason: reason
         )
 
+        broadcast_ticket_availability_update(ticket_order.event_id)
         {:ok, refund_info}
 
       {:error, reason} ->
@@ -1453,6 +1477,8 @@ defmodule Ysc.Tickets do
   end
 
   defp broadcast_ticket_availability_update(event_id) do
+    Ysc.Events.invalidate_event_caches()
+
     # Broadcast a simple event to notify all viewers that ticket availability has changed
     event = %Ysc.MessagePassingEvents.TicketAvailabilityUpdated{
       event_id: event_id

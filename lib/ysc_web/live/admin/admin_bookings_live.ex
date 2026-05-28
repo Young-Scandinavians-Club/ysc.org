@@ -5498,11 +5498,11 @@ defmodule YscWeb.AdminBookingsLive do
     result =
       if existing_booking do
         # Update existing booking with validation skipped (admin override)
-        changeset =
-          existing_booking
-          |> Ysc.Bookings.Booking.changeset(booking_params, changeset_opts)
-
-        Ysc.Repo.update(changeset)
+        Bookings.update_booking(
+          existing_booking,
+          booking_params,
+          changeset_opts
+        )
       else
         # Create new booking using BookingLocker which handles:
         # - Setting status to :complete

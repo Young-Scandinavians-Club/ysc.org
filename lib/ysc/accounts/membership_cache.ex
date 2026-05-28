@@ -35,14 +35,14 @@ defmodule Ysc.Accounts.MembershipCache do
         membership
 
       {:ok, membership} ->
-        # Defensive check: validate cached membership hasn't expired
-        # This prevents serving stale expired subscriptions
+        # Re-check against DB — cached structs can be stale after subscription updates
         if membership_valid?(membership) do
           membership
         else
-          # Membership expired, invalidate cache and fetch fresh
           invalidate_user(user.id)
-          get_active_membership_db(user)
+          membership = get_active_membership_db(user)
+          cache_with_ttl(cache_key, membership)
+          membership
         end
 
       {:error, _reason} ->
@@ -170,23 +170,10 @@ defmodule Ysc.Accounts.MembershipCache do
         user_id: user_to_check.id
       }
     else
-      # Use preloaded subscriptions if available, otherwise fetch them
+      # Always load from DB — preloaded subscriptions on a cached User can be stale
       subscriptions =
-        case user_to_check.subscriptions do
-          %Ecto.Association.NotLoaded{} ->
-            # Fallback: fetch subscriptions if not preloaded
-            Customers.subscriptions(user_to_check)
-            |> Enum.filter(&Subscriptions.valid?/1)
-
-          subscriptions when is_list(subscriptions) ->
-            # Subscriptions are already preloaded, but filter to ensure only valid (non-expired) ones
-            # This is a defensive check in case subscriptions were preloaded before expiration
-            subscriptions
-            |> Enum.filter(&Subscriptions.valid?/1)
-
-          _ ->
-            []
-        end
+        Customers.subscriptions(user_to_check)
+        |> Enum.filter(&Subscriptions.valid?/1)
 
       case subscriptions do
         [] ->
@@ -262,9 +249,11 @@ defmodule Ysc.Accounts.MembershipCache do
 
   defp membership_valid?(%{type: :lifetime}), do: true
 
-  defp membership_valid?(%Subscriptions.Subscription{} = subscription) do
-    # Use the fixed valid?/1 function which checks expiration dates
-    Subscriptions.valid?(subscription)
+  defp membership_valid?(%Subscriptions.Subscription{id: id}) do
+    case Ysc.Repo.get(Subscriptions.Subscription, id) do
+      nil -> false
+      fresh -> Subscriptions.valid?(fresh)
+    end
   end
 
   defp membership_valid?(_), do: false

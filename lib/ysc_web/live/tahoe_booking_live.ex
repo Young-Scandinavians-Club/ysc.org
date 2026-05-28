@@ -22,6 +22,7 @@ defmodule YscWeb.TahoeBookingLive do
     Booking,
     PricingRule,
     Room,
+    RoomsListCache,
     BookingLocker,
     PropertyInventory
   }
@@ -94,30 +95,9 @@ defmodule YscWeb.TahoeBookingLive do
         # This user_with_subs will be reused by check_booking_eligibility and get_membership_type
         # Preloading subscription_items prevents duplicate queries in get_membership_plan_type
         user_with_subs =
-          if user do
-            # Check if subscriptions are already preloaded from auth
-            if Ecto.assoc_loaded?(user.subscriptions) do
-              # Check if subscription_items are also preloaded
-              subscriptions_with_items_loaded? =
-                Enum.all?(user.subscriptions, fn sub ->
-                  Ecto.assoc_loaded?(sub.subscription_items)
-                end)
-
-              if subscriptions_with_items_loaded? do
-                user
-              else
-                # Preload subscription_items if subscriptions are loaded but items are not
-                user
-                |> Ysc.Repo.preload(subscriptions: :subscription_items)
-              end
-            else
-              # Load subscriptions with subscription_items to avoid duplicate queries
-              Accounts.get_user!(user.id)
-              |> Ysc.Repo.preload(subscriptions: :subscription_items)
-            end
-          else
-            nil
-          end
+          if user,
+            do: Accounts.preload_user_subscriptions_for_booking(user),
+            else: nil
 
         # Load active bookings for the entire family group (needed for eligibility check)
         active_bookings =
@@ -202,21 +182,11 @@ defmodule YscWeb.TahoeBookingLive do
          buyout_refund_policy, room_refund_policy}
       end
 
-    # Generate date tooltips asynchronously (heavy operation with multiple queries)
-    # This runs only when connected and loads in the background
-    socket =
+    property_rooms_snapshot =
       if connected?(socket) do
-        start_async(socket, :load_date_tooltips, fn ->
-          generate_date_tooltips(
-            restricted_min_date,
-            restricted_max_date,
-            today,
-            :tahoe,
-            seasons
-          )
-        end)
+        build_property_rooms_snapshot(:tahoe)
       else
-        socket
+        []
       end
 
     socket =
@@ -238,6 +208,7 @@ defmodule YscWeb.TahoeBookingLive do
         season_start_date: season_start_date,
         season_end_date: season_end_date,
         seasons: seasons,
+        property_rooms_snapshot: property_rooms_snapshot,
         selected_room_id: nil,
         selected_room_ids: [],
         selected_booking_mode: booking_mode || :room,
@@ -261,6 +232,7 @@ defmodule YscWeb.TahoeBookingLive do
         buyout_refund_policy: buyout_refund_policy,
         room_refund_policy: room_refund_policy,
         date_tooltips: %{},
+        date_tooltips_loading?: false,
         max_cabin_capacity: @max_cabin_capacity,
         load_radar: true,
         terms_agreed: false,
@@ -285,12 +257,16 @@ defmodule YscWeb.TahoeBookingLive do
         socket
       end
 
-    # Handle scroll to section if hash is present in URL
     socket =
       if connected?(socket) do
-        socket
+        maybe_load_date_tooltips(
+          socket,
+          restricted_min_date,
+          restricted_max_date,
+          today,
+          seasons
+        )
       else
-        # For static render, we'll handle scroll in JavaScript
         socket
       end
 
@@ -510,7 +486,7 @@ defmodule YscWeb.TahoeBookingLive do
     {restricted_min_date, restricted_max_date, dates_restricted}
   end
 
-  # Helper function to maybe load date tooltips
+  # Helper function to maybe load date tooltips (single in-flight async per socket)
   defp maybe_load_date_tooltips(
          socket,
          restricted_min_date,
@@ -518,22 +494,81 @@ defmodule YscWeb.TahoeBookingLive do
          today,
          seasons
        ) do
-    if restricted_min_date != socket.assigns[:restricted_min_date] ||
-         restricted_max_date != socket.assigns[:restricted_max_date] ||
-         !socket.assigns[:date_tooltips] ||
-         socket.assigns[:date_tooltips] == %{} do
-      start_async(socket, :load_date_tooltips, fn ->
+    needs_load =
+      restricted_min_date != socket.assigns[:restricted_min_date] ||
+        restricted_max_date != socket.assigns[:restricted_max_date] ||
+        !socket.assigns[:date_tooltips] ||
+        socket.assigns[:date_tooltips] == %{}
+
+    cond do
+      !needs_load ->
+        socket
+
+      socket.assigns[:date_tooltips_loading?] ->
+        assign(
+          socket,
+          :date_tooltips_pending_range,
+          tooltip_request_key(
+            restricted_min_date,
+            restricted_max_date,
+            today,
+            seasons
+          )
+        )
+
+      true ->
+        schedule_date_tooltips_async(
+          socket,
+          restricted_min_date,
+          restricted_max_date,
+          today,
+          seasons
+        )
+    end
+  end
+
+  defp schedule_date_tooltips_async(
+         socket,
+         restricted_min_date,
+         restricted_max_date,
+         today,
+         seasons
+       ) do
+    property_rooms_snapshot = socket.assigns.property_rooms_snapshot
+
+    socket
+    |> assign(:date_tooltips_loading?, true)
+    |> assign(:date_tooltips_pending_range, nil)
+    |> start_async(:load_date_tooltips, fn ->
+      request_key =
+        tooltip_request_key(
+          restricted_min_date,
+          restricted_max_date,
+          today,
+          seasons
+        )
+
+      tooltips =
         generate_date_tooltips(
           restricted_min_date,
           restricted_max_date,
           today,
           :tahoe,
-          seasons
+          seasons,
+          property_rooms_snapshot
         )
-      end)
-    else
-      socket
-    end
+
+      {request_key, tooltips}
+    end)
+  end
+
+  defp tooltip_request_key(
+         restricted_min_date,
+         restricted_max_date,
+         today,
+         seasons
+       ) do
+    {restricted_min_date, restricted_max_date, today, :erlang.phash2(seasons)}
   end
 
   # Helper function to update socket with parsed params
@@ -600,14 +635,75 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   @impl true
-  def handle_async(:load_date_tooltips, {:ok, date_tooltips}, socket) do
-    {:noreply, assign(socket, :date_tooltips, date_tooltips)}
+  def handle_async(
+        :load_date_tooltips,
+        {:ok, {request_key, date_tooltips}},
+        socket
+      ) do
+    current_key =
+      tooltip_request_key(
+        socket.assigns.restricted_min_date,
+        socket.assigns.restricted_max_date,
+        socket.assigns.today,
+        socket.assigns.seasons
+      )
+
+    socket =
+      socket
+      |> assign(:date_tooltips_loading?, false)
+      |> then(fn s ->
+        if request_key == current_key do
+          assign(s, :date_tooltips, date_tooltips)
+        else
+          s
+        end
+      end)
+
+    socket =
+      case socket.assigns[:date_tooltips_pending_range] do
+        pending when not is_nil(pending) and pending != current_key ->
+          socket
+          |> assign(:date_tooltips_pending_range, nil)
+          |> schedule_date_tooltips_async(
+            socket.assigns.restricted_min_date,
+            socket.assigns.restricted_max_date,
+            socket.assigns.today,
+            socket.assigns.seasons
+          )
+
+        _ ->
+          assign(socket, :date_tooltips_pending_range, nil)
+      end
+
+    {:noreply, socket}
   end
 
   def handle_async(:load_date_tooltips, {:exit, reason}, socket) do
     require Ysc.Logging
     Ysc.Logging.error("Failed to load date tooltips async: #{inspect(reason)}")
-    {:noreply, assign(socket, :date_tooltips, %{})}
+
+    socket =
+      socket
+      |> assign(:date_tooltips, %{})
+      |> assign(:date_tooltips_loading?, false)
+
+    socket =
+      case socket.assigns[:date_tooltips_pending_range] do
+        pending when not is_nil(pending) ->
+          socket
+          |> assign(:date_tooltips_pending_range, nil)
+          |> schedule_date_tooltips_async(
+            socket.assigns.restricted_min_date,
+            socket.assigns.restricted_max_date,
+            socket.assigns.today,
+            socket.assigns.seasons
+          )
+
+        _ ->
+          socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -701,7 +797,8 @@ defmodule YscWeb.TahoeBookingLive do
           restricted_max_date,
           socket.assigns.today,
           :tahoe,
-          socket.assigns.seasons
+          socket.assigns.seasons,
+          socket.assigns.property_rooms_snapshot
         )
       else
         socket.assigns[:date_tooltips] || %{}
@@ -1191,6 +1288,7 @@ defmodule YscWeb.TahoeBookingLive do
                         date_tooltips={@date_tooltips}
                         property={@property}
                         today={@today}
+                        seasons={@seasons}
                       />
                     </div>
                     <!-- Guests and Children Selection (Dropdown) -->
@@ -5314,7 +5412,7 @@ defmodule YscWeb.TahoeBookingLive do
       {_guests_count, _children_count, total_people} =
         parse_and_validate_guest_counts(socket)
 
-      all_rooms = fetch_all_rooms_for_property(socket.assigns.property)
+      all_rooms = rooms_for_property(socket)
       available_room_ids = check_room_availability(all_rooms, socket)
       can_select_multiple = can_select_multiple_rooms?(socket.assigns)
       selected_room_ids = socket.assigns.selected_room_ids || []
@@ -5375,20 +5473,27 @@ defmodule YscWeb.TahoeBookingLive do
     {validated_guests, validated_children, total_people}
   end
 
-  defp fetch_all_rooms_for_property(property) do
-    rooms =
-      from(r in Room,
-        where: r.property == ^property,
-        order_by: [asc: r.property, asc: r.name],
-        preload: [:room_category, :image]
-      )
-      |> Repo.all()
+  defp rooms_for_property(socket) do
+    list_property_rooms(socket.assigns.property)
+  end
 
-    Ysc.Logging.info(
-      "[TahoeBookingLive] Found #{length(rooms)} rooms for property #{property}"
-    )
+  defp build_property_rooms_snapshot(property) do
+    property
+    |> RoomsListCache.list()
+    |> Enum.map(&room_tooltip_snapshot/1)
+  end
 
-    rooms
+  defp room_tooltip_snapshot(%Room{} = room) do
+    %{
+      id: room.id,
+      name: room.name,
+      is_active: room.is_active,
+      capacity_max: room.capacity_max
+    }
+  end
+
+  defp list_property_rooms(property) do
+    RoomsListCache.list(property)
   end
 
   defp check_room_availability(all_rooms, socket) do
@@ -6271,7 +6376,8 @@ defmodule YscWeb.TahoeBookingLive do
         )
         |> validate_max_nights(
           socket.assigns.checkin_date,
-          socket.assigns.checkout_date
+          socket.assigns.checkout_date,
+          socket.assigns.seasons
         )
         |> validate_season_booking_mode(socket)
         |> validate_buyout_availability(socket)
@@ -6440,12 +6546,11 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
-  defp validate_max_nights(errors, checkin_date, checkout_date) do
+  defp validate_max_nights(errors, checkin_date, checkout_date, seasons) do
     nights = Date.diff(checkout_date, checkin_date)
 
-    # Get max nights from season for check-in date
-    season = Ysc.Bookings.Season.for_date(:tahoe, checkin_date)
-    max_nights = Ysc.Bookings.Season.get_max_nights(season, :tahoe)
+    season = Season.find_season_for_date(seasons, checkin_date)
+    max_nights = Season.get_max_nights(season, :tahoe)
 
     if nights > max_nights do
       Map.put(
@@ -6465,15 +6570,7 @@ defmodule YscWeb.TahoeBookingLive do
          socket.assigns.user do
       user = socket.assigns.user
 
-      user_with_subs =
-        case user.subscriptions do
-          %Ecto.Association.NotLoaded{} ->
-            Accounts.get_user!(user.id) |> Repo.preload(:subscriptions)
-
-          _ ->
-            user
-        end
-
+      user_with_subs = Accounts.preload_user_subscriptions_for_booking(user)
       membership_type = get_membership_type(user_with_subs)
 
       # Get all user IDs in the family group
@@ -7077,7 +7174,7 @@ defmodule YscWeb.TahoeBookingLive do
                socket.assigns.available_rooms != [] do
             socket.assigns.available_rooms
           else
-            Bookings.list_rooms(socket.assigns.property)
+            rooms_for_property(socket)
           end
 
         total_capacity =
@@ -7313,15 +7410,23 @@ defmodule YscWeb.TahoeBookingLive do
 
   # Generate tooltips for unavailable dates
   # Returns a map of date strings (ISO format) to tooltip messages
-  defp generate_date_tooltips(min_date, max_date, today, property, _seasons) do
+  defp generate_date_tooltips(
+         min_date,
+         max_date,
+         today,
+         property,
+         seasons,
+         property_rooms_snapshot
+       ) do
     # Generate tooltips for a more limited date range (1 month before min to 1 month after max)
     # This reduces the number of dates we need to check significantly
     start_range = Date.add(min_date, -30)
     end_range = Date.add(max_date, 30)
     date_range = Date.range(start_range, end_range) |> Enum.to_list()
 
-    # Get all rooms for the property
-    all_rooms = Bookings.list_rooms(property) |> Enum.filter(& &1.is_active)
+    all_rooms =
+      property_rooms_snapshot
+      |> Enum.filter(& &1[:is_active])
 
     # Get all bookings in the range (preload rooms for availability checking)
     bookings =
@@ -7360,6 +7465,7 @@ defmodule YscWeb.TahoeBookingLive do
         max_date: max_date,
         today: today,
         property: property,
+        seasons: seasons,
         all_rooms: all_rooms,
         bookings: bookings,
         blackout_dates: blackout_dates,
@@ -7391,7 +7497,8 @@ defmodule YscWeb.TahoeBookingLive do
       not SeasonHelpers.date_selectable?(
         context.property,
         context.date,
-        context.today
+        context.today,
+        context.seasons
       ) ->
         "Bookings for this season are not yet open"
 
@@ -7462,7 +7569,7 @@ defmodule YscWeb.TahoeBookingLive do
       # Check if there's at least one room not booked
       available_rooms =
         Enum.filter(all_rooms, fn room ->
-          not MapSet.member?(booked_room_ids, room.id)
+          not MapSet.member?(booked_room_ids, room[:id])
         end)
 
       available_rooms != []

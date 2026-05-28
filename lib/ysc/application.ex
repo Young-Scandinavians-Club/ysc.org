@@ -35,6 +35,8 @@ defmodule Ysc.Application do
       {Finch, name: Ysc.Finch},
       # Start cache
       {Cachex, name: :ysc_cache},
+      # Warm site settings cache on boot (avoids cold DB hits on public pages)
+      {Ysc.Settings, []},
       # Auth rate limiting (credential stuffing protection)
       {Ysc.AuthRateLimit, [clean_period: :timer.minutes(1)]},
       # Newsletter rate limiting (bot protection)
