@@ -9,8 +9,14 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
   use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import Ysc.EmailValidatorTestHelper
 
   alias Ysc.Newsletter
+
+  setup do
+    put_application_mx_resolver(fn _domain -> :ok end)
+    :ok
+  end
 
   describe "mount - invalid or missing token" do
     test "shows invalid link message for unknown token", %{conn: conn} do
