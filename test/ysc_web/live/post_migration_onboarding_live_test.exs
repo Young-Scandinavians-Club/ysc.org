@@ -121,7 +121,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
         })
 
       conn = log_in_user(conn, user)
-      {:ok, view, html} = live(conn, ~p"/onboarding")
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      html = render(view)
 
       refute html =~ "Membership Type"
       refute has_element?(view, "#membership-selection")
@@ -136,7 +137,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       signup_application_fixture(user, %{membership_type: "family"})
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/onboarding")
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      html = render(view)
 
       assert html =~ ">Family</span>"
       refute html =~ "Membership Type"
@@ -149,7 +151,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       signup_application_fixture(user, %{membership_type: "single"})
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/onboarding")
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      html = render(view)
 
       refute html =~ ">Family</span>"
     end
@@ -159,7 +162,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = user_needing_post_migration_onboarding()
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/onboarding")
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      html = render(view)
 
       assert html =~ "Membership Type"
     end
@@ -176,7 +180,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
         |> Repo.update()
 
       conn = log_in_user(conn, user)
-      {:ok, view, html} = live(conn, ~p"/onboarding")
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      html = render(view)
 
       assert has_element?(view, ~s|button[phx-value-step="1"]|)
       refute has_element?(view, ~s|button[phx-value-step="2"]|)
