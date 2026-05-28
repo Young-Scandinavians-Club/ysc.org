@@ -94,9 +94,28 @@ defmodule YscWeb.AccountSetupLiveTest do
     user
   end
 
+  defp unique_test_phone do
+    suffix =
+      System.unique_integer([:positive])
+      |> rem(10_000)
+      |> Integer.to_string()
+      |> String.pad_leading(4, "0")
+
+    "+1206555#{suffix}"
+  end
+
+  defp otp_form_params(code) when is_binary(code) do
+    code
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Map.new(fn {digit, index} -> {Integer.to_string(index), digit} end)
+  end
+
   # Advances a user to the phone-verification step (step 4):
   # email verified → password set → phone saved (not yet verified).
-  defp user_at_phone_verify_step(phone_number \\ "+12065551234") do
+  defp user_at_phone_verify_step(phone_number \\ nil) do
+    phone_number = phone_number || unique_test_phone()
+
     user =
       user_fixture(%{
         state: :active,
@@ -652,8 +671,18 @@ defmodule YscWeb.AccountSetupLiveTest do
   describe "step 4: phone verification" do
     setup %{conn: conn} do
       user = user_at_phone_verify_step()
+
+      # Pre-store a code so mount does not race SMS sends under parallel CI, and so
+      # verification does not depend on the dev/test-only 000000 bypass.
+      phone_code = Accounts.generate_and_store_phone_verification_code(user)
       conn = log_in_user(conn, user)
-      %{conn: conn, user: user}
+
+      %{
+        conn: conn,
+        user: user,
+        phone_code: phone_code,
+        phone_otp: otp_form_params(phone_code)
+      }
     end
 
     test "shows the phone verification form", %{conn: conn, user: user} do
@@ -674,16 +703,16 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert render(view) =~ "Invalid verification code"
     end
 
-    test "valid code redirects to auto-login", %{conn: conn, user: user} do
+    test "valid code redirects to auto-login", %{
+      conn: conn,
+      user: user,
+      phone_otp: phone_otp
+    } do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "4"}))
 
       view
-      |> form("#phone_verification_form", %{"verification_code" => @valid_otp})
-      |> render_change()
-
-      view
-      |> form("#phone_verification_form", %{"verification_code" => @valid_otp})
+      |> form("#phone_verification_form", %{"verification_code" => phone_otp})
       |> render_submit()
 
       {path, _flash} = assert_redirect(view)
@@ -692,25 +721,37 @@ defmodule YscWeb.AccountSetupLiveTest do
 
     test "OTP entered in two parts (merge) verifies correctly", %{
       conn: conn,
-      user: user
+      user: user,
+      phone_code: phone_code,
+      phone_otp: phone_otp
     } do
+      {first_half, second_half} = String.split_at(phone_code, 3)
+
+      first_otp =
+        first_half
+        |> String.graphemes()
+        |> Enum.with_index()
+        |> Map.new(fn {digit, index} -> {Integer.to_string(index), digit} end)
+
+      second_otp =
+        second_half
+        |> String.graphemes()
+        |> Enum.with_index(3)
+        |> Map.new(fn {digit, index} -> {Integer.to_string(index), digit} end)
+
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "4"}))
 
       view
-      |> form("#phone_verification_form", %{
-        "verification_code" => %{"0" => "0", "1" => "0", "2" => "0"}
-      })
+      |> form("#phone_verification_form", %{"verification_code" => first_otp})
       |> render_change()
 
       view
-      |> form("#phone_verification_form", %{
-        "verification_code" => %{"3" => "0", "4" => "0", "5" => "0"}
-      })
+      |> form("#phone_verification_form", %{"verification_code" => second_otp})
       |> render_change()
 
       view
-      |> form("#phone_verification_form", %{"verification_code" => @valid_otp})
+      |> form("#phone_verification_form", %{"verification_code" => phone_otp})
       |> render_submit()
 
       {path, _flash} = assert_redirect(view)
@@ -952,6 +993,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     test "error on step 0 does not carry to the phone-verification step after completing all steps",
          %{conn: conn} do
       user = user_at_phone_verify_step()
+      phone_code = Accounts.generate_and_store_phone_verification_code(user)
+      phone_otp = otp_form_params(phone_code)
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} =
@@ -966,11 +1009,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       # Now submit valid code — redirects; no stale toast should be carried in flash
       view
-      |> form("#phone_verification_form", %{"verification_code" => @valid_otp})
-      |> render_change()
-
-      view
-      |> form("#phone_verification_form", %{"verification_code" => @valid_otp})
+      |> form("#phone_verification_form", %{"verification_code" => phone_otp})
       |> render_submit()
 
       {path, _flash} = assert_redirect(view)
