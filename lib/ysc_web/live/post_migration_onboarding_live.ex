@@ -48,95 +48,37 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     user = socket.assigns.current_user
 
     if Accounts.needs_post_migration_onboarding?(user) do
-      user =
-        Accounts.get_user!(user.id, [
-          :family_members,
-          :registration_form,
-          :billing_address,
-          # Nested preload avoids two extra `list_subscriptions/1` queries on mount
-          # (see `find_active_real_subscription/1` and `resolve_membership_plan_from_subscriptions/1`).
-          subscriptions: :subscription_items
-        ])
-
-      membership_plan = resolve_membership_plan(user)
-      active_subscription = find_active_real_subscription(user)
-      has_real_subscription = not is_nil(active_subscription)
-      needs_plan_selection = membership_plan == :unknown
-      needs_family_members_step = needs_family_members_step?(membership_plan)
-      skip_payment = membership_plan == :lifetime
-
-      default_payment_method =
-        if connected?(socket) do
-          Ysc.Payments.get_default_payment_method(user)
-        else
-          nil
-        end
-
-      steps =
-        build_steps(
-          needs_family_members_step,
-          skip_payment,
-          needs_plan_selection
-        )
-
       socket =
         socket
-        |> assign(:page_title, "Welcome Back — Complete Your Profile")
-        |> assign(:user, user)
-        |> assign(:current_step, @step_profile)
-        |> assign(:steps, steps)
-        |> assign(:membership_plan, membership_plan)
-        |> assign(:needs_plan_selection, needs_plan_selection)
-        |> assign(:needs_family_members_step, needs_family_members_step)
-        |> assign(:skip_payment, skip_payment)
-        |> assign(:has_real_subscription, has_real_subscription)
-        |> assign(:active_subscription, active_subscription)
-        # Profile step
-        |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
-        |> assign(:original_phone, user.phone_number)
-        # Address step
-        |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
-        # Phone verification step
-        |> assign(:phone_code_form, to_form(%{"code" => ""}, as: "phone_code"))
-        |> assign(:phone_code_valid, false)
-        |> assign(:phone_verification_code_state, %{})
-        |> assign(:sms_resend_disabled_until, nil)
-        # Payment step
-        |> assign(
-          :public_key,
-          Application.get_env(:stripity_stripe, :public_key)
-        )
-        |> assign(:payment_intent_secret, nil)
-        |> assign(:payment_method_saved, false)
-        |> assign(:default_payment_method, default_payment_method)
-        # Membership selection step (only when plan is :unknown)
-        |> assign(
-          :membership_selection_form,
-          to_form(
-            %{
-              "membership_plan" =>
-                if(membership_plan == :unknown,
-                  do: "",
-                  else: to_string(membership_plan)
-                )
-            },
-            as: "membership_selection"
-          )
-        )
-        # Family step (family membership only)
-        |> assign(
-          :family_members_forms,
-          if(needs_family_members_step,
-            do: initial_family_members_forms(user),
-            else: []
-          )
-        )
-        |> assign(:invite_results, [])
+        |> assign(:loading_onboarding_data, true)
+        |> assign_onboarding_shell(user)
+
+      if connected?(socket) do
+        send(self(), :load_onboarding_data)
+      end
 
       {:ok, socket}
     else
       {:ok, redirect(socket, to: ~p"/")}
     end
+  end
+
+  @impl true
+  def handle_info(:load_onboarding_data, socket) do
+    user =
+      Accounts.get_user!(socket.assigns.current_user.id, [
+        :family_members,
+        :registration_form,
+        :billing_address,
+        subscriptions: :subscription_items
+      ])
+
+    default_payment_method = Ysc.Payments.get_default_payment_method(user)
+
+    {:noreply,
+     socket
+     |> assign_onboarding_data(user, default_payment_method)
+     |> assign(:loading_onboarding_data, false)}
   end
 
   @impl true
@@ -151,58 +93,67 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </.link>
         </div>
 
-        <%!-- Stepper --%>
-        <div class="mb-8">
-          <.stepper
-            active_step={step_index(@current_step, @steps)}
-            steps={Enum.map(@steps, fn {label, _} -> label end)}
-          />
-        </div>
+        <.async_section_loader
+          :if={@loading_onboarding_data}
+          id="onboarding-loading"
+          label="Loading your account..."
+          class="py-16"
+        />
 
-        <%!-- Step content --%>
-        <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8">
-          <%= if @current_step == 1 do %>
-            <.step_profile form={@profile_form} />
-          <% end %>
-          <%= if @current_step == 2 do %>
-            <.step_address form={@address_form} />
-          <% end %>
-          <%= if @current_step == 7 do %>
-            <.step_membership_selection
-              form={@membership_selection_form}
-              membership_plan={@membership_plan}
+        <div :if={!@loading_onboarding_data}>
+          <%!-- Stepper --%>
+          <div class="mb-8">
+            <.stepper
+              active_step={step_index(@current_step, @steps)}
+              steps={Enum.map(@steps, fn {label, _} -> label end)}
             />
-          <% end %>
-          <%= if @current_step == 3 do %>
-            <.step_phone_verification
-              form={@phone_code_form}
-              user={@user}
-              phone_code_valid={@phone_code_valid}
-              sms_resend_disabled_until={@sms_resend_disabled_until}
-            />
-          <% end %>
-          <%= if @current_step == 4 do %>
-            <.step_payment
-              user={@user}
-              membership_plan={@membership_plan}
-              has_real_subscription={@has_real_subscription}
-              active_subscription={@active_subscription}
-              public_key={@public_key}
-              payment_intent_secret={@payment_intent_secret}
-              payment_method_saved={@payment_method_saved}
-              default_payment_method={@default_payment_method}
-            />
-          <% end %>
-          <%= if @current_step == 5 and @needs_family_members_step do %>
-            <.step_family
-              user={@user}
-              family_members_forms={@family_members_forms}
-              invite_results={@invite_results}
-            />
-          <% end %>
-          <%= if @current_step == 6 do %>
-            <.step_complete user={@user} />
-          <% end %>
+          </div>
+
+          <%!-- Step content --%>
+          <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8">
+            <%= if @current_step == 1 do %>
+              <.step_profile form={@profile_form} />
+            <% end %>
+            <%= if @current_step == 2 do %>
+              <.step_address form={@address_form} />
+            <% end %>
+            <%= if @current_step == 7 do %>
+              <.step_membership_selection
+                form={@membership_selection_form}
+                membership_plan={@membership_plan}
+              />
+            <% end %>
+            <%= if @current_step == 3 do %>
+              <.step_phone_verification
+                form={@phone_code_form}
+                user={@user}
+                phone_code_valid={@phone_code_valid}
+                sms_resend_disabled_until={@sms_resend_disabled_until}
+              />
+            <% end %>
+            <%= if @current_step == 4 do %>
+              <.step_payment
+                user={@user}
+                membership_plan={@membership_plan}
+                has_real_subscription={@has_real_subscription}
+                active_subscription={@active_subscription}
+                public_key={@public_key}
+                payment_intent_secret={@payment_intent_secret}
+                payment_method_saved={@payment_method_saved}
+                default_payment_method={@default_payment_method}
+              />
+            <% end %>
+            <%= if @current_step == 5 and @needs_family_members_step do %>
+              <.step_family
+                user={@user}
+                family_members_forms={@family_members_forms}
+                invite_results={@invite_results}
+              />
+            <% end %>
+            <%= if @current_step == 6 do %>
+              <.step_complete user={@user} />
+            <% end %>
+          </div>
         </div>
       </div>
     </div>
@@ -1532,6 +1483,87 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         |> assign(:current_step, next_step)
         |> ensure_family_members_forms()
     end
+  end
+
+  defp assign_onboarding_shell(socket, user) do
+    socket
+    |> assign(:page_title, "Welcome Back — Complete Your Profile")
+    |> assign(:user, user)
+    |> assign(:current_step, @step_profile)
+    |> assign(:steps, [{"Profile", @step_profile}])
+    |> assign(:membership_plan, :unknown)
+    |> assign(:needs_plan_selection, true)
+    |> assign(:needs_family_members_step, false)
+    |> assign(:skip_payment, false)
+    |> assign(:has_real_subscription, false)
+    |> assign(:active_subscription, nil)
+    |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
+    |> assign(:original_phone, user.phone_number)
+    |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
+    |> assign(:phone_code_form, to_form(%{"code" => ""}, as: "phone_code"))
+    |> assign(:phone_code_valid, false)
+    |> assign(:phone_verification_code_state, %{})
+    |> assign(:sms_resend_disabled_until, nil)
+    |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
+    |> assign(:payment_intent_secret, nil)
+    |> assign(:payment_method_saved, false)
+    |> assign(:default_payment_method, nil)
+    |> assign(
+      :membership_selection_form,
+      to_form(%{"membership_plan" => ""}, as: "membership_selection")
+    )
+    |> assign(:family_members_forms, [])
+    |> assign(:invite_results, [])
+  end
+
+  defp assign_onboarding_data(socket, user, default_payment_method) do
+    membership_plan = resolve_membership_plan(user)
+    active_subscription = find_active_real_subscription(user)
+    has_real_subscription = not is_nil(active_subscription)
+    needs_plan_selection = membership_plan == :unknown
+    needs_family_members_step = needs_family_members_step?(membership_plan)
+    skip_payment = membership_plan == :lifetime
+
+    steps =
+      build_steps(
+        needs_family_members_step,
+        skip_payment,
+        needs_plan_selection
+      )
+
+    socket
+    |> assign(:user, user)
+    |> assign(:steps, steps)
+    |> assign(:membership_plan, membership_plan)
+    |> assign(:needs_plan_selection, needs_plan_selection)
+    |> assign(:needs_family_members_step, needs_family_members_step)
+    |> assign(:skip_payment, skip_payment)
+    |> assign(:has_real_subscription, has_real_subscription)
+    |> assign(:active_subscription, active_subscription)
+    |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
+    |> assign(:original_phone, user.phone_number)
+    |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
+    |> assign(:default_payment_method, default_payment_method)
+    |> assign(
+      :membership_selection_form,
+      to_form(
+        %{
+          "membership_plan" =>
+            if(membership_plan == :unknown,
+              do: "",
+              else: to_string(membership_plan)
+            )
+        },
+        as: "membership_selection"
+      )
+    )
+    |> assign(
+      :family_members_forms,
+      if(needs_family_members_step,
+        do: initial_family_members_forms(user),
+        else: []
+      )
+    )
   end
 
   defp load_payment_form_if_needed(socket) do

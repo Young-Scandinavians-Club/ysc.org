@@ -2573,7 +2573,7 @@ defmodule YscWeb.EventDetailsLive do
         <form phx-submit="submit-registration" class="space-y-6">
           <%= for ticket <- @tickets_requiring_registration do %>
             <% ticket_id_str = to_string(ticket.id)
-            ticket_detail = Ysc.Events.get_registration_for_ticket(ticket.id)
+            ticket_detail = Map.get(@ticket_registration_details_by_id, ticket.id)
 
             ticket_detail_data =
               Map.get(@ticket_details_form, ticket_id_str, %{}) ||
@@ -3444,6 +3444,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:checkout_expired, false)
     |> assign(:show_registration_modal, false)
     |> assign(:ticket_details_form, %{})
+    |> assign(:ticket_registration_details_by_id, %{})
     |> assign(:tickets_for_me, %{})
     |> assign(:selected_family_members, %{})
     |> assign(:show_attendees_modal, false)
@@ -4106,72 +4107,24 @@ defmodule YscWeb.EventDetailsLive do
     # Load family members for the current user
     family_members = Ysc.Accounts.get_family_group(socket.assigns.current_user)
 
-    # Initialize ticket details form with existing registrations or empty values
-    # Pre-fill first ticket with user details if it's defaulted to "for me"
-    # For non-first tickets, leave form data empty (they default to "Someone else")
-    ticket_details_form =
-      tickets_requiring_registration
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {ticket, index}, acc ->
-        ticket_detail = Ysc.Events.get_registration_for_ticket(ticket.id)
-        ticket_id_str = to_string(ticket.id)
+    registration_assigns =
+      init_ticket_registration_assigns(
+        tickets_requiring_registration,
+        socket.assigns.current_user
+      )
 
-        # If this is the first ticket and it's defaulted to "for me", pre-fill with user details
-        # For non-first tickets (index > 0), always use empty values (they default to "Someone else")
-        form_data =
-          if index == 0 && is_nil(ticket_detail) do
-            %{
-              first_name: socket.assigns.current_user.first_name || "",
-              last_name: socket.assigns.current_user.last_name || "",
-              email: socket.assigns.current_user.email || ""
-            }
-          else
-            # For non-first tickets or tickets with existing details, use empty or existing values
-            %{
-              first_name:
-                if(ticket_detail, do: ticket_detail.first_name, else: ""),
-              last_name:
-                if(ticket_detail, do: ticket_detail.last_name, else: ""),
-              email: if(ticket_detail, do: ticket_detail.email, else: "")
-            }
-          end
-
-        Map.put(acc, ticket_id_str, form_data)
-      end)
-
-    # Initialize tickets_for_me map
-    # Smart default: First ticket defaults to "for me" for better UX
-    tickets_for_me =
-      tickets_requiring_registration
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {ticket, index}, acc ->
-        # Default first ticket (index 0) to "for me"
-        # Use string key for consistency with handler
-        Map.put(acc, to_string(ticket.id), index == 0)
-      end)
-
-    # Initialize selected_family_members map (tracks which family member is selected for each ticket)
-    selected_family_members =
-      tickets_requiring_registration
-      |> Enum.reduce(%{}, fn ticket, acc ->
-        # Use string key for consistency with handler
-        Map.put(acc, to_string(ticket.id), nil)
-      end)
-
-    # Initialize active_ticket_index for progressive disclosure (first ticket is active by default)
-    active_ticket_index =
-      if tickets_requiring_registration != [], do: 0, else: nil
+    %{
+      ticket_details_form: ticket_details_form,
+      tickets_for_me: tickets_for_me,
+      selected_family_members: selected_family_members,
+      active_ticket_index: active_ticket_index,
+      ticket_registration_details_by_id: ticket_registration_details_by_id
+    } = registration_assigns
 
     # Use cached ticket tiers from assigns instead of querying again
     ticket_tiers = socket.assigns.ticket_tiers
 
-    availability_data =
-      case Ysc.Tickets.BookingLocker.check_availability_with_lock(
-             ticket_order.event_id
-           ) do
-        {:ok, availability} -> availability
-        {:error, _} -> nil
-      end
+    availability_data = checkout_availability_data(socket, ticket_tiers)
 
     socket = socket |> assign(:selected_tickets, selected_tickets)
 
@@ -4191,6 +4144,10 @@ defmodule YscWeb.EventDetailsLive do
         |> assign(:selected_family_members, selected_family_members)
         |> assign(:family_members, family_members)
         |> assign(:active_ticket_index, active_ticket_index)
+        |> assign(
+          :ticket_registration_details_by_id,
+          ticket_registration_details_by_id
+        )
         |> assign(:ticket_tiers, ticket_tiers)
         |> assign(:availability_data, availability_data)
 
@@ -4232,6 +4189,10 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:tickets_for_me, tickets_for_me)
             |> assign(:selected_family_members, selected_family_members)
             |> assign(:family_members, family_members)
+            |> assign(
+              :ticket_registration_details_by_id,
+              ticket_registration_details_by_id
+            )
             |> assign(:ticket_tiers, ticket_tiers)
             |> assign(:availability_data, availability_data)
             |> assign(:payment_redirect_in_progress, false)
@@ -7291,39 +7252,30 @@ defmodule YscWeb.EventDetailsLive do
     end)
   end
 
-  # Proceed to payment or free ticket confirmation after registration (if needed)
-  defp proceed_to_payment_or_free(socket, ticket_order) do
-    # Reload ticket order with tickets and their tiers
-    ticket_order_with_tickets = Ysc.Tickets.get_ticket_order(ticket_order.id)
+  defp init_ticket_registration_assigns(
+         tickets_requiring_registration,
+         current_user
+       ) do
+    details_by_id =
+      tickets_requiring_registration
+      |> Enum.map(& &1.id)
+      |> Events.list_ticket_details_for_ticket_ids()
 
-    # Check if any tickets require registration
-    tickets_requiring_registration =
-      get_tickets_requiring_registration(ticket_order_with_tickets.tickets)
-
-    # Load family members for the current user
-    family_members = Ysc.Accounts.get_family_group(socket.assigns.current_user)
-
-    # Initialize ticket details form with existing registrations or empty values
-    # Pre-fill first ticket with user details if it's defaulted to "for me"
-    # For non-first tickets, leave form data empty (they default to "Someone else")
     ticket_details_form =
       tickets_requiring_registration
       |> Enum.with_index()
       |> Enum.reduce(%{}, fn {ticket, index}, acc ->
-        ticket_detail = Ysc.Events.get_registration_for_ticket(ticket.id)
+        ticket_detail = Map.get(details_by_id, ticket.id)
         ticket_id_str = to_string(ticket.id)
 
-        # If this is the first ticket and it's defaulted to "for me", pre-fill with user details
-        # For non-first tickets (index > 0), always use empty values (they default to "Someone else")
         form_data =
           if index == 0 && is_nil(ticket_detail) do
             %{
-              first_name: socket.assigns.current_user.first_name || "",
-              last_name: socket.assigns.current_user.last_name || "",
-              email: socket.assigns.current_user.email || ""
+              first_name: current_user.first_name || "",
+              last_name: current_user.last_name || "",
+              email: current_user.email || ""
             }
           else
-            # For non-first tickets or tickets with existing details, use empty or existing values
             %{
               first_name:
                 if(ticket_detail, do: ticket_detail.first_name, else: ""),
@@ -7336,28 +7288,59 @@ defmodule YscWeb.EventDetailsLive do
         Map.put(acc, ticket_id_str, form_data)
       end)
 
-    # Initialize tickets_for_me map
-    # Smart default: First ticket defaults to "for me" for better UX
     tickets_for_me =
       tickets_requiring_registration
       |> Enum.with_index()
       |> Enum.reduce(%{}, fn {ticket, index}, acc ->
-        # Default first ticket (index 0) to "for me"
-        # Use string key for consistency with handler
         Map.put(acc, to_string(ticket.id), index == 0)
       end)
 
-    # Initialize selected_family_members map (tracks which family member is selected for each ticket)
     selected_family_members =
       tickets_requiring_registration
       |> Enum.reduce(%{}, fn ticket, acc ->
-        # Use string key for consistency with handler
         Map.put(acc, to_string(ticket.id), nil)
       end)
 
-    # Initialize active_ticket_index for progressive disclosure (first ticket is active by default)
     active_ticket_index =
       if tickets_requiring_registration != [], do: 0, else: nil
+
+    %{
+      ticket_details_form: ticket_details_form,
+      tickets_for_me: tickets_for_me,
+      selected_family_members: selected_family_members,
+      active_ticket_index: active_ticket_index,
+      ticket_registration_details_by_id: details_by_id
+    }
+  end
+
+  defp checkout_availability_data(socket, ticket_tiers) do
+    socket.assigns.availability_data ||
+      compute_availability_from_tiers(socket.assigns.event, ticket_tiers)
+  end
+
+  # Proceed to payment or free ticket confirmation after registration (if needed)
+  defp proceed_to_payment_or_free(socket, ticket_order) do
+    # Reload ticket order with tickets and their tiers
+    ticket_order_with_tickets = Ysc.Tickets.get_ticket_order(ticket_order.id)
+
+    # Check if any tickets require registration
+    tickets_requiring_registration =
+      get_tickets_requiring_registration(ticket_order_with_tickets.tickets)
+
+    # Load family members for the current user
+    family_members = Ysc.Accounts.get_family_group(socket.assigns.current_user)
+
+    %{
+      ticket_details_form: ticket_details_form,
+      tickets_for_me: tickets_for_me,
+      selected_family_members: selected_family_members,
+      active_ticket_index: active_ticket_index,
+      ticket_registration_details_by_id: ticket_registration_details_by_id
+    } =
+      init_ticket_registration_assigns(
+        tickets_requiring_registration,
+        socket.assigns.current_user
+      )
 
     # Check if this is a free order (zero amount)
     if Money.zero?(ticket_order_with_tickets.total_amount) do
@@ -7376,6 +7359,10 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:tickets_for_me, tickets_for_me)
        |> assign(:selected_family_members, selected_family_members)
        |> assign(:family_members, family_members)
+       |> assign(
+         :ticket_registration_details_by_id,
+         ticket_registration_details_by_id
+       )
        |> push_patch(
          to:
            ~p"/events/#{socket.assigns.event.id}?checkout=free&order_id=#{ticket_order_with_tickets.id}"
@@ -7406,6 +7393,10 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:selected_family_members, selected_family_members)
            |> assign(:family_members, family_members)
            |> assign(:active_ticket_index, active_ticket_index)
+           |> assign(
+             :ticket_registration_details_by_id,
+             ticket_registration_details_by_id
+           )
            |> assign(:payment_redirect_in_progress, false)
            |> push_patch(
              to:

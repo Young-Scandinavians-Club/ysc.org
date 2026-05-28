@@ -2012,6 +2012,24 @@ defmodule Ysc.Events do
     Repo.get_by(TicketDetail, ticket_id: ticket_id)
   end
 
+  @doc """
+  Batch-load ticket registration details for many tickets in one query.
+
+  Returns a map of `ticket_id => %TicketDetail{}`.
+  """
+  def list_ticket_details_for_ticket_ids(ticket_ids) when is_list(ticket_ids) do
+    ticket_ids = ticket_ids |> Enum.uniq() |> Enum.reject(&is_nil/1)
+
+    if ticket_ids == [] do
+      %{}
+    else
+      TicketDetail
+      |> where([td], td.ticket_id in ^ticket_ids)
+      |> Repo.all()
+      |> Map.new(&{&1.ticket_id, &1})
+    end
+  end
+
   # Registration Management Functions
 
   @doc """
