@@ -1273,6 +1273,28 @@ defmodule YscWeb.BookingReceiptLive do
                     {:error, :payment_processing_failed}
                 end
 
+              {:error, :invalid_status} ->
+                final_booking =
+                  Repo.get!(Booking, reloaded_booking.id)
+                  |> Repo.preload([:rooms, :user])
+
+                if final_booking.status == :complete do
+                  Ysc.Logging.info(
+                    "Booking confirmed by another process, ensuring ledger payment",
+                    booking_id: booking.id
+                  )
+
+                  finalize_paid_ledger_payment(final_booking, payment_intent)
+                else
+                  Ysc.Logging.error(
+                    "Failed to confirm booking: invalid status",
+                    booking_id: booking.id,
+                    status: final_booking.status
+                  )
+
+                  {:error, :booking_confirmation_failed}
+                end
+
               {:error, reason} ->
                 Ysc.Logging.error(
                   "Failed to confirm booking: #{inspect(reason)}",
