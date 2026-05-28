@@ -74,7 +74,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
       refute get_session(conn, :user_token)
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "Password reset successfully"
+               "Password updated. Sign in with your new password."
 
       assert Accounts.get_user_by_email_and_password(
                user.email,
