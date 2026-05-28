@@ -6733,7 +6733,7 @@ defmodule YscWeb.EventDetailsLive do
 
     event_available =
       check_event_capacity(
-        %{available: event_capacity_available(event)},
+        event_capacity_for_event(event, ticket_tiers),
         selected_tickets,
         event.id,
         ticket_tiers,
@@ -6743,10 +6743,24 @@ defmodule YscWeb.EventDetailsLive do
     tier_available && event_available
   end
 
-  defp event_capacity_available(%{max_attendees: nil}), do: :unlimited
+  defp event_capacity_for_event(event, ticket_tiers) do
+    case event.max_attendees do
+      nil ->
+        %{available: :unlimited}
 
-  defp event_capacity_available(%{max_attendees: max_attendees}) do
-    max_attendees
+      max_attendees ->
+        total_sold =
+          ticket_tiers
+          |> Enum.reject(fn tier ->
+            tier_type = Map.get(tier, :type) || Map.get(tier, "type")
+            tier_type == :donation or tier_type == "donation"
+          end)
+          |> Enum.reduce(0, fn tier, acc ->
+            acc + (tier.sold_tickets_count || 0)
+          end)
+
+        %{available: max(0, max_attendees - total_sold)}
+    end
   end
 
   defp check_tier_availability(
@@ -6803,7 +6817,7 @@ defmodule YscWeb.EventDetailsLive do
             end
           end)
 
-        total_selected + existing_for_event + 1 <= available
+        total_selected + 1 <= available + existing_for_event
     end
   end
 

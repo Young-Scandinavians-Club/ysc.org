@@ -95,9 +95,7 @@ defmodule Ysc.PublicContentCache do
 
     case Cachex.get(@cache_name, cache_key) do
       {:ok, nil} ->
-        value = fetch_fun.()
-        cache_with_version_and_ttl(domain, cache_key, value)
-        value
+        fetch_and_cache(domain, cache_key, fetch_fun)
 
       {:ok, {:version, version, ttl_expires_at, value}} ->
         now = System.system_time(:millisecond)
@@ -116,8 +114,7 @@ defmodule Ysc.PublicContentCache do
         end
 
       {:ok, value} ->
-        cache_with_version_and_ttl(domain, cache_key, value)
-        value
+        fetch_and_cache(domain, cache_key, fn -> value end)
 
       {:error, _reason} ->
         fetch_fun.()
@@ -141,14 +138,24 @@ defmodule Ysc.PublicContentCache do
     end
   end
 
-  defp refetch_and_cache(domain, cache_key, fetch_fun) do
-    Cachex.del(@cache_name, cache_key)
+  defp fetch_and_cache(domain, cache_key, fetch_fun) do
+    version_before = current_version(domain)
     value = fetch_fun.()
-    cache_with_version_and_ttl(domain, cache_key, value)
-    value
+
+    if current_version(domain) == version_before do
+      cache_with_version_and_ttl(domain, cache_key, value, version_before)
+      value
+    else
+      refetch_and_cache(domain, cache_key, fetch_fun)
+    end
   end
 
-  defp cache_with_version_and_ttl(domain, key, value) do
+  defp refetch_and_cache(domain, cache_key, fetch_fun) do
+    Cachex.del(@cache_name, cache_key)
+    fetch_and_cache(domain, cache_key, fetch_fun)
+  end
+
+  defp cache_with_version_and_ttl(domain, key, value, version) do
     version_key = version_key(domain)
 
     ttl_ms =
@@ -157,19 +164,27 @@ defmodule Ysc.PublicContentCache do
     now = System.system_time(:millisecond)
     ttl_expires_at = now + ttl_ms
 
-    case Cachex.get(@cache_name, version_key) do
-      {:ok, version} when is_integer(version) ->
+    case version do
+      version when is_integer(version) ->
         Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
           expire: ttl_ms
         )
 
       _ ->
-        version = System.unique_integer([:monotonic, :positive])
-        Cachex.put(@cache_name, version_key, version)
+        new_version = System.unique_integer([:monotonic, :positive])
+        Cachex.put(@cache_name, version_key, new_version)
 
-        Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
-          expire: ttl_ms
-        )
+        Cachex.put(
+          @cache_name,
+          key,
+          {:version, new_version, ttl_expires_at, value}, expire: ttl_ms)
+    end
+  end
+
+  defp current_version(domain) do
+    case Cachex.get(@cache_name, version_key(domain)) do
+      {:ok, version} when is_integer(version) -> version
+      _ -> nil
     end
   end
 

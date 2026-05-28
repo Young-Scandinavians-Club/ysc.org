@@ -18,6 +18,7 @@ defmodule Ysc.Accounts do
     FamilyInvite,
     MembershipCache,
     User,
+    UserProfileCache,
     UserToken,
     UserNotifier,
     AuthService,
@@ -183,6 +184,14 @@ defmodule Ysc.Accounts do
     Repo.get!(User, id) |> Repo.preload(preloads)
   end
 
+  defp invalidate_user_profile_cache(%User{id: id}),
+    do: UserProfileCache.invalidate_user(id)
+
+  defp invalidate_user_profile_cache(id) when is_binary(id),
+    do: UserProfileCache.invalidate_user(id)
+
+  defp invalidate_user_profile_cache(_), do: :ok
+
   @doc """
   Gets a single user, returns nil if not found.
 
@@ -347,11 +356,18 @@ defmodule Ysc.Accounts do
   Dismisses the passkey prompt for a user by setting passkey_prompt_dismissed_at to current time.
   """
   def dismiss_passkey_prompt(user) do
-    user
-    |> User.update_user_changeset(%{
-      passkey_prompt_dismissed_at: DateTime.utc_now()
-    })
-    |> Repo.update()
+    case user
+         |> User.update_user_changeset(%{
+           passkey_prompt_dismissed_at: DateTime.utc_now()
+         })
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -822,6 +838,8 @@ defmodule Ysc.Accounts do
              validate_email: false
            )
            |> Repo.update() do
+      invalidate_user_profile_cache(updated_user)
+
       # Update Stripe customer with new phone information
       Task.start(fn ->
         Ysc.Customers.update_stripe_customer(updated_user)
@@ -1579,9 +1597,16 @@ defmodule Ysc.Accounts do
   Updates the user notification preferences.
   """
   def update_notification_preferences(user, attrs) do
-    user
-    |> User.notification_preferences_changeset(attrs)
-    |> Repo.update()
+    case user
+         |> User.notification_preferences_changeset(attrs)
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -1647,6 +1672,8 @@ defmodule Ysc.Accounts do
          {:ok, %{user: updated_user}} <-
            Repo.transaction(user_email_multi(user, email, context)),
          reloaded_user <- Repo.get!(User, updated_user.id) do
+      invalidate_user_profile_cache(reloaded_user)
+
       # Update Stripe customer with new email
       Task.start(fn ->
         Ysc.Customers.update_stripe_customer(reloaded_user)
@@ -2735,31 +2762,52 @@ defmodule Ysc.Accounts do
   Marks a user's email as verified by setting the email_verified_at timestamp.
   """
   def mark_email_verified(user) do
-    user
-    |> User.email_verification_changeset(%{
-      email_verified_at: DateTime.utc_now()
-    })
-    |> Repo.update()
+    case user
+         |> User.email_verification_changeset(%{
+           email_verified_at: DateTime.utc_now()
+         })
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
   Marks a user's phone as verified by setting the phone_verified_at timestamp.
   """
   def mark_phone_verified(user) do
-    user
-    |> User.phone_verification_changeset(%{
-      phone_verified_at: DateTime.utc_now()
-    })
-    |> Repo.update()
+    case user
+         |> User.phone_verification_changeset(%{
+           phone_verified_at: DateTime.utc_now()
+         })
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
   Marks a user's password as set by setting the password_set_at timestamp.
   """
   def mark_password_set(user) do
-    user
-    |> User.password_set_changeset(%{password_set_at: DateTime.utc_now()})
-    |> Repo.update()
+    case user
+         |> User.password_set_changeset(%{password_set_at: DateTime.utc_now()})
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   ## Family Account Functions

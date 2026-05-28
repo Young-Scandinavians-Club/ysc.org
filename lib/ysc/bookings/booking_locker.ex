@@ -1307,7 +1307,7 @@ defmodule Ysc.Bookings.BookingLocker do
         # Schedule checkout reminder email (evening before checkout at 6:00 PM PST)
         schedule_checkout_reminder(confirmed_booking)
 
-        {:ok, confirmed_booking}
+        invalidate_availability_cache({:ok, confirmed_booking})
 
       # Booking was already confirmed by a prior call - return success without
       # re-triggering emails, SMS, or re-scheduling reminders.
@@ -1322,7 +1322,6 @@ defmodule Ysc.Bookings.BookingLocker do
       error ->
         error
     end
-    |> invalidate_availability_cache()
   end
 
   @doc """

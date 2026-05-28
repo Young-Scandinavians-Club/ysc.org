@@ -508,7 +508,12 @@ defmodule YscWeb.TahoeBookingLive do
         assign(
           socket,
           :date_tooltips_pending_range,
-          {restricted_min_date, restricted_max_date}
+          tooltip_request_key(
+            restricted_min_date,
+            restricted_max_date,
+            today,
+            seasons
+          )
         )
 
       true ->
@@ -535,6 +540,14 @@ defmodule YscWeb.TahoeBookingLive do
     |> assign(:date_tooltips_loading?, true)
     |> assign(:date_tooltips_pending_range, nil)
     |> start_async(:load_date_tooltips, fn ->
+      request_key =
+        tooltip_request_key(
+          restricted_min_date,
+          restricted_max_date,
+          today,
+          seasons
+        )
+
       tooltips =
         generate_date_tooltips(
           restricted_min_date,
@@ -545,8 +558,17 @@ defmodule YscWeb.TahoeBookingLive do
           property_rooms_snapshot
         )
 
-      {restricted_min_date, restricted_max_date, tooltips}
+      {request_key, tooltips}
     end)
+  end
+
+  defp tooltip_request_key(
+         restricted_min_date,
+         restricted_max_date,
+         today,
+         seasons
+       ) do
+    {restricted_min_date, restricted_max_date, today, :erlang.phash2(seasons)}
   end
 
   # Helper function to update socket with parsed params
@@ -615,19 +637,22 @@ defmodule YscWeb.TahoeBookingLive do
   @impl true
   def handle_async(
         :load_date_tooltips,
-        {:ok, {range_min, range_max, date_tooltips}},
+        {:ok, {request_key, date_tooltips}},
         socket
       ) do
-    current_range =
-      {socket.assigns.restricted_min_date, socket.assigns.restricted_max_date}
-
-    requested_range = {range_min, range_max}
+    current_key =
+      tooltip_request_key(
+        socket.assigns.restricted_min_date,
+        socket.assigns.restricted_max_date,
+        socket.assigns.today,
+        socket.assigns.seasons
+      )
 
     socket =
       socket
       |> assign(:date_tooltips_loading?, false)
       |> then(fn s ->
-        if requested_range == current_range do
+        if request_key == current_key do
           assign(s, :date_tooltips, date_tooltips)
         else
           s
@@ -636,14 +661,12 @@ defmodule YscWeb.TahoeBookingLive do
 
     socket =
       case socket.assigns[:date_tooltips_pending_range] do
-        pending when not is_nil(pending) and pending != current_range ->
-          {min, max} = pending
-
+        pending when not is_nil(pending) and pending != current_key ->
           socket
           |> assign(:date_tooltips_pending_range, nil)
           |> schedule_date_tooltips_async(
-            min,
-            max,
+            socket.assigns.restricted_min_date,
+            socket.assigns.restricted_max_date,
             socket.assigns.today,
             socket.assigns.seasons
           )
@@ -666,12 +689,12 @@ defmodule YscWeb.TahoeBookingLive do
 
     socket =
       case socket.assigns[:date_tooltips_pending_range] do
-        {min, max} ->
+        pending when not is_nil(pending) ->
           socket
           |> assign(:date_tooltips_pending_range, nil)
           |> schedule_date_tooltips_async(
-            min,
-            max,
+            socket.assigns.restricted_min_date,
+            socket.assigns.restricted_max_date,
             socket.assigns.today,
             socket.assigns.seasons
           )
