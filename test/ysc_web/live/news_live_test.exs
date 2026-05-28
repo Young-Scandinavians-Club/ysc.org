@@ -409,10 +409,18 @@ defmodule YscWeb.NewsLiveTest do
     end
 
     test "next-page when cursor is exhausted returns empty batch", %{conn: conn} do
+      # Publish in a future window so these 11 posts are always the newest in the DB,
+      # even when seeds or other tests have published posts.
+      base =
+        DateTime.utc_now()
+        |> DateTime.add(400, :day)
+        |> DateTime.truncate(:second)
+
       for i <- 1..11 do
         create_post(%{
           title: "Timeline End #{i}",
-          url_name: "tl-end-#{i}-#{System.unique_integer()}"
+          url_name: "tl-end-#{i}-#{System.unique_integer()}",
+          published_on: DateTime.add(base, -i, :second)
         })
       end
 
@@ -420,6 +428,9 @@ defmodule YscWeb.NewsLiveTest do
       render_async(view)
 
       render_click(view, "next-page")
+
+      html = render(view)
+      assert html =~ "Timeline End 11"
 
       rendered = :sys.get_state(view.pid)
       assert rendered.socket.assigns.end_of_timeline?
