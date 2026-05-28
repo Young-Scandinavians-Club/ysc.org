@@ -272,8 +272,8 @@ defmodule YscWeb.HomeLive do
   end
 
   @impl true
-  def handle_info({:public_content_cache_invalidated, _version}, socket) do
-    {:noreply, assign_public_content_slices(socket)}
+  def handle_info({:public_content_cache_invalidated, domain, _version}, socket) do
+    {:noreply, refresh_public_content(socket, domain)}
   end
 
   defp assign_public_content_slices(socket) do
@@ -281,6 +281,18 @@ defmodule YscWeb.HomeLive do
       upcoming_events: list_home_upcoming_events(),
       latest_news: PublicContentCache.list_recent_posts(3)
     )
+  end
+
+  defp refresh_public_content(socket, :posts) do
+    assign(socket, latest_news: PublicContentCache.list_recent_posts(3))
+  end
+
+  defp refresh_public_content(socket, :events) do
+    assign(socket, upcoming_events: list_home_upcoming_events())
+  end
+
+  defp refresh_public_content(socket, _) do
+    assign_public_content_slices(socket)
   end
 
   defp list_home_upcoming_events do

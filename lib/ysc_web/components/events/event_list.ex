@@ -248,7 +248,7 @@ defmodule YscWeb.EventsListLive do
 
     cache_version_changed =
       Map.has_key?(assigns, :event_list_cache_version) &&
-        socket.assigns[:event_list_cache_version] != nil &&
+        assigns.event_list_cache_version != nil &&
         assigns.event_list_cache_version !=
           socket.assigns[:event_list_cache_version]
 
@@ -316,15 +316,17 @@ defmodule YscWeb.EventsListLive do
     defer_load =
       Map.get(assigns, :defer_load, socket.assigns[:defer_load]) || false
 
-    socket
-    |> assign(:show_hero, show_hero)
-    |> assign(:upcoming, upcoming)
-    |> assign(:limit, limit)
-    |> assign(:defer_load, defer_load)
-    |> assign(
-      :event_list_cache_version,
-      Map.get(assigns, :event_list_cache_version)
-    )
+    socket =
+      socket
+      |> assign(:show_hero, show_hero)
+      |> assign(:upcoming, upcoming)
+      |> assign(:limit, limit)
+      |> assign(:defer_load, defer_load)
+
+    case Map.get(assigns, :event_list_cache_version) do
+      nil -> socket
+      version -> assign(socket, :event_list_cache_version, version)
+    end
   end
 
   # Ensure stream is initialized when handling event messages

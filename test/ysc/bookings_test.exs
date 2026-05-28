@@ -266,7 +266,9 @@ defmodule Ysc.BookingsTest do
     test "update_booking/3 with opts passes changeset options" do
       alias Ysc.Bookings.AvailabilityCache
 
-      booking = booking_fixture() |> Ysc.Repo.preload(:rooms)
+      booking =
+        booking_fixture(%{property: :clear_lake}) |> Ysc.Repo.preload(:rooms)
+
       start_date = booking.checkin_date
       end_date = booking.checkout_date
 

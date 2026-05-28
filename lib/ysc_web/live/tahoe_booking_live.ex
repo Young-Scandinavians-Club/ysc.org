@@ -499,16 +499,25 @@ defmodule YscWeb.TahoeBookingLive do
         !socket.assigns[:date_tooltips] ||
         socket.assigns[:date_tooltips] == %{}
 
-    if needs_load do
-      schedule_date_tooltips_async(
-        socket,
-        restricted_min_date,
-        restricted_max_date,
-        today,
-        seasons
-      )
-    else
-      socket
+    cond do
+      !needs_load ->
+        socket
+
+      socket.assigns[:date_tooltips_loading?] ->
+        assign(
+          socket,
+          :date_tooltips_pending_range,
+          {restricted_min_date, restricted_max_date}
+        )
+
+      true ->
+        schedule_date_tooltips_async(
+          socket,
+          restricted_min_date,
+          restricted_max_date,
+          today,
+          seasons
+        )
     end
   end
 
@@ -519,14 +528,13 @@ defmodule YscWeb.TahoeBookingLive do
          today,
          seasons
        ) do
-    if socket.assigns[:date_tooltips_loading?] do
-      socket
-    else
-      property_rooms = socket.assigns.property_rooms
+    property_rooms = socket.assigns.property_rooms
 
-      socket
-      |> assign(:date_tooltips_loading?, true)
-      |> start_async(:load_date_tooltips, fn ->
+    socket
+    |> assign(:date_tooltips_loading?, true)
+    |> assign(:date_tooltips_pending_range, nil)
+    |> start_async(:load_date_tooltips, fn ->
+      tooltips =
         generate_date_tooltips(
           restricted_min_date,
           restricted_max_date,
@@ -535,8 +543,9 @@ defmodule YscWeb.TahoeBookingLive do
           seasons,
           property_rooms
         )
-      end)
-    end
+
+      {restricted_min_date, restricted_max_date, tooltips}
+    end)
   end
 
   # Helper function to update socket with parsed params
@@ -603,21 +612,74 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   @impl true
-  def handle_async(:load_date_tooltips, {:ok, date_tooltips}, socket) do
-    {:noreply,
-     socket
-     |> assign(:date_tooltips, date_tooltips)
-     |> assign(:date_tooltips_loading?, false)}
+  def handle_async(
+        :load_date_tooltips,
+        {:ok, {range_min, range_max, date_tooltips}},
+        socket
+      ) do
+    current_range =
+      {socket.assigns.restricted_min_date, socket.assigns.restricted_max_date}
+
+    requested_range = {range_min, range_max}
+
+    socket =
+      socket
+      |> assign(:date_tooltips_loading?, false)
+      |> then(fn s ->
+        if requested_range == current_range do
+          assign(s, :date_tooltips, date_tooltips)
+        else
+          s
+        end
+      end)
+
+    socket =
+      case socket.assigns[:date_tooltips_pending_range] do
+        pending when not is_nil(pending) and pending != current_range ->
+          {min, max} = pending
+
+          socket
+          |> assign(:date_tooltips_pending_range, nil)
+          |> schedule_date_tooltips_async(
+            min,
+            max,
+            socket.assigns.today,
+            socket.assigns.seasons
+          )
+
+        _ ->
+          assign(socket, :date_tooltips_pending_range, nil)
+      end
+
+    {:noreply, socket}
   end
 
   def handle_async(:load_date_tooltips, {:exit, reason}, socket) do
     require Ysc.Logging
     Ysc.Logging.error("Failed to load date tooltips async: #{inspect(reason)}")
 
-    {:noreply,
-     socket
-     |> assign(:date_tooltips, %{})
-     |> assign(:date_tooltips_loading?, false)}
+    socket =
+      socket
+      |> assign(:date_tooltips, %{})
+      |> assign(:date_tooltips_loading?, false)
+
+    socket =
+      case socket.assigns[:date_tooltips_pending_range] do
+        {min, max} ->
+          socket
+          |> assign(:date_tooltips_pending_range, nil)
+          |> schedule_date_tooltips_async(
+            min,
+            max,
+            socket.assigns.today,
+            socket.assigns.seasons
+          )
+
+        _ ->
+          socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true

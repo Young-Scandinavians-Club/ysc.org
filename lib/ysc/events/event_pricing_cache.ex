@@ -7,6 +7,7 @@ defmodule Ysc.Events.EventPricingCache do
 
   @cache_name :ysc_cache
   @cache_version_key "event_pricing:version"
+  @default_ttl :timer.hours(24)
 
   # Fields computed in list_upcoming_events_from_db / list_past_events_from_db — not part of
   # pricing enrichment but must not be dropped when serving a cached pricing payload.
@@ -84,14 +85,20 @@ defmodule Ysc.Events.EventPricingCache do
   end
 
   defp cache_with_version(key, value) do
+    ttl_ms = pricing_cache_ttl_ms()
+
     case Cachex.get(@cache_name, @cache_version_key) do
       {:ok, version} when is_integer(version) ->
-        Cachex.put(@cache_name, key, {:version, version, value})
+        Cachex.put(@cache_name, key, {:version, version, value}, expire: ttl_ms)
 
       _ ->
         version = System.unique_integer([:monotonic, :positive])
-        Cachex.put(@cache_name, @cache_version_key, version)
-        Cachex.put(@cache_name, key, {:version, version, value})
+        Cachex.put(@cache_name, @cache_version_key, version, expire: ttl_ms)
+        Cachex.put(@cache_name, key, {:version, version, value}, expire: ttl_ms)
     end
+  end
+
+  defp pricing_cache_ttl_ms do
+    Application.get_env(:ysc, :event_pricing_cache_ttl_ms, @default_ttl)
   end
 end

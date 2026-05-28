@@ -2858,7 +2858,6 @@ defmodule Ysc.Events do
   Call after ticket inventory or public event list data changes (sales, holds, tiers).
   """
   def invalidate_event_caches do
-    Ysc.Events.EventListCache.invalidate()
     Ysc.Events.EventPricingCache.invalidate()
     :ok
   end

@@ -95,12 +95,14 @@ defmodule YscWeb.NewsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/news")
       render_async(view)
 
-      assert {:ok, _} =
+      url_name = "pubsub-post-#{System.unique_integer()}"
+
+      assert {:ok, _post} =
                Posts.create_post(
                  %{
                    "title" => title,
                    "body" => "<p>Content</p>",
-                   "url_name" => "pubsub-post-#{System.unique_integer()}",
+                   "url_name" => url_name,
                    "state" => "published",
                    "featured_post" => false,
                    "published_on" => DateTime.utc_now()
@@ -108,7 +110,7 @@ defmodule YscWeb.NewsLiveTest do
                  author
                )
 
-      assert render(view) =~ title
+      assert has_element?(view, "a[href='/posts/#{url_name}']", title)
     end
 
     test "loads async data after connection", %{conn: conn} do

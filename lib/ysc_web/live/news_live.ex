@@ -361,7 +361,17 @@ defmodule YscWeb.NewsLive do
   end
 
   @impl true
-  def handle_info({:public_content_cache_invalidated, _version}, socket) do
+  def handle_info(
+        {:public_content_cache_invalidated, :events, _version},
+        socket
+      ) do
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        {:public_content_cache_invalidated, _domain, _version},
+        socket
+      ) do
     {:noreply, reload_news_content(socket)}
   end
 

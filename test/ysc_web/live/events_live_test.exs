@@ -110,10 +110,11 @@ defmodule YscWeb.EventsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/events")
       render_events_async(view)
 
-      _event = create_event(%{title: title, past: false})
+      event = create_event(%{title: title, past: false})
       Ysc.Events.EventListCache.invalidate()
 
-      assert render(view) =~ title
+      render_events_async(view)
+      assert has_element?(view, "a[href='/events/#{event.id}']", title)
     end
   end
 

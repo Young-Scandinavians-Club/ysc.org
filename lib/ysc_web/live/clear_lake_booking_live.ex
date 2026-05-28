@@ -3106,16 +3106,6 @@ defmodule YscWeb.ClearLakeBookingLive do
     end
   end
 
-  @impl true
-  def handle_info(:availability_cache_invalidated, socket) do
-    {:noreply,
-     assign(
-       socket,
-       :availability_cache_version,
-       System.unique_integer([:positive])
-     )}
-  end
-
   def handle_info(
         {:availability_calendar_date_changed,
          %{checkin_date: checkin_date, checkout_date: checkout_date}},
@@ -3176,6 +3166,15 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   def handle_info({:availability_calendar_date_changed, _}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_info(:availability_cache_invalidated, socket) do
+    socket =
+      socket
+      |> assign(:availability_cache_version, System.unique_integer([:positive]))
+      |> refresh_selection_after_availability_change()
+
     {:noreply, socket}
   end
 
@@ -3757,6 +3756,22 @@ defmodule YscWeb.ClearLakeBookingLive do
       end
     else
       nil
+    end
+  end
+
+  defp refresh_selection_after_availability_change(socket) do
+    if socket.assigns.checkin_date && socket.assigns.checkout_date do
+      socket
+      |> validate_all_conditions(
+        socket.assigns.checkin_date,
+        socket.assigns.checkout_date,
+        socket.assigns.selected_booking_mode,
+        socket.assigns.guests_count,
+        socket.assigns.current_season
+      )
+      |> calculate_price_if_ready()
+    else
+      socket
     end
   end
 

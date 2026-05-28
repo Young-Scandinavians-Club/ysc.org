@@ -6664,15 +6664,21 @@ defmodule YscWeb.EventDetailsLive do
 
   defp check_availability_cached(
          nil,
-         _ticket_tier,
-         _current_quantity,
-         _selected_tickets,
-         _event,
-         _ticket_tiers,
-         _reservations_by_tier
+         ticket_tier,
+         current_quantity,
+         selected_tickets,
+         event,
+         ticket_tiers,
+         reservations_by_tier
        ) do
-    # Async availability not loaded yet — avoid BookingLocker transaction fallback
-    false
+    check_availability_from_tiers(
+      ticket_tier,
+      current_quantity,
+      selected_tickets,
+      event,
+      ticket_tiers,
+      reservations_by_tier
+    )
   end
 
   defp check_availability_cached(
@@ -6705,6 +6711,42 @@ defmodule YscWeb.EventDetailsLive do
       )
 
     tier_available && event_available
+  end
+
+  defp check_availability_from_tiers(
+         ticket_tier,
+         current_quantity,
+         selected_tickets,
+         event,
+         ticket_tiers,
+         reservations_by_tier
+       ) do
+    tier_available =
+      case get_available_quantity(ticket_tier) do
+        :unlimited ->
+          true
+
+        available ->
+          user_reserved = Map.get(reservations_by_tier, ticket_tier.id, 0)
+          current_quantity < available + user_reserved
+      end
+
+    event_available =
+      check_event_capacity(
+        %{available: event_capacity_available(event)},
+        selected_tickets,
+        event.id,
+        ticket_tiers,
+        reservations_by_tier
+      )
+
+    tier_available && event_available
+  end
+
+  defp event_capacity_available(%{max_attendees: nil}), do: :unlimited
+
+  defp event_capacity_available(%{max_attendees: max_attendees}) do
+    max_attendees
   end
 
   defp check_tier_availability(
@@ -6742,20 +6784,26 @@ defmodule YscWeb.EventDetailsLive do
         true
 
       available ->
-        user_has_reservations = map_size(reservations_by_tier) > 0
+        total_selected =
+          calculate_total_selected_tickets(
+            selected_tickets,
+            event_id,
+            ticket_tiers
+          )
 
-        if user_has_reservations do
-          true
-        else
-          total_selected =
-            calculate_total_selected_tickets(
-              selected_tickets,
-              event_id,
-              ticket_tiers
-            )
+        existing_for_event =
+          reservations_by_tier
+          |> Enum.reduce(0, fn {tier_id, qty}, acc ->
+            tier = get_ticket_tier_by_id(event_id, tier_id, ticket_tiers)
 
-          total_selected + 1 <= available
-        end
+            if tier && tier.type not in ["donation", :donation] do
+              acc + qty
+            else
+              acc
+            end
+          end)
+
+        total_selected + existing_for_event + 1 <= available
     end
   end
 

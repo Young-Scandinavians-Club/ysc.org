@@ -1440,6 +1440,8 @@ defmodule Ysc.Accounts do
            |> User.update_user_with_address_changeset(params)
            |> Repo.update() do
         {:ok, updated_user} ->
+          Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
           Task.start(fn ->
             Ysc.Customers.update_stripe_customer(updated_user)
           end)
@@ -1493,6 +1495,8 @@ defmodule Ysc.Accounts do
 
       case result do
         {:ok, updated_user} ->
+          Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
+
           Task.start(fn ->
             Ysc.Customers.update_stripe_customer(updated_user)
           end)
@@ -1602,6 +1606,7 @@ defmodule Ysc.Accounts do
            address
            |> Address.changeset(attrs_with_user_id)
            |> Repo.insert_or_update() do
+      Ysc.Accounts.UserProfileCache.invalidate_user(user.id)
       # Reload user with updated billing address and update Stripe customer
       updated_user = get_user!(user.id, [:billing_address])
 
@@ -1886,7 +1891,7 @@ defmodule Ysc.Accounts do
   # Optimized preload that only fetches active subscriptions with subscription_items
   # This reduces queries from 2+ (user + all subscriptions) to 1 (user + active subscriptions)
   defp preload_active_subscriptions_for_auth(user) do
-    if Ecto.assoc_loaded?(user.subscriptions) do
+    if user_subscriptions_fully_loaded?(user) do
       Repo.preload(user, :current_avatar)
     else
       do_preload_active_subscriptions_for_auth(user)

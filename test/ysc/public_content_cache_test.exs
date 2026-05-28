@@ -20,7 +20,7 @@ defmodule Ysc.PublicContentCacheTest do
 
       PublicContentCache.invalidate_posts()
 
-      assert_receive {:public_content_cache_invalidated, version}
+      assert_receive {:public_content_cache_invalidated, :posts, version}
       assert is_integer(version)
     end
   end

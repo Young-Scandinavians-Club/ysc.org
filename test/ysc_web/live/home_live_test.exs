@@ -45,12 +45,14 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
       render(view)
 
-      assert {:ok, _} =
+      url_name = "pubsub-news-#{System.unique_integer()}"
+
+      assert {:ok, _post} =
                Posts.create_post(
                  %{
                    "title" => title,
                    "body" => "Body",
-                   "url_name" => "pubsub-news-#{System.unique_integer()}",
+                   "url_name" => url_name,
                    "state" => "published",
                    "featured_post" => false,
                    "published_on" => DateTime.utc_now()
@@ -58,7 +60,7 @@ defmodule YscWeb.HomeLiveTest do
                  author
                )
 
-      assert render(view) =~ title
+      assert has_element?(view, "a[href='/posts/#{url_name}']", title)
     end
 
     test "shows upcoming event title when an upcoming event exists", %{
