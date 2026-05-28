@@ -22,6 +22,7 @@ defmodule YscWeb.TahoeBookingLive do
     Booking,
     PricingRule,
     Room,
+    RoomsListCache,
     BookingLocker,
     PropertyInventory
   }
@@ -181,9 +182,9 @@ defmodule YscWeb.TahoeBookingLive do
          buyout_refund_policy, room_refund_policy}
       end
 
-    property_rooms =
+    property_rooms_snapshot =
       if connected?(socket) do
-        fetch_all_rooms_for_property(:tahoe)
+        build_property_rooms_snapshot(:tahoe)
       else
         []
       end
@@ -207,7 +208,7 @@ defmodule YscWeb.TahoeBookingLive do
         season_start_date: season_start_date,
         season_end_date: season_end_date,
         seasons: seasons,
-        property_rooms: property_rooms,
+        property_rooms_snapshot: property_rooms_snapshot,
         selected_room_id: nil,
         selected_room_ids: [],
         selected_booking_mode: booking_mode || :room,
@@ -528,7 +529,7 @@ defmodule YscWeb.TahoeBookingLive do
          today,
          seasons
        ) do
-    property_rooms = socket.assigns.property_rooms
+    property_rooms_snapshot = socket.assigns.property_rooms_snapshot
 
     socket
     |> assign(:date_tooltips_loading?, true)
@@ -541,7 +542,7 @@ defmodule YscWeb.TahoeBookingLive do
           today,
           :tahoe,
           seasons,
-          property_rooms
+          property_rooms_snapshot
         )
 
       {restricted_min_date, restricted_max_date, tooltips}
@@ -774,7 +775,7 @@ defmodule YscWeb.TahoeBookingLive do
           socket.assigns.today,
           :tahoe,
           socket.assigns.seasons,
-          socket.assigns.property_rooms
+          socket.assigns.property_rooms_snapshot
         )
       else
         socket.assigns[:date_tooltips] || %{}
@@ -5450,26 +5451,26 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp rooms_for_property(socket) do
-    case socket.assigns[:property_rooms] do
-      rooms when is_list(rooms) and rooms != [] -> rooms
-      _ -> fetch_all_rooms_for_property(socket.assigns.property)
-    end
+    list_property_rooms(socket.assigns.property)
   end
 
-  defp fetch_all_rooms_for_property(property) do
-    rooms =
-      from(r in Room,
-        where: r.property == ^property,
-        order_by: [asc: r.property, asc: r.name],
-        preload: [:room_category, :image]
-      )
-      |> Repo.all()
+  defp build_property_rooms_snapshot(property) do
+    property
+    |> RoomsListCache.list()
+    |> Enum.map(&room_tooltip_snapshot/1)
+  end
 
-    Ysc.Logging.info(
-      "[TahoeBookingLive] Found #{length(rooms)} rooms for property #{property}"
-    )
+  defp room_tooltip_snapshot(%Room{} = room) do
+    %{
+      id: room.id,
+      name: room.name,
+      is_active: room.is_active,
+      capacity_max: room.capacity_max
+    }
+  end
 
-    rooms
+  defp list_property_rooms(property) do
+    RoomsListCache.list(property)
   end
 
   defp check_room_availability(all_rooms, socket) do
@@ -7386,7 +7387,7 @@ defmodule YscWeb.TahoeBookingLive do
          today,
          property,
          seasons,
-         property_rooms
+         property_rooms_snapshot
        ) do
     # Generate tooltips for a more limited date range (1 month before min to 1 month after max)
     # This reduces the number of dates we need to check significantly
@@ -7395,8 +7396,8 @@ defmodule YscWeb.TahoeBookingLive do
     date_range = Date.range(start_range, end_range) |> Enum.to_list()
 
     all_rooms =
-      property_rooms
-      |> Enum.filter(& &1.is_active)
+      property_rooms_snapshot
+      |> Enum.filter(& &1[:is_active])
 
     # Get all bookings in the range (preload rooms for availability checking)
     bookings =
@@ -7539,7 +7540,7 @@ defmodule YscWeb.TahoeBookingLive do
       # Check if there's at least one room not booked
       available_rooms =
         Enum.filter(all_rooms, fn room ->
-          not MapSet.member?(booked_room_ids, room.id)
+          not MapSet.member?(booked_room_ids, room[:id])
         end)
 
       available_rooms != []
