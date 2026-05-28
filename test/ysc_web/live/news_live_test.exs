@@ -8,6 +8,22 @@ defmodule YscWeb.NewsLiveTest do
   alias Ysc.Posts
   alias Ysc.Repo
 
+  @async_timeout_ms 2_000
+
+  setup do
+    Ysc.DataCase.invalidate_shared_caches()
+    :ok
+  end
+
+  defp render_news_async(view) do
+    render_async(view, @async_timeout_ms)
+  end
+
+  defp refresh_news_content(view) do
+    Ysc.PublicContentCache.invalidate_posts()
+    render(view)
+  end
+
   defp image_fixture(user_id) do
     {:ok, image} =
       %Image{user_id: user_id}
@@ -93,7 +109,7 @@ defmodule YscWeb.NewsLiveTest do
       title = "PubSub Post #{System.unique_integer()}"
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       url_name = "pubsub-post-#{System.unique_integer()}"
 
@@ -120,7 +136,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
 
@@ -148,7 +164,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "Featured News" or html =~ "Club News"
@@ -159,7 +175,7 @@ defmodule YscWeb.NewsLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       refute html =~ "Pinned News" or html =~ "animate-pulse"
@@ -183,7 +199,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       # May show author name if featured post loaded
@@ -199,7 +215,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       # At least some posts should be visible
@@ -212,7 +228,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "Club News"
@@ -226,7 +242,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       # Should show "min read" somewhere
@@ -243,7 +259,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       # Trigger next page
       result = render_click(view, "next-page")
@@ -259,7 +275,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       # Trigger load of next batch via cursor
       result = render_click(view, "next-page")
@@ -272,7 +288,7 @@ defmodule YscWeb.NewsLiveTest do
     test "handles no posts gracefully", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       # Should show the page header even with no posts
@@ -287,7 +303,7 @@ defmodule YscWeb.NewsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/news")
 
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       # May show "President" if post is visible
@@ -300,7 +316,7 @@ defmodule YscWeb.NewsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/news")
 
       # Even if async load fails, page should still render
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "Club News"
@@ -316,7 +332,7 @@ defmodule YscWeb.NewsLiveTest do
       })
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "UniqueRawSnippet"
@@ -333,7 +349,7 @@ defmodule YscWeb.NewsLiveTest do
       })
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "min read"
@@ -348,7 +364,7 @@ defmodule YscWeb.NewsLiveTest do
       })
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "1 min read"
@@ -363,7 +379,7 @@ defmodule YscWeb.NewsLiveTest do
       })
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "YSC Zz_unknown_role"
@@ -381,8 +397,11 @@ defmodule YscWeb.NewsLiveTest do
         image_id: image.id
       })
 
+      Ysc.PublicContentCache.invalidate_posts()
+
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
+      refresh_news_content(view)
 
       html = render(view)
       assert html =~ image.raw_image_path
@@ -402,7 +421,7 @@ defmodule YscWeb.NewsLiveTest do
       end
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       render_click(view, "next-page")
 
@@ -455,9 +474,13 @@ defmodule YscWeb.NewsLiveTest do
       Ysc.PublicContentCache.invalidate_posts()
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
-      Ysc.PublicContentCache.invalidate_posts()
-      render(view)
+      render_news_async(view)
+      refresh_news_content(view)
+
+      html = render(view)
+      assert html =~ "#{url_prefix}-1"
+      assert html =~ "#{url_prefix}-10"
+      refute html =~ "#{url_prefix}-11"
 
       render_click(view, "next-page")
 
@@ -484,7 +507,7 @@ defmodule YscWeb.NewsLiveTest do
       })
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       html = render(view)
       assert html =~ "min read"
@@ -517,7 +540,7 @@ defmodule YscWeb.NewsLiveTest do
       })
 
       {:ok, view, _html} = live(conn, ~p"/news")
-      render_async(view)
+      render_news_async(view)
 
       assert render(view) =~ "YSC President"
     end

@@ -1149,7 +1149,7 @@ defmodule Ysc.BookingsTest do
     test "batch_check_room_availability/4 checks multiple rooms" do
       room1 = create_room_fixture(%{property: :tahoe})
       room2 = create_room_fixture(%{property: :tahoe})
-      checkin = Date.utc_today() |> Date.add(30)
+      checkin = Date.utc_today() |> Date.add(90) |> first_monday_on_or_after()
       checkout = Date.add(checkin, 2)
 
       results =

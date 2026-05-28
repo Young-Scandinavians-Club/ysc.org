@@ -42,12 +42,25 @@ defmodule Ysc.DataCase do
       end
     end
 
-    Ysc.PublicContentCache.invalidate()
-    Ysc.Events.EventListCache.invalidate()
+    invalidate_shared_caches()
 
     stub_default_external_mocks()
 
     {:ok, sandbox_owner: owner}
+  end
+
+  @doc """
+  Clears process-global caches that are not tied to the SQL sandbox.
+
+  Cached values from one test's DB snapshot must not leak into another test.
+  """
+  def invalidate_shared_caches do
+    Ysc.PublicContentCache.invalidate()
+    Ysc.Events.EventListCache.invalidate()
+    Ysc.Bookings.BlackoutListCache.invalidate()
+    Ysc.Bookings.AvailabilityCache.invalidate()
+    Ysc.Bookings.RoomsListCache.invalidate()
+    :ok
   end
 
   @doc """

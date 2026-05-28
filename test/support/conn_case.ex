@@ -64,8 +64,7 @@ defmodule YscWeb.ConnCase do
           end
         end
 
-        Ysc.PublicContentCache.invalidate()
-        Ysc.Events.EventListCache.invalidate()
+        Ysc.DataCase.invalidate_shared_caches()
 
         Ysc.DataCase.stub_default_external_mocks()
 
