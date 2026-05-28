@@ -3106,6 +3106,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     end
   end
 
+  @impl true
   def handle_info(
         {:availability_calendar_date_changed,
          %{checkin_date: checkin_date, checkout_date: checkout_date}},
