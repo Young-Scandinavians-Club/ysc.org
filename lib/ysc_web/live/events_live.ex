@@ -150,7 +150,11 @@ defmodule YscWeb.EventsLive do
                 What Was
               </span>
             </h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div
+              id="past-events"
+              phx-update="stream"
+              class="grid grid-cols-2 md:grid-cols-4 gap-4"
+            >
               <div
                 :for={{id, event} <- @streams.past_events}
                 id={id}

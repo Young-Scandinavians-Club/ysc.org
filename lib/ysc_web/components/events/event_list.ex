@@ -183,9 +183,11 @@ defmodule YscWeb.EventsListLive do
         </div>
       </div>
 
-      <%!-- Event List Section --%>
+      <%!-- Event List Section (stream parent must stay mounted whenever !@defer_load) --%>
       <div
-        :if={!@defer_load && @event_count > 0}
+        :if={!@defer_load}
+        id="upcoming-events-stream"
+        phx-update="stream"
         class="grid grid-cols-1 md:grid-cols-2 gap-8"
       >
         <div :for={{id, event} <- @streams.events} id={id}>
@@ -195,41 +197,40 @@ defmodule YscWeb.EventsListLive do
             selling_fast={Map.get(event, :selling_fast, false)}
           />
         </div>
-      </div>
-
-      <div
-        :if={!@defer_load && @total_event_count == 0}
-        class="flex flex-col items-center justify-center py-10 md:py-20 px-0 md:px-6 flex-grow"
-      >
-        <div class="flex flex-col items-center justify-center w-full border border-dashed border-zinc-200 rounded-xl bg-zinc-50/50 p-6 md:p-12">
-          <div class="p-4 bg-white rounded-xl mb-6 border border-zinc-100">
-            <.icon
-              name="hero-calendar-days"
-              class="w-10 h-10 md:w-12 md:h-12 text-zinc-300"
-            />
-          </div>
-          <h3 class="text-xl md:text-2xl font-black text-zinc-900 tracking-tight mb-2 text-center">
-            The calendar is clear (for now)
-          </h3>
-          <p class="text-zinc-500 text-center max-w-sm mb-8 text-sm md:text-base leading-relaxed">
-            We're currently brewing some new ideas. Check back soon or join our community to see what's happening behind the scenes.
-          </p>
-          <div class="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto">
-            <.link
-              navigate={~p"/news"}
-              class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-zinc-800 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-            >
-              Read Latest News <.icon name="hero-newspaper" class="w-5 h-5 ml-2" />
-            </.link>
-            <.link
-              navigate={
-                ~p"/contact?subject=Events&message=#{URI.encode("Hi, I have an idea for an event I'd love to host with YSC. Here's what I had in mind: ")}"
-              }
-              class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-white border border-zinc-200 text-zinc-600 rounded-md font-bold hover:bg-zinc-50 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2"
-            >
-              Suggest an Event
-              <.icon name="hero-light-bulb-solid" class="w-5 h-5 ml-2" />
-            </.link>
+        <div id="events-empty-state" class="hidden only:block col-span-full">
+          <div class="flex flex-col items-center justify-center py-10 md:py-20 px-0 md:px-6 flex-grow">
+            <div class="flex flex-col items-center justify-center w-full border border-dashed border-zinc-200 rounded-xl bg-zinc-50/50 p-6 md:p-12">
+              <div class="p-4 bg-white rounded-xl mb-6 border border-zinc-100">
+                <.icon
+                  name="hero-calendar-days"
+                  class="w-10 h-10 md:w-12 md:h-12 text-zinc-300"
+                />
+              </div>
+              <h3 class="text-xl md:text-2xl font-black text-zinc-900 tracking-tight mb-2 text-center">
+                The calendar is clear (for now)
+              </h3>
+              <p class="text-zinc-500 text-center max-w-sm mb-8 text-sm md:text-base leading-relaxed">
+                We're currently brewing some new ideas. Check back soon or join our community to see what's happening behind the scenes.
+              </p>
+              <div class="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto">
+                <.link
+                  navigate={~p"/news"}
+                  class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-zinc-800 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                >
+                  Read Latest News
+                  <.icon name="hero-newspaper" class="w-5 h-5 ml-2" />
+                </.link>
+                <.link
+                  navigate={
+                    ~p"/contact?subject=Events&message=#{URI.encode("Hi, I have an idea for an event I'd love to host with YSC. Here's what I had in mind: ")}"
+                  }
+                  class="inline-flex items-center justify-center min-h-[44px] px-6 py-3 bg-white border border-zinc-200 text-zinc-600 rounded-md font-bold hover:bg-zinc-50 transition-colors duration-150 text-sm md:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2"
+                >
+                  Suggest an Event
+                  <.icon name="hero-light-bulb-solid" class="w-5 h-5 ml-2" />
+                </.link>
+              </div>
+            </div>
           </div>
         </div>
       </div>
