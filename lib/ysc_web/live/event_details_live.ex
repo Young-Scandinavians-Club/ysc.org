@@ -4144,7 +4144,10 @@ defmodule YscWeb.EventDetailsLive do
         |> assign(:selected_family_members, selected_family_members)
         |> assign(:family_members, family_members)
         |> assign(:active_ticket_index, active_ticket_index)
-        |> assign(:ticket_registration_details_by_id, ticket_registration_details_by_id)
+        |> assign(
+          :ticket_registration_details_by_id,
+          ticket_registration_details_by_id
+        )
         |> assign(:ticket_tiers, ticket_tiers)
         |> assign(:availability_data, availability_data)
 
@@ -4186,7 +4189,10 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:tickets_for_me, tickets_for_me)
             |> assign(:selected_family_members, selected_family_members)
             |> assign(:family_members, family_members)
-            |> assign(:ticket_registration_details_by_id, ticket_registration_details_by_id)
+            |> assign(
+              :ticket_registration_details_by_id,
+              ticket_registration_details_by_id
+            )
             |> assign(:ticket_tiers, ticket_tiers)
             |> assign(:availability_data, availability_data)
             |> assign(:payment_redirect_in_progress, false)
@@ -7246,7 +7252,10 @@ defmodule YscWeb.EventDetailsLive do
     end)
   end
 
-  defp init_ticket_registration_assigns(tickets_requiring_registration, current_user) do
+  defp init_ticket_registration_assigns(
+         tickets_requiring_registration,
+         current_user
+       ) do
     details_by_id =
       tickets_requiring_registration
       |> Enum.map(& &1.id)
@@ -7350,7 +7359,10 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:tickets_for_me, tickets_for_me)
        |> assign(:selected_family_members, selected_family_members)
        |> assign(:family_members, family_members)
-       |> assign(:ticket_registration_details_by_id, ticket_registration_details_by_id)
+       |> assign(
+         :ticket_registration_details_by_id,
+         ticket_registration_details_by_id
+       )
        |> push_patch(
          to:
            ~p"/events/#{socket.assigns.event.id}?checkout=free&order_id=#{ticket_order_with_tickets.id}"
@@ -7381,7 +7393,10 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:selected_family_members, selected_family_members)
            |> assign(:family_members, family_members)
            |> assign(:active_ticket_index, active_ticket_index)
-           |> assign(:ticket_registration_details_by_id, ticket_registration_details_by_id)
+           |> assign(
+             :ticket_registration_details_by_id,
+             ticket_registration_details_by_id
+           )
            |> assign(:payment_redirect_in_progress, false)
            |> push_patch(
              to:

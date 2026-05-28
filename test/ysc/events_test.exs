@@ -2948,7 +2948,10 @@ defmodule Ysc.EventsTest do
       assert %{} = Events.list_ticket_details_for_ticket_ids([])
 
       details_by_id = Events.list_ticket_details_for_ticket_ids([ticket.id])
-      assert %Ysc.Events.TicketDetail{id: reg_id} = Map.fetch!(details_by_id, ticket.id)
+
+      assert %Ysc.Events.TicketDetail{id: reg_id} =
+               Map.fetch!(details_by_id, ticket.id)
+
       assert reg_id == reg.id
 
       assert {:ok, updated} =

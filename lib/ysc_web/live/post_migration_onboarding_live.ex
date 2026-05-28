@@ -111,48 +111,48 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
           <%!-- Step content --%>
           <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8">
-          <%= if @current_step == 1 do %>
-            <.step_profile form={@profile_form} />
-          <% end %>
-          <%= if @current_step == 2 do %>
-            <.step_address form={@address_form} />
-          <% end %>
-          <%= if @current_step == 7 do %>
-            <.step_membership_selection
-              form={@membership_selection_form}
-              membership_plan={@membership_plan}
-            />
-          <% end %>
-          <%= if @current_step == 3 do %>
-            <.step_phone_verification
-              form={@phone_code_form}
-              user={@user}
-              phone_code_valid={@phone_code_valid}
-              sms_resend_disabled_until={@sms_resend_disabled_until}
-            />
-          <% end %>
-          <%= if @current_step == 4 do %>
-            <.step_payment
-              user={@user}
-              membership_plan={@membership_plan}
-              has_real_subscription={@has_real_subscription}
-              active_subscription={@active_subscription}
-              public_key={@public_key}
-              payment_intent_secret={@payment_intent_secret}
-              payment_method_saved={@payment_method_saved}
-              default_payment_method={@default_payment_method}
-            />
-          <% end %>
-          <%= if @current_step == 5 and @needs_family_members_step do %>
-            <.step_family
-              user={@user}
-              family_members_forms={@family_members_forms}
-              invite_results={@invite_results}
-            />
-          <% end %>
-          <%= if @current_step == 6 do %>
-            <.step_complete user={@user} />
-          <% end %>
+            <%= if @current_step == 1 do %>
+              <.step_profile form={@profile_form} />
+            <% end %>
+            <%= if @current_step == 2 do %>
+              <.step_address form={@address_form} />
+            <% end %>
+            <%= if @current_step == 7 do %>
+              <.step_membership_selection
+                form={@membership_selection_form}
+                membership_plan={@membership_plan}
+              />
+            <% end %>
+            <%= if @current_step == 3 do %>
+              <.step_phone_verification
+                form={@phone_code_form}
+                user={@user}
+                phone_code_valid={@phone_code_valid}
+                sms_resend_disabled_until={@sms_resend_disabled_until}
+              />
+            <% end %>
+            <%= if @current_step == 4 do %>
+              <.step_payment
+                user={@user}
+                membership_plan={@membership_plan}
+                has_real_subscription={@has_real_subscription}
+                active_subscription={@active_subscription}
+                public_key={@public_key}
+                payment_intent_secret={@payment_intent_secret}
+                payment_method_saved={@payment_method_saved}
+                default_payment_method={@default_payment_method}
+              />
+            <% end %>
+            <%= if @current_step == 5 and @needs_family_members_step do %>
+              <.step_family
+                user={@user}
+                family_members_forms={@family_members_forms}
+                invite_results={@invite_results}
+              />
+            <% end %>
+            <%= if @current_step == 6 do %>
+              <.step_complete user={@user} />
+            <% end %>
           </div>
         </div>
       </div>
@@ -1549,14 +1549,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       to_form(
         %{
           "membership_plan" =>
-            if(membership_plan == :unknown, do: "", else: to_string(membership_plan))
+            if(membership_plan == :unknown,
+              do: "",
+              else: to_string(membership_plan)
+            )
         },
         as: "membership_selection"
       )
     )
     |> assign(
       :family_members_forms,
-      if(needs_family_members_step, do: initial_family_members_forms(user), else: [])
+      if(needs_family_members_step,
+        do: initial_family_members_forms(user),
+        else: []
+      )
     )
   end
 
