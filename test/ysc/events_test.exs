@@ -2945,6 +2945,14 @@ defmodule Ysc.EventsTest do
 
       assert Events.get_registration_for_ticket(ticket.id).id == reg.id
 
+      assert %{} = Events.list_ticket_details_for_ticket_ids([])
+
+      assert %{
+               ticket.id => %Ysc.Events.TicketDetail{id: reg_id}
+             } = Events.list_ticket_details_for_ticket_ids([ticket.id])
+
+      assert reg_id == reg.id
+
       assert {:ok, updated} =
                Events.update_registration(reg, %{first_name: "Grace M."})
 
