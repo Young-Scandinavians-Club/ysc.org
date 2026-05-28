@@ -411,25 +411,25 @@ defmodule YscWeb.NewsLiveTest do
     end
 
     test "next-page when cursor is exhausted returns empty batch", %{conn: conn} do
-      # Publish in a future window so these 11 posts are always the newest in the DB,
-      # even when seeds or other tests have published posts.
+      # Publish in a far-future window with hour spacing so no other test posts can
+      # land between our pages when using published_on cursor pagination.
       base =
         DateTime.utc_now()
-        |> DateTime.add(400, :day)
+        |> DateTime.add(10_000, :day)
         |> DateTime.truncate(:second)
 
       unique = System.unique_integer()
+      url_prefix = "tl-end-#{unique}"
 
-      posts =
+      post_11 =
         for i <- 1..11 do
           create_post(%{
             title: "Timeline End #{i}",
-            url_name: "tl-end-#{i}-#{unique}",
-            published_on: DateTime.add(base, -i, :second)
+            url_name: "#{url_prefix}-#{i}",
+            published_on: DateTime.add(base, -i, :hour)
           })
         end
-
-      post_11 = List.last(posts)
+        |> List.last()
 
       # create_post uses Repo.insert and does not invalidate the public posts cache.
       Ysc.PublicContentCache.invalidate_posts()
@@ -438,8 +438,10 @@ defmodule YscWeb.NewsLiveTest do
       render_async(view)
 
       render_click(view, "next-page")
+      html = render(view)
 
-      assert has_element?(view, "a[href='/posts/#{post_11.url_name}']")
+      assert has_element?(view, "#image-#{post_11.id}")
+      assert html =~ "Timeline End 11"
 
       rendered = :sys.get_state(view.pid)
       assert rendered.socket.assigns.end_of_timeline?
