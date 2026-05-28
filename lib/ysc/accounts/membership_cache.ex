@@ -170,23 +170,10 @@ defmodule Ysc.Accounts.MembershipCache do
         user_id: user_to_check.id
       }
     else
-      # Use preloaded subscriptions if available, otherwise fetch them
+      # Always load from DB — preloaded subscriptions on a cached User can be stale
       subscriptions =
-        case user_to_check.subscriptions do
-          %Ecto.Association.NotLoaded{} ->
-            # Fallback: fetch subscriptions if not preloaded
-            Customers.subscriptions(user_to_check)
-            |> Enum.filter(&Subscriptions.valid?/1)
-
-          subscriptions when is_list(subscriptions) ->
-            # Subscriptions are already preloaded, but filter to ensure only valid (non-expired) ones
-            # This is a defensive check in case subscriptions were preloaded before expiration
-            subscriptions
-            |> Enum.filter(&Subscriptions.valid?/1)
-
-          _ ->
-            []
-        end
+        Customers.subscriptions(user_to_check)
+        |> Enum.filter(&Subscriptions.valid?/1)
 
       case subscriptions do
         [] ->

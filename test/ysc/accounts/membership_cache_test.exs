@@ -12,7 +12,6 @@ defmodule Ysc.Accounts.MembershipCacheTest do
   import Ysc.AccountsFixtures
 
   setup do
-    # Clear cache before each test
     MembershipCache.invalidate_all()
     :ok
   end
