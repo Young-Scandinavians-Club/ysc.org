@@ -202,10 +202,18 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     today = assigns[:today] || Date.utc_today()
 
     current_date =
-      if socket.assigns[:current] && socket.assigns.current[:date] do
-        socket.assigns.current.date
-      else
-        today
+      cond do
+        is_nil(socket.assigns[:today]) ->
+          today
+
+        socket.assigns[:today] != today ->
+          today
+
+        socket.assigns[:current] && socket.assigns.current[:date] ->
+          socket.assigns.current.date
+
+        true ->
+          today
       end
 
     # Calculate availability range
@@ -853,6 +861,9 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       cond do
         day_info.is_blacked_out ->
           :blackout
+
+        assigns.selected_booking_mode == :day && day_info.has_buyout ->
+          :bookings
 
         assigns.selected_booking_mode == :day && !day_info.can_book_day ->
           :bookings

@@ -4,7 +4,16 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.{AvailabilityCache, BlackoutListCache}
   alias YscWeb.Components.AvailabilityCalendar
+
+  # Dedicated dates for buyout/blackout styling tests — offset from the
+  # near-future helper (1–4 days) to reduce parallel-test collisions in CI.
+  defp buyout_calendar_test_date,
+    do: Date.add(near_future_in_current_month(), 5)
+
+  defp blackout_calendar_test_date,
+    do: Date.add(near_future_in_current_month(), 6)
 
   # Returns a date that falls in the current calendar month. When today is the
   # last day of the month (days_left == 0) it returns today so the anchor stays
@@ -21,7 +30,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
   # LazyHTML.filter only searches top-level nodes of a fragment, so it cannot reach
   # the deeply-nested day divs. Instead we split the rendered string on data-day markers.
   defp extract_day_cell(html, day_str) do
-    marker = ~s|data-day="#{day_str}">|
+    marker = ~s|data-day="#{day_str}"|
 
     case String.split(html, marker, parts: 2) do
       [_before, rest] ->
@@ -39,26 +48,34 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
   # is required for gradient (check-in style) rendering to work correctly.
   defp render_shifted_calendar(date) do
     calendar_base = Date.add(date, -1)
-    render_clear_lake_calendar(today: calendar_base, min: calendar_base)
+
+    render_clear_lake_calendar(
+      today: calendar_base,
+      min: calendar_base,
+      max: Date.add(date, 30)
+    )
   end
 
   defp render_clear_lake_calendar(opts \\ []) do
     today = Date.utc_today()
 
-    render_component(
-      AvailabilityCalendar,
-      [
-        id: "calendar",
-        today: today,
-        min: today,
-        max: Date.add(today, 90),
-        property: :clear_lake,
-        selected_booking_mode: :day,
-        checkin_date: nil,
-        checkout_date: nil,
-        guests_count: 1
-      ] ++ opts
-    )
+    opts =
+      Keyword.merge(
+        [
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :clear_lake,
+          selected_booking_mode: :day,
+          checkin_date: nil,
+          checkout_date: nil,
+          guests_count: 1
+        ],
+        opts
+      )
+
+    render_component(AvailabilityCalendar, opts)
   end
 
   describe "render" do
@@ -191,7 +208,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
     test "a date with a buyout is unavailable for day bookings" do
       user = user_fixture()
-      checkin = near_future_in_current_month()
+      checkin = buyout_calendar_test_date()
       checkout = Date.add(checkin, 1)
 
       {:ok, _buyout} =
@@ -206,17 +223,20 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           total_price: Money.new(500, :USD)
         })
 
+      AvailabilityCache.invalidate()
+
       html = render_shifted_calendar(checkin)
       day_str = Calendar.strftime(checkin, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 
-      # The checkin day is a "check-in day" (morning available, afternoon booked),
-      # so it renders a green-to-red gradient rather than a fully blocked bg-red-200 cell.
+      # Check-in day with buyout: morning open, afternoon blocked as a booking (not blackout).
       assert day_html =~ "to-red-200"
+      refute day_html =~ "to-red-800"
+      refute day_html =~ "Check-in allowed"
     end
 
     test "a blacked-out date shows blackout styling" do
-      blackout_date = near_future_in_current_month()
+      blackout_date = blackout_calendar_test_date()
 
       {:ok, _blackout} =
         Bookings.create_blackout(%{
@@ -225,6 +245,8 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           end_date: blackout_date,
           reason: "Test blackout"
         })
+
+      BlackoutListCache.invalidate()
 
       html = render_shifted_calendar(blackout_date)
       day_str = Calendar.strftime(blackout_date, "%Y-%m-%d")
