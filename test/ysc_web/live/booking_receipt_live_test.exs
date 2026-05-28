@@ -1,5 +1,6 @@
 defmodule YscWeb.BookingReceiptLiveTest do
-  use YscWeb.ConnCase, async: true
+  # async: false — setup and redirect tests override global :stripe_client via Application.put_env
+  use YscWeb.ConnCase, async: false
 
   import Ecto.Changeset
   import Phoenix.LiveViewTest
