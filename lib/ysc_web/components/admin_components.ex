@@ -727,19 +727,74 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_stat_card
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Metric summary card for admin dashboards (membership counts, KPI tiles).
+
+  ## Examples
+
+      <.admin_stat_card label="Total" value={42} subtitle="Active primary accounts" />
+  """
+  attr :id, :string, default: nil
+  attr :label, :string, required: true
+  attr :value, :any, required: true
+  attr :subtitle, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes on the card container"
+
+  def admin_stat_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "bg-white p-6 rounded-lg shadow-sm border border-zinc-100",
+        @class
+      ]}
+    >
+      <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+        {@label}
+      </p>
+      <p class="text-3xl font-black text-zinc-900">
+        {@value}
+      </p>
+      <p :if={@subtitle} class="text-xs text-zinc-500 mt-1 font-medium">
+        {@subtitle}
+      </p>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_toggle_pill
   # ---------------------------------------------------------------------------
 
   @doc """
   Segmented filter control (e.g. subscriber status All / Active / Inactive).
 
-  Pass `phx-click` and `phx-value-*` via `rest`.
+  - `variant={:muted}` — zinc active state (default; newsletter subscriber filters).
+  - `variant={:primary}` — blue active state (URL patch filters such as membership type).
+
+  Use `patch` or `navigate` for LiveView URL-driven filters; pass `phx-click` and
+  `phx-value-*` via `rest` for event-driven filters.
   """
+  attr :id, :string, default: nil
   attr :active, :boolean, default: false
+
+  attr :variant, :atom,
+    default: :muted,
+    values: [:muted, :primary],
+    doc: ":primary uses blue background when active (patch-based list filters)"
+
+  attr :patch, :any, default: nil
+  attr :navigate, :any, default: nil
 
   attr :class, :any,
     default: nil,
-    doc: "Additional classes merged onto the pill button"
+    doc: "Additional classes merged onto the pill control"
 
   attr :rest, :global,
     include:
@@ -749,22 +804,45 @@ defmodule YscWeb.AdminComponents do
 
   def admin_toggle_pill(assigns) do
     ~H"""
-    <button
-      type="button"
-      class={[
-        "rounded px-3 py-1.5 text-sm font-medium transition-colors",
-        if(@active,
-          do: "bg-zinc-200 text-zinc-800",
-          else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-        ),
-        @class
-      ]}
-      {@rest}
-    >
-      {render_slot(@inner_block)}
-    </button>
+    <%= if @patch || @navigate do %>
+      <.link
+        id={@id}
+        patch={@patch}
+        navigate={@navigate}
+        class={admin_toggle_pill_class(@active, @variant, @class)}
+      >
+        {render_slot(@inner_block)}
+      </.link>
+    <% else %>
+      <button
+        id={@id}
+        type="button"
+        class={admin_toggle_pill_class(@active, @variant, @class)}
+        {@rest}
+      >
+        {render_slot(@inner_block)}
+      </button>
+    <% end %>
     """
   end
+
+  defp admin_toggle_pill_class(active, variant, extra) do
+    [
+      "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+      admin_toggle_pill_state(active, variant),
+      extra
+    ]
+  end
+
+  defp admin_toggle_pill_state(true, :muted), do: "bg-zinc-200 text-zinc-800"
+
+  defp admin_toggle_pill_state(false, :muted),
+    do: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+
+  defp admin_toggle_pill_state(true, :primary), do: "bg-blue-600 text-white"
+
+  defp admin_toggle_pill_state(false, :primary),
+    do: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
 
   # ---------------------------------------------------------------------------
   # side_menu
