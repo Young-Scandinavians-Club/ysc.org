@@ -6681,14 +6681,20 @@ defmodule YscWeb.TahoeBookingLive do
     if booking_still_active?(checkout_date) do
       formatted_date = format_date(checkout_date)
 
-      booking_owner =
-        if active_booking.user_id == user.id, do: "you", else: "a family member"
+      {title, body} =
+        if active_booking.user_id == user.id do
+          {
+            "You already have an active booking",
+            "You can book again after checkout on #{formatted_date}, or if that booking is cancelled."
+          }
+        else
+          {
+            "Your family already has an active booking",
+            "You can book again after checkout on #{formatted_date}, or if that booking is cancelled."
+          }
+        end
 
-      {
-        false,
-        "Looks like #{booking_owner} already have a booking!",
-        "You can make a new reservation once the current stay is complete (after #{formatted_date}) or if the existing booking is cancelled."
-      }
+      {false, title, body}
     else
       {true, nil, nil}
     end

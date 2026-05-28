@@ -114,7 +114,7 @@ defmodule YscWeb.UserRegistrationLive do
               >
                 <p class="font-medium">This email is already registered.</p>
                 <p class="mt-1 text-amber-700">
-                  If this is you, sign in to your account. If you no longer know your password, use Reset password below.
+                  If this is you, sign in to your account. Forgot your password? Use the link below.
                 </p>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <.link
@@ -127,7 +127,7 @@ defmodule YscWeb.UserRegistrationLive do
                     navigate={~p"/users/reset-password"}
                     class="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
                   >
-                    Reset password
+                    Forgot password
                   </.link>
                 </div>
               </div>

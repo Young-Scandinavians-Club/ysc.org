@@ -2166,7 +2166,7 @@ defmodule YscWeb.UserSettingsLive do
                       Tickets waiting for checkout
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
-                      You started buying tickets but did not finish payment. Your selected tickets and member price are saved until the hold expires.
+                      You started buying tickets but did not finish payment. Your tickets and member price are still saved. Finish checkout before the deadline on each item below.
                     </p>
                   </div>
                   <div class="hidden sm:flex items-center text-zinc-400">
@@ -2221,7 +2221,7 @@ defmodule YscWeb.UserSettingsLive do
                           class="w-3.5 h-3.5 me-1 text-zinc-500"
                         />
                         <%= if res.expires_at do %>
-                          Hold until {Calendar.strftime(
+                          Saved until {Calendar.strftime(
                             DateTime.shift_zone!(
                               res.expires_at,
                               "America/Los_Angeles"

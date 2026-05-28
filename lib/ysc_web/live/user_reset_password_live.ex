@@ -16,6 +16,9 @@ defmodule YscWeb.UserResetPasswordLive do
       </.link>
       <.header class="text-center">
         Reset Your Password
+        <:subtitle>
+          Choose a new password for your account. This link expires after a short time for security.
+        </:subtitle>
       </.header>
 
       <.simple_form
@@ -43,9 +46,9 @@ defmodule YscWeb.UserResetPasswordLive do
         </:actions>
       </.simple_form>
 
-      <p class="text-center text-sm mt-4">
-        <.link href={~p"/users/log-in"}>Sign in</.link>
-      </p>
+      <div class="text-center mt-4">
+        <.back navigate={~p"/users/log-in"}>Back to sign in</.back>
+      </div>
     </div>
     """
   end
@@ -112,7 +115,9 @@ defmodule YscWeb.UserResetPasswordLive do
 
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:info, "Password reset successfully.",
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Password updated. Sign in with your new password.",
            title: "Password"
          )
          |> redirect(to: ~p"/users/log-in")}
