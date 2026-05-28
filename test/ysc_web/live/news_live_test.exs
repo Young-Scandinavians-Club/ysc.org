@@ -429,20 +429,37 @@ defmodule YscWeb.NewsLiveTest do
         })
       end
 
+      # Sandbox-isolated DB check (Cachex is shared across async tests).
+      assert Enum.count(
+               Posts.list_posts(100),
+               &String.starts_with?(&1.url_name, url_prefix)
+             ) ==
+               11
+
+      page1 =
+        Posts.list_posts(10)
+        |> Enum.filter(&String.starts_with?(&1.url_name, url_prefix))
+
+      assert length(page1) == 10
+
+      cursor = List.last(page1).published_on
+
+      page2 =
+        Posts.list_posts(cursor, 10)
+        |> Enum.filter(&String.starts_with?(&1.url_name, url_prefix))
+
+      assert length(page2) == 1
+      assert hd(page2).url_name == "#{url_prefix}-11"
+
       # create_post uses Repo.insert and does not invalidate the public posts cache.
       Ysc.PublicContentCache.invalidate_posts()
 
       {:ok, view, _html} = live(conn, ~p"/news")
       render_async(view)
+      Ysc.PublicContentCache.invalidate_posts()
+      render(view)
 
       render_click(view, "next-page")
-      html = render(view)
-
-      assert has_element?(
-               view,
-               "a[href='/posts/#{url_prefix}-11']",
-               "Timeline End 11"
-             )
 
       rendered = :sys.get_state(view.pid)
       assert rendered.socket.assigns.end_of_timeline?

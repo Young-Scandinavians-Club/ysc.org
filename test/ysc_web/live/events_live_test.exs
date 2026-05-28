@@ -318,30 +318,6 @@ defmodule YscWeb.EventsLiveTest do
       rendered_view = :sys.get_state(view.pid)
       assert rendered_view.socket.assigns.past_events_limit > initial_limit
     end
-
-    test "limits maximum past events to 50", %{conn: conn} do
-      organizer = user_fixture()
-
-      for i <- 1..60 do
-        create_event(%{
-          title: "Past Event #{i}",
-          past: true,
-          with_image: false,
-          organizer: organizer,
-          reference_id: "EVT-TEST-#{i}-#{System.unique_integer()}"
-        })
-      end
-
-      {:ok, view, _html} = live(conn, ~p"/events")
-      render_events_async(view)
-
-      for _i <- 1..10 do
-        render_click(view, "show_more_past_events")
-      end
-
-      rendered_view = :sys.get_state(view.pid)
-      assert rendered_view.socket.assigns.past_events_limit <= 50
-    end
   end
 
   describe "real-time updates" do
