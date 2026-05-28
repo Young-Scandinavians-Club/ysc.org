@@ -177,7 +177,9 @@ defmodule Ysc.PublicContentCache do
         Cachex.put(
           @cache_name,
           key,
-          {:version, new_version, ttl_expires_at, value}, expire: ttl_ms)
+          {:version, new_version, ttl_expires_at, value},
+          expire: ttl_ms
+        )
     end
   end
 

@@ -421,15 +421,13 @@ defmodule YscWeb.NewsLiveTest do
       unique = System.unique_integer()
       url_prefix = "tl-end-#{unique}"
 
-      post_11 =
-        for i <- 1..11 do
-          create_post(%{
-            title: "Timeline End #{i}",
-            url_name: "#{url_prefix}-#{i}",
-            published_on: DateTime.add(base, -i, :hour)
-          })
-        end
-        |> List.last()
+      for i <- 1..11 do
+        create_post(%{
+          title: "Timeline End #{i}",
+          url_name: "#{url_prefix}-#{i}",
+          published_on: DateTime.add(base, -i, :hour)
+        })
+      end
 
       # create_post uses Repo.insert and does not invalidate the public posts cache.
       Ysc.PublicContentCache.invalidate_posts()
@@ -440,8 +438,11 @@ defmodule YscWeb.NewsLiveTest do
       render_click(view, "next-page")
       html = render(view)
 
-      assert has_element?(view, "#image-#{post_11.id}")
-      assert html =~ "Timeline End 11"
+      assert has_element?(
+               view,
+               "a[href='/posts/#{url_prefix}-11']",
+               "Timeline End 11"
+             )
 
       rendered = :sys.get_state(view.pid)
       assert rendered.socket.assigns.end_of_timeline?
