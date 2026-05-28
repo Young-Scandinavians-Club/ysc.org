@@ -12,8 +12,6 @@ defmodule YscWeb.AdminMembershipsLive do
 
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
-  import YscWeb.CoreComponents
-
   alias Ysc.Accounts
 
   @impl true
@@ -73,53 +71,30 @@ defmodule YscWeb.AdminMembershipsLive do
 
         <%!-- Stats cards --%>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100">
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-              Total Memberships
-            </p>
-            <p class="text-3xl font-black text-zinc-900">
-              {@stats.total}
-            </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">
-              Active primary accounts
-            </p>
-          </div>
-
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100">
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-              Single
-            </p>
-            <p class="text-3xl font-black text-zinc-900">
-              {@stats.single}
-            </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">
-              Individual memberships
-            </p>
-          </div>
-
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100">
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-              Family
-            </p>
-            <p class="text-3xl font-black text-zinc-900">
-              {@stats.family}
-            </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">
-              Family plan memberships
-            </p>
-          </div>
-
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-zinc-100">
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
-              Lifetime
-            </p>
-            <p class="text-3xl font-black text-zinc-900">
-              {@stats.lifetime}
-            </p>
-            <p class="text-xs text-zinc-500 mt-1 font-medium">
-              Lifetime memberships
-            </p>
-          </div>
+          <.admin_stat_card
+            id="memberships-stat-total"
+            label="Total Memberships"
+            value={@stats.total}
+            subtitle="Active primary accounts"
+          />
+          <.admin_stat_card
+            id="memberships-stat-single"
+            label="Single"
+            value={@stats.single}
+            subtitle="Individual memberships"
+          />
+          <.admin_stat_card
+            id="memberships-stat-family"
+            label="Family"
+            value={@stats.family}
+            subtitle="Family plan memberships"
+          />
+          <.admin_stat_card
+            id="memberships-stat-lifetime"
+            label="Lifetime"
+            value={@stats.lifetime}
+            subtitle="Lifetime memberships"
+          />
         </div>
 
         <%!-- Filter and membership list --%>
@@ -127,54 +102,38 @@ defmodule YscWeb.AdminMembershipsLive do
           <div class="px-6 py-4 border-b border-zinc-100 flex flex-wrap items-center gap-4">
             <h2 class="text-lg font-bold text-zinc-900">All Memberships</h2>
             <div class="flex gap-2">
-              <.link
+              <.admin_toggle_pill
+                id="memberships-filter-all"
+                variant={:primary}
+                active={@type_filter == nil}
                 patch={~p"/admin/memberships"}
-                class={[
-                  "px-3 py-1.5 text-sm font-medium rounded transition-colors",
-                  if(@type_filter == nil,
-                    do: "bg-blue-600 text-white",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 All
-              </.link>
-              <.link
+              </.admin_toggle_pill>
+              <.admin_toggle_pill
+                id="memberships-filter-single"
+                variant={:primary}
+                active={@type_filter == :single}
                 patch={~p"/admin/memberships?type=single"}
-                class={[
-                  "px-3 py-1.5 text-sm font-medium rounded transition-colors",
-                  if(@type_filter == :single,
-                    do: "bg-blue-600 text-white",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 Single
-              </.link>
-              <.link
+              </.admin_toggle_pill>
+              <.admin_toggle_pill
+                id="memberships-filter-family"
+                variant={:primary}
+                active={@type_filter == :family}
                 patch={~p"/admin/memberships?type=family"}
-                class={[
-                  "px-3 py-1.5 text-sm font-medium rounded transition-colors",
-                  if(@type_filter == :family,
-                    do: "bg-blue-600 text-white",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 Family
-              </.link>
-              <.link
+              </.admin_toggle_pill>
+              <.admin_toggle_pill
+                id="memberships-filter-lifetime"
+                variant={:primary}
+                active={@type_filter == :lifetime}
                 patch={~p"/admin/memberships?type=lifetime"}
-                class={[
-                  "px-3 py-1.5 text-sm font-medium rounded transition-colors",
-                  if(@type_filter == :lifetime,
-                    do: "bg-blue-600 text-white",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
               >
                 Lifetime
-              </.link>
+              </.admin_toggle_pill>
             </div>
           </div>
 

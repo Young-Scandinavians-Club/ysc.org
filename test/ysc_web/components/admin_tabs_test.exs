@@ -120,5 +120,28 @@ defmodule YscWeb.AdminTabsTest do
       assert html =~ "bg-zinc-100 text-zinc-600"
       assert html =~ ~s(phx-value-filter="all")
     end
+
+    test "primary variant uses blue active state" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_toggle_pill variant={:primary} active={true} patch="/admin/memberships">
+          All
+        </.admin_toggle_pill>
+        <.admin_toggle_pill
+          variant={:primary}
+          active={false}
+          patch="/admin/memberships?type=single"
+        >
+          Single
+        </.admin_toggle_pill>
+        """)
+
+      assert html =~ "bg-blue-600 text-white"
+      assert html =~ ~s(href="/admin/memberships")
+      assert html =~ ~s(href="/admin/memberships?type=single")
+      refute html =~ "bg-zinc-200 text-zinc-800"
+    end
   end
 end
